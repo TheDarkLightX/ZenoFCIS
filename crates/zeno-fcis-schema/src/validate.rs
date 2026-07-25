@@ -3,8 +3,7 @@
 use zeno_fcis_value::Value;
 
 use crate::{
-    EnumVariantDef, Schema, SumVariantDef, TypeDef, TypeId, TypeKind, ValueValidationError,
-    VariantId,
+    EnumVariantDef, Schema, SumVariantDef, TypeId, TypeKind, ValueValidationError, VariantId,
 };
 
 /// Deterministic resource limits for one schema/value validation.
@@ -118,7 +117,7 @@ fn validate_node(
             validate_length(bytes.len(), *min_len, *max_len)
         }
         (TypeKind::Text { min_len, max_len }, Value::Text(text)) => {
-            validate_length(text.as_bytes().len(), *min_len, *max_len)
+            validate_length(text.len(), *min_len, *max_len)
         }
         (TypeKind::Enum { variants }, Value::Enum { type_id, variant }) => {
             if *type_id != definition.id().get() {
@@ -139,7 +138,12 @@ fn validate_node(
             }
             Ok(())
         }
-        (TypeKind::Record { fields: definitions }, Value::Record(fields)) => {
+        (
+            TypeKind::Record {
+                fields: definitions,
+            },
+            Value::Record(fields),
+        ) => {
             if definitions.len() != fields.len() {
                 return Err(ValueValidationError::RecordShape);
             }
@@ -211,11 +215,7 @@ fn validate_node(
     }
 }
 
-fn validate_length(
-    length: usize,
-    minimum: u32,
-    maximum: u32,
-) -> Result<(), ValueValidationError> {
+fn validate_length(length: usize, minimum: u32, maximum: u32) -> Result<(), ValueValidationError> {
     let length = u32::try_from(length).map_err(|_| ValueValidationError::Length)?;
     if minimum <= length && length <= maximum {
         Ok(())
@@ -224,10 +224,7 @@ fn validate_length(
     }
 }
 
-fn find_enum_variant(
-    variants: &[EnumVariantDef],
-    id: VariantId,
-) -> Option<&EnumVariantDef> {
+fn find_enum_variant(variants: &[EnumVariantDef], id: VariantId) -> Option<&EnumVariantDef> {
     variants
         .binary_search_by_key(&id, EnumVariantDef::id)
         .ok()
@@ -253,7 +250,7 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::{FieldDef, SchemaLimits, TypeDef};
+    use crate::{FieldDef, FieldId, SchemaError, SchemaLimits, TypeDef};
 
     fn scalar_schema() -> Schema {
         let limits = SchemaLimits::default();
@@ -264,16 +261,12 @@ mod tests {
             limits,
         );
         match amount {
-            Ok(amount) => match Schema::try_new(
-                "ScalarProfile",
-                1,
-                TypeId::new(1),
-                vec![amount],
-                limits,
-            ) {
-                Ok(schema) => schema,
-                Err(error) => panic!("schema rejected: {error}"),
-            },
+            Ok(amount) => {
+                match Schema::try_new("ScalarProfile", 1, TypeId::new(1), vec![amount], limits) {
+                    Ok(schema) => schema,
+                    Err(error) => panic!("schema rejected: {error}"),
+                }
+            }
             Err(error) => panic!("type rejected: {error}"),
         }
     }
@@ -336,16 +329,11 @@ mod tests {
             Ok(value) => value,
             Err(error) => panic!("type rejected: {error}"),
         };
-        let schema = match Schema::try_new(
-            "PairProfile",
-            1,
-            TypeId::new(2),
-            vec![pair, scalar],
-            limits,
-        ) {
-            Ok(value) => value,
-            Err(error) => panic!("schema rejected: {error}"),
-        };
+        let schema =
+            match Schema::try_new("PairProfile", 1, TypeId::new(2), vec![pair, scalar], limits) {
+                Ok(value) => value,
+                Err(error) => panic!("schema rejected: {error}"),
+            };
         let value = Value::Tuple(Box::new([Value::Bool(true), Value::Bool(false)]));
         let report = schema.validate_root(
             &value,
