@@ -4,6 +4,13 @@ use std::fmt;
 
 use zeno_fcis_codec::Hash32;
 
+/// Stable renderer/formatter semantic identity.
+///
+/// The formatter identity is evidence metadata. Changing formatting without
+/// changing stable identifiers or schema bytes changes generated-file evidence
+/// but not protocol meaning.
+pub const FORMATTER_ID: &str = "zeno-fcis-codegen-renderer/1";
+
 /// Inputs that influence generated file names and evidence identities.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GenerationSpec {
@@ -76,22 +83,28 @@ impl GeneratedFile {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GeneratedBundle {
     generator_id: &'static str,
+    formatter_id: &'static str,
     schema_hash: Hash32,
     manifest_hash: Hash32,
+    vector_set_hash: Hash32,
     files: Vec<GeneratedFile>,
 }
 
 impl GeneratedBundle {
     pub(crate) fn new(
         generator_id: &'static str,
+        formatter_id: &'static str,
         schema_hash: Hash32,
         manifest_hash: Hash32,
+        vector_set_hash: Hash32,
         files: Vec<GeneratedFile>,
     ) -> Self {
         Self {
             generator_id,
+            formatter_id,
             schema_hash,
             manifest_hash,
+            vector_set_hash,
             files,
         }
     }
@@ -100,6 +113,12 @@ impl GeneratedBundle {
     #[must_use]
     pub const fn generator_id(&self) -> &'static str {
         self.generator_id
+    }
+
+    /// Returns the renderer/formatter semantic identity.
+    #[must_use]
+    pub const fn formatter_id(&self) -> &'static str {
+        self.formatter_id
     }
 
     /// Returns the closed schema commitment.
@@ -112,6 +131,12 @@ impl GeneratedBundle {
     #[must_use]
     pub const fn manifest_hash(&self) -> Hash32 {
         self.manifest_hash
+    }
+
+    /// Returns the commitment over the complete ordered vector set.
+    #[must_use]
+    pub const fn vector_set_hash(&self) -> Hash32 {
+        self.vector_set_hash
     }
 
     /// Returns files in canonical path order.
@@ -132,6 +157,10 @@ pub enum CodegenError {
     SchemaEncoding,
     /// A generated file path or content length exceeded its format.
     LengthOverflow,
+    /// A schema name was not a valid Rust or Python identifier.
+    InvalidIdentifier,
+    /// A negative vector could not be constructed deterministically.
+    VectorConstruction,
 }
 
 impl fmt::Display for CodegenError {
@@ -141,6 +170,12 @@ impl fmt::Display for CodegenError {
             Self::ConstantCollision => formatter.write_str("generated constant name collision"),
             Self::SchemaEncoding => formatter.write_str("schema encoding or commitment failed"),
             Self::LengthOverflow => formatter.write_str("generated length overflow"),
+            Self::InvalidIdentifier => {
+                formatter.write_str("schema name is not a valid generated identifier")
+            }
+            Self::VectorConstruction => {
+                formatter.write_str("deterministic vector construction failed")
+            }
         }
     }
 }
@@ -160,4 +195,42 @@ fn valid_module_name(value: &str) -> bool {
         .iter()
         .copied()
         .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+}
+
+/// The assurance category of one generated codec vector.
+///
+/// Categories are evidence metadata. They describe which boundary law a vector
+/// exercises; they do not change protocol meaning.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum VectorKind {
+    /// A well-formed canonical value that decodes and validates.
+    Positive,
+    /// An exact inclusive-bound value (min/max, empty/full).
+    Boundary,
+    /// Truncated or unknown-tag input rejected by the decoder.
+    Malformed,
+    /// A structurally decodable but noncanonical ordering rejected by the codec.
+    NonCanonical,
+    /// A record carrying a field identifier absent from the schema.
+    UnknownField,
+    /// An enum or sum carrying a variant ordinal absent from the schema.
+    UnknownVariant,
+    /// A complete value followed by extra bytes.
+    TrailingBytes,
+}
+
+impl VectorKind {
+    /// Returns the stable lowercase evidence label.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Positive => "positive",
+            Self::Boundary => "boundary",
+            Self::Malformed => "malformed",
+            Self::NonCanonical => "noncanonical",
+            Self::UnknownField => "unknown_field",
+            Self::UnknownVariant => "unknown_variant",
+            Self::TrailingBytes => "trailing_bytes",
+        }
+    }
 }
