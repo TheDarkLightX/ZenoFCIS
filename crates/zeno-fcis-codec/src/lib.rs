@@ -112,11 +112,11 @@ impl<'a> Domain<'a> {
 
 /// Builds the exact domain-separated hash preimage.
 pub fn domain_preimage(domain: Domain<'_>, payload: &[u8]) -> Result<Vec<u8>, EncodeError> {
-    let domain_length = u16::try_from(domain.name.len()).map_err(|_| EncodeError::LengthOverflow)?;
+    let domain_length =
+        u16::try_from(domain.name.len()).map_err(|_| EncodeError::LengthOverflow)?;
     let payload_length = u64::try_from(payload.len()).map_err(|_| EncodeError::LengthOverflow)?;
-    let mut output = Vec::with_capacity(
-        HASH_MAGIC.len() + 2 + 2 + domain.name.len() + 8 + payload.len(),
-    );
+    let mut output =
+        Vec::with_capacity(HASH_MAGIC.len() + 2 + 2 + domain.name.len() + 8 + payload.len());
     output.extend_from_slice(HASH_MAGIC);
     output.extend_from_slice(&domain.version.to_be_bytes());
     output.extend_from_slice(&domain_length.to_be_bytes());
@@ -673,7 +673,9 @@ impl fmt::Display for EncodeError {
             Self::NonAsciiText => formatter.write_str("canonical text is not ASCII"),
             Self::NonCanonicalRecord => formatter.write_str("record fields are not canonical"),
             Self::NonCanonicalMap => formatter.write_str("map entries are not canonical"),
-            Self::MapKeyMismatch => formatter.write_str("map encoded key does not match semantic key"),
+            Self::MapKeyMismatch => {
+                formatter.write_str("map encoded key does not match semantic key")
+            }
             Self::InvalidDomain => formatter.write_str("invalid domain-separation tag"),
             Self::InvalidValue(error) => error.fmt(formatter),
         }
@@ -772,7 +774,9 @@ impl fmt::Display for DecodeError {
                 formatter,
                 "unexpected end at offset {offset}; requested {requested} bytes"
             ),
-            Self::TrailingBytes { offset } => write!(formatter, "trailing bytes at offset {offset}"),
+            Self::TrailingBytes { offset } => {
+                write!(formatter, "trailing bytes at offset {offset}")
+            }
             Self::UnknownTag(tag) => write!(formatter, "unknown value tag {tag}"),
             Self::Utf8 => formatter.write_str("invalid UTF-8"),
             Self::NonAsciiText => formatter.write_str("decoded text is not ASCII"),
@@ -794,7 +798,10 @@ impl fmt::Display for DecodeError {
                 write!(formatter, "payload bytes {attempted} exceeds limit {limit}")
             }
             Self::CollectionLimit { limit, attempted } => {
-                write!(formatter, "collection length {attempted} exceeds limit {limit}")
+                write!(
+                    formatter,
+                    "collection length {attempted} exceeds limit {limit}"
+                )
             }
             Self::InvalidValue(error) => error.fmt(formatter),
             Self::Encode(error) => error.fmt(formatter),
@@ -826,7 +833,10 @@ mod tests {
         let value = Value::record_canonical(vec![
             Field::new(1, Value::U128(42)),
             Field::new(2, Value::Bool(true)),
-            Field::new(3, Value::tuple(vec![Value::I128(-7), Value::bytes(vec![1, 2])])),
+            Field::new(
+                3,
+                Value::tuple(vec![Value::I128(-7), Value::bytes(vec![1, 2])]),
+            ),
         ]);
         assert!(value.is_ok());
         let value = match value {
@@ -884,10 +894,8 @@ mod tests {
             Err(error) => panic!("unexpected domain error: {error}"),
         };
         let left = commitment::<XorTestHasher>(domain, b"payload");
-        let right = commitment::<XorTestHasher>(
-            Domain::new("zeno/test", 2).unwrap_or(domain),
-            b"payload",
-        );
+        let right =
+            commitment::<XorTestHasher>(Domain::new("zeno/test", 2).unwrap_or(domain), b"payload");
         assert!(left.is_ok() && right.is_ok());
         assert_ne!(left, right);
     }

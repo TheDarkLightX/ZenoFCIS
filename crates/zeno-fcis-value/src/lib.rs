@@ -616,7 +616,9 @@ impl fmt::Display for ValueError {
                 formatter,
                 "record fields are not strictly increasing: {previous} then {current}"
             ),
-            Self::MapKeyOrder => formatter.write_str("map keys are duplicate or not strictly ordered"),
+            Self::MapKeyOrder => {
+                formatter.write_str("map keys are duplicate or not strictly ordered")
+            }
             Self::NonAsciiText => formatter.write_str("text is not ASCII"),
             Self::DepthLimit { limit, attempted } => {
                 write!(formatter, "depth {attempted} exceeds limit {limit}")
@@ -628,7 +630,10 @@ impl fmt::Display for ValueError {
                 write!(formatter, "payload bytes {attempted} exceeds limit {limit}")
             }
             Self::CollectionLimit { limit, attempted } => {
-                write!(formatter, "collection length {attempted} exceeds limit {limit}")
+                write!(
+                    formatter,
+                    "collection length {attempted} exceeds limit {limit}"
+                )
             }
             Self::ArithmeticOverflow => formatter.write_str("value metric arithmetic overflow"),
         }
@@ -650,10 +655,7 @@ mod tests {
 
     #[test]
     fn records_require_stable_field_order() {
-        let fields = vec![
-            Field::new(2, Value::U128(2)),
-            Field::new(1, Value::U128(1)),
-        ];
+        let fields = vec![Field::new(2, Value::U128(2)), Field::new(1, Value::U128(1))];
         assert!(Value::record_canonical(fields.clone()).is_err());
         let normalized = Value::normalize_record(fields);
         assert!(normalized.is_ok());

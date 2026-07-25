@@ -453,7 +453,10 @@ mod tests {
     #[test]
     fn decision_candidate_mapping_preserves_kind() {
         let accepted: Decision<u64, Reason, Reason> = Decision::Accept(Accepted::new(3));
-        assert_eq!(accepted.map_candidate(|value| value + 1).kind(), DecisionKind::Accept);
+        assert_eq!(
+            accepted.map_candidate(|value| value + 1).kind(),
+            DecisionKind::Accept
+        );
 
         let failed: Decision<u64, Reason, Reason> =
             Decision::CommittedFailure(Failed::new(3, Reason::Later));
