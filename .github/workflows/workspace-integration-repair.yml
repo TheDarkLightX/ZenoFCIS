@@ -7,9 +7,7 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/zeno-fcis/**"
-      - "crates/zeno-fcis-schema/**"
-      - "crates/zeno-fcis-codegen/**"
+      - "crates/**"
       - "internal/workspace-integration-hardening.py"
       - ".github/workflows/ci.yml"
       - ".github/workflows/ecosystem-features.yml"
@@ -17,19 +15,9 @@ on:
   pull_request:
     branches:
       - agent/schema-codegen-v1
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "crates/zeno-fcis/**"
-      - "crates/zeno-fcis-schema/**"
-      - "crates/zeno-fcis-codegen/**"
-      - "internal/workspace-integration-hardening.py"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/ecosystem-features.yml"
-      - ".github/workflows/workspace-integration-repair.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: workspace-integration-repair-${{ github.ref }}
@@ -45,18 +33,25 @@ jobs:
         with:
           ref: agent/workspace-integration-repair-v1
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Install pinned Rust
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
-      - name: Harden, generate lockfile, and normalize source
+      - name: Produce exact formatted tree
         run: |
           python internal/workspace-integration-hardening.py
           cargo +1.97.1 generate-lockfile
           cargo +1.97.1 fmt --all
+          mkdir -p internal/workspace-integration-formatted
+          git diff --name-only > internal/workspace-integration-formatted/changed-files.txt
+          while IFS= read -r path; do
+            test -n "${path}" || continue
+            mkdir -p "internal/workspace-integration-formatted/$(dirname "${path}")"
+            cp "${path}" "internal/workspace-integration-formatted/${path}"
+          done < internal/workspace-integration-formatted/changed-files.txt
 
       - name: Verify integrated workspace
         run: |
@@ -90,19 +85,10 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features sha256-parity --locked --target wasm32-unknown-unknown
           RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
 
-      - name: Commit validated non-workflow review surface
-        run: |
-          git config user.name 'ZenoFCIS workspace integration repair'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- \
-            Cargo.toml \
-            Cargo.lock \
-            crates/zeno-fcis/Cargo.toml \
-            crates/zeno-fcis/src/lib.rs \
-            crates/zeno-fcis-schema/src/validate.rs \
-            crates/zeno-fcis-codegen/src/render.rs
-          if git diff --cached --quiet --exit-code; then
-            exit 0
-          fi
-          git commit -m 'fix: integrate crypto schema and codegen workspace layers'
-          git push origin HEAD:agent/workspace-integration-repair-v1
+      - name: Upload exact formatted changes
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: workspace-integration-formatted
+          path: internal/workspace-integration-formatted
+          if-no-files-found: error
+          retention-days: 7
