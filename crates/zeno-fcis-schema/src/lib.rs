@@ -20,8 +20,7 @@ mod validate;
 pub use error::{SchemaError, ValueValidationError};
 pub use ids::{FieldId, SchemaName, TypeId, VariantId};
 pub use model::{
-    EnumVariantDef, FieldDef, Schema, SchemaLimits, SchemaMetrics, SumVariantDef, TypeDef,
-    TypeKind,
+    EnumVariantDef, FieldDef, Schema, SchemaLimits, SchemaMetrics, SumVariantDef, TypeDef, TypeKind,
 };
 pub use validate::{ValidationLimits, ValidationReport};
 
@@ -42,7 +41,9 @@ mod tests {
             let mut output = [0_u8; 32];
             for (index, byte) in bytes.iter().copied().enumerate() {
                 let slot = index % output.len();
-                output[slot] = output[slot].wrapping_add(byte).rotate_left((slot % 7) as u32);
+                output[slot] = output[slot]
+                    .wrapping_add(byte)
+                    .rotate_left((slot % 7) as u32);
             }
             Hash32::new(output)
         }
@@ -82,7 +83,10 @@ mod tests {
             (left, right) => panic!("schemas rejected: {left:?} {right:?}"),
         };
         assert_eq!(left.canonical_bytes(), right.canonical_bytes());
-        assert_eq!(left.schema_hash::<TestHash>(), right.schema_hash::<TestHash>());
+        assert_eq!(
+            left.schema_hash::<TestHash>(),
+            right.schema_hash::<TestHash>()
+        );
     }
 
     #[test]

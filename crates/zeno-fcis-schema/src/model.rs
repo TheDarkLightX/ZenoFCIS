@@ -274,10 +274,7 @@ impl TypeKind {
             | Self::Enum { .. } => Vec::new(),
             Self::Tuple { items } => items.to_vec(),
             Self::Record { fields } => fields.iter().map(FieldDef::type_id).collect(),
-            Self::Sum { variants } => variants
-                .iter()
-                .filter_map(SumVariantDef::payload)
-                .collect(),
+            Self::Sum { variants } => variants.iter().filter_map(SumVariantDef::payload).collect(),
             Self::Vector { element, .. } => vec![*element],
             Self::Map { key, value, .. } => vec![*key, *value],
         }
@@ -489,7 +486,10 @@ fn normalize_enum_variants(
         }
     }
     for (index, item) in variants.iter().enumerate() {
-        if variants[..index].iter().any(|prior| prior.name == item.name) {
+        if variants[..index]
+            .iter()
+            .any(|prior| prior.name == item.name)
+        {
             return Err(SchemaError::DuplicateVariantName);
         }
     }
@@ -510,7 +510,10 @@ fn normalize_sum_variants(
         }
     }
     for (index, item) in variants.iter().enumerate() {
-        if variants[..index].iter().any(|prior| prior.name == item.name) {
+        if variants[..index]
+            .iter()
+            .any(|prior| prior.name == item.name)
+        {
             return Err(SchemaError::DuplicateVariantName);
         }
     }
