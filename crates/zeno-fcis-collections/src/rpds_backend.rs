@@ -6,6 +6,7 @@
 use alloc::vec::Vec;
 
 use super::{LogicalEntry, PersistentMap};
+use crate::private::Sealed;
 
 /// A persistent map backed by `rpds::HashTrieMap`.
 ///
@@ -15,6 +16,8 @@ use super::{LogicalEntry, PersistentMap};
 pub struct RpdsBackend {
     entries: rpds::HashTrieMap<Vec<u8>, (crate::Value, crate::Value)>,
 }
+
+impl Sealed for RpdsBackend {}
 
 impl RpdsBackend {
     /// Creates an empty rpds backend.

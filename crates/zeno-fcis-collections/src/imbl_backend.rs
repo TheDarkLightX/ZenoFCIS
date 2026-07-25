@@ -6,6 +6,7 @@
 use alloc::vec::Vec;
 
 use super::{LogicalEntry, PersistentMap};
+use crate::private::Sealed;
 
 /// A persistent map backed by `imbl::OrdMap`.
 ///
@@ -15,6 +16,8 @@ use super::{LogicalEntry, PersistentMap};
 pub struct ImblBackend {
     entries: imbl::OrdMap<Box<[u8]>, (crate::Value, crate::Value)>,
 }
+
+impl Sealed for ImblBackend {}
 
 impl ImblBackend {
     #[must_use]
