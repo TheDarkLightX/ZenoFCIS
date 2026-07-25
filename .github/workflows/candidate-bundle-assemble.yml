@@ -107,10 +107,10 @@ jobs:
           : > "${LOG}"
           git config user.name 'ZenoFCIS candidate assembler' >> "${LOG}" 2>&1
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com' >> "${LOG}" 2>&1
+          git restore .github/workflows/ci.yml >> "${LOG}" 2>&1
           git status --short >> "${LOG}" 2>&1
           git add -- \
             Cargo.toml \
-            .github/workflows/ci.yml \
             docs/CANDIDATE_COMMIT_BOUNDARY.md \
             crates/zeno-fcis \
             crates/zeno-fcis-patch \
