@@ -53,15 +53,24 @@ jobs:
             '541b9cfbce9249a25c8d875f9b52a320f4ab1fde589dbc574d95720010c74070' \
             "${RUNNER_TEMP}/candidate-bundle.tar.gz" | sha256sum --check --strict
           tar -xzf "${RUNNER_TEMP}/candidate-bundle.tar.gz" -C .
+          cargo +1.97.1 fmt --all
 
-      - name: Format and verify exact source
+      - name: Capture exact Rust diagnostics
         shell: bash
         run: |
-          set -euo pipefail
-          cargo +1.97.1 fmt --all
-          cargo +1.97.1 clippy --workspace --all-targets --all-features -- -D warnings
-          cargo +1.97.1 test --workspace --all-features
-          cargo +1.97.1 test --workspace --doc --all-features
+          set +e
+          mkdir -p internal/candidate-bundle-diagnostics
+          LOG=internal/candidate-bundle-diagnostics/rust.log
+          : > "${LOG}"
+          status=0
+          run_check() {
+            printf '\n===== %s =====\n' "$1" >> "${LOG}"
+            shift
+            "$@" >> "${LOG}" 2>&1 || status=$?
+          }
+          run_check clippy cargo +1.97.1 clippy --workspace --all-targets --all-features -- -D warnings
+          run_check tests cargo +1.97.1 test --workspace --all-features
+          run_check doctests cargo +1.97.1 test --workspace --doc --all-features
           for crate in \
             zeno-fcis-patch \
             zeno-fcis-plan \
@@ -69,9 +78,23 @@ jobs:
             zeno-fcis-shell \
             zeno-fcis
           do
-            cargo +1.97.1 check -p "${crate}" --no-default-features --target wasm32-unknown-unknown
+            run_check "no_std-${crate}" cargo +1.97.1 check -p "${crate}" --no-default-features --target wasm32-unknown-unknown
           done
-          RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --no-deps
+          run_check rustdoc env RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --no-deps
+          printf '%s\n' "${status}" > internal/candidate-bundle-diagnostics/status.txt
+          exit 0
+
+      - name: Upload compiler transcript
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: candidate-bundle-rust-diagnostics
+          path: internal/candidate-bundle-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce verification result
+        run: test "$(cat internal/candidate-bundle-diagnostics/status.txt)" = "0"
 
       - name: Commit reviewable source
         shell: bash
