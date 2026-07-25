@@ -29,7 +29,7 @@ on:
       - ".github/workflows/workspace-integration-repair.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: workspace-integration-repair-${{ github.ref }}
@@ -45,7 +45,7 @@ jobs:
         with:
           ref: agent/workspace-integration-repair-v1
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Install pinned Rust
         run: |
@@ -90,24 +90,19 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features sha256-parity --locked --target wasm32-unknown-unknown
           RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
 
-      - name: Assemble exact review artifact
+      - name: Commit validated non-workflow review surface
         run: |
-          mkdir -p internal/workspace-integration-review/crates/zeno-fcis/src
-          mkdir -p internal/workspace-integration-review/crates/zeno-fcis-schema/src
-          mkdir -p internal/workspace-integration-review/crates/zeno-fcis-codegen/src
-          mkdir -p internal/workspace-integration-review/.github/workflows
-          cp Cargo.toml Cargo.lock internal/workspace-integration-review/
-          cp crates/zeno-fcis/Cargo.toml internal/workspace-integration-review/crates/zeno-fcis/Cargo.toml
-          cp crates/zeno-fcis/src/lib.rs internal/workspace-integration-review/crates/zeno-fcis/src/lib.rs
-          cp crates/zeno-fcis-schema/src/validate.rs internal/workspace-integration-review/crates/zeno-fcis-schema/src/validate.rs
-          cp crates/zeno-fcis-codegen/src/render.rs internal/workspace-integration-review/crates/zeno-fcis-codegen/src/render.rs
-          cp .github/workflows/ci.yml internal/workspace-integration-review/.github/workflows/ci.yml
-          cp .github/workflows/ecosystem-features.yml internal/workspace-integration-review/.github/workflows/ecosystem-features.yml
-
-      - name: Upload exact review artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
-        with:
-          name: workspace-integration-review
-          path: internal/workspace-integration-review
-          if-no-files-found: error
-          retention-days: 7
+          git config user.name 'ZenoFCIS workspace integration repair'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            Cargo.toml \
+            Cargo.lock \
+            crates/zeno-fcis/Cargo.toml \
+            crates/zeno-fcis/src/lib.rs \
+            crates/zeno-fcis-schema/src/validate.rs \
+            crates/zeno-fcis-codegen/src/render.rs
+          if git diff --cached --quiet --exit-code; then
+            exit 0
+          fi
+          git commit -m 'fix: integrate crypto schema and codegen workspace layers'
+          git push origin HEAD:agent/workspace-integration-repair-v1
