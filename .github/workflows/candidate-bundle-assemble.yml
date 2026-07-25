@@ -1,0 +1,85 @@
+name: candidate-bundle-assemble
+
+on:
+  push:
+    branches:
+      - agent/candidate-commit-bundle-v1
+    paths:
+      - "internal/candidate-bundle-payload/**"
+      - ".github/workflows/candidate-bundle-assemble.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: candidate-bundle-assemble-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: agent/candidate-commit-bundle-v1
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Decode exact payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            internal/candidate-bundle-payload/000a.b64 \
+            internal/candidate-bundle-payload/000b.b64 \
+            internal/candidate-bundle-payload/000c.b64 \
+            internal/candidate-bundle-payload/001.b64 \
+            | base64 --decode > "${RUNNER_TEMP}/candidate-bundle.tar.gz"
+          printf '%s  %s\n' \
+            '541b9cfbce9249a25c8d875f9b52a320f4ab1fde589dbc574d95720010c74070' \
+            "${RUNNER_TEMP}/candidate-bundle.tar.gz" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/candidate-bundle.tar.gz" -C .
+
+      - name: Format and verify exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +1.97.1 fmt --all
+          cargo +1.97.1 clippy --workspace --all-targets --all-features -- -D warnings
+          cargo +1.97.1 test --workspace --all-features
+          cargo +1.97.1 test --workspace --doc --all-features
+          for crate in \
+            zeno-fcis-patch \
+            zeno-fcis-plan \
+            zeno-fcis-receipt \
+            zeno-fcis-shell \
+            zeno-fcis
+          do
+            cargo +1.97.1 check -p "${crate}" --no-default-features --target wasm32-unknown-unknown
+          done
+          RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --no-deps
+
+      - name: Commit reviewable source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ZenoFCIS candidate assembler'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            Cargo.toml \
+            .github/workflows/ci.yml \
+            docs/CANDIDATE_COMMIT_BOUNDARY.md \
+            crates/zeno-fcis \
+            crates/zeno-fcis-patch \
+            crates/zeno-fcis-plan \
+            crates/zeno-fcis-receipt \
+            crates/zeno-fcis-shell
+          git commit -m 'feat: seal canonical candidates and atomic commit bundles'
+          git push origin HEAD:agent/candidate-commit-bundle-v1
