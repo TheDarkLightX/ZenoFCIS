@@ -17,8 +17,8 @@ extern crate alloc;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use zeno_fcis_codec::CanonicalEncode;
-use zeno_fcis_value::{MapEntry, Value};
+use zeno_fcis_codec::{CanonicalEncode, EncodeError};
+use zeno_fcis_value::{MapEntry, Value, ValueError};
 
 // ---------------------------------------------------------------------------
 // Logical entry
@@ -73,6 +73,43 @@ impl LogicalEntry {
 }
 
 // ---------------------------------------------------------------------------
+// Map error
+// ---------------------------------------------------------------------------
+
+/// Map materialization or encoding failure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum MapError {
+    /// Value map construction failed (duplicate or unsorted keys).
+    ValueMap(ValueError),
+    /// Canonical encoding failed.
+    Encoding(EncodeError),
+}
+
+impl From<ValueError> for MapError {
+    fn from(error: ValueError) -> Self {
+        Self::ValueMap(error)
+    }
+}
+
+impl From<EncodeError> for MapError {
+    fn from(error: EncodeError) -> Self {
+        Self::Encoding(error)
+    }
+}
+
+impl core::fmt::Display for MapError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::ValueMap(error) => write!(formatter, "value map error: {error}"),
+            Self::Encoding(error) => write!(formatter, "encoding error: {error}"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for MapError {}
+
+// ---------------------------------------------------------------------------
 // Persistent map trait
 // ---------------------------------------------------------------------------
 
@@ -106,19 +143,45 @@ pub trait PersistentMap: Clone {
     fn to_entries(&self) -> Vec<LogicalEntry>;
 
     /// Materializes a `Value::Map` in canonical order.
-    fn to_value_map(&self) -> Value {
+    ///
+    /// Returns an error if entries are not in strict sorted order or have
+    /// duplicate keys. Backends sort entries in `to_entries()`, so this only
+    /// fails if the backend's sort is broken.
+    fn try_to_value_map(&self) -> Result<Value, MapError> {
         let entries: Vec<MapEntry> = self
             .to_entries()
             .into_iter()
             .map(|e| MapEntry::new(e.encoded_key.to_vec(), e.key, e.value))
             .collect();
-        Value::map_canonical(entries).unwrap_or_else(|e| panic!("materialize map: {e}"))
+        Value::map_canonical(entries).map_err(MapError::from)
+    }
+
+    /// Materializes a `Value::Map` in canonical order.
+    ///
+    /// # Panics
+    /// Panics if entries are not in strict sorted order or have duplicate keys.
+    /// Use `try_to_value_map` for fallible construction.
+    fn to_value_map(&self) -> Value {
+        self.try_to_value_map()
+            .unwrap_or_else(|e| panic!("materialize map: {e}"))
     }
 
     /// Returns canonical bytes for the materialized map.
-    fn canonical_bytes(&self) -> Vec<u8> {
-        self.to_value_map()
+    ///
+    /// Returns an error if the map cannot be encoded.
+    fn try_canonical_bytes(&self) -> Result<Vec<u8>, MapError> {
+        self.try_to_value_map()?
             .canonical_bytes()
+            .map_err(MapError::from)
+    }
+
+    /// Returns canonical bytes for the materialized map.
+    ///
+    /// # Panics
+    /// Panics if the map cannot be encoded. Use `try_canonical_bytes` for
+    /// fallible construction.
+    fn canonical_bytes(&self) -> Vec<u8> {
+        self.try_canonical_bytes()
             .unwrap_or_else(|e| panic!("canonical encode: {e}"))
     }
 }

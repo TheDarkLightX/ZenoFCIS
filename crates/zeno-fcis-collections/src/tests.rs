@@ -352,3 +352,36 @@ mod imbl_tests {
         assert_eq!(btree.canonical_bytes(), imbl.canonical_bytes());
     }
 }
+
+// ---------------------------------------------------------------------------
+// Fallible materialization tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn btreemap_try_to_value_map_succeeds() {
+    let map = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20));
+    let result = map.try_to_value_map();
+    assert!(result.is_ok());
+    let value = result.unwrap_or_else(|e| panic!("value map: {e}"));
+    assert_eq!(value.kind(), zeno_fcis_value::ValueKind::Map);
+}
+
+#[test]
+fn btreemap_try_canonical_bytes_succeeds() {
+    let map = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20));
+    let result = map.try_canonical_bytes();
+    assert!(result.is_ok());
+    let bytes = result.unwrap_or_else(|e| panic!("canonical: {e}"));
+    assert!(!bytes.is_empty());
+}
+
+#[test]
+fn btreemap_empty_map_value_is_map() {
+    let map = BTreeMapBackend::empty();
+    let value = map.to_value_map();
+    assert_eq!(value.kind(), zeno_fcis_value::ValueKind::Map);
+}
