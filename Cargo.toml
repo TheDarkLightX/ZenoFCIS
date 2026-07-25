@@ -5,6 +5,10 @@ members = [
     "crates/zeno-fcis-core",
     "crates/zeno-fcis-value",
     "crates/zeno-fcis-codec",
+    "crates/zeno-fcis-patch",
+    "crates/zeno-fcis-plan",
+    "crates/zeno-fcis-receipt",
+    "crates/zeno-fcis-shell",
 ]
 
 [workspace.package]

@@ -1,6 +1,6 @@
 [package]
-name = "zeno-fcis"
-description = "High-assurance functional-core / imperative-shell primitives"
+name = "zeno-fcis-receipt"
+description = "Candidate sealing, receipts, and atomic commit bundles for ZenoFCIS"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,22 +13,18 @@ authors.workspace = true
 default = ["std"]
 std = [
     "zeno-fcis-core/std",
-    "zeno-fcis-value/std",
     "zeno-fcis-codec/std",
     "zeno-fcis-patch/std",
     "zeno-fcis-plan/std",
-    "zeno-fcis-receipt/std",
-    "zeno-fcis-shell/std",
+    "zeno-fcis-value/std",
 ]
 
 [dependencies]
 zeno-fcis-core = { path = "../zeno-fcis-core", default-features = false }
-zeno-fcis-value = { path = "../zeno-fcis-value", default-features = false }
 zeno-fcis-codec = { path = "../zeno-fcis-codec", default-features = false }
 zeno-fcis-patch = { path = "../zeno-fcis-patch", default-features = false }
 zeno-fcis-plan = { path = "../zeno-fcis-plan", default-features = false }
-zeno-fcis-receipt = { path = "../zeno-fcis-receipt", default-features = false }
-zeno-fcis-shell = { path = "../zeno-fcis-shell", default-features = false }
+zeno-fcis-value = { path = "../zeno-fcis-value", default-features = false }
 
 [lints]
 workspace = true
