@@ -30,12 +30,14 @@ fn valid_envelope(
     bindings: SourceBindings,
 ) -> EvidenceEnvelope {
     let query_id = "query_001";
-    let artifact_digest = query_id_hash(query_id);
+    let claim_hash = nonzero_hash(10);
+    let artifact_digest = nonzero_hash(7);
     EvidenceEnvelope::try_new(
         valid_tool(),
         kind,
         bindings,
         query_id,
+        claim_hash,
         vec![
             Assumption::try_new("axiom_1", nonzero_hash(6))
                 .unwrap_or_else(|e| panic!("assumption: {e}")),
@@ -169,6 +171,7 @@ fn envelope_rejects_blocking_result() {
         ToolKind::Z3,
         valid_bindings(),
         "query_001",
+        nonzero_hash(10),
         vec![],
         EvidenceResult::Timeout,
         nonzero_hash(7),
@@ -189,6 +192,7 @@ fn envelope_rejects_unbounded_coverage() {
         ToolKind::Z3,
         valid_bindings(),
         "query_001",
+        nonzero_hash(10),
         vec![],
         EvidenceResult::Proven,
         nonzero_hash(7),
@@ -204,6 +208,7 @@ fn envelope_rejects_zero_artifact_digest() {
         ToolKind::Z3,
         valid_bindings(),
         "query_001",
+        nonzero_hash(10),
         vec![],
         EvidenceResult::Proven,
         Hash32::ZERO,
@@ -213,12 +218,29 @@ fn envelope_rejects_zero_artifact_digest() {
 }
 
 #[test]
+fn envelope_rejects_zero_claim_hash() {
+    let error = EvidenceEnvelope::try_new(
+        valid_tool(),
+        ToolKind::Z3,
+        valid_bindings(),
+        "query_001",
+        Hash32::ZERO,
+        vec![],
+        EvidenceResult::Proven,
+        nonzero_hash(7),
+        CoverageDeclaration::Bounded { case_budget: 10 },
+    );
+    assert_eq!(error, Err(EvidenceError::ZeroClaimHash));
+}
+
+#[test]
 fn envelope_rejects_empty_query_id() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
         ToolKind::Z3,
         valid_bindings(),
         "",
+        nonzero_hash(10),
         vec![],
         EvidenceResult::Proven,
         nonzero_hash(7),
@@ -240,6 +262,7 @@ fn envelope_rejects_unbound_bindings() {
         ToolKind::Z3,
         bad_bindings,
         "query_001",
+        nonzero_hash(10),
         vec![],
         EvidenceResult::Proven,
         nonzero_hash(7),
