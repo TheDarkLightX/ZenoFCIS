@@ -15,6 +15,7 @@ std = [
     "zeno-fcis-core/std",
     "zeno-fcis-value/std",
     "zeno-fcis-codec/std",
+    "zeno-fcis-crypto?/std",
     "zeno-fcis-patch/std",
     "zeno-fcis-plan/std",
     "zeno-fcis-receipt/std",
@@ -22,12 +23,23 @@ std = [
     "zeno-fcis-compose/std",
     "zeno-fcis-refine/std",
     "zeno-fcis-profile-zenodex/std",
+    "zeno-fcis-schema?/std",
 ]
+rustcrypto-sha256 = ["dep:zeno-fcis-crypto", "zeno-fcis-crypto/rustcrypto"]
+verified-sha256 = ["dep:zeno-fcis-crypto", "zeno-fcis-crypto/libcrux"]
+sha256-parity = [
+    "rustcrypto-sha256",
+    "verified-sha256",
+    "zeno-fcis-crypto/parity",
+]
+schema = ["dep:zeno-fcis-schema"]
+codegen = ["schema", "dep:zeno-fcis-codegen"]
 
 [dependencies]
 zeno-fcis-core = { path = "../zeno-fcis-core", default-features = false }
 zeno-fcis-value = { path = "../zeno-fcis-value", default-features = false }
 zeno-fcis-codec = { path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-crypto = { path = "../zeno-fcis-crypto", default-features = false, optional = true }
 zeno-fcis-patch = { path = "../zeno-fcis-patch", default-features = false }
 zeno-fcis-plan = { path = "../zeno-fcis-plan", default-features = false }
 zeno-fcis-receipt = { path = "../zeno-fcis-receipt", default-features = false }
@@ -35,6 +47,8 @@ zeno-fcis-shell = { path = "../zeno-fcis-shell", default-features = false }
 zeno-fcis-compose = { path = "../zeno-fcis-compose", default-features = false }
 zeno-fcis-refine = { path = "../zeno-fcis-refine", default-features = false }
 zeno-fcis-profile-zenodex = { path = "../zeno-fcis-profile-zenodex", default-features = false }
+zeno-fcis-schema = { path = "../zeno-fcis-schema", default-features = false, optional = true }
+zeno-fcis-codegen = { path = "../zeno-fcis-codegen", optional = true }
 
 [lints]
 workspace = true
