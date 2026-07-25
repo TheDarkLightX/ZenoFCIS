@@ -1,0 +1,115 @@
+name: composition-profile-assemble
+
+on:
+  pull_request:
+    branches:
+      - agent/candidate-commit-bundle-v1
+    paths:
+      - "internal/composition-profile-payload/**"
+      - ".github/workflows/composition-profile-assemble.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: composition-profile-assemble-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  assemble-verify-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Reconstruct exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            internal/composition-profile-payload/000.b64 \
+            internal/composition-profile-payload/001.b64 \
+            internal/composition-profile-payload/002.b64 \
+            | base64 --decode > "${RUNNER_TEMP}/composition-profile.tar.gz"
+          printf '%s  %s\n' \
+            '25fd1cb0db4f1167efe51d86928ec0bb082eef13d0747451461317ab837612c4' \
+            "${RUNNER_TEMP}/composition-profile.tar.gz" | sha256sum --check --strict
+          tar -xzf "${RUNNER_TEMP}/composition-profile.tar.gz" -C .
+          cargo +1.97.1 fmt --all
+
+      - name: Capture exact Rust diagnostics
+        shell: bash
+        run: |
+          set +e
+          mkdir -p internal/composition-profile-diagnostics
+          LOG=internal/composition-profile-diagnostics/rust.log
+          : > "${LOG}"
+          status=0
+          run_check() {
+            printf '\n===== %s =====\n' "$1" >> "${LOG}"
+            shift
+            "$@" >> "${LOG}" 2>&1 || status=$?
+          }
+          run_check clippy cargo +1.97.1 clippy --workspace --all-targets --all-features -- -D warnings
+          run_check tests cargo +1.97.1 test --workspace --all-features
+          run_check doctests cargo +1.97.1 test --workspace --doc --all-features
+          for crate in \
+            zeno-fcis-core \
+            zeno-fcis-value \
+            zeno-fcis-codec \
+            zeno-fcis-patch \
+            zeno-fcis-plan \
+            zeno-fcis-receipt \
+            zeno-fcis-shell \
+            zeno-fcis-compose \
+            zeno-fcis-refine \
+            zeno-fcis-profile-zenodex \
+            zeno-fcis
+          do
+            run_check "no_std-${crate}" cargo +1.97.1 check -p "${crate}" --no-default-features --target wasm32-unknown-unknown
+          done
+          run_check rustdoc env RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --no-deps
+          printf '%s\n' "${status}" > internal/composition-profile-diagnostics/status.txt
+          exit 0
+
+      - name: Upload compiler transcript
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: composition-profile-rust-diagnostics
+          path: internal/composition-profile-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce verification result
+        run: test "$(cat internal/composition-profile-diagnostics/status.txt)" = "0"
+
+      - name: Publish reviewable source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'ZenoFCIS composition assembler'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            Cargo.toml \
+            docs/COMPOSITION_REFINEMENT_ZENODEX.md \
+            crates/zeno-fcis/Cargo.toml \
+            crates/zeno-fcis/src/lib.rs \
+            crates/zeno-fcis-compose \
+            crates/zeno-fcis-refine \
+            crates/zeno-fcis-profile-zenodex
+          if git diff --cached --quiet --exit-code; then
+            exit 0
+          fi
+          git commit -m 'feat: add compositional contracts and ZenoDEX refinement'
+          git push origin HEAD:agent/composition-refinement-zenodex-v1
