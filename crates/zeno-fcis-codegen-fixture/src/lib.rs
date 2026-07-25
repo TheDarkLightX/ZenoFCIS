@@ -127,7 +127,7 @@ mod tests {
         assert_eq!(segments.len(), 1);
         match &segments[0] {
             zeno_fcis_patch::PathSegment::Field(id) => {
-                assert_eq!(*id, FIELD_BALANCESTATE_AMOUNT as u16);
+                assert_eq!(*id, FIELD_BALANCESTATE_AMOUNT);
             }
             other => panic!("expected Field segment, got {other:?}"),
         }

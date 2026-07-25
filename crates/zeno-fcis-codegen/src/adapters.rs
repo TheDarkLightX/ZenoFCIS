@@ -407,7 +407,7 @@ fn render_record(
         let fconst = field_const_name(name, field.name().as_str());
         let _ = writeln!(
             output,
-            "        fields.push(Field::new({fconst} as u16, self.{fname}.to_value()?));"
+            "        fields.push(Field::new({fconst}, self.{fname}.to_value()?));"
         );
     }
     let _ = writeln!(output, "        Ok(Value::record_canonical(fields)?)");
@@ -437,7 +437,7 @@ fn render_record(
         );
         let _ = writeln!(
             output,
-            "                if next.id() != {fconst} as u16 {{ return Err(AdapterError::RecordShape); }}"
+            "                if next.id() != {fconst} {{ return Err(AdapterError::RecordShape); }}"
         );
         let _ = writeln!(
             output,
@@ -470,7 +470,7 @@ fn render_record_paths(
         let fconst = field_const_name(name, field.name().as_str());
         let _ = writeln!(
             output,
-            "    pub fn {fname}_path() -> ValuePath {{ ValuePath::new(vec![PathSegment::Field({fconst} as u16)]) }}"
+            "    pub fn {fname}_path() -> ValuePath {{ ValuePath::new(vec![PathSegment::Field({fconst})]) }}"
         );
     }
     Ok(())
