@@ -1,4 +1,5 @@
 name: candidate-bundle-assemble
+# Temporary branch-only assembler; removed after source publication.
 
 on:
   push:
