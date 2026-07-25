@@ -11,6 +11,16 @@ on:
       - ".github/workflows/ci.yml"
       - ".github/workflows/ecosystem-features.yml"
       - ".github/workflows/workspace-integration-repair.yml"
+  pull_request:
+    branches:
+      - agent/schema-codegen-v1
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/zeno-fcis/**"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/ecosystem-features.yml"
+      - ".github/workflows/workspace-integration-repair.yml"
 
 permissions:
   contents: write
