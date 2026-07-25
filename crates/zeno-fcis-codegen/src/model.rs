@@ -151,6 +151,9 @@ fn valid_module_name(value: &str) -> bool {
     if value.is_empty() || value.len() > 96 {
         return false;
     }
+    if is_reserved_keyword(value) {
+        return false;
+    }
     let bytes = value.as_bytes();
     let first = bytes[0];
     if !(first.is_ascii_lowercase() || first == b'_') {
@@ -160,4 +163,27 @@ fn valid_module_name(value: &str) -> bool {
         .iter()
         .copied()
         .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+}
+
+/// Returns true if the value is a reserved keyword in Rust or Python.
+///
+/// Generated module names must not collide with language reserved words,
+/// or the generated code will fail to compile.
+fn is_reserved_keyword(value: &str) -> bool {
+    const KEYWORDS: &[&str] = &[
+        // Rust strict keywords
+        "as", "break", "const", "continue", "crate", "else", "enum", "extern", "false", "fn", "for",
+        "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return",
+        "self", "Self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use",
+        "where", "while", // Rust reserved keywords
+        "async", "await", "dyn",
+        // Rust contextual keywords that break module names
+        "abstract", "become", "box", "do", "final", "macro", "override", "priv", "typeof",
+        "unsized", "virtual", "yield", "try",
+        // Python keywords (not already in Rust list)
+        "False", "None", "True", "and", "assert", "class", "def", "del", "elif", "except",
+        "finally", "from", "global", "import", "is", "lambda", "nonlocal", "not", "or", "pass",
+        "raise", "with",
+    ];
+    KEYWORDS.contains(&value)
 }
