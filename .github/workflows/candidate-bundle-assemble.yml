@@ -7,12 +7,14 @@ on:
       - agent/candidate-commit-bundle-v1
     paths:
       - "internal/candidate-bundle-payload/**"
+      - "internal/candidate-bundle-hardening.py"
       - ".github/workflows/candidate-bundle-assemble.yml"
   pull_request:
     branches:
       - agent/semantic-kernel-v1
     paths:
       - "internal/candidate-bundle-payload/**"
+      - "internal/candidate-bundle-hardening.py"
       - ".github/workflows/candidate-bundle-assemble.yml"
 
 permissions:
@@ -39,7 +41,7 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
-      - name: Decode exact payload
+      - name: Decode and harden exact payload
         shell: bash
         run: |
           set -euo pipefail
@@ -53,6 +55,7 @@ jobs:
             '541b9cfbce9249a25c8d875f9b52a320f4ab1fde589dbc574d95720010c74070' \
             "${RUNNER_TEMP}/candidate-bundle.tar.gz" | sha256sum --check --strict
           tar -xzf "${RUNNER_TEMP}/candidate-bundle.tar.gz" -C .
+          python internal/candidate-bundle-hardening.py
           cargo +1.97.1 fmt --all
 
       - name: Capture exact Rust diagnostics
