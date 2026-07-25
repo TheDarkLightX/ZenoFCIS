@@ -8,7 +8,6 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/**"
-      - "internal/workspace-integration-hardening.py"
       - ".github/workflows/ci.yml"
       - ".github/workflows/ecosystem-features.yml"
       - ".github/workflows/workspace-integration-repair.yml"
@@ -42,7 +41,6 @@ jobs:
 
       - name: Produce exact formatted tree
         run: |
-          python internal/workspace-integration-hardening.py
           cargo +1.97.1 generate-lockfile
           cargo +1.97.1 fmt --all
           mkdir -p internal/workspace-integration-formatted
