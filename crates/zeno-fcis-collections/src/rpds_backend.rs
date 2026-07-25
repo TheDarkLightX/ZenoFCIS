@@ -1,27 +1,26 @@
-//! rpds persistent vector backend.
+//! rpds persistent map backend.
 //!
-//! Uses `rpds::Vector` as a builder with structural sharing. Entries are
-//! materialized in canonical (encoded-key-sorted) order on `to_entries`.
+//! Uses `rpds::HashTrieMap` for O(log n) structural sharing. Entries are
+//! keyed by encoded key bytes and materialized in canonical order.
 
 use alloc::vec::Vec;
 
 use super::{LogicalEntry, PersistentMap};
 
-/// A persistent map backed by `rpds::Vector`.
+/// A persistent map backed by `rpds::HashTrieMap`.
 ///
-/// Entries are stored in insertion order and sorted on materialization. This
-/// backend provides structural sharing: `insert` and `remove` return new maps
-/// that share structure with the original.
+/// Entries are keyed by encoded key bytes. This backend provides structural
+/// sharing with O(log n) insert and remove operations.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RpdsBackend {
-    entries: rpds::Vector<LogicalEntry>,
+    entries: rpds::HashTrieMap<Vec<u8>, (crate::Value, crate::Value)>,
 }
 
 impl RpdsBackend {
-    #[must_use]
+    /// Creates an empty rpds backend.
     pub fn new() -> Self {
         Self {
-            entries: rpds::Vector::new(),
+            entries: rpds::HashTrieMap::new(),
         }
     }
 }
@@ -38,38 +37,24 @@ impl PersistentMap for RpdsBackend {
     }
 
     fn insert(&self, entry: LogicalEntry) -> Self {
+        let (encoded_key, key, value) = entry.into_parts();
         let mut next = self.clone();
-        let encoded_key = entry.encoded_key().to_vec();
-        next.entries = next
-            .entries
-            .iter()
-            .filter(|e| e.encoded_key() != encoded_key.as_slice())
-            .cloned()
-            .collect();
-        next.entries.push_back_mut(entry);
+        next.entries = next.entries.insert(encoded_key.to_vec(), (key, value));
         next
     }
 
     fn remove(&self, encoded_key: &[u8]) -> Self {
         let mut next = self.clone();
-        next.entries = next
-            .entries
-            .iter()
-            .filter(|e| e.encoded_key() != encoded_key)
-            .cloned()
-            .collect();
+        next.entries = next.entries.remove(encoded_key);
         next
     }
 
     fn get(&self, encoded_key: &[u8]) -> Option<&crate::Value> {
-        self.entries
-            .iter()
-            .find(|e| e.encoded_key() == encoded_key)
-            .map(|e| e.value())
+        self.entries.get(encoded_key).map(|(_, v)| v)
     }
 
     fn len(&self) -> usize {
-        self.entries.len()
+        self.entries.size()
     }
 
     fn is_empty(&self) -> bool {
@@ -77,7 +62,11 @@ impl PersistentMap for RpdsBackend {
     }
 
     fn to_entries(&self) -> Vec<LogicalEntry> {
-        let mut entries: Vec<LogicalEntry> = self.entries.iter().cloned().collect();
+        let mut entries: Vec<LogicalEntry> = self
+            .entries
+            .iter()
+            .map(|(ek, (k, v))| LogicalEntry::new(ek.clone(), k.clone(), v.clone()))
+            .collect();
         entries.sort_by(|a, b| a.encoded_key().cmp(b.encoded_key()));
         entries
     }
