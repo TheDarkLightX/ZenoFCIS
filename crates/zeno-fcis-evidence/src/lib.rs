@@ -107,21 +107,72 @@ fn validate_tool_version(version: &str) -> Result<(), EvidenceError> {
 
 /// Content-addressed bindings that anchor evidence to exact protocol artifacts.
 ///
-/// Every field must be non-zero. A zero hash means the evidence is unbound
-/// and must be rejected.
+/// Every field is non-zero, enforced at construction. A zero hash means the
+/// evidence is unbound and must be rejected.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceBindings {
     /// Source commit hash of the code under verification.
-    pub source_commit: Hash32,
+    source_commit: Hash32,
     /// Profile commitment being promoted.
-    pub profile_hash: Hash32,
+    profile_hash: Hash32,
     /// Schema commitment for the profile.
-    pub schema_hash: Hash32,
+    schema_hash: Hash32,
     /// Algorithm and codec version commitment.
-    pub algorithm_hash: Hash32,
+    algorithm_hash: Hash32,
 }
 
 impl SourceBindings {
+    /// Creates validated source bindings. Rejects any zero hash.
+    pub fn try_new(
+        source_commit: Hash32,
+        profile_hash: Hash32,
+        schema_hash: Hash32,
+        algorithm_hash: Hash32,
+    ) -> Result<Self, EvidenceError> {
+        if source_commit == Hash32::ZERO {
+            return Err(EvidenceError::UnboundSourceCommit);
+        }
+        if profile_hash == Hash32::ZERO {
+            return Err(EvidenceError::UnboundProfile);
+        }
+        if schema_hash == Hash32::ZERO {
+            return Err(EvidenceError::UnboundSchema);
+        }
+        if algorithm_hash == Hash32::ZERO {
+            return Err(EvidenceError::UnboundAlgorithm);
+        }
+        Ok(Self {
+            source_commit,
+            profile_hash,
+            schema_hash,
+            algorithm_hash,
+        })
+    }
+
+    /// Returns the source commit hash.
+    #[must_use]
+    pub const fn source_commit(&self) -> Hash32 {
+        self.source_commit
+    }
+
+    /// Returns the profile commitment.
+    #[must_use]
+    pub const fn profile_hash(&self) -> Hash32 {
+        self.profile_hash
+    }
+
+    /// Returns the schema commitment.
+    #[must_use]
+    pub const fn schema_hash(&self) -> Hash32 {
+        self.schema_hash
+    }
+
+    /// Returns the algorithm commitment.
+    #[must_use]
+    pub const fn algorithm_hash(&self) -> Hash32 {
+        self.algorithm_hash
+    }
+
     /// Validates that every binding is non-zero.
     pub fn validate(&self) -> Result<(), EvidenceError> {
         if self.source_commit == Hash32::ZERO {
@@ -274,6 +325,35 @@ impl CoverageDeclaration {
     pub const fn is_admissible(self) -> bool {
         !matches!(self, Self::Unbounded)
     }
+
+    /// Validates that all hashes are non-zero and cardinalities are positive.
+    pub fn validate(&self) -> Result<(), EvidenceError> {
+        match self {
+            Self::ExhaustiveFinite {
+                domain_hash,
+                cardinality,
+            } => {
+                if *domain_hash == Hash32::ZERO {
+                    return Err(EvidenceError::ZeroDomainHash);
+                }
+                if *cardinality == 0 {
+                    return Err(EvidenceError::ZeroCardinality);
+                }
+            }
+            Self::Bounded { case_budget } => {
+                if *case_budget == 0 {
+                    return Err(EvidenceError::ZeroCaseBudget);
+                }
+            }
+            Self::ProofAssisted { theorem_claim } => {
+                if *theorem_claim == Hash32::ZERO {
+                    return Err(EvidenceError::ZeroTheoremClaim);
+                }
+            }
+            Self::Unbounded => {}
+        }
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -337,6 +417,7 @@ impl EvidenceEnvelope {
         if !coverage.is_admissible() {
             return Err(EvidenceError::UnboundedCoverage);
         }
+        coverage.validate()?;
         Ok(Self {
             tool,
             kind,
@@ -436,10 +517,10 @@ impl CanonicalEncode for EvidenceEnvelope {
         put_text(output, self.tool.version())?;
         output.extend_from_slice(self.tool.binary_hash.as_bytes());
         output.push(self.kind as u8);
-        output.extend_from_slice(self.bindings.source_commit.as_bytes());
-        output.extend_from_slice(self.bindings.profile_hash.as_bytes());
-        output.extend_from_slice(self.bindings.schema_hash.as_bytes());
-        output.extend_from_slice(self.bindings.algorithm_hash.as_bytes());
+        output.extend_from_slice(self.bindings.source_commit().as_bytes());
+        output.extend_from_slice(self.bindings.profile_hash().as_bytes());
+        output.extend_from_slice(self.bindings.schema_hash().as_bytes());
+        output.extend_from_slice(self.bindings.algorithm_hash().as_bytes());
         put_text(output, &self.query_id)?;
         output.extend_from_slice(self.claim_hash.as_bytes());
         let assumption_count =
@@ -511,8 +592,9 @@ impl EvidenceChecker for RejectAllChecker {
     }
 }
 
-/// A checker that accepts envelopes whose artifact digest equals the query
-/// identity hash. This is a minimal structural check, not a proof verification.
+/// A checker that accepts envelopes with non-zero claim hash, non-zero
+/// artifact digest, non-zero binary hash, and a conclusive success result.
+/// This is a minimal structural check, not a proof verification.
 /// Production code must supply a real checker.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct StructuralChecker;
@@ -649,16 +731,16 @@ fn verify_bindings_match(
     envelope: &EvidenceEnvelope,
 ) -> Result<(), EvidenceError> {
     let actual = envelope.bindings();
-    if actual.source_commit != expected.source_commit {
+    if actual.source_commit() != expected.source_commit() {
         return Err(EvidenceError::StaleSourceCommit);
     }
-    if actual.profile_hash != expected.profile_hash {
+    if actual.profile_hash() != expected.profile_hash() {
         return Err(EvidenceError::ProfileMismatch);
     }
-    if actual.schema_hash != expected.schema_hash {
+    if actual.schema_hash() != expected.schema_hash() {
         return Err(EvidenceError::SchemaMismatch);
     }
-    if actual.algorithm_hash != expected.algorithm_hash {
+    if actual.algorithm_hash() != expected.algorithm_hash() {
         return Err(EvidenceError::AlgorithmMismatch);
     }
     Ok(())
@@ -781,6 +863,14 @@ pub enum EvidenceError {
     },
     /// Coverage was declared as unbounded.
     UnboundedCoverage,
+    /// Exhaustive finite coverage had a zero domain hash.
+    ZeroDomainHash,
+    /// Exhaustive finite coverage had zero cardinality.
+    ZeroCardinality,
+    /// Bounded coverage had a zero case budget.
+    ZeroCaseBudget,
+    /// Proof-assisted coverage had a zero theorem claim hash.
+    ZeroTheoremClaim,
     /// Too many envelopes for one importer.
     TooManyEnvelopes,
     /// Envelope source commit does not match importer bindings.
@@ -825,6 +915,12 @@ impl fmt::Display for EvidenceError {
                 write!(formatter, "evidence result {result:?} blocks promotion")
             }
             Self::UnboundedCoverage => formatter.write_str("coverage is unbounded"),
+            Self::ZeroDomainHash => formatter.write_str("exhaustive finite domain hash is zero"),
+            Self::ZeroCardinality => formatter.write_str("exhaustive finite cardinality is zero"),
+            Self::ZeroCaseBudget => formatter.write_str("bounded case budget is zero"),
+            Self::ZeroTheoremClaim => {
+                formatter.write_str("proof-assisted theorem claim hash is zero")
+            }
             Self::TooManyEnvelopes => formatter.write_str("too many evidence envelopes"),
             Self::StaleSourceCommit => formatter.write_str("envelope source commit is stale"),
             Self::ProfileMismatch => formatter.write_str("envelope profile does not match"),
