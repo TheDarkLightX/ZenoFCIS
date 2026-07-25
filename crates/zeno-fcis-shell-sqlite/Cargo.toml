@@ -1,0 +1,26 @@
+[package]
+name = "zeno-fcis-shell-sqlite"
+description = "Crash-atomic SQLite and idempotent outbox refinement for ZenoFCIS"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[dependencies]
+rusqlite = { version = "=0.40.1", features = ["bundled"] }
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
+zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch" }
+zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan" }
+zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt" }
+zeno-fcis-shell = { version = "=0.1.0", path = "../zeno-fcis-shell" }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value" }
+
+[dev-dependencies]
+zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core" }
+
+[lints]
+workspace = true

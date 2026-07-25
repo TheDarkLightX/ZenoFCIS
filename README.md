@@ -14,20 +14,62 @@ immutable state + command + policy + authenticated context
 
 The semantic kernel treats values, decisions, resource budgets, canonical bytes, and commitments as explicit protocol data. It forbids unsafe Rust and is designed for `no_std + alloc` use without clocks, randomness, networking, filesystems, databases, or executable effect closures.
 
-## Initial workspace
+## Implemented workspace
 
-The first pull request contains:
+The workspace now includes the complete package ladder:
 
-- `zeno-fcis-core`: three-way decisions, stable reason precedence, deterministic budgets, and the transition trait;
-- `zeno-fcis-value`: closed transitively immutable values, bounded owners, canonical record/map shape, and structural limits;
-- `zeno-fcis-codec`: the initial ZCVE/1 canonical reference codec and a narrow cryptographic-hasher provider interface;
-- `zeno-fcis`: umbrella re-exports.
+- semantic values, decisions, deterministic budgets, ZCVE/1 canonical encoding, exact commitments, preconditioned patches, closed plans, receipts, and complete candidate bundles;
+- assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
+- vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
+- closed schema validation plus deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
+- strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
+- an explicit dual-root sparse authenticated-state reference with membership/absence proofs, expected-version publication, and full-rebuild equality checks;
+- verifier-gated bounded synthesis over canonical closed candidate domains with content-addressed certificates and honest incomplete-search results;
+- crash-atomic SQLite publication, exact replay binding, a transactional outbox, idempotent delivery, and crash-point refinement tests;
+- backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
+- release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
 
-Later pull requests add preconditioned patches, candidate sealing, effect and outbox plans, receipts, atomic commit bundles, composition contracts, authenticated-state adapters, synthesis, formal verification, and ZenoDEX profiles.
+The `zeno-fcis` umbrella keeps the semantic kernel small by default. Enable the complete integration surface explicitly:
+
+```toml
+[dependencies]
+zeno-fcis = { version = "=0.1.0", features = ["full"] }
+```
+
+Important optional features include `codegen`, `evidence`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
+
+## Architecture
+
+The repository keeps computation and coordination separate:
+
+```text
+pure transition
+    -> immutable, content-addressed candidate
+    -> independent validation
+    -> atomic shell publication
+    -> idempotent outbox delivery
+```
+
+Persistent backends are sealed behind a pure logical-map interface. Updates return new structurally shared versions; equality and canonical bytes depend on logical entries only.
+
+Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; the pure validators decide whether that data is admissible.
+
+## Verification
+
+The main local gate is:
+
+```bash
+python3 tools/check_assurance.py --self-test
+cargo +1.97.1 fmt --all -- --check
+cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo +1.97.1 test --workspace --all-features --locked
+```
+
+See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`, Miri, fuzz, supply-chain, and source-manifest gates. Package-specific boundaries are documented in `docs/`.
 
 ## Assurance posture
 
-This repository is pre-release research software. The initial kernel does not claim production authority, economic correctness, cryptographic implementation, shell refinement, or audit completion.
+This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, and fail-closed promotion rules. It does not claim audit completion, economic correctness, side-channel resistance, production authorization, or that an external ZenoDEX, JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
 
 ## License
 

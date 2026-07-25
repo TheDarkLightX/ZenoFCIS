@@ -3,6 +3,7 @@
 //! Uses `imbl::OrdMap` for structural sharing with ordered keys. Entries
 //! are stored by encoded key and materialized in canonical order.
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use super::{LogicalEntry, PersistentMap};
@@ -21,6 +22,7 @@ impl Sealed for ImblBackend {}
 
 impl ImblBackend {
     #[must_use]
+    /// Creates an empty persistent map.
     pub fn new() -> Self {
         Self {
             entries: imbl::OrdMap::new(),

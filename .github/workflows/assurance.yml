@@ -1,0 +1,83 @@
+name: assurance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-supply-chain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.97.1 --profile minimal
+
+      - name: Prove static assurance rules
+        run: |
+          python3 tools/check_assurance.py --self-test > /tmp/zeno-fcis-static-assurance.txt
+          cat /tmp/zeno-fcis-static-assurance.txt
+          python3 tools/check_assurance.py
+
+      - name: Prove source-manifest reproducibility
+        run: |
+          python3 tools/release_manifest.py --require-clean > /tmp/zeno-fcis-manifest-a.json
+          python3 tools/release_manifest.py --require-clean > /tmp/zeno-fcis-manifest-b.json
+          cmp /tmp/zeno-fcis-manifest-a.json /tmp/zeno-fcis-manifest-b.json
+
+      - name: Validate locked dependency graph
+        run: cargo +1.97.1 metadata --locked --format-version 1 > /tmp/zeno-fcis-cargo-metadata.json
+
+      - name: Install pinned supply-chain tools
+        run: |
+          cargo +1.97.1 install cargo-deny --version 0.20.2 --locked
+          cargo +1.97.1 install cargo-audit --version 0.22.2 --locked
+
+      - name: License, source, and advisory policy
+        run: |
+          cargo +1.97.1 deny check > /tmp/zeno-fcis-cargo-deny.txt 2>&1
+          cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings > /tmp/zeno-fcis-cargo-audit.txt 2>&1
+
+      - name: Build reproducible evidence bundle
+        run: |
+          python3 tools/build_assurance_bundle.py \
+            --source-manifest /tmp/zeno-fcis-manifest-a.json \
+            --artifact static-assurance=/tmp/zeno-fcis-static-assurance.txt \
+            --artifact cargo-metadata=/tmp/zeno-fcis-cargo-metadata.json \
+            --artifact cargo-deny=/tmp/zeno-fcis-cargo-deny.txt \
+            --artifact cargo-audit=/tmp/zeno-fcis-cargo-audit.txt \
+            --output /tmp/zeno-fcis-assurance-a.zip
+          python3 tools/build_assurance_bundle.py \
+            --source-manifest /tmp/zeno-fcis-manifest-a.json \
+            --artifact static-assurance=/tmp/zeno-fcis-static-assurance.txt \
+            --artifact cargo-metadata=/tmp/zeno-fcis-cargo-metadata.json \
+            --artifact cargo-deny=/tmp/zeno-fcis-cargo-deny.txt \
+            --artifact cargo-audit=/tmp/zeno-fcis-cargo-audit.txt \
+            --output /tmp/zeno-fcis-assurance-b.zip
+          cmp /tmp/zeno-fcis-assurance-a.zip /tmp/zeno-fcis-assurance-b.zip
+
+      - name: Retain assurance evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zeno-fcis-assurance-${{ github.sha }}
+          path: /tmp/zeno-fcis-assurance-a.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Critical boundary tests
+        run: |
+          cargo +1.97.1 test --locked -p zeno-fcis-adapter-zenodex
+          cargo +1.97.1 test --locked -p zeno-fcis-authenticated
+          cargo +1.97.1 test --locked -p zeno-fcis-synthesis
+          cargo +1.97.1 test --locked -p zeno-fcis-shell-sqlite
+          cargo +1.97.1 test --locked -p zeno-fcis-collections --all-features

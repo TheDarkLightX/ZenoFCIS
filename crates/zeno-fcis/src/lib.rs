@@ -2,12 +2,21 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+#[cfg(feature = "mounted-zenodex")]
+/// Strict canonical mounted-runtime adapters and replay fixtures.
+pub use zeno_fcis_adapter_zenodex as adapter_zenodex;
+#[cfg(feature = "authenticated-state")]
+/// Versioned sparse authenticated-state planning and proof verification.
+pub use zeno_fcis_authenticated as authenticated;
 
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
 #[cfg(feature = "codegen")]
 /// Deterministic, inspectable source generation from closed schemas.
 pub use zeno_fcis_codegen as codegen;
+#[cfg(feature = "collections")]
+/// Backend-independent persistent collection interfaces and implementations.
+pub use zeno_fcis_collections as collections;
 /// Assume-guarantee contracts and deterministic composition evidence.
 pub use zeno_fcis_compose as compose;
 /// Decision algebra, budgets, reasons, and transition traits.
@@ -19,6 +28,9 @@ pub use zeno_fcis_core as core;
 ))]
 /// Vetted SHA-256 providers and independent provider-parity evidence.
 pub use zeno_fcis_crypto as crypto;
+#[cfg(feature = "evidence")]
+/// Canonical evidence envelopes and independent checker adapters.
+pub use zeno_fcis_evidence as evidence;
 /// Preconditioned canonical state patches.
 pub use zeno_fcis_patch as patch;
 /// Closed authoritative and outbox plans.
@@ -34,6 +46,12 @@ pub use zeno_fcis_refine as refine;
 pub use zeno_fcis_schema as schema;
 /// Pure reference semantics for atomic commit, replay, and outbox acknowledgement.
 pub use zeno_fcis_shell as shell;
+#[cfg(feature = "sqlite-shell")]
+/// Crash-atomic SQLite interpretation and idempotent outbox delivery.
+pub use zeno_fcis_shell_sqlite as shell_sqlite;
+#[cfg(feature = "synthesis")]
+/// Deterministic verifier-gated bounded synthesis.
+pub use zeno_fcis_synthesis as synthesis;
 /// Transitively immutable closed values.
 pub use zeno_fcis_value as value;
 

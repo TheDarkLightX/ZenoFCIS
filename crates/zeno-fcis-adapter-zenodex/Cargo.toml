@@ -1,6 +1,6 @@
 [package]
-name = "zeno-fcis-codegen"
-description = "Deterministic inspectable source generation for ZenoFCIS schemas"
+name = "zeno-fcis-adapter-zenodex"
+description = "Strict mounted ZenoDEX full-decision adapters for ZenoFCIS refinement"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,10 +10,12 @@ homepage.workspace = true
 authors.workspace = true
 
 [dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = { version = "=1.0.151" }
 zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
+zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core" }
 zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
-zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema" }
-zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine" }
 
 [lints]
 workspace = true

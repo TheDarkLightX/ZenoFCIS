@@ -1,6 +1,6 @@
 [package]
-name = "zeno-fcis-codegen"
-description = "Deterministic inspectable source generation for ZenoFCIS schemas"
+name = "zeno-fcis-synthesis"
+description = "Deterministic verifier-gated bounded synthesis for ZenoFCIS schemas and contracts"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,8 +12,7 @@ authors.workspace = true
 [dependencies]
 zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
 zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
-zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema" }
-zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value" }
 
 [lints]
 workspace = true

@@ -17,6 +17,10 @@ members = [
     "crates/zeno-fcis-codegen",
     "crates/zeno-fcis-codegen-fixture",
     "crates/zeno-fcis-evidence",
+    "crates/zeno-fcis-adapter-zenodex",
+    "crates/zeno-fcis-authenticated",
+    "crates/zeno-fcis-synthesis",
+    "crates/zeno-fcis-shell-sqlite",
     "crates/zeno-fcis-collections",
 ]
 

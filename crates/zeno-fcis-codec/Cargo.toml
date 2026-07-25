@@ -14,7 +14,7 @@ default = ["std"]
 std = ["zeno-fcis-value/std"]
 
 [dependencies]
-zeno-fcis-value = { path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
 
 [lints]
 workspace = true
