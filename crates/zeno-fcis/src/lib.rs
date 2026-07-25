@@ -5,6 +5,9 @@
 
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
+#[cfg(feature = "codegen")]
+/// Deterministic, inspectable source generation from closed schemas.
+pub use zeno_fcis_codegen as codegen;
 /// Assume-guarantee contracts and deterministic composition evidence.
 pub use zeno_fcis_compose as compose;
 /// Decision algebra, budgets, reasons, and transition traits.
@@ -16,9 +19,6 @@ pub use zeno_fcis_core as core;
 ))]
 /// Vetted SHA-256 providers and independent provider-parity evidence.
 pub use zeno_fcis_crypto as crypto;
-#[cfg(feature = "codegen")]
-/// Deterministic, inspectable source generation from closed schemas.
-pub use zeno_fcis_codegen as codegen;
 /// Preconditioned canonical state patches.
 pub use zeno_fcis_patch as patch;
 /// Closed authoritative and outbox plans.
@@ -41,6 +41,10 @@ pub use zeno_fcis_codec::{
     CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain, EncodeError, Envelope,
     Hash32, commitment, decode_envelope, decode_value, domain_preimage,
 };
+#[cfg(feature = "codegen")]
+pub use zeno_fcis_codegen::{
+    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GenerationSpec, generate,
+};
 pub use zeno_fcis_compose::{
     AccessPath, Assumption, AssumptionDischarge, ClaimEvidence, ComponentContract, ComponentId,
     CompositionBlocker, CompositionEvidence, CompositionReport, CompositionSpec, Conflict,
@@ -51,18 +55,14 @@ pub use zeno_fcis_core::{
     Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, Decision, DecisionKind, Failed,
     Rejected, Resource, StableReason, Transition, first_reason,
 };
-#[cfg(feature = "rustcrypto-sha256")]
-pub use zeno_fcis_crypto::RustCryptoSha256;
 #[cfg(feature = "verified-sha256")]
 pub use zeno_fcis_crypto::LibcruxSha256;
+#[cfg(feature = "rustcrypto-sha256")]
+pub use zeno_fcis_crypto::RustCryptoSha256;
 #[cfg(any(feature = "rustcrypto-sha256", feature = "verified-sha256"))]
 pub use zeno_fcis_crypto::{KnownAnswerReport, ProviderVerificationError, verify_known_answers};
 #[cfg(feature = "sha256-parity")]
 pub use zeno_fcis_crypto::{ProviderParityReport, verify_provider_parity};
-#[cfg(feature = "codegen")]
-pub use zeno_fcis_codegen::{
-    CodegenError, GeneratedBundle, GeneratedFile, GenerationSpec, GENERATOR_ID, generate,
-};
 pub use zeno_fcis_patch::{
     AppliedPatch, CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath, hash_value,
 };
@@ -84,8 +84,8 @@ pub use zeno_fcis_refine::{
 };
 #[cfg(feature = "schema")]
 pub use zeno_fcis_schema::{
-    EnumVariantDef, FieldDef, FieldId, Schema, SchemaError, SchemaLimits, SchemaMetrics, SchemaName,
-    SumVariantDef, TypeDef, TypeId, TypeKind, ValidationLimits, ValidationReport,
+    EnumVariantDef, FieldDef, FieldId, Schema, SchemaError, SchemaLimits, SchemaMetrics,
+    SchemaName, SumVariantDef, TypeDef, TypeId, TypeKind, ValidationLimits, ValidationReport,
     ValueValidationError, VariantId,
 };
 pub use zeno_fcis_shell::{
