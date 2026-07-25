@@ -39,11 +39,18 @@ jobs:
           check_blob() {
             expected="$1"
             path="$2"
-            test "$(git hash-object "${path}")" = "${expected}"
+            actual="$(git hash-object "${path}")"
+            if [ "${actual}" != "${expected}" ]; then
+              printf 'blob mismatch: %s expected=%s actual=%s\n' "${path}" "${expected}" "${actual}" >&2
+              exit 1
+            fi
           }
           check_blob f1a2601e96beeda3563ddf8e0b1f69cc37f91828 internal/composition-profile-payload-v2/000.b64
           check_blob eecbf93876baad807fba88c727e43449e917c541 internal/composition-profile-payload-v2/001.b64
-          check_blob 09caa1ade3936eb49a1f6d45feeadd1b6152b5e0 internal/composition-profile-payload-v2/002.b64
+          check_blob 9837b873b2b38003b724475df9a06435a69d7413 internal/composition-profile-payload-v2/002a.b64
+          check_blob 00fc1dfe775e24b3d0ef063b6dc3ca986fe10560 internal/composition-profile-payload-v2/002b.b64
+          check_blob d4d1aadd882be194dcb2c2469397c38365a1f8bf internal/composition-profile-payload-v2/002c.b64
+          check_blob a619f944956385af733d66b52777191b79a1d9b1 internal/composition-profile-payload-v2/002d.b64
           check_blob 4d16ed5c2637da484f9a20719a8ffe289f6bdcc9 internal/composition-profile-payload-v2/003.b64
           check_blob 87f288f9d3691d7cbacd5375950f1887c33238cf internal/composition-profile-payload-v2/004.b64
           check_blob fe14460f916d197d92611894b9b12e557421bafd internal/composition-profile-payload-v2/005.b64
@@ -53,7 +60,22 @@ jobs:
           check_blob 16cfbe361bd137606958e97ae9910110846808b7 internal/composition-profile-payload-v2/009.b64
           check_blob a90a35ec482f70365da6b4f0484a8b9cd27a0352 internal/composition-profile-payload-v2/010.b64
           check_blob 8a580b423f69f32e4439216de654ff4de1328093 internal/composition-profile-payload-v2/011.b64
-          cat internal/composition-profile-payload-v2/*.b64 \
+          cat \
+            internal/composition-profile-payload-v2/000.b64 \
+            internal/composition-profile-payload-v2/001.b64 \
+            internal/composition-profile-payload-v2/002a.b64 \
+            internal/composition-profile-payload-v2/002b.b64 \
+            internal/composition-profile-payload-v2/002c.b64 \
+            internal/composition-profile-payload-v2/002d.b64 \
+            internal/composition-profile-payload-v2/003.b64 \
+            internal/composition-profile-payload-v2/004.b64 \
+            internal/composition-profile-payload-v2/005.b64 \
+            internal/composition-profile-payload-v2/006.b64 \
+            internal/composition-profile-payload-v2/007.b64 \
+            internal/composition-profile-payload-v2/008.b64 \
+            internal/composition-profile-payload-v2/009.b64 \
+            internal/composition-profile-payload-v2/010.b64 \
+            internal/composition-profile-payload-v2/011.b64 \
             | base64 --decode > "${RUNNER_TEMP}/composition-profile.tar.gz"
           printf '%s  %s\n' \
             '25fd1cb0db4f1167efe51d86928ec0bb082eef13d0747451461317ab837612c4' \
