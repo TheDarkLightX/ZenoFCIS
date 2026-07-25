@@ -9,6 +9,9 @@ members = [
     "crates/zeno-fcis-plan",
     "crates/zeno-fcis-receipt",
     "crates/zeno-fcis-shell",
+    "crates/zeno-fcis-compose",
+    "crates/zeno-fcis-refine",
+    "crates/zeno-fcis-profile-zenodex",
 ]
 
 [workspace.package]

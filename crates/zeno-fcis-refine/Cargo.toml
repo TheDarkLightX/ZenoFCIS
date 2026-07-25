@@ -1,0 +1,26 @@
+[package]
+name = "zeno-fcis-refine"
+description = "Exact runtime-to-model refinement and proof-assisted promotion evidence for ZenoFCIS"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[features]
+default = ["std"]
+std = [
+    "zeno-fcis-codec/std",
+    "zeno-fcis-core/std",
+    "zeno-fcis-receipt/std",
+]
+
+[dependencies]
+zeno-fcis-codec = { path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-core = { path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-receipt = { path = "../zeno-fcis-receipt", default-features = false }
+
+[lints]
+workspace = true
