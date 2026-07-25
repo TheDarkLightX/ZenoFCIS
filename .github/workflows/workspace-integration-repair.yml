@@ -29,7 +29,7 @@ on:
       - ".github/workflows/workspace-integration-repair.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: workspace-integration-repair-${{ github.ref }}
@@ -45,7 +45,7 @@ jobs:
         with:
           ref: agent/workspace-integration-repair-v1
           fetch-depth: 0
-          persist-credentials: true
+          persist-credentials: false
 
       - name: Install pinned Rust
         run: |
@@ -58,22 +58,11 @@ jobs:
           cargo +1.97.1 generate-lockfile
           cargo +1.97.1 fmt --all
 
-      - name: Capture integrated workspace diagnostics
-        shell: bash
+      - name: Verify integrated workspace
         run: |
-          set +e
-          mkdir -p internal/workspace-integration-diagnostics
-          LOG=internal/workspace-integration-diagnostics/rust.log
-          : > "${LOG}"
-          status=0
-          run_check() {
-            printf '\n===== %s =====\n' "$1" >> "${LOG}"
-            shift
-            "$@" >> "${LOG}" 2>&1 || status=$?
-          }
-          run_check clippy cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
-          run_check tests cargo +1.97.1 test --workspace --all-features --locked
-          run_check doctests cargo +1.97.1 test --workspace --doc --all-features --locked
+          cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
+          cargo +1.97.1 test --workspace --all-features --locked
+          cargo +1.97.1 test --workspace --doc --all-features --locked
           for crate in \
             zeno-fcis-core \
             zeno-fcis-value \
@@ -89,47 +78,36 @@ jobs:
             zeno-fcis-schema \
             zeno-fcis
           do
-            run_check "no_std-${crate}" cargo +1.97.1 check -p "${crate}" --no-default-features --locked --target wasm32-unknown-unknown
+            cargo +1.97.1 check -p "${crate}" --no-default-features --locked --target wasm32-unknown-unknown
           done
-          run_check crypto-rustcrypto cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features rustcrypto --locked --target wasm32-unknown-unknown
-          run_check crypto-libcrux cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features libcrux --locked --target wasm32-unknown-unknown
-          run_check crypto-parity cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features parity --locked --target wasm32-unknown-unknown
-          run_check umbrella-schema cargo +1.97.1 check -p zeno-fcis --no-default-features --features schema --locked --target wasm32-unknown-unknown
-          run_check umbrella-codegen cargo +1.97.1 check -p zeno-fcis --features codegen --locked
-          run_check umbrella-rustcrypto cargo +1.97.1 check -p zeno-fcis --no-default-features --features rustcrypto-sha256 --locked --target wasm32-unknown-unknown
-          run_check umbrella-libcrux cargo +1.97.1 check -p zeno-fcis --no-default-features --features verified-sha256 --locked --target wasm32-unknown-unknown
-          run_check umbrella-parity cargo +1.97.1 check -p zeno-fcis --no-default-features --features sha256-parity --locked --target wasm32-unknown-unknown
-          run_check rustdoc env RUSTDOCFLAGS=-Dwarnings cargo +1.97.1 doc --workspace --all-features --locked --no-deps
-          printf '%s\n' "${status}" > internal/workspace-integration-diagnostics/status.txt
-          exit 0
+          cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features rustcrypto --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features libcrux --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features parity --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features schema --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --features codegen --locked
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features rustcrypto-sha256 --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features verified-sha256 --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features sha256-parity --locked --target wasm32-unknown-unknown
+          RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
 
-      - name: Upload exact diagnostics
-        if: always()
+      - name: Assemble exact review artifact
+        run: |
+          mkdir -p internal/workspace-integration-review/crates/zeno-fcis/src
+          mkdir -p internal/workspace-integration-review/crates/zeno-fcis-schema/src
+          mkdir -p internal/workspace-integration-review/crates/zeno-fcis-codegen/src
+          mkdir -p internal/workspace-integration-review/.github/workflows
+          cp Cargo.toml Cargo.lock internal/workspace-integration-review/
+          cp crates/zeno-fcis/Cargo.toml internal/workspace-integration-review/crates/zeno-fcis/Cargo.toml
+          cp crates/zeno-fcis/src/lib.rs internal/workspace-integration-review/crates/zeno-fcis/src/lib.rs
+          cp crates/zeno-fcis-schema/src/validate.rs internal/workspace-integration-review/crates/zeno-fcis-schema/src/validate.rs
+          cp crates/zeno-fcis-codegen/src/render.rs internal/workspace-integration-review/crates/zeno-fcis-codegen/src/render.rs
+          cp .github/workflows/ci.yml internal/workspace-integration-review/.github/workflows/ci.yml
+          cp .github/workflows/ecosystem-features.yml internal/workspace-integration-review/.github/workflows/ecosystem-features.yml
+
+      - name: Upload exact review artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: workspace-integration-diagnostics
-          path: internal/workspace-integration-diagnostics
+          name: workspace-integration-review
+          path: internal/workspace-integration-review
           if-no-files-found: error
           retention-days: 7
-
-      - name: Enforce verification result
-        run: test "$(cat internal/workspace-integration-diagnostics/status.txt)" = "0"
-
-      - name: Commit exact integrated review surface
-        run: |
-          git config user.name 'ZenoFCIS workspace integration repair'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- \
-            Cargo.toml \
-            Cargo.lock \
-            crates/zeno-fcis/Cargo.toml \
-            crates/zeno-fcis/src/lib.rs \
-            crates/zeno-fcis-schema/src/validate.rs \
-            crates/zeno-fcis-codegen/src/render.rs \
-            .github/workflows/ci.yml \
-            .github/workflows/ecosystem-features.yml
-          if git diff --cached --quiet --exit-code; then
-            exit 0
-          fi
-          git commit -m 'fix: integrate crypto schema and codegen workspace layers'
-          git push origin HEAD:agent/workspace-integration-repair-v1
