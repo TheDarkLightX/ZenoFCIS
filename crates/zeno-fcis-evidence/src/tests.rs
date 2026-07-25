@@ -889,3 +889,173 @@ fn source_bindings_reject_zero_algorithm() {
     );
     assert_eq!(error, Err(EvidenceError::UnboundAlgorithm));
 }
+
+// ---------------------------------------------------------------------------
+// Builder pattern tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn builder_creates_valid_envelope() {
+    let envelope = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .query_id("theorem_001")
+        .claim_hash(nonzero_hash(10))
+        .artifact_digest(nonzero_hash(7))
+        .result(EvidenceResult::Proven)
+        .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+        .build()
+        .unwrap_or_else(|e| panic!("builder: {e}"));
+    assert_eq!(envelope.kind(), ToolKind::Kani);
+    assert_eq!(envelope.query_id(), "theorem_001");
+}
+
+#[test]
+fn builder_rejects_missing_query_id() {
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .claim_hash(nonzero_hash(10))
+        .artifact_digest(nonzero_hash(7))
+        .result(EvidenceResult::Proven)
+        .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+        .build();
+    assert_eq!(error, Err(EvidenceError::MissingQueryId));
+}
+
+#[test]
+fn builder_rejects_missing_claim_hash() {
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .query_id("theorem_001")
+        .artifact_digest(nonzero_hash(7))
+        .result(EvidenceResult::Proven)
+        .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+        .build();
+    assert_eq!(error, Err(EvidenceError::MissingClaimHash));
+}
+
+#[test]
+fn builder_rejects_missing_result() {
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .query_id("theorem_001")
+        .claim_hash(nonzero_hash(10))
+        .artifact_digest(nonzero_hash(7))
+        .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+        .build();
+    assert_eq!(error, Err(EvidenceError::MissingResult));
+}
+
+#[test]
+fn builder_rejects_missing_artifact_digest() {
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .query_id("theorem_001")
+        .claim_hash(nonzero_hash(10))
+        .result(EvidenceResult::Proven)
+        .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+        .build();
+    assert_eq!(error, Err(EvidenceError::MissingArtifactDigest));
+}
+
+#[test]
+fn builder_rejects_missing_coverage() {
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .query_id("theorem_001")
+        .claim_hash(nonzero_hash(10))
+        .artifact_digest(nonzero_hash(7))
+        .result(EvidenceResult::Proven)
+        .build();
+    assert_eq!(error, Err(EvidenceError::MissingCoverage));
+}
+
+#[test]
+fn builder_propagates_validation_errors() {
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .query_id("theorem_001")
+        .claim_hash(nonzero_hash(10))
+        .artifact_digest(nonzero_hash(7))
+        .result(EvidenceResult::Timeout)
+        .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+        .build();
+    assert_eq!(
+        error,
+        Err(EvidenceError::BlockingResult {
+            result: EvidenceResult::Timeout
+        })
+    );
+}
+
+#[test]
+fn builder_adds_assumptions() {
+    let a1 = Assumption::try_new("axiom_1", nonzero_hash(6))
+        .unwrap_or_else(|e| panic!("assumption: {e}"));
+    let a2 = Assumption::try_new("axiom_2", nonzero_hash(7))
+        .unwrap_or_else(|e| panic!("assumption: {e}"));
+    let envelope = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+        .query_id("theorem_001")
+        .claim_hash(nonzero_hash(10))
+        .artifact_digest(nonzero_hash(7))
+        .result(EvidenceResult::Proven)
+        .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+        .assumption(a1)
+        .assumption(a2)
+        .build()
+        .unwrap_or_else(|e| panic!("builder: {e}"));
+    assert_eq!(envelope.assumptions().len(), 2);
+}
+
+// ---------------------------------------------------------------------------
+// QueryId newtype tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn query_id_accepts_valid_string() {
+    let qid = QueryId::try_new("theorem_001").unwrap_or_else(|e| panic!("query id: {e}"));
+    assert_eq!(qid.as_str(), "theorem_001");
+}
+
+#[test]
+fn query_id_rejects_empty() {
+    assert_eq!(QueryId::try_new(""), Err(EvidenceError::InvalidQueryId));
+}
+
+#[test]
+fn query_id_rejects_non_ascii() {
+    assert_eq!(
+        QueryId::try_new("theorem_ñ"),
+        Err(EvidenceError::InvalidQueryId)
+    );
+}
+
+#[test]
+fn query_id_display_matches_inner() {
+    let qid = QueryId::try_new("lemma_42").unwrap_or_else(|e| panic!("query id: {e}"));
+    assert_eq!(alloc::format!("{qid}"), "lemma_42");
+}
+
+// ---------------------------------------------------------------------------
+// EvidenceResult TryFrom tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn evidence_result_try_from_valid_tags() {
+    assert_eq!(EvidenceResult::try_from(0), Ok(EvidenceResult::Proven));
+    assert_eq!(EvidenceResult::try_from(1), Ok(EvidenceResult::Disproven));
+    assert_eq!(
+        EvidenceResult::try_from(2),
+        Ok(EvidenceResult::Inconclusive)
+    );
+    assert_eq!(EvidenceResult::try_from(3), Ok(EvidenceResult::Timeout));
+    assert_eq!(EvidenceResult::try_from(4), Ok(EvidenceResult::Crash));
+    assert_eq!(
+        EvidenceResult::try_from(5),
+        Ok(EvidenceResult::SolverDisagreement)
+    );
+}
+
+#[test]
+fn evidence_result_try_from_invalid_tag() {
+    assert_eq!(
+        EvidenceResult::try_from(6),
+        Err(EvidenceError::InvalidResultTag)
+    );
+    assert_eq!(
+        EvidenceResult::try_from(255),
+        Err(EvidenceError::InvalidResultTag)
+    );
+}

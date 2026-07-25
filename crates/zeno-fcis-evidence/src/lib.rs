@@ -500,6 +500,208 @@ impl EvidenceEnvelope {
     }
 }
 
+// ---------------------------------------------------------------------------
+// QueryId newtype
+// ---------------------------------------------------------------------------
+
+/// A validated theorem or model-checking query identifier.
+///
+/// This newtype prevents stringly-typed APIs by enforcing that query IDs
+/// are non-empty, ASCII, and bounded at construction time.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct QueryId {
+    inner: Box<str>,
+}
+
+impl QueryId {
+    /// Creates a validated query identifier.
+    pub fn try_new(value: &str) -> Result<Self, EvidenceError> {
+        validate_query_id(value)?;
+        Ok(Self {
+            inner: Box::from(value),
+        })
+    }
+
+    /// Returns the query identifier string.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.inner
+    }
+}
+
+impl core::fmt::Display for QueryId {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str(&self.inner)
+    }
+}
+
+impl From<QueryId> for Box<str> {
+    fn from(value: QueryId) -> Self {
+        value.inner
+    }
+}
+
+// ---------------------------------------------------------------------------
+// EvidenceResult decoding
+// ---------------------------------------------------------------------------
+
+impl TryFrom<u8> for EvidenceResult {
+    type Error = EvidenceError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Proven),
+            1 => Ok(Self::Disproven),
+            2 => Ok(Self::Inconclusive),
+            3 => Ok(Self::Timeout),
+            4 => Ok(Self::Crash),
+            5 => Ok(Self::SolverDisagreement),
+            _ => Err(EvidenceError::InvalidResultTag),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Evidence envelope builder
+// ---------------------------------------------------------------------------
+
+/// Builder for [`EvidenceEnvelope`].
+///
+/// Provides incremental, validated construction of evidence envelopes.
+/// All required fields must be set before calling [`build`](Self::build).
+/// The builder is consumed on build, preventing reuse after a failed attempt.
+///
+/// # Example
+///
+/// ```
+/// use zeno_fcis_codec::Hash32;
+/// use zeno_fcis_evidence::{
+///     Assumption, CoverageDeclaration, EvidenceEnvelopeBuilder,
+///     EvidenceResult, SourceBindings, ToolIdentity,
+/// };
+/// use zeno_fcis_refine::ToolKind;
+///
+/// let tool = ToolIdentity::try_new("kani", "0.62.0", Hash32::new([1; 32])).unwrap();
+/// let bindings = SourceBindings::try_new(
+///     Hash32::new([2; 32]),
+///     Hash32::new([3; 32]),
+///     Hash32::new([4; 32]),
+///     Hash32::new([5; 32]),
+/// ).unwrap();
+/// let envelope = EvidenceEnvelopeBuilder::new(tool, ToolKind::Kani, bindings)
+///     .query_id("theorem_001")
+///     .claim_hash(Hash32::new([6; 32]))
+///     .artifact_digest(Hash32::new([7; 32]))
+///     .result(EvidenceResult::Proven)
+///     .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
+///     .build()
+///     .unwrap();
+/// assert_eq!(envelope.kind(), ToolKind::Kani);
+/// ```
+#[derive(Clone, Debug)]
+pub struct EvidenceEnvelopeBuilder {
+    tool: ToolIdentity,
+    kind: ToolKind,
+    bindings: SourceBindings,
+    query_id: Option<Box<str>>,
+    claim_hash: Option<Hash32>,
+    assumptions: Vec<Assumption>,
+    result: Option<EvidenceResult>,
+    artifact_digest: Option<Hash32>,
+    coverage: Option<CoverageDeclaration>,
+}
+
+impl EvidenceEnvelopeBuilder {
+    /// Creates a builder with the required identity fields.
+    #[must_use]
+    pub fn new(tool: ToolIdentity, kind: ToolKind, bindings: SourceBindings) -> Self {
+        Self {
+            tool,
+            kind,
+            bindings,
+            query_id: None,
+            claim_hash: None,
+            assumptions: Vec::new(),
+            result: None,
+            artifact_digest: None,
+            coverage: None,
+        }
+    }
+
+    /// Sets the query identifier.
+    #[must_use]
+    pub fn query_id(mut self, value: &str) -> Self {
+        self.query_id = Some(Box::from(value));
+        self
+    }
+
+    /// Sets the claim hash.
+    #[must_use]
+    pub fn claim_hash(mut self, value: Hash32) -> Self {
+        self.claim_hash = Some(value);
+        self
+    }
+
+    /// Sets the artifact digest.
+    #[must_use]
+    pub fn artifact_digest(mut self, value: Hash32) -> Self {
+        self.artifact_digest = Some(value);
+        self
+    }
+
+    /// Sets the evidence result.
+    #[must_use]
+    pub fn result(mut self, value: EvidenceResult) -> Self {
+        self.result = Some(value);
+        self
+    }
+
+    /// Sets the coverage declaration.
+    #[must_use]
+    pub fn coverage(mut self, value: CoverageDeclaration) -> Self {
+        self.coverage = Some(value);
+        self
+    }
+
+    /// Adds an assumption.
+    #[must_use]
+    pub fn assumption(mut self, value: Assumption) -> Self {
+        self.assumptions.push(value);
+        self
+    }
+
+    /// Sets all assumptions, replacing any previously added.
+    #[must_use]
+    pub fn assumptions(mut self, values: Vec<Assumption>) -> Self {
+        self.assumptions = values;
+        self
+    }
+
+    /// Builds the validated evidence envelope.
+    ///
+    /// Returns an error if any required field is missing or invalid.
+    pub fn build(self) -> Result<EvidenceEnvelope, EvidenceError> {
+        let query_id = self.query_id.ok_or(EvidenceError::MissingQueryId)?;
+        let claim_hash = self.claim_hash.ok_or(EvidenceError::MissingClaimHash)?;
+        let result = self.result.ok_or(EvidenceError::MissingResult)?;
+        let artifact_digest = self
+            .artifact_digest
+            .ok_or(EvidenceError::MissingArtifactDigest)?;
+        let coverage = self.coverage.ok_or(EvidenceError::MissingCoverage)?;
+        EvidenceEnvelope::try_new(
+            self.tool,
+            self.kind,
+            self.bindings,
+            &query_id,
+            claim_hash,
+            self.assumptions,
+            result,
+            artifact_digest,
+            coverage,
+        )
+    }
+}
+
 fn validate_query_id(query_id: &str) -> Result<(), EvidenceError> {
     if query_id.is_empty() || !query_id.is_ascii() || query_id.len() > MAX_QUERY_ID_BYTES {
         return Err(EvidenceError::InvalidQueryId);
@@ -893,6 +1095,18 @@ pub enum EvidenceError {
     },
     /// Promotion gate has duplicate or excessive tool requirements.
     InvalidPromotionGate,
+    /// Builder was missing the query identifier.
+    MissingQueryId,
+    /// Builder was missing the claim hash.
+    MissingClaimHash,
+    /// Builder was missing the evidence result.
+    MissingResult,
+    /// Builder was missing the artifact digest.
+    MissingArtifactDigest,
+    /// Builder was missing the coverage declaration.
+    MissingCoverage,
+    /// Evidence result tag was not a valid variant.
+    InvalidResultTag,
 }
 
 impl fmt::Display for EvidenceError {
@@ -933,6 +1147,12 @@ impl fmt::Display for EvidenceError {
                 write!(formatter, "duplicate tool evidence kind {kind:?}")
             }
             Self::InvalidPromotionGate => formatter.write_str("invalid promotion gate"),
+            Self::MissingQueryId => formatter.write_str("missing query identifier"),
+            Self::MissingClaimHash => formatter.write_str("missing claim hash"),
+            Self::MissingResult => formatter.write_str("missing evidence result"),
+            Self::MissingArtifactDigest => formatter.write_str("missing artifact digest"),
+            Self::MissingCoverage => formatter.write_str("missing coverage declaration"),
+            Self::InvalidResultTag => formatter.write_str("invalid evidence result tag"),
         }
     }
 }
