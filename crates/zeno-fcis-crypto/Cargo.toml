@@ -1,0 +1,25 @@
+[package]
+name = "zeno-fcis-crypto"
+description = "Vetted cryptographic commitment providers for ZenoFCIS"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[features]
+default = ["rustcrypto"]
+std = []
+rustcrypto = ["dep:sha2"]
+libcrux = ["dep:libcrux-sha2"]
+parity = ["rustcrypto", "libcrux"]
+
+[dependencies]
+zeno-fcis-codec = { path = "../zeno-fcis-codec", default-features = false }
+sha2 = { version = "=0.11.0", default-features = false, optional = true }
+libcrux-sha2 = { version = "=0.0.8", default-features = false, optional = true }
+
+[lints]
+workspace = true
