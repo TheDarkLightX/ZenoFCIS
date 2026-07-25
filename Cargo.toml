@@ -1,0 +1,37 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/zeno-fcis",
+    "crates/zeno-fcis-core",
+    "crates/zeno-fcis-value",
+    "crates/zeno-fcis-codec",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/TheDarkLightX/ZenoFCIS"
+homepage = "https://github.com/TheDarkLightX/ZenoFCIS"
+authors = ["TheDarkLightX and ZenoFCIS contributors"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+
+[profile.release]
+overflow-checks = true
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+overflow-checks = true

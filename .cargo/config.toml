@@ -1,0 +1,5 @@
+[build]
+rustdocflags = ["-D", "warnings"]
+
+[term]
+color = "always"
