@@ -6,6 +6,7 @@ members = [
     "crates/zeno-fcis-value",
     "crates/zeno-fcis-codec",
     "crates/zeno-fcis-crypto",
+    "crates/zeno-fcis-schema",
     "crates/zeno-fcis-patch",
     "crates/zeno-fcis-plan",
     "crates/zeno-fcis-receipt",
@@ -13,8 +14,8 @@ members = [
     "crates/zeno-fcis-compose",
     "crates/zeno-fcis-refine",
     "crates/zeno-fcis-profile-zenodex",
-    "crates/zeno-fcis-schema",
     "crates/zeno-fcis-codegen",
+    "crates/zeno-fcis-codegen-fixture",
 ]
 
 [workspace.package]
