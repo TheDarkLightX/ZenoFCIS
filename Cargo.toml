@@ -17,6 +17,7 @@ members = [
     "crates/zeno-fcis-codegen",
     "crates/zeno-fcis-codegen-fixture",
     "crates/zeno-fcis-evidence",
+    "crates/zeno-fcis-collections",
 ]
 
 [workspace.package]
