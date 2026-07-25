@@ -522,11 +522,11 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), CodegenError> {
 }
 
 /// Computes the commitment over the complete ordered vector set.
-pub(crate) fn set_hash(
+pub(crate) fn set_hash<E>(
     _domain_name: &'static str,
     cases: &[VectorCase],
-    hash: impl Fn(&[u8]) -> Hash32,
-) -> Hash32 {
+    hash: impl Fn(&[u8]) -> Result<Hash32, E>,
+) -> Result<Hash32, E> {
     let mut preimage = Vec::new();
     for case in cases {
         preimage.extend_from_slice(case.name.as_bytes());
@@ -749,8 +749,12 @@ mod tests {
         let schema = fixture_schema();
         let left = build(&schema).unwrap_or_else(|e| panic!("build failed: {e}"));
         let right = build(&schema).unwrap_or_else(|e| panic!("build failed: {e}"));
-        let left_hash = set_hash("zeno-fcis/vectors", &left, XorHasher::hash);
-        let right_hash = set_hash("zeno-fcis/vectors", &right, XorHasher::hash);
+        let left_hash = set_hash("zeno-fcis/vectors", &left, |bytes| {
+            Ok::<_, core::convert::Infallible>(XorHasher::hash(bytes))
+        });
+        let right_hash = set_hash("zeno-fcis/vectors", &right, |bytes| {
+            Ok::<_, core::convert::Infallible>(XorHasher::hash(bytes))
+        });
         assert_eq!(left_hash, right_hash);
         assert_eq!(left, right);
     }

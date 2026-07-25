@@ -1,0 +1,31 @@
+name: fuzz-build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+jobs:
+  harnesses:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned fuzz toolchain
+        run: |
+          rustup toolchain install nightly-2026-07-21 --profile minimal
+          cargo +nightly-2026-07-21 install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Build parser and candidate harnesses
+        run: |
+          cargo +nightly-2026-07-21 fuzz build codec_roundtrip
+          cargo +nightly-2026-07-21 fuzz build candidate_bundle

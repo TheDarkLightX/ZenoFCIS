@@ -19,10 +19,10 @@ std = [
 ]
 
 [dependencies]
-zeno-fcis-codec = { path = "../zeno-fcis-codec", default-features = false }
-zeno-fcis-core = { path = "../zeno-fcis-core", default-features = false }
-zeno-fcis-refine = { path = "../zeno-fcis-refine", default-features = false }
-zeno-fcis-value = { path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine", default-features = false }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
 
 [lints]
 workspace = true

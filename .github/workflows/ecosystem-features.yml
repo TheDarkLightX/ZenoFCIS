@@ -41,3 +41,4 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features rustcrypto-sha256 --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features verified-sha256 --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features sha256-parity --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --features full --locked

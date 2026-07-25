@@ -14,14 +14,14 @@ default = ["std"]
 std = []
 
 [dependencies]
-zeno-fcis-codec = { path = "../zeno-fcis-codec" }
-zeno-fcis-patch = { path = "../zeno-fcis-patch" }
-zeno-fcis-value = { path = "../zeno-fcis-value" }
-zeno-fcis-codegen = { path = "../zeno-fcis-codegen" }
-zeno-fcis-schema = { path = "../zeno-fcis-schema" }
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
+zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch" }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value" }
+zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen" }
+zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema" }
 
 [build-dependencies]
-zeno-fcis-codegen = { path = "../zeno-fcis-codegen" }
+zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen" }
 
 [lints]
 workspace = true

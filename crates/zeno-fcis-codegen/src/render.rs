@@ -29,8 +29,8 @@ pub fn generate(schema: &Schema, spec: &GenerationSpec) -> Result<GeneratedBundl
     let cases = vectors::build(schema)?;
 
     let vector_set_hash = vectors::set_hash("zeno-fcis/vector-set", &cases, |bytes| {
-        hash_bytes("zeno-fcis/vector-set", bytes).unwrap_or(Hash32::ZERO)
-    });
+        hash_bytes("zeno-fcis/vector-set", bytes)
+    })?;
 
     let rust = render_rust(schema, spec, schema_hash, &schema_bytes, &constants, &cases)?;
     let python_module = python::render_adapter_module(schema, spec, &cases)?;
@@ -174,7 +174,7 @@ fn render_rust(
     output.push_str("use zeno_fcis_value::{Field, MapEntry, Value, ValueError};\n\n");
     let _ = writeln!(output, "pub const GENERATOR_ID: &str = \"{GENERATOR_ID}\";");
     let _ = writeln!(output, "pub const FORMATTER_ID: &str = \"{FORMATTER_ID}\";");
-    let _ = writeln!(
+    writeln!(
         output,
         "pub const RUST_MODULE: &str = \"{}\";",
         spec.rust_module()
@@ -190,18 +190,18 @@ fn render_rust(
         "pub const PROFILE_VERSION: u16 = {};",
         schema.version()
     );
-    let _ = writeln!(
+    writeln!(
         output,
         "pub const ROOT_TYPE_ID: u32 = {};",
         schema.root_type().get()
     )
     .map_err(|_| CodegenError::LengthOverflow)?;
-    let _ = writeln!(
+    writeln!(
         output,
         "pub const SCHEMA_HASH_HEX: &str = \"{schema_hash}\";"
     )
     .map_err(|_| CodegenError::LengthOverflow)?;
-    let _ = writeln!(
+    writeln!(
         output,
         "pub const SCHEMA_BYTES_HEX: &str = \"{}\";\n",
         hex(schema_bytes)
