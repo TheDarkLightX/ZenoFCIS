@@ -385,3 +385,68 @@ fn btreemap_empty_map_value_is_map() {
     let value = map.to_value_map();
     assert_eq!(value.kind(), zeno_fcis_value::ValueKind::Map);
 }
+
+// ---------------------------------------------------------------------------
+// LogicalEntry::try_new validation tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn logical_entry_try_new_accepts_matching_encoding() {
+    let key = Value::U128(42);
+    let encoded = key
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode: {e}"));
+    let result = LogicalEntry::try_new(encoded, key.clone(), Value::U128(99));
+    assert!(result.is_ok());
+    let entry = result.unwrap_or_else(|e| panic!("entry: {e}"));
+    assert_eq!(entry.key(), &Value::U128(42));
+}
+
+#[test]
+fn logical_entry_try_new_rejects_mismatched_encoding() {
+    let key = Value::U128(42);
+    let wrong_encoded = vec![0_u8, 1, 2, 3];
+    let result = LogicalEntry::try_new(wrong_encoded, key, Value::U128(99));
+    assert!(matches!(result, Err(MapError::KeyEncodingMismatch { .. })));
+}
+
+#[test]
+fn logical_entry_try_new_rejects_empty_encoding() {
+    let key = Value::U128(42);
+    let result = LogicalEntry::try_new(vec![], key, Value::U128(99));
+    assert!(matches!(result, Err(MapError::KeyEncodingMismatch { .. })));
+}
+
+// ---------------------------------------------------------------------------
+// Canonical round-trip test
+// ---------------------------------------------------------------------------
+
+#[test]
+fn btreemap_canonical_bytes_round_trip_is_stable() {
+    let map = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20))
+        .insert(make_entry(3, 30));
+    let bytes_v1 = map.canonical_bytes();
+    let bytes_v2 = map.canonical_bytes();
+    assert_eq!(bytes_v1, bytes_v2, "canonical bytes must be deterministic");
+    assert!(
+        bytes_v1.len() > 10,
+        "canonical bytes must contain map header and entries"
+    );
+}
+
+#[test]
+fn btreemap_canonical_bytes_differ_for_different_maps() {
+    let map_a = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20));
+    let map_b = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 99));
+    assert_ne!(
+        map_a.canonical_bytes(),
+        map_b.canonical_bytes(),
+        "different values must produce different canonical bytes"
+    );
+}

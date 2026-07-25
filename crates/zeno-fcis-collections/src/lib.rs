@@ -38,6 +38,10 @@ pub struct LogicalEntry {
 
 impl LogicalEntry {
     /// Creates a logical entry.
+    ///
+    /// This constructor does not validate that `encoded_key` matches the
+    /// canonical encoding of `key`. Use [`try_new`](Self::try_new) for
+    /// validated construction.
     #[must_use]
     pub fn new(encoded_key: Vec<u8>, key: Value, value: Value) -> Self {
         Self {
@@ -45,6 +49,27 @@ impl LogicalEntry {
             key,
             value,
         }
+    }
+
+    /// Creates a validated logical entry, checking that `encoded_key` matches
+    /// the canonical encoding of `key`.
+    ///
+    /// This enforces the CBC invariant that the encoded key is the canonical
+    /// encoding of the semantic key, preventing inconsistent entries that
+    /// would fail at the codec boundary.
+    pub fn try_new(encoded_key: Vec<u8>, key: Value, value: Value) -> Result<Self, MapError> {
+        let expected = key.canonical_bytes()?;
+        if encoded_key != expected {
+            return Err(MapError::KeyEncodingMismatch {
+                expected: expected.into_boxed_slice(),
+                actual: encoded_key.into_boxed_slice(),
+            });
+        }
+        Ok(Self {
+            encoded_key: encoded_key.into_boxed_slice(),
+            key,
+            value,
+        })
     }
 
     /// Returns the authoritative encoded key bytes.
@@ -83,6 +108,13 @@ pub enum MapError {
     ValueMap(ValueError),
     /// Canonical encoding failed.
     Encoding(EncodeError),
+    /// Encoded key does not match the canonical encoding of the semantic key.
+    KeyEncodingMismatch {
+        /// Expected canonical encoding.
+        expected: Box<[u8]>,
+        /// Actual encoded key provided.
+        actual: Box<[u8]>,
+    },
 }
 
 impl From<ValueError> for MapError {
@@ -102,6 +134,12 @@ impl core::fmt::Display for MapError {
         match self {
             Self::ValueMap(error) => write!(formatter, "value map error: {error}"),
             Self::Encoding(error) => write!(formatter, "encoding error: {error}"),
+            Self::KeyEncodingMismatch { expected, actual } => write!(
+                formatter,
+                "encoded key does not match canonical encoding of semantic key (expected {} bytes, got {} bytes)",
+                expected.len(),
+                actual.len()
+            ),
         }
     }
 }
@@ -113,12 +151,26 @@ impl std::error::Error for MapError {}
 // Persistent map trait
 // ---------------------------------------------------------------------------
 
+/// Sealed module preventing external implementations of [`PersistentMap`].
+///
+/// Only vetted backends within this crate can implement the trait, ensuring
+/// that all backends pass differential testing and meet the authority
+/// boundary requirements.
+mod private {
+    /// Sealed trait marker.
+    pub trait Sealed {}
+}
+
 /// A persistent map with structural sharing.
 ///
 /// All implementations must produce identical `Value::Map` values for the same
 /// logical entries, regardless of insertion history. The canonical encoding
 /// is defined over the materialized entries, not the backend's internal shape.
-pub trait PersistentMap: Clone {
+///
+/// This trait is sealed: only vetted backends within this crate can implement
+/// it, preventing untested external implementations from entering the
+/// protocol boundary.
+pub trait PersistentMap: Clone + private::Sealed {
     /// Creates an empty map.
     fn empty() -> Self;
 
