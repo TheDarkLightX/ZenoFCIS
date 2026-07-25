@@ -291,6 +291,7 @@ pub struct EvidenceEnvelope {
     kind: ToolKind,
     bindings: SourceBindings,
     query_id: Box<str>,
+    claim_hash: Hash32,
     assumptions: Box<[Assumption]>,
     result: EvidenceResult,
     artifact_digest: Hash32,
@@ -313,6 +314,7 @@ impl EvidenceEnvelope {
         kind: ToolKind,
         bindings: SourceBindings,
         query_id: &str,
+        claim_hash: Hash32,
         assumptions: Vec<Assumption>,
         result: EvidenceResult,
         artifact_digest: Hash32,
@@ -320,6 +322,9 @@ impl EvidenceEnvelope {
     ) -> Result<Self, EvidenceError> {
         bindings.validate()?;
         validate_query_id(query_id)?;
+        if claim_hash == Hash32::ZERO {
+            return Err(EvidenceError::ZeroClaimHash);
+        }
         if assumptions.len() > MAX_ASSUMPTIONS {
             return Err(EvidenceError::TooManyAssumptions);
         }
@@ -337,6 +342,7 @@ impl EvidenceEnvelope {
             kind,
             bindings,
             query_id: Box::from(query_id),
+            claim_hash,
             assumptions: assumptions.into_boxed_slice(),
             result,
             artifact_digest,
@@ -368,6 +374,12 @@ impl EvidenceEnvelope {
         &self.query_id
     }
 
+    /// Returns the claim commitment (hash of the theorem/query statement).
+    #[must_use]
+    pub const fn claim_hash(&self) -> Hash32 {
+        self.claim_hash
+    }
+
     /// Returns the declared assumptions.
     #[must_use]
     pub fn assumptions(&self) -> &[Assumption] {
@@ -394,14 +406,13 @@ impl EvidenceEnvelope {
 
     /// Converts to a `ToolEvidence` for the refine crate's promotion pipeline.
     ///
-    /// The `claim` is the query identity hash, the `artifact` is the retained
+    /// The `claim` is the provided claim hash, the `artifact` is the retained
     /// artifact digest, and the `toolchain` is the tool binary hash.
     #[must_use]
     pub fn to_tool_evidence(&self) -> ToolEvidence {
-        let claim = query_id_hash(&self.query_id);
         ToolEvidence::new(
             self.kind,
-            claim,
+            self.claim_hash,
             self.artifact_digest,
             self.tool.binary_hash,
         )
@@ -413,14 +424,6 @@ fn validate_query_id(query_id: &str) -> Result<(), EvidenceError> {
         return Err(EvidenceError::InvalidQueryId);
     }
     Ok(())
-}
-
-pub(crate) fn query_id_hash(query_id: &str) -> Hash32 {
-    let mut bytes = [0_u8; 32];
-    let src = query_id.as_bytes();
-    let len = src.len().min(32);
-    bytes[..len].copy_from_slice(&src[..len]);
-    Hash32::new(bytes)
 }
 
 // ---------------------------------------------------------------------------
@@ -438,6 +441,7 @@ impl CanonicalEncode for EvidenceEnvelope {
         output.extend_from_slice(self.bindings.schema_hash.as_bytes());
         output.extend_from_slice(self.bindings.algorithm_hash.as_bytes());
         put_text(output, &self.query_id)?;
+        output.extend_from_slice(self.claim_hash.as_bytes());
         let assumption_count =
             u16::try_from(self.assumptions.len()).map_err(|_| EncodeError::LengthOverflow)?;
         output.extend_from_slice(&assumption_count.to_be_bytes());
@@ -515,8 +519,8 @@ pub struct StructuralChecker;
 
 impl EvidenceChecker for StructuralChecker {
     fn check(&self, envelope: &EvidenceEnvelope) -> bool {
-        let expected = query_id_hash(envelope.query_id());
-        envelope.artifact_digest() == expected
+        envelope.claim_hash() != Hash32::ZERO
+            && envelope.artifact_digest() != Hash32::ZERO
             && envelope.tool().binary_hash() != Hash32::ZERO
             && envelope.result().is_conclusive_success()
     }
@@ -760,6 +764,8 @@ pub enum EvidenceError {
     UnboundAlgorithm,
     /// Query identifier was empty, non-ASCII, or too long.
     InvalidQueryId,
+    /// Claim hash was zero.
+    ZeroClaimHash,
     /// Assumption label was empty, non-ASCII, or too long.
     InvalidAssumptionLabel,
     /// Assumption statement hash was zero.
@@ -810,6 +816,7 @@ impl fmt::Display for EvidenceError {
             Self::UnboundSchema => formatter.write_str("schema binding is zero"),
             Self::UnboundAlgorithm => formatter.write_str("algorithm binding is zero"),
             Self::InvalidQueryId => formatter.write_str("invalid query identifier"),
+            Self::ZeroClaimHash => formatter.write_str("claim hash is zero"),
             Self::InvalidAssumptionLabel => formatter.write_str("invalid assumption label"),
             Self::ZeroAssumptionHash => formatter.write_str("assumption statement hash is zero"),
             Self::TooManyAssumptions => formatter.write_str("too many assumptions"),

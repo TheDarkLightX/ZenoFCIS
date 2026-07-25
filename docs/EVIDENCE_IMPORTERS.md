@@ -8,6 +8,7 @@
 - A `SourceBindings` struct binding the source commit, profile hash, schema
   hash, and algorithm hash.
 - A query identifier (theorem or model-checking query name).
+- A claim hash (cryptographic commitment to the theorem/query statement).
 - A list of named assumptions with statement hashes.
 - An `EvidenceResult` (Proven, Disproven, Inconclusive, Timeout, Crash,
   SolverDisagreement).
@@ -58,7 +59,7 @@ crates under ZenoFCIS control.
 ### Laws
 
 1. **Fail-closed construction**: envelopes with blocking results, unbound
-   bindings, zero digests, or unbounded coverage are rejected at construction.
+   bindings, zero digests (claim or artifact), or unbounded coverage are rejected at construction.
 2. **Binding consistency**: the importer rejects envelopes whose source
    bindings do not match the importer's bindings (stale commit, profile
    mismatch, schema mismatch, algorithm mismatch).
@@ -96,8 +97,8 @@ crates under ZenoFCIS control.
 - The `EvidenceChecker` implementation is trusted to correctly validate
   retained artifacts. The `StructuralChecker` is a minimal structural check,
   not a proof verification. Production code must supply a real checker.
-- The `query_id_hash` function is a deterministic identity hash, not a
-  cryptographic commitment. It is used only for `ToolEvidence` conversion.
+- The `claim_hash` field is provided by the caller, who is responsible for
+  computing a proper cryptographic commitment to the theorem/query statement.
 - The promotion gate does not verify the correctness of the proof itself; it
   verifies that the required evidence is present and independently checked.
 
