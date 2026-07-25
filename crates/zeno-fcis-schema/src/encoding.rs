@@ -4,13 +4,9 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-use zeno_fcis_codec::{
-    CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment,
-};
+use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 
-use crate::{
-    EnumVariantDef, FieldDef, Schema, SchemaError, SumVariantDef, TypeDef, TypeKind,
-};
+use crate::{EnumVariantDef, FieldDef, Schema, SchemaError, SumVariantDef, TypeDef, TypeKind};
 
 const SCHEMA_MAGIC: &[u8; 13] = b"ZFCISSCHEMA1\0";
 const KIND_UNIT: u8 = 0;
@@ -43,9 +39,7 @@ impl CanonicalEncode for Schema {
 impl Schema {
     /// Computes the schema commitment under the fixed ZenoFCIS schema domain.
     pub fn schema_hash<H: CommitmentHasher>(&self) -> Result<Hash32, SchemaError> {
-        let bytes = self
-            .canonical_bytes()
-            .map_err(|_| SchemaError::Encoding)?;
+        let bytes = self.canonical_bytes().map_err(|_| SchemaError::Encoding)?;
         let domain = Domain::new("zeno-fcis/schema", 1).map_err(|_| SchemaError::Encoding)?;
         commitment::<H>(domain, &bytes).map_err(|_| SchemaError::Encoding)
     }
@@ -138,18 +132,12 @@ fn encode_field(output: &mut Vec<u8>, field: &FieldDef) -> Result<(), EncodeErro
     Ok(())
 }
 
-fn encode_enum_variant(
-    output: &mut Vec<u8>,
-    variant: &EnumVariantDef,
-) -> Result<(), EncodeError> {
+fn encode_enum_variant(output: &mut Vec<u8>, variant: &EnumVariantDef) -> Result<(), EncodeError> {
     output.extend_from_slice(&variant.id().get().to_be_bytes());
     put_text(output, variant.name().as_str())
 }
 
-fn encode_sum_variant(
-    output: &mut Vec<u8>,
-    variant: &SumVariantDef,
-) -> Result<(), EncodeError> {
+fn encode_sum_variant(output: &mut Vec<u8>, variant: &SumVariantDef) -> Result<(), EncodeError> {
     output.extend_from_slice(&variant.id().get().to_be_bytes());
     put_text(output, variant.name().as_str())?;
     match variant.payload() {

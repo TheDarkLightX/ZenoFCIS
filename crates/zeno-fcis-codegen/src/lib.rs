@@ -14,9 +14,7 @@ pub use render::{GENERATOR_ID, generate};
 
 #[cfg(test)]
 mod tests {
-    use zeno_fcis_schema::{
-        FieldDef, FieldId, Schema, SchemaLimits, TypeDef, TypeId, TypeKind,
-    };
+    use zeno_fcis_schema::{FieldDef, FieldId, Schema, SchemaLimits, TypeDef, TypeId, TypeKind};
 
     use super::*;
 
@@ -34,11 +32,7 @@ mod tests {
             Ok(value) => value,
             Err(error) => panic!("amount type rejected: {error}"),
         };
-        let amount_field = match FieldDef::try_new(
-            FieldId::new(7),
-            "amount",
-            TypeId::new(1),
-        ) {
+        let amount_field = match FieldDef::try_new(FieldId::new(7), "amount", TypeId::new(1)) {
             Ok(value) => value,
             Err(error) => panic!("field rejected: {error}"),
         };
