@@ -51,11 +51,22 @@ jobs:
           cargo +1.97.1 generate-lockfile
           cargo +1.97.1 fmt --all
 
-      - name: Verify integrated workspace
+      - name: Capture integrated workspace diagnostics
+        shell: bash
         run: |
-          cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
-          cargo +1.97.1 test --workspace --all-features --locked
-          cargo +1.97.1 test --workspace --doc --all-features --locked
+          set +e
+          mkdir -p internal/workspace-integration-diagnostics
+          LOG=internal/workspace-integration-diagnostics/rust.log
+          : > "${LOG}"
+          status=0
+          run_check() {
+            printf '\n===== %s =====\n' "$1" >> "${LOG}"
+            shift
+            "$@" >> "${LOG}" 2>&1 || status=$?
+          }
+          run_check clippy cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
+          run_check tests cargo +1.97.1 test --workspace --all-features --locked
+          run_check doctests cargo +1.97.1 test --workspace --doc --all-features --locked
           for crate in \
             zeno-fcis-core \
             zeno-fcis-value \
@@ -71,17 +82,31 @@ jobs:
             zeno-fcis-schema \
             zeno-fcis
           do
-            cargo +1.97.1 check -p "${crate}" --no-default-features --locked --target wasm32-unknown-unknown
+            run_check "no_std-${crate}" cargo +1.97.1 check -p "${crate}" --no-default-features --locked --target wasm32-unknown-unknown
           done
-          cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features rustcrypto --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features libcrux --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features parity --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis --no-default-features --features schema --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis --features codegen --locked
-          cargo +1.97.1 check -p zeno-fcis --no-default-features --features rustcrypto-sha256 --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis --no-default-features --features verified-sha256 --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis --no-default-features --features sha256-parity --locked --target wasm32-unknown-unknown
-          RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+          run_check crypto-rustcrypto cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features rustcrypto --locked --target wasm32-unknown-unknown
+          run_check crypto-libcrux cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features libcrux --locked --target wasm32-unknown-unknown
+          run_check crypto-parity cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features parity --locked --target wasm32-unknown-unknown
+          run_check umbrella-schema cargo +1.97.1 check -p zeno-fcis --no-default-features --features schema --locked --target wasm32-unknown-unknown
+          run_check umbrella-codegen cargo +1.97.1 check -p zeno-fcis --features codegen --locked
+          run_check umbrella-rustcrypto cargo +1.97.1 check -p zeno-fcis --no-default-features --features rustcrypto-sha256 --locked --target wasm32-unknown-unknown
+          run_check umbrella-libcrux cargo +1.97.1 check -p zeno-fcis --no-default-features --features verified-sha256 --locked --target wasm32-unknown-unknown
+          run_check umbrella-parity cargo +1.97.1 check -p zeno-fcis --no-default-features --features sha256-parity --locked --target wasm32-unknown-unknown
+          run_check rustdoc env RUSTDOCFLAGS=-Dwarnings cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+          printf '%s\n' "${status}" > internal/workspace-integration-diagnostics/status.txt
+          exit 0
+
+      - name: Upload exact diagnostics
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: workspace-integration-diagnostics
+          path: internal/workspace-integration-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce verification result
+        run: test "$(cat internal/workspace-integration-diagnostics/status.txt)" = "0"
 
       - name: Commit exact integrated review surface
         run: |
