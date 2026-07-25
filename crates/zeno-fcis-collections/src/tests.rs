@@ -450,3 +450,126 @@ fn btreemap_canonical_bytes_differ_for_different_maps() {
         "different values must produce different canonical bytes"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Property-based insertion-history independence tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn btreemap_insertion_order_independence_all_permutations() {
+    let entries = vec![
+        make_entry(1, 10),
+        make_entry(2, 20),
+        make_entry(3, 30),
+        make_entry(4, 40),
+        make_entry(5, 50),
+    ];
+    let permutations = [
+        [0_usize, 1, 2, 3, 4],
+        [4, 3, 2, 1, 0],
+        [2, 0, 4, 1, 3],
+        [3, 1, 4, 2, 0],
+        [1, 3, 0, 2, 4],
+        [4, 0, 3, 1, 2],
+        [0, 4, 1, 3, 2],
+        [2, 4, 0, 3, 1],
+    ];
+    let reference = {
+        let mut map = BTreeMapBackend::empty();
+        for entry in &entries {
+            map = map.insert(entry.clone());
+        }
+        map.canonical_bytes()
+    };
+    for perm in &permutations {
+        let mut map = BTreeMapBackend::empty();
+        for &idx in perm {
+            map = map.insert(entries[idx].clone());
+        }
+        assert_eq!(
+            map.canonical_bytes(),
+            reference,
+            "insertion order {:?} produced different canonical bytes",
+            perm
+        );
+    }
+}
+
+#[test]
+fn btreemap_remove_then_reinsert_is_identity() {
+    let original = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20))
+        .insert(make_entry(3, 30));
+    let original_bytes = original.canonical_bytes();
+    let key = encoded_key_for(2);
+    let after_remove = original.remove(&key);
+    let after_reinsert = after_remove.insert(make_entry(2, 20));
+    assert_eq!(
+        after_reinsert.canonical_bytes(),
+        original_bytes,
+        "remove then reinsert must produce identical canonical bytes"
+    );
+}
+
+#[test]
+fn btreemap_update_value_changes_bytes_but_key_set_stable() {
+    let original = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20));
+    let updated = original.insert(make_entry(2, 99));
+    assert_ne!(
+        original.canonical_bytes(),
+        updated.canonical_bytes(),
+        "updating a value must change canonical bytes"
+    );
+    assert_eq!(
+        original.len(),
+        updated.len(),
+        "updating a value must not change entry count"
+    );
+    let original_entries = original.to_entries();
+    let original_keys: Vec<Vec<u8>> = original_entries
+        .iter()
+        .map(|e| e.encoded_key().to_vec())
+        .collect();
+    let updated_entries = updated.to_entries();
+    let updated_keys: Vec<Vec<u8>> = updated_entries
+        .iter()
+        .map(|e| e.encoded_key().to_vec())
+        .collect();
+    assert_eq!(
+        original_keys, updated_keys,
+        "key set must be stable after update"
+    );
+}
+
+#[test]
+fn btreemap_multiple_removes_are_cumulative() {
+    let map = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20))
+        .insert(make_entry(3, 30))
+        .insert(make_entry(4, 40));
+    let after_one = map.remove(&encoded_key_for(1));
+    assert_eq!(after_one.len(), 3);
+    let after_two = after_one.remove(&encoded_key_for(3));
+    assert_eq!(after_two.len(), 2);
+    let after_three = after_two.remove(&encoded_key_for(2));
+    assert_eq!(after_three.len(), 1);
+    let after_four = after_three.remove(&encoded_key_for(4));
+    assert_eq!(after_four.len(), 0);
+    assert!(after_four.is_empty());
+}
+
+#[test]
+fn btreemap_get_after_remove_returns_none() {
+    let map = BTreeMapBackend::empty()
+        .insert(make_entry(1, 10))
+        .insert(make_entry(2, 20));
+    let key = encoded_key_for(1);
+    assert!(map.get(&key).is_some());
+    let after_remove = map.remove(&key);
+    assert!(after_remove.get(&key).is_none());
+    assert!(map.get(&key).is_some(), "original must be unchanged");
+}
