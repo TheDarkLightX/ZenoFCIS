@@ -1,0 +1,253 @@
+//! Deterministic renderers and manifest construction.
+
+use std::collections::BTreeSet;
+use std::fmt::Write as _;
+
+use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, Hash32, commitment};
+use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_schema::{Schema, TypeKind};
+
+use crate::{CodegenError, GeneratedBundle, GeneratedFile, GenerationSpec};
+
+/// Stable generator semantics identifier.
+pub const GENERATOR_ID: &str = "zeno-fcis-codegen/1";
+
+/// Generates Rust/Python constants, canonical schema bytes, and a manifest.
+pub fn generate(
+    schema: &Schema,
+    spec: &GenerationSpec,
+) -> Result<GeneratedBundle, CodegenError> {
+    let schema_bytes = schema
+        .canonical_bytes()
+        .map_err(|_| CodegenError::SchemaEncoding)?;
+    let schema_hash = schema
+        .schema_hash::<RustCryptoSha256>()
+        .map_err(|_| CodegenError::SchemaEncoding)?;
+    let constants = collect_constants(schema)?;
+
+    let rust = render_rust(schema, spec, schema_hash, &schema_bytes, &constants);
+    let python = render_python(schema, spec, schema_hash, &schema_bytes, &constants);
+
+    let mut files = vec![
+        GeneratedFile::new(
+            format!("python/{}.py", spec.python_module()),
+            python.into_bytes(),
+        ),
+        GeneratedFile::new(
+            format!("rust/{}.rs", spec.rust_module()),
+            rust.into_bytes(),
+        ),
+        GeneratedFile::new("schema.zcve".to_owned(), schema_bytes),
+    ];
+    files.sort_by(|left, right| left.path().cmp(right.path()));
+
+    let manifest = render_manifest(schema_hash, &files)?;
+    let manifest_hash = hash_bytes("zeno-fcis/generation-manifest", manifest.as_bytes())?;
+    files.push(GeneratedFile::new(
+        "MANIFEST.zfcis".to_owned(),
+        manifest.into_bytes(),
+    ));
+    files.sort_by(|left, right| left.path().cmp(right.path()));
+
+    Ok(GeneratedBundle::new(
+        GENERATOR_ID,
+        schema_hash,
+        manifest_hash,
+        files,
+    ))
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct Constant {
+    name: String,
+    value: u32,
+}
+
+fn collect_constants(schema: &Schema) -> Result<Vec<Constant>, CodegenError> {
+    let mut seen = BTreeSet::new();
+    let mut constants = Vec::new();
+    for type_definition in schema.types() {
+        let type_name = constant_fragment(type_definition.name().as_str());
+        push_constant(
+            &mut seen,
+            &mut constants,
+            format!("TYPE_{type_name}"),
+            type_definition.id().get(),
+        )?;
+        match type_definition.kind() {
+            TypeKind::Record { fields } => {
+                for field in fields {
+                    push_constant(
+                        &mut seen,
+                        &mut constants,
+                        format!(
+                            "FIELD_{}_{}",
+                            type_name,
+                            constant_fragment(field.name().as_str())
+                        ),
+                        u32::from(field.id().get()),
+                    )?;
+                }
+            }
+            TypeKind::Enum { variants } => {
+                for variant in variants {
+                    push_constant(
+                        &mut seen,
+                        &mut constants,
+                        format!(
+                            "VARIANT_{}_{}",
+                            type_name,
+                            constant_fragment(variant.name().as_str())
+                        ),
+                        u32::from(variant.id().get()),
+                    )?;
+                }
+            }
+            TypeKind::Sum { variants } => {
+                for variant in variants {
+                    push_constant(
+                        &mut seen,
+                        &mut constants,
+                        format!(
+                            "VARIANT_{}_{}",
+                            type_name,
+                            constant_fragment(variant.name().as_str())
+                        ),
+                        u32::from(variant.id().get()),
+                    )?;
+                }
+            }
+            _ => {}
+        }
+    }
+    constants.sort_by(|left, right| left.name.cmp(&right.name));
+    Ok(constants)
+}
+
+fn push_constant(
+    seen: &mut BTreeSet<String>,
+    constants: &mut Vec<Constant>,
+    name: String,
+    value: u32,
+) -> Result<(), CodegenError> {
+    if !seen.insert(name.clone()) {
+        return Err(CodegenError::ConstantCollision);
+    }
+    constants.push(Constant { name, value });
+    Ok(())
+}
+
+fn constant_fragment(value: &str) -> String {
+    value.to_ascii_uppercase()
+}
+
+fn render_rust(
+    schema: &Schema,
+    spec: &GenerationSpec,
+    schema_hash: Hash32,
+    schema_bytes: &[u8],
+    constants: &[Constant],
+) -> String {
+    let mut output = String::new();
+    output.push_str("// @generated by zeno-fcis-codegen/1; do not edit.\n");
+    output.push_str("#![allow(dead_code)]\n\n");
+    let _ = writeln!(output, "pub const GENERATOR_ID: &str = \"{GENERATOR_ID}\";");
+    let _ = writeln!(
+        output,
+        "pub const RUST_MODULE: &str = \"{}\";",
+        spec.rust_module()
+    );
+    let _ = writeln!(
+        output,
+        "pub const PROFILE_NAME: &str = \"{}\";",
+        schema.profile().as_str()
+    );
+    let _ = writeln!(output, "pub const PROFILE_VERSION: u16 = {};", schema.version());
+    let _ = writeln!(
+        output,
+        "pub const ROOT_TYPE_ID: u32 = {};",
+        schema.root_type().get()
+    );
+    let _ = writeln!(
+        output,
+        "pub const SCHEMA_HASH_HEX: &str = \"{schema_hash}\";"
+    );
+    let _ = writeln!(
+        output,
+        "pub const SCHEMA_BYTES_HEX: &str = \"{}\";\n",
+        hex(schema_bytes)
+    );
+    for constant in constants {
+        let _ = writeln!(
+            output,
+            "pub const {}: u32 = {};",
+            constant.name, constant.value
+        );
+    }
+    output
+}
+
+fn render_python(
+    schema: &Schema,
+    spec: &GenerationSpec,
+    schema_hash: Hash32,
+    schema_bytes: &[u8],
+    constants: &[Constant],
+) -> String {
+    let mut output = String::new();
+    output.push_str("# @generated by zeno-fcis-codegen/1; do not edit.\n");
+    let _ = writeln!(output, "GENERATOR_ID = \"{GENERATOR_ID}\"");
+    let _ = writeln!(
+        output,
+        "PYTHON_MODULE = \"{}\"",
+        spec.python_module()
+    );
+    let _ = writeln!(
+        output,
+        "PROFILE_NAME = \"{}\"",
+        schema.profile().as_str()
+    );
+    let _ = writeln!(output, "PROFILE_VERSION = {}", schema.version());
+    let _ = writeln!(output, "ROOT_TYPE_ID = {}", schema.root_type().get());
+    let _ = writeln!(output, "SCHEMA_HASH_HEX = \"{schema_hash}\"");
+    let _ = writeln!(
+        output,
+        "SCHEMA_BYTES_HEX = \"{}\"\n",
+        hex(schema_bytes)
+    );
+    for constant in constants {
+        let _ = writeln!(output, "{} = {}", constant.name, constant.value);
+    }
+    output
+}
+
+fn render_manifest(schema_hash: Hash32, files: &[GeneratedFile]) -> Result<String, CodegenError> {
+    let mut output = String::new();
+    let _ = writeln!(output, "generator={GENERATOR_ID}");
+    let _ = writeln!(output, "schema_hash={schema_hash}");
+    for file in files {
+        let file_hash = hash_bytes("zeno-fcis/generated-file", file.bytes())?;
+        let length = u64::try_from(file.bytes().len()).map_err(|_| CodegenError::LengthOverflow)?;
+        let _ = writeln!(
+            output,
+            "file={}\tlength={}\tsha256={}",
+            file.path(), length, file_hash
+        );
+    }
+    Ok(output)
+}
+
+fn hash_bytes(domain_name: &'static str, bytes: &[u8]) -> Result<Hash32, CodegenError> {
+    let domain = Domain::new(domain_name, 1).map_err(|_| CodegenError::SchemaEncoding)?;
+    commitment::<RustCryptoSha256>(domain, bytes).map_err(|_| CodegenError::SchemaEncoding)
+}
+
+fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        output.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        output.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    output
+}
