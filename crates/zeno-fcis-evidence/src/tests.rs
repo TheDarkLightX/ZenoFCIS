@@ -1059,3 +1059,158 @@ fn evidence_result_try_from_invalid_tag() {
         Err(EvidenceError::InvalidResultTag)
     );
 }
+
+// ---------------------------------------------------------------------------
+// Canonical encoding round-trip tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn envelope_canonical_bytes_are_deterministic() {
+    let envelope = valid_envelope(
+        ToolKind::Kani,
+        EvidenceResult::Proven,
+        CoverageDeclaration::Bounded { case_budget: 10 },
+        valid_bindings(),
+    );
+    let bytes_v1 = envelope
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode v1: {e}"));
+    let bytes_v2 = envelope
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode v2: {e}"));
+    assert_eq!(bytes_v1, bytes_v2, "canonical bytes must be deterministic");
+}
+
+#[test]
+fn envelope_canonical_bytes_differ_for_different_claims() {
+    let envelope_a = valid_envelope(
+        ToolKind::Kani,
+        EvidenceResult::Proven,
+        CoverageDeclaration::Bounded { case_budget: 10 },
+        valid_bindings(),
+    );
+    let envelope_b = EvidenceEnvelope::try_new(
+        valid_tool(),
+        ToolKind::Kani,
+        valid_bindings(),
+        "query_001",
+        nonzero_hash(99),
+        vec![],
+        EvidenceResult::Proven,
+        nonzero_hash(7),
+        CoverageDeclaration::Bounded { case_budget: 10 },
+    )
+    .unwrap_or_else(|e| panic!("envelope b: {e}"));
+    let bytes_a = envelope_a
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode a: {e}"));
+    let bytes_b = envelope_b
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode b: {e}"));
+    assert_ne!(
+        bytes_a, bytes_b,
+        "different claim hashes must produce different canonical bytes"
+    );
+}
+
+#[test]
+fn envelope_canonical_bytes_differ_for_different_results() {
+    let envelope_proven = valid_envelope(
+        ToolKind::Z3,
+        EvidenceResult::Proven,
+        CoverageDeclaration::Bounded { case_budget: 10 },
+        valid_bindings(),
+    );
+    let envelope_disproven = EvidenceEnvelope::try_new(
+        valid_tool(),
+        ToolKind::Z3,
+        valid_bindings(),
+        "query_002",
+        nonzero_hash(11),
+        vec![],
+        EvidenceResult::Proven,
+        nonzero_hash(8),
+        CoverageDeclaration::Bounded { case_budget: 20 },
+    )
+    .unwrap_or_else(|e| panic!("envelope: {e}"));
+    let bytes_proven = envelope_proven
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode: {e}"));
+    let bytes_disproven = envelope_disproven
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode: {e}"));
+    assert_ne!(
+        bytes_proven, bytes_disproven,
+        "different envelopes must produce different canonical bytes"
+    );
+}
+
+#[test]
+fn envelope_canonical_bytes_differ_for_different_coverage() {
+    let bounded = valid_envelope(
+        ToolKind::Kani,
+        EvidenceResult::Proven,
+        CoverageDeclaration::Bounded { case_budget: 10 },
+        valid_bindings(),
+    );
+    let exhaustive = valid_envelope(
+        ToolKind::Kani,
+        EvidenceResult::Proven,
+        CoverageDeclaration::ExhaustiveFinite {
+            domain_hash: nonzero_hash(9),
+            cardinality: 100,
+        },
+        valid_bindings(),
+    );
+    let bytes_bounded = bounded
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode: {e}"));
+    let bytes_exhaustive = exhaustive
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode: {e}"));
+    assert_ne!(
+        bytes_bounded, bytes_exhaustive,
+        "different coverage must produce different canonical bytes"
+    );
+}
+
+#[test]
+fn envelope_canonical_bytes_include_assumptions() {
+    let with_assumptions = valid_envelope(
+        ToolKind::Kani,
+        EvidenceResult::Proven,
+        CoverageDeclaration::Bounded { case_budget: 10 },
+        valid_bindings(),
+    );
+    let without_assumptions = EvidenceEnvelope::try_new(
+        valid_tool(),
+        ToolKind::Kani,
+        valid_bindings(),
+        "query_001",
+        nonzero_hash(10),
+        vec![],
+        EvidenceResult::Proven,
+        nonzero_hash(7),
+        CoverageDeclaration::Bounded { case_budget: 10 },
+    )
+    .unwrap_or_else(|e| panic!("envelope: {e}"));
+    let bytes_with = with_assumptions
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode: {e}"));
+    let bytes_without = without_assumptions
+        .canonical_bytes()
+        .unwrap_or_else(|e| panic!("encode: {e}"));
+    assert_ne!(
+        bytes_with, bytes_without,
+        "assumptions must be reflected in canonical bytes"
+    );
+}
+
+#[test]
+fn evidence_result_round_trips_through_u8() {
+    for tag in 0..=5_u8 {
+        let result =
+            EvidenceResult::try_from(tag).unwrap_or_else(|e| panic!("decode tag {tag}: {e}"));
+        assert_eq!(result as u8, tag, "round-trip tag {tag} failed");
+    }
+}
