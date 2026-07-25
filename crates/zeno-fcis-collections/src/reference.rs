@@ -4,6 +4,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use super::{LogicalEntry, PersistentMap};
+use crate::private::Sealed;
 
 /// A persistent map backed by a standard `BTreeMap`.
 ///
@@ -14,6 +15,8 @@ use super::{LogicalEntry, PersistentMap};
 pub struct BTreeMapBackend {
     entries: BTreeMap<Box<[u8]>, (crate::Value, crate::Value)>,
 }
+
+impl Sealed for BTreeMapBackend {}
 
 impl BTreeMapBackend {
     #[must_use]
