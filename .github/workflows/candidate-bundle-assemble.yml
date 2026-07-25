@@ -8,6 +8,12 @@ on:
     paths:
       - "internal/candidate-bundle-payload/**"
       - ".github/workflows/candidate-bundle-assemble.yml"
+  pull_request:
+    branches:
+      - agent/semantic-kernel-v1
+    paths:
+      - "internal/candidate-bundle-payload/**"
+      - ".github/workflows/candidate-bundle-assemble.yml"
 
 permissions:
   contents: write
