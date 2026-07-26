@@ -639,6 +639,7 @@ impl fmt::Display for SynthesisError {
 }
 
 #[cfg(feature = "std")]
+#[cfg(feature = "std")]
 impl std::error::Error for SynthesisError {}
 
 #[cfg(test)]
