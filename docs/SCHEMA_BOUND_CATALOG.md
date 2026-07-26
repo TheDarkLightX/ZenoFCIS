@@ -35,6 +35,8 @@ ProjectCatalog
 
 The catalog does not replace project business rules. It prevents a shell or adapter from silently changing the set or shape of operations after a transition has produced a plan.
 
+`ProjectCatalog::try_new` also closes the schema/profile type boundary. The profile's state, command, and context type identifiers must exist in the schema, and the profile's state type must equal the schema's declared root type. Effect payload types and channel destination and payload types must likewise exist before the catalog can be constructed.
+
 ## Reason definitions
 
 Each reason binds:
@@ -93,6 +95,28 @@ The delivery-policy commitment may identify project-specific retry, acknowledgem
 - children in any one collection.
 
 Validation returns `CatalogMetrics`, which can be retained in receipts, evidence, performance reports, or deterministic budget accounting.
+
+## Inputs, outputs, and laws
+
+Catalog construction consumes one owned `ProjectProfile`, one owned closed `Schema`, one owned `CatalogManifest`, explicit `CatalogLimits`, and a selected `CommitmentHasher`. Its authoritative output is either an immutable `ProjectCatalog` or one typed `CatalogError`. Plan admission consumes immutable `CommitPlan` and `OutboxPlan` values and returns exact `CatalogMetrics` only after every ID, type, commitment requirement, and bound succeeds.
+
+The implemented laws are:
+
+- definition declaration order does not change the normalized manifest or its bytes;
+- reason precedence is exactly the gap-free range `0..reason_count`;
+- the profile schema, precedence, effect-registry, and channel-registry commitments equal the catalog commitments;
+- the profile state type equals the schema root, while command, context, effect, destination, and payload types all exist in that schema;
+- the profile contains every exact reason, effect, and channel entry and no hidden entries in those namespaces;
+- each admitted plan ID is nonzero and registered, each value satisfies its declared schema, and each effect satisfies its authority and subject rules;
+- returned metrics equal the validated plan pair and never exceed the configured per-value or aggregate envelope.
+
+Negative tests cover noncontiguous precedence, wrong profile bindings, hidden profile effects, schema-root divergence, unknown effect and channel IDs, wrong effect authority and subject commitments, wrong effect/channel payload shapes, cross-class reasons, and aggregate payload overflow. Existing `CommitPlan` and `OutboxPlan` constructors separately reject duplicate ordinals and canonicalize operation order.
+
+## Trusted dependencies and assumptions
+
+The crate adds no external dependency. It reuses the workspace's closed value, canonical codec, schema, profile, plan, and decision crates with default features disabled. It assumes the selected commitment provider is collision resistant for promoted use, the profile's definition and policy commitments identify independently reviewed meaning, and callers retain the resulting catalog identity with any validation evidence they treat as authoritative.
+
+Catalog validation is deterministic and performs no I/O, time reads, randomness, threading, global mutation, interior mutation, or external delivery. Work is bounded by the definition, plan-item, depth, node, byte, and collection limits declared above.
 
 ## Construction order
 
