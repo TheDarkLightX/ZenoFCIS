@@ -65,13 +65,7 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --features mounted-zenodex --locked
           RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
 
-      - name: Pull and test exact mounted ZenoDEX Rust workspace
-        run: |
-          cargo +1.74.1 fmt --manifest-path integration/zenodex/rust-runtime/Cargo.toml --all -- --check
-          cargo +1.74.1 clippy --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
-          cargo +1.74.1 test --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --locked
-
-      - name: Commit validated formatting and lockfile
+      - name: Commit validated ZenoFCIS formatting and lockfile
         if: github.event_name == 'push'
         run: |
           git config user.name 'ZenoFCIS universal project assembler'
@@ -91,3 +85,12 @@ jobs:
           fi
           git commit -m 'feat: generalize project profiles and mounted runtimes'
           git push origin HEAD:agent/universal-project-runtime-v1
+
+      - name: Check exact mounted ZenoDEX formatting
+        run: cargo +1.74.1 fmt --manifest-path integration/zenodex/rust-runtime/Cargo.toml --all -- --check
+
+      - name: Lint exact mounted ZenoDEX Rust workspace
+        run: cargo +1.74.1 clippy --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
+
+      - name: Test exact mounted ZenoDEX Rust workspace
+        run: cargo +1.74.1 test --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --locked
