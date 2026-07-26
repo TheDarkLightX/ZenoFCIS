@@ -37,8 +37,10 @@ are supplied by the mounted `JsonLineRuntime` implementation as runtime errors.
 
 ## Nonclaims
 
-This crate does not ship or certify a particular ZenoDEX binary or Python
-module. A promotion run must mount the exact external revisions, enforce its
-timeout and process sandbox, persist generated replay fixtures, and submit the
-result through the evidence and promotion gates. Passing adapter unit tests is
-not mounted runtime-refinement evidence and grants no production authority.
+The generic adapter does not certify arbitrary ZenoDEX binaries or Python
+modules. Its concrete single-vault zUSD runner mounts the exact external
+revision documented in `MOUNTED_ZENODEX_ZUSD_V1.md`, enforces bounded process
+and transport controls, persists generated replay fixtures, and retains one
+bounded parity report. That report is mounted runtime-refinement evidence only
+for its declared corpus and revisions. Passing generic adapter unit tests is
+not mounted evidence. Neither result grants production authority.
