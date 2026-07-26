@@ -674,14 +674,27 @@ impl BackendResponse {
         if !identity.capabilities.supports(request.operation) {
             return Err(BackendError::UnsupportedOperation(request.operation));
         }
+        let usage = BackendUsage::try_new(
+            request.limits,
+            usage.logical_fuel,
+            usage.candidates,
+            usage.output_bytes,
+            usage.trace_entries,
+        )?;
         let output_length = outcome
             .canonical_bytes()
             .map_err(BackendError::Encode)?
             .len();
         let output_length =
             u64::try_from(output_length).map_err(|_| BackendError::OutputTooLarge)?;
-        if output_length > request.limits.max_output_bytes || output_length > usage.output_bytes {
+        if output_length > request.limits.max_output_bytes {
             return Err(BackendError::OutputTooLarge);
+        }
+        if output_length != usage.output_bytes {
+            return Err(BackendError::OutputUsageMismatch {
+                actual: output_length,
+                reported: usage.output_bytes,
+            });
         }
         Ok(Self {
             request_hash: request.commitment()?,
@@ -737,6 +750,22 @@ impl BackendResponse {
             self.usage.output_bytes,
             self.usage.trace_entries,
         )?;
+        let output_length = self
+            .outcome
+            .canonical_bytes()
+            .map_err(BackendError::Encode)?
+            .len();
+        let output_length =
+            u64::try_from(output_length).map_err(|_| BackendError::OutputTooLarge)?;
+        if output_length > request.limits.max_output_bytes {
+            return Err(BackendError::OutputTooLarge);
+        }
+        if output_length != self.usage.output_bytes {
+            return Err(BackendError::OutputUsageMismatch {
+                actual: output_length,
+                reported: self.usage.output_bytes,
+            });
+        }
         Ok(())
     }
 
@@ -1067,12 +1096,31 @@ impl<E: BackendEngine, V: BackendVerifier> CandidateChecker for SynthesisBackend
         let Ok(run) = execute_verified(&mut self.engine, &mut self.verifier, &request) else {
             return CheckResult::Indeterminate;
         };
-        match run.response.outcome() {
-            BackendOutcome::Accepted(accepted) => CheckResult::Accepted {
-                compiled: accepted.artifact().clone(),
-                reference_claim: accepted.reference_claim(),
-                composition_claim: accepted.composition_claim(),
-            },
+        let Ok(certificate_hash) = run.certificate().commitment() else {
+            return CheckResult::Indeterminate;
+        };
+        match run.response().outcome() {
+            BackendOutcome::Accepted(accepted) => {
+                let Ok(reference_claim) = bind_verified_claim(
+                    "zeno-fcis/backend-synthesis-reference",
+                    accepted.reference_claim(),
+                    certificate_hash,
+                ) else {
+                    return CheckResult::Indeterminate;
+                };
+                let Ok(composition_claim) = bind_verified_claim(
+                    "zeno-fcis/backend-synthesis-composition",
+                    accepted.composition_claim(),
+                    certificate_hash,
+                ) else {
+                    return CheckResult::Indeterminate;
+                };
+                CheckResult::Accepted {
+                    compiled: accepted.artifact().clone(),
+                    reference_claim,
+                    composition_claim,
+                }
+            }
             BackendOutcome::Rejected(rejected) => CheckResult::Rejected {
                 counterexample: rejected.counterexample().clone(),
             },
@@ -1081,6 +1129,17 @@ impl<E: BackendEngine, V: BackendVerifier> CandidateChecker for SynthesisBackend
             }
         }
     }
+}
+
+fn bind_verified_claim(
+    domain: &'static str,
+    claim: Hash32,
+    certificate_hash: Hash32,
+) -> Result<Hash32, BackendError> {
+    let mut bytes = Vec::with_capacity(64);
+    bytes.extend_from_slice(claim.as_bytes());
+    bytes.extend_from_slice(certificate_hash.as_bytes());
+    hash_bytes(domain, &bytes)
 }
 
 fn put_u16_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
@@ -1136,6 +1195,13 @@ pub enum BackendError {
     InvalidAdditionalClaims,
     /// Canonical output exceeds the declared output budget.
     OutputTooLarge,
+    /// Reported output-byte usage differs from the exactly encoded outcome.
+    OutputUsageMismatch {
+        /// Exact canonical outcome byte count.
+        actual: u64,
+        /// Backend-reported output byte count.
+        reported: u64,
+    },
     /// Response does not bind the expected request.
     RequestMismatch,
     /// Response does not bind the expected backend identity.
@@ -1191,6 +1257,10 @@ impl fmt::Display for BackendError {
                 formatter.write_str("backend additional claims are invalid")
             }
             Self::OutputTooLarge => formatter.write_str("backend output exceeds declared bound"),
+            Self::OutputUsageMismatch { actual, reported } => write!(
+                formatter,
+                "backend reported {reported} output bytes but encoded {actual}"
+            ),
             Self::RequestMismatch => {
                 formatter.write_str("backend response request binding mismatch")
             }
@@ -1294,6 +1364,58 @@ mod tests {
     }
 
     #[test]
+    fn response_revalidates_usage_against_request_limits() {
+        let request = request(BackendOperation::Verify);
+        let identity = identity(vec![BackendOperation::Verify]);
+        let outcome = BackendOutcome::Rejected(
+            RejectedOutcome::try_new(Value::Unit, hash(30))
+                .unwrap_or_else(|error| panic!("outcome: {error}")),
+        );
+        let output_bytes = u64::try_from(
+            outcome
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("outcome bytes: {error}"))
+                .len(),
+        )
+        .unwrap_or_else(|error| panic!("output length: {error}"));
+        let permissive = BackendLimits::try_new(20_000, 200, 1_000_000, 2_000)
+            .unwrap_or_else(|error| panic!("permissive limits: {error}"));
+        let usage = BackendUsage::try_new(permissive, 10_001, 1, output_bytes, 1)
+            .unwrap_or_else(|error| panic!("usage: {error}"));
+        assert!(matches!(
+            BackendResponse::try_new(&request, &identity, usage, outcome),
+            Err(BackendError::UsageExceedsLimit)
+        ));
+    }
+
+    #[test]
+    fn response_requires_exact_output_byte_accounting() {
+        let request = request(BackendOperation::Verify);
+        let identity = identity(vec![BackendOperation::Verify]);
+        let outcome = BackendOutcome::Rejected(
+            RejectedOutcome::try_new(Value::Unit, hash(31))
+                .unwrap_or_else(|error| panic!("outcome: {error}")),
+        );
+        let actual = u64::try_from(
+            outcome
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("outcome bytes: {error}"))
+                .len(),
+        )
+        .unwrap_or_else(|error| panic!("output length: {error}"));
+        let reported = actual + 1;
+        let usage = BackendUsage::try_new(request.limits(), 1, 1, reported, 1)
+            .unwrap_or_else(|error| panic!("usage: {error}"));
+        assert!(matches!(
+            BackendResponse::try_new(&request, &identity, usage, outcome),
+            Err(BackendError::OutputUsageMismatch {
+                actual: observed,
+                reported: declared,
+            }) if observed == actual && declared == reported
+        ));
+    }
+
+    #[test]
     fn response_requires_advertised_operation() {
         let request = request(BackendOperation::Verify);
         let identity = identity(vec![BackendOperation::Synthesize]);
@@ -1309,7 +1431,9 @@ mod tests {
         ));
     }
 
-    struct MockVerifier;
+    struct MockVerifier {
+        claim_hash: Hash32,
+    }
 
     impl BackendVerifier for MockVerifier {
         fn verifier_hash(&self) -> Hash32 {
@@ -1322,7 +1446,7 @@ mod tests {
             _response: &BackendResponse,
         ) -> VerificationDecision {
             VerificationDecision::Attested {
-                claim_hash: hash(41),
+                claim_hash: self.claim_hash,
             }
         }
     }
@@ -1379,14 +1503,56 @@ mod tests {
     }
 
     #[test]
+    fn synthesis_result_binds_independent_verifier_attestation() {
+        let make_checker = |claim_hash| {
+            let engine = MockEngine {
+                identity: identity(vec![BackendOperation::Synthesize]),
+            };
+            let template = BackendRequestTemplate::try_new(hash(60), hash(61), hash(62), limits())
+                .unwrap_or_else(|error| panic!("template: {error}"));
+            SynthesisBackendChecker::try_new(engine, MockVerifier { claim_hash }, template)
+                .unwrap_or_else(|error| panic!("checker: {error}"))
+        };
+        let hole = Hole::try_new(
+            HoleId::try_new(1).unwrap_or_else(|error| panic!("hole id: {error}")),
+            vec![Value::U128(2), Value::U128(1)],
+        )
+        .unwrap_or_else(|error| panic!("hole: {error}"));
+        let problem = SynthesisProblem::try_new(
+            SynthesisBindings {
+                schema_hash: hash(70),
+                contract_hash: hash(71),
+                grammar_hash: hash(72),
+                algorithm_hash: hash(73),
+            },
+            vec![hole],
+            SearchBudget { max_assignments: 2 },
+        )
+        .unwrap_or_else(|error| panic!("problem: {error}"));
+        let mut first_checker = make_checker(hash(41));
+        let mut second_checker = make_checker(hash(42));
+        let first = search(&problem, &mut first_checker)
+            .unwrap_or_else(|error| panic!("first search failed: {error}"));
+        let second = search(&problem, &mut second_checker)
+            .unwrap_or_else(|error| panic!("second search failed: {error}"));
+        assert_ne!(first, second);
+    }
+
+    #[test]
     fn generic_backend_drives_canonical_synthesis() {
         let engine = MockEngine {
             identity: identity(vec![BackendOperation::Synthesize]),
         };
         let template = BackendRequestTemplate::try_new(hash(60), hash(61), hash(62), limits())
             .unwrap_or_else(|error| panic!("template: {error}"));
-        let mut checker = SynthesisBackendChecker::try_new(engine, MockVerifier, template)
-            .unwrap_or_else(|error| panic!("checker: {error}"));
+        let mut checker = SynthesisBackendChecker::try_new(
+            engine,
+            MockVerifier {
+                claim_hash: hash(41),
+            },
+            template,
+        )
+        .unwrap_or_else(|error| panic!("checker: {error}"));
         let hole = Hole::try_new(
             HoleId::try_new(1).unwrap_or_else(|error| panic!("hole id: {error}")),
             vec![Value::U128(2), Value::U128(1)],
