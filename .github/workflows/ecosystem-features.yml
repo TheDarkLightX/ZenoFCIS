@@ -13,7 +13,7 @@ permissions:
 jobs:
   features:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -33,10 +33,18 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features parity --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-crypto --all-features --locked
 
+      - name: Synthesis and backend matrix
+        run: |
+          cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis-backend --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 test -p zeno-fcis-backend --all-features --locked
+
       - name: Umbrella feature matrix
         run: |
           cargo +1.97.1 check -p zeno-fcis --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features schema --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features synthesis --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --features codegen --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-runtime --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-zenodex --locked
