@@ -27,7 +27,8 @@ fn make_entry(key_byte: u8, value_byte: u8) -> LogicalEntry {
     let encoded_key = key
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode key: {e}"));
-    LogicalEntry::new(encoded_key, key, Value::U128(u128::from(value_byte)))
+    LogicalEntry::try_new(encoded_key, key, Value::U128(u128::from(value_byte)))
+        .unwrap_or_else(|error| panic!("logical entry: {error}"))
 }
 
 fn make_entry_text(key_text: &str, value_byte: u8) -> LogicalEntry {
@@ -35,7 +36,8 @@ fn make_entry_text(key_text: &str, value_byte: u8) -> LogicalEntry {
     let encoded_key = key
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode key: {e}"));
-    LogicalEntry::new(encoded_key, key, Value::U128(u128::from(value_byte)))
+    LogicalEntry::try_new(encoded_key, key, Value::U128(u128::from(value_byte)))
+        .unwrap_or_else(|error| panic!("logical entry: {error}"))
 }
 
 // ---------------------------------------------------------------------------
@@ -384,6 +386,47 @@ fn btreemap_empty_map_value_is_map() {
     let map = BTreeMapBackend::empty();
     let value = map.to_value_map();
     assert_eq!(value.kind(), zeno_fcis_value::ValueKind::Map);
+}
+
+#[derive(Clone)]
+struct CorruptStoredKeyBackend;
+
+impl super::private::Sealed for CorruptStoredKeyBackend {}
+
+impl PersistentMap for CorruptStoredKeyBackend {
+    fn empty() -> Self {
+        Self
+    }
+
+    fn insert(&self, _entry: LogicalEntry) -> Self {
+        self.clone()
+    }
+
+    fn remove(&self, _encoded_key: &[u8]) -> Self {
+        self.clone()
+    }
+
+    fn get(&self, _encoded_key: &[u8]) -> Option<&Value> {
+        None
+    }
+
+    fn len(&self) -> usize {
+        1
+    }
+
+    fn to_entries(&self) -> Vec<LogicalEntry> {
+        vec![LogicalEntry::from_stored_parts(
+            vec![0xff],
+            Value::U128(42),
+            Value::Unit,
+        )]
+    }
+}
+
+#[test]
+fn materialization_rejects_a_backend_stored_key_mismatch() {
+    let result = CorruptStoredKeyBackend.try_to_value_map();
+    assert!(matches!(result, Err(MapError::KeyEncodingMismatch { .. })));
 }
 
 // ---------------------------------------------------------------------------

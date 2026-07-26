@@ -15,21 +15,11 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
+use zeno_fcis_value::zcve::{
+    TAG_BOOL_FALSE, TAG_BOOL_TRUE, TAG_BYTES, TAG_ENUM, TAG_I128, TAG_MAP, TAG_RECORD, TAG_SUM,
+    TAG_TEXT, TAG_TUPLE, TAG_U128, TAG_UNIT, TAG_VECTOR,
+};
 use zeno_fcis_value::{Field, MapEntry, Value, ValueError, ValueLimits};
-
-const TAG_UNIT: u8 = 0x00;
-const TAG_BOOL_FALSE: u8 = 0x01;
-const TAG_BOOL_TRUE: u8 = 0x02;
-const TAG_U128: u8 = 0x03;
-const TAG_I128: u8 = 0x04;
-const TAG_BYTES: u8 = 0x05;
-const TAG_TEXT: u8 = 0x06;
-const TAG_ENUM: u8 = 0x07;
-const TAG_TUPLE: u8 = 0x08;
-const TAG_RECORD: u8 = 0x09;
-const TAG_SUM: u8 = 0x0a;
-const TAG_VECTOR: u8 = 0x0b;
-const TAG_MAP: u8 = 0x0c;
 const ENVELOPE_MAGIC: &[u8; 8] = b"ZFCISV1\0";
 const HASH_MAGIC: &[u8; 14] = b"ZENOFCIS-HASH\0";
 
@@ -150,104 +140,17 @@ pub trait CanonicalEncode {
 
 impl CanonicalEncode for Value {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
-        self.validate_limits(ValueLimits::default())
-            .map_err(EncodeError::InvalidValue)?;
-        encode_value(self, output)
+        self.encode_zcve_to(output).map_err(map_value_encode_error)
     }
 }
 
-fn encode_value(value: &Value, output: &mut Vec<u8>) -> Result<(), EncodeError> {
-    match value {
-        Value::Unit => output.push(TAG_UNIT),
-        Value::Bool(false) => output.push(TAG_BOOL_FALSE),
-        Value::Bool(true) => output.push(TAG_BOOL_TRUE),
-        Value::U128(integer) => {
-            output.push(TAG_U128);
-            output.extend_from_slice(&integer.to_be_bytes());
-        }
-        Value::I128(integer) => {
-            output.push(TAG_I128);
-            output.extend_from_slice(&integer.to_be_bytes());
-        }
-        Value::Bytes(bytes) => {
-            output.push(TAG_BYTES);
-            put_bytes(output, bytes)?;
-        }
-        Value::Text(text) => {
-            if !text.is_ascii() {
-                return Err(EncodeError::NonAsciiText);
-            }
-            output.push(TAG_TEXT);
-            put_bytes(output, text.as_bytes())?;
-        }
-        Value::Enum { type_id, variant } => {
-            output.push(TAG_ENUM);
-            output.extend_from_slice(&type_id.to_be_bytes());
-            output.extend_from_slice(&variant.to_be_bytes());
-        }
-        Value::Tuple(items) => {
-            output.push(TAG_TUPLE);
-            put_length(output, items.len())?;
-            for item in items {
-                encode_value(item, output)?;
-            }
-        }
-        Value::Record(fields) => {
-            output.push(TAG_RECORD);
-            put_length(output, fields.len())?;
-            let mut previous = None;
-            for field in fields {
-                if previous.is_some_and(|value| value >= field.id()) {
-                    return Err(EncodeError::NonCanonicalRecord);
-                }
-                previous = Some(field.id());
-                output.extend_from_slice(&field.id().to_be_bytes());
-                encode_value(field.value(), output)?;
-            }
-        }
-        Value::Sum {
-            type_id,
-            variant,
-            payload,
-        } => {
-            output.push(TAG_SUM);
-            output.extend_from_slice(&type_id.to_be_bytes());
-            output.extend_from_slice(&variant.to_be_bytes());
-            match payload {
-                None => output.push(0),
-                Some(value) => {
-                    output.push(1);
-                    encode_value(value, output)?;
-                }
-            }
-        }
-        Value::Vector(items) => {
-            output.push(TAG_VECTOR);
-            put_length(output, items.len())?;
-            for item in items {
-                encode_value(item, output)?;
-            }
-        }
-        Value::Map(entries) => {
-            output.push(TAG_MAP);
-            put_length(output, entries.len())?;
-            let mut previous: Option<&[u8]> = None;
-            for entry in entries {
-                if previous.is_some_and(|value| value >= entry.encoded_key()) {
-                    return Err(EncodeError::NonCanonicalMap);
-                }
-                let actual_key = entry.key().canonical_bytes()?;
-                if actual_key.as_slice() != entry.encoded_key() {
-                    return Err(EncodeError::MapKeyMismatch);
-                }
-                previous = Some(entry.encoded_key());
-                put_bytes(output, entry.encoded_key())?;
-                let encoded_value = entry.value().canonical_bytes()?;
-                put_bytes(output, &encoded_value)?;
-            }
-        }
+fn map_value_encode_error(error: ValueError) -> EncodeError {
+    match error {
+        ValueError::RecordFieldOrder { .. } => EncodeError::NonCanonicalRecord,
+        ValueError::MapKeyOrder => EncodeError::NonCanonicalMap,
+        ValueError::NonAsciiText => EncodeError::NonAsciiText,
+        other => EncodeError::InvalidValue(other),
     }
-    Ok(())
 }
 
 fn put_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
@@ -576,8 +479,12 @@ fn decode_value_inner(
                     return Err(DecodeError::NonCanonical);
                 }
 
-                previous = Some(encoded_key.clone());
-                entries.push(MapEntry::new(encoded_key, key, value));
+                let entry = MapEntry::try_new(key, value).map_err(DecodeError::InvalidValue)?;
+                if entry.encoded_key() != encoded_key.as_slice() {
+                    return Err(DecodeError::NonCanonical);
+                }
+                previous = Some(encoded_key);
+                entries.push(entry);
             }
             Value::map_canonical(entries).map_err(DecodeError::InvalidValue)
         }
@@ -856,12 +763,12 @@ mod tests {
     fn map_order_is_encoded_key_order() {
         let key_one = Value::U128(1);
         let key_two = Value::U128(2);
-        let encoded_one = key_one.canonical_bytes();
-        let encoded_two = key_two.canonical_bytes();
-        assert!(encoded_one.is_ok() && encoded_two.is_ok());
+        let entry_one = MapEntry::try_new(key_one, Value::Bool(true));
+        let entry_two = MapEntry::try_new(key_two, Value::Bool(false));
+        assert!(entry_one.is_ok() && entry_two.is_ok());
         let entries = vec![
-            MapEntry::new(encoded_one.unwrap_or_default(), key_one, Value::Bool(true)),
-            MapEntry::new(encoded_two.unwrap_or_default(), key_two, Value::Bool(false)),
+            entry_one.unwrap_or_else(|error| panic!("map entry: {error}")),
+            entry_two.unwrap_or_else(|error| panic!("map entry: {error}")),
         ];
         let map = Value::map_canonical(entries);
         assert!(map.is_ok());
@@ -873,6 +780,27 @@ mod tests {
         assert!(bytes.is_ok());
         let bytes = bytes.unwrap_or_default();
         assert_eq!(decode_value(&bytes, DecodeLimits::default()), Ok(map));
+    }
+
+    #[test]
+    fn map_encoding_preserves_the_zcve_v1_golden_bytes() {
+        let entry = MapEntry::try_new(Value::U128(1), Value::Bool(true));
+        assert!(entry.is_ok());
+        let map = Value::map_canonical(vec![
+            entry.unwrap_or_else(|error| panic!("map entry: {error}")),
+        ]);
+        assert!(map.is_ok());
+        let bytes = map
+            .unwrap_or_else(|error| panic!("map value: {error}"))
+            .canonical_bytes();
+        assert_eq!(
+            bytes,
+            Ok(vec![
+                0x0c, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x11, 0x03, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+                0x00, 0x01, 0x02,
+            ])
+        );
     }
 
     #[test]
