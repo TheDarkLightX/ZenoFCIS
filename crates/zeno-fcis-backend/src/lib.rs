@@ -1122,13 +1122,23 @@ impl<E: BackendEngine, V: BackendVerifier> CandidateChecker for SynthesisBackend
                 }
             }
             BackendOutcome::Rejected(rejected) => CheckResult::Rejected {
-                counterexample: rejected.counterexample().clone(),
+                counterexample: bind_verified_counterexample(
+                    rejected.counterexample(),
+                    certificate_hash,
+                ),
             },
             BackendOutcome::Incomplete(_) | BackendOutcome::Indeterminate(_) => {
                 CheckResult::Indeterminate
             }
         }
     }
+}
+
+fn bind_verified_counterexample(counterexample: &Value, certificate_hash: Hash32) -> Value {
+    Value::tuple(vec![
+        counterexample.clone(),
+        Value::bytes(certificate_hash.as_bytes().to_vec()),
+    ])
 }
 
 fn bind_verified_claim(
@@ -1500,6 +1510,44 @@ mod tests {
             BackendResponse::try_new(request, &self.identity, usage, outcome)
                 .map_err(|_| BackendExecutionError::ProtocolViolation)
         }
+    }
+
+    #[test]
+    fn no_solution_binds_independent_verifier_attestation() {
+        let make_checker = |claim_hash| {
+            let engine = MockEngine {
+                identity: identity(vec![BackendOperation::Synthesize]),
+            };
+            let template = BackendRequestTemplate::try_new(hash(60), hash(61), hash(62), limits())
+                .unwrap_or_else(|error| panic!("template: {error}"));
+            SynthesisBackendChecker::try_new(engine, MockVerifier { claim_hash }, template)
+                .unwrap_or_else(|error| panic!("checker: {error}"))
+        };
+        let hole = Hole::try_new(
+            HoleId::try_new(1).unwrap_or_else(|error| panic!("hole id: {error}")),
+            vec![Value::U128(1), Value::U128(3)],
+        )
+        .unwrap_or_else(|error| panic!("hole: {error}"));
+        let problem = SynthesisProblem::try_new(
+            SynthesisBindings {
+                schema_hash: hash(70),
+                contract_hash: hash(71),
+                grammar_hash: hash(72),
+                algorithm_hash: hash(73),
+            },
+            vec![hole],
+            SearchBudget { max_assignments: 2 },
+        )
+        .unwrap_or_else(|error| panic!("problem: {error}"));
+        let mut first_checker = make_checker(hash(41));
+        let mut second_checker = make_checker(hash(42));
+        let first = search(&problem, &mut first_checker)
+            .unwrap_or_else(|error| panic!("first search failed: {error}"));
+        let second = search(&problem, &mut second_checker)
+            .unwrap_or_else(|error| panic!("second search failed: {error}"));
+        assert!(matches!(&first, SearchResult::NoSolution { .. }));
+        assert!(matches!(&second, SearchResult::NoSolution { .. }));
+        assert_ne!(first, second);
     }
 
     #[test]
