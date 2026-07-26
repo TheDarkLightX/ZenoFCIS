@@ -19,6 +19,7 @@ std = [
     "zeno-fcis-project/std",
     "zeno-fcis-catalog?/std",
     "zeno-fcis-transition?/std",
+    "zeno-fcis-security?/std",
     "zeno-fcis-patch/std",
     "zeno-fcis-plan/std",
     "zeno-fcis-receipt/std",
@@ -40,6 +41,7 @@ sha256-parity = [
 schema = ["dep:zeno-fcis-schema"]
 catalog = ["schema", "dep:zeno-fcis-catalog"]
 transition = ["catalog", "dep:zeno-fcis-transition"]
+security = ["dep:zeno-fcis-security"]
 codegen = ["schema", "dep:zeno-fcis-codegen"]
 evidence = ["std", "dep:zeno-fcis-evidence"]
 mounted-runtime = ["std", "dep:zeno-fcis-adapter"]
@@ -61,6 +63,7 @@ full = [
     "sha256-parity",
     "catalog",
     "transition",
+    "security",
     "codegen",
     "evidence",
     "mounted-zenodex",
@@ -78,6 +81,7 @@ zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-f
 zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project", default-features = false }
 zeno-fcis-catalog = { version = "=0.1.0", path = "../zeno-fcis-catalog", default-features = false, optional = true }
 zeno-fcis-transition = { version = "=0.1.0", path = "../zeno-fcis-transition", default-features = false, optional = true }
+zeno-fcis-security = { version = "=0.1.0", path = "../zeno-fcis-security", default-features = false, optional = true }
 zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch", default-features = false }
 zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan", default-features = false }
 zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt", default-features = false }
