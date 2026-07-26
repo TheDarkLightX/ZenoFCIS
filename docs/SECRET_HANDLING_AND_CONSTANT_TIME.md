@@ -51,7 +51,7 @@ An `ExposurePermit` is a closed structural claim. Anyone who knows its public fi
 
 `SecretBytes<N>` should be preferred whenever secret length may itself carry information. Equality, selection, and assignment visit the complete fixed array. Their secret-derived branch condition is carried by the opaque `SecretChoice` adapter so the external `subtle::Choice` type and its ordinary boolean escape hatches do not enter the public API.
 
-`SecretBox` supports dynamic buffers when length is explicitly public. Its equality operation returns immediately when public lengths differ. Projects must not use it when length is secret.
+`SecretBox` supports exactly sized `Box<[u8]>` buffers when length is explicitly public. Its allocation size, exposed length, and zeroization work are therefore covered by the same bound, without hidden `Vec` spare capacity. Its equality operation returns immediately when public lengths differ. Projects must not use it when length is secret.
 
 Both containers:
 
@@ -76,7 +76,7 @@ The permanent `secret-hardening` workflow runs the crate in an optimized profile
 
 ## Residual risks
 
-Zeroization cannot erase copies created before ownership transfer, previous `Vec` reallocations, compiler spills outside the owned object, swap, crash dumps, hibernation images, device DMA, caches, speculative state, or external copies made by the exposure closure. A secret identity must be public metadata chosen independently of the secret bytes; deriving it by hashing low-entropy secret material would create an offline guessing oracle.
+Zeroization cannot erase copies created before ownership transfer, including reallocations made while preparing a boxed slice, compiler spills outside the owned object, swap, crash dumps, hibernation images, device DMA, caches, speculative state, or external copies made by the exposure closure. A secret identity must be public metadata chosen independently of the secret bytes; deriving it by hashing low-entropy secret material would create an offline guessing oracle.
 
 Constant-time source patterns can be changed by compilation or affected by the processor. Production deployment should additionally consider:
 
