@@ -14,14 +14,25 @@ default = ["std"]
 std = []
 
 [dependencies]
+zeno-fcis-catalog = { version = "=0.1.0", path = "../zeno-fcis-catalog" }
 zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
+zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core" }
 zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch" }
+zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan" }
+zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project" }
+zeno-fcis-transition = { version = "=0.1.0", path = "../zeno-fcis-transition" }
 zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value" }
 zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen" }
 zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema" }
 
 [build-dependencies]
+zeno-fcis-bootstrap = { version = "=0.1.0", path = "../zeno-fcis-bootstrap" }
+zeno-fcis-catalog = { version = "=0.1.0", path = "../zeno-fcis-catalog" }
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
 zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen" }
+zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }
+zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project" }
+zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema" }
 
 [lints]
 workspace = true
