@@ -14,7 +14,8 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
-use alloc::string::{String, ToString};
+#[cfg(test)]
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -405,14 +406,10 @@ impl CatalogManifest {
         let channels = normalize_channels(channels)?;
 
         let precedence_hash = reason_registry_hash::<H>(&reasons)?;
-        let effect_registry_hash = definition_registry_hash::<H, _>(
-            "zeno-fcis/effect-registry",
-            &effects,
-        )?;
-        let channel_registry_hash = definition_registry_hash::<H, _>(
-            "zeno-fcis/channel-registry",
-            &channels,
-        )?;
+        let effect_registry_hash =
+            definition_registry_hash::<H, _>("zeno-fcis/effect-registry", &effects)?;
+        let channel_registry_hash =
+            definition_registry_hash::<H, _>("zeno-fcis/channel-registry", &channels)?;
         let mut entries = Vec::with_capacity(reasons.len() + effects.len() + channels.len());
         for reason in &reasons {
             entries.push(
@@ -780,9 +777,7 @@ impl ProjectCatalog {
             require_schema_type(&schema, channel.payload_type())?;
         }
         validate_profile_registry(&profile, manifest.registry_entries())?;
-        let profile_hash = profile
-            .commitment::<H>()
-            .map_err(CatalogError::Profile)?;
+        let profile_hash = profile.commitment::<H>().map_err(CatalogError::Profile)?;
         Ok(Self {
             profile,
             schema,
@@ -872,10 +867,10 @@ impl ProjectCatalog {
         commit_plan: &CommitPlan,
         outbox_plan: &OutboxPlan,
     ) -> Result<CatalogMetrics, CatalogError> {
-        let effects = u32::try_from(commit_plan.effects().len())
-            .map_err(|_| CatalogError::MetricOverflow)?;
-        let outbox_entries = u32::try_from(outbox_plan.entries().len())
-            .map_err(|_| CatalogError::MetricOverflow)?;
+        let effects =
+            u32::try_from(commit_plan.effects().len()).map_err(|_| CatalogError::MetricOverflow)?;
+        let outbox_entries =
+            u32::try_from(outbox_plan.entries().len()).map_err(|_| CatalogError::MetricOverflow)?;
         if effects > self.limits.max_effects {
             return Err(CatalogError::EffectCountExceeded {
                 limit: self.limits.max_effects,
@@ -1405,11 +1400,19 @@ pub enum CatalogError {
     MetricOverflow,
 }
 
+impl From<EncodeError> for CatalogError {
+    fn from(error: EncodeError) -> Self {
+        Self::Encode(error)
+    }
+}
+
 impl fmt::Display for CatalogError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ZeroCommitment => formatter.write_str("catalog commitment is zero"),
-            Self::ZeroDerivedCommitment => formatter.write_str("derived catalog commitment is zero"),
+            Self::ZeroDerivedCommitment => {
+                formatter.write_str("derived catalog commitment is zero")
+            }
             Self::InvalidHashAlgorithmId => formatter.write_str("invalid hash algorithm identity"),
             Self::HashAlgorithmMismatch => formatter.write_str("catalog hash algorithm mismatch"),
             Self::TooManyDefinitions(kind) => write!(formatter, "too many {kind:?} definitions"),
@@ -1442,7 +1445,11 @@ impl fmt::Display for CatalogError {
                 write!(formatter, "profile is missing {kind:?} entry {}", id.get())
             }
             Self::ProfileEntryMismatch { kind, id } => {
-                write!(formatter, "profile {kind:?} entry {} differs from catalog", id.get())
+                write!(
+                    formatter,
+                    "profile {kind:?} entry {} differs from catalog",
+                    id.get()
+                )
             }
             Self::UnexpectedProfileEntry { kind, id } => {
                 write!(formatter, "unexpected profile {kind:?} entry {}", id.get())
@@ -1452,7 +1459,11 @@ impl fmt::Display for CatalogError {
             Self::UnknownEffect(id) => write!(formatter, "unknown effect {id}"),
             Self::UnknownChannel(id) => write!(formatter, "unknown channel {id}"),
             Self::ReasonDispositionMismatch { id, .. } => {
-                write!(formatter, "reason {} has the wrong decision class", id.get())
+                write!(
+                    formatter,
+                    "reason {} has the wrong decision class",
+                    id.get()
+                )
             }
             Self::EffectHashRequirementMismatch { ordinal, field } => write!(
                 formatter,
@@ -1462,7 +1473,10 @@ impl fmt::Display for CatalogError {
                 role,
                 ordinal,
                 error,
-            } => write!(formatter, "{role:?} at ordinal {ordinal} failed schema: {error}"),
+            } => write!(
+                formatter,
+                "{role:?} at ordinal {ordinal} failed schema: {error}"
+            ),
             Self::StructuralValue {
                 role,
                 ordinal,
@@ -1481,7 +1495,10 @@ impl fmt::Display for CatalogError {
                 write!(formatter, "aggregate node count {actual} exceeds {limit}")
             }
             Self::AggregatePayloadLimit { limit, actual } => {
-                write!(formatter, "aggregate payload bytes {actual} exceeds {limit}")
+                write!(
+                    formatter,
+                    "aggregate payload bytes {actual} exceeds {limit}"
+                )
             }
             Self::MetricOverflow => formatter.write_str("catalog metric arithmetic overflow"),
         }
@@ -1568,31 +1585,37 @@ mod tests {
         Vec<ChannelDefinition>,
     ) {
         (
-            vec![ReasonDefinition::try_new(
-                id(10),
-                name("denied"),
-                ReasonDisposition::Reject,
-                0,
-                hash(10),
-            )
-            .unwrap_or_else(|error| panic!("reason: {error}"))],
-            vec![EffectDefinition::try_new(
-                id(20),
-                name("write"),
-                TypeId::new(4),
-                HashRequirement::Present,
-                HashRequirement::Absent,
-                hash(20),
-            )
-            .unwrap_or_else(|error| panic!("effect: {error}"))],
-            vec![ChannelDefinition::try_new(
-                id(30),
-                name("notify"),
-                TypeId::new(5),
-                TypeId::new(6),
-                hash(30),
-            )
-            .unwrap_or_else(|error| panic!("channel: {error}"))],
+            vec![
+                ReasonDefinition::try_new(
+                    id(10),
+                    name("denied"),
+                    ReasonDisposition::Reject,
+                    0,
+                    hash(10),
+                )
+                .unwrap_or_else(|error| panic!("reason: {error}")),
+            ],
+            vec![
+                EffectDefinition::try_new(
+                    id(20),
+                    name("write"),
+                    TypeId::new(4),
+                    HashRequirement::Present,
+                    HashRequirement::Absent,
+                    hash(20),
+                )
+                .unwrap_or_else(|error| panic!("effect: {error}")),
+            ],
+            vec![
+                ChannelDefinition::try_new(
+                    id(30),
+                    name("notify"),
+                    TypeId::new(5),
+                    TypeId::new(6),
+                    hash(30),
+                )
+                .unwrap_or_else(|error| panic!("channel: {error}")),
+            ],
         )
     }
 
@@ -1608,7 +1631,12 @@ mod tests {
     }
 
     fn profile(schema: &Schema, manifest: &CatalogManifest) -> ProjectProfile {
-        profile_with_effect_hash(schema, manifest, manifest.effect_registry_hash(), Vec::new())
+        profile_with_effect_hash(
+            schema,
+            manifest,
+            manifest.effect_registry_hash(),
+            Vec::new(),
+        )
     }
 
     fn profile_with_effect_hash(
@@ -1632,8 +1660,7 @@ mod tests {
             id(1),
             id(2),
             id(3),
-            DomainPrefix::try_new("example/core")
-                .unwrap_or_else(|error| panic!("domain: {error}")),
+            DomainPrefix::try_new("example/core").unwrap_or_else(|error| panic!("domain: {error}")),
             ProfileBindings {
                 schema_hash: schema
                     .schema_hash::<TestHasher>()
@@ -1654,13 +1681,8 @@ mod tests {
         let schema = schema();
         let manifest = manifest();
         let profile = profile(&schema, &manifest);
-        ProjectCatalog::try_new::<TestHasher>(
-            profile,
-            schema,
-            manifest,
-            CatalogLimits::default(),
-        )
-        .unwrap_or_else(|error| panic!("catalog: {error}"))
+        ProjectCatalog::try_new::<TestHasher>(profile, schema, manifest, CatalogLimits::default())
+            .unwrap_or_else(|error| panic!("catalog: {error}"))
     }
 
     #[test]
@@ -1721,13 +1743,9 @@ mod tests {
     fn profile_may_not_hide_an_extra_effect() {
         let schema = schema();
         let manifest = manifest();
-        let extra = RegistryEntry::try_new(
-            RegistryKind::Effect,
-            id(21),
-            name("hidden-write"),
-            hash(88),
-        )
-        .unwrap_or_else(|error| panic!("extra: {error}"));
+        let extra =
+            RegistryEntry::try_new(RegistryKind::Effect, id(21), name("hidden-write"), hash(88))
+                .unwrap_or_else(|error| panic!("extra: {error}"));
         let profile = profile_with_effect_hash(
             &schema,
             &manifest,
