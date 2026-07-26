@@ -111,7 +111,7 @@ The public ZenoFCIS crate contains no private source and does not assume either 
 
 ## Deterministic synthesis integration
 
-`SynthesisBackendChecker` adapts a verified generic backend to the existing `CandidateChecker` interface. Canonical assignment ordering and search completeness remain owned by `zeno-fcis-synthesis`. The mounted backend checks one assignment at a time; it cannot reorder, omit, or terminate the outer complete-within-bounds search. Accepted synthesis claims are re-committed together with the exact independent `BackendCertificate`, so the outer synthesis certificate binds the request, response, backend identity, verifier identity, and verifier attestation rather than only backend-supplied claim hashes.
+`SynthesisBackendChecker` adapts a verified generic backend to the existing `CandidateChecker` interface. Canonical assignment ordering and search completeness remain owned by `zeno-fcis-synthesis`. The mounted backend checks one assignment at a time; it cannot reorder, omit, or terminate the outer complete-within-bounds search. Accepted synthesis claims are re-committed together with the exact independent `BackendCertificate`, and rejected counterexamples retain that certificate commitment as part of the normalized witness. Both selected and no-solution synthesis certificates therefore bind the request, response, backend identity, verifier identity, and verifier attestation rather than only backend-supplied claims or counterexamples.
 
 The backend and synthesis crates support `no_std + alloc`. Concrete engines normally live in `std` shell crates because they invoke processes, services, solvers, compilers, or models.
 
