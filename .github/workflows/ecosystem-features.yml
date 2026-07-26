@@ -13,7 +13,7 @@ permissions:
 jobs:
   features:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -41,10 +41,13 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis-transition --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-transition --all-features --locked
 
-      - name: Security model matrix
+      - name: Security and secret matrix
         run: |
           cargo +1.97.1 check -p zeno-fcis-security --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-security --all-features --locked
+          cargo +1.97.1 check -p zeno-fcis-secret --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 test -p zeno-fcis-secret --all-features --locked
+          cargo +1.97.1 test -p zeno-fcis-secret --all-features --release --locked
 
       - name: Umbrella feature matrix
         run: |
@@ -55,6 +58,7 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features catalog --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features transition --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features security --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features secret --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --features codegen --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-runtime --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-zenodex --locked

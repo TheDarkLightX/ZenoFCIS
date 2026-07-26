@@ -11,6 +11,7 @@ members = [
     "crates/zeno-fcis-catalog",
     "crates/zeno-fcis-transition",
     "crates/zeno-fcis-security",
+    "crates/zeno-fcis-secret",
     "crates/zeno-fcis-patch",
     "crates/zeno-fcis-plan",
     "crates/zeno-fcis-receipt",
