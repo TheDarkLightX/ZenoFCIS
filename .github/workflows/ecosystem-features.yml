@@ -33,11 +33,13 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features parity --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-crypto --all-features --locked
 
-      - name: Synthesis and backend matrix
+      - name: Synthesis, backend, and transition matrix
         run: |
           cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis-backend --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-backend --all-features --locked
+          cargo +1.97.1 check -p zeno-fcis-transition --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 test -p zeno-fcis-transition --all-features --locked
 
       - name: Umbrella feature matrix
         run: |
@@ -46,6 +48,7 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features synthesis --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features catalog --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features transition --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --features codegen --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-runtime --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-zenodex --locked

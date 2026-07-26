@@ -1187,6 +1187,7 @@ dependencies = [
  "zeno-fcis-shell",
  "zeno-fcis-shell-sqlite",
  "zeno-fcis-synthesis",
+ "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
 
@@ -1414,6 +1415,22 @@ version = "0.1.0"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
+ "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-transition"
+version = "0.1.0"
+dependencies = [
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-core",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-receipt",
+ "zeno-fcis-schema",
  "zeno-fcis-value",
 ]
 
