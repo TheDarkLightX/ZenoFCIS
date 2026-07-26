@@ -15,6 +15,9 @@ pub use zeno_fcis_authenticated as authenticated;
 #[cfg(feature = "backend")]
 /// Checked project-neutral backend protocol for private and external engines.
 pub use zeno_fcis_backend as backend;
+#[cfg(feature = "bootstrap")]
+/// Deterministic project starter generation from reviewed catalogs.
+pub use zeno_fcis_bootstrap as bootstrap;
 #[cfg(feature = "catalog")]
 /// Schema-bound reason, effect, channel, and plan-validation catalogs.
 pub use zeno_fcis_catalog as catalog;
@@ -82,6 +85,12 @@ pub use zeno_fcis_backend::{
     BackendRequest, BackendRequestTemplate, BackendResponse, BackendUsage, BackendVerifier,
     IncompleteOutcome, IndeterminateOutcome, RejectedOutcome, SynthesisBackendChecker,
     VerificationDecision, VerifiedBackendRun, execute_verified, verify_backend_response,
+};
+#[cfg(feature = "bootstrap")]
+pub use zeno_fcis_bootstrap::{
+    BOOTSTRAP_FORMAT_VERSION, BOOTSTRAP_GENERATOR_ID, BootstrapBundle, BootstrapError,
+    BootstrapFile, BootstrapLimits, BootstrapSpec, MAX_BOOTSTRAP_FILE_BYTES, MAX_BOOTSTRAP_FILES,
+    MAX_BOOTSTRAP_TOTAL_BYTES, generate_project,
 };
 #[cfg(feature = "catalog")]
 pub use zeno_fcis_catalog::{
