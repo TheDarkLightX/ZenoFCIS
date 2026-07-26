@@ -17,7 +17,7 @@ concurrency:
 jobs:
   rust:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -52,6 +52,7 @@ jobs:
             zeno-fcis-catalog \
             zeno-fcis-transition \
             zeno-fcis-security \
+            zeno-fcis-secret \
             zeno-fcis-patch \
             zeno-fcis-plan \
             zeno-fcis-receipt \
