@@ -53,6 +53,32 @@ use alloc::vec::Vec;
 )
 replace_exact(
     backend,
+    '''impl BackendRequestTemplate {
+    /// Creates a synthesis request template.
+    pub const fn try_new(
+''',
+    '''impl BackendRequestTemplate {
+    /// Creates a synthesis request template.
+    pub fn try_new(
+''',
+    "backend template non-const constructor",
+)
+replace_exact(
+    backend,
+    '''impl fmt::Display for BackendError {
+''',
+    '''impl From<EncodeError> for BackendError {
+    fn from(error: EncodeError) -> Self {
+        Self::Encode(error)
+    }
+}
+
+impl fmt::Display for BackendError {
+''',
+    "backend encode error conversion",
+)
+replace_exact(
+    backend,
     '''        assert_eq!(
             BackendLimits::try_new(0, 1, 1, 1),
             Err(BackendError::ZeroLimit)
