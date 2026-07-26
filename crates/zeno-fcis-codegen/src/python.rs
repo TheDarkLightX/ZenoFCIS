@@ -161,10 +161,13 @@ fn emit_u128(output: &mut String, name: &str, min: u128, max: u128) {
     let _ = writeln!(output, "    MIN = {min}");
     let _ = writeln!(output, "    MAX = {max}");
     let _ = writeln!(output, "    def __init__(self, value): self.value = value");
+    let _ = writeln!(output, "    def to_value(self):");
+    let _ = writeln!(output, "        x = int(self.value)");
     let _ = writeln!(
         output,
-        "    def to_value(self): return (\"u128\", int(self.value))"
+        "        if not (self.MIN <= x <= self.MAX): raise AdapterError(\"integer_range\")"
     );
+    let _ = writeln!(output, "        return (\"u128\", x)");
     let _ = writeln!(output, "    @classmethod");
     let _ = writeln!(output, "    def try_from_value(cls, v):");
     let _ = writeln!(
@@ -184,10 +187,13 @@ fn emit_i128(output: &mut String, name: &str, min: i128, max: i128) {
     let _ = writeln!(output, "    MIN = {min}");
     let _ = writeln!(output, "    MAX = {max}");
     let _ = writeln!(output, "    def __init__(self, value): self.value = value");
+    let _ = writeln!(output, "    def to_value(self):");
+    let _ = writeln!(output, "        x = int(self.value)");
     let _ = writeln!(
         output,
-        "    def to_value(self): return (\"i128\", int(self.value))"
+        "        if not (self.MIN <= x <= self.MAX): raise AdapterError(\"integer_range\")"
     );
+    let _ = writeln!(output, "        return (\"i128\", x)");
     let _ = writeln!(output, "    @classmethod");
     let _ = writeln!(output, "    def try_from_value(cls, v):");
     let _ = writeln!(
@@ -210,10 +216,14 @@ fn emit_bytes(output: &mut String, name: &str, min_len: u32, max_len: u32) {
         output,
         "    def __init__(self, value): self.value = bytes(value)"
     );
+    let _ = writeln!(output, "    def to_value(self):");
+    let _ = writeln!(output, "        b = bytes(self.value)");
+    let _ = writeln!(output, "        n = len(b)");
     let _ = writeln!(
         output,
-        "    def to_value(self): return (\"bytes\", bytes(self.value))"
+        "        if not (self.MIN_LEN <= n <= self.MAX_LEN): raise AdapterError(\"length\")"
     );
+    let _ = writeln!(output, "        return (\"bytes\", b)");
     let _ = writeln!(output, "    @classmethod");
     let _ = writeln!(output, "    def try_from_value(cls, v):");
     let _ = writeln!(
@@ -237,10 +247,19 @@ fn emit_text(output: &mut String, name: &str, min_len: u32, max_len: u32) {
         output,
         "    def __init__(self, value): self.value = str(value)"
     );
+    let _ = writeln!(output, "    def to_value(self):");
+    let _ = writeln!(output, "        s = str(self.value)");
+    let _ = writeln!(output, "        try: s.encode(\"ascii\")");
     let _ = writeln!(
         output,
-        "    def to_value(self): return (\"text\", str(self.value))"
+        "        except UnicodeEncodeError: raise AdapterError(\"non_ascii_text\")"
     );
+    let _ = writeln!(output, "        n = len(s)");
+    let _ = writeln!(
+        output,
+        "        if not (self.MIN_LEN <= n <= self.MAX_LEN): raise AdapterError(\"length\")"
+    );
+    let _ = writeln!(output, "        return (\"text\", s)");
     let _ = writeln!(output, "    @classmethod");
     let _ = writeln!(output, "    def try_from_value(cls, v):");
     let _ = writeln!(
@@ -501,9 +520,15 @@ fn emit_vector(
         output,
         "    def __init__(self, value): self.value = list(value)"
     );
+    let _ = writeln!(output, "    def to_value(self):");
+    let _ = writeln!(output, "        n = len(self.value)");
     let _ = writeln!(
         output,
-        "    def to_value(self): return (\"vector\", [x.to_value() for x in self.value])"
+        "        if not (self.MIN_LEN <= n <= self.MAX_LEN): raise AdapterError(\"length\")"
+    );
+    let _ = writeln!(
+        output,
+        "        return (\"vector\", [x.to_value() for x in self.value])"
     );
     let _ = writeln!(output, "    @classmethod");
     let _ = writeln!(output, "    def try_from_value(cls, v):");
@@ -554,6 +579,11 @@ fn emit_map(
         "    def __init__(self, value): self.value = list(value)"
     );
     let _ = writeln!(output, "    def to_value(self):");
+    let _ = writeln!(output, "        n = len(self.value)");
+    let _ = writeln!(
+        output,
+        "        if not (self.MIN_LEN <= n <= self.MAX_LEN): raise AdapterError(\"length\")"
+    );
     let _ = writeln!(
         output,
         "        entries = [e.to_entry() for e in self.value]"

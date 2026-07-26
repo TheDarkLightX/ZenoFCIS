@@ -126,8 +126,14 @@ fn render_u128(output: &mut String, name: &str, min: u128, max: u128) {
     let _ = writeln!(output, "    pub const MAX: u128 = {max};");
     let _ = writeln!(
         output,
-        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{ Ok(Value::U128(self.0)) }}"
+        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{"
     );
+    let _ = writeln!(
+        output,
+        "        if self.0 < Self::MIN || self.0 > Self::MAX {{ return Err(AdapterError::IntegerRange); }}"
+    );
+    let _ = writeln!(output, "        Ok(Value::U128(self.0))");
+    let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
@@ -155,8 +161,14 @@ fn render_i128(output: &mut String, name: &str, min: i128, max: i128) {
     let _ = writeln!(output, "    pub const MAX: i128 = {max};");
     let _ = writeln!(
         output,
-        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{ Ok(Value::I128(self.0)) }}"
+        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{"
     );
+    let _ = writeln!(
+        output,
+        "        if self.0 < Self::MIN || self.0 > Self::MAX {{ return Err(AdapterError::IntegerRange); }}"
+    );
+    let _ = writeln!(output, "        Ok(Value::I128(self.0))");
+    let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
@@ -184,8 +196,18 @@ fn render_bytes(output: &mut String, name: &str, min_len: u32, max_len: u32) {
     let _ = writeln!(output, "    pub const MAX_LEN: u32 = {max_len};");
     let _ = writeln!(
         output,
-        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{ Ok(Value::Bytes(self.0.clone())) }}"
+        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{"
     );
+    let _ = writeln!(
+        output,
+        "        let len = u32::try_from(self.0.len()).map_err(|_| AdapterError::Length)?;"
+    );
+    let _ = writeln!(
+        output,
+        "        if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
+    );
+    let _ = writeln!(output, "        Ok(Value::Bytes(self.0.clone()))");
+    let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
@@ -221,6 +243,14 @@ fn render_text(output: &mut String, name: &str, min_len: u32, max_len: u32) {
     let _ = writeln!(
         output,
         "        if !self.0.is_ascii() {{ return Err(AdapterError::NonAsciiText); }}"
+    );
+    let _ = writeln!(
+        output,
+        "        let len = u32::try_from(self.0.len()).map_err(|_| AdapterError::Length)?;"
+    );
+    let _ = writeln!(
+        output,
+        "        if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
     );
     let _ = writeln!(output, "        Ok(Value::Text(self.0.clone()))");
     let _ = writeln!(output, "    }}");
@@ -588,6 +618,14 @@ fn render_vector(
     );
     let _ = writeln!(
         output,
+        "        let len = u32::try_from(self.0.len()).map_err(|_| AdapterError::Length)?;"
+    );
+    let _ = writeln!(
+        output,
+        "        if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
+    );
+    let _ = writeln!(
+        output,
         "        let items: Result<Vec<Value>, _> = self.0.iter().map(|x| x.to_value()).collect();"
     );
     let _ = writeln!(output, "        Ok(Value::vector(items?))");
@@ -646,6 +684,14 @@ fn render_map(
     let _ = writeln!(
         output,
         "    pub fn to_value(&self) -> Result<Value, AdapterError> {{"
+    );
+    let _ = writeln!(
+        output,
+        "        let len = u32::try_from(self.0.len()).map_err(|_| AdapterError::Length)?;"
+    );
+    let _ = writeln!(
+        output,
+        "        if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
     );
     let _ = writeln!(
         output,
