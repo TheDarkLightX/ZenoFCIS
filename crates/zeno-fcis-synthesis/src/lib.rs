@@ -3,8 +3,14 @@
 //! Search order is canonical protocol data. A proposer may populate reviewed
 //! candidate domains, but only an external checker can accept an assignment.
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
 
+extern crate alloc;
+
+use alloc::boxed::Box;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::fmt;
 
 use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
@@ -632,6 +638,9 @@ impl fmt::Display for SynthesisError {
     }
 }
 
+#[cfg(feature = "std")]
+#[cfg(feature = "std")]
+#[cfg(feature = "std")]
 impl std::error::Error for SynthesisError {}
 
 #[cfg(test)]
