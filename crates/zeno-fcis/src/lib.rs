@@ -144,9 +144,8 @@ pub use zeno_fcis_security::{
     CapacityEvidence, ChannelClass, CompartmentId, Declassification, DeploymentContract,
     LeakageBlocker, LeakagePolicy, LeakageReport, LeakageRule, Mitigation, Observation,
     ObservationKind, ObservationTrace, ObserverClearance, RuleMode, SecurityDomainId,
-    SecurityError, SecurityEvidence, SecurityEvidenceKind, SecurityLabel,
-    SecurityPromotionBlocker, SecurityPromotionPolicy, SecurityPromotionReport, compare_traces,
-    evaluate_security_promotion,
+    SecurityError, SecurityEvidence, SecurityEvidenceKind, SecurityLabel, SecurityPromotionBlocker,
+    SecurityPromotionPolicy, SecurityPromotionReport, compare_traces, evaluate_security_promotion,
 };
 pub use zeno_fcis_shell::{
     CommitResult, CommitStatus, OutboxRecord, ReplayRecord, ShellError, ShellState, acknowledge,
