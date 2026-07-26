@@ -1,0 +1,63 @@
+name: universal-project
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeno-fcis-universal-project-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-zenodex-workspace:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact ZenoFCIS source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact mounted ZenoDEX source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: TheDarkLightX/ZenoDEX
+          ref: e3cf1aad40e487893230ae0c55f1f0dda62f9955
+          path: mounted-zenodex
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: >-
+          rustup toolchain install 1.97.1
+          --profile minimal
+          --component clippy
+          --component rustfmt
+
+      - name: Check exact ZenoDEX formatting
+        run: >-
+          cargo +1.97.1 fmt
+          --manifest-path mounted-zenodex/rust-runtime/Cargo.toml
+          --all
+          -- --check
+
+      - name: Lint exact ZenoDEX workspace
+        run: >-
+          cargo +1.97.1 clippy
+          --manifest-path mounted-zenodex/rust-runtime/Cargo.toml
+          --workspace
+          --all-targets
+          --locked
+          -- -D warnings
+
+      - name: Test exact ZenoDEX workspace
+        run: >-
+          cargo +1.97.1 test
+          --manifest-path mounted-zenodex/rust-runtime/Cargo.toml
+          --workspace
+          --locked

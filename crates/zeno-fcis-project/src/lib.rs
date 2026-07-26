@@ -21,6 +21,8 @@ use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Ha
 
 /// Canonical project-profile format version.
 pub const PROJECT_PROFILE_FORMAT_VERSION: u16 = 1;
+/// Canonical profile-evolution format version.
+pub const PROFILE_EVOLUTION_FORMAT_VERSION: u16 = 1;
 /// Maximum byte length of a project, subsystem, or registry name.
 pub const MAX_STABLE_NAME_BYTES: usize = 64;
 /// Maximum byte length of a domain prefix.
@@ -458,16 +460,119 @@ impl CanonicalEncode for ProjectProfile {
     }
 }
 
+/// Reviewed compatibility evidence for additive authority-surface extensions.
+///
+/// An evidence hash commits an independently reviewed compatibility argument.
+/// It is required only when the corresponding profile binding changes, and it
+/// grants no authority unless the successor also adds an entry in that exact
+/// registry namespace.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct AdditiveExtensionEvidence {
+    schema: Option<Hash32>,
+    effect_registry: Option<Hash32>,
+    channel_registry: Option<Hash32>,
+}
+
+impl AdditiveExtensionEvidence {
+    /// No authority-surface binding changes are intended.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            schema: None,
+            effect_registry: None,
+            channel_registry: None,
+        }
+    }
+
+    /// Creates extension evidence, rejecting zero placeholder commitments.
+    pub fn try_new(
+        schema: Option<Hash32>,
+        effect_registry: Option<Hash32>,
+        channel_registry: Option<Hash32>,
+    ) -> Result<Self, ProfileError> {
+        for (label, hash) in [
+            ("schema", schema),
+            ("effect-registry", effect_registry),
+            ("channel-registry", channel_registry),
+        ] {
+            if hash == Some(Hash32::ZERO) {
+                return Err(ProfileError::ZeroExtensionEvidence(label));
+            }
+        }
+        Ok(Self {
+            schema,
+            effect_registry,
+            channel_registry,
+        })
+    }
+
+    /// Returns the reviewed schema-extension evidence commitment.
+    #[must_use]
+    pub const fn schema(self) -> Option<Hash32> {
+        self.schema
+    }
+
+    /// Returns the reviewed effect-registry extension evidence commitment.
+    #[must_use]
+    pub const fn effect_registry(self) -> Option<Hash32> {
+        self.effect_registry
+    }
+
+    /// Returns the reviewed channel-registry extension evidence commitment.
+    #[must_use]
+    pub const fn channel_registry(self) -> Option<Hash32> {
+        self.channel_registry
+    }
+}
+
+impl CanonicalEncode for AdditiveExtensionEvidence {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        encode_optional_hash(output, self.schema);
+        encode_optional_hash(output, self.effect_registry);
+        encode_optional_hash(output, self.channel_registry);
+        Ok(())
+    }
+}
+
 /// How a successor profile is intended to relate to its predecessor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EvolutionMode {
-    /// Existing identifiers and definitions remain unchanged; new entries may be added.
-    Additive,
+    /// Existing identifiers remain unchanged and reviewed extensions may be added.
+    Additive {
+        /// Evidence for each authority binding that changes.
+        evidence: AdditiveExtensionEvidence,
+    },
     /// A reviewed migration explicitly translates old values and semantics.
     Migrated {
         /// Nonzero migration-specification commitment.
         migration_hash: Hash32,
     },
+}
+
+impl EvolutionMode {
+    /// Creates an additive mode with no authority-surface binding changes.
+    #[must_use]
+    pub const fn additive() -> Self {
+        Self::Additive {
+            evidence: AdditiveExtensionEvidence::none(),
+        }
+    }
+}
+
+impl CanonicalEncode for EvolutionMode {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        match self {
+            Self::Additive { evidence } => {
+                output.push(0);
+                evidence.encode_to(output)
+            }
+            Self::Migrated { migration_hash } => {
+                output.push(1);
+                output.extend_from_slice(migration_hash.as_bytes());
+                Ok(())
+            }
+        }
+    }
 }
 
 /// One incompatibility discovered between profile revisions.
@@ -485,6 +590,12 @@ pub enum CompatibilityBlocker {
     RootTypeChanged,
     /// Additive evolution changed an existing authority binding.
     BindingChanged(&'static str),
+    /// An extendable binding changed without reviewed compatibility evidence.
+    UnprovenBindingChange(&'static str),
+    /// Extension evidence was supplied although the corresponding binding is unchanged.
+    UnexpectedExtensionEvidence(&'static str),
+    /// A binding changed without adding an entry in its corresponding namespace.
+    BindingChangedWithoutRegistryAddition(&'static str),
     /// An existing stable entry was removed.
     RemovedEntry {
         /// Registry namespace.
@@ -545,7 +656,7 @@ pub fn compare_successor(
     }
 
     match mode {
-        EvolutionMode::Additive => {
+        EvolutionMode::Additive { evidence } => {
             if previous.state_type != next.state_type
                 || previous.command_type != next.command_type
                 || previous.context_type != next.context_type
@@ -574,6 +685,36 @@ pub fn compare_successor(
                 previous.bindings.policy_hash,
                 next.bindings.policy_hash,
                 "policy",
+                &mut blockers,
+            );
+            compare_extendable_binding(
+                previous,
+                next,
+                previous.bindings.schema_hash,
+                next.bindings.schema_hash,
+                evidence.schema(),
+                "schema",
+                is_schema_kind,
+                &mut blockers,
+            );
+            compare_extendable_binding(
+                previous,
+                next,
+                previous.bindings.effect_registry_hash,
+                next.bindings.effect_registry_hash,
+                evidence.effect_registry(),
+                "effect-registry",
+                |kind| kind == RegistryKind::Effect,
+                &mut blockers,
+            );
+            compare_extendable_binding(
+                previous,
+                next,
+                previous.bindings.channel_registry_hash,
+                next.bindings.channel_registry_hash,
+                evidence.channel_registry(),
+                "channel-registry",
+                |kind| kind == RegistryKind::Channel,
                 &mut blockers,
             );
             for entry in &previous.entries {
@@ -607,6 +748,74 @@ pub fn compare_successor(
     }
 }
 
+/// Canonical, content-addressed evidence that one exact profile succeeds another.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProfileEvolution {
+    previous_profile_hash: Hash32,
+    next_profile_hash: Hash32,
+    mode: EvolutionMode,
+}
+
+impl ProfileEvolution {
+    /// Validates compatibility and binds the exact predecessor, successor, and mode.
+    pub fn try_new<H: CommitmentHasher>(
+        previous: &ProjectProfile,
+        next: &ProjectProfile,
+        mode: EvolutionMode,
+    ) -> Result<Self, EvolutionError> {
+        let report = compare_successor(previous, next, mode);
+        if !report.is_compatible() {
+            return Err(EvolutionError::Incompatible(report));
+        }
+        Ok(Self {
+            previous_profile_hash: previous
+                .commitment::<H>()
+                .map_err(EvolutionError::Profile)?,
+            next_profile_hash: next.commitment::<H>().map_err(EvolutionError::Profile)?,
+            mode,
+        })
+    }
+
+    /// Returns the exact predecessor profile commitment.
+    #[must_use]
+    pub const fn previous_profile_hash(self) -> Hash32 {
+        self.previous_profile_hash
+    }
+
+    /// Returns the exact successor profile commitment.
+    #[must_use]
+    pub const fn next_profile_hash(self) -> Hash32 {
+        self.next_profile_hash
+    }
+
+    /// Returns the reviewed evolution mode.
+    #[must_use]
+    pub const fn mode(self) -> EvolutionMode {
+        self.mode
+    }
+
+    /// Computes the complete content-derived evolution commitment.
+    pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, EvolutionError> {
+        let bytes = self.canonical_bytes().map_err(EvolutionError::Encode)?;
+        let domain = Domain::new(
+            "zeno-fcis/profile-evolution",
+            PROFILE_EVOLUTION_FORMAT_VERSION,
+        )
+        .map_err(EvolutionError::Encode)?;
+        commitment::<H>(domain, &bytes).map_err(EvolutionError::Encode)
+    }
+}
+
+impl CanonicalEncode for ProfileEvolution {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-EVOLUTION\0");
+        output.extend_from_slice(&PROFILE_EVOLUTION_FORMAT_VERSION.to_be_bytes());
+        output.extend_from_slice(self.previous_profile_hash.as_bytes());
+        output.extend_from_slice(self.next_profile_hash.as_bytes());
+        self.mode.encode_to(output)
+    }
+}
+
 fn compare_binding(
     previous: Hash32,
     next: Hash32,
@@ -615,6 +824,56 @@ fn compare_binding(
 ) {
     if previous != next {
         blockers.push(CompatibilityBlocker::BindingChanged(label));
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn compare_extendable_binding<F>(
+    previous_profile: &ProjectProfile,
+    next_profile: &ProjectProfile,
+    previous_binding: Hash32,
+    next_binding: Hash32,
+    evidence: Option<Hash32>,
+    label: &'static str,
+    admits_kind: F,
+    blockers: &mut Vec<CompatibilityBlocker>,
+) where
+    F: Fn(RegistryKind) -> bool,
+{
+    if previous_binding == next_binding {
+        if evidence.is_some() {
+            blockers.push(CompatibilityBlocker::UnexpectedExtensionEvidence(label));
+        }
+        return;
+    }
+    if evidence.is_none() {
+        blockers.push(CompatibilityBlocker::UnprovenBindingChange(label));
+        return;
+    }
+    let has_corresponding_addition = next_profile.entries.iter().any(|entry| {
+        admits_kind(entry.kind) && previous_profile.entry(entry.kind, entry.id).is_none()
+    });
+    if !has_corresponding_addition {
+        blockers.push(CompatibilityBlocker::BindingChangedWithoutRegistryAddition(
+            label,
+        ));
+    }
+}
+
+fn is_schema_kind(kind: RegistryKind) -> bool {
+    matches!(
+        kind,
+        RegistryKind::StateType | RegistryKind::CommandType | RegistryKind::ContextType
+    )
+}
+
+fn encode_optional_hash(output: &mut Vec<u8>, hash: Option<Hash32>) {
+    match hash {
+        Some(hash) => {
+            output.push(1);
+            output.extend_from_slice(hash.as_bytes());
+        }
+        None => output.push(0),
     }
 }
 
@@ -661,6 +920,8 @@ pub enum ProfileError {
     ZeroDefinitionHash,
     /// Every authority binding must be nonzero, including empty-registry commitments.
     ZeroProfileBinding,
+    /// Additive extension evidence commitments cannot be zero placeholders.
+    ZeroExtensionEvidence(&'static str),
     /// Registry entry count exceeds its deterministic bound.
     TooManyRegistryEntries,
     /// Two entries reuse one `(kind, id)` pair.
@@ -697,6 +958,9 @@ impl fmt::Display for ProfileError {
             Self::ZeroProfileVersion => formatter.write_str("profile version must be nonzero"),
             Self::ZeroDefinitionHash => formatter.write_str("registry definition hash is zero"),
             Self::ZeroProfileBinding => formatter.write_str("profile binding is zero"),
+            Self::ZeroExtensionEvidence(label) => {
+                write!(formatter, "{label} extension evidence hash is zero")
+            }
             Self::TooManyRegistryEntries => formatter.write_str("registry exceeds entry bound"),
             Self::DuplicateRegistryId { kind, id } => {
                 write!(formatter, "duplicate {kind:?} identifier {}", id.get())
@@ -714,6 +978,34 @@ impl fmt::Display for ProfileError {
 
 #[cfg(feature = "std")]
 impl std::error::Error for ProfileError {}
+
+/// Profile-evolution validation or commitment failure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EvolutionError {
+    /// Compatibility validation found one or more deterministic blockers.
+    Incompatible(CompatibilityReport),
+    /// One of the exact profiles could not be committed.
+    Profile(ProfileError),
+    /// Canonical evolution encoding or commitment failed.
+    Encode(EncodeError),
+}
+
+impl fmt::Display for EvolutionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Incompatible(report) => write!(
+                formatter,
+                "profile evolution has {} compatibility blocker(s)",
+                report.blockers().len()
+            ),
+            Self::Profile(error) => write!(formatter, "profile commitment failed: {error}"),
+            Self::Encode(error) => write!(formatter, "evolution encoding failed: {error}"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for EvolutionError {}
 
 #[cfg(test)]
 mod tests {
@@ -766,7 +1058,15 @@ mod tests {
         }
     }
 
-    fn profile(version: u32, mut extras: Vec<RegistryEntry>) -> ProjectProfile {
+    fn profile(version: u32, extras: Vec<RegistryEntry>) -> ProjectProfile {
+        profile_with_bindings(version, bindings(), extras)
+    }
+
+    fn profile_with_bindings(
+        version: u32,
+        profile_bindings: ProfileBindings,
+        mut extras: Vec<RegistryEntry>,
+    ) -> ProjectProfile {
         let mut entries = vec![
             entry(RegistryKind::StateType, 1, "state", 11),
             entry(RegistryKind::CommandType, 2, "command", 12),
@@ -782,7 +1082,7 @@ mod tests {
             id(2),
             id(3),
             DomainPrefix::try_new("example/core").unwrap_or_else(|error| panic!("domain: {error}")),
-            bindings(),
+            profile_bindings,
             entries,
         )
         .unwrap_or_else(|error| panic!("profile: {error}"))
@@ -891,10 +1191,10 @@ mod tests {
                 entry(RegistryKind::Reason, 11, "expired", 31),
             ],
         );
-        assert!(compare_successor(&previous, &additive, EvolutionMode::Additive).is_compatible());
+        assert!(compare_successor(&previous, &additive, EvolutionMode::additive()).is_compatible());
 
         let rebound = profile(2, vec![entry(RegistryKind::Reason, 10, "denied", 99)]);
-        let report = compare_successor(&previous, &rebound, EvolutionMode::Additive);
+        let report = compare_successor(&previous, &rebound, EvolutionMode::additive());
         assert_eq!(
             report.blockers(),
             &[CompatibilityBlocker::ReboundEntry {
@@ -929,5 +1229,135 @@ mod tests {
             )
             .is_compatible()
         );
+    }
+
+    #[test]
+    fn additive_binding_changes_require_exact_extension_evidence() {
+        let previous = profile(1, Vec::new());
+        let mut changed = bindings();
+        changed.schema_hash = hash(40);
+        changed.effect_registry_hash = hash(41);
+        changed.channel_registry_hash = hash(42);
+        let next_without_additions = profile_with_bindings(2, changed, Vec::new());
+
+        assert_eq!(
+            compare_successor(
+                &previous,
+                &next_without_additions,
+                EvolutionMode::additive()
+            )
+            .blockers(),
+            &[
+                CompatibilityBlocker::UnprovenBindingChange("schema"),
+                CompatibilityBlocker::UnprovenBindingChange("effect-registry"),
+                CompatibilityBlocker::UnprovenBindingChange("channel-registry"),
+            ]
+        );
+
+        let evidence =
+            AdditiveExtensionEvidence::try_new(Some(hash(50)), Some(hash(51)), Some(hash(52)))
+                .unwrap_or_else(|error| panic!("evidence: {error}"));
+        assert_eq!(
+            compare_successor(
+                &previous,
+                &next_without_additions,
+                EvolutionMode::Additive { evidence },
+            )
+            .blockers(),
+            &[
+                CompatibilityBlocker::BindingChangedWithoutRegistryAddition("schema"),
+                CompatibilityBlocker::BindingChangedWithoutRegistryAddition("effect-registry"),
+                CompatibilityBlocker::BindingChangedWithoutRegistryAddition("channel-registry"),
+            ]
+        );
+
+        let next_with_additions = profile_with_bindings(
+            2,
+            changed,
+            vec![
+                entry(RegistryKind::StateType, 20, "state-extension", 60),
+                entry(RegistryKind::Effect, 21, "effect-extension", 61),
+                entry(RegistryKind::Channel, 22, "channel-extension", 62),
+            ],
+        );
+        assert!(
+            compare_successor(
+                &previous,
+                &next_with_additions,
+                EvolutionMode::Additive { evidence },
+            )
+            .is_compatible()
+        );
+    }
+
+    #[test]
+    fn unused_or_zero_extension_evidence_is_rejected() {
+        assert_eq!(
+            AdditiveExtensionEvidence::try_new(Some(Hash32::ZERO), None, None),
+            Err(ProfileError::ZeroExtensionEvidence("schema"))
+        );
+
+        let previous = profile(1, Vec::new());
+        let next = profile(2, Vec::new());
+        let evidence =
+            AdditiveExtensionEvidence::try_new(Some(hash(70)), Some(hash(71)), Some(hash(72)))
+                .unwrap_or_else(|error| panic!("evidence: {error}"));
+        assert_eq!(
+            compare_successor(&previous, &next, EvolutionMode::Additive { evidence }).blockers(),
+            &[
+                CompatibilityBlocker::UnexpectedExtensionEvidence("schema"),
+                CompatibilityBlocker::UnexpectedExtensionEvidence("effect-registry"),
+                CompatibilityBlocker::UnexpectedExtensionEvidence("channel-registry"),
+            ]
+        );
+    }
+
+    #[test]
+    fn evolution_artifact_binds_exact_profiles_and_migration() {
+        let previous = profile(1, Vec::new());
+        let next = profile(2, Vec::new());
+        let first = ProfileEvolution::try_new::<TestHasher>(
+            &previous,
+            &next,
+            EvolutionMode::Migrated {
+                migration_hash: hash(80),
+            },
+        )
+        .unwrap_or_else(|error| panic!("first evolution: {error}"));
+        let second = ProfileEvolution::try_new::<TestHasher>(
+            &previous,
+            &next,
+            EvolutionMode::Migrated {
+                migration_hash: hash(81),
+            },
+        )
+        .unwrap_or_else(|error| panic!("second evolution: {error}"));
+
+        assert_eq!(
+            first.previous_profile_hash(),
+            previous
+                .commitment::<TestHasher>()
+                .unwrap_or_else(|error| panic!("previous: {error}"))
+        );
+        assert_eq!(
+            first.next_profile_hash(),
+            next.commitment::<TestHasher>()
+                .unwrap_or_else(|error| panic!("next: {error}"))
+        );
+        assert_ne!(first.canonical_bytes(), second.canonical_bytes());
+        assert_ne!(
+            first.commitment::<TestHasher>(),
+            second.commitment::<TestHasher>()
+        );
+    }
+
+    #[test]
+    fn evolution_artifact_cannot_bind_an_incompatible_pair() {
+        let previous = profile(2, Vec::new());
+        let next = profile(1, Vec::new());
+        assert!(matches!(
+            ProfileEvolution::try_new::<TestHasher>(&previous, &next, EvolutionMode::additive()),
+            Err(EvolutionError::Incompatible(_))
+        ));
     }
 }

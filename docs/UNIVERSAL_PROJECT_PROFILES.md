@@ -16,7 +16,40 @@ canonically ordered stable registry entries
 
 Registry namespaces cover state types, commands, contexts, reasons, effects, channels, evidence, capabilities, events, claims, and migrations. Numeric IDs and definition commitments are authority. Readable names are normalized and retained for review.
 
-Additive evolution may add entries, but it may not delete or rebind an existing stable ID, change root types, or silently change codec, precedence, algorithm, or policy. Incompatible changes require an explicit nonzero migration-specification commitment.
+## Evolution evidence
+
+Additive evolution may add entries, but it may not delete or rebind an existing stable ID, change root types, or silently change codec, precedence, algorithm, or policy. A schema, effect-registry, or channel-registry commitment may change only when the successor adds an entry in that exact namespace and supplies a nonzero reviewed compatibility-evidence commitment. Evidence for an unchanged binding is rejected.
+
+Incompatible changes require an explicit nonzero migration-specification commitment. `ProfileEvolution` is the authoritative evolution artifact. It binds:
+
+```text
+exact predecessor profile commitment
+exact successor profile commitment
+additive extension evidence or migration commitment
+profile-evolution format version
+```
+
+A bare compatibility report is diagnostic. Promotion and migration records should retain the canonical `ProfileEvolution` commitment.
+
+## Inputs, outputs, authority, and bounds
+
+Inputs are two validated `ProjectProfile` values plus one explicit `EvolutionMode`. The diagnostic output is a deterministic blocker sequence. The authoritative output is a canonical `ProfileEvolution` or a typed incompatibility error.
+
+The crate decides identifier continuity and whether required evidence is present and content-bound. It does not decide that a migration implementation, schema extension, or business invariant is correct. Those claims belong to independent evidence checkers.
+
+Deterministic bounds are:
+
+```text
+maximum stable-name bytes: 64
+maximum domain-prefix bytes: 160
+maximum registry entries per profile: 65,536
+fixed three optional additive evidence commitments
+linear predecessor-entry and successor-addition scans
+```
+
+The compatibility laws are stable-ID preservation, no removal or rebinding under additive evolution, exact namespace matching for binding extensions, strict version increase, deterministic blocker order, and content separation for distinct migration commitments. Negative cases cover zero evidence, unused evidence, missing corresponding additions, root changes, removals, rebindings, non-increasing versions, and zero migration commitments.
+
+Assumptions are collision resistance of the selected commitment provider and correctness of independently reviewed definition/evidence hashes. This layer does not prove schema compatibility, migration totality, semantic equivalence, business correctness, runtime refinement, or production readiness.
 
 ## Generic mounted runtime
 
@@ -126,7 +159,7 @@ ESSO, Morph, theorem provers, solvers, compilers, LLMs, and project-specific opt
 
 ## Cross-repository validation
 
-The universal-profile PR checks out the exact ZenoDEX revision named by the mounted zUSD profile and runs both Rust workspaces under pinned toolchains. This is a build and regression integration gate, not a substitute for the already separate full-decision runtime-refinement evidence.
+The permanent read-only `universal-project` workflow checks out the exact ZenoDEX revision named by the mounted zUSD profile and runs formatting, warnings-denied Clippy, and tests for its complete Rust workspace under Rust 1.97.1. This is a build and regression integration gate, not a substitute for the separate full-decision runtime-refinement evidence.
 
 ## Nonclaims
 
