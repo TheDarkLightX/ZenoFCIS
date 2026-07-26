@@ -14,6 +14,18 @@ pub mod generated {
     include!(concat!(env!("OUT_DIR"), "/codegen_fixture.rs"));
 }
 
+/// Compiled catalog-aware helpers emitted by `zeno-fcis-bootstrap`.
+pub mod bootstrap_project {
+    #![allow(dead_code, unused_imports, missing_docs, clippy::all, clippy::pedantic)]
+    include!(concat!(env!("OUT_DIR"), "/bootstrap_project.rs"));
+}
+
+/// Compiled runtime skeleton emitted by `zeno-fcis-bootstrap`.
+pub mod bootstrap_runtime {
+    #![allow(dead_code, unused_imports, missing_docs, clippy::all, clippy::pedantic)]
+    include!(concat!(env!("OUT_DIR"), "/bootstrap_runtime.rs"));
+}
+
 pub use zeno_fcis_codegen::{fixture_schema, fixture_spec};
 
 #[cfg(test)]
@@ -179,5 +191,19 @@ mod tests {
             .collect::<Vec<_>>()
             .into_boxed_slice();
         assert_eq!(Scores(scores).to_value(), Err(AdapterError::Length));
+    }
+
+    #[test]
+    fn bootstrap_effect_helper_uses_catalogued_operation_and_payload() {
+        let effect = crate::bootstrap_project::effect_20(
+            7,
+            zeno_fcis_codec::Hash32::new([1; 32]),
+            zeno_fcis_codec::Hash32::ZERO,
+            &Amount(9),
+        )
+        .unwrap_or_else(|error| panic!("bootstrap effect helper: {error:?}"));
+        assert_eq!(effect.ordinal(), 7);
+        assert_eq!(effect.operation(), 20);
+        assert_eq!(effect.payload(), &zeno_fcis_value::Value::U128(9));
     }
 }

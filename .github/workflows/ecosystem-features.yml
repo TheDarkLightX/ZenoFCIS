@@ -60,6 +60,7 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features security --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features secret --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --features codegen --locked
+          cargo +1.97.1 check -p zeno-fcis --features bootstrap --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-runtime --locked
           cargo +1.97.1 check -p zeno-fcis --features mounted-zenodex --locked
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features rustcrypto-sha256 --locked --target wasm32-unknown-unknown

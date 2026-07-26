@@ -80,5 +80,7 @@ jobs:
           cargo +1.97.1 test --locked -p zeno-fcis-adapter-zenodex
           cargo +1.97.1 test --locked -p zeno-fcis-authenticated
           cargo +1.97.1 test --locked -p zeno-fcis-synthesis
+          cargo +1.97.1 test --locked -p zeno-fcis-bootstrap
+          cargo +1.97.1 test --locked -p zeno-fcis-codegen-fixture
           cargo +1.97.1 test --locked -p zeno-fcis-shell-sqlite
           cargo +1.97.1 test --locked -p zeno-fcis-collections --all-features

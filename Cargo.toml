@@ -21,6 +21,7 @@ members = [
     "crates/zeno-fcis-profile-zenodex",
     "crates/zeno-fcis-codegen",
     "crates/zeno-fcis-codegen-fixture",
+    "crates/zeno-fcis-bootstrap",
     "crates/zeno-fcis-evidence",
     "crates/zeno-fcis-adapter",
     "crates/zeno-fcis-adapter-zenodex",
