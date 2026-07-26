@@ -1166,6 +1166,7 @@ dependencies = [
  "zeno-fcis-adapter-zenodex",
  "zeno-fcis-authenticated",
  "zeno-fcis-backend",
+ "zeno-fcis-bootstrap",
  "zeno-fcis-catalog",
  "zeno-fcis-codec",
  "zeno-fcis-codegen",
@@ -1242,6 +1243,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeno-fcis-bootstrap"
+version = "0.1.0"
+dependencies = [
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-codegen",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
+]
+
+[[package]]
 name = "zeno-fcis-catalog"
 version = "0.1.0"
 dependencies = [
@@ -1274,10 +1286,17 @@ dependencies = [
 name = "zeno-fcis-codegen-fixture"
 version = "0.1.0"
 dependencies = [
+ "zeno-fcis-bootstrap",
+ "zeno-fcis-catalog",
  "zeno-fcis-codec",
  "zeno-fcis-codegen",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
  "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
  "zeno-fcis-schema",
+ "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
 

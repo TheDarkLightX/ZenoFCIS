@@ -45,6 +45,7 @@ transition = ["catalog", "dep:zeno-fcis-transition"]
 security = ["dep:zeno-fcis-security"]
 secret = ["dep:zeno-fcis-secret"]
 codegen = ["schema", "dep:zeno-fcis-codegen"]
+bootstrap = ["std", "catalog", "codegen", "dep:zeno-fcis-bootstrap"]
 evidence = ["std", "dep:zeno-fcis-evidence"]
 mounted-runtime = ["std", "dep:zeno-fcis-adapter"]
 mounted-zenodex = [
@@ -68,6 +69,7 @@ full = [
     "security",
     "secret",
     "codegen",
+    "bootstrap",
     "evidence",
     "mounted-zenodex",
     "authenticated-state",
@@ -95,6 +97,7 @@ zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine", default-f
 zeno-fcis-profile-zenodex = { version = "=0.1.0", path = "../zeno-fcis-profile-zenodex", default-features = false }
 zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema", default-features = false, optional = true }
 zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen", optional = true }
+zeno-fcis-bootstrap = { version = "=0.1.0", path = "../zeno-fcis-bootstrap", optional = true }
 zeno-fcis-evidence = { version = "=0.1.0", path = "../zeno-fcis-evidence", default-features = false, optional = true }
 zeno-fcis-adapter = { version = "=0.1.0", path = "../zeno-fcis-adapter", optional = true }
 zeno-fcis-adapter-zenodex = { version = "=0.1.0", path = "../zeno-fcis-adapter-zenodex", optional = true }
