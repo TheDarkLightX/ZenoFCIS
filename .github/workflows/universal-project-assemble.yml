@@ -1,18 +1,6 @@
 name: universal-project-assemble
 
 on:
-  push:
-    branches:
-      - agent/universal-project-runtime-v1
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "crates/**"
-      - "tools/check_assurance.py"
-      - "docs/UNIVERSAL_PROJECT_PROFILES.md"
-      - ".github/workflows/ci.yml"
-      - ".github/workflows/ecosystem-features.yml"
-      - ".github/workflows/universal-project-assemble.yml"
   pull_request:
     branches:
       - main
@@ -21,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: universal-project-assemble-${{ github.ref }}
+  group: universal-project-assemble-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -44,11 +32,10 @@ jobs:
           path: integration/zenodex
           persist-credentials: false
 
-      - name: Install pinned Rust toolchains
+      - name: Install pinned current stable Rust
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
-          rustup toolchain install 1.74.1 --profile minimal --component clippy --component rustfmt
 
       - name: Normalize ZenoFCIS source and lockfile
         run: |
@@ -65,8 +52,16 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --features mounted-zenodex --locked
           RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
 
+      - name: Check exact mounted ZenoDEX formatting
+        run: cargo +1.97.1 fmt --manifest-path integration/zenodex/rust-runtime/Cargo.toml --all -- --check
+
+      - name: Lint exact mounted ZenoDEX Rust workspace
+        run: cargo +1.97.1 clippy --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
+
+      - name: Test exact mounted ZenoDEX Rust workspace
+        run: cargo +1.97.1 test --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --locked
+
       - name: Commit validated ZenoFCIS formatting and lockfile
-        if: github.event_name == 'push'
         run: |
           git config user.name 'ZenoFCIS universal project assembler'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -85,12 +80,3 @@ jobs:
           fi
           git commit -m 'feat: generalize project profiles and mounted runtimes'
           git push origin HEAD:agent/universal-project-runtime-v1
-
-      - name: Check exact mounted ZenoDEX formatting
-        run: cargo +1.74.1 fmt --manifest-path integration/zenodex/rust-runtime/Cargo.toml --all -- --check
-
-      - name: Lint exact mounted ZenoDEX Rust workspace
-        run: cargo +1.74.1 clippy --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
-
-      - name: Test exact mounted ZenoDEX Rust workspace
-        run: cargo +1.74.1 test --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --locked
