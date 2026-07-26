@@ -25,9 +25,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{
-    CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment,
-};
+use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 
 /// Maximum compartments attached to one information-flow label.
 pub const MAX_COMPARTMENTS: usize = 64;
@@ -1170,9 +1168,7 @@ pub fn compare_traces<H: CommitmentHasher>(
     left: &ObservationTrace,
     right: &ObservationTrace,
 ) -> LeakageReport {
-    let deployment_hash = deployment
-        .commitment::<H>()
-        .unwrap_or(Hash32::ZERO);
+    let deployment_hash = deployment.commitment::<H>().unwrap_or(Hash32::ZERO);
     let mut blockers = Vec::new();
     let mut declassified_bits = 0_u64;
 
@@ -1250,10 +1246,7 @@ pub fn compare_traces<H: CommitmentHasher>(
             RuleMode::Exact => {
                 check_undeclassified(left_observation, right_observation, index, &mut blockers);
                 if !left_observation.label.can_flow_to(clearance) {
-                    push_blocker(
-                        &mut blockers,
-                        LeakageBlocker::LabelFlowViolation { index },
-                    );
+                    push_blocker(&mut blockers, LeakageBlocker::LabelFlowViolation { index });
                 }
                 if left_observation.value_hash != right_observation.value_hash {
                     push_blocker(&mut blockers, LeakageBlocker::ValueMismatch { index });
@@ -1265,15 +1258,14 @@ pub fn compare_traces<H: CommitmentHasher>(
             RuleMode::BoundedQuantity { max_delta } => {
                 check_undeclassified(left_observation, right_observation, index, &mut blockers);
                 if !left_observation.label.can_flow_to(clearance) {
-                    push_blocker(
-                        &mut blockers,
-                        LeakageBlocker::LabelFlowViolation { index },
-                    );
+                    push_blocker(&mut blockers, LeakageBlocker::LabelFlowViolation { index });
                 }
                 if left_observation.value_hash != right_observation.value_hash {
                     push_blocker(&mut blockers, LeakageBlocker::ValueMismatch { index });
                 }
-                let delta = left_observation.quantity.abs_diff(right_observation.quantity);
+                let delta = left_observation
+                    .quantity
+                    .abs_diff(right_observation.quantity);
                 if delta > max_delta {
                     push_blocker(
                         &mut blockers,
@@ -1355,10 +1347,7 @@ fn check_undeclassified(
         );
     }
     if left.leakage_bits_upper_bound != 0 || right.leakage_bits_upper_bound != 0 {
-        push_blocker(
-            blockers,
-            LeakageBlocker::UnjustifiedLeakageBits { index },
-        );
+        push_blocker(blockers, LeakageBlocker::UnjustifiedLeakageBits { index });
     }
 }
 
@@ -1761,7 +1750,9 @@ pub fn evaluate_security_promotion(
         match evidence.binary_search_by_key(required, |item| item.kind) {
             Ok(index) => {
                 if evidence[index].deployment_hash != policy.deployment_hash {
-                    blockers.push(SecurityPromotionBlocker::EvidenceDeploymentMismatch(*required));
+                    blockers.push(SecurityPromotionBlocker::EvidenceDeploymentMismatch(
+                        *required,
+                    ));
                 }
             }
             Err(_) => blockers.push(SecurityPromotionBlocker::MissingEvidence(*required)),
@@ -1876,11 +1867,15 @@ impl fmt::Display for SecurityError {
             Self::CapacityForIntendedChannel => {
                 formatter.write_str("capacity evidence is only for side or covert channels")
             }
-            Self::InvalidConfidence => formatter.write_str("invalid confidence in parts per million"),
+            Self::InvalidConfidence => {
+                formatter.write_str("invalid confidence in parts per million")
+            }
             Self::EmptySecurityEvidencePolicy => {
                 formatter.write_str("security promotion policy requires no evidence")
             }
-            Self::TooManySecurityEvidence => formatter.write_str("too many security evidence kinds"),
+            Self::TooManySecurityEvidence => {
+                formatter.write_str("too many security evidence kinds")
+            }
             Self::Encode(error) => write!(formatter, "security encoding failed: {error}"),
         }
     }
@@ -1934,7 +1929,9 @@ mod tests {
             let mut output = [0_u8; 32];
             for (index, byte) in bytes.iter().enumerate() {
                 let slot = index % output.len();
-                output[slot] = output[slot].wrapping_add(*byte).rotate_left((index % 8) as u32);
+                output[slot] = output[slot]
+                    .wrapping_add(*byte)
+                    .rotate_left((index % 8) as u32);
             }
             Hash32::new(output)
         }
@@ -1952,7 +1949,11 @@ mod tests {
         CompartmentId::try_new(value).unwrap_or_else(|error| panic!("compartment: {error}"))
     }
 
-    fn label(confidentiality: u16, integrity: u16, compartments: Vec<CompartmentId>) -> SecurityLabel {
+    fn label(
+        confidentiality: u16,
+        integrity: u16,
+        compartments: Vec<CompartmentId>,
+    ) -> SecurityLabel {
         SecurityLabel::try_new(confidentiality, integrity, compartments)
             .unwrap_or_else(|error| panic!("label: {error}"))
     }
@@ -1990,13 +1991,8 @@ mod tests {
                 label(10, 0, vec![compartment(1)]),
             )],
             vec![
-                LeakageRule::try_new(
-                    domain(1),
-                    ObservationKind::OutputLength,
-                    channel,
-                    mode,
-                )
-                .unwrap_or_else(|error| panic!("rule: {error}")),
+                LeakageRule::try_new(domain(1), ObservationKind::OutputLength, channel, mode)
+                    .unwrap_or_else(|error| panic!("rule: {error}")),
             ],
             vec![
                 Mitigation::ConstantTimeControlFlow,
@@ -2129,10 +2125,12 @@ mod tests {
         let left = trace(21, observation(30, 64, 0, ChannelClass::Side, None));
         let right = trace(22, observation(30, 64, 0, ChannelClass::Side, None));
         let report = compare_traces::<TestHasher>(&policy, &weak, &left, &right);
-        assert!(report
-            .blockers()
-            .iter()
-            .any(|item| matches!(item, LeakageBlocker::MissingMitigation(_))));
+        assert!(
+            report
+                .blockers()
+                .iter()
+                .any(|item| matches!(item, LeakageBlocker::MissingMitigation(_)))
+        );
     }
 
     #[test]
@@ -2183,8 +2181,13 @@ mod tests {
             hash(61),
         )
         .unwrap_or_else(|error| panic!("capacity: {error}"));
-        let result =
-            evaluate_security_promotion(&promotion, &leakage_policy, &[report], evidence, vec![capacity]);
+        let result = evaluate_security_promotion(
+            &promotion,
+            &leakage_policy,
+            &[report],
+            evidence,
+            vec![capacity],
+        );
         assert!(matches!(
             result.blockers(),
             [SecurityPromotionBlocker::CapacityExceeded { .. }]
@@ -2227,8 +2230,13 @@ mod tests {
             hash(61),
         )
         .unwrap_or_else(|error| panic!("capacity: {error}"));
-        let result =
-            evaluate_security_promotion(&promotion, &leakage_policy, &[report], evidence, vec![capacity]);
+        let result = evaluate_security_promotion(
+            &promotion,
+            &leakage_policy,
+            &[report],
+            evidence,
+            vec![capacity],
+        );
         assert!(result.is_promoted());
     }
 }
