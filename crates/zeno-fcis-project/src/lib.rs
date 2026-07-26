@@ -44,9 +44,7 @@ impl StableName {
             return Err(ProfileError::InvalidStableName);
         }
         if !bytes.iter().all(|byte| {
-            byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || matches!(byte, b'.' | b'_' | b'-')
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'_' | b'-')
         }) {
             return Err(ProfileError::InvalidStableName);
         }
@@ -433,11 +431,8 @@ impl ProjectProfile {
     /// Computes the complete content-derived profile commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ProfileError> {
         let bytes = self.canonical_bytes().map_err(ProfileError::Encode)?;
-        let domain = Domain::new(
-            "zeno-fcis/project-profile",
-            PROJECT_PROFILE_FORMAT_VERSION,
-        )
-        .map_err(ProfileError::Encode)?;
+        let domain = Domain::new("zeno-fcis/project-profile", PROJECT_PROFILE_FORMAT_VERSION)
+            .map_err(ProfileError::Encode)?;
         commitment::<H>(domain, &bytes).map_err(ProfileError::Encode)
     }
 }
@@ -786,8 +781,7 @@ mod tests {
             id(1),
             id(2),
             id(3),
-            DomainPrefix::try_new("example/core")
-                .unwrap_or_else(|error| panic!("domain: {error}")),
+            DomainPrefix::try_new("example/core").unwrap_or_else(|error| panic!("domain: {error}")),
             bindings(),
             entries,
         )
@@ -847,8 +841,7 @@ mod tests {
             id(1),
             id(2),
             id(3),
-            DomainPrefix::try_new("example/core")
-                .unwrap_or_else(|error| panic!("domain: {error}")),
+            DomainPrefix::try_new("example/core").unwrap_or_else(|error| panic!("domain: {error}")),
             bindings(),
             duplicate_id,
         );
