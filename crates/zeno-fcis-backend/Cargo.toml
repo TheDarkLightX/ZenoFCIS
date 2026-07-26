@@ -1,6 +1,6 @@
 [package]
-name = "zeno-fcis-synthesis"
-description = "Deterministic verifier-gated bounded synthesis for ZenoFCIS schemas and contracts"
+name = "zeno-fcis-backend"
+description = "Project-neutral checked backend protocol for synthesis, proof, refinement, and transformation engines"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -14,12 +14,14 @@ default = ["std"]
 std = [
     "zeno-fcis-codec/std",
     "zeno-fcis-crypto/std",
-    "zeno-fcis-value/std",
+    "zeno-fcis-project/std",
 ]
 
 [dependencies]
 zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
 zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project", default-features = false }
+zeno-fcis-synthesis = { version = "=0.1.0", path = "../zeno-fcis-synthesis" }
 zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
 
 [lints]

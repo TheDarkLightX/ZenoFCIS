@@ -25,6 +25,7 @@ std = [
     "zeno-fcis-refine/std",
     "zeno-fcis-profile-zenodex/std",
     "zeno-fcis-schema?/std",
+    "zeno-fcis-backend?/std",
     "zeno-fcis-collections?/std",
 ]
 rustcrypto-sha256 = ["dep:zeno-fcis-crypto", "zeno-fcis-crypto/rustcrypto"]
@@ -43,7 +44,8 @@ mounted-zenodex = [
     "dep:zeno-fcis-adapter-zenodex",
 ]
 authenticated-state = ["std", "dep:zeno-fcis-authenticated"]
-synthesis = ["std", "dep:zeno-fcis-synthesis"]
+synthesis = ["dep:zeno-fcis-synthesis"]
+backend = ["synthesis", "dep:zeno-fcis-backend"]
 sqlite-shell = ["std", "dep:zeno-fcis-shell-sqlite"]
 collections = ["std", "dep:zeno-fcis-collections"]
 persistent-collections = [
@@ -57,7 +59,7 @@ full = [
     "evidence",
     "mounted-zenodex",
     "authenticated-state",
-    "synthesis",
+    "backend",
     "sqlite-shell",
     "persistent-collections",
 ]
@@ -81,7 +83,8 @@ zeno-fcis-evidence = { version = "=0.1.0", path = "../zeno-fcis-evidence", defau
 zeno-fcis-adapter = { version = "=0.1.0", path = "../zeno-fcis-adapter", optional = true }
 zeno-fcis-adapter-zenodex = { version = "=0.1.0", path = "../zeno-fcis-adapter-zenodex", optional = true }
 zeno-fcis-authenticated = { version = "=0.1.0", path = "../zeno-fcis-authenticated", optional = true }
-zeno-fcis-synthesis = { version = "=0.1.0", path = "../zeno-fcis-synthesis", optional = true }
+zeno-fcis-synthesis = { version = "=0.1.0", path = "../zeno-fcis-synthesis", default-features = false, optional = true }
+zeno-fcis-backend = { version = "=0.1.0", path = "../zeno-fcis-backend", default-features = false, optional = true }
 zeno-fcis-shell-sqlite = { version = "=0.1.0", path = "../zeno-fcis-shell-sqlite", optional = true }
 zeno-fcis-collections = { version = "=0.1.0", path = "../zeno-fcis-collections", default-features = false, optional = true }
 
