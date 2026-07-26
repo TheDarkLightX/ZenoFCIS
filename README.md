@@ -35,8 +35,8 @@ The workspace now includes the complete package ladder:
 ZenoFCIS mounts the existing ZenoDEX single-vault zUSD functional core through
 two thin JSON-line entry points: one calls the Python transition and one calls
 the independent Rust transition. Both receive the same exact state, command,
-context, policy, profile, algorithm, schema, codec, precedence, and budget
-bindings.
+context, and policy. ZenoFCIS normalization additionally binds the profile,
+algorithm, schema, codec, precedence, and budget identities.
 
 The retained v1 corpus executes 17 state-threaded cases. It currently produces
 9 accepted transitions and 8 rejections with no Python/Rust divergence. For
