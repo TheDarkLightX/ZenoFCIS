@@ -1,0 +1,20 @@
+[package]
+name = "zeno-fcis-project"
+description = "Project-neutral protocol profiles, stable registries, and migration compatibility for ZenoFCIS"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[features]
+default = ["std"]
+std = ["zeno-fcis-codec/std"]
+
+[dependencies]
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
+
+[lints]
+workspace = true
