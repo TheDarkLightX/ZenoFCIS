@@ -15,7 +15,12 @@ serde_json = { version = "=1.0.151" }
 zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
 zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core" }
 zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch" }
+zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan" }
+zeno-fcis-profile-zenodex = { version = "=0.1.0", path = "../zeno-fcis-profile-zenodex" }
+zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt" }
 zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine" }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value" }
 
 [lints]
 workspace = true

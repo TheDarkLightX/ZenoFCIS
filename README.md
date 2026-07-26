@@ -23,11 +23,49 @@ The workspace now includes the complete package ladder:
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation plus deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
+- a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
 - an explicit dual-root sparse authenticated-state reference with membership/absence proofs, expected-version publication, and full-rebuild equality checks;
 - verifier-gated bounded synthesis over canonical closed candidate domains with content-addressed certificates and honest incomplete-search results;
 - crash-atomic SQLite publication, exact replay binding, a transactional outbox, idempotent delivery, and crash-point refinement tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
+
+## Demonstrated ZenoDEX runtime mount
+
+ZenoFCIS mounts the existing ZenoDEX single-vault zUSD functional core through
+two thin JSON-line entry points: one calls the Python transition and one calls
+the independent Rust transition. Both receive the same exact state, command,
+context, and policy. ZenoFCIS normalization additionally binds the profile,
+algorithm, schema, codec, precedence, and budget identities.
+
+The retained v1 corpus executes 17 state-threaded cases. It currently produces
+9 accepted transitions and 8 rejections with no Python/Rust divergence. For
+each case, the mount compares the complete normalized decision:
+
+```text
+decision kind and reason
++ pre-state and post-state roots
++ candidate identity and CanonicalPatch
++ CommitPlan and OutboxPlan
++ receipt and CommitBundle
++ complete decision commitment
+```
+
+The permanent `mounted-zenodex` workflow checks out the exact pinned ZenoDEX
+revision, builds its Rust runtime, runs both implementations, and byte-compares
+the new report with the retained
+[`fixtures/mounted-zenodex/zusd-v1/report.json`](fixtures/mounted-zenodex/zusd-v1/report.json).
+The runner can also be invoked directly:
+
+```bash
+cargo +1.97.1 run -p zeno-fcis-adapter-zenodex \
+  --bin mount-zenodex-zusd --locked -- \
+  <pinned-zenodex-checkout> <zenodex-rust-binary> <output-directory>
+```
+
+This establishes bounded executable integration for the mounted profile. It
+does not authorize production effects, cover multiple vaults or other ZenoDEX
+lanes, or replace an audit or unbounded refinement proof.
 
 The `zeno-fcis` umbrella keeps the semantic kernel small by default. Enable the complete integration surface explicitly:
 
@@ -69,7 +107,7 @@ See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`
 
 ## Assurance posture
 
-This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, and fail-closed promotion rules. It does not claim audit completion, economic correctness, side-channel resistance, production authorization, or that an external ZenoDEX, JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
+This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, and fail-closed promotion rules. The pinned ZenoDEX single-vault zUSD mount is bounded executable refinement evidence. It does not claim audit completion, economic correctness, side-channel resistance, production authorization, full ZenoDEX coverage, or that an external ZenoDEX, JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
 
 ## License
 
