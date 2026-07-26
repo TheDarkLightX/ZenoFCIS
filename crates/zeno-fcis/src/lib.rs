@@ -15,6 +15,9 @@ pub use zeno_fcis_authenticated as authenticated;
 #[cfg(feature = "backend")]
 /// Checked project-neutral backend protocol for private and external engines.
 pub use zeno_fcis_backend as backend;
+#[cfg(feature = "catalog")]
+/// Schema-bound reason, effect, channel, and plan-validation catalogs.
+pub use zeno_fcis_catalog as catalog;
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
 #[cfg(feature = "codegen")]
@@ -70,6 +73,12 @@ pub use zeno_fcis_backend::{
     BackendRequest, BackendRequestTemplate, BackendResponse, BackendUsage, BackendVerifier,
     IncompleteOutcome, IndeterminateOutcome, RejectedOutcome, SynthesisBackendChecker,
     VerificationDecision, VerifiedBackendRun, execute_verified, verify_backend_response,
+};
+#[cfg(feature = "catalog")]
+pub use zeno_fcis_catalog::{
+    CatalogError, CatalogLimits, CatalogManifest, CatalogMetrics, ChannelDefinition,
+    EffectDefinition, EffectHashField, HashRequirement, NonZeroHash, ProjectCatalog,
+    ReasonDefinition, ReasonDisposition, ValueRole,
 };
 pub use zeno_fcis_codec::{
     CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain, EncodeError, Envelope,
