@@ -2,13 +2,16 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+
+#[cfg(feature = "mounted-runtime")]
+/// Strict project-neutral mounted-runtime adapters and replay fixtures.
+pub use zeno_fcis_adapter as adapter;
 #[cfg(feature = "mounted-zenodex")]
-/// Strict canonical mounted-runtime adapters and replay fixtures.
+/// Concrete ZenoDEX runtime profiles built on the generic mounted boundary.
 pub use zeno_fcis_adapter_zenodex as adapter_zenodex;
 #[cfg(feature = "authenticated-state")]
 /// Versioned sparse authenticated-state planning and proof verification.
 pub use zeno_fcis_authenticated as authenticated;
-
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
 #[cfg(feature = "codegen")]
@@ -37,6 +40,8 @@ pub use zeno_fcis_patch as patch;
 pub use zeno_fcis_plan as plan;
 /// ZenoDEX profile values and the first zUSD schema registry.
 pub use zeno_fcis_profile_zenodex as profile_zenodex;
+/// Project-neutral profiles, stable registries, and migration compatibility.
+pub use zeno_fcis_project as project;
 /// Candidate sealing, receipts, and atomic bundles.
 pub use zeno_fcis_receipt as receipt;
 /// Exact runtime-to-model refinement and proof-assisted promotion.
@@ -90,6 +95,11 @@ pub use zeno_fcis_profile_zenodex::{
     ZenoDexLane, ZenoDexProfileV1, ZusdCommandTagV1, ZusdRejectV1, ZusdStateError,
     ZusdStateFieldV1, ZusdStateV1, zusd_precedence_bytes_v1, zusd_precedence_hash_v1,
     zusd_promotion_policy_v1,
+};
+pub use zeno_fcis_project::{
+    AdditiveExtensionEvidence, CompatibilityBlocker, CompatibilityReport, DomainPrefix,
+    EvolutionError, EvolutionMode, ProfileBindings, ProfileEvolution, ProjectProfile,
+    RegistryEntry, RegistryKind, SemanticId, StableName, compare_successor,
 };
 pub use zeno_fcis_receipt::{
     CandidateBindings, CandidateBody, CandidateBuilder, CandidateId, CommitBundle, ReasonCode,

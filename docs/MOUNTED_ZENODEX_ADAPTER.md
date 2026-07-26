@@ -1,9 +1,11 @@
-# Mounted ZenoDEX full-decision adapter
+# Project-neutral mounted full-decision adapter
 
 ## Boundary
 
-`zeno-fcis-adapter-zenodex` admits output from a callable runtime or an exact
-JSON-line exchange and normalizes it into `zeno-fcis-refine::NormalizedDecision`.
+`zeno-fcis-adapter` admits output from any callable runtime or exact JSON-line
+exchange and normalizes it into `zeno-fcis-refine::NormalizedDecision`.
+`zeno-fcis-adapter-zenodex` contains the concrete zUSD mapping and runner on
+top of that common transport.
 The adapter compares decision kind, stable reason, all six input/profile
 bindings, pre/post roots, candidate identity, patch, commit plan, outbox plan,
 receipt, and complete bundle.
@@ -29,7 +31,7 @@ not encode protocol values, roots, receipts, or bundles.
 
 ## Bounds and negative cases
 
-Line and individual artifact sizes are explicit. The adapter rejects missing,
+Line and individual artifact sizes are bounded explicitly. The adapter rejects missing,
 duplicate, unknown, reordered, whitespace-aliased, multi-line, uppercase-hex,
 odd-hex, oversized, wrong-kind, incomplete-candidate, changed-on-reject, crash,
 and runtime-reported failures. Timeout and tool-disagreement classifications
@@ -37,7 +39,7 @@ are supplied by the mounted `JsonLineRuntime` implementation as runtime errors.
 
 ## Nonclaims
 
-The generic adapter does not certify arbitrary ZenoDEX binaries or Python
+The generic adapter does not certify arbitrary project binaries or Python
 modules. Its concrete single-vault zUSD runner mounts the exact external
 revision documented in `MOUNTED_ZENODEX_ZUSD_V1.md`, enforces bounded process
 and transport controls, persists generated replay fixtures, and retains one
