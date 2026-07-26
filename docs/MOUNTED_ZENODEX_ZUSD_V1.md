@@ -87,6 +87,8 @@ shell controls.
 
 - identical admitted native observations normalize to identical complete
   decisions;
+- each decoded native observation is bound to the exact canonical input used
+  during decoding and cannot be normalized for another input;
 - accepted results bind a candidate and complete bundle;
 - rejected results preserve state and carry no candidate, plan, outbox, or
   bundle;
@@ -100,7 +102,8 @@ shell controls.
 
 ## Assumptions
 
-- the pinned ZenoDEX revision remains retrievable by full commit ID;
+- the pinned ZenoDEX revision remains retrievable by full commit ID and is
+  checked out without tracked or untracked worktree changes;
 - CPython integer semantics match the source transition assumptions;
 - the Rust and Python entry points call the reviewed transitions rather than a
   substituted implementation;
