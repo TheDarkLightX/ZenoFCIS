@@ -14,6 +14,20 @@ catalog = Path("crates/zeno-fcis-catalog/src/lib.rs")
 replace_exact(
     catalog,
     "use alloc::string::{String, ToString};\n",
-    "use alloc::string::String;\n",
-    "unused ToString import",
+    "#[cfg(test)]\nuse alloc::string::String;\n",
+    "test-only String import",
+)
+replace_exact(
+    catalog,
+    '''impl fmt::Display for CatalogError {
+''',
+    '''impl From<EncodeError> for CatalogError {
+    fn from(error: EncodeError) -> Self {
+        Self::Encode(error)
+    }
+}
+
+impl fmt::Display for CatalogError {
+''',
+    "encoding error conversion",
 )
