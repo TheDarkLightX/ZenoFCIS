@@ -12,6 +12,9 @@ pub use zeno_fcis_adapter_zenodex as adapter_zenodex;
 #[cfg(feature = "authenticated-state")]
 /// Versioned sparse authenticated-state planning and proof verification.
 pub use zeno_fcis_authenticated as authenticated;
+#[cfg(feature = "backend")]
+/// Checked project-neutral backend protocol for private and external engines.
+pub use zeno_fcis_backend as backend;
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
 #[cfg(feature = "codegen")]
@@ -60,6 +63,14 @@ pub use zeno_fcis_synthesis as synthesis;
 /// Transitively immutable closed values.
 pub use zeno_fcis_value as value;
 
+#[cfg(feature = "backend")]
+pub use zeno_fcis_backend::{
+    AcceptedOutcome, BackendCapabilities, BackendCertificate, BackendEngine, BackendError,
+    BackendExecutionError, BackendIdentity, BackendLimits, BackendOperation, BackendOutcome,
+    BackendRequest, BackendRequestTemplate, BackendResponse, BackendUsage, BackendVerifier,
+    IncompleteOutcome, IndeterminateOutcome, RejectedOutcome, SynthesisBackendChecker,
+    VerificationDecision, VerifiedBackendRun, execute_verified, verify_backend_response,
+};
 pub use zeno_fcis_codec::{
     CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain, EncodeError, Envelope,
     Hash32, commitment, decode_envelope, decode_value, domain_preimage,
