@@ -55,6 +55,9 @@ pub use zeno_fcis_refine as refine;
 #[cfg(feature = "schema")]
 /// Closed, acyclic protocol schemas and schema-bound value admission.
 pub use zeno_fcis_schema as schema;
+#[cfg(feature = "secret")]
+/// Zeroizing and constant-time secret-handling boundaries.
+pub use zeno_fcis_secret as secret;
 #[cfg(feature = "security")]
 /// Information-flow, side-channel, and covert-channel assurance values.
 pub use zeno_fcis_security as security;
@@ -142,6 +145,10 @@ pub use zeno_fcis_schema::{
     EnumVariantDef, FieldDef, FieldId, Schema, SchemaError, SchemaLimits, SchemaMetrics,
     SchemaName, SumVariantDef, TypeDef, TypeId, TypeKind, ValidationLimits, ValidationReport,
     ValueValidationError, VariantId,
+};
+#[cfg(feature = "secret")]
+pub use zeno_fcis_secret::{
+    Exposed, ExposureEvent, ExposurePermit, HardenedExecution, SecretBox, SecretBytes, SecretError,
 };
 #[cfg(feature = "security")]
 pub use zeno_fcis_security::{
