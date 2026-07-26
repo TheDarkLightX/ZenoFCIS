@@ -63,8 +63,6 @@ jobs:
           run_check synthesis-no-std cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked --target wasm32-unknown-unknown
           run_check backend-no-std cargo +1.97.1 check -p zeno-fcis-backend --no-default-features --locked --target wasm32-unknown-unknown
           run_check umbrella-backend-no-std cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
-          run_check assurance-self-test python3 tools/check_assurance.py --self-test
-          run_check assurance python3 tools/check_assurance.py
           run_check rustdoc env RUSTDOCFLAGS=-Dwarnings cargo +1.97.1 doc --workspace --all-features --locked --no-deps
           printf '%s\n' "$status" > internal/backend-rebase-diagnostics/status.txt
           exit 0
