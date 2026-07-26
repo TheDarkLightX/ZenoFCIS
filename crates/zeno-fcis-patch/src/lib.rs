@@ -266,7 +266,6 @@ impl CanonicalPatch {
         }
 
         let mut current = state.clone();
-        let value_domain = Domain::new("zeno-fcis/value", 1).map_err(PatchError::Encode)?;
         for operation in &self.operations {
             current = match operation {
                 PatchOp::Insert {
@@ -280,7 +279,7 @@ impl CanonicalPatch {
                     value,
                 } => {
                     let old = lookup(&current, path.segments())?;
-                    let actual = hash_value::<H>(value_domain, old)?;
+                    let actual = hash_precondition_value::<H>(old)?;
                     if actual != *expected_old_hash {
                         return Err(PatchError::OldValueMismatch {
                             path: path.clone(),
@@ -295,7 +294,7 @@ impl CanonicalPatch {
                     expected_old_hash,
                 } => {
                     let old = lookup(&current, path.segments())?;
-                    let actual = hash_value::<H>(value_domain, old)?;
+                    let actual = hash_precondition_value::<H>(old)?;
                     if actual != *expected_old_hash {
                         return Err(PatchError::OldValueMismatch {
                             path: path.clone(),
@@ -362,6 +361,20 @@ pub fn hash_value<H: CommitmentHasher>(
 ) -> Result<Hash32, PatchError> {
     let bytes = value.canonical_bytes().map_err(PatchError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(PatchError::Encode)
+}
+
+/// Computes the protocol-defined old-value commitment used by update and deletion preconditions.
+pub fn hash_precondition_value<H: CommitmentHasher>(value: &Value) -> Result<Hash32, PatchError> {
+    let domain = Domain::new("zeno-fcis/value", 1).map_err(PatchError::Encode)?;
+    hash_value::<H>(domain, value)
+}
+
+/// Resolves one immutable value path without applying a patch.
+///
+/// The empty path returns the complete supplied value. Map navigation uses the
+/// exact encoded key bytes already carried by [`ValuePath`].
+pub fn value_at<'a>(value: &'a Value, path: &ValuePath) -> Result<&'a Value, PatchError> {
+    lookup(value, path.segments())
 }
 
 fn validate_insert_shape(operation: &PatchOp) -> Result<(), PatchError> {
@@ -801,8 +814,7 @@ mod tests {
             Ok(root) => root,
             Err(error) => panic!("hash failed: {error}"),
         };
-        let value_domain = Domain::new("zeno-fcis/value", 1).unwrap_or(state_domain());
-        let old_hash = match hash_value::<TestHasher>(value_domain, &Value::U128(7)) {
+        let old_hash = match hash_precondition_value::<TestHasher>(&Value::U128(7)) {
             Ok(root) => root,
             Err(error) => panic!("hash failed: {error}"),
         };
@@ -818,6 +830,20 @@ mod tests {
         assert!(patch.is_ok());
         let applied = patch.and_then(|value| value.apply::<TestHasher>(&state, state_domain()));
         assert!(applied.is_ok());
+    }
+
+    #[test]
+    fn value_at_resolves_nested_paths_without_mutation() {
+        let state = Value::record_canonical(vec![Field::new(
+            1,
+            Value::Tuple(vec![Value::Bool(false), Value::U128(7)].into_boxed_slice()),
+        )])
+        .unwrap_or_else(|error| panic!("invalid state: {error}"));
+        let original = state.clone();
+        let path = ValuePath::new(vec![PathSegment::Field(1), PathSegment::TupleIndex(1)]);
+
+        assert_eq!(value_at(&state, &path), Ok(&Value::U128(7)));
+        assert_eq!(state, original);
     }
 
     #[test]

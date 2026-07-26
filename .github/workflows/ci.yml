@@ -50,6 +50,7 @@ jobs:
             zeno-fcis-crypto \
             zeno-fcis-project \
             zeno-fcis-catalog \
+            zeno-fcis-transition \
             zeno-fcis-patch \
             zeno-fcis-plan \
             zeno-fcis-receipt \
