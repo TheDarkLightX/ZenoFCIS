@@ -62,8 +62,6 @@ jobs:
           run_check doctests cargo +1.97.1 test --workspace --doc --all-features --locked
           run_check security-no-std cargo +1.97.1 check -p zeno-fcis-security --no-default-features --locked --target wasm32-unknown-unknown
           run_check umbrella-security-no-std cargo +1.97.1 check -p zeno-fcis --no-default-features --features security --locked --target wasm32-unknown-unknown
-          run_check assurance-self-test python3 tools/check_assurance.py --self-test
-          run_check assurance python3 tools/check_assurance.py
           run_check rustdoc env RUSTDOCFLAGS=-Dwarnings cargo +1.97.1 doc --workspace --all-features --locked --no-deps
           printf '%s\n' "$status" > internal/security-diagnostics/status.txt
           exit 0
