@@ -212,10 +212,13 @@ impl CanonicalPatch {
             keyed.push((operation.sort_key()?, operation));
         }
         keyed.sort_by(|left, right| left.0.cmp(&right.0));
-        for pair in keyed.windows(2) {
-            let left = &pair[0].1;
-            let right = &pair[1].1;
-            if left.path().is_prefix_of(right.path()) {
+        {
+            let mut paths = keyed
+                .iter()
+                .map(|(_, operation)| operation.path())
+                .collect::<Vec<_>>();
+            paths.sort_unstable();
+            if paths.windows(2).any(|pair| pair[0].is_prefix_of(pair[1])) {
                 return Err(PatchError::OverlappingPaths);
             }
         }
@@ -832,6 +835,32 @@ mod tests {
                     path: ValuePath::new(vec![PathSegment::Field(1), PathSegment::Field(2)]),
                     expected_old_hash: Hash32::ZERO,
                     value: Value::U128(2),
+                },
+            ],
+        );
+        assert_eq!(patch, Err(PatchError::OverlappingPaths));
+    }
+
+    #[test]
+    fn non_adjacent_overlapping_paths_are_rejected() {
+        let patch = CanonicalPatch::try_new(
+            1,
+            Hash32::ZERO,
+            vec![
+                PatchOp::Update {
+                    path: ValuePath::new(vec![PathSegment::Field(1)]),
+                    expected_old_hash: Hash32::ZERO,
+                    value: Value::U128(1),
+                },
+                PatchOp::Update {
+                    path: ValuePath::new(vec![PathSegment::Field(0), PathSegment::Field(0)]),
+                    expected_old_hash: Hash32::ZERO,
+                    value: Value::U128(2),
+                },
+                PatchOp::Update {
+                    path: ValuePath::new(vec![PathSegment::Field(1), PathSegment::Field(0)]),
+                    expected_old_hash: Hash32::ZERO,
+                    value: Value::U128(3),
                 },
             ],
         );

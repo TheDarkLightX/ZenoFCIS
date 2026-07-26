@@ -149,4 +149,35 @@ mod tests {
         let result = Amount::try_from_value(over_max);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn outgoing_schema_bounds_are_enforced_by_adapter() {
+        assert_eq!(
+            Amount(1_000_001).to_value(),
+            Err(AdapterError::IntegerRange)
+        );
+        assert_eq!(Signed(-1_001).to_value(), Err(AdapterError::IntegerRange));
+        assert_eq!(
+            Blob(vec![0; 33].into_boxed_slice()).to_value(),
+            Err(AdapterError::Length)
+        );
+        assert_eq!(Label("".into()).to_value(), Err(AdapterError::Length));
+        assert_eq!(
+            Label("é".into()).to_value(),
+            Err(AdapterError::NonAsciiText)
+        );
+        let labels = (0..5)
+            .map(|_| Label("a".into()))
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        assert_eq!(Labels(labels).to_value(), Err(AdapterError::Length));
+        let scores = (0..5)
+            .map(|index| ScoresEntry {
+                key: Amount(index),
+                value: Amount(index),
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        assert_eq!(Scores(scores).to_value(), Err(AdapterError::Length));
+    }
 }

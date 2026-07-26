@@ -318,7 +318,11 @@ pub fn plan_authenticated_update<P: StateProjector>(
     let semantic_post_root = applied.post_root();
     let (post_state, _) = applied.into_parts();
     let after = projected_map(projector.project(&post_state)?)?;
-    let rebuilt = ReferenceSparseTree::from_map(tree.profile, tree.version + 1, after.clone())?;
+    let next_version = tree
+        .version
+        .checked_add(1)
+        .ok_or(AuthError::VersionOverflow)?;
+    let rebuilt = ReferenceSparseTree::from_map(tree.profile, next_version, after.clone())?;
     let node_batch = NodeBatch::from_maps(&before, &after);
     let mut stale_nodes = Vec::new();
     for write in node_batch.writes() {
@@ -334,10 +338,7 @@ pub fn plan_authenticated_update<P: StateProjector>(
     let plan = PlannedAuthenticatedCommit {
         profile: tree.profile,
         expected_version: tree.version,
-        next_version: tree
-            .version
-            .checked_add(1)
-            .ok_or(AuthError::VersionOverflow)?,
+        next_version,
         semantic_pre_root: patch.expected_pre_root(),
         semantic_post_root,
         patch_hash,
@@ -815,5 +816,39 @@ mod tests {
         };
         assert_eq!(tree.apply_plan(&plan), Err(AuthError::VersionConflict));
         assert_eq!(tree, before);
+    }
+
+    #[test]
+    fn planning_at_maximum_version_returns_overflow() {
+        let pre = Value::U128(7);
+        let pre_root = hash_value::<RustCryptoSha256>(domain(), &pre)
+            .unwrap_or_else(|error| panic!("pre root: {error}"));
+        let old_hash = hash_value::<RustCryptoSha256>(
+            Domain::new("zeno-fcis/value", 1).unwrap_or_else(|error| panic!("domain: {error}")),
+            &pre,
+        )
+        .unwrap_or_else(|error| panic!("old hash: {error}"));
+        let patch = CanonicalPatch::try_new(
+            1,
+            pre_root,
+            vec![PatchOp::Update {
+                path: ValuePath::new(Vec::new()),
+                expected_old_hash: old_hash,
+                value: Value::U128(8),
+            }],
+        )
+        .unwrap_or_else(|error| panic!("patch: {error}"));
+        let tree = ReferenceSparseTree::try_new(
+            profile(),
+            u64::MAX,
+            RootProjector
+                .project(&pre)
+                .unwrap_or_else(|error| panic!("project: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("tree: {error}"));
+        assert_eq!(
+            plan_authenticated_update(&pre, domain(), &patch, &tree, &RootProjector),
+            Err(AuthError::VersionOverflow)
+        );
     }
 }

@@ -39,3 +39,42 @@ fn python_vector_replay_succeeds() {
         "missing replay confirmation in stdout: {stdout}"
     );
 }
+
+#[test]
+fn python_outgoing_schema_bounds_are_enforced() {
+    let manifest_dir = PathBuf::from(
+        env::var_os("CARGO_MANIFEST_DIR").unwrap_or_else(|| panic!("CARGO_MANIFEST_DIR not set")),
+    );
+    let python_dir = manifest_dir.join("python");
+    let script = r#"
+from codegen_fixture import AdapterError, Amount, Signed, Blob, Label, Labels, Scores, ScoresEntry
+
+def rejects(call, kind):
+    try:
+        call()
+    except AdapterError as error:
+        assert error.kind == kind, (error.kind, kind)
+        return
+    raise AssertionError(f"expected {kind}")
+
+rejects(lambda: Amount(1_000_001).to_value(), "integer_range")
+rejects(lambda: Signed(-1_001).to_value(), "integer_range")
+rejects(lambda: Blob(bytes(33)).to_value(), "length")
+rejects(lambda: Label("").to_value(), "length")
+rejects(lambda: Label("é").to_value(), "non_ascii_text")
+rejects(lambda: Labels([Label("a")] * 5).to_value(), "length")
+rejects(lambda: Scores([ScoresEntry(Amount(i), Amount(i)) for i in range(5)]).to_value(), "length")
+"#;
+    let output = Command::new("python3")
+        .arg("-c")
+        .arg(script)
+        .current_dir(&python_dir)
+        .output()
+        .unwrap_or_else(|_| panic!("failed to run python3"));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "python outgoing-bound checks failed\nstdout: {stdout}\nstderr: {stderr}"
+    );
+}

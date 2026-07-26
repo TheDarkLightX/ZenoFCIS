@@ -111,6 +111,24 @@ impl AccessPath {
         }
         true
     }
+
+    /// Returns whether this declared path contains every value designated by
+    /// `other`.
+    #[must_use]
+    pub fn covers(&self, other: &Self) -> bool {
+        if self.namespace != other.namespace || self.atoms.len() > other.atoms.len() {
+            return false;
+        }
+        for (declared, requested) in self.atoms.iter().zip(other.atoms.iter()) {
+            if matches!(declared, PathAtom::AnyDescendant) {
+                return true;
+            }
+            if declared != requested {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 impl CanonicalEncode for AccessPath {
@@ -186,10 +204,10 @@ impl PathSet {
             .any(|left| other.paths.iter().any(|right| left.overlaps(right)))
     }
 
-    /// Returns whether a path overlaps a declared member.
+    /// Returns whether a path is contained by a declared member.
     #[must_use]
     pub fn covers(&self, path: &AccessPath) -> bool {
-        self.paths.iter().any(|declared| declared.overlaps(path))
+        self.paths.iter().any(|declared| declared.covers(path))
     }
 }
 
@@ -868,6 +886,14 @@ pub enum CompositionBlocker {
         /// Unknown guarantee claim.
         guarantee: Hash32,
     },
+    /// A wiring reads an effect absent from the source component's declared
+    /// effect footprint.
+    UndeclaredWiringSourceEffect {
+        /// Source component.
+        source: ComponentId,
+        /// Effect path consumed by the wiring.
+        effect: AccessPath,
+    },
     /// Wiring writes a destination without an applicable frame permission.
     UnauthorizedWiring {
         /// Source component.
@@ -969,6 +995,15 @@ pub fn verify_assume_guarantee<V: EvidenceVerifier>(
     }
 
     for wiring in spec.wirings() {
+        let source_declared = spec
+            .component(wiring.source_component())
+            .is_some_and(|source| source.footprint().effects().covers(wiring.source_effect()));
+        if !source_declared {
+            blockers.push(CompositionBlocker::UndeclaredWiringSourceEffect {
+                source: wiring.source_component(),
+                effect: wiring.source_effect().clone(),
+            });
+        }
         let permitted = spec
             .component(wiring.destination_component())
             .is_some_and(|destination| {
@@ -1162,6 +1197,8 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("path: {error}"));
         assert!(broad.overlaps(&narrow));
+        assert!(broad.covers(&narrow));
+        assert!(!narrow.covers(&broad));
     }
 
     #[test]
@@ -1172,7 +1209,12 @@ mod tests {
         let producer = ComponentContract::try_new(
             ComponentId::new(1),
             hash(10),
-            Footprint::default(),
+            Footprint::new(
+                PathSet::empty(),
+                PathSet::empty(),
+                PathSet::empty(),
+                PathSet::try_new(vec![path(2, 1)]).unwrap_or_default(),
+            ),
             Vec::new(),
             vec![guarantee],
             Vec::new(),
@@ -1217,6 +1259,59 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("evidence: {error}"));
         assert!(verify_assume_guarantee(&spec, &evidence, &ExactVerifier).is_verified());
+    }
+
+    #[test]
+    fn wiring_source_must_be_declared_as_an_effect() {
+        let frame = FrameRule::try_new(path(1, 9), vec![ComponentId::new(1)], hash(2))
+            .unwrap_or_else(|error| panic!("frame: {error}"));
+        let producer = ComponentContract::try_new(
+            ComponentId::new(1),
+            hash(10),
+            Footprint::default(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        )
+        .unwrap_or_else(|error| panic!("producer: {error}"));
+        let consumer = ComponentContract::try_new(
+            ComponentId::new(2),
+            hash(11),
+            Footprint::default(),
+            Vec::new(),
+            Vec::new(),
+            vec![frame],
+        )
+        .unwrap_or_else(|error| panic!("consumer: {error}"));
+        let wiring = Wiring::new(
+            ComponentId::new(1),
+            path(2, 1),
+            ComponentId::new(2),
+            path(1, 9),
+            hash(12),
+        );
+        let spec = CompositionSpec::try_new(
+            1,
+            vec![producer, consumer],
+            vec![wiring],
+            Vec::new(),
+            vec![ComponentId::new(1), ComponentId::new(2)],
+        )
+        .unwrap_or_else(|error| panic!("spec: {error}"));
+        let evidence = CompositionEvidence::try_new(
+            vec![ClaimEvidence::new(hash(2), hash(2))],
+            Vec::new(),
+            hash(9),
+            hash(9),
+        )
+        .unwrap_or_else(|error| panic!("evidence: {error}"));
+        assert!(matches!(
+            verify_assume_guarantee(&spec, &evidence, &ExactVerifier).blockers(),
+            [CompositionBlocker::UndeclaredWiringSourceEffect {
+                source,
+                ..
+            }] if *source == ComponentId::new(1)
+        ));
     }
 
     #[test]
