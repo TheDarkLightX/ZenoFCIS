@@ -12,15 +12,14 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 
 use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_project::StableName;
-use zeno_fcis_synthesis::{
-    Assignment, CandidateChecker, CheckResult, SynthesisError,
-};
+use zeno_fcis_synthesis::{Assignment, CandidateChecker, CheckResult, SynthesisError};
 use zeno_fcis_value::{Value, ValueError, ValueLimits};
 
 /// Maximum advertised operations for one backend identity.
@@ -957,7 +956,7 @@ pub struct BackendRequestTemplate {
 
 impl BackendRequestTemplate {
     /// Creates a synthesis request template.
-    pub const fn try_new(
+    pub fn try_new(
         profile_hash: Hash32,
         specification_hash: Hash32,
         context_hash: Hash32,
@@ -1097,7 +1096,10 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
     Ok(())
 }
 
-fn hash_canonical<T: CanonicalEncode>(domain: &'static str, value: &T) -> Result<Hash32, BackendError> {
+fn hash_canonical<T: CanonicalEncode>(
+    domain: &'static str,
+    value: &T,
+) -> Result<Hash32, BackendError> {
     let bytes = value.canonical_bytes().map_err(BackendError::Encode)?;
     hash_bytes(domain, &bytes)
 }
@@ -1156,29 +1158,53 @@ pub enum BackendError {
     Encode(EncodeError),
 }
 
+impl From<EncodeError> for BackendError {
+    fn from(error: EncodeError) -> Self {
+        Self::Encode(error)
+    }
+}
+
 impl fmt::Display for BackendError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyCapabilities => formatter.write_str("backend capabilities are empty"),
-            Self::TooManyCapabilities => formatter.write_str("backend capability count exceeds bound"),
+            Self::TooManyCapabilities => {
+                formatter.write_str("backend capability count exceeds bound")
+            }
             Self::ZeroProtocolVersion => formatter.write_str("backend protocol version is zero"),
             Self::ZeroIdentityHash => formatter.write_str("backend identity contains a zero hash"),
-            Self::ZeroRequestBinding => formatter.write_str("backend request contains a zero binding"),
+            Self::ZeroRequestBinding => {
+                formatter.write_str("backend request contains a zero binding")
+            }
             Self::ZeroLimit => formatter.write_str("backend request limit is zero"),
-            Self::LimitTooLarge => formatter.write_str("backend request limit exceeds protocol maximum"),
+            Self::LimitTooLarge => {
+                formatter.write_str("backend request limit exceeds protocol maximum")
+            }
             Self::UsageExceedsLimit => formatter.write_str("backend usage exceeds request limit"),
             Self::UnsupportedOperation(operation) => {
                 write!(formatter, "backend does not support {operation:?}")
             }
-            Self::ZeroOutcomeBinding => formatter.write_str("backend outcome contains a zero claim or trace"),
-            Self::InvalidAdditionalClaims => formatter.write_str("backend additional claims are invalid"),
+            Self::ZeroOutcomeBinding => {
+                formatter.write_str("backend outcome contains a zero claim or trace")
+            }
+            Self::InvalidAdditionalClaims => {
+                formatter.write_str("backend additional claims are invalid")
+            }
             Self::OutputTooLarge => formatter.write_str("backend output exceeds declared bound"),
-            Self::RequestMismatch => formatter.write_str("backend response request binding mismatch"),
+            Self::RequestMismatch => {
+                formatter.write_str("backend response request binding mismatch")
+            }
             Self::IdentityMismatch => formatter.write_str("backend response identity mismatch"),
             Self::ZeroVerifierIdentity => formatter.write_str("backend verifier identity is zero"),
-            Self::ZeroVerificationClaim => formatter.write_str("backend verification claim is zero"),
-            Self::VerifierRefuted(_) => formatter.write_str("backend response was independently refuted"),
-            Self::VerifierIndeterminate => formatter.write_str("backend verifier was indeterminate"),
+            Self::ZeroVerificationClaim => {
+                formatter.write_str("backend verification claim is zero")
+            }
+            Self::VerifierRefuted(_) => {
+                formatter.write_str("backend response was independently refuted")
+            }
+            Self::VerifierIndeterminate => {
+                formatter.write_str("backend verifier was indeterminate")
+            }
             Self::Execution(error) => write!(formatter, "backend execution failed: {error:?}"),
             Self::Value(error) => write!(formatter, "backend value rejected: {error}"),
             Self::Synthesis(error) => write!(formatter, "synthesis conversion failed: {error}"),
@@ -1256,15 +1282,15 @@ mod tests {
 
     #[test]
     fn limits_and_usage_fail_closed() {
-        assert_eq!(
+        assert!(matches!(
             BackendLimits::try_new(0, 1, 1, 1),
             Err(BackendError::ZeroLimit)
-        );
+        ));
         let limits = limits();
-        assert_eq!(
+        assert!(matches!(
             BackendUsage::try_new(limits, 10_001, 0, 0, 0),
             Err(BackendError::UsageExceedsLimit)
-        );
+        ));
     }
 
     #[test]
@@ -1377,15 +1403,19 @@ mod tests {
             SearchBudget { max_assignments: 2 },
         )
         .unwrap_or_else(|error| panic!("problem: {error}"));
-        let result = search(&problem, &mut checker)
-            .unwrap_or_else(|error| panic!("search failed: {error}"));
+        let result =
+            search(&problem, &mut checker).unwrap_or_else(|error| panic!("search failed: {error}"));
         match result {
             SearchResult::Selected {
                 assignment,
                 compiled,
                 ..
             } => {
-                assert_eq!(assignment.get(HoleId::try_new(1).unwrap_or_else(|error| panic!("id: {error}"))), Some(&Value::U128(2)));
+                assert_eq!(
+                    assignment
+                        .get(HoleId::try_new(1).unwrap_or_else(|error| panic!("id: {error}"))),
+                    Some(&Value::U128(2))
+                );
                 assert_eq!(compiled, Value::U128(99));
             }
             SearchResult::NoSolution { .. } => panic!("expected selected candidate"),
