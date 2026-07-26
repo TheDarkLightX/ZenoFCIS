@@ -30,6 +30,43 @@ The workspace now includes the complete package ladder:
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
 
+## Demonstrated ZenoDEX runtime mount
+
+ZenoFCIS mounts the existing ZenoDEX single-vault zUSD functional core through
+two thin JSON-line entry points: one calls the Python transition and one calls
+the independent Rust transition. Both receive the same exact state, command,
+context, policy, profile, algorithm, schema, codec, precedence, and budget
+bindings.
+
+The retained v1 corpus executes 17 state-threaded cases. It currently produces
+9 accepted transitions and 8 rejections with no Python/Rust divergence. For
+each case, the mount compares the complete normalized decision:
+
+```text
+decision kind and reason
++ pre-state and post-state roots
++ candidate identity and CanonicalPatch
++ CommitPlan and OutboxPlan
++ receipt and CommitBundle
++ complete decision commitment
+```
+
+The permanent `mounted-zenodex` workflow checks out the exact pinned ZenoDEX
+revision, builds its Rust runtime, runs both implementations, and byte-compares
+the new report with the retained
+[`fixtures/mounted-zenodex/zusd-v1/report.json`](fixtures/mounted-zenodex/zusd-v1/report.json).
+The runner can also be invoked directly:
+
+```bash
+cargo +1.97.1 run -p zeno-fcis-adapter-zenodex \
+  --bin mount-zenodex-zusd --locked -- \
+  <pinned-zenodex-checkout> <zenodex-rust-binary> <output-directory>
+```
+
+This establishes bounded executable integration for the mounted profile. It
+does not authorize production effects, cover multiple vaults or other ZenoDEX
+lanes, or replace an audit or unbounded refinement proof.
+
 The `zeno-fcis` umbrella keeps the semantic kernel small by default. Enable the complete integration surface explicitly:
 
 ```toml
