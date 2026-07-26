@@ -763,13 +763,6 @@ mod tests {
 
     #[test]
     fn rejected_owned_input_is_zeroized_before_return() {
-        let mut oversized = vec![7_u8; MAX_SECRET_BYTES + 1];
-        assert_eq!(
-            validate_owned_vec(hash(3), &mut oversized),
-            Err(SecretError::InvalidLength)
-        );
-        assert!(oversized.is_empty());
-
         let mut wrong_identity = vec![9_u8; 32];
         assert_eq!(
             validate_owned_vec(Hash32::ZERO, &mut wrong_identity),
@@ -783,6 +776,20 @@ mod tests {
             Err(SecretError::ZeroHash)
         );
         assert_eq!(rejected_array, [0_u8; 8]);
+    }
+
+    #[test]
+    #[cfg_attr(
+        miri,
+        ignore = "the exact 1 MiB volatile-zeroization bound is covered outside Miri"
+    )]
+    fn oversized_owned_input_is_zeroized_before_return() {
+        let mut oversized = vec![7_u8; MAX_SECRET_BYTES + 1];
+        assert_eq!(
+            validate_owned_vec(hash(3), &mut oversized),
+            Err(SecretError::InvalidLength)
+        );
+        assert!(oversized.is_empty());
     }
 
     #[test]
