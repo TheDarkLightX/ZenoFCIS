@@ -10,6 +10,7 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
@@ -240,6 +241,41 @@ pub enum ZusdStateFieldV1 {
 impl ZusdStateFieldV1 {
     /// Canonical field count.
     pub const COUNT: usize = 32;
+    /// Complete field registry in canonical record order.
+    pub const ALL: [Self; Self::COUNT] = [
+        Self::NowEpoch,
+        Self::OracleSeen,
+        Self::OracleLastUpdateEpoch,
+        Self::PriceE8,
+        Self::PricePendingE8,
+        Self::MaxOracleStalenessEpochs,
+        Self::CollateralE8,
+        Self::DebtE8,
+        Self::FreeDebtE8,
+        Self::StabilityPoolDebtE8,
+        Self::StabilityPoolCollateralE8,
+        Self::ProtocolCollateralE8,
+        Self::ProtocolRevenueZusdCumulativeE8,
+        Self::LiquidatorCompensationCollateralCumulativeE8,
+        Self::McrBps,
+        Self::CcrBps,
+        Self::MinDebtOpenE8,
+        Self::MaxDebtE8,
+        Self::MaxDebtSupplyE8,
+        Self::MaxStabilityPoolCollateralE8,
+        Self::MaxProtocolCollateralE8,
+        Self::BaseRateBps,
+        Self::BaseRateLastEpoch,
+        Self::BaseRateDecayPerEpochBps,
+        Self::BaseRateBorrowBumpBps,
+        Self::BaseRateRedeemBumpBps,
+        Self::BorrowFeeFloorBps,
+        Self::BorrowFeeMaxBps,
+        Self::RedemptionFeeFloorBps,
+        Self::RedemptionFeeMaxBps,
+        Self::LiquidationGasCompensationFixedCollateralE8,
+        Self::LiquidationGasCompensationBps,
+    ];
 
     /// Returns the canonical record identifier.
     #[must_use]
@@ -259,6 +295,22 @@ pub struct ZusdStateV1 {
 }
 
 impl ZusdStateV1 {
+    /// Constructs the exact `ZUSDState()` defaults mounted from ZenoDEX.
+    pub fn reference_initial() -> Result<Self, ZusdStateError> {
+        let mut fields = [0_u128; ZusdStateFieldV1::COUNT];
+        fields[ZusdStateFieldV1::MaxOracleStalenessEpochs.index()] = 100;
+        fields[ZusdStateFieldV1::McrBps.index()] = 11_000;
+        fields[ZusdStateFieldV1::CcrBps.index()] = 15_000;
+        fields[ZusdStateFieldV1::MinDebtOpenE8.index()] = 100 * E8;
+        fields[ZusdStateFieldV1::MaxDebtE8.index()] = 10_000_000 * E8;
+        fields[ZusdStateFieldV1::MaxDebtSupplyE8.index()] = 20_000_000 * E8;
+        fields[ZusdStateFieldV1::MaxStabilityPoolCollateralE8.index()] = 20_000_000 * E8;
+        fields[ZusdStateFieldV1::MaxProtocolCollateralE8.index()] = 20_000_000 * E8;
+        fields[ZusdStateFieldV1::BorrowFeeMaxBps.index()] = 1_000;
+        fields[ZusdStateFieldV1::RedemptionFeeMaxBps.index()] = 1_000;
+        Self::try_from_fields(fields)
+    }
+
     /// Constructs and checks the hard representation/accounting invariants.
     pub fn try_from_fields(
         fields: [u128; ZusdStateFieldV1::COUNT],
@@ -444,10 +496,148 @@ pub enum ZusdCommandTagV1 {
 }
 
 impl ZusdCommandTagV1 {
+    /// Returns the exact native ZenoDEX command spelling.
+    #[must_use]
+    pub const fn native_name(self) -> &'static str {
+        match self {
+            Self::AdvanceEpochLegacy => "advance_epoch",
+            Self::BootstrapOracle => "bootstrap_oracle",
+            Self::OracleReport => "oracle_report",
+            Self::OracleCommit => "oracle_commit",
+            Self::DepositCollateral => "deposit_collateral",
+            Self::WithdrawCollateral => "withdraw_collateral",
+            Self::MintZusd => "mint_zusd",
+            Self::RepayZusd => "repay_zusd",
+            Self::DepositStabilityPool => "deposit_sp",
+            Self::WithdrawStabilityPool => "withdraw_sp",
+            Self::RedeemZusd => "redeem_zusd",
+            Self::Liquidate => "liquidate",
+        }
+    }
+
     /// Returns whether the command is admitted as production protocol authority.
     #[must_use]
     pub const fn is_protocol_authority(self) -> bool {
         !matches!(self, Self::AdvanceEpochLegacy)
+    }
+}
+
+/// Closed zUSD command values admitted by the mounted profile.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ZusdCommandV1 {
+    /// Legacy deterministic test command.
+    AdvanceEpochLegacy {
+        /// Positive epoch delta.
+        delta: u128,
+    },
+    /// Bootstrap the first finalized Oracle price.
+    BootstrapOracle {
+        /// Explicit Oracle authority decision.
+        auth_ok: bool,
+        /// Initial price in E8.
+        price_e8: u128,
+    },
+    /// Submit a pending Oracle price.
+    OracleReport {
+        /// Explicit Oracle authority decision.
+        auth_ok: bool,
+        /// Pending price in E8.
+        price_e8: u128,
+    },
+    /// Finalize the pending Oracle price.
+    OracleCommit {
+        /// Explicit Oracle authority decision.
+        auth_ok: bool,
+    },
+    /// Deposit vault collateral.
+    DepositCollateral {
+        /// Collateral amount in E8.
+        amount_e8: u128,
+    },
+    /// Withdraw vault collateral.
+    WithdrawCollateral {
+        /// Collateral amount in E8.
+        amount_e8: u128,
+    },
+    /// Mint zUSD.
+    MintZusd {
+        /// Principal amount in E8.
+        amount_e8: u128,
+    },
+    /// Repay zUSD.
+    RepayZusd {
+        /// Repayment amount in E8.
+        amount_e8: u128,
+    },
+    /// Deposit zUSD into the Stability Pool.
+    DepositStabilityPool {
+        /// Deposit amount in E8.
+        amount_e8: u128,
+    },
+    /// Withdraw zUSD from the Stability Pool.
+    WithdrawStabilityPool {
+        /// Withdrawal amount in E8.
+        amount_e8: u128,
+    },
+    /// Redeem zUSD for collateral.
+    RedeemZusd {
+        /// Redemption amount in E8.
+        amount_e8: u128,
+    },
+    /// Liquidate the current vault.
+    Liquidate,
+}
+
+impl ZusdCommandV1 {
+    /// Returns the stable command tag.
+    #[must_use]
+    pub const fn tag(self) -> ZusdCommandTagV1 {
+        match self {
+            Self::AdvanceEpochLegacy { .. } => ZusdCommandTagV1::AdvanceEpochLegacy,
+            Self::BootstrapOracle { .. } => ZusdCommandTagV1::BootstrapOracle,
+            Self::OracleReport { .. } => ZusdCommandTagV1::OracleReport,
+            Self::OracleCommit { .. } => ZusdCommandTagV1::OracleCommit,
+            Self::DepositCollateral { .. } => ZusdCommandTagV1::DepositCollateral,
+            Self::WithdrawCollateral { .. } => ZusdCommandTagV1::WithdrawCollateral,
+            Self::MintZusd { .. } => ZusdCommandTagV1::MintZusd,
+            Self::RepayZusd { .. } => ZusdCommandTagV1::RepayZusd,
+            Self::DepositStabilityPool { .. } => ZusdCommandTagV1::DepositStabilityPool,
+            Self::WithdrawStabilityPool { .. } => ZusdCommandTagV1::WithdrawStabilityPool,
+            Self::RedeemZusd { .. } => ZusdCommandTagV1::RedeemZusd,
+            Self::Liquidate => ZusdCommandTagV1::Liquidate,
+        }
+    }
+
+    /// Converts the command into its canonical typed value.
+    pub fn to_value(self) -> Result<Value, ZusdStateError> {
+        let payload = match self {
+            Self::AdvanceEpochLegacy { delta } => Some(single_u128_payload(delta)?),
+            Self::BootstrapOracle { auth_ok, price_e8 }
+            | Self::OracleReport { auth_ok, price_e8 } => Some(
+                Value::record_canonical(vec![
+                    Field::new(0, Value::Bool(auth_ok)),
+                    Field::new(1, Value::U128(price_e8)),
+                ])
+                .map_err(|_| ZusdStateError::WrongFieldOrder)?,
+            ),
+            Self::OracleCommit { auth_ok } => Some(
+                Value::record_canonical(vec![Field::new(0, Value::Bool(auth_ok))])
+                    .map_err(|_| ZusdStateError::WrongFieldOrder)?,
+            ),
+            Self::DepositCollateral { amount_e8 }
+            | Self::WithdrawCollateral { amount_e8 }
+            | Self::MintZusd { amount_e8 }
+            | Self::RepayZusd { amount_e8 }
+            | Self::DepositStabilityPool { amount_e8 }
+            | Self::WithdrawStabilityPool { amount_e8 }
+            | Self::RedeemZusd { amount_e8 } => Some(single_u128_payload(amount_e8)?),
+            Self::Liquidate => None,
+        };
+        Ok(Value::Sum {
+            type_id: ZUSD_COMMAND_TYPE_V1,
+            variant: self.tag() as u16,
+            payload: payload.map(Box::new),
+        })
     }
 }
 
@@ -545,11 +735,13 @@ pub enum ZusdRejectV1 {
     LiquidateSpCannotAbsorb = 43,
     /// Liquidation exceeds Stability Pool collateral capacity.
     LiquidateSpCapExceeded = 44,
+    /// Finalized Oracle price leaves the vault below MCR at commit time.
+    CommitBelowMcr = 45,
 }
 
 impl ZusdRejectV1 {
     /// Complete registry in exact precedence order.
-    pub const ALL: [Self; 45] = [
+    pub const ALL: [Self; 46] = [
         Self::NotPositiveInt,
         Self::BoundedCheckFailed,
         Self::InvariantViolation,
@@ -595,7 +787,14 @@ impl ZusdRejectV1 {
         Self::LiquidateNotUnderMcr,
         Self::LiquidateSpCannotAbsorb,
         Self::LiquidateSpCapExceeded,
+        Self::CommitBelowMcr,
     ];
+
+    /// Resolves one exact stable rejection code.
+    #[must_use]
+    pub fn from_code(code: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|reason| reason.code() == code)
+    }
 }
 
 impl StableReason for ZusdRejectV1 {
@@ -646,6 +845,7 @@ impl StableReason for ZusdRejectV1 {
             Self::LiquidateNotUnderMcr => "liquidate_not_under_mcr",
             Self::LiquidateSpCannotAbsorb => "liquidate_sp_cannot_absorb",
             Self::LiquidateSpCapExceeded => "liquidate_sp_cap_exceeded",
+            Self::CommitBelowMcr => "commit_below_mcr",
         }
     }
 
@@ -771,6 +971,11 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
     Ok(())
 }
 
+fn single_u128_payload(value: u128) -> Result<Value, ZusdStateError> {
+    Value::record_canonical(vec![Field::new(0, Value::U128(value))])
+        .map_err(|_| ZusdStateError::WrongFieldOrder)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -828,9 +1033,14 @@ mod tests {
 
     #[test]
     fn reason_registry_has_stable_total_precedence() {
-        assert_eq!(ZusdRejectV1::ALL.len(), 45);
+        assert_eq!(ZusdRejectV1::ALL.len(), 46);
         assert_eq!(ZusdRejectV1::NotPositiveInt.precedence(), 0);
         assert_eq!(ZusdRejectV1::LiquidateSpCapExceeded.precedence(), 44);
+        assert_eq!(ZusdRejectV1::CommitBelowMcr.precedence(), 45);
+        assert_eq!(
+            ZusdRejectV1::from_code("commit_below_mcr"),
+            Some(ZusdRejectV1::CommitBelowMcr)
+        );
         assert_eq!(
             ZusdRejectV1::MintExceedsMaxSupply.code(),
             "mint_exceeds_max_supply"

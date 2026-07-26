@@ -1,0 +1,213 @@
+{
+  "schema": "zeno-fcis.mounted-zenodex-zusd.v1",
+  "exact": true,
+  "zenodex_commit": "e3cf1aad40e487893230ae0c55f1f0dda62f9955",
+  "python_entrypoint": "tools/runtime/zusd_fcis_op.py",
+  "rust_subcommand": "zusd-fcis-op",
+  "rust_toolchain": "1.89.0",
+  "zeno_fcis_toolchain": "1.97.1",
+  "profile_hash": "666155d7c358d5aa1470296f38a62814d10cc78325ef3e602f66a3e3bc6bcc18",
+  "schema_hash": "c54113edccec302c731b46e19d15508f9eb4387e44d85e5e92a6919d86aec823",
+  "precedence_hash": "2f084b783f12e22fcf93ffe8b3c860e376c07694a39fd8b9c45791aff5603317",
+  "algorithm_hash": "2f46d6670d680bed1ecb5880aed666d156b564bac82bb5d2b035743440030733",
+  "context_hash": "bbb3406cc4c9f9ae18842e42c85b0edb92e97040ce5766a1051693fddffa75c2",
+  "budget_hash": "bb4d9a83b12011227749539e84e7f0fcf809f4f813c97fde60cc1c66e06c8107",
+  "cases": [
+    {
+      "index": 0,
+      "case_id": "2f43d9f9431645f36920ef2b62c5f128dc4d2f3e4f461ef16a1eab0880d9ba59",
+      "command": "mint_zusd",
+      "kind": "reject",
+      "reason": "mint_blocked_oracle",
+      "pre_root": "643e446cdcbd139cd04b17f84f9513b2852283085b2a5afd8f7b50d039a10970",
+      "post_root": "643e446cdcbd139cd04b17f84f9513b2852283085b2a5afd8f7b50d039a10970",
+      "candidate_id": null,
+      "decision_commitment": "9accc1cd790bf5404880f30f6b1b1e5e2ff401e72fc9c2bf42bb8ab768b7ca34"
+    },
+    {
+      "index": 1,
+      "case_id": "c4aadcc1c428d7a26d3b91c07725719ae58c21bc9d89ad49569ea28f66bbade1",
+      "command": "bootstrap_oracle",
+      "kind": "reject",
+      "reason": "bootstrap_requires_auth",
+      "pre_root": "643e446cdcbd139cd04b17f84f9513b2852283085b2a5afd8f7b50d039a10970",
+      "post_root": "643e446cdcbd139cd04b17f84f9513b2852283085b2a5afd8f7b50d039a10970",
+      "candidate_id": null,
+      "decision_commitment": "b93458435e13394006d13f5e2af722c6a53ade30d4ec0b5b053b974fa00aa8d8"
+    },
+    {
+      "index": 2,
+      "case_id": "ad2e588cfcf6aeefb6dbe58741d08c5b95d6d94b3cf14518db4b655b47254404",
+      "command": "bootstrap_oracle",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "643e446cdcbd139cd04b17f84f9513b2852283085b2a5afd8f7b50d039a10970",
+      "post_root": "f50a48be73efd14630d7181c0f9623d4c2f667a1c8ff150bf302723d92eec917",
+      "candidate_id": "a6851b59368e13caf2aca308e55cdf32026fdcb6dab441c6b2602f7d7302d2f0",
+      "decision_commitment": "f14f4093be88169e696e096f87a96a915a1e605eaa7cf2ce97d738d622c51a65"
+    },
+    {
+      "index": 3,
+      "case_id": "7bf74d22d26f8fd7f561d80ae0454d1d3716bc5312df4acfb18ea66c055c8371",
+      "command": "bootstrap_oracle",
+      "kind": "reject",
+      "reason": "oracle_already_bootstrapped",
+      "pre_root": "f50a48be73efd14630d7181c0f9623d4c2f667a1c8ff150bf302723d92eec917",
+      "post_root": "f50a48be73efd14630d7181c0f9623d4c2f667a1c8ff150bf302723d92eec917",
+      "candidate_id": null,
+      "decision_commitment": "0ef8db511f621eedf122d65e2e5f6bc481a271347e8d2ce4313a5fe1e765183e"
+    },
+    {
+      "index": 4,
+      "case_id": "432f0bbd4ca3644f42b5f5b43c82ed73506792bc31113549baf9c314cef832c0",
+      "command": "mint_zusd",
+      "kind": "reject",
+      "reason": "mint_violates_mcr",
+      "pre_root": "f50a48be73efd14630d7181c0f9623d4c2f667a1c8ff150bf302723d92eec917",
+      "post_root": "f50a48be73efd14630d7181c0f9623d4c2f667a1c8ff150bf302723d92eec917",
+      "candidate_id": null,
+      "decision_commitment": "01e0c3b68732fbd035904fcc9a80abadc5fb7d314b0d0d6e36831097caedd056"
+    },
+    {
+      "index": 5,
+      "case_id": "32d19029ae686177cd032507a20434100b7f4403dcbeaa30b6fd1244ffdadfa3",
+      "command": "deposit_collateral",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "f50a48be73efd14630d7181c0f9623d4c2f667a1c8ff150bf302723d92eec917",
+      "post_root": "cf6cd79bb0648a5ec059272437251732ce859814dff074c56722a5de8a76f0a7",
+      "candidate_id": "4ab6eee9faea35f2ed32163de36180c706288bfd88494f9546d67b15c7caa01b",
+      "decision_commitment": "72a2c72321545360672d7bf3684068109babb0256f09be2ece4207bcb57e431a"
+    },
+    {
+      "index": 6,
+      "case_id": "69623a641770374f3472c59a051fc9b5b7646fe6acc3be4b4e26763caa5aff91",
+      "command": "mint_zusd",
+      "kind": "reject",
+      "reason": "mint_below_min_debt",
+      "pre_root": "cf6cd79bb0648a5ec059272437251732ce859814dff074c56722a5de8a76f0a7",
+      "post_root": "cf6cd79bb0648a5ec059272437251732ce859814dff074c56722a5de8a76f0a7",
+      "candidate_id": null,
+      "decision_commitment": "b6cb351f59d63ae1d226b041017350c72346b036496502bb762bc7d0cb964896"
+    },
+    {
+      "index": 7,
+      "case_id": "8e3c46366088e0b0876744da22738bddf212c4ceedadf92b312a3d655ad2b153",
+      "command": "mint_zusd",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "cf6cd79bb0648a5ec059272437251732ce859814dff074c56722a5de8a76f0a7",
+      "post_root": "42da070a08c0ea0f4299d8ce13f65c567a9dab69ca8f009657a5caa4a76764a8",
+      "candidate_id": "c0f0e96caa9ac92e67a90a31788d92d6f88bc2b09e69c9498d96a4b74e10966d",
+      "decision_commitment": "26695e35b39026572da9769bb568f1809b5d6bb7e26877f5d57dd34d5fc9596c"
+    },
+    {
+      "index": 8,
+      "case_id": "988e0fa99ed4648c579b0f02ec4789a4299cdcaac24a115647ea50702c62b78a",
+      "command": "deposit_sp",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "42da070a08c0ea0f4299d8ce13f65c567a9dab69ca8f009657a5caa4a76764a8",
+      "post_root": "33276917e92ea3de9dd925b0499bdaefb58cc35b13101c89ed23b4becd25b06e",
+      "candidate_id": "bd4eef3eba9d110fd0f33cbb471cac0e6fdd43125238c0b4ff1b74ba1b50c38b",
+      "decision_commitment": "24b7963b0a859dbdd22c0a31d86f0aab82fea7de7fd89aee884d5de986811043"
+    },
+    {
+      "index": 9,
+      "case_id": "127c05459e92a163d5b1b7b2f83f17a668b86cd2af7322f21cf0b7fe4380e8ff",
+      "command": "withdraw_sp",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "33276917e92ea3de9dd925b0499bdaefb58cc35b13101c89ed23b4becd25b06e",
+      "post_root": "1d5b40bba8df2d445df9417e3fe786834e930e79abba49ee897ba2b9397ef131",
+      "candidate_id": "6f0d950c16cff792f3446aa915c7a8cadd8f545290c923f39a85a7db8c2f2948",
+      "decision_commitment": "03b77e5c81b8741509510cc6bb2ca7f07e4ab020d8e5e48ac1607cc1c6daedf6"
+    },
+    {
+      "index": 10,
+      "case_id": "15e6451c7a25437560d8878ba6b4c07dab8c00c12b122b9b50a67e7f98208786",
+      "command": "repay_zusd",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "1d5b40bba8df2d445df9417e3fe786834e930e79abba49ee897ba2b9397ef131",
+      "post_root": "ab5dbfb55ff90c9aaab335febe33218c3ccab6a5b09e71606e4dbdca85bac40c",
+      "candidate_id": "b33ac307b35f552e53a69738dd2fa142eb84f0db53496de125fc8c089c528d7b",
+      "decision_commitment": "08f27a027967cc5ab09dca55635b5dc5d3b33b00119b9d30779ad141eb958f4a"
+    },
+    {
+      "index": 11,
+      "case_id": "8df5f66042ef99cb0d1b2e38a01179806e6501a1f55147d9b5f5a078831a2892",
+      "command": "redeem_zusd",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "ab5dbfb55ff90c9aaab335febe33218c3ccab6a5b09e71606e4dbdca85bac40c",
+      "post_root": "620d9ac29226f93babdc44cd1542a39f00f52d4d2bca6171e82e6c960f0a55a8",
+      "candidate_id": "f53267f9c8dcffd9f710264fb71c1f29f0f33f887e3350c1d701ad65d3f87d11",
+      "decision_commitment": "57afe3bf462d0518b32860f095ba568b030907d5f8732213f2c1778ecc4a4b9e"
+    },
+    {
+      "index": 12,
+      "case_id": "28ced04a8273127892270f3f374f444ff291dacfe033ca4817becbab5eb9d005",
+      "command": "withdraw_collateral",
+      "kind": "reject",
+      "reason": "insufficient_collateral",
+      "pre_root": "620d9ac29226f93babdc44cd1542a39f00f52d4d2bca6171e82e6c960f0a55a8",
+      "post_root": "620d9ac29226f93babdc44cd1542a39f00f52d4d2bca6171e82e6c960f0a55a8",
+      "candidate_id": null,
+      "decision_commitment": "848ac3cc89f74364ac61e367b409b73b855c80a168095486ce8fa7be32f4b92a"
+    },
+    {
+      "index": 13,
+      "case_id": "8b75e2ee278a29b8b92a96775bba595c9cd6b1d9d6c7915274f0193f45198cb1",
+      "command": "oracle_report",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "620d9ac29226f93babdc44cd1542a39f00f52d4d2bca6171e82e6c960f0a55a8",
+      "post_root": "53d50116ef0de885926059b1e23086867143284f4cab9a91870b486b862cc566",
+      "candidate_id": "0accc0eef0de8f0317b255ba5c75dece5b67f4c1114fab3a9b306eb27ac6dec1",
+      "decision_commitment": "f468a1dfdff1e5aba1c12270598fe0167bf61320dba7cfd1110d882d0e144ac8"
+    },
+    {
+      "index": 14,
+      "case_id": "fff6007ad1e9242561fbdcca98f92d05f18b93a56f1e9b5fb2f766789ae13273",
+      "command": "oracle_report",
+      "kind": "reject",
+      "reason": "report_price_not_non_increasing",
+      "pre_root": "53d50116ef0de885926059b1e23086867143284f4cab9a91870b486b862cc566",
+      "post_root": "53d50116ef0de885926059b1e23086867143284f4cab9a91870b486b862cc566",
+      "candidate_id": null,
+      "decision_commitment": "86bb7cce5bb98cc875315e61bc0809837288dcdabecfd12d8fdb574845099361"
+    },
+    {
+      "index": 15,
+      "case_id": "60c3e966eaf8571c508fe4dbf6532e310f74e6c16a0a976b1a52e9bc1e9559eb",
+      "command": "mint_zusd",
+      "kind": "reject",
+      "reason": "mint_blocked_oracle",
+      "pre_root": "53d50116ef0de885926059b1e23086867143284f4cab9a91870b486b862cc566",
+      "post_root": "53d50116ef0de885926059b1e23086867143284f4cab9a91870b486b862cc566",
+      "candidate_id": null,
+      "decision_commitment": "e8e8a00e37c86c7beaf4e02f71b7cdcc7d6bbbdcb0e521edc94d46cdcaa6fe03"
+    },
+    {
+      "index": 16,
+      "case_id": "7219d75bd0eafb54874fcaae7282323d1454c72423c719c367a818d888da7f01",
+      "command": "oracle_commit",
+      "kind": "accept",
+      "reason": null,
+      "pre_root": "53d50116ef0de885926059b1e23086867143284f4cab9a91870b486b862cc566",
+      "post_root": "fcdf70a1f32fcc62236cdabd92bcb291134c84f2243f790fdfb1eb37b7956728",
+      "candidate_id": "f01ded95468f5cce84973d2d6c6df573ccd880fb76a1d0fd0a3b0869f2654787",
+      "decision_commitment": "ea24a9c8ef8e1d33adbe98c42fd7ed96350460ca6628ca7a62856278fa1bf326"
+    }
+  ],
+  "accepted": 9,
+  "rejected": 8,
+  "final_root": "fcdf70a1f32fcc62236cdabd92bcb291134c84f2243f790fdfb1eb37b7956728",
+  "nonclaims": [
+    "bounded executable refinement evidence, not an unbounded proof",
+    "single-vault zUSD profile only",
+    "empty commit/outbox plans do not authorize production effects",
+    "no production authority or release status"
+  ]
+}
