@@ -43,17 +43,43 @@ jobs:
           cargo +1.97.1 generate-lockfile
           cargo +1.97.1 fmt --all
 
-      - name: Verify complete ZenoFCIS workspace
+      - name: Capture complete ZenoFCIS diagnostics
+        shell: bash
         run: |
-          cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
-          cargo +1.97.1 test --workspace --all-features --locked
-          cargo +1.97.1 test --workspace --doc --all-features --locked
-          cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis-backend --no-default-features --locked --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
-          python3 tools/check_assurance.py --self-test
-          python3 tools/check_assurance.py
-          RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+          set +e
+          mkdir -p internal/backend-rebase-diagnostics
+          status=0
+          run_check() {
+            name="$1"
+            shift
+            "$@" >"internal/backend-rebase-diagnostics/${name}.log" 2>&1
+            code=$?
+            printf '%s\n' "$code" >"internal/backend-rebase-diagnostics/${name}.status"
+            if test "$code" -ne 0; then status="$code"; fi
+          }
+          run_check clippy cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
+          run_check tests cargo +1.97.1 test --workspace --all-features --locked
+          run_check doctests cargo +1.97.1 test --workspace --doc --all-features --locked
+          run_check synthesis-no-std cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked --target wasm32-unknown-unknown
+          run_check backend-no-std cargo +1.97.1 check -p zeno-fcis-backend --no-default-features --locked --target wasm32-unknown-unknown
+          run_check umbrella-backend-no-std cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
+          run_check assurance-self-test python3 tools/check_assurance.py --self-test
+          run_check assurance python3 tools/check_assurance.py
+          run_check rustdoc env RUSTDOCFLAGS=-Dwarnings cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+          printf '%s\n' "$status" > internal/backend-rebase-diagnostics/status.txt
+          exit 0
+
+      - name: Upload ZenoFCIS diagnostics
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: universal-backend-rebase-diagnostics
+          path: internal/backend-rebase-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce complete ZenoFCIS result
+        run: test "$(cat internal/backend-rebase-diagnostics/status.txt)" = "0"
 
       - name: Verify exact mounted ZenoDEX workspace
         run: |
