@@ -68,7 +68,7 @@ impl PersistentMap for BTreeMapBackend {
     fn to_entries(&self) -> Vec<LogicalEntry> {
         self.entries
             .iter()
-            .map(|(ek, (k, v))| LogicalEntry::new(ek.to_vec(), k.clone(), v.clone()))
+            .map(|(ek, (k, v))| LogicalEntry::from_stored_parts(ek.to_vec(), k.clone(), v.clone()))
             .collect()
     }
 }

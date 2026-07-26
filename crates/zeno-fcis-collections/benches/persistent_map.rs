@@ -14,7 +14,8 @@ fn make_entry(key_byte: u8, value_byte: u8) -> LogicalEntry {
     let encoded_key = key
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode key: {e}"));
-    LogicalEntry::new(encoded_key, key, Value::U128(u128::from(value_byte)))
+    LogicalEntry::try_new(encoded_key, key, Value::U128(u128::from(value_byte)))
+        .unwrap_or_else(|error| panic!("logical entry: {error}"))
 }
 
 fn build_dense(size: u8) -> Vec<LogicalEntry> {
