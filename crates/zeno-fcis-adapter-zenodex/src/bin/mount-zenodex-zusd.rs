@@ -438,13 +438,22 @@ struct Arguments {
 impl Arguments {
     fn parse() -> Result<Self, String> {
         let mut values = env::args_os().skip(1);
-        let zenodex_root = values.next().map(PathBuf::from).ok_or_else(|| {
+        let supplied_root = values.next().map(PathBuf::from).ok_or_else(|| {
             "usage: mount-zenodex-zusd <zenodex-root> <rust-bin> <output-dir>".to_owned()
         })?;
-        let rust_binary = values
+        let supplied_rust_binary = values
             .next()
             .map(PathBuf::from)
             .ok_or_else(|| "missing Rust runtime binary".to_owned())?;
+        let zenodex_root = fs::canonicalize(&supplied_root).map_err(|error| {
+            format!("resolve ZenoDEX root {}: {error}", supplied_root.display())
+        })?;
+        let rust_binary = fs::canonicalize(&supplied_rust_binary).map_err(|error| {
+            format!(
+                "resolve Rust binary {}: {error}",
+                supplied_rust_binary.display()
+            )
+        })?;
         let output_dir = values
             .next()
             .map(PathBuf::from)
