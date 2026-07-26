@@ -37,7 +37,7 @@ sha256-parity = [
     "zeno-fcis-crypto/parity",
 ]
 schema = ["dep:zeno-fcis-schema"]
-catalog = ["dep:zeno-fcis-catalog"]
+catalog = ["schema", "dep:zeno-fcis-catalog"]
 codegen = ["schema", "dep:zeno-fcis-codegen"]
 evidence = ["std", "dep:zeno-fcis-evidence"]
 mounted-runtime = ["std", "dep:zeno-fcis-adapter"]
