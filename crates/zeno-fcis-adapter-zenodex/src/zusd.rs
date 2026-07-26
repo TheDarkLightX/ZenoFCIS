@@ -145,6 +145,7 @@ impl ZusdMountBindingsV1 {
 /// Validated native ZenoDEX result before ZenoFCIS candidate sealing.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeZusdDecisionV1 {
+    input_id: Hash32,
     accept: bool,
     reject_reason: Option<Box<str>>,
     receipt_hash: Option<Hash32>,
@@ -247,6 +248,7 @@ pub fn decode_zusd_native_decision_line_v1(
     };
 
     Ok(NativeZusdDecisionV1 {
+        input_id: zusd_mount_case_id_v1(input)?,
         accept: wire.accept,
         reject_reason,
         receipt_hash,
@@ -262,6 +264,9 @@ pub fn normalize_zusd_native_decision_v1(
     input: &ZusdMountInputV1,
     native: &NativeZusdDecisionV1,
 ) -> Result<NormalizedDecision, ZusdMountError> {
+    if native.input_id != zusd_mount_case_id_v1(input)? {
+        return Err(ZusdMountError::NativeInputMismatch);
+    }
     let fixed = ZusdMountBindingsV1::pinned()?;
     let command_value = input.command().to_value().map_err(ZusdMountError::State)?;
     let command_hash = hash_value::<RustCryptoSha256>(
@@ -887,6 +892,8 @@ pub enum ZusdMountError {
     NativeRootMismatch,
     /// Native receipt tag or hash disagrees with the independently computed receipt.
     NativeReceiptMismatch,
+    /// Decoded native decision was produced for a different canonical request.
+    NativeInputMismatch,
     /// Native decimal integer is noncanonical or out of range.
     InvalidNativeInteger,
     /// Native runtime returned a reason outside the pinned registry.
@@ -927,6 +934,9 @@ impl fmt::Display for ZusdMountError {
             Self::InvalidNativeHash => formatter.write_str("native zUSD hash is not canonical"),
             Self::NativeRootMismatch => formatter.write_str("native zUSD state root mismatch"),
             Self::NativeReceiptMismatch => formatter.write_str("native zUSD receipt mismatch"),
+            Self::NativeInputMismatch => {
+                formatter.write_str("native zUSD decision input identity mismatch")
+            }
             Self::InvalidNativeInteger => {
                 formatter.write_str("native zUSD integer is not canonical")
             }
@@ -989,6 +999,24 @@ mod tests {
             .unwrap_or_else(|error| panic!("normalize: {error}"));
         assert_eq!(decision.artifacts().kind, DecisionKind::Reject);
         assert!(decision.artifacts().candidate_id.is_none());
+    }
+
+    #[test]
+    fn decoded_decision_cannot_be_normalized_for_another_input() {
+        let state =
+            ZusdStateV1::reference_initial().unwrap_or_else(|error| panic!("state: {error}"));
+        let decoded_input =
+            ZusdMountInputV1::new(state.clone(), ZusdCommandV1::MintZusd { amount_e8: 1 });
+        let other_input = ZusdMountInputV1::new(state, ZusdCommandV1::Liquidate);
+        let native = decode_zusd_native_decision_line_v1(
+            &reject_line(&decoded_input, "mint_blocked_oracle"),
+            &decoded_input,
+        )
+        .unwrap_or_else(|error| panic!("decode: {error}"));
+        assert!(matches!(
+            normalize_zusd_native_decision_v1(&other_input, &native),
+            Err(ZusdMountError::NativeInputMismatch)
+        ));
     }
 
     #[test]

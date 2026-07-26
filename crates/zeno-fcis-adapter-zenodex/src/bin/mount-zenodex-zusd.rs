@@ -265,11 +265,29 @@ fn verify_source(root: &Path) -> Result<(), String> {
     }
     let revision = String::from_utf8(output.stdout)
         .map_err(|_| "ZenoDEX revision was not UTF-8".to_owned())?;
-    if revision.trim() != PINNED_ZENODEX_COMMIT {
+    let status = Command::new("git")
+        .args(["status", "--porcelain=v1", "--untracked-files=all", "--"])
+        .current_dir(root)
+        .output()
+        .map_err(|error| format!("read ZenoDEX worktree status: {error}"))?;
+    if !status.status.success() {
+        return Err("ZenoDEX worktree status command failed".to_owned());
+    }
+    validate_source_identity(revision.trim(), &status.stdout)
+}
+
+fn validate_source_identity(revision: &str, porcelain_status: &[u8]) -> Result<(), String> {
+    if revision != PINNED_ZENODEX_COMMIT {
         return Err(format!(
             "ZenoDEX revision mismatch: expected {PINNED_ZENODEX_COMMIT}, got {}",
-            revision.trim()
+            revision
         ));
+    }
+    if !porcelain_status.is_empty() {
+        return Err(
+            "ZenoDEX worktree is dirty; pinned evidence requires no tracked or untracked changes"
+                .to_owned(),
+        );
     }
     Ok(())
 }
@@ -467,5 +485,27 @@ impl Arguments {
             python_binary: PathBuf::from("python3"),
             output_dir,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pinned_revision_requires_a_clean_worktree() {
+        assert!(validate_source_identity(PINNED_ZENODEX_COMMIT, b"").is_ok());
+        assert!(
+            validate_source_identity(PINNED_ZENODEX_COMMIT, b" M tools/runtime/zusd_fcis_op.py\n")
+                .is_err()
+        );
+        assert!(
+            validate_source_identity(PINNED_ZENODEX_COMMIT, b"?? src/core/shadow.py\n").is_err()
+        );
+    }
+
+    #[test]
+    fn clean_worktree_cannot_mask_the_wrong_revision() {
+        assert!(validate_source_identity("0000000000000000000000000000000000000000", b"").is_err());
     }
 }
