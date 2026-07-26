@@ -1193,6 +1193,7 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
 name = "zeno-fcis"
 version = "0.1.0"
 dependencies = [
+ "zeno-fcis-adapter",
  "zeno-fcis-adapter-zenodex",
  "zeno-fcis-authenticated",
  "zeno-fcis-codec",
@@ -1205,6 +1206,7 @@ dependencies = [
  "zeno-fcis-patch",
  "zeno-fcis-plan",
  "zeno-fcis-profile-zenodex",
+ "zeno-fcis-project",
  "zeno-fcis-receipt",
  "zeno-fcis-refine",
  "zeno-fcis-schema",
@@ -1215,11 +1217,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeno-fcis-adapter"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "zeno-fcis-codec",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-refine",
+]
+
+[[package]]
 name = "zeno-fcis-adapter-zenodex"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "zeno-fcis-adapter",
  "zeno-fcis-codec",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
@@ -1332,6 +1347,13 @@ dependencies = [
  "zeno-fcis-core",
  "zeno-fcis-refine",
  "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-project"
+version = "0.1.0"
+dependencies = [
+ "zeno-fcis-codec",
 ]
 
 [[package]]
