@@ -1,6 +1,6 @@
 [package]
-name = "zeno-fcis-codec"
-description = "Canonical encoding and commitment-provider interfaces for ZenoFCIS"
+name = "zeno-fcis-compose"
+description = "Assume-guarantee contracts, footprints, and deterministic composition evidence for ZenoFCIS"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,10 +11,10 @@ authors.workspace = true
 
 [features]
 default = ["std"]
-std = ["zeno-fcis-value/std"]
+std = ["zeno-fcis-codec/std"]
 
 [dependencies]
-zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
 
 [lints]
 workspace = true

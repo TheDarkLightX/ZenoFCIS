@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - "agent/**"
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ concurrency:
 jobs:
   rust:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -32,22 +33,35 @@ jobs:
         run: cargo +1.97.1 fmt --all -- --check
 
       - name: Clippy
-        run: cargo +1.97.1 clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 
       - name: Test
-        run: cargo +1.97.1 test --workspace --all-features
+        run: cargo +1.97.1 test --workspace --all-features --locked
 
       - name: Documentation tests
-        run: cargo +1.97.1 test --workspace --doc --all-features
+        run: cargo +1.97.1 test --workspace --doc --all-features --locked
 
       - name: no_std checks
         run: |
-          cargo +1.97.1 check -p zeno-fcis-core --no-default-features --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis-value --no-default-features --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis-codec --no-default-features --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis --no-default-features --target wasm32-unknown-unknown
+          for crate in \
+            zeno-fcis-core \
+            zeno-fcis-value \
+            zeno-fcis-codec \
+            zeno-fcis-crypto \
+            zeno-fcis-patch \
+            zeno-fcis-plan \
+            zeno-fcis-receipt \
+            zeno-fcis-shell \
+            zeno-fcis-compose \
+            zeno-fcis-refine \
+            zeno-fcis-profile-zenodex \
+            zeno-fcis-schema \
+            zeno-fcis
+          do
+            cargo +1.97.1 check -p "${crate}" --no-default-features --locked --target wasm32-unknown-unknown
+          done
 
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo +1.97.1 doc --workspace --all-features --no-deps
+        run: cargo +1.97.1 doc --workspace --all-features --locked --no-deps
