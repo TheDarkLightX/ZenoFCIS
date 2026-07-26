@@ -1169,6 +1169,7 @@ dependencies = [
  "zeno-fcis-adapter-zenodex",
  "zeno-fcis-authenticated",
  "zeno-fcis-backend",
+ "zeno-fcis-catalog",
  "zeno-fcis-codec",
  "zeno-fcis-codegen",
  "zeno-fcis-collections",
@@ -1237,6 +1238,18 @@ dependencies = [
  "zeno-fcis-crypto",
  "zeno-fcis-project",
  "zeno-fcis-synthesis",
+ "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-catalog"
+version = "0.1.0"
+dependencies = [
+ "zeno-fcis-codec",
+ "zeno-fcis-core",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
  "zeno-fcis-value",
 ]
 

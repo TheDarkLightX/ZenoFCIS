@@ -31,7 +31,7 @@ jobs:
         run: |
           cargo +nightly-2026-07-21 miri test --locked \
             -p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec \
-            -p zeno-fcis-project -p zeno-fcis-patch -p zeno-fcis-plan \
-            -p zeno-fcis-receipt -p zeno-fcis-shell -p zeno-fcis-compose \
-            -p zeno-fcis-refine -p zeno-fcis-schema -p zeno-fcis-synthesis \
-            -p zeno-fcis-backend
+            -p zeno-fcis-project -p zeno-fcis-catalog \
+            -p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt \
+            -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-refine \
+            -p zeno-fcis-schema -p zeno-fcis-synthesis -p zeno-fcis-backend
