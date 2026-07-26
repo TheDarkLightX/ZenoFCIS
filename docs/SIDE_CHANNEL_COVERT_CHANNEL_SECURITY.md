@@ -75,6 +75,10 @@ Projects may model a subset, but every observer-visible surface in the project t
 
 The comparison also checks aggregate declassification, observer clearance, trace length, ordering, deployment identity, and required mitigations.
 
+A changed observation under `Declassified` must carry a nonzero leakage-bit upper bound. A permit with zero-bit accounting cannot authorize a changed value or quantity.
+
+Every `LeakageReport` binds the exact deployment, leakage policy, and left/right trace commitments. A clean report produced under another policy cannot be replayed into promotion for a stronger policy on the same deployment.
+
 ## Deployment contract
 
 Side-channel resistance is deployment specific. The contract binds:
@@ -108,6 +112,10 @@ The production gate distinguishes:
 
 Each item binds its claim, retained artifact, toolchain, and exact deployment. Capacity evidence is required for every modeled side or covert channel and is evaluated against an explicit maximum and confidence threshold.
 
+`SecurityEvidence` is a structural reference to independently checked material. This crate does not open, replay, or validate the retained artifact. A project evidence importer or checker must decide which claim, artifact, and toolchain commitments are eligible before constructing the value.
+
+The resulting `SecurityPromotionReport` binds the exact promotion policy, leakage policy, evaluated leakage reports, structural evidence, capacity evidence, and blockers. Successful reports from different evidence sets therefore have different canonical identities.
+
 ## Required project workflow
 
 For each production profile:
@@ -140,5 +148,6 @@ The crate does not:
 - enforce cache partitioning, microarchitectural flushing, IOMMU configuration, or core isolation;
 - determine an acceptable covert-channel bandwidth for every project;
 - replace red-team testing, hardware evaluation, or independent security review.
+- independently validate a proof, experiment, or audit merely because its hashes are nonzero.
 
 A successful report means the supplied closed observations and evidence satisfy the supplied policy for the exact deployment. Production authorization remains a project-specific promotion decision.
