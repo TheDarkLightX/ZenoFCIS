@@ -148,7 +148,8 @@ pub use zeno_fcis_schema::{
 };
 #[cfg(feature = "secret")]
 pub use zeno_fcis_secret::{
-    Exposed, ExposureEvent, ExposurePermit, HardenedExecution, SecretBox, SecretBytes, SecretError,
+    Exposed, ExposureEvent, ExposurePermit, HardenedExecution, SecretBox, SecretBytes,
+    SecretChoice, SecretError,
 };
 #[cfg(feature = "security")]
 pub use zeno_fcis_security::{
