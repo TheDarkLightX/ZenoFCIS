@@ -1184,6 +1184,7 @@ dependencies = [
  "zeno-fcis-receipt",
  "zeno-fcis-refine",
  "zeno-fcis-schema",
+ "zeno-fcis-security",
  "zeno-fcis-shell",
  "zeno-fcis-shell-sqlite",
  "zeno-fcis-synthesis",
@@ -1379,6 +1380,13 @@ version = "0.1.0"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-security"
+version = "0.1.0"
+dependencies = [
+ "zeno-fcis-codec",
 ]
 
 [[package]]
