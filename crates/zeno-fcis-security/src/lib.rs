@@ -1023,6 +1023,11 @@ pub enum LeakageBlocker {
         /// Observation index.
         index: u32,
     },
+    /// A changed declassified observation claimed that zero bits were released.
+    MissingDeclassificationBits {
+        /// Observation index.
+        index: u32,
+    },
     /// Arithmetic overflowed while accumulating a leakage bound.
     ArithmeticOverflow,
 }
@@ -1107,6 +1112,10 @@ impl CanonicalEncode for LeakageBlocker {
                 output.push(17);
                 output.extend_from_slice(&index.to_be_bytes());
             }
+            Self::MissingDeclassificationBits { index } => {
+                output.push(19);
+                output.extend_from_slice(&index.to_be_bytes());
+            }
             Self::ArithmeticOverflow => output.push(18),
         }
         Ok(())
@@ -1117,6 +1126,9 @@ impl CanonicalEncode for LeakageBlocker {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LeakageReport {
     deployment_hash: Hash32,
+    policy_hash: Hash32,
+    left_trace_hash: Hash32,
+    right_trace_hash: Hash32,
     declassified_bits: u64,
     blockers: Box<[LeakageBlocker]>,
 }
@@ -1134,6 +1146,24 @@ impl LeakageReport {
         self.deployment_hash
     }
 
+    /// Returns the exact leakage-policy commitment used by the comparison.
+    #[must_use]
+    pub const fn policy_hash(&self) -> Hash32 {
+        self.policy_hash
+    }
+
+    /// Returns the exact left trace commitment.
+    #[must_use]
+    pub const fn left_trace_hash(&self) -> Hash32 {
+        self.left_trace_hash
+    }
+
+    /// Returns the exact right trace commitment.
+    #[must_use]
+    pub const fn right_trace_hash(&self) -> Hash32 {
+        self.right_trace_hash
+    }
+
     /// Returns the aggregate explicit declassification bound.
     #[must_use]
     pub const fn declassified_bits(&self) -> u64 {
@@ -1149,7 +1179,11 @@ impl LeakageReport {
 
 impl CanonicalEncode for LeakageReport {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-LEAKAGE-REPORT\0");
         output.extend_from_slice(self.deployment_hash.as_bytes());
+        output.extend_from_slice(self.policy_hash.as_bytes());
+        output.extend_from_slice(self.left_trace_hash.as_bytes());
+        output.extend_from_slice(self.right_trace_hash.as_bytes());
         output.extend_from_slice(&self.declassified_bits.to_be_bytes());
         put_u32_length(output, self.blockers.len())?;
         for blocker in &self.blockers {
@@ -1169,8 +1203,11 @@ pub fn compare_traces<H: CommitmentHasher>(
     deployment: &DeploymentContract,
     left: &ObservationTrace,
     right: &ObservationTrace,
-) -> LeakageReport {
-    let deployment_hash = deployment.commitment::<H>().unwrap_or(Hash32::ZERO);
+) -> Result<LeakageReport, SecurityError> {
+    let deployment_hash = deployment.commitment::<H>()?;
+    let policy_hash = policy.commitment::<H>()?;
+    let left_trace_hash = left.commitment::<H>()?;
+    let right_trace_hash = right.commitment::<H>()?;
     let mut blockers = Vec::new();
     let mut declassified_bits = 0_u64;
 
@@ -1301,6 +1338,15 @@ pub fn compare_traces<H: CommitmentHasher>(
                 let observed = left_observation
                     .leakage_bits_upper_bound
                     .max(right_observation.leakage_bits_upper_bound);
+                if observed == 0
+                    && (left_observation.value_hash != right_observation.value_hash
+                        || left_observation.quantity != right_observation.quantity)
+                {
+                    push_blocker(
+                        &mut blockers,
+                        LeakageBlocker::MissingDeclassificationBits { index },
+                    );
+                }
                 if observed > max_bits {
                     push_blocker(
                         &mut blockers,
@@ -1329,11 +1375,14 @@ pub fn compare_traces<H: CommitmentHasher>(
         );
     }
 
-    LeakageReport {
+    Ok(LeakageReport {
         deployment_hash,
+        policy_hash,
+        left_trace_hash,
+        right_trace_hash,
         declassified_bits,
         blockers: blockers.into_boxed_slice(),
-    }
+    })
 }
 
 fn check_undeclassified(
@@ -1583,6 +1632,11 @@ impl SecurityPromotionPolicy {
     pub const fn threat_model_hash(&self) -> Hash32 {
         self.threat_model_hash
     }
+
+    /// Computes the complete promotion-policy commitment.
+    pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, SecurityError> {
+        hash_canonical::<H>("zeno-fcis/security-promotion-policy", self)
+    }
 }
 
 impl CanonicalEncode for SecurityPromotionPolicy {
@@ -1638,6 +1692,11 @@ pub enum SecurityPromotionBlocker {
         observed: u32,
         /// Maximum evaluated capacity count.
         maximum: u32,
+    },
+    /// A leakage report was produced under another leakage policy.
+    LeakageReportPolicyMismatch {
+        /// Report index.
+        index: u32,
     },
     /// Required evidence is absent.
     MissingEvidence(SecurityEvidenceKind),
@@ -1737,6 +1796,10 @@ impl CanonicalEncode for SecurityPromotionBlocker {
                 output.extend_from_slice(&observed.to_be_bytes());
                 output.extend_from_slice(&maximum.to_be_bytes());
             }
+            Self::LeakageReportPolicyMismatch { index } => {
+                output.push(16);
+                output.extend_from_slice(&index.to_be_bytes());
+            }
         }
         Ok(())
     }
@@ -1745,6 +1808,11 @@ impl CanonicalEncode for SecurityPromotionBlocker {
 /// Security-promotion evaluation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SecurityPromotionReport {
+    promotion_policy_hash: Hash32,
+    leakage_policy_hash: Hash32,
+    leakage_reports_hash: Hash32,
+    evidence_hash: Hash32,
+    capacity_evidence_hash: Hash32,
     blockers: Box<[SecurityPromotionBlocker]>,
 }
 
@@ -1753,6 +1821,36 @@ impl SecurityPromotionReport {
     #[must_use]
     pub fn is_promoted(&self) -> bool {
         self.blockers.is_empty()
+    }
+
+    /// Returns the exact promotion-policy commitment.
+    #[must_use]
+    pub const fn promotion_policy_hash(&self) -> Hash32 {
+        self.promotion_policy_hash
+    }
+
+    /// Returns the exact leakage-policy commitment.
+    #[must_use]
+    pub const fn leakage_policy_hash(&self) -> Hash32 {
+        self.leakage_policy_hash
+    }
+
+    /// Returns the commitment to evaluated leakage reports in caller order.
+    #[must_use]
+    pub const fn leakage_reports_hash(&self) -> Hash32 {
+        self.leakage_reports_hash
+    }
+
+    /// Returns the commitment to canonicalized structural evidence.
+    #[must_use]
+    pub const fn evidence_hash(&self) -> Hash32 {
+        self.evidence_hash
+    }
+
+    /// Returns the commitment to canonicalized capacity evidence.
+    #[must_use]
+    pub const fn capacity_evidence_hash(&self) -> Hash32 {
+        self.capacity_evidence_hash
     }
 
     /// Returns blockers in deterministic order.
@@ -1764,6 +1862,12 @@ impl SecurityPromotionReport {
 
 impl CanonicalEncode for SecurityPromotionReport {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-SECURITY-PROMOTION-REPORT\0");
+        output.extend_from_slice(self.promotion_policy_hash.as_bytes());
+        output.extend_from_slice(self.leakage_policy_hash.as_bytes());
+        output.extend_from_slice(self.leakage_reports_hash.as_bytes());
+        output.extend_from_slice(self.evidence_hash.as_bytes());
+        output.extend_from_slice(self.capacity_evidence_hash.as_bytes());
         put_u32_length(output, self.blockers.len())?;
         for blocker in &self.blockers {
             put_blob(output, &blocker.canonical_bytes()?)?;
@@ -1773,15 +1877,17 @@ impl CanonicalEncode for SecurityPromotionReport {
 }
 
 /// Evaluates deployment-bound side/covert-channel promotion evidence.
-#[must_use]
-pub fn evaluate_security_promotion(
+#[must_use = "promotion evaluation must be checked or explicitly rejected"]
+pub fn evaluate_security_promotion<H: CommitmentHasher>(
     policy: &SecurityPromotionPolicy,
     leakage_policy: &LeakagePolicy,
     reports: &[LeakageReport],
     mut evidence: Vec<SecurityEvidence>,
     mut capacities: Vec<CapacityEvidence>,
-) -> SecurityPromotionReport {
+) -> Result<SecurityPromotionReport, SecurityError> {
     let mut blockers = Vec::new();
+    let promotion_policy_hash = policy.commitment::<H>()?;
+    let leakage_policy_hash = leakage_policy.commitment::<H>()?;
 
     if leakage_policy.deployment_contract_hash != policy.deployment_hash {
         blockers.push(SecurityPromotionBlocker::LeakagePolicyDeploymentMismatch);
@@ -1817,6 +1923,9 @@ pub fn evaluate_security_promotion(
         let index = u32::try_from(position).unwrap_or(u32::MAX);
         if report.deployment_hash != policy.deployment_hash {
             blockers.push(SecurityPromotionBlocker::LeakageDeploymentMismatch { index });
+        }
+        if report.policy_hash != leakage_policy_hash {
+            blockers.push(SecurityPromotionBlocker::LeakageReportPolicyMismatch { index });
         }
         if !report.is_secure() {
             blockers.push(SecurityPromotionBlocker::LeakageReportFailed { index });
@@ -1883,9 +1992,21 @@ pub fn evaluate_security_promotion(
         }
     }
 
-    SecurityPromotionReport {
+    let evaluated_reports = &reports[..reports.len().min(MAX_LEAKAGE_REPORTS)];
+    let leakage_reports_hash =
+        hash_sequence::<H, _>("zeno-fcis/security-leakage-report-set", evaluated_reports)?;
+    let evidence_hash = hash_sequence::<H, _>("zeno-fcis/security-evidence-set", &evidence)?;
+    let capacity_evidence_hash =
+        hash_sequence::<H, _>("zeno-fcis/security-capacity-evidence-set", &capacities)?;
+
+    Ok(SecurityPromotionReport {
+        promotion_policy_hash,
+        leakage_policy_hash,
+        leakage_reports_hash,
+        evidence_hash,
+        capacity_evidence_hash,
         blockers: blockers.into_boxed_slice(),
-    }
+    })
 }
 
 /// Security model construction or commitment failure.
@@ -1976,6 +2097,19 @@ fn hash_canonical<H: CommitmentHasher>(
     value: &impl CanonicalEncode,
 ) -> Result<Hash32, SecurityError> {
     let bytes = value.canonical_bytes().map_err(SecurityError::Encode)?;
+    let domain = Domain::new(domain_name, 1).map_err(SecurityError::Encode)?;
+    commitment::<H>(domain, &bytes).map_err(SecurityError::Encode)
+}
+
+fn hash_sequence<H: CommitmentHasher, T: CanonicalEncode>(
+    domain_name: &'static str,
+    values: &[T],
+) -> Result<Hash32, SecurityError> {
+    let mut bytes = Vec::new();
+    put_u32_length(&mut bytes, values.len())?;
+    for value in values {
+        put_blob(&mut bytes, &value.canonical_bytes()?)?;
+    }
     let domain = Domain::new(domain_name, 1).map_err(SecurityError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(SecurityError::Encode)
 }
@@ -2111,6 +2245,33 @@ mod tests {
             .unwrap_or_else(|error| panic!("trace: {error}"))
     }
 
+    fn compare(
+        policy: &LeakagePolicy,
+        deployment: &DeploymentContract,
+        left: &ObservationTrace,
+        right: &ObservationTrace,
+    ) -> LeakageReport {
+        compare_traces::<TestHasher>(policy, deployment, left, right)
+            .unwrap_or_else(|error| panic!("compare traces: {error}"))
+    }
+
+    fn promote(
+        policy: &SecurityPromotionPolicy,
+        leakage_policy: &LeakagePolicy,
+        reports: &[LeakageReport],
+        evidence: Vec<SecurityEvidence>,
+        capacities: Vec<CapacityEvidence>,
+    ) -> SecurityPromotionReport {
+        evaluate_security_promotion::<TestHasher>(
+            policy,
+            leakage_policy,
+            reports,
+            evidence,
+            capacities,
+        )
+        .unwrap_or_else(|error| panic!("evaluate promotion: {error}"))
+    }
+
     #[test]
     fn information_flow_lattice_is_explicit() {
         let low = label(1, 10, vec![compartment(1)]);
@@ -2160,7 +2321,7 @@ mod tests {
         let policy = policy(RuleMode::Exact, ChannelClass::Side);
         let left = trace(21, observation(30, 64, 0, ChannelClass::Side, None));
         let right = trace(22, observation(30, 96, 0, ChannelClass::Side, None));
-        let report = compare_traces::<TestHasher>(&policy, &deployment(), &left, &right);
+        let report = compare(&policy, &deployment(), &left, &right);
         assert!(matches!(
             report.blockers(),
             [LeakageBlocker::QuantityMismatch { .. }]
@@ -2187,7 +2348,7 @@ mod tests {
             22,
             observation(31, 1, 8, ChannelClass::Intended, Some(release)),
         );
-        let report = compare_traces::<TestHasher>(&policy, &deployment(), &left, &right);
+        let report = compare(&policy, &deployment(), &left, &right);
         assert!(report.is_secure());
         assert_eq!(report.declassified_bits(), 8);
     }
@@ -2207,7 +2368,7 @@ mod tests {
         .unwrap_or_else(|error| panic!("weak deployment: {error}"));
         let left = trace(21, observation(30, 64, 0, ChannelClass::Side, None));
         let right = trace(22, observation(30, 64, 0, ChannelClass::Side, None));
-        let report = compare_traces::<TestHasher>(&policy, &weak, &left, &right);
+        let report = compare(&policy, &weak, &left, &right);
         assert!(
             report
                 .blockers()
@@ -2221,7 +2382,7 @@ mod tests {
         let leakage_policy = policy(RuleMode::Exact, ChannelClass::Covert);
         let left = trace(21, observation(30, 64, 0, ChannelClass::Covert, None));
         let right = trace(22, observation(30, 64, 0, ChannelClass::Covert, None));
-        let report = compare_traces::<TestHasher>(&leakage_policy, &deployment(), &left, &right);
+        let report = compare(&leakage_policy, &deployment(), &left, &right);
         assert!(report.is_secure());
 
         let promotion = SecurityPromotionPolicy::try_new(
@@ -2264,7 +2425,7 @@ mod tests {
             hash(61),
         )
         .unwrap_or_else(|error| panic!("capacity: {error}"));
-        let result = evaluate_security_promotion(
+        let result = promote(
             &promotion,
             &leakage_policy,
             &[report],
@@ -2296,7 +2457,7 @@ mod tests {
             deployment_hash(),
         )
         .unwrap_or_else(|error| panic!("evidence: {error}"));
-        let result = evaluate_security_promotion(
+        let result = promote(
             &promotion,
             &leakage_policy,
             &[],
@@ -2328,7 +2489,7 @@ mod tests {
         let leakage_policy = policy(RuleMode::Exact, ChannelClass::Side);
         let left = trace(21, observation(30, 64, 0, ChannelClass::Side, None));
         let right = trace(22, observation(30, 64, 0, ChannelClass::Side, None));
-        let report = compare_traces::<TestHasher>(&leakage_policy, &deployment(), &left, &right);
+        let report = compare(&leakage_policy, &deployment(), &left, &right);
 
         let promotion = SecurityPromotionPolicy::try_new(
             deployment_hash(),
@@ -2359,7 +2520,7 @@ mod tests {
             hash(61),
         )
         .unwrap_or_else(|error| panic!("capacity: {error}"));
-        let result = evaluate_security_promotion(
+        let result = promote(
             &promotion,
             &leakage_policy,
             &[report],
@@ -2367,5 +2528,159 @@ mod tests {
             vec![capacity],
         );
         assert!(result.is_promoted());
+    }
+
+    #[test]
+    fn changed_declassified_observation_requires_nonzero_bit_accounting() {
+        let release = Declassification::try_new(hash(40), hash(41), 8)
+            .unwrap_or_else(|error| panic!("declassification: {error}"));
+        let leakage_policy = policy(
+            RuleMode::Declassified {
+                authority_hash: hash(40),
+                purpose_hash: hash(41),
+                max_bits: 8,
+            },
+            ChannelClass::Intended,
+        );
+        let left = trace(
+            21,
+            observation(30, 1, 0, ChannelClass::Intended, Some(release)),
+        );
+        let right = trace(
+            22,
+            observation(31, 1, 0, ChannelClass::Intended, Some(release)),
+        );
+        let report = compare(&leakage_policy, &deployment(), &left, &right);
+        assert!(matches!(
+            report.blockers(),
+            [LeakageBlocker::MissingDeclassificationBits { index: 0 }]
+        ));
+    }
+
+    #[test]
+    fn leakage_report_binds_exact_policy_and_trace_pair() {
+        let leakage_policy = policy(RuleMode::Exact, ChannelClass::Side);
+        let left = trace(21, observation(30, 64, 0, ChannelClass::Side, None));
+        let first_right = trace(22, observation(30, 64, 0, ChannelClass::Side, None));
+        let second_right = trace(23, observation(30, 64, 0, ChannelClass::Side, None));
+        let first = compare(&leakage_policy, &deployment(), &left, &first_right);
+        let second = compare(&leakage_policy, &deployment(), &left, &second_right);
+
+        assert_eq!(
+            first.policy_hash(),
+            leakage_policy
+                .commitment::<TestHasher>()
+                .unwrap_or_else(|error| panic!("policy hash: {error}"))
+        );
+        assert_ne!(first.right_trace_hash(), second.right_trace_hash());
+        assert_ne!(first.canonical_bytes(), second.canonical_bytes());
+    }
+
+    #[test]
+    fn promotion_rejects_report_from_weaker_policy() {
+        let strong = policy(RuleMode::Exact, ChannelClass::Side);
+        let weak = policy(
+            RuleMode::BoundedQuantity { max_delta: 64 },
+            ChannelClass::Side,
+        );
+        let left = trace(21, observation(30, 64, 0, ChannelClass::Side, None));
+        let right = trace(22, observation(30, 96, 0, ChannelClass::Side, None));
+        let weak_report = compare(&weak, &deployment(), &left, &right);
+        assert!(weak_report.is_secure());
+
+        let promotion = SecurityPromotionPolicy::try_new(
+            deployment_hash(),
+            hash(10),
+            vec![SecurityEvidenceKind::NoninterferenceProof],
+            100,
+            990_000,
+        )
+        .unwrap_or_else(|error| panic!("promotion: {error}"));
+        let evidence = SecurityEvidence::try_new(
+            SecurityEvidenceKind::NoninterferenceProof,
+            hash(50),
+            hash(51),
+            hash(52),
+            deployment_hash(),
+        )
+        .unwrap_or_else(|error| panic!("evidence: {error}"));
+        let capacity = CapacityEvidence::try_new(
+            domain(1),
+            ObservationKind::OutputLength,
+            ChannelClass::Side,
+            deployment_hash(),
+            0,
+            999_000,
+            hash(60),
+            hash(61),
+        )
+        .unwrap_or_else(|error| panic!("capacity: {error}"));
+        let result = promote(
+            &promotion,
+            &strong,
+            &[weak_report],
+            vec![evidence],
+            vec![capacity],
+        );
+        assert!(result.blockers().iter().any(|blocker| matches!(
+            blocker,
+            SecurityPromotionBlocker::LeakageReportPolicyMismatch { index: 0 }
+        )));
+    }
+
+    #[test]
+    fn successful_promotion_identity_binds_exact_evidence() {
+        let leakage_policy = policy(RuleMode::Exact, ChannelClass::Side);
+        let left = trace(21, observation(30, 64, 0, ChannelClass::Side, None));
+        let right = trace(22, observation(30, 64, 0, ChannelClass::Side, None));
+        let report = compare(&leakage_policy, &deployment(), &left, &right);
+        let promotion = SecurityPromotionPolicy::try_new(
+            deployment_hash(),
+            hash(10),
+            vec![SecurityEvidenceKind::NoninterferenceProof],
+            100,
+            990_000,
+        )
+        .unwrap_or_else(|error| panic!("promotion: {error}"));
+        let evidence = |artifact| {
+            SecurityEvidence::try_new(
+                SecurityEvidenceKind::NoninterferenceProof,
+                hash(50),
+                hash(artifact),
+                hash(52),
+                deployment_hash(),
+            )
+            .unwrap_or_else(|error| panic!("evidence: {error}"))
+        };
+        let capacity = CapacityEvidence::try_new(
+            domain(1),
+            ObservationKind::OutputLength,
+            ChannelClass::Side,
+            deployment_hash(),
+            0,
+            999_000,
+            hash(60),
+            hash(61),
+        )
+        .unwrap_or_else(|error| panic!("capacity: {error}"));
+        let first = promote(
+            &promotion,
+            &leakage_policy,
+            core::slice::from_ref(&report),
+            vec![evidence(51)],
+            vec![capacity],
+        );
+        let second = promote(
+            &promotion,
+            &leakage_policy,
+            &[report],
+            vec![evidence(53)],
+            vec![capacity],
+        );
+
+        assert!(first.is_promoted());
+        assert!(second.is_promoted());
+        assert_ne!(first.evidence_hash(), second.evidence_hash());
+        assert_ne!(first.canonical_bytes(), second.canonical_bytes());
     }
 }
