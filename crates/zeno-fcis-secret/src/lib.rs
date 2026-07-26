@@ -49,6 +49,7 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -385,13 +386,13 @@ impl<const N: usize> ZeroizeOnDrop for SecretBytes<N> {}
 /// must be indistinguishable.
 pub struct SecretBox {
     secret_id: Hash32,
-    bytes: Vec<u8>,
+    bytes: Box<[u8]>,
 }
 
 impl SecretBox {
-    /// Takes ownership of a nonempty bounded secret buffer.
-    pub fn try_new(secret_id: Hash32, mut bytes: Vec<u8>) -> Result<Self, SecretError> {
-        validate_owned_vec(secret_id, &mut bytes)?;
+    /// Takes ownership of a nonempty, exactly sized secret allocation.
+    pub fn try_new(secret_id: Hash32, mut bytes: Box<[u8]>) -> Result<Self, SecretError> {
+        validate_owned_box(secret_id, &mut bytes)?;
         Ok(Self { secret_id, bytes })
     }
 
@@ -419,7 +420,7 @@ impl SecretBox {
             SecretChoice::from_public(false)
         } else {
             SecretChoice {
-                choice: self.bytes.as_slice().ct_eq(other.bytes.as_slice()),
+                choice: self.bytes.as_ref().ct_eq(other.bytes.as_ref()),
             }
         }
     }
@@ -445,18 +446,16 @@ impl SecretBox {
     }
 
     /// Replaces the buffer after securely erasing the previous allocation.
-    pub fn replace(&mut self, mut replacement: Vec<u8>) -> Result<(), SecretError> {
-        validate_owned_vec(self.secret_id, &mut replacement)?;
-        self.bytes.zeroize();
+    pub fn replace(&mut self, mut replacement: Box<[u8]>) -> Result<(), SecretError> {
+        validate_owned_box(self.secret_id, &mut replacement)?;
+        self.bytes.as_mut().zeroize();
         self.bytes = replacement;
         Ok(())
     }
 
     /// Explicitly erases the allocation while retaining its public length.
     pub fn clear(&mut self) {
-        let public_length = self.bytes.len();
-        self.bytes.zeroize();
-        self.bytes.resize(public_length, 0_u8);
+        self.bytes.as_mut().zeroize();
     }
 
     /// Exposes the bytes only under an explicit permit and hardened-execution token.
@@ -467,7 +466,7 @@ impl SecretBox {
         operation: impl FnOnce(&[u8]) -> T,
     ) -> Result<Exposed<T>, SecretError> {
         expose::<H, T>(
-            self.bytes.as_slice(),
+            self.bytes.as_ref(),
             self.secret_id,
             execution,
             permit,
@@ -478,7 +477,7 @@ impl SecretBox {
 
 impl Drop for SecretBox {
     fn drop(&mut self) {
-        self.bytes.zeroize();
+        self.bytes.as_mut().zeroize();
     }
 }
 
@@ -529,10 +528,10 @@ fn validate_owned_slice(secret_id: Hash32, bytes: &mut [u8]) -> Result<(), Secre
     result
 }
 
-fn validate_owned_vec(secret_id: Hash32, bytes: &mut Vec<u8>) -> Result<(), SecretError> {
+fn validate_owned_box(secret_id: Hash32, bytes: &mut Box<[u8]>) -> Result<(), SecretError> {
     let result = validate_identity_and_length(secret_id, bytes.len());
     if result.is_err() {
-        bytes.zeroize();
+        bytes.as_mut().zeroize();
     }
     result
 }
@@ -718,11 +717,11 @@ mod tests {
     #[test]
     fn dynamic_length_is_explicit_and_assignment_checks_it() {
         let execution = HardenedExecution::for_test();
-        let mut left = SecretBox::try_new(hash(3), vec![1, 2, 3])
+        let mut left = SecretBox::try_new(hash(3), vec![1, 2, 3].into_boxed_slice())
             .unwrap_or_else(|error| panic!("left: {error}"));
-        let same = SecretBox::try_new(hash(3), vec![1, 2, 3])
+        let same = SecretBox::try_new(hash(3), vec![1, 2, 3].into_boxed_slice())
             .unwrap_or_else(|error| panic!("same: {error}"));
-        let different = SecretBox::try_new(hash(3), vec![1, 2])
+        let different = SecretBox::try_new(hash(3), vec![1, 2].into_boxed_slice())
             .unwrap_or_else(|error| panic!("different: {error}"));
         assert_eq!(left.ct_eq(&same, &execution).reveal_for_test(), 1);
         assert_eq!(left.ct_eq(&different, &execution).reveal_for_test(), 0);
@@ -749,8 +748,7 @@ mod tests {
             .unwrap_or_else(|error| panic!("replace exposure: {error}"));
         assert_eq!(replaced.into_parts().0, vec![4_u8; 8]);
 
-        let mut dynamic_input = Vec::with_capacity(64);
-        dynamic_input.extend_from_slice(&[6_u8; 8]);
+        let dynamic_input = vec![6_u8; 8].into_boxed_slice();
         let mut dynamic = SecretBox::try_new(hash(3), dynamic_input)
             .unwrap_or_else(|error| panic!("dynamic: {error}"));
         dynamic.clear();
@@ -763,12 +761,12 @@ mod tests {
 
     #[test]
     fn rejected_owned_input_is_zeroized_before_return() {
-        let mut wrong_identity = vec![9_u8; 32];
+        let mut wrong_identity = vec![9_u8; 32].into_boxed_slice();
         assert_eq!(
-            validate_owned_vec(Hash32::ZERO, &mut wrong_identity),
+            validate_owned_box(Hash32::ZERO, &mut wrong_identity),
             Err(SecretError::ZeroHash)
         );
-        assert!(wrong_identity.is_empty());
+        assert!(wrong_identity.iter().all(|byte| *byte == 0));
 
         let mut rejected_array = [11_u8; 8];
         assert_eq!(
@@ -784,12 +782,12 @@ mod tests {
         ignore = "the exact 1 MiB volatile-zeroization bound is covered outside Miri"
     )]
     fn oversized_owned_input_is_zeroized_before_return() {
-        let mut oversized = vec![7_u8; MAX_SECRET_BYTES + 1];
+        let mut oversized = vec![7_u8; MAX_SECRET_BYTES + 1].into_boxed_slice();
         assert_eq!(
-            validate_owned_vec(hash(3), &mut oversized),
+            validate_owned_box(hash(3), &mut oversized),
             Err(SecretError::InvalidLength)
         );
-        assert!(oversized.is_empty());
+        assert!(oversized.iter().all(|byte| *byte == 0));
     }
 
     #[test]
