@@ -53,28 +53,6 @@ use alloc::vec::Vec;
 )
 replace_exact(
     backend,
-    '''        if operations.is_empty() {
-            return Err(BackendError::EmptyCapabilities);
-        }
-        if operations.len() > MAX_BACKEND_CAPABILITIES {
-            return Err(BackendError::TooManyCapabilities);
-        }
-        operations.sort_unstable();
-        operations.dedup();
-''',
-    '''        if operations.is_empty() {
-            return Err(BackendError::EmptyCapabilities);
-        }
-        operations.sort_unstable();
-        operations.dedup();
-        if operations.len() > MAX_BACKEND_CAPABILITIES {
-            return Err(BackendError::TooManyCapabilities);
-        }
-''',
-    "backend canonical capability bound",
-)
-replace_exact(
-    backend,
     '''impl BackendRequestTemplate {
     /// Creates a synthesis request template.
     pub const fn try_new(
@@ -84,41 +62,6 @@ replace_exact(
     pub fn try_new(
 ''',
     "backend template non-const constructor",
-)
-replace_exact(
-    backend,
-    '''        if additional_claims.len() > MAX_ADDITIONAL_CLAIMS
-            || additional_claims.contains(&Hash32::ZERO)
-        {
-            return Err(BackendError::InvalidAdditionalClaims);
-        }
-        additional_claims.sort_unstable();
-        additional_claims.dedup();
-''',
-    '''        if additional_claims.contains(&Hash32::ZERO) {
-            return Err(BackendError::InvalidAdditionalClaims);
-        }
-        additional_claims.sort_unstable();
-        additional_claims.dedup();
-        if additional_claims.len() > MAX_ADDITIONAL_CLAIMS {
-            return Err(BackendError::InvalidAdditionalClaims);
-        }
-''',
-    "backend canonical claim bound",
-)
-replace_exact(
-    backend,
-    '''impl fmt::Display for BackendError {
-''',
-    '''impl From<EncodeError> for BackendError {
-    fn from(error: EncodeError) -> Self {
-        Self::Encode(error)
-    }
-}
-
-impl fmt::Display for BackendError {
-''',
-    "backend encode error conversion",
 )
 replace_exact(
     backend,
