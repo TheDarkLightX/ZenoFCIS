@@ -97,8 +97,9 @@ pub use zeno_fcis_profile_zenodex::{
     zusd_promotion_policy_v1,
 };
 pub use zeno_fcis_project::{
-    CompatibilityBlocker, CompatibilityReport, DomainPrefix, EvolutionMode, ProfileBindings,
-    ProjectProfile, RegistryEntry, RegistryKind, SemanticId, StableName, compare_successor,
+    AdditiveExtensionEvidence, CompatibilityBlocker, CompatibilityReport, DomainPrefix,
+    EvolutionError, EvolutionMode, ProfileBindings, ProfileEvolution, ProjectProfile,
+    RegistryEntry, RegistryKind, SemanticId, StableName, compare_successor,
 };
 pub use zeno_fcis_receipt::{
     CandidateBindings, CandidateBody, CandidateBuilder, CandidateId, CommitBundle, ReasonCode,

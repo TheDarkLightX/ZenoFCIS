@@ -22,6 +22,8 @@ The workspace now includes the complete package ladder:
 - assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation plus deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
+- project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
+- a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
 - a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
 - an explicit dual-root sparse authenticated-state reference with membership/absence proofs, expected-version publication, and full-rebuild equality checks;
@@ -74,7 +76,7 @@ The `zeno-fcis` umbrella keeps the semantic kernel small by default. Enable the 
 zeno-fcis = { version = "=0.1.0", features = ["full"] }
 ```
 
-Important optional features include `codegen`, `evidence`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
+Important optional features include `codegen`, `evidence`, `mounted-runtime`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
 
 ## Architecture
 
