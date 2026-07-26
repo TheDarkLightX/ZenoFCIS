@@ -22,6 +22,7 @@ members = [
     "crates/zeno-fcis-adapter-zenodex",
     "crates/zeno-fcis-authenticated",
     "crates/zeno-fcis-synthesis",
+    "crates/zeno-fcis-backend",
     "crates/zeno-fcis-shell-sqlite",
     "crates/zeno-fcis-collections",
 ]

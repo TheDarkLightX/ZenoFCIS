@@ -1,0 +1,82 @@
+name: universal-backend-rebase-assemble
+
+on:
+  push:
+    branches:
+      - agent/universal-backend-rebased-v1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: universal-backend-rebase-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    steps:
+      - name: Checkout backend branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: agent/universal-backend-rebased-v1
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Checkout exact mounted ZenoDEX revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: TheDarkLightX/ZenoDEX
+          ref: e3cf1aad40e487893230ae0c55f1f0dda62f9955
+          path: integration/zenodex
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Normalize source and lockfile
+        run: |
+          cargo +1.97.1 generate-lockfile
+          cargo +1.97.1 fmt --all
+
+      - name: Verify complete ZenoFCIS workspace
+        run: |
+          cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
+          cargo +1.97.1 test --workspace --all-features --locked
+          cargo +1.97.1 test --workspace --doc --all-features --locked
+          cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis-backend --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
+          python3 tools/check_assurance.py --self-test
+          python3 tools/check_assurance.py
+          RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+
+      - name: Verify exact mounted ZenoDEX workspace
+        run: |
+          cargo +1.97.1 fmt --manifest-path integration/zenodex/rust-runtime/Cargo.toml --all -- --check
+          cargo +1.97.1 clippy --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
+          cargo +1.97.1 test --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --locked
+
+      - name: Commit exact validated review surface
+        run: |
+          git config user.name 'ZenoFCIS universal backend rebase'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            Cargo.toml \
+            Cargo.lock \
+            crates/zeno-fcis-backend \
+            crates/zeno-fcis-synthesis \
+            crates/zeno-fcis \
+            tools/check_assurance.py \
+            docs/GENERIC_BACKEND_PROTOCOL.md \
+            .github/workflows/ci.yml \
+            .github/workflows/ecosystem-features.yml \
+            .github/workflows/miri.yml
+          if git diff --cached --quiet --exit-code; then
+            exit 0
+          fi
+          git commit -m 'feat: rebase checked backend protocol onto hardened profiles'
+          git push origin HEAD:agent/universal-backend-rebased-v1
