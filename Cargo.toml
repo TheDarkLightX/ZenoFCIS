@@ -9,6 +9,7 @@ members = [
     "crates/zeno-fcis-schema",
     "crates/zeno-fcis-project",
     "crates/zeno-fcis-catalog",
+    "crates/zeno-fcis-transition",
     "crates/zeno-fcis-patch",
     "crates/zeno-fcis-plan",
     "crates/zeno-fcis-receipt",

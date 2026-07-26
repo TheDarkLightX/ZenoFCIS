@@ -63,6 +63,9 @@ pub use zeno_fcis_shell_sqlite as shell_sqlite;
 #[cfg(feature = "synthesis")]
 /// Deterministic verifier-gated bounded synthesis.
 pub use zeno_fcis_synthesis as synthesis;
+#[cfg(feature = "transition")]
+/// Catalog-aware pure transition construction and same-candidate sealing.
+pub use zeno_fcis_transition as transition;
 /// Transitively immutable closed values.
 pub use zeno_fcis_value as value;
 
@@ -107,7 +110,8 @@ pub use zeno_fcis_crypto::{KnownAnswerReport, ProviderVerificationError, verify_
 #[cfg(feature = "sha256-parity")]
 pub use zeno_fcis_crypto::{ProviderParityReport, verify_provider_parity};
 pub use zeno_fcis_patch::{
-    AppliedPatch, CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath, hash_value,
+    AppliedPatch, CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath,
+    hash_precondition_value, hash_value, value_at,
 };
 pub use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanError};
 pub use zeno_fcis_profile_zenodex::{
@@ -139,6 +143,14 @@ pub use zeno_fcis_schema::{
 pub use zeno_fcis_shell::{
     CommitResult, CommitStatus, OutboxRecord, ReplayRecord, ShellError, ShellState, acknowledge,
     commit,
+};
+#[cfg(feature = "transition")]
+pub use zeno_fcis_transition::{
+    ArtifactField, CataloguedTransitionBuilder, LimitKind, MAX_TRANSITION_MAP_KEY_BYTES,
+    MAX_TRANSITION_OBSERVED_PATHS, MAX_TRANSITION_PATCH_OPERATIONS, MAX_TRANSITION_REASONS,
+    MAX_TRANSITION_STATE_DEPTH, MAX_TRANSITION_STATE_NODES, TRANSITION_FORMAT_VERSION,
+    TransitionArtifacts, TransitionDecision, TransitionError, TransitionLimits, TransitionReject,
+    TransitionResourceReport, validate_transition_decision,
 };
 pub use zeno_fcis_value::{
     AsciiText, BoundedVec, Field, LengthError, MapEntry, NonEmptyVec, OwnedBytes, TextError, Value,
