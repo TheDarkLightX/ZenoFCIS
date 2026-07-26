@@ -1,15 +1,15 @@
 name: universal-backend-rebase-assemble
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/universal-backend-rebased-v1
+      - main
 
 permissions:
   contents: write
 
 concurrency:
-  group: universal-backend-rebase-${{ github.ref }}
+  group: universal-backend-rebase-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
