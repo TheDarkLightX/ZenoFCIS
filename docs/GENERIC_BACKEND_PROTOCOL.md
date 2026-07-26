@@ -52,7 +52,7 @@ A backend response is rejected if the engine did not advertise the requested ope
 
 ## Resource model
 
-Requests authorize logical fuel, candidate count, output bytes, and trace entries. Responses report exact usage and fail closed when usage or canonical output exceeds the request. Wall-clock deadlines, host memory exhaustion, process crashes, and service unavailability remain shell failures and never become evidence that a semantic search was complete.
+Requests authorize logical fuel, candidate count, output bytes, and trace entries. Responses are revalidated against the exact request limits even when their `BackendUsage` value was constructed elsewhere. Canonical output bytes are computed by ZenoFCIS and must equal the reported output-byte usage exactly; over-reporting and under-reporting both fail closed. Wall-clock deadlines, host memory exhaustion, process crashes, and service unavailability remain shell failures and never become evidence that a semantic search was complete.
 
 ## Outcome algebra
 
@@ -111,7 +111,7 @@ The public ZenoFCIS crate contains no private source and does not assume either 
 
 ## Deterministic synthesis integration
 
-`SynthesisBackendChecker` adapts a verified generic backend to the existing `CandidateChecker` interface. Canonical assignment ordering and search completeness remain owned by `zeno-fcis-synthesis`. The mounted backend checks one assignment at a time; it cannot reorder, omit, or terminate the outer complete-within-bounds search.
+`SynthesisBackendChecker` adapts a verified generic backend to the existing `CandidateChecker` interface. Canonical assignment ordering and search completeness remain owned by `zeno-fcis-synthesis`. The mounted backend checks one assignment at a time; it cannot reorder, omit, or terminate the outer complete-within-bounds search. Accepted synthesis claims are re-committed together with the exact independent `BackendCertificate`, so the outer synthesis certificate binds the request, response, backend identity, verifier identity, and verifier attestation rather than only backend-supplied claim hashes.
 
 The backend and synthesis crates support `no_std + alloc`. Concrete engines normally live in `std` shell crates because they invoke processes, services, solvers, compilers, or models.
 
