@@ -1,0 +1,39 @@
+[package]
+name = "zeno-fcis-collections"
+description = "Persistent collection adapters for ZenoFCIS with logical-entry-defined equality"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[features]
+default = ["std"]
+std = []
+# Enable the rpds persistent vector backend.
+rpds-backend = ["dep:rpds"]
+# Enable the imbl persistent map backend.
+imbl-backend = ["dep:imbl"]
+
+[dependencies]
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value" }
+
+# Optional persistent collection backends.
+# Pinned exactly per ZenoFCIS dependency policy.
+# rpds 1.1.0: MIT/Apache-2.0, no unsafe, no advisory.
+rpds = { version = "=1.1.0", optional = true }
+# imbl 3.0.0: MPL-2.0+, no advisory.
+imbl = { version = "=3.0.0", optional = true }
+
+[dev-dependencies]
+criterion = "=0.5.1"
+
+[[bench]]
+name = "persistent_map"
+harness = false
+
+[lints]
+workspace = true

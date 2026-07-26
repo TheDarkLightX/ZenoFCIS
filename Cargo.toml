@@ -5,6 +5,23 @@ members = [
     "crates/zeno-fcis-core",
     "crates/zeno-fcis-value",
     "crates/zeno-fcis-codec",
+    "crates/zeno-fcis-crypto",
+    "crates/zeno-fcis-schema",
+    "crates/zeno-fcis-patch",
+    "crates/zeno-fcis-plan",
+    "crates/zeno-fcis-receipt",
+    "crates/zeno-fcis-shell",
+    "crates/zeno-fcis-compose",
+    "crates/zeno-fcis-refine",
+    "crates/zeno-fcis-profile-zenodex",
+    "crates/zeno-fcis-codegen",
+    "crates/zeno-fcis-codegen-fixture",
+    "crates/zeno-fcis-evidence",
+    "crates/zeno-fcis-adapter-zenodex",
+    "crates/zeno-fcis-authenticated",
+    "crates/zeno-fcis-synthesis",
+    "crates/zeno-fcis-shell-sqlite",
+    "crates/zeno-fcis-collections",
 ]
 
 [workspace.package]

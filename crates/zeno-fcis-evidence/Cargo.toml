@@ -1,0 +1,21 @@
+[package]
+name = "zeno-fcis-evidence"
+description = "Canonical formal-evidence envelopes and independent checker adapters for ZenoFCIS promotion"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
+zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine" }
+
+[lints]
+workspace = true

@@ -15,12 +15,68 @@ std = [
     "zeno-fcis-core/std",
     "zeno-fcis-value/std",
     "zeno-fcis-codec/std",
+    "zeno-fcis-crypto?/std",
+    "zeno-fcis-patch/std",
+    "zeno-fcis-plan/std",
+    "zeno-fcis-receipt/std",
+    "zeno-fcis-shell/std",
+    "zeno-fcis-compose/std",
+    "zeno-fcis-refine/std",
+    "zeno-fcis-profile-zenodex/std",
+    "zeno-fcis-schema?/std",
+    "zeno-fcis-collections?/std",
+]
+rustcrypto-sha256 = ["dep:zeno-fcis-crypto", "zeno-fcis-crypto/rustcrypto"]
+verified-sha256 = ["dep:zeno-fcis-crypto", "zeno-fcis-crypto/libcrux"]
+sha256-parity = [
+    "rustcrypto-sha256",
+    "verified-sha256",
+    "zeno-fcis-crypto/parity",
+]
+schema = ["dep:zeno-fcis-schema"]
+codegen = ["schema", "dep:zeno-fcis-codegen"]
+evidence = ["std", "dep:zeno-fcis-evidence"]
+mounted-zenodex = ["std", "dep:zeno-fcis-adapter-zenodex"]
+authenticated-state = ["std", "dep:zeno-fcis-authenticated"]
+synthesis = ["std", "dep:zeno-fcis-synthesis"]
+sqlite-shell = ["std", "dep:zeno-fcis-shell-sqlite"]
+collections = ["std", "dep:zeno-fcis-collections"]
+persistent-collections = [
+    "collections",
+    "zeno-fcis-collections/rpds-backend",
+    "zeno-fcis-collections/imbl-backend",
+]
+full = [
+    "sha256-parity",
+    "codegen",
+    "evidence",
+    "mounted-zenodex",
+    "authenticated-state",
+    "synthesis",
+    "sqlite-shell",
+    "persistent-collections",
 ]
 
 [dependencies]
-zeno-fcis-core = { path = "../zeno-fcis-core", default-features = false }
-zeno-fcis-value = { path = "../zeno-fcis-value", default-features = false }
-zeno-fcis-codec = { path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, optional = true }
+zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch", default-features = false }
+zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan", default-features = false }
+zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt", default-features = false }
+zeno-fcis-shell = { version = "=0.1.0", path = "../zeno-fcis-shell", default-features = false }
+zeno-fcis-compose = { version = "=0.1.0", path = "../zeno-fcis-compose", default-features = false }
+zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine", default-features = false }
+zeno-fcis-profile-zenodex = { version = "=0.1.0", path = "../zeno-fcis-profile-zenodex", default-features = false }
+zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema", default-features = false, optional = true }
+zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen", optional = true }
+zeno-fcis-evidence = { version = "=0.1.0", path = "../zeno-fcis-evidence", default-features = false, optional = true }
+zeno-fcis-adapter-zenodex = { version = "=0.1.0", path = "../zeno-fcis-adapter-zenodex", optional = true }
+zeno-fcis-authenticated = { version = "=0.1.0", path = "../zeno-fcis-authenticated", optional = true }
+zeno-fcis-synthesis = { version = "=0.1.0", path = "../zeno-fcis-synthesis", optional = true }
+zeno-fcis-shell-sqlite = { version = "=0.1.0", path = "../zeno-fcis-shell-sqlite", optional = true }
+zeno-fcis-collections = { version = "=0.1.0", path = "../zeno-fcis-collections", default-features = false, optional = true }
 
 [lints]
 workspace = true
