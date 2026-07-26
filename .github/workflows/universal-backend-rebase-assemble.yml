@@ -37,8 +37,9 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
-      - name: Normalize source and lockfile
+      - name: Harden, normalize source, and generate lockfile
         run: |
+          python3 internal/backend-rebase-hardening.py
           cargo +1.97.1 generate-lockfile
           cargo +1.97.1 fmt --all
 
