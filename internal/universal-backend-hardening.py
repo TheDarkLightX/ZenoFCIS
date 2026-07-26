@@ -79,3 +79,27 @@ replace_exact(
 ''',
     "backend usage test",
 )
+
+assurance = Path("tools/check_assurance.py")
+replace_exact(
+    assurance,
+    '''    "zeno-fcis-synthesis",
+)
+''',
+    '''    "zeno-fcis-synthesis",
+    "zeno-fcis-backend",
+)
+''',
+    "backend semantic boundary",
+)
+replace_exact(
+    assurance,
+    '''    "zeno-fcis-synthesis": 2,
+    "zeno-fcis": 3,
+''',
+    '''    "zeno-fcis-synthesis": 2,
+    "zeno-fcis-backend": 3,
+    "zeno-fcis": 3,
+''',
+    "backend dependency ring",
+)
