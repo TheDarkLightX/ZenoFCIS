@@ -13,6 +13,9 @@ on:
       - ".github/workflows/ci.yml"
       - ".github/workflows/ecosystem-features.yml"
       - ".github/workflows/universal-project-assemble.yml"
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -69,6 +72,7 @@ jobs:
           cargo +1.74.1 test --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --locked
 
       - name: Commit validated formatting and lockfile
+        if: github.event_name == 'push'
         run: |
           git config user.name 'ZenoFCIS universal project assembler'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
