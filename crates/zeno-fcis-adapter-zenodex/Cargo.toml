@@ -1,6 +1,6 @@
 [package]
 name = "zeno-fcis-adapter-zenodex"
-description = "Strict mounted ZenoDEX full-decision adapters for ZenoFCIS refinement"
+description = "Mounted ZenoDEX profiles built on the project-neutral ZenoFCIS runtime adapter"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,7 @@ authors.workspace = true
 [dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151" }
+zeno-fcis-adapter = { version = "=0.1.0", path = "../zeno-fcis-adapter" }
 zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
 zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core" }
 zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
