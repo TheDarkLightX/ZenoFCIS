@@ -82,8 +82,8 @@ replace_exact(
             .unwrap_or_else(|error| panic!("first search failed: {error}"));
         let second = search(&problem, &mut second_checker)
             .unwrap_or_else(|error| panic!("second search failed: {error}"));
-        assert!(matches!(first, SearchResult::NoSolution { .. }));
-        assert!(matches!(second, SearchResult::NoSolution { .. }));
+        assert!(matches!(&first, SearchResult::NoSolution { .. }));
+        assert!(matches!(&second, SearchResult::NoSolution { .. }));
         assert_ne!(first, second);
     }
 
