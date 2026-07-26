@@ -623,6 +623,36 @@ impl CatalogLimits {
     pub const fn max_outbox_entries(self) -> u32 {
         self.max_outbox_entries
     }
+
+    /// Returns the maximum recursive value depth.
+    #[must_use]
+    pub const fn max_value_depth(self) -> u16 {
+        self.max_value_depth
+    }
+
+    /// Returns the maximum nodes admitted in any one value.
+    #[must_use]
+    pub const fn max_value_nodes(self) -> u64 {
+        self.max_value_nodes
+    }
+
+    /// Returns the maximum nodes admitted across both plans.
+    #[must_use]
+    pub const fn max_total_value_nodes(self) -> u64 {
+        self.max_total_value_nodes
+    }
+
+    /// Returns the maximum payload bytes admitted across both plans.
+    #[must_use]
+    pub const fn max_total_payload_bytes(self) -> u64 {
+        self.max_total_payload_bytes
+    }
+
+    /// Returns the maximum children admitted in one collection value.
+    #[must_use]
+    pub const fn max_collection_len(self) -> u32 {
+        self.max_collection_len
+    }
 }
 
 impl Default for CatalogLimits {
@@ -762,12 +792,17 @@ impl ProjectCatalog {
         if bindings.channel_registry_hash != manifest.channel_registry_hash() {
             return Err(CatalogError::ChannelRegistryBindingMismatch);
         }
-        for id in [
-            profile.state_type(),
-            profile.command_type(),
-            profile.context_type(),
-        ] {
-            require_schema_type(&schema, TypeId::new(id.get()))?;
+        let state_type = TypeId::new(profile.state_type().get());
+        let command_type = TypeId::new(profile.command_type().get());
+        let context_type = TypeId::new(profile.context_type().get());
+        for id in [state_type, command_type, context_type] {
+            require_schema_type(&schema, id)?;
+        }
+        if schema.root_type() != state_type {
+            return Err(CatalogError::RootStateTypeMismatch {
+                profile: state_type,
+                schema: schema.root_type(),
+            });
         }
         for effect in manifest.effects() {
             require_schema_type(&schema, effect.payload_type())?;
@@ -1305,6 +1340,13 @@ pub enum CatalogError {
     ChannelRegistryBindingMismatch,
     /// A profile or definition references an unknown schema type.
     UnknownSchemaType(TypeId),
+    /// The profile's state type differs from the schema's declared root type.
+    RootStateTypeMismatch {
+        /// State type declared by the project profile.
+        profile: TypeId,
+        /// Root type declared by the closed schema.
+        schema: TypeId,
+    },
     /// A catalog definition has no corresponding profile entry.
     MissingProfileEntry {
         /// Registry namespace.
@@ -1441,6 +1483,10 @@ impl fmt::Display for CatalogError {
                 formatter.write_str("profile channel-registry binding mismatch")
             }
             Self::UnknownSchemaType(id) => write!(formatter, "unknown schema type {id}"),
+            Self::RootStateTypeMismatch { profile, schema } => write!(
+                formatter,
+                "profile state type {profile} differs from schema root type {schema}"
+            ),
             Self::MissingProfileEntry { kind, id } => {
                 write!(formatter, "profile is missing {kind:?} entry {}", id.get())
             }
@@ -1643,10 +1689,20 @@ mod tests {
         schema: &Schema,
         manifest: &CatalogManifest,
         effect_hash: Hash32,
+        extras: Vec<RegistryEntry>,
+    ) -> ProjectProfile {
+        profile_with_state_type_and_effect_hash(schema, manifest, 1, effect_hash, extras)
+    }
+
+    fn profile_with_state_type_and_effect_hash(
+        schema: &Schema,
+        manifest: &CatalogManifest,
+        state_type: u32,
+        effect_hash: Hash32,
         mut extras: Vec<RegistryEntry>,
     ) -> ProjectProfile {
         let mut entries = vec![
-            root_entry(RegistryKind::StateType, 1, "state", 1),
+            root_entry(RegistryKind::StateType, state_type, "state", 1),
             root_entry(RegistryKind::CommandType, 2, "command", 2),
             root_entry(RegistryKind::ContextType, 3, "context", 3),
         ];
@@ -1657,7 +1713,7 @@ mod tests {
             name("core"),
             id(100),
             1,
-            id(1),
+            id(state_type),
             id(2),
             id(3),
             DomainPrefix::try_new("example/core").unwrap_or_else(|error| panic!("domain: {error}")),
@@ -1687,7 +1743,38 @@ mod tests {
 
     #[test]
     fn declaration_order_does_not_change_manifest() {
-        let (reasons, effects, channels) = definitions();
+        let (mut reasons, mut effects, mut channels) = definitions();
+        reasons.push(
+            ReasonDefinition::try_new(
+                id(11),
+                name("committed-denial"),
+                ReasonDisposition::CommittedFailure,
+                1,
+                hash(11),
+            )
+            .unwrap_or_else(|error| panic!("second reason: {error}")),
+        );
+        effects.push(
+            EffectDefinition::try_new(
+                id(21),
+                name("write-secondary"),
+                TypeId::new(4),
+                HashRequirement::Any,
+                HashRequirement::Any,
+                hash(21),
+            )
+            .unwrap_or_else(|error| panic!("second effect: {error}")),
+        );
+        channels.push(
+            ChannelDefinition::try_new(
+                id(31),
+                name("notify-secondary"),
+                TypeId::new(5),
+                TypeId::new(6),
+                hash(31),
+            )
+            .unwrap_or_else(|error| panic!("second channel: {error}")),
+        );
         let left = CatalogManifest::try_new::<TestHasher>(
             reasons.clone(),
             effects.clone(),
@@ -1702,6 +1789,31 @@ mod tests {
         .unwrap_or_else(|error| panic!("right: {error}"));
         assert_eq!(left, right);
         assert_eq!(left.canonical_bytes(), right.canonical_bytes());
+    }
+
+    #[test]
+    fn profile_state_type_must_equal_the_schema_root() {
+        let schema = schema();
+        let manifest = manifest();
+        let profile = profile_with_state_type_and_effect_hash(
+            &schema,
+            &manifest,
+            2,
+            manifest.effect_registry_hash(),
+            Vec::new(),
+        );
+        assert_eq!(
+            ProjectCatalog::try_new::<TestHasher>(
+                profile,
+                schema,
+                manifest,
+                CatalogLimits::default(),
+            ),
+            Err(CatalogError::RootStateTypeMismatch {
+                profile: TypeId::new(2),
+                schema: TypeId::new(1),
+            })
+        );
     }
 
     #[test]
@@ -1830,6 +1942,25 @@ mod tests {
     }
 
     #[test]
+    fn effect_subject_requirement_is_enforced() {
+        let commit = CommitPlan::try_new(vec![Effect::new(
+            8,
+            20,
+            hash(50),
+            hash(51),
+            Value::U128(50),
+        )])
+        .unwrap_or_else(|error| panic!("commit: {error}"));
+        assert_eq!(
+            catalog().validate_commit_plan(&commit),
+            Err(CatalogError::EffectHashRequirementMismatch {
+                ordinal: 8,
+                field: EffectHashField::Subject,
+            })
+        );
+    }
+
+    #[test]
     fn effect_payload_must_match_its_schema() {
         let commit = CommitPlan::try_new(vec![Effect::new(
             1,
@@ -1864,30 +1995,81 @@ mod tests {
     }
 
     #[test]
+    fn channels_fail_closed_for_unknown_ids_and_wrong_shapes() {
+        let unknown = OutboxPlan::try_new(vec![OutboxEntry::new(1, 999, Value::Unit, Value::Unit)])
+            .unwrap_or_else(|error| panic!("unknown outbox: {error}"));
+        assert_eq!(
+            catalog().validate_outbox_plan(&unknown),
+            Err(CatalogError::UnknownChannel(999))
+        );
+
+        let wrong_destination = OutboxPlan::try_new(vec![OutboxEntry::new(
+            2,
+            30,
+            Value::Bool(true),
+            Value::Bool(true),
+        )])
+        .unwrap_or_else(|error| panic!("destination outbox: {error}"));
+        assert!(matches!(
+            catalog().validate_outbox_plan(&wrong_destination),
+            Err(CatalogError::SchemaValue {
+                role: ValueRole::OutboxDestination,
+                ordinal: 2,
+                error: ValueValidationError::TypeMismatch,
+            })
+        ));
+
+        let wrong_payload = OutboxPlan::try_new(vec![OutboxEntry::new(
+            3,
+            30,
+            Value::text_ascii(String::from("mail"))
+                .unwrap_or_else(|error| panic!("destination: {error}")),
+            Value::U128(1),
+        )])
+        .unwrap_or_else(|error| panic!("payload outbox: {error}"));
+        assert!(matches!(
+            catalog().validate_outbox_plan(&wrong_payload),
+            Err(CatalogError::SchemaValue {
+                role: ValueRole::OutboxPayload,
+                ordinal: 3,
+                error: ValueValidationError::TypeMismatch,
+            })
+        ));
+    }
+
+    #[test]
     fn aggregate_resource_limits_are_enforced() {
         let schema = schema();
         let manifest = manifest();
         let profile = profile(&schema, &manifest);
-        let limits = CatalogLimits::try_new(10, 10, 64, 100, 100, 3, 100)
+        let limits = CatalogLimits::try_new(10, 10, 64, 100, 100, 5, 100)
             .unwrap_or_else(|error| panic!("limits: {error}"));
         let catalog = ProjectCatalog::try_new::<TestHasher>(profile, schema, manifest, limits)
             .unwrap_or_else(|error| panic!("catalog: {error}"));
-        let outbox = OutboxPlan::try_new(vec![OutboxEntry::new(
-            1,
-            30,
-            Value::text_ascii(String::from("mail"))
-                .unwrap_or_else(|error| panic!("destination: {error}")),
-            Value::Bool(true),
-        )])
+        let outbox = OutboxPlan::try_new(vec![
+            OutboxEntry::new(
+                1,
+                30,
+                Value::text_ascii(String::from("one"))
+                    .unwrap_or_else(|error| panic!("first destination: {error}")),
+                Value::Bool(true),
+            ),
+            OutboxEntry::new(
+                2,
+                30,
+                Value::text_ascii(String::from("two"))
+                    .unwrap_or_else(|error| panic!("second destination: {error}")),
+                Value::Bool(false),
+            ),
+        ])
         .unwrap_or_else(|error| panic!("outbox: {error}"));
-        assert!(matches!(
+        assert_eq!(
             catalog.validate_outbox_plan(&outbox),
-            Err(CatalogError::StructuralValue {
-                role: ValueRole::OutboxDestination,
-                error: ValueError::PayloadLimit { .. },
-                ..
+            Err(CatalogError::AggregatePayloadLimit {
+                limit: 5,
+                actual: 6,
             })
-        ));
+        );
     }
 
     #[test]
