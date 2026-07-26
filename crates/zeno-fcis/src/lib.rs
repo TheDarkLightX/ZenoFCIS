@@ -55,6 +55,9 @@ pub use zeno_fcis_refine as refine;
 #[cfg(feature = "schema")]
 /// Closed, acyclic protocol schemas and schema-bound value admission.
 pub use zeno_fcis_schema as schema;
+#[cfg(feature = "security")]
+/// Information-flow, side-channel, and covert-channel assurance values.
+pub use zeno_fcis_security as security;
 /// Pure reference semantics for atomic commit, replay, and outbox acknowledgement.
 pub use zeno_fcis_shell as shell;
 #[cfg(feature = "sqlite-shell")]
@@ -135,6 +138,15 @@ pub use zeno_fcis_schema::{
     EnumVariantDef, FieldDef, FieldId, Schema, SchemaError, SchemaLimits, SchemaMetrics,
     SchemaName, SumVariantDef, TypeDef, TypeId, TypeKind, ValidationLimits, ValidationReport,
     ValueValidationError, VariantId,
+};
+#[cfg(feature = "security")]
+pub use zeno_fcis_security::{
+    CapacityEvidence, ChannelClass, CompartmentId, Declassification, DeploymentContract,
+    LeakageBlocker, LeakagePolicy, LeakageReport, LeakageRule, Mitigation, Observation,
+    ObservationKind, ObservationTrace, ObserverClearance, RuleMode, SecurityDomainId,
+    SecurityError, SecurityEvidence, SecurityEvidenceKind, SecurityLabel,
+    SecurityPromotionBlocker, SecurityPromotionPolicy, SecurityPromotionReport, compare_traces,
+    evaluate_security_promotion,
 };
 pub use zeno_fcis_shell::{
     CommitResult, CommitStatus, OutboxRecord, ReplayRecord, ShellError, ShellState, acknowledge,
