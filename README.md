@@ -23,6 +23,7 @@ The workspace now includes the complete package ladder:
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation plus deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
+- a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
 - an explicit dual-root sparse authenticated-state reference with membership/absence proofs, expected-version publication, and full-rebuild equality checks;
 - verifier-gated bounded synthesis over canonical closed candidate domains with content-addressed certificates and honest incomplete-search results;
 - crash-atomic SQLite publication, exact replay binding, a transactional outbox, idempotent delivery, and crash-point refinement tests;
@@ -69,7 +70,7 @@ See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`
 
 ## Assurance posture
 
-This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, and fail-closed promotion rules. It does not claim audit completion, economic correctness, side-channel resistance, production authorization, or that an external ZenoDEX, JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
+This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, and fail-closed promotion rules. The pinned ZenoDEX single-vault zUSD mount is bounded executable refinement evidence. It does not claim audit completion, economic correctness, side-channel resistance, production authorization, full ZenoDEX coverage, or that an external ZenoDEX, JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
 
 ## License
 

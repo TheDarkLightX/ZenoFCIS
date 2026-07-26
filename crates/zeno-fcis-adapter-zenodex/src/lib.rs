@@ -8,6 +8,9 @@
 
 #![forbid(unsafe_code)]
 
+/// Concrete mounted single-vault zUSD profile and native transport.
+pub mod zusd;
+
 use core::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 

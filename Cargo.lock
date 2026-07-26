@@ -1223,7 +1223,12 @@ dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-profile-zenodex",
+ "zeno-fcis-receipt",
  "zeno-fcis-refine",
+ "zeno-fcis-value",
 ]
 
 [[package]]

@@ -1,0 +1,75 @@
+name: mounted-zenodex
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeno-fcis-mounted-zenodex-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zusd-full-decision-refinement:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact ZenoFCIS source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact mounted ZenoDEX source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: TheDarkLightX/ZenoDEX
+          ref: e3cf1aad40e487893230ae0c55f1f0dda62f9955
+          path: mounted-zenodex
+          persist-credentials: false
+
+      - name: Install pinned toolchains
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup toolchain install 1.89.0 --profile minimal
+
+      - name: Build exact ZenoDEX Rust runtime
+        run: >-
+          cargo +1.89.0 build
+          --manifest-path mounted-zenodex/rust-runtime/Cargo.toml
+          -p zenodex-runtime-cli
+          --locked
+
+      - name: Compare complete Python and Rust decisions
+        run: |
+          cargo +1.97.1 run \
+            -p zeno-fcis-adapter-zenodex \
+            --bin mount-zenodex-zusd \
+            --locked \
+            -- \
+            mounted-zenodex \
+            mounted-zenodex/rust-runtime/target/debug/zenodex-runtime \
+            /tmp/zenodex-zusd-mount
+          cmp \
+            fixtures/mounted-zenodex/zusd-v1/report.json \
+            /tmp/zenodex-zusd-mount/report.json
+
+      - name: Bind exact-head evidence
+        run: |
+          sha256sum /tmp/zenodex-zusd-mount/report.json > /tmp/zenodex-zusd-mount/report.sha256
+          git rev-parse HEAD > /tmp/zenodex-zusd-mount/zeno-fcis.commit
+          git -C mounted-zenodex rev-parse HEAD > /tmp/zenodex-zusd-mount/zenodex.commit
+          rustc +1.97.1 --version --verbose > /tmp/zenodex-zusd-mount/zeno-fcis-rustc.txt
+          rustc +1.89.0 --version --verbose > /tmp/zenodex-zusd-mount/zenodex-rustc.txt
+
+      - name: Retain mounted refinement evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mounted-zenodex-zusd-${{ github.sha }}
+          path: /tmp/zenodex-zusd-mount
+          if-no-files-found: error
+          retention-days: 30
