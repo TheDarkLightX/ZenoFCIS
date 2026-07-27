@@ -1,0 +1,70 @@
+name: agent-repair-onchain-generator
+
+on:
+  push:
+    branches:
+      - agent/solidity-fcis-v1-20260727
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: true
+          ref: agent/solidity-fcis-v1-20260727
+
+      - name: Apply exact repairs
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/zeno-fcis-codegen/src/solidity_advanced.rs")
+          text = path.read_text(encoding="utf-8")
+          replacements = [
+              ("use std::collections::{BTreeMap, BTreeSet};", "use std::collections::BTreeMap;", 1),
+              ("OnchainCapabilityKind, OnchainEvent, OnchainField", "OnchainCapabilityKind, OnchainField", 1),
+              ('output.push_str("\\n");', "output.push('\\n');", 3),
+              ('output.push_str("        unchecked { _sequence += 1; }\\n");', 'output.push_str("        _sequence += 1;\\n");', 1),
+          ]
+          for old, new, expected in replacements:
+              actual = text.count(old)
+              if actual != expected:
+                  raise SystemExit(f"expected {expected} occurrences of {old!r}, found {actual}")
+              text = text.replace(old, new)
+          path.write_text(text, encoding="utf-8")
+
+          path = Path("crates/zeno-fcis-codegen/src/solidity.rs")
+          text = path.read_text(encoding="utf-8")
+          old = 'pub const SOLIDITY_PRAGMA: &str = ">=0.8.24 <0.9.0";'
+          if text.count(old) == 1:
+              text = text.replace(old, 'pub const SOLIDITY_PRAGMA: &str = "0.8.35";')
+              path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Remove temporary diagnostics
+        run: |
+          rm -rf .agent-diagnostics
+          rm -f .github/workflows/agent-format-onchain-solidity-v2.yml
+          rm -f .github/workflows/agent-capture-onchain-clippy.yml
+          rm -f .github/workflows/agent-repair-onchain-generator.yml
+
+      - name: Install pinned formatter
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+
+      - name: Format workspace
+        run: cargo +1.97.1 fmt --all
+
+      - name: Commit clean repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix advanced onchain generator gates"
+          git push origin HEAD:agent/solidity-fcis-v1-20260727
