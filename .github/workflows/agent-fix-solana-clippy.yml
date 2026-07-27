@@ -1,0 +1,74 @@
+name: agent-fix-solana-clippy
+
+on:
+  pull_request:
+  push:
+    branches:
+      - agent/solana-fcis-v1-20260727
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-fix-solana-clippy
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: true
+          ref: agent/solana-fcis-v1-20260727
+          show-progress: false
+
+      - name: Apply exact lint repair
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/zeno-fcis-codegen/src/solana_anchor.rs")
+          text = path.read_text(encoding="utf-8")
+          old = '''        write!(
+              output,
+              "{}, field_count: {}, ..EventPlan::default() }};\\n",
+              event.code(),
+              event.fields().len()
+          )?;
+          '''
+          new = '''        writeln!(
+              output,
+              "{}, field_count: {}, ..EventPlan::default() }};",
+              event.code(),
+              event.fields().len()
+          )?;
+          '''
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one write-with-newline block, found {text.count(old)}")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          PY
+
+      - name: Remove temporary diagnostics
+        run: |
+          rm -rf .agent-diagnostics
+          rm -f .github/workflows/agent-capture-solana-clippy.yml
+          rm -f .github/workflows/agent-fix-solana-clippy.yml
+
+      - name: Install pinned formatter
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+
+      - name: Format workspace
+        run: cargo +1.97.1 fmt --all
+
+      - name: Commit clean repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix Solana generator Clippy finding"
+          git pull --rebase origin agent/solana-fcis-v1-20260727
+          git push origin HEAD:agent/solana-fcis-v1-20260727
