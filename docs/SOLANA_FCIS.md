@@ -76,7 +76,7 @@ It does not by itself prove:
 
 ## Validation layers
 
-Repository Rust CI validates the generator implementation, deterministic rendering, source-policy checks, and public API integration. A separate retained generated-workspace gate is still required to compile the emitted Anchor program with its exact toolchain and to run instruction-level tests; generator CI alone is not deployment evidence.
+Repository Rust CI validates the `zeno-fcis-solana-anchor/2` generator implementation, deterministic rendering, source-policy checks, and public API integration. A separate retained generated-workspace gate is required to compile the emitted Anchor program with its exact dependency graph. Instruction-level tests remain a distinct requirement; generator and host compilation evidence are not deployment evidence.
 
 ## Required promotion evidence
 
@@ -94,4 +94,4 @@ Before a generated program is production-authorized, retain at minimum:
 10. explicit upgrade-authority disposition, preferably a reviewed multisig/timelock or final removal where appropriate;
 11. independent security review.
 
-The generator pins Anchor `1.0.2` and records Solana/Agave `3.1.10` in its manifest. Those pins are evidence inputs, not a claim that the generated workspace has already been compiled or verified in this repository.
+The generator pins Anchor `1.0.2` and `solana-sha256-hasher` `3.1.0`, and records Solana/Agave `3.1.10` in its manifest. The hasher's `sha2` feature supports deterministic host compilation and testing while the Solana target uses the platform SHA-256 syscall. These pins are evidence inputs, not a claim that a generated program has passed instruction-level, verified-build, or deployment verification.
