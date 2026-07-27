@@ -49,7 +49,6 @@ pub(crate) fn render_rust_project(
     );
     output.push_str("use zeno_fcis_compose::AccessPath;\n");
     output.push_str("use zeno_fcis_core::BudgetUsed;\n");
-    output.push_str("use zeno_fcis_patch::ValuePath;\n");
     output.push_str("use zeno_fcis_plan::{Effect, OutboxEntry};\n");
     output.push_str("use zeno_fcis_project::{\n");
     output.push_str(
@@ -68,7 +67,6 @@ pub(crate) fn render_rust_project(
         "    CataloguedTransitionBuilder, TransitionDecision, TransitionError, TransitionLimits,\n",
     );
     output.push_str("};\n");
-    output.push_str("use zeno_fcis_value::Value;\n");
     output.push('\n');
     writeln!(
         output,
@@ -387,11 +385,11 @@ fn render_generated_transition(
     catalog: &ProjectCatalog,
 ) -> Result<(), BootstrapError> {
     output.push_str(
-        "/// Generated high-level transition with typed reasons, effects, and channels.\n",
+        "/// Generated high-level transition with typed state access, reasons, effects, and channels.\n",
     );
     output.push_str("///\n");
     output.push_str(
-        "/// The private generic builder prevents raw reason, effect, and outbox staging.\n",
+        "/// The private generic builder prevents raw path mutation, reason, effect, and outbox staging.\n",
     );
     output.push_str("pub struct GeneratedTransition<'a, H: CommitmentHasher> {\n");
     output.push_str("    inner: CataloguedTransitionBuilder<'a, H>,\n");
@@ -399,14 +397,6 @@ fn render_generated_transition(
     output.push_str("impl<'a, H: CommitmentHasher> GeneratedTransition<'a, H> {\n");
     render_generated_root_read_methods(output, catalog)?;
     render_generated_root_update_methods(output, catalog)?;
-    output.push_str("    /// Stages one absent field or map-entry insertion.\n");
-    output.push_str("    pub fn insert(&mut self, path: ValuePath, map_key: Option<Value>, value: Value) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str("        self.inner.insert(path, map_key, value)?;\n        Ok(self)\n");
-    output.push_str("    }\n\n");
-    output.push_str("    /// Stages one preconditioned deletion.\n");
-    output.push_str("    pub fn delete(&mut self, path: ValuePath) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str("        self.inner.delete(path)?;\n        Ok(self)\n");
-    output.push_str("    }\n\n");
     output.push_str("    /// Records one exact context observation.\n");
     output.push_str("    pub fn observe_context(&mut self, path: AccessPath) -> Result<&mut Self, GeneratedProjectError> {\n");
     output.push_str("        self.inner.observe_context(path)?;\n        Ok(self)\n");

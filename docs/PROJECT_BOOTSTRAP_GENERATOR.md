@@ -18,7 +18,7 @@ The generated bundle contains:
 - the complete stable registry as a readable table;
 - general and disposition-typed Rust reason identifiers plus typed effect and channel identifiers;
 - effect and outbox smart constructors with schema-generated payload and destination types;
-- a private-field `GeneratedProject` that reconstructs the exact catalog, admits generated root/command/context types, derives command/context commitments, and returns a private-inner transition wrapper with typed direct root-field read, update, reason, effect, and channel methods;
+- a private-field `GeneratedProject` that reconstructs the exact catalog, admits generated root/command/context types, derives command/context commitments, and returns a private-inner transition wrapper with typed direct root-field read, update, reason, effect, and channel methods and no raw path mutation surface;
 - Rust and Python mounted-runtime skeletons pointing at the common adapter boundary;
 - a migration stub that grants no migration authority;
 - an evidence manifest whose requirements begin unsatisfied;
@@ -50,6 +50,7 @@ Generation fails atomically. No partial bundle is returned after a collision, ha
 - the generated project reconstructs the exact input catalog and refuses a different provider, schema commitment, profile commitment, catalog commitment, or root type;
 - the generated transition entry point accepts no caller-supplied catalog, raw state value, or raw command/context commitment; its high-level methods accept no raw reason `SemanticId`, `Effect`, or `OutboxEntry`;
 - generated direct root-field read and update methods fix existing schema paths and types, while the high-level wrapper exposes no raw read or update path;
+- generated high-level source exposes no raw insertion or deletion method;
 - evidence and migration output starts explicitly incomplete;
 - invalid package/module names, wrong hash provider, one-over file limits, and file collisions fail closed;
 - generated source is compiled in the permanent fixture crate before review.
