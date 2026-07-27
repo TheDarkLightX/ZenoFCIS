@@ -24,7 +24,7 @@ pub use zeno_fcis_catalog as catalog;
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
 #[cfg(feature = "codegen")]
-/// Deterministic, inspectable source generation from closed schemas.
+/// Deterministic, inspectable source generation from closed schemas and bounded Solidity FCIS scaffolds.
 pub use zeno_fcis_codegen as codegen;
 #[cfg(feature = "collections")]
 /// Backend-independent persistent collection interfaces and implementations.
@@ -104,7 +104,11 @@ pub use zeno_fcis_codec::{
 };
 #[cfg(feature = "codegen")]
 pub use zeno_fcis_codegen::{
-    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GenerationSpec, generate,
+    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GeneratedSolidity, GenerationSpec,
+    MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES, SOLIDITY_GENERATOR_ID,
+    SOLIDITY_PRAGMA, SolidityContractSpec, SolidityField, SolidityGenerationError,
+    SolidityListKind, SoliditySafetyFinding, SoliditySafetyFindingKind, SoliditySafetyReport,
+    SolidityScalar, generate, generate_solidity, inspect_solidity_source,
 };
 pub use zeno_fcis_compose::{
     AccessPath, Assumption, AssumptionDischarge, ClaimEvidence, ComponentContract, ComponentId,
