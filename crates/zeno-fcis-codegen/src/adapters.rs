@@ -190,7 +190,7 @@ fn render_i128(output: &mut String, name: &str, min: i128, max: i128) {
 
 fn render_bytes(output: &mut String, name: &str, min_len: u32, max_len: u32) {
     let _ = writeln!(output, "#[derive(Clone, Debug, Eq, PartialEq)]");
-    let _ = writeln!(output, "pub struct {name}(pub Box<[u8]>);");
+    let _ = writeln!(output, "pub struct {name}(pub alloc::boxed::Box<[u8]>);");
     let _ = writeln!(output, "impl {name} {{");
     let _ = writeln!(output, "    pub const MIN_LEN: u32 = {min_len};");
     let _ = writeln!(output, "    pub const MAX_LEN: u32 = {max_len};");
@@ -232,7 +232,7 @@ fn render_bytes(output: &mut String, name: &str, min_len: u32, max_len: u32) {
 
 fn render_text(output: &mut String, name: &str, min_len: u32, max_len: u32) {
     let _ = writeln!(output, "#[derive(Clone, Debug, Eq, PartialEq)]");
-    let _ = writeln!(output, "pub struct {name}(pub Box<str>);");
+    let _ = writeln!(output, "pub struct {name}(pub alloc::boxed::Box<str>);");
     let _ = writeln!(output, "impl {name} {{");
     let _ = writeln!(output, "    pub const MIN_LEN: u32 = {min_len};");
     let _ = writeln!(output, "    pub const MAX_LEN: u32 = {max_len};");
@@ -548,7 +548,7 @@ fn render_sum(
             Some(_) => {
                 let _ = writeln!(
                     output,
-                    "            Self::{vname}(p) => Value::Sum {{ type_id: {type_const}, variant: {vconst}, payload: Some(Box::new(p.to_value()?)) }},"
+                    "            Self::{vname}(p) => Value::Sum {{ type_id: {type_const}, variant: {vconst}, payload: Some(alloc::boxed::Box::new(p.to_value()?)) }},"
                 );
             }
         }
@@ -608,7 +608,10 @@ fn render_vector(
 ) {
     let element_name = resolve_type_name(schema, *element);
     let _ = writeln!(output, "#[derive(Clone, Debug, Eq, PartialEq)]");
-    let _ = writeln!(output, "pub struct {name}(pub Box<[{element_name}]>);");
+    let _ = writeln!(
+        output,
+        "pub struct {name}(pub alloc::boxed::Box<[{element_name}]>);"
+    );
     let _ = writeln!(output, "impl {name} {{");
     let _ = writeln!(output, "    pub const MIN_LEN: u32 = {min_len};");
     let _ = writeln!(output, "    pub const MAX_LEN: u32 = {max_len};");
@@ -677,7 +680,10 @@ fn render_map(
         "pub struct {entry_name} {{ pub key: {key_name}, pub value: {value_name} }}"
     );
     let _ = writeln!(output, "#[derive(Clone, Debug, Eq, PartialEq)]");
-    let _ = writeln!(output, "pub struct {name}(pub Box<[{entry_name}]>);");
+    let _ = writeln!(
+        output,
+        "pub struct {name}(pub alloc::boxed::Box<[{entry_name}]>);"
+    );
     let _ = writeln!(output, "impl {name} {{");
     let _ = writeln!(output, "    pub const MIN_LEN: u32 = {min_len};");
     let _ = writeln!(output, "    pub const MAX_LEN: u32 = {max_len};");

@@ -14,8 +14,9 @@
 The generator produces a `GeneratedBundle` containing:
 
 1. **Rust typed adapters** (`rust/<module>.rs`): ordinary structs, enums, and
-   newtypes with strict `to_value`/`try_from_value` conversions and typed
-   patch-path constructors. No procedural macros.
+   newtypes with strict `to_value`/`try_from_value` conversions, typed
+   patch-path constructors, exact schema reconstruction on the generated root,
+   and a root-only `to_root_envelope` smart constructor. No procedural macros.
 2. **Python typed adapters** (`python/<module>.py`): ordinary Python classes
    with strict `to_value`/`try_from_value` conversions and a `replay()`
    function.
@@ -41,6 +42,9 @@ The generator produces a `GeneratedBundle` containing:
   text).
 - Stable numeric identifiers (type IDs, field IDs, variant IDs) drive every
   emitted reference. Source names are cosmetic.
+- The generated root helper may admit a value under caller-supplied validation
+  limits and commitment provider. It cannot choose the schema or silently
+  accept a schema commitment different from the value embedded at generation.
 
 ### Bounds
 
@@ -48,6 +52,11 @@ The generator produces a `GeneratedBundle` containing:
 - Maximum collection length: enforced by `DecodeLimits` and `ValidationLimits`.
 - All generated constants are `u32` (type IDs) or `u16` (field/variant IDs).
 - Generated text is ASCII-only.
+- Generated schema reconstruction uses exact finite limits derived from the
+  source schema's type and maximum field, variant, and tuple cardinalities.
+- Root-envelope value validation uses explicit caller-supplied
+  `ValidationLimits`; later structural and complete-envelope admission retains
+  the lower layers' existing bounds.
 
 ### Laws
 
@@ -66,6 +75,12 @@ The generator produces a `GeneratedBundle` containing:
 6. **No hidden macros**: generated Rust contains only ordinary items. No
    procedural macros, no `include_str!` of generated content, no build-time
    code execution beyond the generator itself.
+7. **Exact schema reconstruction**: the generated root reconstructs the same
+   canonical `Schema` as the generator input.
+8. **Bound root admission**: a successful generated root smart constructor
+   binds the exact root type, schema hash, value, and validation metrics.
+9. **Fail-closed provider check**: a runtime hasher whose schema commitment
+   differs from the embedded generation-time commitment is rejected.
 
 ### Non-Claims
 
@@ -76,3 +91,6 @@ The generator produces a `GeneratedBundle` containing:
 - The Python codec is **not** a production implementation; it is a minimal
   replay parity tool. Production systems use the Rust codec.
 - The generated adapters are **not** zero-copy; they own their data.
+- The root smart constructor does **not** select a hash provider, schema,
+  profile version, or stable identifier, and it does not establish business
+  invariants or production authority.
