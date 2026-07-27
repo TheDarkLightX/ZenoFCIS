@@ -99,8 +99,8 @@ pub use zeno_fcis_catalog::{
     ReasonDefinition, ReasonDisposition, ValueRole,
 };
 pub use zeno_fcis_codec::{
-    CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain, EncodeError, Envelope,
-    Hash32, commitment, decode_envelope, decode_value, domain_preimage,
+    AdmittedEnvelope, CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain,
+    EncodeError, Envelope, Hash32, commitment, decode_envelope, decode_value, domain_preimage,
 };
 #[cfg(feature = "codegen")]
 pub use zeno_fcis_codegen::{
