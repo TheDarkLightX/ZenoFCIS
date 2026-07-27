@@ -381,6 +381,10 @@ mod tests {
     }
 
     fn catalog(reverse: bool) -> ProjectCatalog {
+        catalog_with_context_type(reverse, 12)
+    }
+
+    fn catalog_with_context_type(reverse: bool, context_type: u32) -> ProjectCatalog {
         let schema = fixture_schema().unwrap_or_else(|error| panic!("fixture schema: {error}"));
         let mut reasons = vec![
             ReasonDefinition::try_new(
@@ -459,7 +463,7 @@ mod tests {
         let mut entries = vec![
             root_entry(RegistryKind::StateType, 12, "state", 1),
             root_entry(RegistryKind::CommandType, 9, "command", 2),
-            root_entry(RegistryKind::ContextType, 5, "context", 3),
+            root_entry(RegistryKind::ContextType, context_type, "context", 3),
         ];
         entries.extend_from_slice(manifest.registry_entries());
         let profile = ProjectProfile::try_new(
@@ -469,7 +473,7 @@ mod tests {
             1,
             id(12),
             id(9),
-            id(5),
+            id(context_type),
             DomainPrefix::try_new("example/core")
                 .unwrap_or_else(|error| panic!("domain prefix: {error}")),
             ProfileBindings {
@@ -610,7 +614,11 @@ mod tests {
         assert!(text.contains("pub fn admit_command<H: CommitmentHasher>"));
         assert!(text.contains("command: &crate::generated::Event"));
         assert!(text.contains("pub fn admit_context<H: CommitmentHasher>"));
-        assert!(text.contains("context: &crate::generated::Flag"));
+        assert!(text.contains("context: &crate::generated::BalanceState"));
+        assert!(text.contains(
+            "pub fn observe_context_amount(\n        &mut self,\n    ) -> Result<&mut Self, GeneratedProjectError>"
+        ));
+        assert!(text.contains("CONTEXT_TYPE_ID,\n            vec![PathAtom::Field(1)],"));
         assert!(text.contains("command: &GeneratedCommandEnvelope"));
         assert!(text.contains("context: &GeneratedContextEnvelope"));
         assert!(text.contains("INPUT_COMMITMENT_FORMAT_VERSION: u16 = 1"));
@@ -631,10 +639,32 @@ mod tests {
         assert!(!text.contains("pub fn update(&mut self, path: ValuePath, value: Value)"));
         assert!(!text.contains("pub fn insert(&mut self, path: ValuePath"));
         assert!(!text.contains("pub fn delete(&mut self, path: ValuePath"));
+        assert!(!text.contains("pub fn observe_context(&mut self, path: AccessPath)"));
         assert!(!text.contains("ValuePath"));
         assert!(!text.contains("zeno_fcis_value::Value"));
         assert!(!text.contains("reason_id: SemanticId"));
         assert!(!text.contains("Result<CataloguedTransitionBuilder<'a, H>"));
+    }
+
+    #[test]
+    fn non_record_context_generates_typed_root_observation() {
+        let generated = generate_project::<TestHasher>(
+            &catalog_with_context_type(false, 5),
+            &spec(BootstrapLimits::default()),
+        )
+        .unwrap_or_else(|error| panic!("bootstrap generation: {error}"));
+        let project = generated
+            .files()
+            .iter()
+            .find(|file| file.path() == "rust/project.rs")
+            .unwrap_or_else(|| panic!("project helpers missing"));
+        let text = core::str::from_utf8(project.bytes())
+            .unwrap_or_else(|error| panic!("project source UTF-8: {error}"));
+        assert!(text.contains(
+            "pub fn observe_context_root(&mut self) -> Result<&mut Self, GeneratedProjectError>"
+        ));
+        assert!(text.contains("AccessPath::try_new(CONTEXT_TYPE_ID, vec![])"));
+        assert!(!text.contains("pub fn observe_context(&mut self, path: AccessPath)"));
     }
 
     #[test]
