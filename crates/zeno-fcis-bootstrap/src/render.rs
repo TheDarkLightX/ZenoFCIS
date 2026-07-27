@@ -561,10 +561,25 @@ mod tests {
         assert!(text.contains("destination: &crate::generated::Label"));
         assert!(text.contains("pub struct GeneratedProject {"));
         assert!(text.contains("pub fn admit_root<H: CommitmentHasher>"));
+        assert!(text.contains("pub struct GeneratedCommandEnvelope {"));
+        assert!(text.contains("pub struct GeneratedContextEnvelope {"));
+        assert!(text.contains("pub fn admit_command<H: CommitmentHasher>"));
+        assert!(text.contains("command: &crate::generated::Event"));
+        assert!(text.contains("pub fn admit_context<H: CommitmentHasher>"));
+        assert!(text.contains("context: &crate::generated::Flag"));
+        assert!(text.contains("command: &GeneratedCommandEnvelope"));
+        assert!(text.contains("context: &GeneratedContextEnvelope"));
+        assert!(text.contains("INPUT_COMMITMENT_FORMAT_VERSION: u16 = 1"));
+        assert!(text.contains("COMMAND_DOMAIN: &str = \"example/core/command\""));
+        assert!(text.contains("CONTEXT_DOMAIN: &str = \"example/core/context\""));
         assert!(text.contains("pre_state: &'a SchemaAdmittedEnvelope"));
         assert!(text.contains("let actual_catalog_hash = self.catalog.commitment::<H>()?"));
         assert!(!text.contains("pre_state: &'a Value"));
         assert!(!text.contains("catalog: &'a ProjectCatalog"));
+        assert!(!text.contains("command_hash: Hash32"));
+        assert!(!text.contains("context_hash: Hash32"));
+        assert!(!text.contains("pub admitted: SchemaAdmittedTypeEnvelope"));
+        assert!(!text.contains("pub commitment: Hash32"));
     }
 
     #[test]
