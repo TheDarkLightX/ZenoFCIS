@@ -15,10 +15,14 @@ Successful validation does not authenticate provenance or establish a business i
 `zeno-fcis-codegen` emits:
 
 - ordinary Rust constants;
+- ordinary Rust schema reconstruction and a root-only schema-bound envelope
+  smart constructor;
 - ordinary Python constants;
 - exact canonical schema bytes;
 - a content-addressed generation manifest.
 
-The output exposes every type, field, and variant identifier and embeds the schema commitment. It contains no hidden source transformation and can be regenerated and diffed independently.
+The output exposes every type, field, and variant identifier and embeds the schema commitment. The generated root helper converts the typed root, reconstructs the exact source schema under finite generated limits, performs complete `SchemaAdmittedEnvelope` admission under caller-supplied validation limits, and rejects a runtime provider whose schema commitment differs from the embedded value. It contains no hidden source transformation and can be regenerated and diffed independently.
 
 Generator semantics are versioned separately from schema semantics. Changing formatting without changing identifiers or schema bytes changes generated-file evidence but not protocol meaning. Changing a schema identifier, bound, or type graph changes the schema commitment and requires an explicit profile migration.
+
+The helper is an admission path, not schema-selection or promotion authority. See [generated root-envelope smart constructors](GENERATED_ROOT_ENVELOPE.md) for its bounds, laws, and explicit nonclaims.
