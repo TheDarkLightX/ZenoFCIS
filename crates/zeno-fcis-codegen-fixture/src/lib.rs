@@ -42,6 +42,7 @@ mod tests {
     };
     use zeno_fcis_core::{BudgetUsed, Decision};
     use zeno_fcis_crypto::RustCryptoSha256;
+    use zeno_fcis_patch::{PatchOp, PathSegment};
     use zeno_fcis_schema::{
         Schema, SchemaAdmittedEnvelope, SchemaEnvelopeError, SchemaLimits, TypeDef, TypeId,
         TypeKind, ValidationLimits, ValueValidationError,
@@ -436,6 +437,111 @@ mod tests {
                 .entries()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn generated_typed_root_update_uses_exact_field_path_and_value() {
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let mut transition = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        transition
+            .update_amount(&Amount(9))
+            .unwrap_or_else(|error| panic!("typed root update failed: {error}"));
+        let decision = transition
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        let artifacts = match &decision {
+            Decision::Accept(artifacts) => artifacts,
+            other => panic!("expected accept, got {other:?}"),
+        };
+        let patch = artifacts.candidate().bundle().patch();
+        assert_eq!(patch.operations().len(), 1);
+        match &patch.operations()[0] {
+            PatchOp::Update { path, value, .. } => {
+                assert_eq!(path.segments(), &[PathSegment::Field(1)]);
+                assert_eq!(value, &zeno_fcis_value::Value::U128(9));
+            }
+            other => panic!("expected root-field update, got {other:?}"),
+        }
+        let applied = artifacts
+            .candidate()
+            .bundle()
+            .validate_and_apply::<RustCryptoSha256>(envelope.value().value(), state_domain())
+            .unwrap_or_else(|error| panic!("updated bundle application failed: {error}"));
+        assert_eq!(
+            applied.state(),
+            &BalanceState {
+                amount: Amount(9),
+                ..minimal_state()
+            }
+            .to_value()
+            .unwrap_or_else(|error| panic!("updated state conversion failed: {error:?}"))
+        );
+        validate_transition_decision::<RustCryptoSha256>(
+            &decision,
+            project.catalog(),
+            envelope.value().value(),
+            state_domain(),
+        )
+        .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
+    fn generated_typed_root_update_rejects_invalid_value_without_staging() {
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let mut transition = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        assert!(matches!(
+            transition.update_amount(&Amount(1_000_001)),
+            Err(GeneratedProjectError::Adapter(AdapterError::IntegerRange))
+        ));
+        let decision = transition
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        let artifacts = match decision {
+            Decision::Accept(artifacts) => artifacts,
+            other => panic!("expected accept, got {other:?}"),
+        };
+        assert!(
+            artifacts
+                .candidate()
+                .bundle()
+                .patch()
+                .operations()
+                .is_empty()
+        );
+        let applied = artifacts
+            .candidate()
+            .bundle()
+            .validate_and_apply::<RustCryptoSha256>(envelope.value().value(), state_domain())
+            .unwrap_or_else(|error| panic!("unchanged bundle application failed: {error}"));
+        assert_eq!(applied.state(), envelope.value().value());
     }
 
     #[test]

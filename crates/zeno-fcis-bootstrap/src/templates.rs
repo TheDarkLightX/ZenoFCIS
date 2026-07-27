@@ -5,6 +5,7 @@ use std::fmt::Write as _;
 use zeno_fcis_catalog::{HashRequirement, ProjectCatalog, ReasonDisposition};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_project::{ProfileBindings, RegistryKind};
+use zeno_fcis_schema::TypeKind;
 
 use crate::{BOOTSTRAP_GENERATOR_ID, BootstrapError, BootstrapSpec};
 
@@ -402,10 +403,7 @@ fn render_generated_transition(
     output.push_str("    pub fn read(&mut self, path: ValuePath) -> Result<&'a Value, GeneratedProjectError> {\n");
     output.push_str("        Ok(self.inner.read(path)?)\n");
     output.push_str("    }\n\n");
-    output.push_str("    /// Stages one preconditioned update.\n");
-    output.push_str("    pub fn update(&mut self, path: ValuePath, value: Value) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str("        self.inner.update(path, value)?;\n        Ok(self)\n");
-    output.push_str("    }\n\n");
+    render_generated_root_update_methods(output, catalog)?;
     output.push_str("    /// Stages one absent field or map-entry insertion.\n");
     output.push_str("    pub fn insert(&mut self, path: ValuePath, map_key: Option<Value>, value: Value) -> Result<&mut Self, GeneratedProjectError> {\n");
     output.push_str("        self.inner.insert(path, map_key, value)?;\n        Ok(self)\n");
@@ -438,6 +436,32 @@ fn render_generated_transition(
     output.push_str("        Ok(self.inner.seal()?)\n");
     output.push_str("    }\n");
     output.push_str("}\n\n");
+    Ok(())
+}
+
+fn render_generated_root_update_methods(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+) -> Result<(), BootstrapError> {
+    let root = catalog
+        .schema()
+        .type_by_id(catalog.schema().root_type())
+        .ok_or(BootstrapError::UnknownSchemaType(
+            catalog.schema().root_type(),
+        ))?;
+    let TypeKind::Record { fields } = root.kind() else {
+        return Ok(());
+    };
+    let root_name = root.name().as_str();
+    for field in fields {
+        let field_name = field.name().as_str();
+        let field_type = schema_type_name(catalog, field.type_id())?;
+        writeln!(
+            output,
+            "    /// Stages a preconditioned update of root field `{field_name}`.\n    pub fn update_{field_name}(\n        &mut self,\n        value: &crate::generated::{field_type},\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        self.inner.update(\n            crate::generated::{root_name}::{field_name}_path(),\n            value.to_value()?,\n        )?;\n        Ok(self)\n    }}\n",
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
     Ok(())
 }
 
