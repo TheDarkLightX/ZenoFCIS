@@ -1,6 +1,6 @@
 # Generated catalog-bound transitions
 
-The project bootstrap generator emits an exact `GeneratedProject` binding between the reviewed `ProjectCatalog`, schema-admitted inputs, and a private-inner `GeneratedTransition`. The generated project owns a private reconstructed catalog, and the generated transition owns the generic `CataloguedTransitionBuilder` privately. Callers cannot start this path with an arbitrary catalog or raw `Value`, read or mutate an arbitrary `ValuePath`, apply a raw reason `SemanticId`, or stage a raw `Effect` or `OutboxEntry` through the high-level wrapper.
+The project bootstrap generator emits an exact `GeneratedProject` binding between the reviewed `ProjectCatalog`, schema-admitted inputs, and a private-inner `GeneratedTransition`. The generated project owns a private reconstructed catalog, and the generated transition owns the generic `CataloguedTransitionBuilder` privately. Callers cannot start this path with an arbitrary catalog or raw `Value`, read or mutate an arbitrary `ValuePath`, observe an arbitrary context `AccessPath`, apply a raw reason `SemanticId`, or stage a raw `Effect` or `OutboxEntry` through the high-level wrapper.
 
 ## Inputs
 
@@ -30,7 +30,7 @@ Generated source contains:
 - typed `admit_command` and `admit_context` methods that derive visible role-separated commitments;
 - an envelope-bound `GeneratedProject::begin_transition` method;
 - separate `RejectReasonId` and `CommittedFailureReasonId` enums copied from the exact catalog dispositions;
-- a `GeneratedTransition` wrapper with schema-typed direct root-field read and update methods, disposition-typed reason methods, and per-catalog typed effect/channel staging methods;
+- a `GeneratedTransition` wrapper with schema-typed direct root-field read/update methods, schema-fixed context-observation methods, disposition-typed reason methods, and per-catalog typed effect/channel staging methods;
 - local fail-closed diagnostics for provider, catalog, profile, schema, root-type, and transition failures.
 
 Successful startup returns `GeneratedTransition`, which retains the existing generic builder in a private field. Sealing and three-way decision semantics are unchanged.
@@ -39,7 +39,7 @@ Successful startup returns `GeneratedTransition`, which retains the existing gen
 
 The input catalog remains authoritative. Generation copies existing schema types, stable identifiers, reason dispositions and precedence, registry commitments, policy commitments, provider identity, and resource limits. It does not select or alter any of them.
 
-`GeneratedProject::try_new` reconstructs those values, recomputes the schema commitment, validates all catalog cross-bindings, and compares the exact profile and complete catalog commitments with the generation-time constants. `admit_root` converts only the generated typed root and admits it with the catalog's schema and selected catalog provider. Command and context admission use the profile's exact type IDs and derive commitments over their complete schema-bound envelope bytes under `<domain-prefix>/command` and `<domain-prefix>/context`. `begin_transition` rechecks the provider, complete stored catalog identity, root witness, command witness, context witness, and both derived commitments before constructing the private-inner wrapper. Direct root-field read and update methods reuse existing schema-generated types and paths; generic nested traversal and mutation remain explicit lower-level APIs. Reason types are a deterministic partition of existing catalog definitions. Effect and channel methods reuse existing catalog definitions and generated smart constructors; their signatures reflect the reviewed schema and hash-requirement shape. The generator chooses no field, path, identifier, precedence, authority rule, or destination.
+`GeneratedProject::try_new` reconstructs those values, recomputes the schema commitment, validates all catalog cross-bindings, and compares the exact profile and complete catalog commitments with the generation-time constants. `admit_root` converts only the generated typed root and admits it with the catalog's schema and selected catalog provider. Command and context admission use the profile's exact type IDs and derive commitments over their complete schema-bound envelope bytes under `<domain-prefix>/command` and `<domain-prefix>/context`. `begin_transition` rechecks the provider, complete stored catalog identity, root witness, command witness, context witness, and both derived commitments before constructing the private-inner wrapper. Direct root-field read and update methods reuse existing schema-generated types and paths; generic nested traversal and mutation remain explicit lower-level APIs. Context-observation methods fix the profile context namespace and either one reviewed record-field ID or the complete non-record root; arbitrary context paths remain an explicit lower-level API. Reason types are a deterministic partition of existing catalog definitions. Effect and channel methods reuse existing catalog definitions and generated smart constructors; their signatures reflect the reviewed schema and hash-requirement shape. The generator chooses no field, path, identifier, precedence, authority rule, or destination.
 
 The local error order is:
 
@@ -83,6 +83,7 @@ The compiled generated fixture verifies:
 - generated source exposes no raw insertion or deletion method and imports no raw state-mutation `ValuePath` or `Value`;
 - generated record-root read methods use the exact field path and type, record the exact read footprint, stage no write, and expose no raw read path;
 - generated record-root update methods use the exact field path and type, reject malformed field values before staging, and expose no raw update path/value pair;
+- generated record-context observation methods fix the exact namespace and stable field ID, while non-record contexts receive one fixed root method and no raw `AccessPath` parameter;
 - generated high-level reason methods accept only the catalog-disposition-specific nominal reason types;
 - generated high-level effect and channel methods fix existing IDs and schema-generated value types while exposing no raw plan value;
 - invalid typed payloads and destinations fail before staging and leave the plans unchanged;
