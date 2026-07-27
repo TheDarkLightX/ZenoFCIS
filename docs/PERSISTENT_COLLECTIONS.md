@@ -59,8 +59,9 @@ All dependency versions are pinned exactly per ZenoFCIS dependency policy.
    new versions.
 4. **Old-version stability**: the canonical bytes of an old version do not
    change after modifications to new versions.
-5. **Canonical encoding consistency**: `canonical_bytes()` is deterministic
-   and equals the encoding of the materialized `Value::Map`.
+5. **Canonical encoding consistency**: successful
+   `try_canonical_bytes()` output is deterministic and equals the encoding of
+   the successfully materialized `Value::Map`.
 6. **Deletion correctness**: removing a key eliminates it; removing a
    nonexistent key is a no-op.
 7. **Zero-removal**: removing all entries yields an empty map with empty

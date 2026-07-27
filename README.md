@@ -90,7 +90,7 @@ pure transition
     -> idempotent outbox delivery
 ```
 
-Persistent backends are sealed behind a pure logical-map interface. Updates return new structurally shared versions; equality and canonical bytes depend on logical entries only. Map-entry ordering bytes are derived from the semantic key, and the explicit persistent-entry boundary rejects mismatched key bytes.
+Persistent backends are sealed behind a pure logical-map interface. Updates return new structurally shared versions; equality and canonical bytes depend on logical entries only. Map-entry ordering bytes are derived from the semantic key, the explicit persistent-entry boundary rejects mismatched key bytes, and materialization exposes only fallible APIs.
 
 Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; the pure validators decide whether that data is admissible.
 
