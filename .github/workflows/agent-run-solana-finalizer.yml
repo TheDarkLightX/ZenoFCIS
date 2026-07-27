@@ -30,34 +30,9 @@ jobs:
         run: python3 -m py_compile tools/agent_finalize_solana.py
 
       - name: Apply finalizer
-        id: apply
-        continue-on-error: true
-        shell: bash
-        run: |
-          set +e
-          python3 tools/agent_finalize_solana.py > /tmp/solana-finalizer.log 2>&1
-          status=$?
-          set -e
-          printf 'status=%s\n' "$status" >> "$GITHUB_OUTPUT"
-
-      - name: Retain finalizer exception
-        if: steps.apply.outputs.status != '0'
-        run: |
-          mkdir -p .agent-diagnostics
-          cp /tmp/solana-finalizer.log .agent-diagnostics/solana-finalizer.log
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .agent-diagnostics/solana-finalizer.log
-          git commit -m "Capture Solana finalizer exception"
-          git pull --rebase origin agent/solana-fcis-v1-20260727
-          git push origin HEAD:agent/solana-fcis-v1-20260727
-
-      - name: Stop after captured exception
-        if: steps.apply.outputs.status != '0'
-        run: exit 1
+        run: python3 tools/agent_finalize_solana.py
 
       - name: Remove temporary machinery
-        if: steps.apply.outputs.status == '0'
         run: |
           rm -rf .agent-diagnostics
           rm -f tools/agent_finalize_solana.py
@@ -68,15 +43,12 @@ jobs:
           rm -f .github/workflows/agent-run-solana-finalizer.yml
 
       - name: Install pinned formatter
-        if: steps.apply.outputs.status == '0'
         run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
 
       - name: Format workspace
-        if: steps.apply.outputs.status == '0'
         run: cargo +1.97.1 fmt --all
 
       - name: Commit clean integration
-        if: steps.apply.outputs.status == '0'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
