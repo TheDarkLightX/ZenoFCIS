@@ -1290,6 +1290,7 @@ dependencies = [
  "zeno-fcis-catalog",
  "zeno-fcis-codec",
  "zeno-fcis-codegen",
+ "zeno-fcis-compose",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
  "zeno-fcis-patch",
