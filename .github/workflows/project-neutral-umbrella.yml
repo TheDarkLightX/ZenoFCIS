@@ -1,0 +1,45 @@
+name: project-neutral-umbrella
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+jobs:
+  project-neutral-umbrella:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Project-neutral default surfaces
+        run: |
+          cargo +1.97.1 check -p zeno-fcis --locked
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --locked --target wasm32-unknown-unknown
+          if cargo +1.97.1 tree -p zeno-fcis --locked --edges normal --prefix none | grep -q '^zeno-fcis-profile-zenodex '; then
+            echo 'default umbrella unexpectedly activates the ZenoDEX profile' >&2
+            exit 1
+          fi
+          if cargo +1.97.1 tree -p zeno-fcis --no-default-features --locked --edges normal --prefix none | grep -q '^zeno-fcis-profile-zenodex '; then
+            echo 'minimal umbrella unexpectedly activates the ZenoDEX profile' >&2
+            exit 1
+          fi
+
+      - name: Explicit ZenoDEX surfaces
+        run: |
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features zenodex-profile --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --features mounted-zenodex --locked
+          cargo +1.97.1 tree -p zeno-fcis --no-default-features --features zenodex-profile --locked --edges normal --prefix none | grep -q '^zeno-fcis-profile-zenodex '

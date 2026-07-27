@@ -18,7 +18,7 @@ The semantic kernel treats values, decisions, resource budgets, canonical bytes,
 
 The workspace now includes the complete package ladder:
 
-- semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions, deterministic budgets, ZCVE/1 canonical encoding, exact commitments, preconditioned patches, closed plans, receipts, and complete candidate bundles;
+- semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches and closed commit/outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
 - assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, content-addressed generation manifests, a shared chain-neutral on-chain machine model, and bounded Solidity FCIS generators with capability-typed effects;
@@ -76,7 +76,11 @@ The `zeno-fcis` umbrella keeps the semantic kernel small by default. Enable the 
 zeno-fcis = { version = "=0.1.0", features = ["full"] }
 ```
 
-Important optional features include `codegen`, `evidence`, `mounted-runtime`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
+The umbrella crate's default and `no_std` feature sets are project-neutral.
+Enable `zenodex-profile` for the ZenoDEX profile exports or `mounted-zenodex`
+for that profile plus its concrete mounted runtime.
+
+Important optional features include `codegen`, `evidence`, `mounted-runtime`, `zenodex-profile`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
 
 ## Architecture
 

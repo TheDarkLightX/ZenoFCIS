@@ -27,7 +27,7 @@ std = [
     "zeno-fcis-shell/std",
     "zeno-fcis-compose/std",
     "zeno-fcis-refine/std",
-    "zeno-fcis-profile-zenodex/std",
+    "zeno-fcis-profile-zenodex?/std",
     "zeno-fcis-schema?/std",
     "zeno-fcis-backend?/std",
     "zeno-fcis-collections?/std",
@@ -48,8 +48,10 @@ codegen = ["schema", "dep:zeno-fcis-codegen"]
 bootstrap = ["std", "catalog", "codegen", "dep:zeno-fcis-bootstrap"]
 evidence = ["std", "dep:zeno-fcis-evidence"]
 mounted-runtime = ["std", "dep:zeno-fcis-adapter"]
+zenodex-profile = ["dep:zeno-fcis-profile-zenodex"]
 mounted-zenodex = [
     "mounted-runtime",
+    "zenodex-profile",
     "dep:zeno-fcis-adapter-zenodex",
 ]
 authenticated-state = ["std", "dep:zeno-fcis-authenticated"]
@@ -94,7 +96,7 @@ zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt", default
 zeno-fcis-shell = { version = "=0.1.0", path = "../zeno-fcis-shell", default-features = false }
 zeno-fcis-compose = { version = "=0.1.0", path = "../zeno-fcis-compose", default-features = false }
 zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine", default-features = false }
-zeno-fcis-profile-zenodex = { version = "=0.1.0", path = "../zeno-fcis-profile-zenodex", default-features = false }
+zeno-fcis-profile-zenodex = { version = "=0.1.0", path = "../zeno-fcis-profile-zenodex", default-features = false, optional = true }
 zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema", default-features = false, optional = true }
 zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen", optional = true }
 zeno-fcis-bootstrap = { version = "=0.1.0", path = "../zeno-fcis-bootstrap", optional = true }
