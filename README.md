@@ -21,7 +21,7 @@ The workspace now includes the complete package ladder:
 - semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions, deterministic budgets, ZCVE/1 canonical encoding, exact commitments, preconditioned patches, closed plans, receipts, and complete candidate bundles;
 - assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
-- closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads and updates, a raw-path-free generated mutation surface, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
+- closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads and updates, a raw-path-free generated mutation surface, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, content-addressed generation manifests, and a bounded effect-free Solidity FCIS scaffold generator;
 - project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
 - a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
@@ -77,6 +77,14 @@ zeno-fcis = { version = "=0.1.0", features = ["full"] }
 ```
 
 Important optional features include `codegen`, `evidence`, `mounted-runtime`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
+
+## Solidity FCIS scaffold
+
+The `codegen` feature now includes a deterministic Solidity v1 scaffold for closed local-state machines. It generates an abstract shell that owns initialization, private storage capture, expected-root checks, a recomputed-root corruption check, shell-captured execution context, decision consistency, invariant validation, a reentrancy gate, atomic commit, and transition receipts.
+
+Derived contracts implement only `internal pure` command-admission, invariant, and decision hooks. V1 accepts fixed-size ABI scalars and generates no arbitrary external calls, token transfers, oracle adapters, delegate calls, upgrade hooks, or effect interpreter. This is a deliberately fail-closed foundation for agent-assisted contract development, not a claim that arbitrary “vibe-coded” Solidity is safe.
+
+See [`docs/SOLIDITY_FCIS.md`](docs/SOLIDITY_FCIS.md) for the generated boundary, source-policy checker, example workflow, limitations, and production roadmap.
 
 ## Architecture
 
