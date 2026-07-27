@@ -17,7 +17,7 @@ insert(ValuePath, Option<Value>, Value)
 delete(ValuePath)
 ```
 
-It also does not import `ValuePath` or raw `Value` for state mutation. Direct record-root reads and updates, disposition-typed reasons, catalog-typed effects and channels, explicit context-footprint observation, and sealing remain available.
+It also does not import `ValuePath` or raw `Value` for state mutation. Direct record-root reads and updates, disposition-typed reasons, catalog-typed effects and channels, schema-fixed context-footprint observation, and sealing remain available.
 
 ## Authority boundary
 

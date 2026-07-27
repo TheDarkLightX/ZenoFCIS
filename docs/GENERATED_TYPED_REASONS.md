@@ -29,7 +29,7 @@ The caller still computes each business predicate and supplies the resulting boo
 
 ## Trusted dependencies
 
-No new external library is introduced. The generated wrapper uses the existing catalog, project, transition, compose, patch, plan, value, schema, codec, and commitment-provider boundaries. The compiled fixture adds a direct dependency on the existing workspace `zeno-fcis-compose` crate because `GeneratedTransition::observe_context` exposes `AccessPath`.
+No new external library is introduced. The generated wrapper uses the existing catalog, project, transition, compose, patch, plan, value, schema, codec, and commitment-provider boundaries. The compiled fixture directly uses the existing workspace `zeno-fcis-compose` crate to inspect generated context footprints; the generated high-level API exposes no caller-supplied `AccessPath`.
 
 ## Deterministic resource bounds
 
