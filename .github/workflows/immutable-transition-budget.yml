@@ -1,0 +1,38 @@
+name: immutable-transition-budget
+
+on:
+  push:
+    branches:
+      - main
+      - "agent/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  immutable-transition-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@6d653acede841f1e1a19741e2f90711d3d59e475
+        with:
+          toolchain: 1.97.1
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+      - name: Formatting
+        run: cargo +1.97.1 fmt --all -- --check
+      - name: Core Clippy
+        run: cargo +1.97.1 clippy -p zeno-fcis-core --all-targets --all-features --locked -- -D warnings
+      - name: Core tests
+        run: cargo +1.97.1 test -p zeno-fcis-core --all-features --locked
+      - name: Core no_std
+        run: cargo +1.97.1 check -p zeno-fcis-core --no-default-features --locked --target wasm32-unknown-unknown
+      - name: Umbrella no_std
+        run: cargo +1.97.1 check -p zeno-fcis --no-default-features --locked --target wasm32-unknown-unknown
+      - name: Rustdoc
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo +1.97.1 doc -p zeno-fcis-core -p zeno-fcis --all-features --locked --no-deps
