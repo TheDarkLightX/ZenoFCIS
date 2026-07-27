@@ -21,11 +21,7 @@ fn path(namespace: u32, atoms: Vec<PathAtom>) -> AccessPath {
     AccessPath::try_new(namespace, atoms).unwrap_or_else(|error| panic!("path: {error}"))
 }
 
-fn component(
-    id: ComponentId,
-    footprint: Footprint,
-    frames: Vec<FrameRule>,
-) -> ComponentContract {
+fn component(id: ComponentId, footprint: Footprint, frames: Vec<FrameRule>) -> ComponentContract {
     ComponentContract::try_new(id, hash(60), footprint, vec![], vec![], frames)
         .unwrap_or_else(|error| panic!("component: {error}"))
 }
@@ -58,7 +54,11 @@ fn report_for(
     protected: AccessPath,
     destination_path: AccessPath,
     frame_claim: Hash32,
-) -> (ComponentId, ComponentId, zeno_fcis_compose::CompositionReport) {
+) -> (
+    ComponentId,
+    ComponentId,
+    zeno_fcis_compose::CompositionReport,
+) {
     let source_id = ComponentId::new(1);
     let destination_id = ComponentId::new(2);
     let source_effect = path(70, vec![PathAtom::Field(1)]);
@@ -102,10 +102,7 @@ fn narrow_frame_does_not_authorize_ancestor_destination() {
 
 #[test]
 fn broad_frame_authorizes_descendant_destination() {
-    let protected = path(
-        80,
-        vec![PathAtom::Field(7), PathAtom::AnyDescendant],
-    );
+    let protected = path(80, vec![PathAtom::Field(7), PathAtom::AnyDescendant]);
     let descendant = path(80, vec![PathAtom::Field(7), PathAtom::Field(2)]);
     let (_, _, report) = report_for(protected, descendant, hash(41));
 
