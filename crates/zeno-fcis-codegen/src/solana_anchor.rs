@@ -115,9 +115,7 @@ impl SolanaAnchorSpec {
         let expected: Vec<u16> = machine
             .capabilities()
             .iter()
-            .filter(|capability| {
-                capability.kind() == OnchainCapabilityKind::FungibleTransfer
-            })
+            .filter(|capability| capability.kind() == OnchainCapabilityKind::FungibleTransfer)
             .map(OnchainCapability::code)
             .collect();
         let actual: Vec<u16> = fungible_bindings
@@ -262,17 +260,23 @@ pub fn inspect_solana_core_source(source: &str) -> SolanaSafetyReport<SolanaCore
         ("accountinfo", SolanaCoreSafetyFindingKind::SolanaRuntime),
         ("context<", SolanaCoreSafetyFindingKind::SolanaRuntime),
         ("clock::", SolanaCoreSafetyFindingKind::SolanaRuntime),
-        ("invoke(", SolanaCoreSafetyFindingKind::CrossProgramInvocation),
+        (
+            "invoke(",
+            SolanaCoreSafetyFindingKind::CrossProgramInvocation,
+        ),
         (
             "invoke_signed",
             SolanaCoreSafetyFindingKind::CrossProgramInvocation,
         ),
-        ("cpicontext", SolanaCoreSafetyFindingKind::CrossProgramInvocation),
+        (
+            "cpicontext",
+            SolanaCoreSafetyFindingKind::CrossProgramInvocation,
+        ),
         (
             "remaining_accounts",
             SolanaCoreSafetyFindingKind::RemainingAccounts,
         ),
-        ("unsafe", SolanaCoreSafetyFindingKind::UnsafeCode),
+        ("unsafe {", SolanaCoreSafetyFindingKind::UnsafeCode),
         ("unwrap(", SolanaCoreSafetyFindingKind::PanicPath),
         ("expect(", SolanaCoreSafetyFindingKind::PanicPath),
         ("panic!", SolanaCoreSafetyFindingKind::PanicPath),
@@ -304,14 +308,20 @@ pub fn inspect_solana_shell_source(
             SolanaShellSafetyFindingKind::RemainingAccounts,
         ),
         ("invoke(", SolanaShellSafetyFindingKind::RawInvocation),
+        ("invoke_signed", SolanaShellSafetyFindingKind::RawInvocation),
+        ("unsafe {", SolanaShellSafetyFindingKind::UnsafeCode),
         (
-            "invoke_signed",
-            SolanaShellSafetyFindingKind::RawInvocation,
+            "realloc",
+            SolanaShellSafetyFindingKind::DynamicAccountLifecycle,
         ),
-        ("unsafe", SolanaShellSafetyFindingKind::UnsafeCode),
-        ("realloc", SolanaShellSafetyFindingKind::DynamicAccountLifecycle),
-        ("init_if_needed", SolanaShellSafetyFindingKind::DynamicAccountLifecycle),
-        ("close =", SolanaShellSafetyFindingKind::DynamicAccountLifecycle),
+        (
+            "init_if_needed",
+            SolanaShellSafetyFindingKind::DynamicAccountLifecycle,
+        ),
+        (
+            "close =",
+            SolanaShellSafetyFindingKind::DynamicAccountLifecycle,
+        ),
         (
             "loader_upgradeable",
             SolanaShellSafetyFindingKind::UpgradeAuthority,
@@ -370,11 +380,7 @@ pub fn generate_solana_anchor(
         .find(|file| file.path().ends_with("core/src/project.rs"))
         .map(GeneratedOnchainFile::content)
         .ok_or(OnchainModelError::InvalidBinding)?;
-    let shell_source = files
-        .iter()
-        .find(|file| file.path().ends_with("programs/"))
-        .map(GeneratedOnchainFile::content);
-    if !inspect_solana_core_source(core_source).is_clean() || shell_source.is_some() {
+    if !inspect_solana_core_source(core_source).is_clean() {
         return Err(OnchainModelError::InvalidBinding);
     }
     let shell_source = files
@@ -398,13 +404,19 @@ fn render_core_lib(spec: &SolanaAnchorSpec) -> Result<String, OnchainModelError>
     let event_capacity = usize::from(machine.max_event_slots().max(1));
     let effect_capacity = usize::from(machine.max_effect_slots().max(1));
     let mut output = String::new();
-    output.push_str("#![no_std]\n#![forbid(unsafe_code)]\n\nmod project;\npub use project::ProjectCore;\n\n");
+    output.push_str(
+        "#![no_std]\n#![forbid(unsafe_code)]\n\nmod project;\npub use project::ProjectCore;\n\n",
+    );
     writeln!(
         output,
         "pub const MACHINE_HASH: [u8; 32] = {};",
         rust_bytes(machine.machine_hash().into_bytes())
     )?;
-    writeln!(output, "pub const MACHINE_VERSION: u16 = {};", machine.version())?;
+    writeln!(
+        output,
+        "pub const MACHINE_VERSION: u16 = {};",
+        machine.version()
+    )?;
     for reason in machine.reasons() {
         writeln!(
             output,
@@ -437,8 +449,14 @@ fn render_core_lib(spec: &SolanaAnchorSpec) -> Result<String, OnchainModelError>
     output.push_str("#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]\npub struct Context {\n    pub actor: [u8; 32],\n    pub chain_domain: [u8; 32],\n    pub sequence: u64,\n    pub slot: u64,\n    pub unix_timestamp: i64,\n}\n\n");
     output.push_str("#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]\npub struct EventPlan {\n    pub code: u16,\n    pub field_count: u8,\n    pub data: [[u8; 32]; 8],\n}\n\n");
     output.push_str("#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]\npub struct EffectPlan {\n    pub capability: u16,\n    pub asset_id: [u8; 32],\n    pub recipient: [u8; 32],\n    pub amount: u128,\n}\n\n");
-    writeln!(output, "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct Decision {{\n    pub kind: DecisionKind,\n    pub reason_code: u16,\n    pub next_state: State,\n    pub event_count: u8,\n    pub events: [EventPlan; {event_capacity}],\n    pub effect_count: u8,\n    pub effects: [EffectPlan; {effect_capacity}],\n}}\n")?;
-    writeln!(output, "impl Default for Decision {{\n    fn default() -> Self {{\n        Self {{ kind: DecisionKind::Accept, reason_code: 0, next_state: State::default(), event_count: 0, events: [EventPlan::default(); {event_capacity}], effect_count: 0, effects: [EffectPlan::default(); {effect_capacity}] }}\n    }}\n}}\n")?;
+    writeln!(
+        output,
+        "#[derive(Clone, Copy, Debug, Eq, PartialEq)]\npub struct Decision {{\n    pub kind: DecisionKind,\n    pub reason_code: u16,\n    pub next_state: State,\n    pub event_count: u8,\n    pub events: [EventPlan; {event_capacity}],\n    pub effect_count: u8,\n    pub effects: [EffectPlan; {effect_capacity}],\n}}\n"
+    )?;
+    writeln!(
+        output,
+        "impl Default for Decision {{\n    fn default() -> Self {{\n        Self {{ kind: DecisionKind::Accept, reason_code: 0, next_state: State::default(), event_count: 0, events: [EventPlan::default(); {event_capacity}], effect_count: 0, effects: [EffectPlan::default(); {effect_capacity}] }}\n    }}\n}}\n"
+    )?;
     output.push_str("impl Decision {\n    pub fn rejected(reason_code: u16) -> Self { Self { kind: DecisionKind::Reject, reason_code, ..Self::default() } }\n    pub fn accepted(next_state: State) -> Self { Self { next_state, ..Self::default() } }\n}\n\n");
     output.push_str("pub trait Core {\n    fn command_admissible(command: &Command, context: &Context) -> bool;\n    fn invariant(state: &State) -> bool;\n    fn decide(state: &State, command: &Command, context: &Context) -> Decision;\n}\n\n");
     render_core_builders(&mut output, machine)?;
@@ -478,20 +496,43 @@ fn render_program(
     output.push_str("#![forbid(unsafe_code)]\n\nuse anchor_lang::prelude::*;\nuse anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};\n");
     writeln!(
         output,
-        "use {core_crate}::{{Command, Context as CoreContext, Core, Decision, DecisionKind, EffectPlan, EventPlan, ProjectCore, State, MACHINE_HASH}};"
+        "use {core_crate}::{{Command, Context as CoreContext, Core, Decision, DecisionKind, EffectPlan, EventPlan, ProjectCore, State, MACHINE_HASH, MACHINE_VERSION}};"
     )?;
-    writeln!(output, "\ndeclare_id!(\"{}\");\n", base58_encode(spec.program_id()))?;
-    writeln!(output, "const STATE_SEED: &[u8] = b\"{}\";", spec.state_seed())?;
-    writeln!(output, "const MAX_EVENT_SLOTS: u8 = {};", machine.max_event_slots())?;
-    writeln!(output, "const MAX_EFFECT_SLOTS: u8 = {};\n", machine.max_effect_slots())?;
+    writeln!(
+        output,
+        "\ndeclare_id!(\"{}\");\n",
+        base58_encode(spec.program_id())
+    )?;
+    writeln!(
+        output,
+        "const STATE_SEED: &[u8] = b\"{}\";",
+        spec.state_seed()
+    )?;
+    writeln!(
+        output,
+        "const MAX_EVENT_SLOTS: u8 = {};",
+        machine.max_event_slots()
+    )?;
+    writeln!(
+        output,
+        "const MAX_EFFECT_SLOTS: u8 = {};\n",
+        machine.max_effect_slots()
+    )?;
 
     writeln!(output, "#[program]\npub mod {base} {{\n    use super::*;\n")?;
-    output.push_str("    pub fn initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {\n        let initial_state = args.into_core();\n        require!(ProjectCore::invariant(&initial_state), FcisError::InvariantViolation);\n        let state = &mut ctx.accounts.state;\n        state.version = 1;\n        state.bump = ctx.bumps.state;\n        state.authority = ctx.accounts.authority.key();\n        state.sequence = 0;\n        state.apply_core(initial_state);\n        state.state_hash = hash_state(&initial_state);\n        emit!(Initialized { state: state.key(), state_hash: state.state_hash, authority: state.authority });\n        Ok(())\n    }\n\n");
+    output.push_str("    pub fn initialize(ctx: Context<Initialize>, args: InitializeArgs) -> Result<()> {\n        let initial_state = args.into_core();\n        require!(ProjectCore::invariant(&initial_state), FcisError::InvariantViolation);\n        let state = &mut ctx.accounts.state;\n        state.version = MACHINE_VERSION;\n        state.bump = ctx.bumps.state;\n        state.authority = ctx.accounts.authority.key();\n        state.sequence = 0;\n        state.apply_core(initial_state);\n        state.state_hash = hash_state(&initial_state);\n        emit!(Initialized { state: state.key(), state_hash: state.state_hash, authority: state.authority });\n        Ok(())\n    }\n\n");
     output.push_str("    pub fn execute(ctx: Context<Execute>, args: ExecuteArgs) -> Result<()> {\n        let before_state = ctx.accounts.state.to_core();\n        let actual_state_hash = hash_state(&before_state);\n        require!(actual_state_hash == ctx.accounts.state.state_hash, FcisError::StateRootCorrupted);\n        require!(actual_state_hash == args.expected_state_hash && ctx.accounts.state.sequence == args.expected_sequence, FcisError::StaleState);\n        let command = args.command();\n        let clock = Clock::get()?;\n        let context = CoreContext { actor: ctx.accounts.actor.key().to_bytes(), chain_domain: hash_chain_domain(&ctx.accounts.state.key()), sequence: ctx.accounts.state.sequence, slot: clock.slot, unix_timestamp: clock.unix_timestamp };\n        require!(ProjectCore::command_admissible(&command, &context), FcisError::CommandNotAdmissible);\n        let decision = ProjectCore::decide(&before_state, &command, &context);\n        if decision.kind == DecisionKind::Reject { return Err(rejection_error(decision.reason_code)); }\n        require!(decision.reason_code == 0, FcisError::InvalidDecision);\n        require!(ProjectCore::invariant(&decision.next_state), FcisError::InvariantViolation);\n        validate_plans(&decision, &before_state, &command, &context)?;\n        let post_state_hash = hash_state(&decision.next_state);\n        let command_hash = hash_command(&command);\n        let context_hash = hash_context(&context);\n        let event_plan_hash = hash_event_plan(&decision);\n        let effect_plan_hash = hash_effect_plan(&decision);\n        let candidate_hash = hashv_owned(&[&MACHINE_HASH, &actual_state_hash, &post_state_hash, &command_hash, &context_hash, &event_plan_hash, &effect_plan_hash]);\n        {\n            let state = &mut ctx.accounts.state;\n            state.apply_core(decision.next_state);\n            state.state_hash = post_state_hash;\n            state.sequence = state.sequence.checked_add(1).ok_or(FcisError::SequenceOverflow)?;\n        }\n        apply_effects(&ctx, &decision)?;\n        for index in 0..usize::from(decision.event_count) { let planned = decision.events[index]; emit!(DomainEvent { code: planned.code, field_count: planned.field_count, data: planned.data, payload_hash: hash_event(&planned) }); }\n        emit!(TransitionCommitted { state: ctx.accounts.state.key(), sequence: ctx.accounts.state.sequence, pre_state_hash: actual_state_hash, post_state_hash, candidate_hash, command_hash, context_hash });\n        Ok(())\n    }\n}\n\n");
 
-    output.push_str("#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]\npub struct InitializeArgs {\n");
+    output.push_str(
+        "#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]\npub struct InitializeArgs {\n",
+    );
     for field in machine.state_fields() {
-        writeln!(output, "    pub {}: {},", field.name(), rust_type(field.scalar()))?;
+        writeln!(
+            output,
+            "    pub {}: {},",
+            field.name(),
+            rust_type(field.scalar())
+        )?;
     }
     output.push_str("}\n\nimpl InitializeArgs { fn into_core(self) -> State { State {\n");
     for field in machine.state_fields() {
@@ -501,7 +542,12 @@ fn render_program(
 
     output.push_str("#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy)]\npub struct ExecuteArgs {\n    pub expected_state_hash: [u8; 32],\n    pub expected_sequence: u64,\n");
     for field in machine.command_fields() {
-        writeln!(output, "    pub {}: {},", field.name(), rust_type(field.scalar()))?;
+        writeln!(
+            output,
+            "    pub {}: {},",
+            field.name(),
+            rust_type(field.scalar())
+        )?;
     }
     output.push_str("}\n\nimpl ExecuteArgs { fn command(&self) -> Command { Command {\n");
     for field in machine.command_fields() {
@@ -538,17 +584,33 @@ fn render_program(
     }
     output.push_str("}\n\n");
 
-    writeln!(output, "#[account]\npub struct MachineState {{\n    pub version: u16,\n    pub bump: u8,\n    pub authority: Pubkey,\n    pub sequence: u64,\n    pub state_hash: [u8; 32],")?;
+    writeln!(
+        output,
+        "#[account]\npub struct MachineState {{\n    pub version: u16,\n    pub bump: u8,\n    pub authority: Pubkey,\n    pub sequence: u64,\n    pub state_hash: [u8; 32],"
+    )?;
     for field in machine.state_fields() {
-        writeln!(output, "    pub {}: {},", field.name(), rust_type(field.scalar()))?;
+        writeln!(
+            output,
+            "    pub {}: {},",
+            field.name(),
+            rust_type(field.scalar())
+        )?;
     }
-    writeln!(output, "}}\n\nimpl MachineState {{\n    pub const SPACE: usize = {state_space};\n    fn to_core(&self) -> State {{ State {{")?;
+    writeln!(
+        output,
+        "}}\n\nimpl MachineState {{\n    pub const SPACE: usize = {state_space};\n    fn to_core(&self) -> State {{ State {{"
+    )?;
     for field in machine.state_fields() {
         writeln!(output, "        {}: self.{},", field.name(), field.name())?;
     }
     output.push_str("    } }\n    fn apply_core(&mut self, value: State) {\n");
     for field in machine.state_fields() {
-        writeln!(output, "        self.{} = value.{};", field.name(), field.name())?;
+        writeln!(
+            output,
+            "        self.{} = value.{};",
+            field.name(),
+            field.name()
+        )?;
     }
     output.push_str("    }\n}\n\n");
 
@@ -577,44 +639,84 @@ fn render_program_helpers(
         writeln!(output, "        {} => {{", capability.code())?;
         output.push_str("            require!(ctx.accounts.");
         output.push_str(&name);
-        output.push_str("_destination.owner.to_bytes() == planned.recipient, FcisError::InvalidRecipient);\n");
+        output.push_str(
+            "_destination.owner.to_bytes() == planned.recipient, FcisError::InvalidRecipient);\n",
+        );
         output.push_str("            let amount = u64::try_from(planned.amount).map_err(|_| error!(FcisError::InvalidPlan))?;\n");
         output.push_str("            let authority_key = ctx.accounts.authority.key();\n            let bump = [ctx.accounts.state.bump];\n            let signer_seeds: &[&[u8]] = &[STATE_SEED, authority_key.as_ref(), &bump];\n            let signer = &[signer_seeds];\n");
-        writeln!(output, "            let cpi_accounts = TransferChecked {{ from: ctx.accounts.{name}_vault.to_account_info(), mint: ctx.accounts.{name}_mint.to_account_info(), to: ctx.accounts.{name}_destination.to_account_info(), authority: ctx.accounts.state.to_account_info() }};")?;
-        writeln!(output, "            token_interface::transfer_checked(CpiContext::new_with_signer(ctx.accounts.{name}_token_program.to_account_info(), cpi_accounts, signer), amount, ctx.accounts.{name}_mint.decimals)?;")?;
+        writeln!(
+            output,
+            "            let cpi_accounts = TransferChecked {{ from: ctx.accounts.{name}_vault.to_account_info(), mint: ctx.accounts.{name}_mint.to_account_info(), to: ctx.accounts.{name}_destination.to_account_info(), authority: ctx.accounts.state.to_account_info() }};"
+        )?;
+        writeln!(
+            output,
+            "            token_interface::transfer_checked(CpiContext::new_with_signer(ctx.accounts.{name}_token_program.to_account_info(), cpi_accounts, signer), amount, ctx.accounts.{name}_mint.decimals)?;"
+        )?;
         output.push_str("        }\n");
     }
-    output.push_str("        _ => return err!(FcisError::InvalidCapability),\n    } }\n    Ok(())\n}\n\n");
+    output.push_str(
+        "        _ => return err!(FcisError::InvalidCapability),\n    } }\n    Ok(())\n}\n\n",
+    );
 
     output.push_str("fn event_field_count(code: u16) -> Result<u8> { match code {\n");
     for event in machine.events() {
-        writeln!(output, "    {} => Ok({}),", event.code(), event.fields().len())?;
+        writeln!(
+            output,
+            "    {} => Ok({}),",
+            event.code(),
+            event.fields().len()
+        )?;
     }
     output.push_str("    _ => err!(FcisError::InvalidPlan),\n} }\n\n");
     output.push_str("fn capability_asset(code: u16) -> Result<[u8; 32]> { match code {\n");
     for capability in machine.capabilities() {
-        writeln!(output, "    {} => Ok({}),", capability.code(), rust_bytes(capability.asset_id()))?;
+        writeln!(
+            output,
+            "    {} => Ok({}),",
+            capability.code(),
+            rust_bytes(capability.asset_id())
+        )?;
     }
     output.push_str("    _ => err!(FcisError::InvalidCapability),\n} }\n");
     output.push_str("fn capability_max_amount(code: u16) -> Result<u128> { match code {\n");
     for capability in machine.capabilities() {
-        writeln!(output, "    {} => Ok({}),", capability.code(), capability.max_amount())?;
+        writeln!(
+            output,
+            "    {} => Ok({}),",
+            capability.code(),
+            capability.max_amount()
+        )?;
     }
     output.push_str("    _ => err!(FcisError::InvalidCapability),\n} }\n");
     output.push_str("fn capability_max_uses(code: u16) -> Result<u8> { match code {\n");
     for capability in machine.capabilities() {
-        writeln!(output, "    {} => Ok({}),", capability.code(), capability.max_uses())?;
+        writeln!(
+            output,
+            "    {} => Ok({}),",
+            capability.code(),
+            capability.max_uses()
+        )?;
     }
     output.push_str("    _ => err!(FcisError::InvalidCapability),\n} }\n");
     output.push_str("fn expected_recipient(code: u16, before_state: &State, command: &Command, context: &CoreContext) -> [u8; 32] { match code {\n");
     for capability in machine.capabilities() {
-        writeln!(output, "    {} => {},", capability.code(), recipient_expression(capability.recipient(), machine))?;
+        writeln!(
+            output,
+            "    {} => {},",
+            capability.code(),
+            recipient_expression(capability.recipient(), machine)
+        )?;
     }
     output.push_str("    _ => [0_u8; 32],\n} }\n\n");
 
     output.push_str("fn rejection_error(code: u16) -> anchor_lang::error::Error { match code {\n");
     for reason in machine.reasons() {
-        writeln!(output, "    {} => FcisError::Reject{}.into(),", reason.code(), reason.name())?;
+        writeln!(
+            output,
+            "    {} => FcisError::Reject{}.into(),",
+            reason.code(),
+            reason.name()
+        )?;
     }
     output.push_str("    _ => FcisError::InvalidDecision.into(),\n} }\n\n");
 
@@ -629,12 +731,22 @@ fn render_hash_helpers(
 ) -> Result<(), OnchainModelError> {
     output.push_str("fn hash_state(value: &State) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/state/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH);\n");
     for field in machine.state_fields() {
-        writeln!(output, "    bytes.extend_from_slice(&{}u16.to_be_bytes()); {}", field.id(), append_expression("value", field))?;
+        writeln!(
+            output,
+            "    bytes.extend_from_slice(&{}u16.to_be_bytes()); {}",
+            field.id(),
+            append_expression("value", field)
+        )?;
     }
     output.push_str("    anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
     output.push_str("fn hash_command(value: &Command) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/command/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH);\n");
     for field in machine.command_fields() {
-        writeln!(output, "    bytes.extend_from_slice(&{}u16.to_be_bytes()); {}", field.id(), append_expression("value", field))?;
+        writeln!(
+            output,
+            "    bytes.extend_from_slice(&{}u16.to_be_bytes()); {}",
+            field.id(),
+            append_expression("value", field)
+        )?;
     }
     output.push_str("    anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
     output.push_str("fn hash_context(value: &CoreContext) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/context/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.actor); bytes.extend_from_slice(&value.chain_domain); bytes.extend_from_slice(&value.sequence.to_be_bytes()); bytes.extend_from_slice(&value.slot.to_be_bytes()); bytes.extend_from_slice(&value.unix_timestamp.to_be_bytes()); anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
@@ -660,14 +772,30 @@ fn render_core_builders(
             write!(output, "{}: {}", field.name(), rust_type(field.scalar()))?;
         }
         output.push_str(") -> EventPlan {\n    let mut planned = EventPlan { code: ");
-        write!(output, "{}, field_count: {}, ..EventPlan::default() }};\n", event.code(), event.fields().len())?;
+        write!(
+            output,
+            "{}, field_count: {}, ..EventPlan::default() }};\n",
+            event.code(),
+            event.fields().len()
+        )?;
         for (index, field) in event.fields().iter().enumerate() {
-            writeln!(output, "    planned.data[{index}] = {};", encode_bytes32(field.scalar(), field.name()))?;
+            writeln!(
+                output,
+                "    planned.data[{index}] = {};",
+                encode_bytes32(field.scalar(), field.name())
+            )?;
         }
         output.push_str("    planned\n}\n\n");
     }
     for capability in machine.capabilities() {
-        writeln!(output, "pub fn effect_{}(amount: u128, before_state: &State, command: &Command, context: &Context) -> EffectPlan {{\n    EffectPlan {{ capability: {}, asset_id: {}, recipient: {}, amount }}\n}}\n", to_lower_snake(capability.name()), capability.code(), rust_bytes(capability.asset_id()), recipient_expression(capability.recipient(), machine))?;
+        writeln!(
+            output,
+            "pub fn effect_{}(amount: u128, before_state: &State, command: &Command, context: &Context) -> EffectPlan {{\n    let _ = (before_state, command, context);\n    EffectPlan {{ capability: {}, asset_id: {}, recipient: {}, amount }}\n}}\n",
+            to_lower_snake(capability.name()),
+            capability.code(),
+            rust_bytes(capability.asset_id()),
+            recipient_expression(capability.recipient(), machine)
+        )?;
     }
     Ok(())
 }
@@ -678,7 +806,12 @@ fn render_error_enum(
 ) -> Result<(), OnchainModelError> {
     output.push_str("#[error_code]\npub enum FcisError {\n    #[msg(\"State invariant rejected\")] InvariantViolation,\n    #[msg(\"Command admission rejected\")] CommandNotAdmissible,\n    #[msg(\"State root differs from committed root\")] StateRootCorrupted,\n    #[msg(\"Expected state root or sequence is stale\")] StaleState,\n    #[msg(\"Decision encoding is inconsistent\")] InvalidDecision,\n    #[msg(\"Plan exceeds its closed authority\")] InvalidPlan,\n    #[msg(\"Unknown or malformed capability\")] InvalidCapability,\n    #[msg(\"Destination token owner does not match the planned recipient\")] InvalidRecipient,\n    #[msg(\"State sequence overflow\")] SequenceOverflow,\n");
     for reason in machine.reasons() {
-        writeln!(output, "    #[msg(\"Transition rejected: {}\")] Reject{},", reason.name(), reason.name())?;
+        writeln!(
+            output,
+            "    #[msg(\"Transition rejected: {}\")] Reject{},",
+            reason.name(),
+            reason.name()
+        )?;
     }
     output.push_str("}\n\n");
     Ok(())
@@ -689,9 +822,17 @@ fn render_rust_struct(
     name: &str,
     fields: &[OnchainField],
 ) -> Result<(), OnchainModelError> {
-    writeln!(output, "#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]\npub struct {name} {{")?;
+    writeln!(
+        output,
+        "#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]\npub struct {name} {{"
+    )?;
     for field in fields {
-        writeln!(output, "    pub {}: {},", field.name(), rust_type(field.scalar()))?;
+        writeln!(
+            output,
+            "    pub {}: {},",
+            field.name(),
+            rust_type(field.scalar())
+        )?;
     }
     output.push_str("}\n\n");
     Ok(())
@@ -732,9 +873,24 @@ fn render_manifest(spec: &SolanaAnchorSpec) -> String {
     let _ = writeln!(output, "state_seed={}", spec.state_seed());
     output.push_str("core_dependencies=0\ncore_no_std=true\noverflow_checks=true\nverified_build=required\nupgrade_authority_review=required\n");
     for binding in spec.fungible_bindings() {
-        let _ = writeln!(output, "capability.{}.mint={}", binding.capability_code(), base58_encode(binding.mint()));
-        let _ = writeln!(output, "capability.{}.token_program={}", binding.capability_code(), base58_encode(binding.token_program()));
-        let _ = writeln!(output, "capability.{}.vault={}", binding.capability_code(), base58_encode(binding.vault()));
+        let _ = writeln!(
+            output,
+            "capability.{}.mint={}",
+            binding.capability_code(),
+            base58_encode(binding.mint())
+        );
+        let _ = writeln!(
+            output,
+            "capability.{}.token_program={}",
+            binding.capability_code(),
+            base58_encode(binding.token_program())
+        );
+        let _ = writeln!(
+            output,
+            "capability.{}.vault={}",
+            binding.capability_code(),
+            base58_encode(binding.vault())
+        );
     }
     output
 }
@@ -860,16 +1016,44 @@ fn append_expression(prefix: &str, field: &OnchainField) -> String {
     match field.scalar() {
         OnchainScalar::Bool => format!("bytes.push(u8::from({prefix}.{}));", field.name()),
         OnchainScalar::Bytes32 => format!("bytes.extend_from_slice(&{prefix}.{});", field.name()),
-        _ => format!("bytes.extend_from_slice(&{prefix}.{}.to_be_bytes());", field.name()),
+        _ => format!(
+            "bytes.extend_from_slice(&{prefix}.{}.to_be_bytes());",
+            field.name()
+        ),
     }
 }
 
 fn encode_bytes32(scalar: OnchainScalar, name: &str) -> String {
     match scalar {
-        OnchainScalar::Bool => format!("if {name} {{ u128::from(1_u8).to_be_bytes().into() }} else {{ [0_u8; 32] }}"),
+        OnchainScalar::Bool => {
+            format!("{{ let mut output = [0_u8; 32]; output[31] = u8::from({name}); output }}")
+        }
         OnchainScalar::Bytes32 => name.to_owned(),
-        _ => format!("encode_scalar({name})"),
+        OnchainScalar::U8 => encode_unsigned_bytes32(name, 1),
+        OnchainScalar::U16 => encode_unsigned_bytes32(name, 2),
+        OnchainScalar::U32 => encode_unsigned_bytes32(name, 4),
+        OnchainScalar::U64 => encode_unsigned_bytes32(name, 8),
+        OnchainScalar::U128 => encode_unsigned_bytes32(name, 16),
+        OnchainScalar::I8 => encode_signed_bytes32(name, 1),
+        OnchainScalar::I16 => encode_signed_bytes32(name, 2),
+        OnchainScalar::I32 => encode_signed_bytes32(name, 4),
+        OnchainScalar::I64 => encode_signed_bytes32(name, 8),
+        OnchainScalar::I128 => encode_signed_bytes32(name, 16),
     }
+}
+
+fn encode_unsigned_bytes32(name: &str, width: usize) -> String {
+    let start = 32_usize.saturating_sub(width);
+    format!(
+        "{{ let mut output = [0_u8; 32]; let bytes = {name}.to_be_bytes(); output[{start}..].copy_from_slice(&bytes); output }}"
+    )
+}
+
+fn encode_signed_bytes32(name: &str, width: usize) -> String {
+    let start = 32_usize.saturating_sub(width);
+    format!(
+        "{{ let mut output = if {name} < 0 {{ [0xff_u8; 32] }} else {{ [0_u8; 32] }}; let bytes = {name}.to_be_bytes(); output[{start}..].copy_from_slice(&bytes); output }}"
+    )
 }
 
 fn rust_type(scalar: OnchainScalar) -> &'static str {
@@ -892,7 +1076,7 @@ fn rust_type(scalar: OnchainScalar) -> &'static str {
 fn rust_bytes(bytes: [u8; 32]) -> String {
     let joined = bytes
         .iter()
-        .map(u8::to_string)
+        .map(|byte| byte.to_string())
         .collect::<Vec<_>>()
         .join(", ");
     format!("[{joined}]")
@@ -1012,7 +1196,10 @@ mod tests {
 
     #[test]
     fn repeated_generation_is_identical() {
-        assert_eq!(generate_solana_anchor(&spec()), generate_solana_anchor(&spec()));
+        assert_eq!(
+            generate_solana_anchor(&spec()),
+            generate_solana_anchor(&spec())
+        );
     }
 
     #[test]
@@ -1064,7 +1251,11 @@ mod tests {
         let source = "use anchor_lang::prelude::*; fn run() { panic!(\"bad\"); }";
         let report = inspect_solana_core_source(source);
         assert!(!report.is_clean());
-        let kinds: BTreeSet<_> = report.findings().iter().map(SolanaSafetyFinding::kind).collect();
+        let kinds: BTreeSet<_> = report
+            .findings()
+            .iter()
+            .map(SolanaSafetyFinding::kind)
+            .collect();
         assert!(kinds.contains(&SolanaCoreSafetyFindingKind::AnchorDependency));
         assert!(kinds.contains(&SolanaCoreSafetyFindingKind::PanicPath));
     }
