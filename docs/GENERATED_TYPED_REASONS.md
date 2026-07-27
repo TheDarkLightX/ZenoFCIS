@@ -15,7 +15,7 @@ Generated Rust source contains:
 - the existing general `ReasonId` enum for catalog inspection;
 - `RejectReasonId`, containing exactly the catalog reasons whose disposition is `Reject`;
 - `CommittedFailureReasonId`, containing exactly the catalog reasons whose disposition is `CommittedFailure`;
-- a private-inner `GeneratedTransition<'a, H>` that delegates state, context, effect, outbox, and sealing operations to `CataloguedTransitionBuilder`;
+- a private-inner `GeneratedTransition<'a, H>` that delegates state, context, catalog-typed effect/channel staging, and sealing operations to `CataloguedTransitionBuilder`;
 - disposition-typed `require` and `fail_if` methods;
 - no public escape method that returns the generic builder.
 
