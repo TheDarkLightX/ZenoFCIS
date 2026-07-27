@@ -1,6 +1,6 @@
 # Generated catalog-bound transitions
 
-The project bootstrap generator emits an exact `GeneratedProject` binding between the reviewed `ProjectCatalog`, schema-admitted inputs, and a private-inner `GeneratedTransition`. The generated project owns a private reconstructed catalog, and the generated transition owns the generic `CataloguedTransitionBuilder` privately. Callers cannot start this path with an arbitrary catalog or raw `Value`, read or update an arbitrary `ValuePath`, apply a raw reason `SemanticId`, or stage a raw `Effect` or `OutboxEntry` through the high-level wrapper.
+The project bootstrap generator emits an exact `GeneratedProject` binding between the reviewed `ProjectCatalog`, schema-admitted inputs, and a private-inner `GeneratedTransition`. The generated project owns a private reconstructed catalog, and the generated transition owns the generic `CataloguedTransitionBuilder` privately. Callers cannot start this path with an arbitrary catalog or raw `Value`, read or mutate an arbitrary `ValuePath`, apply a raw reason `SemanticId`, or stage a raw `Effect` or `OutboxEntry` through the high-level wrapper.
 
 ## Inputs
 
@@ -80,6 +80,7 @@ The compiled generated fixture verifies:
 - command and context commitments are deterministic, value-sensitive in bounded fixtures, role-domain separated, and nonzero;
 - candidate bindings carry the exact generated command and context commitments;
 - generated source contains no raw-`Value` or caller-supplied-catalog transition entry point;
+- generated source exposes no raw insertion or deletion method and imports no raw state-mutation `ValuePath` or `Value`;
 - generated record-root read methods use the exact field path and type, record the exact read footprint, stage no write, and expose no raw read path;
 - generated record-root update methods use the exact field path and type, reject malformed field values before staging, and expose no raw update path/value pair;
 - generated high-level reason methods accept only the catalog-disposition-specific nominal reason types;
