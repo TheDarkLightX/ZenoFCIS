@@ -12,11 +12,13 @@ extern crate alloc;
 extern crate std;
 
 mod encoding;
+mod envelope;
 mod error;
 mod ids;
 mod model;
 mod validate;
 
+pub use envelope::{SchemaAdmittedEnvelope, SchemaEnvelopeError};
 pub use error::{SchemaError, ValueValidationError};
 pub use ids::{FieldId, SchemaName, TypeId, VariantId};
 pub use model::{
