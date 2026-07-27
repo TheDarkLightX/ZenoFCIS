@@ -181,7 +181,9 @@ impl OnchainEvent {
             return Err(OnchainModelError::ReservedIdentifier);
         }
         if fields.len() > MAX_ONCHAIN_EVENT_FIELDS {
-            return Err(OnchainModelError::LimitExceeded(OnchainListKind::EventFields));
+            return Err(OnchainModelError::LimitExceeded(
+                OnchainListKind::EventFields,
+            ));
         }
         let name = name.into();
         validate_upper_camel(&name)?;
@@ -382,7 +384,11 @@ impl OnchainMachineSpec {
         if version == 0 {
             return Err(OnchainModelError::ReservedIdentifier);
         }
-        validate_required_len(&state_fields, MAX_ONCHAIN_FIELDS, OnchainListKind::StateFields)?;
+        validate_required_len(
+            &state_fields,
+            MAX_ONCHAIN_FIELDS,
+            OnchainListKind::StateFields,
+        )?;
         validate_required_len(
             &command_fields,
             MAX_ONCHAIN_FIELDS,
@@ -395,9 +401,7 @@ impl OnchainMachineSpec {
             MAX_ONCHAIN_CAPABILITIES,
             OnchainListKind::Capabilities,
         )?;
-        if max_event_slots > MAX_ONCHAIN_PLAN_SLOTS
-            || max_effect_slots > MAX_ONCHAIN_PLAN_SLOTS
-        {
+        if max_event_slots > MAX_ONCHAIN_PLAN_SLOTS || max_effect_slots > MAX_ONCHAIN_PLAN_SLOTS {
             return Err(OnchainModelError::LimitExceeded(OnchainListKind::PlanSlots));
         }
         if events.is_empty() != (max_event_slots == 0)
@@ -754,9 +758,7 @@ fn normalize_events(events: &mut [OnchainEvent]) -> Result<(), OnchainModelError
     Ok(())
 }
 
-fn normalize_capabilities(
-    capabilities: &mut [OnchainCapability],
-) -> Result<(), OnchainModelError> {
+fn normalize_capabilities(capabilities: &mut [OnchainCapability]) -> Result<(), OnchainModelError> {
     capabilities.sort_by_key(OnchainCapability::code);
     let mut codes = BTreeSet::new();
     let mut names = BTreeSet::new();
@@ -829,9 +831,7 @@ fn validate_upper_camel(value: &str) -> Result<(), OnchainModelError> {
         return Err(OnchainModelError::InvalidIdentifier);
     }
     let bytes = value.as_bytes();
-    if !bytes[0].is_ascii_uppercase()
-        || !bytes.iter().all(|byte| byte.is_ascii_alphanumeric())
-    {
+    if !bytes[0].is_ascii_uppercase() || !bytes.iter().all(|byte| byte.is_ascii_alphanumeric()) {
         return Err(OnchainModelError::InvalidIdentifier);
     }
     Ok(())
