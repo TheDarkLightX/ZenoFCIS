@@ -19,7 +19,7 @@ use zeno_fcis_value::zcve::{
     TAG_BOOL_FALSE, TAG_BOOL_TRUE, TAG_BYTES, TAG_ENUM, TAG_I128, TAG_MAP, TAG_RECORD, TAG_SUM,
     TAG_TEXT, TAG_TUPLE, TAG_U128, TAG_UNIT, TAG_VECTOR,
 };
-use zeno_fcis_value::{Field, MapEntry, Value, ValueError, ValueLimits};
+use zeno_fcis_value::{AdmittedValue, Field, MapEntry, Value, ValueError, ValueLimits};
 const ENVELOPE_MAGIC: &[u8; 8] = b"ZFCISV1\0";
 const HASH_MAGIC: &[u8; 14] = b"ZENOFCIS-HASH\0";
 
@@ -139,6 +139,12 @@ pub trait CanonicalEncode {
 }
 
 impl CanonicalEncode for Value {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        self.encode_zcve_to(output).map_err(map_value_encode_error)
+    }
+}
+
+impl CanonicalEncode for AdmittedValue {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.encode_zcve_to(output).map_err(map_value_encode_error)
     }
@@ -755,6 +761,31 @@ mod tests {
             Err(error) => panic!("unexpected encode error: {error}"),
         };
         assert_eq!(decode_value(&bytes, DecodeLimits::default()), Ok(value));
+    }
+
+    #[test]
+    fn admitted_value_encoding_matches_raw_and_is_repeatable() {
+        let value = Value::tuple(vec![Value::U128(42), Value::Bool(true)]);
+        let raw = value
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("raw encoding: {error}"));
+        let admitted =
+            AdmittedValue::try_new(value).unwrap_or_else(|error| panic!("admission: {error}"));
+        let first = admitted
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("first encoding: {error}"));
+        let second = admitted
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("second encoding: {error}"));
+
+        assert_eq!(first, raw);
+        assert_eq!(second, raw);
+    }
+
+    #[test]
+    fn raw_value_encoding_remains_fail_closed() {
+        let value = Value::Text(String::from("é").into_boxed_str());
+        assert_eq!(value.canonical_bytes(), Err(EncodeError::NonAsciiText));
     }
 
     #[test]
