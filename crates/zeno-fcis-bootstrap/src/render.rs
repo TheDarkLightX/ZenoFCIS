@@ -578,6 +578,12 @@ mod tests {
         assert!(text.contains("pub enum CommittedFailureReasonId {"));
         assert!(text.contains("pub struct GeneratedTransition<'a, H: CommitmentHasher> {"));
         assert!(text.contains(
+            "pub fn read_amount(\n        &mut self,\n    ) -> Result<crate::generated::Amount, GeneratedProjectError>"
+        ));
+        assert!(text.contains(
+            ".read(crate::generated::BalanceState::amount_path())?\n            .clone();"
+        ));
+        assert!(text.contains(
             "pub fn update_amount(\n        &mut self,\n        value: &crate::generated::Amount,"
         ));
         assert!(text.contains(
@@ -621,6 +627,7 @@ mod tests {
         assert!(!text.contains("pub inner: CataloguedTransitionBuilder"));
         assert!(!text.contains("pub fn emit(&mut self, effect: Effect)"));
         assert!(!text.contains("pub fn enqueue(&mut self, entry: OutboxEntry)"));
+        assert!(!text.contains("pub fn read(&mut self, path: ValuePath) -> Result<&'a Value"));
         assert!(!text.contains("pub fn update(&mut self, path: ValuePath, value: Value)"));
         assert!(!text.contains("reason_id: SemanticId"));
         assert!(!text.contains("Result<CataloguedTransitionBuilder<'a, H>"));

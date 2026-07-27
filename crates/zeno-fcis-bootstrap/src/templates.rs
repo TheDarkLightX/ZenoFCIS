@@ -397,12 +397,7 @@ fn render_generated_transition(
     output.push_str("    inner: CataloguedTransitionBuilder<'a, H>,\n");
     output.push_str("}\n\n");
     output.push_str("impl<'a, H: CommitmentHasher> GeneratedTransition<'a, H> {\n");
-    output.push_str(
-        "    /// Observes one immutable pre-state path and records its read footprint.\n",
-    );
-    output.push_str("    pub fn read(&mut self, path: ValuePath) -> Result<&'a Value, GeneratedProjectError> {\n");
-    output.push_str("        Ok(self.inner.read(path)?)\n");
-    output.push_str("    }\n\n");
+    render_generated_root_read_methods(output, catalog)?;
     render_generated_root_update_methods(output, catalog)?;
     output.push_str("    /// Stages one absent field or map-entry insertion.\n");
     output.push_str("    pub fn insert(&mut self, path: ValuePath, map_key: Option<Value>, value: Value) -> Result<&mut Self, GeneratedProjectError> {\n");
@@ -436,6 +431,32 @@ fn render_generated_transition(
     output.push_str("        Ok(self.inner.seal()?)\n");
     output.push_str("    }\n");
     output.push_str("}\n\n");
+    Ok(())
+}
+
+fn render_generated_root_read_methods(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+) -> Result<(), BootstrapError> {
+    let root = catalog
+        .schema()
+        .type_by_id(catalog.schema().root_type())
+        .ok_or(BootstrapError::UnknownSchemaType(
+            catalog.schema().root_type(),
+        ))?;
+    let TypeKind::Record { fields } = root.kind() else {
+        return Ok(());
+    };
+    let root_name = root.name().as_str();
+    for field in fields {
+        let field_name = field.name().as_str();
+        let field_type = schema_type_name(catalog, field.type_id())?;
+        writeln!(
+            output,
+            "    /// Reads root field `{field_name}` and records its exact read footprint.\n    pub fn read_{field_name}(\n        &mut self,\n    ) -> Result<crate::generated::{field_type}, GeneratedProjectError> {{\n        let value = self\n            .inner\n            .read(crate::generated::{root_name}::{field_name}_path())?\n            .clone();\n        Ok(crate::generated::{field_type}::try_from_value(value)?)\n    }}\n",
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
     Ok(())
 }
 
