@@ -1,0 +1,74 @@
+name: generated-typed-root-reads
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeno-fcis-generated-typed-root-reads-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generated-typed-root-reads:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Format
+        run: cargo +1.97.1 fmt --all -- --check
+
+      - name: Compile generated read boundary
+        run: |
+          cargo +1.97.1 clippy \
+            -p zeno-fcis-bootstrap \
+            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-transition \
+            --all-targets --all-features --locked -- -D warnings
+
+      - name: Typed root-read laws
+        run: |
+          cargo +1.97.1 test \
+            -p zeno-fcis-bootstrap \
+            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-transition \
+            --all-features --locked
+          cargo +1.97.1 test \
+            -p zeno-fcis-bootstrap \
+            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-transition \
+            --doc --all-features --locked
+
+      - name: Generated no_std check
+        run: |
+          cargo +1.97.1 check \
+            -p zeno-fcis-codegen-fixture \
+            --no-default-features --locked \
+            --target wasm32-unknown-unknown
+
+      - name: Documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          cargo +1.97.1 doc \
+            -p zeno-fcis-bootstrap \
+            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-transition \
+            --all-features --locked --no-deps
+
+      - name: Static authority-boundary checks
+        run: python3 tools/check_assurance.py
