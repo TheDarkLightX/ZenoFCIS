@@ -25,7 +25,7 @@ Arbitrary EVM calls, arbitrary Solana CPIs, arbitrary calldata, delegate executi
 
 `generate_advanced_solidity` emits:
 
-- an abstract base contract pinned to Solidity `0.8.35`;
+- an abstract base contract pinned to Solidity `0.8.36`;
 - an exact machine-hash constant;
 - private generated storage and sequence state;
 - expected-state-hash and expected-sequence checks;

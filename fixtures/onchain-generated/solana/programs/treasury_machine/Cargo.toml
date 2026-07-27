@@ -1,0 +1,22 @@
+[package]
+name = "treasury_machine"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "treasury_machine"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = "=1.0.2"
+anchor-spl = { version = "=1.0.2", features = ["token", "token_2022"] }
+treasury_machine-core = { path = "../../crates/treasury_machine-core" }
