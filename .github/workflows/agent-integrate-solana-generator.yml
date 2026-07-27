@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/solana-fcis-v1-20260727
+  pull_request:
 
 permissions:
   contents: write
