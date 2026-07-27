@@ -1,0 +1,40 @@
+name: agent-clippy-capture-solidity
+
+on:
+  push:
+    branches:
+      - agent/solidity-fcis-v1-20260727
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: true
+          ref: agent/solidity-fcis-v1-20260727
+
+      - name: Install pinned Rust and Clippy
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy
+
+      - name: Capture Clippy diagnostics
+        shell: bash
+        run: |
+          set +e
+          cargo +1.97.1 clippy -p zeno-fcis-codegen -p zeno-fcis --all-targets --all-features --locked -- -D warnings > /tmp/solidity-clippy.log 2>&1
+          status=$?
+          set -e
+          mkdir -p .agent-diagnostics
+          cp /tmp/solidity-clippy.log .agent-diagnostics/solidity-clippy.log
+          printf '%s\n' "$status" > .agent-diagnostics/solidity-clippy.status
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .agent-diagnostics/solidity-clippy.log .agent-diagnostics/solidity-clippy.status
+          git commit -m "Capture Solidity Clippy diagnostics"
+          git push origin HEAD:agent/solidity-fcis-v1-20260727
