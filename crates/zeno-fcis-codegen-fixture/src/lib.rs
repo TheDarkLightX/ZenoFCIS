@@ -48,7 +48,8 @@ mod tests {
     use zeno_fcis_transition::{TransitionLimits, validate_transition_decision};
 
     use crate::bootstrap_project::{
-        GeneratedCommandEnvelope, GeneratedContextEnvelope, GeneratedProject, GeneratedProjectError,
+        GeneratedCommandEnvelope, GeneratedContextEnvelope, GeneratedProject,
+        GeneratedProjectError, ReasonClass, ReasonId, RejectReasonId,
     };
     use crate::catalog_fixture::fixture_catalog;
 
@@ -382,6 +383,110 @@ mod tests {
             state_domain(),
         )
         .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
+    fn generated_typed_rejection_uses_exact_catalog_reason() {
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        assert_eq!(RejectReasonId::Reason10.reason_id(), ReasonId::Reason10);
+        assert_eq!(ReasonId::Reason10.class(), ReasonClass::Reject);
+
+        let mut transition = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        transition
+            .require(false, RejectReasonId::Reason10)
+            .unwrap_or_else(|error| panic!("typed rejection failed: {error}"));
+        let decision = transition
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        let rejected = match &decision {
+            Decision::Reject(rejected) => rejected.reason(),
+            other => panic!("expected reject, got {other:?}"),
+        };
+        assert_eq!(rejected.reason_id().get(), 10);
+        validate_transition_decision::<RustCryptoSha256>(
+            &decision,
+            project.catalog(),
+            envelope.value().value(),
+            state_domain(),
+        )
+        .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
+    fn generated_typed_reason_condition_and_duplicates_preserve_semantics() {
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let mut accepted = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        accepted
+            .require(true, RejectReasonId::Reason10)
+            .unwrap_or_else(|error| panic!("typed requirement failed: {error}"));
+        let accepted = accepted
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        assert!(matches!(accepted, Decision::Accept(_)));
+
+        let mut once = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        once.require(false, RejectReasonId::Reason10)
+            .unwrap_or_else(|error| panic!("typed rejection failed: {error}"));
+        let once = once
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+
+        let mut twice = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        twice
+            .require(false, RejectReasonId::Reason10)
+            .unwrap_or_else(|error| panic!("first typed rejection failed: {error}"))
+            .require(false, RejectReasonId::Reason10)
+            .unwrap_or_else(|error| panic!("second typed rejection failed: {error}"));
+        let twice = twice
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        assert_eq!(once, twice);
     }
 
     #[test]

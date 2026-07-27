@@ -16,6 +16,7 @@ std = []
 [dependencies]
 zeno-fcis-catalog = { version = "=0.1.0", path = "../zeno-fcis-catalog" }
 zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec" }
+zeno-fcis-compose = { version = "=0.1.0", path = "../zeno-fcis-compose" }
 zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core" }
 zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch" }
 zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan" }
