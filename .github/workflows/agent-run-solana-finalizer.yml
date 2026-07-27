@@ -1,0 +1,54 @@
+name: agent-run-solana-finalizer
+
+on:
+  pull_request:
+  push:
+    branches:
+      - agent/solana-fcis-v1-20260727
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: true
+          ref: agent/solana-fcis-v1-20260727
+          show-progress: false
+
+      - name: Syntax-check finalizer
+        run: python3 -m py_compile tools/agent_finalize_solana.py
+
+      - name: Apply finalizer
+        run: python3 tools/agent_finalize_solana.py
+
+      - name: Remove temporary machinery
+        run: |
+          rm -rf .agent-diagnostics
+          rm -f tools/agent_finalize_solana.py
+          rm -f .github/workflows/agent-integrate-solana-generator.yml
+          rm -f .github/workflows/agent-diagnose-solana-integration.yml
+          rm -f .github/workflows/agent-finalize-solana-integration.yml
+          rm -f .github/workflows/agent-trace-solana-finalizer.yml
+          rm -f .github/workflows/agent-run-solana-finalizer.yml
+
+      - name: Install pinned formatter
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+
+      - name: Format workspace
+        run: cargo +1.97.1 fmt --all
+
+      - name: Commit clean integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Integrate Solana Anchor FCIS generator"
+          git pull --rebase origin agent/solana-fcis-v1-20260727
+          git push origin HEAD:agent/solana-fcis-v1-20260727
