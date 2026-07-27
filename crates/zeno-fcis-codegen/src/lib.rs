@@ -13,6 +13,7 @@ mod fixture;
 mod model;
 mod python;
 mod render;
+mod root_envelope;
 mod vectors;
 
 pub use fixture::{fixture_schema, fixture_spec};
@@ -103,6 +104,10 @@ mod tests {
         assert!(text.contains("TYPE_BALANCESTATE"));
         assert!(text.contains("FIELD_BALANCESTATE_AMOUNT"));
         assert!(text.contains("SCHEMA_HASH_HEX"));
+        assert!(text.contains("pub fn zfcis_schema() -> Result<Schema, SchemaError>"));
+        assert!(text.contains("pub fn to_root_envelope<H: CommitmentHasher>"));
+        assert!(text.contains("SchemaAdmittedEnvelope::try_new::<H>"));
+        assert!(text.contains("AdapterError::SchemaHashMismatch"));
     }
 
     #[test]

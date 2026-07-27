@@ -34,5 +34,8 @@ zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", features 
 zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project" }
 zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema" }
 
+[dev-dependencies]
+zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+
 [lints]
 workspace = true
