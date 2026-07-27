@@ -266,7 +266,7 @@ impl Default for BudgetUsed {
 }
 
 /// A deterministic budget consumed by logical work, never by wall-clock time.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Budget {
     limits: BudgetLimits,
     used: BudgetUsed,
@@ -317,6 +317,54 @@ impl Budget {
     pub const fn used(&self) -> BudgetUsed {
         self.used
     }
+
+    /// Consumes this execution-local meter and binds its exact report to a decision.
+    pub fn finish<A, R, F>(self, decision: Decision<A, R, F>) -> BudgetedDecision<A, R, F> {
+        BudgetedDecision {
+            decision,
+            limits: self.limits,
+            used: self.used,
+        }
+    }
+}
+
+/// One semantic decision paired with its immutable limits and exact logical usage.
+///
+/// Values can only be created by consuming a fresh [`Budget`] through
+/// [`Budget::finish`]. The execution-local mutation used to count logical work
+/// therefore cannot escape the transition result.
+#[must_use]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BudgetedDecision<A, R, F> {
+    decision: Decision<A, R, F>,
+    limits: BudgetLimits,
+    used: BudgetUsed,
+}
+
+impl<A, R, F> BudgetedDecision<A, R, F> {
+    /// Returns the complete three-way semantic decision.
+    #[must_use]
+    pub const fn decision(&self) -> &Decision<A, R, F> {
+        &self.decision
+    }
+
+    /// Returns the immutable limits supplied to the transition.
+    #[must_use]
+    pub const fn limits(&self) -> BudgetLimits {
+        self.limits
+    }
+
+    /// Returns the exact logical resources charged by the transition.
+    #[must_use]
+    pub const fn used(&self) -> BudgetUsed {
+        self.used
+    }
+
+    /// Consumes the report and returns its complete parts.
+    #[must_use]
+    pub fn into_parts(self) -> (Decision<A, R, F>, BudgetLimits, BudgetUsed) {
+        (self.decision, self.limits, self.used)
+    }
 }
 
 /// A deterministic resource-bound failure.
@@ -361,6 +409,8 @@ impl fmt::Display for BudgetExceeded {
 ///
 /// Implementations must treat every input as immutable and must not observe
 /// ambient I/O, time, randomness, scheduling, global state, or process state.
+/// They create a fresh execution-local [`Budget`], charge modeled work, and
+/// consume it with [`Budget::finish`] so exact usage is returned explicitly.
 pub trait Transition {
     /// Immutable pre-state type.
     type State;
@@ -380,8 +430,8 @@ pub trait Transition {
         state: &Self::State,
         command: &Self::Command,
         context: &Self::Context,
-        budget: &mut Budget,
-    ) -> Decision<Self::Candidate, Self::Reject, Self::Failure>;
+        limits: BudgetLimits,
+    ) -> BudgetedDecision<Self::Candidate, Self::Reject, Self::Failure>;
 }
 
 /// Collects applicable reasons without allowing iterator order to become policy.
@@ -464,5 +514,59 @@ mod tests {
             failed.map_candidate(|value| value + 1).kind(),
             DecisionKind::CommittedFailure
         );
+    }
+
+    struct ReadTransition;
+
+    impl Transition for ReadTransition {
+        type State = u64;
+        type Command = u64;
+        type Context = ();
+        type Candidate = u64;
+        type Reject = Reason;
+        type Failure = Reason;
+
+        fn step(
+            state: &Self::State,
+            command: &Self::Command,
+            _context: &Self::Context,
+            limits: BudgetLimits,
+        ) -> BudgetedDecision<Self::Candidate, Self::Reject, Self::Failure> {
+            let mut budget = Budget::new(limits);
+            let decision = match budget.charge(Resource::Read, 1) {
+                Ok(()) => Decision::Accept(Accepted::new(state + command)),
+                Err(_) => Decision::Reject(Rejected::new(Reason::Earlier)),
+            };
+            budget.finish(decision)
+        }
+    }
+
+    #[test]
+    fn transition_returns_explicit_usage_from_immutable_limits() {
+        let limits = BudgetLimits::zero().with_limit(Resource::Read, 1);
+
+        let first = ReadTransition::step(&2, &3, &(), limits);
+        let second = ReadTransition::step(&2, &3, &(), limits);
+
+        assert_eq!(first, second);
+        assert_eq!(first.decision().kind(), DecisionKind::Accept);
+        assert_eq!(first.limits(), limits);
+        assert_eq!(first.used().used(Resource::Read), 1);
+
+        let (decision, returned_limits, used) = first.into_parts();
+        assert_eq!(decision.kind(), DecisionKind::Accept);
+        assert_eq!(returned_limits, limits);
+        assert_eq!(used.used(Resource::Read), 1);
+    }
+
+    #[test]
+    fn rejected_charge_reports_no_partial_usage() {
+        let limits = BudgetLimits::zero();
+
+        let result = ReadTransition::step(&2, &3, &(), limits);
+
+        assert_eq!(result.decision().kind(), DecisionKind::Reject);
+        assert_eq!(result.limits(), limits);
+        assert_eq!(result.used(), BudgetUsed::default());
     }
 }

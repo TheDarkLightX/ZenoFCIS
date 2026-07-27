@@ -47,7 +47,8 @@ pub use zeno_fcis_evidence as evidence;
 pub use zeno_fcis_patch as patch;
 /// Closed authoritative and outbox plans.
 pub use zeno_fcis_plan as plan;
-/// ZenoDEX profile values and the first zUSD schema registry.
+#[cfg(feature = "zenodex-profile")]
+/// Optional ZenoDEX profile values and the first zUSD schema registry.
 pub use zeno_fcis_profile_zenodex as profile_zenodex;
 /// Project-neutral profiles, stable registries, and migration compatibility.
 pub use zeno_fcis_project as project;
@@ -128,8 +129,8 @@ pub use zeno_fcis_compose::{
     PathSet, Wiring, conflicts, verify_assume_guarantee, verify_deterministic_parallel,
 };
 pub use zeno_fcis_core::{
-    Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, Decision, DecisionKind, Failed,
-    Rejected, Resource, StableReason, Transition, first_reason,
+    Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, BudgetedDecision, Decision,
+    DecisionKind, Failed, Rejected, Resource, StableReason, Transition, first_reason,
 };
 #[cfg(feature = "verified-sha256")]
 pub use zeno_fcis_crypto::LibcruxSha256;
@@ -140,10 +141,14 @@ pub use zeno_fcis_crypto::{KnownAnswerReport, ProviderVerificationError, verify_
 #[cfg(feature = "sha256-parity")]
 pub use zeno_fcis_crypto::{ProviderParityReport, verify_provider_parity};
 pub use zeno_fcis_patch::{
-    AppliedPatch, CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath,
-    hash_precondition_value, hash_value, value_at,
+    AppliedPatch, CanonicalPatch, PatchDecodeError, PatchDecodeLimits, PatchError, PatchOp,
+    PathSegment, ValuePath, decode_canonical_patch, hash_precondition_value, hash_value, value_at,
 };
-pub use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanError};
+pub use zeno_fcis_plan::{
+    CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanDecodeError, PlanDecodeLimits, PlanError,
+    decode_commit_plan, decode_outbox_plan,
+};
+#[cfg(feature = "zenodex-profile")]
 pub use zeno_fcis_profile_zenodex::{
     BPS_SCALE, E8, MAX_AMOUNT_E8, ProfileError, ZUSD_COMMAND_TYPE_V1, ZUSD_STATE_TYPE_V1,
     ZenoDexLane, ZenoDexProfileV1, ZusdCommandTagV1, ZusdRejectV1, ZusdStateError,
