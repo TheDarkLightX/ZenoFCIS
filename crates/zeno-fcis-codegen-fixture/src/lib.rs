@@ -117,7 +117,7 @@ mod tests {
 
     fn admitted_context(project: &GeneratedProject) -> GeneratedContextEnvelope {
         project
-            .admit_context::<RustCryptoSha256>(&Flag(false), ValidationLimits::default())
+            .admit_context::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
             .unwrap_or_else(|error| panic!("generated context rejected: {error}"))
     }
 
@@ -568,6 +568,54 @@ mod tests {
     }
 
     #[test]
+    fn generated_typed_context_field_observation_records_only_exact_context_footprint() {
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let mut transition = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        transition
+            .observe_context_flag()
+            .unwrap_or_else(|error| panic!("typed context observation failed: {error}"));
+        let decision = transition
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        let artifacts = match &decision {
+            Decision::Accept(artifacts) => artifacts,
+            other => panic!("expected accept, got {other:?}"),
+        };
+        let candidate = artifacts.candidate();
+        assert!(candidate.bundle().patch().operations().is_empty());
+        assert!(candidate.footprint().reads().paths().is_empty());
+        assert!(candidate.footprint().writes().paths().is_empty());
+        assert_eq!(candidate.footprint().contexts().paths().len(), 1);
+        let observed = &candidate.footprint().contexts().paths()[0];
+        assert_eq!(
+            observed.namespace(),
+            crate::bootstrap_project::CONTEXT_TYPE_ID
+        );
+        assert_eq!(observed.atoms(), &[PathAtom::Field(5)]);
+        validate_transition_decision::<RustCryptoSha256>(
+            &decision,
+            project.catalog(),
+            envelope.value().value(),
+            state_domain(),
+        )
+        .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
     fn generated_typed_root_update_rejects_invalid_value_without_staging() {
         let project = generated_project();
         let envelope = project
@@ -788,7 +836,7 @@ mod tests {
         let command = admitted_command(&project);
         let context = admitted_context(&project);
         assert_eq!(command.admitted().type_id(), TypeId::new(9));
-        assert_eq!(context.admitted().type_id(), TypeId::new(5));
+        assert_eq!(context.admitted().type_id(), TypeId::new(12));
         assert_eq!(
             command.admitted().schema_hash(),
             project.catalog().schema_hash()
@@ -798,7 +846,7 @@ mod tests {
             project.catalog().schema_hash()
         );
         assert_eq!(command.validation_report().nodes, 1);
-        assert_eq!(context.validation_report().nodes, 1);
+        assert_eq!(context.validation_report().nodes, 14);
 
         let command_bytes = command
             .admitted()
@@ -850,7 +898,13 @@ mod tests {
 
         let false_context = admitted_context(&project);
         let true_context = project
-            .admit_context::<RustCryptoSha256>(&Flag(true), ValidationLimits::default())
+            .admit_context::<RustCryptoSha256>(
+                &BalanceState {
+                    flag: Flag(true),
+                    ..minimal_state()
+                },
+                ValidationLimits::default(),
+            )
             .unwrap_or_else(|error| panic!("changed context rejected: {error}"));
         assert_ne!(false_context.commitment(), true_context.commitment());
     }
@@ -869,7 +923,7 @@ mod tests {
         );
         assert_eq!(
             project.admit_context::<RustCryptoSha256>(
-                &Flag(false),
+                &minimal_state(),
                 ValidationLimits {
                     max_depth: 0,
                     max_nodes: 0,

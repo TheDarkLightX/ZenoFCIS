@@ -49,7 +49,7 @@ pub(crate) fn fixture_catalog(schema: Schema) -> ProjectCatalog {
     let mut entries = vec![
         root_entry(RegistryKind::StateType, 12, "state", 1),
         root_entry(RegistryKind::CommandType, 9, "command", 2),
-        root_entry(RegistryKind::ContextType, 5, "context", 3),
+        root_entry(RegistryKind::ContextType, 12, "context", 3),
     ];
     entries.extend_from_slice(manifest.registry_entries());
     let profile = ProjectProfile::try_new(
@@ -59,7 +59,7 @@ pub(crate) fn fixture_catalog(schema: Schema) -> ProjectCatalog {
         1,
         id(12),
         id(9),
-        id(5),
+        id(12),
         DomainPrefix::try_new("codegen-fixture/core")
             .unwrap_or_else(|error| panic!("fixture domain rejected: {error}")),
         ProfileBindings {
