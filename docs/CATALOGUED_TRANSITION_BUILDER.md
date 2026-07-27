@@ -93,5 +93,6 @@ The crate adds no external dependency. It trusts the existing value, codec, core
 - An observed footprint is not a complete static component contract.
 - Builder validation is not a proof of business correctness or invariant preservation.
 - A policy or predicate commitment is not proof that its referenced rule is safe.
-- This package does not repair the separate unchecked low-level `MapEntry` constructor.
+- Low-level map entries now derive their ordering bytes from their semantic key; see
+  `CORRECT_BY_CONSTRUCTION_MAP_ENTRIES.md`.
 - It does not add runtime refinement, shell atomicity evidence, mechanized proofs, or production authorization.

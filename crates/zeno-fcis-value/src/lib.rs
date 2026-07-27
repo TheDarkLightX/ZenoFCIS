@@ -14,6 +14,39 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
+/// ZCVE/1 value tags shared by construction and decoding.
+///
+/// These identifiers are protocol meaning. They are exposed so the codec can
+/// decode the exact byte format whose encoder lives with [`Value`].
+pub mod zcve {
+    /// Unit value tag.
+    pub const TAG_UNIT: u8 = 0x00;
+    /// Boolean false tag.
+    pub const TAG_BOOL_FALSE: u8 = 0x01;
+    /// Boolean true tag.
+    pub const TAG_BOOL_TRUE: u8 = 0x02;
+    /// Unsigned 128-bit integer tag.
+    pub const TAG_U128: u8 = 0x03;
+    /// Signed 128-bit integer tag.
+    pub const TAG_I128: u8 = 0x04;
+    /// Byte string tag.
+    pub const TAG_BYTES: u8 = 0x05;
+    /// ASCII text tag.
+    pub const TAG_TEXT: u8 = 0x06;
+    /// Closed enum tag.
+    pub const TAG_ENUM: u8 = 0x07;
+    /// Tuple tag.
+    pub const TAG_TUPLE: u8 = 0x08;
+    /// Record tag.
+    pub const TAG_RECORD: u8 = 0x09;
+    /// Closed sum tag.
+    pub const TAG_SUM: u8 = 0x0a;
+    /// Vector tag.
+    pub const TAG_VECTOR: u8 = 0x0b;
+    /// Map tag.
+    pub const TAG_MAP: u8 = 0x0c;
+}
+
 /// A length-bound violation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LengthError {
@@ -218,6 +251,14 @@ impl Field {
 }
 
 /// A canonical map entry carrying the authoritative encoded key ordering.
+///
+/// Encoded key bytes cannot be supplied independently:
+///
+/// ```compile_fail
+/// use zeno_fcis_value::{MapEntry, Value};
+///
+/// let _ = MapEntry::new(vec![0], Value::Unit, Value::Unit);
+/// ```
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MapEntry {
     encoded_key: Box<[u8]>,
@@ -226,14 +267,17 @@ pub struct MapEntry {
 }
 
 impl MapEntry {
-    /// Creates an entry. The enclosing map validates order and uniqueness.
-    #[must_use]
-    pub fn new(encoded_key: Vec<u8>, key: Value, value: Value) -> Self {
-        Self {
+    /// Creates an entry whose ordering bytes are derived from the semantic key.
+    ///
+    /// Callers cannot supply the encoded key independently. The enclosing map
+    /// still validates strict ordering and uniqueness.
+    pub fn try_new(key: Value, value: Value) -> Result<Self, ValueError> {
+        let encoded_key = key.zcve_bytes()?;
+        Ok(Self {
             encoded_key: encoded_key.into_boxed_slice(),
             key,
             value,
-        }
+        })
     }
 
     /// Returns the authoritative encoded key bytes.
@@ -357,6 +401,27 @@ impl Value {
         Self::map_canonical(entries)
     }
 
+    /// Returns the exact ZCVE/1 bytes for this value.
+    ///
+    /// This low-level primitive is shared with `zeno-fcis-codec` so map-entry
+    /// construction and public canonical encoding cannot drift. It validates
+    /// the default closed-value limits before emitting any bytes.
+    pub fn zcve_bytes(&self) -> Result<Vec<u8>, ValueError> {
+        let mut output = Vec::new();
+        self.encode_zcve_to(&mut output)?;
+        Ok(output)
+    }
+
+    /// Appends the exact ZCVE/1 bytes for this value.
+    ///
+    /// Most callers should use the codec's `CanonicalEncode` API. This method
+    /// exists at the lower dependency ring so [`MapEntry::try_new`] can derive
+    /// canonical ordering bytes without accepting a caller-supplied encoding.
+    pub fn encode_zcve_to(&self, output: &mut Vec<u8>) -> Result<(), ValueError> {
+        self.validate_limits(ValueLimits::default())?;
+        encode_zcve_value(self, output)
+    }
+
     /// Returns the structural value kind.
     #[must_use]
     pub const fn kind(&self) -> ValueKind {
@@ -382,6 +447,101 @@ impl Value {
         validate_value(self, 0, limits, &mut metrics)?;
         Ok(metrics)
     }
+}
+
+fn encode_zcve_value(value: &Value, output: &mut Vec<u8>) -> Result<(), ValueError> {
+    use zcve::{
+        TAG_BOOL_FALSE, TAG_BOOL_TRUE, TAG_BYTES, TAG_ENUM, TAG_I128, TAG_MAP, TAG_RECORD, TAG_SUM,
+        TAG_TEXT, TAG_TUPLE, TAG_U128, TAG_UNIT, TAG_VECTOR,
+    };
+
+    match value {
+        Value::Unit => output.push(TAG_UNIT),
+        Value::Bool(false) => output.push(TAG_BOOL_FALSE),
+        Value::Bool(true) => output.push(TAG_BOOL_TRUE),
+        Value::U128(integer) => {
+            output.push(TAG_U128);
+            output.extend_from_slice(&integer.to_be_bytes());
+        }
+        Value::I128(integer) => {
+            output.push(TAG_I128);
+            output.extend_from_slice(&integer.to_be_bytes());
+        }
+        Value::Bytes(bytes) => {
+            output.push(TAG_BYTES);
+            put_zcve_blob(output, bytes)?;
+        }
+        Value::Text(text) => {
+            output.push(TAG_TEXT);
+            put_zcve_blob(output, text.as_bytes())?;
+        }
+        Value::Enum { type_id, variant } => {
+            output.push(TAG_ENUM);
+            output.extend_from_slice(&type_id.to_be_bytes());
+            output.extend_from_slice(&variant.to_be_bytes());
+        }
+        Value::Tuple(items) => {
+            output.push(TAG_TUPLE);
+            put_zcve_length(output, items.len())?;
+            for item in items {
+                encode_zcve_value(item, output)?;
+            }
+        }
+        Value::Record(fields) => {
+            output.push(TAG_RECORD);
+            put_zcve_length(output, fields.len())?;
+            for field in fields {
+                output.extend_from_slice(&field.id().to_be_bytes());
+                encode_zcve_value(field.value(), output)?;
+            }
+        }
+        Value::Sum {
+            type_id,
+            variant,
+            payload,
+        } => {
+            output.push(TAG_SUM);
+            output.extend_from_slice(&type_id.to_be_bytes());
+            output.extend_from_slice(&variant.to_be_bytes());
+            match payload {
+                None => output.push(0),
+                Some(child) => {
+                    output.push(1);
+                    encode_zcve_value(child, output)?;
+                }
+            }
+        }
+        Value::Vector(items) => {
+            output.push(TAG_VECTOR);
+            put_zcve_length(output, items.len())?;
+            for item in items {
+                encode_zcve_value(item, output)?;
+            }
+        }
+        Value::Map(entries) => {
+            output.push(TAG_MAP);
+            put_zcve_length(output, entries.len())?;
+            for entry in entries {
+                put_zcve_blob(output, entry.encoded_key())?;
+                let mut encoded_value = Vec::new();
+                encode_zcve_value(entry.value(), &mut encoded_value)?;
+                put_zcve_blob(output, &encoded_value)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn put_zcve_length(output: &mut Vec<u8>, length: usize) -> Result<(), ValueError> {
+    let length = u32::try_from(length).map_err(|_| ValueError::ArithmeticOverflow)?;
+    output.extend_from_slice(&length.to_be_bytes());
+    Ok(())
+}
+
+fn put_zcve_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), ValueError> {
+    put_zcve_length(output, bytes.len())?;
+    output.extend_from_slice(bytes);
+    Ok(())
 }
 
 fn ensure_strict_fields(fields: &[Field]) -> Result<(), ValueError> {
@@ -663,11 +823,25 @@ mod tests {
 
     #[test]
     fn maps_reject_duplicate_encoded_keys() {
+        let first = MapEntry::try_new(Value::U128(1), Value::Bool(true));
+        let second = MapEntry::try_new(Value::U128(1), Value::Bool(false));
+        assert!(first.is_ok() && second.is_ok());
         let entries = vec![
-            MapEntry::new(vec![1], Value::U128(1), Value::Bool(true)),
-            MapEntry::new(vec![1], Value::U128(1), Value::Bool(false)),
+            first.unwrap_or_else(|error| panic!("map entry: {error}")),
+            second.unwrap_or_else(|error| panic!("map entry: {error}")),
         ];
         assert_eq!(Value::map_canonical(entries), Err(ValueError::MapKeyOrder));
+    }
+
+    #[test]
+    fn map_entry_derives_exact_key_bytes() {
+        let key = Value::tuple(vec![Value::U128(7), Value::Bool(true)]);
+        let expected = key.zcve_bytes();
+        let entry = MapEntry::try_new(key, Value::Unit);
+        assert!(expected.is_ok() && entry.is_ok());
+        let expected = expected.unwrap_or_else(|error| panic!("key bytes: {error}"));
+        let entry = entry.unwrap_or_else(|error| panic!("map entry: {error}"));
+        assert_eq!(entry.encoded_key(), expected.as_slice());
     }
 
     #[test]
