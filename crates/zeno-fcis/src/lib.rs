@@ -129,7 +129,10 @@ pub use zeno_fcis_patch::{
     AppliedPatch, CanonicalPatch, PatchDecodeError, PatchDecodeLimits, PatchError, PatchOp,
     PathSegment, ValuePath, decode_canonical_patch, hash_precondition_value, hash_value, value_at,
 };
-pub use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanError};
+pub use zeno_fcis_plan::{
+    CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanDecodeError, PlanDecodeLimits, PlanError,
+    decode_commit_plan, decode_outbox_plan,
+};
 #[cfg(feature = "zenodex-profile")]
 pub use zeno_fcis_profile_zenodex::{
     BPS_SCALE, E8, MAX_AMOUNT_E8, ProfileError, ZUSD_COMMAND_TYPE_V1, ZUSD_STATE_TYPE_V1,
