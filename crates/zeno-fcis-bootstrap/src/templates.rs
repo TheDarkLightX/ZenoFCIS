@@ -381,10 +381,17 @@ fn render_generated_input_envelopes(output: &mut String) {
     output.push_str("}\n\n");
 }
 
-fn render_generated_transition(output: &mut String) {
-    output.push_str("/// Generated high-level transition with typed reason application.\n");
+fn render_generated_transition(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+) -> Result<(), BootstrapError> {
+    output.push_str(
+        "/// Generated high-level transition with typed reasons, effects, and channels.\n",
+    );
     output.push_str("///\n");
-    output.push_str("/// The generic builder remains private so this path cannot apply raw reason identifiers.\n");
+    output.push_str(
+        "/// The private generic builder prevents raw reason, effect, and outbox staging.\n",
+    );
     output.push_str("pub struct GeneratedTransition<'a, H: CommitmentHasher> {\n");
     output.push_str("    inner: CataloguedTransitionBuilder<'a, H>,\n");
     output.push_str("}\n\n");
@@ -411,14 +418,8 @@ fn render_generated_transition(output: &mut String) {
     output.push_str("    pub fn observe_context(&mut self, path: AccessPath) -> Result<&mut Self, GeneratedProjectError> {\n");
     output.push_str("        self.inner.observe_context(path)?;\n        Ok(self)\n");
     output.push_str("    }\n\n");
-    output.push_str("    /// Stages one authoritative effect.\n");
-    output.push_str("    pub fn emit(&mut self, effect: Effect) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str("        self.inner.emit(effect)?;\n        Ok(self)\n");
-    output.push_str("    }\n\n");
-    output.push_str("    /// Stages one external-delivery obligation.\n");
-    output.push_str("    pub fn enqueue(&mut self, entry: OutboxEntry) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str("        self.inner.enqueue(entry)?;\n        Ok(self)\n");
-    output.push_str("    }\n\n");
+    render_generated_effect_methods(output, catalog)?;
+    render_generated_channel_methods(output, catalog)?;
     output.push_str("    /// Records an ordinary rejection when `condition` is false.\n");
     output.push_str("    pub fn require(&mut self, condition: bool, reason: RejectReasonId) -> Result<&mut Self, GeneratedProjectError> {\n");
     output.push_str(
@@ -437,6 +438,78 @@ fn render_generated_transition(output: &mut String) {
     output.push_str("        Ok(self.inner.seal()?)\n");
     output.push_str("    }\n");
     output.push_str("}\n\n");
+    Ok(())
+}
+
+fn render_generated_effect_methods(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+) -> Result<(), BootstrapError> {
+    for effect in catalog.manifest().effects() {
+        let payload = schema_type_name(catalog, effect.payload_type())?;
+        let mut parameters = vec!["ordinal: u32".to_owned()];
+        push_hash_requirement_parameter(
+            &mut parameters,
+            "authority",
+            effect.authority_requirement(),
+        );
+        push_hash_requirement_parameter(&mut parameters, "subject", effect.subject_requirement());
+        parameters.push(format!("payload: &crate::generated::{payload}"));
+        let authority = hash_requirement_argument("authority", effect.authority_requirement());
+        let subject = hash_requirement_argument("subject", effect.subject_requirement());
+        writeln!(
+            output,
+            "    /// Stages catalog effect `{}` with its reviewed payload and authority shape.\n    pub fn emit_effect_{}(\n        &mut self,\n        {},\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        let effect = effect_{}(\n            ordinal,\n            {authority},\n            {subject},\n            payload,\n        )?;\n        self.inner.emit(effect)?;\n        Ok(self)\n    }}\n",
+            effect.name().as_str(),
+            effect.id().get(),
+            parameters.join(",\n        "),
+            effect.id().get(),
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
+    Ok(())
+}
+
+fn render_generated_channel_methods(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+) -> Result<(), BootstrapError> {
+    for channel in catalog.manifest().channels() {
+        let destination = schema_type_name(catalog, channel.destination_type())?;
+        let payload = schema_type_name(catalog, channel.payload_type())?;
+        writeln!(
+            output,
+            "    /// Stages catalog channel `{}` with reviewed destination and payload types.\n    pub fn enqueue_channel_{}(\n        &mut self,\n        ordinal: u32,\n        destination: &crate::generated::{destination},\n        payload: &crate::generated::{payload},\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        let entry = channel_{}(ordinal, destination, payload)?;\n        self.inner.enqueue(entry)?;\n        Ok(self)\n    }}\n",
+            channel.name().as_str(),
+            channel.id().get(),
+            channel.id().get(),
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
+    Ok(())
+}
+
+fn push_hash_requirement_parameter(
+    parameters: &mut Vec<String>,
+    name: &str,
+    requirement: HashRequirement,
+) {
+    match requirement {
+        HashRequirement::Any => parameters.push(format!("{name}: Hash32")),
+        HashRequirement::Present => {
+            parameters.push(format!("{name}: zeno_fcis_catalog::NonZeroHash"));
+        }
+        HashRequirement::Absent | HashRequirement::Exact(_) => {}
+    }
+}
+
+fn hash_requirement_argument(name: &str, requirement: HashRequirement) -> String {
+    match requirement {
+        HashRequirement::Any => name.to_owned(),
+        HashRequirement::Absent => "Hash32::ZERO".to_owned(),
+        HashRequirement::Present => format!("{name}.get()"),
+        HashRequirement::Exact(expected) => hash_expression(expected.get()),
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -448,7 +521,7 @@ fn render_generated_project(
     context_type: &str,
 ) -> Result<(), BootstrapError> {
     render_generated_input_envelopes(output);
-    render_generated_transition(output);
+    render_generated_transition(output, catalog)?;
     output.push_str("/// Local generated-binding construction or admission failure.\n");
     output.push_str("///\n");
     output.push_str("/// This diagnostic order is not application rejection precedence.\n");
