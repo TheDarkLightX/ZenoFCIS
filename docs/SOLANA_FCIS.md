@@ -74,6 +74,10 @@ It does not by itself prove:
 - deterministic reproducibility of an unverified local build;
 - audit completion.
 
+## Validation layers
+
+Repository Rust CI validates the generator implementation, deterministic rendering, source-policy checks, and public API integration. A separate retained generated-workspace gate is still required to compile the emitted Anchor program with its exact toolchain and to run instruction-level tests; generator CI alone is not deployment evidence.
+
 ## Required promotion evidence
 
 Before a generated program is production-authorized, retain at minimum:
