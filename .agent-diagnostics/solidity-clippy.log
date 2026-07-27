@@ -1,0 +1,144 @@
+[1m[92m    Updating[0m crates.io index
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m cc v1.4.0
+[1m[92m  Downloaded[0m hybrid-array v0.4.13
+[1m[92m  Downloaded[0m hashbrown v0.17.1
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m bitmaps v3.2.1
+[1m[92m  Downloaded[0m hashlink v0.12.1
+[1m[92m  Downloaded[0m archery v1.2.2
+[1m[92m  Downloaded[0m libcrux-macros v0.0.3
+[1m[92m  Downloaded[0m fallible-streaming-iterator v0.1.9
+[1m[92m  Downloaded[0m find-msvc-tools v0.1.9
+[1m[92m  Downloaded[0m pkg-config v0.3.33
+[1m[92m  Downloaded[0m crypto-common v0.2.2
+[1m[92m  Downloaded[0m libcrux-hacl-rs v0.0.5
+[1m[92m  Downloaded[0m block-buffer v0.12.1
+[1m[92m  Downloaded[0m cpufeatures v0.3.0
+[1m[92m  Downloaded[0m rand_xoshiro v0.6.0
+[1m[92m  Downloaded[0m rpds v1.1.0
+[1m[92m  Downloaded[0m libcrux-sha2 v0.0.8
+[1m[92m  Downloaded[0m subtle v2.6.1
+[1m[92m  Downloaded[0m cfg-if v1.0.4
+[1m[92m  Downloaded[0m digest v0.11.3
+[1m[92m  Downloaded[0m foldhash v0.2.0
+[1m[92m  Downloaded[0m zeroize v1.9.0
+[1m[92m  Downloaded[0m bitflags v2.13.1
+[1m[92m  Downloaded[0m fallible-iterator v0.3.0
+[1m[92m  Downloaded[0m libcrux-traits v0.0.8
+[1m[92m  Downloaded[0m rand_core v0.6.4
+[1m[92m  Downloaded[0m rand_core v0.10.1
+[1m[92m  Downloaded[0m shlex v2.0.1
+[1m[92m  Downloaded[0m triomphe v0.1.16
+[1m[92m  Downloaded[0m quote v1.0.47
+[1m[92m  Downloaded[0m zmij v1.0.23
+[1m[92m  Downloaded[0m imbl-sized-chunks v0.1.3
+[1m[92m  Downloaded[0m libcrux-secrets v0.0.6
+[1m[92m  Downloaded[0m hax-lib-macros v0.3.7
+[1m[92m  Downloaded[0m smallvec v1.15.2
+[1m[92m  Downloaded[0m serde_core v1.0.229
+[1m[92m  Downloaded[0m unicode-ident v1.0.24
+[1m[92m  Downloaded[0m serde_derive v1.0.229
+[1m[92m  Downloaded[0m sha2 v0.11.0
+[1m[92m  Downloaded[0m proc-macro2 v1.0.107
+[1m[92m  Downloaded[0m rand v0.10.2
+[1m[92m  Downloaded[0m memchr v2.8.3
+[1m[92m  Downloaded[0m serde v1.0.229
+[1m[92m  Downloaded[0m typenum v1.20.1
+[1m[92m  Downloaded[0m syn v3.0.3
+[1m[92m  Downloaded[0m imbl v3.0.0
+[1m[92m  Downloaded[0m serde_json v1.0.151
+[1m[92m  Downloaded[0m rusqlite v0.40.1
+[1m[92m  Downloaded[0m vcpkg v0.2.15
+[1m[92m  Downloaded[0m hax-lib v0.3.7
+[1m[92m  Downloaded[0m syn v2.0.119
+[1m[92m  Downloaded[0m libsqlite3-sys v0.38.1
+[1m[92m    Checking[0m zeno-fcis-value v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-value)
+[1m[92m   Compiling[0m proc-macro2 v1.0.107
+[1m[92m   Compiling[0m unicode-ident v1.0.24
+[1m[92m   Compiling[0m quote v1.0.47
+[1m[92m    Checking[0m typenum v1.20.1
+[1m[92m   Compiling[0m hax-lib v0.3.7
+[1m[92m    Checking[0m zeno-fcis-codec v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-codec)
+[1m[92m    Checking[0m rand_core v0.10.1
+[1m[92m    Checking[0m rand v0.10.2
+[1m[92m    Checking[0m zeno-fcis-plan v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-plan)
+[1m[92m    Checking[0m cfg-if v1.0.4
+[1m[92m    Checking[0m zeno-fcis-core v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-core)
+[1m[92m    Checking[0m cpufeatures v0.3.0
+[1m[92m    Checking[0m zeno-fcis-patch v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-patch)
+[1m[92m   Compiling[0m serde_core v1.0.229
+[1m[92m   Compiling[0m syn v2.0.119
+[1m[92m    Checking[0m hybrid-array v0.4.13
+[1m[92m    Checking[0m zeno-fcis-receipt v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-receipt)
+[1m[92m   Compiling[0m shlex v2.0.1
+[1m[92m   Compiling[0m find-msvc-tools v0.1.9
+[1m[92m    Checking[0m zeno-fcis-schema v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-schema)
+[1m[92m   Compiling[0m cc v1.4.0
+[1m[92m    Checking[0m crypto-common v0.2.2
+[1m[92m    Checking[0m block-buffer v0.12.1
+[1m[92m   Compiling[0m vcpkg v0.2.15
+[1m[92m    Checking[0m digest v0.11.3
+[1m[92m   Compiling[0m zmij v1.0.23
+[1m[92m    Checking[0m sha2 v0.11.0
+[1m[92m   Compiling[0m pkg-config v0.3.33
+[1m[92m   Compiling[0m libsqlite3-sys v0.38.1
+[1m[92m    Checking[0m zeno-fcis-refine v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-refine)
+[1m[92m   Compiling[0m syn v3.0.3
+[1m[92m    Checking[0m zeno-fcis-project v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-project)
+[1m[92m    Checking[0m foldhash v0.2.0
+[1m[92m   Compiling[0m serde v1.0.229
+[1m[92m   Compiling[0m serde_json v1.0.151
+[1m[92m    Checking[0m hashbrown v0.17.1
+[1m[92m    Checking[0m triomphe v0.1.16
+[1m[92m    Checking[0m memchr v2.8.3
+[1m[92m   Compiling[0m hax-lib-macros v0.3.7
+[1m[92m   Compiling[0m libcrux-macros v0.0.3
+[1m[92m   Compiling[0m serde_derive v1.0.229
+[1m[92m    Checking[0m libcrux-hacl-rs v0.0.5
+[1m[92m    Checking[0m libcrux-secrets v0.0.6
+[1m[92m    Checking[0m libcrux-traits v0.0.8
+[1m[92m    Checking[0m bitmaps v3.2.1
+[1m[92m    Checking[0m rand_core v0.6.4
+[1m[92m    Checking[0m itoa v1.0.18
+[1m[92m    Checking[0m rand_xoshiro v0.6.0
+[1m[92m    Checking[0m imbl-sized-chunks v0.1.3
+[1m[92m    Checking[0m archery v1.2.2
+[1m[92m    Checking[0m hashlink v0.12.1
+[1m[92m    Checking[0m zeno-fcis-catalog v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-catalog)
+[1m[92m    Checking[0m smallvec v1.15.2
+[1m[92m    Checking[0m fallible-iterator v0.3.0
+[1m[92m    Checking[0m bitflags v2.13.1
+[1m[92m    Checking[0m fallible-streaming-iterator v0.1.9
+[1m[92m    Checking[0m libcrux-sha2 v0.0.8
+[1m[92m    Checking[0m rpds v1.1.0
+[1m[92m    Checking[0m imbl v3.0.0
+[1m[92m    Checking[0m zeno-fcis-profile-zenodex v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-profile-zenodex)
+[1m[92m    Checking[0m zeno-fcis-shell v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-shell)
+[1m[92m    Checking[0m zeno-fcis-crypto v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-crypto)
+[1m[92m    Checking[0m zeno-fcis-compose v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-compose)
+[1m[92m    Checking[0m zeroize v1.9.0
+[1m[92m    Checking[0m zeno-fcis-codegen v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-codegen)
+[1m[92m    Checking[0m zeno-fcis-adapter v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-adapter)
+[1m[92m    Checking[0m zeno-fcis-synthesis v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-synthesis)
+[1m[92m    Checking[0m subtle v2.6.1
+[1m[92m    Checking[0m zeno-fcis-backend v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-backend)
+[1m[92m    Checking[0m zeno-fcis-secret v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-secret)
+[1m[92m    Checking[0m zeno-fcis-adapter-zenodex v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-adapter-zenodex)
+[1m[92m    Checking[0m zeno-fcis-transition v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-transition)
+[1m[91merror[0m[1m: match can be simplified with `.unwrap_or_default()`[0m
+    [1m[94m--> [0mcrates/zeno-fcis-codegen/src/solidity.rs:1099:5
+     [1m[94m|[0m
+[1m[94m1099[0m [1m[94m|[0m [1m[91m/[0m     match String::from_utf8(output) {
+[1m[94m1100[0m [1m[94m|[0m [1m[91m|[0m         Ok(value) => value,
+[1m[94m1101[0m [1m[94m|[0m [1m[91m|[0m         Err(_) => String::new(),
+[1m[94m1102[0m [1m[94m|[0m [1m[91m|[0m     }
+     [1m[94m|[0m [1m[91m|_____^[0m [1m[91mhelp: replace it with: `String::from_utf8(output).unwrap_or_default()`[0m
+     [1m[94m|[0m
+     [1m[94m= [0m[1mhelp[0m: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.97.0/index.html#manual_unwrap_or_default
+     [1m[94m= [0m[1mnote[0m: `-D clippy::manual-unwrap-or-default` implied by `-D warnings`
+     [1m[94m= [0m[1mhelp[0m: to override `-D warnings` add `#[allow(clippy::manual_unwrap_or_default)]`
+
+[1m[91merror[0m: could not compile `zeno-fcis-codegen` (lib) due to 1 previous error
+[1m[33mwarning[0m: build failed, waiting for other jobs to finish...
