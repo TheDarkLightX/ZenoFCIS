@@ -1,4 +1,4 @@
-//! Root-schema-bound canonical envelope admission.
+//! Schema-bound canonical envelope admission.
 
 extern crate alloc;
 
@@ -12,13 +12,13 @@ use crate::{
     Schema, SchemaError, TypeId, ValidationLimits, ValidationReport, ValueValidationError,
 };
 
-/// Failure while binding an owned root value to a reviewed schema envelope.
+/// Failure while binding an owned value to a reviewed schema envelope.
 ///
 /// The variants record the fixed local admission order. They are not protocol
 /// rejection reasons and do not define application-level precedence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SchemaEnvelopeError {
-    /// The value failed validation against the schema's declared root type.
+    /// The value failed validation against the selected schema type.
     SchemaValidation(ValueValidationError),
     /// The value failed the reviewed default structural and canonical limits.
     ValueAdmission(ValueError),
@@ -32,7 +32,7 @@ impl fmt::Display for SchemaEnvelopeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SchemaValidation(error) => {
-                write!(formatter, "schema root validation failed: {error}")
+                write!(formatter, "schema value validation failed: {error}")
             }
             Self::ValueAdmission(error) => {
                 write!(formatter, "default value admission failed: {error}")
@@ -97,15 +97,7 @@ impl SchemaAdmittedEnvelope {
         value: Value,
         limits: ValidationLimits,
     ) -> Result<Self, SchemaEnvelopeError> {
-        let validation = schema
-            .validate_root(&value, limits)
-            .map_err(SchemaEnvelopeError::SchemaValidation)?;
-        let value = AdmittedValue::try_new(value).map_err(SchemaEnvelopeError::ValueAdmission)?;
-        let schema_hash = schema
-            .schema_hash::<H>()
-            .map_err(SchemaEnvelopeError::SchemaCommitment)?;
-        let envelope = AdmittedEnvelope::try_new(schema.root_type().get(), schema_hash, value)
-            .map_err(SchemaEnvelopeError::EnvelopeAdmission)?;
+        let (envelope, validation) = admit_type::<H>(schema, schema.root_type(), value, limits)?;
         Ok(Self {
             envelope,
             validation,
@@ -159,6 +151,103 @@ impl CanonicalEncode for SchemaAdmittedEnvelope {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.envelope.encode_to(output)
     }
+}
+
+/// An owned canonical envelope admitted against one selected type in a reviewed schema.
+///
+/// Unlike [`SchemaAdmittedEnvelope`], this witness is not restricted to the schema root.
+/// The selected type identifier is bound into the existing canonical envelope bytes, and
+/// private fields prevent callers from pairing those bytes with invented validation metrics.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SchemaAdmittedTypeEnvelope {
+    envelope: AdmittedEnvelope,
+    validation: ValidationReport,
+}
+
+impl SchemaAdmittedTypeEnvelope {
+    /// Validates and owns a value as the selected schema type.
+    ///
+    /// Local failures use the same fixed diagnostic order as root admission:
+    /// schema validation, default structural admission, schema commitment, then
+    /// complete-envelope size admission.
+    pub fn try_new<H: CommitmentHasher>(
+        schema: &Schema,
+        type_id: TypeId,
+        value: Value,
+        limits: ValidationLimits,
+    ) -> Result<Self, SchemaEnvelopeError> {
+        let (envelope, validation) = admit_type::<H>(schema, type_id, value, limits)?;
+        Ok(Self {
+            envelope,
+            validation,
+        })
+    }
+
+    /// Returns the selected schema type bound into the envelope.
+    #[must_use]
+    pub const fn type_id(&self) -> TypeId {
+        TypeId::new(self.envelope.type_id())
+    }
+
+    /// Returns the exact schema commitment bound into the envelope.
+    #[must_use]
+    pub const fn schema_hash(&self) -> Hash32 {
+        self.envelope.schema_hash()
+    }
+
+    /// Returns the exact successful schema-validation resource report.
+    #[must_use]
+    pub const fn validation_report(&self) -> ValidationReport {
+        self.validation
+    }
+
+    /// Returns the structurally admitted immutable value.
+    #[must_use]
+    pub const fn value(&self) -> &AdmittedValue {
+        self.envelope.value()
+    }
+
+    /// Returns the exact complete canonical envelope length.
+    #[must_use]
+    pub fn encoded_length(&self) -> u64 {
+        self.envelope.encoded_length()
+    }
+
+    /// Returns the compatible structurally admitted envelope.
+    #[must_use]
+    pub const fn envelope(&self) -> &AdmittedEnvelope {
+        &self.envelope
+    }
+
+    /// Consumes the schema-bound witness and returns its admitted envelope.
+    #[must_use]
+    pub fn into_envelope(self) -> AdmittedEnvelope {
+        self.envelope
+    }
+}
+
+impl CanonicalEncode for SchemaAdmittedTypeEnvelope {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        self.envelope.encode_to(output)
+    }
+}
+
+fn admit_type<H: CommitmentHasher>(
+    schema: &Schema,
+    type_id: TypeId,
+    value: Value,
+    limits: ValidationLimits,
+) -> Result<(AdmittedEnvelope, ValidationReport), SchemaEnvelopeError> {
+    let validation = schema
+        .validate_value(type_id, &value, limits)
+        .map_err(SchemaEnvelopeError::SchemaValidation)?;
+    let value = AdmittedValue::try_new(value).map_err(SchemaEnvelopeError::ValueAdmission)?;
+    let schema_hash = schema
+        .schema_hash::<H>()
+        .map_err(SchemaEnvelopeError::SchemaCommitment)?;
+    let envelope = AdmittedEnvelope::try_new(type_id.get(), schema_hash, value)
+        .map_err(SchemaEnvelopeError::EnvelopeAdmission)?;
+    Ok((envelope, validation))
 }
 
 #[cfg(test)]
@@ -256,6 +345,65 @@ mod tests {
             Ok(raw.clone())
         );
         assert_eq!(admitted.into_envelope().into_envelope(), raw);
+    }
+
+    #[test]
+    fn binds_selected_non_root_type_schema_hash_and_validation_report() {
+        let amount = type_def(7, "Amount", TypeKind::U128 { min: 1, max: 100 });
+        let flag = type_def(8, "Flag", TypeKind::Bool);
+        let schema = schema(1, vec![amount, flag]);
+        let admitted = SchemaAdmittedTypeEnvelope::try_new::<TestHash>(
+            &schema,
+            TypeId::new(8),
+            Value::Bool(true),
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("typed envelope rejected: {error}"));
+
+        assert_eq!(admitted.type_id(), TypeId::new(8));
+        assert_eq!(
+            admitted.schema_hash(),
+            schema
+                .schema_hash::<TestHash>()
+                .unwrap_or_else(|error| panic!("schema hash failed: {error}"))
+        );
+        assert_eq!(
+            admitted.validation_report(),
+            ValidationReport {
+                nodes: 1,
+                maximum_depth: 0,
+            }
+        );
+        assert_eq!(admitted.value().value(), &Value::Bool(true));
+        let bytes = admitted
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("encoding failed: {error}"));
+        assert_eq!(
+            decode_envelope(&bytes, DecodeLimits::default()),
+            Ok(Envelope::new(8, admitted.schema_hash(), Value::Bool(true)))
+        );
+        assert_eq!(
+            admitted.encoded_length(),
+            u64::try_from(bytes.len()).unwrap_or(u64::MAX)
+        );
+    }
+
+    #[test]
+    fn selected_type_mismatch_fails_before_structural_admission() {
+        let amount = type_def(7, "Amount", TypeKind::U128 { min: 1, max: 100 });
+        let flag = type_def(8, "Flag", TypeKind::Bool);
+        let schema = schema(1, vec![amount, flag]);
+        assert_eq!(
+            SchemaAdmittedTypeEnvelope::try_new::<TestHash>(
+                &schema,
+                TypeId::new(7),
+                Value::Bool(true),
+                ValidationLimits::default(),
+            ),
+            Err(SchemaEnvelopeError::SchemaValidation(
+                ValueValidationError::TypeMismatch
+            ))
+        );
     }
 
     #[test]

@@ -17,6 +17,14 @@ pub(crate) fn render_rust_project(
 ) -> Result<String, BootstrapError> {
     let profile = catalog.profile();
     let root_type = schema_type_name(catalog, catalog.schema().root_type())?;
+    let command_type = schema_type_name(
+        catalog,
+        zeno_fcis_schema::TypeId::new(profile.command_type().get()),
+    )?;
+    let context_type = schema_type_name(
+        catalog,
+        zeno_fcis_schema::TypeId::new(profile.context_type().get()),
+    )?;
     let mut output = String::new();
     writeln!(
         output,
@@ -35,7 +43,9 @@ pub(crate) fn render_rust_project(
     output.push_str("    EffectDefinition, HashRequirement, ProjectCatalog, ReasonDefinition,\n");
     output.push_str("    ReasonDisposition,\n");
     output.push_str("};\n");
-    output.push_str("use zeno_fcis_codec::{CommitmentHasher, Domain, Hash32};\n");
+    output.push_str(
+        "use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};\n",
+    );
     output.push_str("use zeno_fcis_core::BudgetUsed;\n");
     output.push_str("use zeno_fcis_plan::{Effect, OutboxEntry};\n");
     output.push_str("use zeno_fcis_project::{\n");
@@ -46,8 +56,9 @@ pub(crate) fn render_rust_project(
     output.push_str("};\n");
     output.push_str("use zeno_fcis_schema::{\n");
     output.push_str(
-        "    SchemaAdmittedEnvelope, SchemaEnvelopeError, SchemaError, TypeId, ValidationLimits,\n",
+        "    SchemaAdmittedEnvelope, SchemaAdmittedTypeEnvelope, SchemaEnvelopeError, SchemaError,\n",
     );
+    output.push_str("    TypeId, ValidationLimits, ValidationReport,\n");
     output.push_str("};\n");
     output.push_str("use zeno_fcis_transition::{CataloguedTransitionBuilder, TransitionError, TransitionLimits};\n");
     output.push('\n');
@@ -123,6 +134,20 @@ pub(crate) fn render_rust_project(
         hash_expression(schema_hash)
     )
     .map_err(|_| BootstrapError::Render)?;
+    output.push_str("/// Generated command/context commitment-domain format version.\n");
+    output.push_str("pub const INPUT_COMMITMENT_FORMAT_VERSION: u16 = 1;\n");
+    writeln!(
+        output,
+        "pub const COMMAND_DOMAIN: &str = {:?};",
+        format!("{}/command", profile.domain_prefix().as_str())
+    )
+    .map_err(|_| BootstrapError::Render)?;
+    writeln!(
+        output,
+        "pub const CONTEXT_DOMAIN: &str = {:?};\n",
+        format!("{}/context", profile.domain_prefix().as_str())
+    )
+    .map_err(|_| BootstrapError::Render)?;
 
     output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     output.push_str("pub enum ReasonClass { Reject, CommittedFailure }\n\n");
@@ -131,7 +156,7 @@ pub(crate) fn render_rust_project(
     render_channel_enum(&mut output, catalog)?;
     render_effect_helpers(&mut output, catalog)?;
     render_channel_helpers(&mut output, catalog)?;
-    render_generated_project(&mut output, catalog, root_type)?;
+    render_generated_project(&mut output, catalog, root_type, command_type, context_type)?;
 
     Ok(output)
 }
@@ -250,12 +275,53 @@ fn render_channel_helpers(
     Ok(())
 }
 
+fn render_generated_input_envelopes(output: &mut String) {
+    output.push_str("/// Generated input role used only by local admission diagnostics.\n");
+    output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    output.push_str("pub enum GeneratedInputKind { Command, Context }\n\n");
+    output.push_str("/// Schema-admitted generated command plus its derived commitment.\n");
+    output.push_str("#[derive(Clone, Debug, Eq, PartialEq)]\n");
+    output.push_str("pub struct GeneratedCommandEnvelope {\n");
+    output.push_str("    admitted: SchemaAdmittedTypeEnvelope,\n");
+    output.push_str("    commitment: Hash32,\n");
+    output.push_str("}\n\n");
+    output.push_str("impl GeneratedCommandEnvelope {\n");
+    output.push_str("    /// Returns the exact schema-admitted command.\n");
+    output.push_str(
+        "    pub const fn admitted(&self) -> &SchemaAdmittedTypeEnvelope { &self.admitted }\n",
+    );
+    output.push_str("    /// Returns the derived domain-separated command commitment.\n");
+    output.push_str("    pub const fn commitment(&self) -> Hash32 { self.commitment }\n");
+    output.push_str("    /// Returns the exact successful schema-validation report.\n");
+    output.push_str("    pub const fn validation_report(&self) -> ValidationReport { self.admitted.validation_report() }\n");
+    output.push_str("}\n\n");
+    output.push_str("/// Schema-admitted generated context plus its derived commitment.\n");
+    output.push_str("#[derive(Clone, Debug, Eq, PartialEq)]\n");
+    output.push_str("pub struct GeneratedContextEnvelope {\n");
+    output.push_str("    admitted: SchemaAdmittedTypeEnvelope,\n");
+    output.push_str("    commitment: Hash32,\n");
+    output.push_str("}\n\n");
+    output.push_str("impl GeneratedContextEnvelope {\n");
+    output.push_str("    /// Returns the exact schema-admitted authenticated context.\n");
+    output.push_str(
+        "    pub const fn admitted(&self) -> &SchemaAdmittedTypeEnvelope { &self.admitted }\n",
+    );
+    output.push_str("    /// Returns the derived domain-separated context commitment.\n");
+    output.push_str("    pub const fn commitment(&self) -> Hash32 { self.commitment }\n");
+    output.push_str("    /// Returns the exact successful schema-validation report.\n");
+    output.push_str("    pub const fn validation_report(&self) -> ValidationReport { self.admitted.validation_report() }\n");
+    output.push_str("}\n\n");
+}
+
 #[allow(clippy::too_many_lines)]
 fn render_generated_project(
     output: &mut String,
     catalog: &ProjectCatalog,
     root_type: &str,
+    command_type: &str,
+    context_type: &str,
 ) -> Result<(), BootstrapError> {
+    render_generated_input_envelopes(output);
     output.push_str("/// Local generated-binding construction or admission failure.\n");
     output.push_str("///\n");
     output.push_str("/// This diagnostic order is not application rejection precedence.\n");
@@ -266,8 +332,15 @@ fn render_generated_project(
     output.push_str("    ProfileHashMismatch { expected: Hash32, actual: Hash32 },\n");
     output.push_str("    CatalogHashMismatch { expected: Hash32, actual: Hash32 },\n");
     output.push_str("    RootTypeMismatch { expected: u32, actual: u32 },\n");
+    output.push_str("    InputSchemaHashMismatch { kind: GeneratedInputKind, expected: Hash32, actual: Hash32 },\n");
+    output.push_str(
+        "    InputTypeMismatch { kind: GeneratedInputKind, expected: u32, actual: u32 },\n",
+    );
+    output.push_str("    InputCommitmentMismatch { kind: GeneratedInputKind, expected: Hash32, actual: Hash32 },\n");
+    output.push_str("    ZeroInputCommitment(GeneratedInputKind),\n");
     output.push_str("    Catalog(CatalogError),\n");
     output.push_str("    Adapter(crate::generated::AdapterError),\n");
+    output.push_str("    Encode(EncodeError),\n");
     output.push_str("    Envelope(SchemaEnvelopeError),\n");
     output.push_str("    Profile(ProfileError),\n");
     output.push_str("    Schema(SchemaError),\n");
@@ -280,6 +353,9 @@ fn render_generated_project(
     output.push_str(
         "    fn from(error: crate::generated::AdapterError) -> Self { Self::Adapter(error) }\n",
     );
+    output.push_str("}\n\n");
+    output.push_str("impl From<EncodeError> for GeneratedProjectError {\n");
+    output.push_str("    fn from(error: EncodeError) -> Self { Self::Encode(error) }\n");
     output.push_str("}\n\n");
     output.push_str("impl From<SchemaEnvelopeError> for GeneratedProjectError {\n");
     output.push_str("    fn from(error: SchemaEnvelopeError) -> Self { Self::Envelope(error) }\n");
@@ -301,9 +377,14 @@ fn render_generated_project(
     output.push_str("            Self::ProfileHashMismatch { expected, actual } => write!(formatter, \"generated project profile hash mismatch: expected {expected}, actual {actual}\"),\n");
     output.push_str("            Self::CatalogHashMismatch { expected, actual } => write!(formatter, \"generated project catalog hash mismatch: expected {expected}, actual {actual}\"),\n");
     output.push_str("            Self::RootTypeMismatch { expected, actual } => write!(formatter, \"generated project root type mismatch: expected {expected}, actual {actual}\"),\n");
+    output.push_str("            Self::InputSchemaHashMismatch { kind, expected, actual } => write!(formatter, \"generated {kind:?} schema hash mismatch: expected {expected}, actual {actual}\"),\n");
+    output.push_str("            Self::InputTypeMismatch { kind, expected, actual } => write!(formatter, \"generated {kind:?} type mismatch: expected {expected}, actual {actual}\"),\n");
+    output.push_str("            Self::InputCommitmentMismatch { kind, expected, actual } => write!(formatter, \"generated {kind:?} commitment mismatch: expected {expected}, actual {actual}\"),\n");
+    output.push_str("            Self::ZeroInputCommitment(kind) => write!(formatter, \"generated {kind:?} commitment used the zero sentinel\"),\n");
     output.push_str("            Self::Catalog(error) => write!(formatter, \"generated catalog rejected: {error}\"),\n");
-    output.push_str("            Self::Adapter(error) => write!(formatter, \"generated root adapter rejected: {error:?}\"),\n");
-    output.push_str("            Self::Envelope(error) => write!(formatter, \"generated root envelope rejected: {error}\"),\n");
+    output.push_str("            Self::Adapter(error) => write!(formatter, \"generated typed adapter rejected: {error:?}\"),\n");
+    output.push_str("            Self::Encode(error) => write!(formatter, \"generated input commitment failed: {error}\"),\n");
+    output.push_str("            Self::Envelope(error) => write!(formatter, \"generated schema envelope rejected: {error}\"),\n");
     output.push_str("            Self::Profile(error) => write!(formatter, \"generated profile rejected: {error}\"),\n");
     output.push_str("            Self::Schema(error) => write!(formatter, \"generated schema rejected: {error}\"),\n");
     output.push_str("            Self::Transition(error) => write!(formatter, \"generated transition rejected: {error}\"),\n");
@@ -368,13 +449,55 @@ fn render_generated_project(
         "        Ok(SchemaAdmittedEnvelope::try_new::<H>(self.catalog.schema(), value, limits)?)\n",
     );
     output.push_str("    }\n\n");
-    output.push_str("    /// Starts a catalog-aware transition from one schema-admitted root.\n");
+    output.push_str("    /// Admits a typed command and derives its exact commitment.\n");
+    output.push_str("    pub fn admit_command<H: CommitmentHasher>(\n");
+    output.push_str("        &self,\n");
+    writeln!(
+        output,
+        "        command: &crate::generated::{command_type},"
+    )
+    .map_err(|_| BootstrapError::Render)?;
+    output.push_str("        limits: ValidationLimits,\n");
+    output.push_str("    ) -> Result<GeneratedCommandEnvelope, GeneratedProjectError> {\n");
+    output.push_str("        self.validate_catalog::<H>()?;\n");
+    output.push_str("        let value = command.to_value()?;\n");
+    output.push_str("        let admitted = SchemaAdmittedTypeEnvelope::try_new::<H>(\n");
+    output.push_str(
+        "            self.catalog.schema(), TypeId::new(COMMAND_TYPE_ID), value, limits,\n",
+    );
+    output.push_str("        )?;\n");
+    output.push_str("        let commitment = Self::input_commitment::<H>(GeneratedInputKind::Command, &admitted)?;\n");
+    output.push_str("        Ok(GeneratedCommandEnvelope { admitted, commitment })\n");
+    output.push_str("    }\n\n");
+    output.push_str(
+        "    /// Admits a typed authenticated context and derives its exact commitment.\n",
+    );
+    output.push_str("    pub fn admit_context<H: CommitmentHasher>(\n");
+    output.push_str("        &self,\n");
+    writeln!(
+        output,
+        "        context: &crate::generated::{context_type},"
+    )
+    .map_err(|_| BootstrapError::Render)?;
+    output.push_str("        limits: ValidationLimits,\n");
+    output.push_str("    ) -> Result<GeneratedContextEnvelope, GeneratedProjectError> {\n");
+    output.push_str("        self.validate_catalog::<H>()?;\n");
+    output.push_str("        let value = context.to_value()?;\n");
+    output.push_str("        let admitted = SchemaAdmittedTypeEnvelope::try_new::<H>(\n");
+    output.push_str(
+        "            self.catalog.schema(), TypeId::new(CONTEXT_TYPE_ID), value, limits,\n",
+    );
+    output.push_str("        )?;\n");
+    output.push_str("        let commitment = Self::input_commitment::<H>(GeneratedInputKind::Context, &admitted)?;\n");
+    output.push_str("        Ok(GeneratedContextEnvelope { admitted, commitment })\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Starts a catalog-aware transition from schema-admitted inputs.\n");
     output.push_str("    pub fn begin_transition<'a, H: CommitmentHasher>(\n");
     output.push_str("        &'a self,\n");
     output.push_str("        pre_state: &'a SchemaAdmittedEnvelope,\n");
     output.push_str("        state_domain: Domain<'a>,\n");
-    output.push_str("        command_hash: Hash32,\n");
-    output.push_str("        context_hash: Hash32,\n");
+    output.push_str("        command: &GeneratedCommandEnvelope,\n");
+    output.push_str("        context: &GeneratedContextEnvelope,\n");
     output.push_str("        budget_used: BudgetUsed,\n");
     output.push_str("        limits: TransitionLimits,\n");
     output
@@ -386,12 +509,53 @@ fn render_generated_project(
     output.push_str("        if pre_state.root_type() != TypeId::new(STATE_TYPE_ID) {\n");
     output.push_str("            return Err(GeneratedProjectError::RootTypeMismatch { expected: STATE_TYPE_ID, actual: pre_state.root_type().get() });\n");
     output.push_str("        }\n");
+    output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Command, command.admitted(), command.commitment())?;\n");
+    output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Context, context.admitted(), context.commitment())?;\n");
     output.push_str("        Ok(CataloguedTransitionBuilder::try_new(\n");
     output.push_str(
-        "            &self.catalog, pre_state.value().value(), state_domain, command_hash,\n",
+        "            &self.catalog, pre_state.value().value(), state_domain, command.commitment(),\n",
     );
-    output.push_str("            context_hash, budget_used, limits,\n");
+    output.push_str("            context.commitment(), budget_used, limits,\n");
     output.push_str("        )?)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    fn validate_input<H: CommitmentHasher>(\n");
+    output.push_str("        kind: GeneratedInputKind,\n");
+    output.push_str("        admitted: &SchemaAdmittedTypeEnvelope,\n");
+    output.push_str("        expected_commitment: Hash32,\n");
+    output.push_str("    ) -> Result<(), GeneratedProjectError> {\n");
+    output.push_str("        let expected_type = match kind {\n");
+    output.push_str("            GeneratedInputKind::Command => COMMAND_TYPE_ID,\n");
+    output.push_str("            GeneratedInputKind::Context => CONTEXT_TYPE_ID,\n");
+    output.push_str("        };\n");
+    output.push_str("        if admitted.schema_hash() != SCHEMA_HASH {\n");
+    output.push_str("            return Err(GeneratedProjectError::InputSchemaHashMismatch { kind, expected: SCHEMA_HASH, actual: admitted.schema_hash() });\n");
+    output.push_str("        }\n");
+    output.push_str("        if admitted.type_id() != TypeId::new(expected_type) {\n");
+    output.push_str("            return Err(GeneratedProjectError::InputTypeMismatch { kind, expected: expected_type, actual: admitted.type_id().get() });\n");
+    output.push_str("        }\n");
+    output.push_str("        let actual = Self::input_commitment::<H>(kind, admitted)?;\n");
+    output.push_str("        if actual != expected_commitment {\n");
+    output.push_str("            return Err(GeneratedProjectError::InputCommitmentMismatch { kind, expected: expected_commitment, actual });\n");
+    output.push_str("        }\n");
+    output.push_str("        Ok(())\n");
+    output.push_str("    }\n\n");
+    output.push_str("    fn input_commitment<H: CommitmentHasher>(\n");
+    output.push_str("        kind: GeneratedInputKind,\n");
+    output.push_str("        admitted: &SchemaAdmittedTypeEnvelope,\n");
+    output.push_str("    ) -> Result<Hash32, GeneratedProjectError> {\n");
+    output.push_str("        let domain_name = match kind {\n");
+    output.push_str("            GeneratedInputKind::Command => COMMAND_DOMAIN,\n");
+    output.push_str("            GeneratedInputKind::Context => CONTEXT_DOMAIN,\n");
+    output.push_str("        };\n");
+    output.push_str(
+        "        let domain = Domain::new(domain_name, INPUT_COMMITMENT_FORMAT_VERSION)?;\n",
+    );
+    output.push_str("        let bytes = admitted.canonical_bytes()?;\n");
+    output.push_str("        let value = commitment::<H>(domain, &bytes)?;\n");
+    output.push_str("        if value == Hash32::ZERO {\n");
+    output.push_str("            return Err(GeneratedProjectError::ZeroInputCommitment(kind));\n");
+    output.push_str("        }\n");
+    output.push_str("        Ok(value)\n");
     output.push_str("    }\n\n");
     output.push_str("    fn validate_catalog<H: CommitmentHasher>(&self) -> Result<(), GeneratedProjectError> {\n");
     output.push_str("        if H::ALGORITHM_ID != HASH_ALGORITHM_ID {\n");
@@ -636,7 +800,7 @@ pub(crate) fn render_ci(spec: &BootstrapSpec) -> String {
 
 pub(crate) fn render_architecture(catalog: &ProjectCatalog, spec: &BootstrapSpec) -> String {
     format!(
-        "# {} bootstrap architecture\n\nGenerated by `{}` from the reviewed `{}/{}` catalog.\n\n## Authority boundary\n\nThe schema, profile, catalog, stable identifiers, policies, and resource limits are inputs. This package only renders them into inspectable starter artifacts. Runtime execution, migration activation, evidence acceptance, proof claims, promotion, and release remain outside generator authority.\n\nThe generated private-field `GeneratedProject` reconstructs the exact catalog and rechecks its schema, profile, complete catalog, and provider commitments. Its transition entry point accepts the exact schema-admitted root envelope rather than a raw value or caller-supplied catalog.\n\n## Pure transition path\n\n```text\nexact generated catalog + schema-admitted root + command/context commitments\n  -> typed helpers\n  -> CataloguedTransitionBuilder\n  -> catalog validation\n  -> Accept | Reject | CommittedFailure\n  -> candidate-bound CommitBundle\n```\n\n## Explicit nonclaims\n\n- The runtime skeleton is not a mounted runtime.\n- The migration stub authorizes no migration.\n- The evidence manifest contains no satisfied evidence.\n- Exact catalog reconstruction does not prove business-policy correctness.\n- Generation is not a proof or production-readiness claim.\n\n## Deterministic output bounds\n\n- Files: at most {}.\n- Bytes per file: at most {}.\n- Aggregate bytes: at most {}.\n",
+        "# {} bootstrap architecture\n\nGenerated by `{}` from the reviewed `{}/{}` catalog.\n\n## Authority boundary\n\nThe schema, profile, catalog, stable identifiers, policies, and resource limits are inputs. This package only renders them into inspectable starter artifacts. Runtime execution, migration activation, evidence acceptance, proof claims, promotion, and release remain outside generator authority.\n\nThe generated private-field `GeneratedProject` reconstructs the exact catalog and rechecks its schema, profile, complete catalog, and provider commitments. Its transition entry point accepts exact schema-admitted root, command, and context witnesses rather than raw values, caller-supplied commitments, or a caller-supplied catalog. Command and context commitments use visible role-separated domains derived from the reviewed profile prefix.\n\n## Pure transition path\n\n```text\nexact generated catalog + schema-admitted root/command/context\n  -> derived command/context commitments\n  -> typed helpers\n  -> CataloguedTransitionBuilder\n  -> catalog validation\n  -> Accept | Reject | CommittedFailure\n  -> candidate-bound CommitBundle\n```\n\n## Explicit nonclaims\n\n- The runtime skeleton is not a mounted runtime.\n- The migration stub authorizes no migration.\n- The evidence manifest contains no satisfied evidence.\n- Exact catalog reconstruction does not prove business-policy correctness.\n- Schema admission does not authenticate context provenance.\n- Generation is not a proof or production-readiness claim.\n\n## Deterministic output bounds\n\n- Files: at most {}.\n- Bytes per file: at most {}.\n- Aggregate bytes: at most {}.\n",
         spec.package_name(),
         BOOTSTRAP_GENERATOR_ID,
         catalog.profile().project().as_str(),

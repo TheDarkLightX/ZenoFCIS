@@ -2,14 +2,14 @@
 
 ## Scope
 
-This package adds `SchemaAdmittedEnvelope`, an immutable root-only admission
-witness in `zeno-fcis-schema`. It closes the remaining caller-controlled gap
-between a reviewed `Schema` and `AdmittedEnvelope`.
+This package supplies immutable schema-admission witnesses in `zeno-fcis-schema`.
+`SchemaAdmittedEnvelope` remains root-only. `SchemaAdmittedTypeEnvelope` binds an
+explicit selected type for generated command, context, and other non-root values.
 
-The new constructor validates one owned `Value` against the schema's declared
-root, performs the existing default structural value admission, computes the
-schema commitment using the caller-selected `CommitmentHasher`, and admits the
-complete envelope under the existing default decoder input limit.
+Both constructors validate one owned `Value` against the selected schema type,
+perform the existing default structural value admission, compute the schema
+commitment using the caller-selected `CommitmentHasher`, and admit the complete
+envelope under the existing default decoder input limit.
 
 Raw `Value`, `Envelope`, `AdmittedValue`, and `AdmittedEnvelope` behavior stays
 unchanged. ZCVE/1 bytes, envelope framing, schema bytes, domains, type
@@ -34,6 +34,11 @@ It returns either:
 The caller cannot supply a different type identifier or schema hash. The
 constructor takes the root type from `Schema::root_type()` and computes the
 schema hash from the exact supplied schema.
+
+`SchemaAdmittedTypeEnvelope::try_new::<H>` additionally consumes an explicit
+`TypeId`. It validates against that exact type and binds it into the canonical
+envelope. Higher-level generated wrappers fix this argument to the reviewed
+command or context type so application callers cannot substitute it.
 
 ## Authority boundary
 
@@ -66,7 +71,7 @@ encoded as protocol meaning.
 
 No dependency is added or changed. The implementation uses:
 
-- `Schema::validate_root`;
+- `Schema::validate_root` and `Schema::validate_value`;
 - `Schema::schema_hash`;
 - `AdmittedValue::try_new`;
 - `AdmittedEnvelope::try_new`;
@@ -102,9 +107,10 @@ thread, global mutation, or interior mutability is consulted.
 
 ## Laws and positive cases
 
-1. A witness exists only after successful validation against the supplied
-   schema's declared root.
-2. The bound type identifier equals `Schema::root_type()`.
+1. A witness exists only after successful validation against the selected
+   schema type.
+2. Root admission binds `Schema::root_type()`; selected-type admission binds
+   the exact supplied `TypeId`.
 3. The bound schema hash equals `Schema::schema_hash::<H>()`.
 4. The retained validation report is the exact report from the successful
    root validation.
@@ -145,8 +151,6 @@ thread, global mutation, or interior mutability is consulted.
 - This does not choose or approve a schema, type ID, stable identifier, hash
   provider, migration, or release profile.
 - It does not prove the selected hash provider cryptographically correct.
-- It does not validate non-root schema types or add a caller-selectable type
-  constructor.
 - It does not add application invariants beyond the supplied closed schema.
 - It does not cache canonical bytes or promise constant-time execution.
 - It does not establish wall-clock or allocation performance.
