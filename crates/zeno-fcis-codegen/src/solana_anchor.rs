@@ -772,9 +772,9 @@ fn render_core_builders(
             write!(output, "{}: {}", field.name(), rust_type(field.scalar()))?;
         }
         output.push_str(") -> EventPlan {\n    let mut planned = EventPlan { code: ");
-        write!(
+        writeln!(
             output,
-            "{}, field_count: {}, ..EventPlan::default() }};\n",
+            "{}, field_count: {}, ..EventPlan::default() }};",
             event.code(),
             event.fields().len()
         )?;
