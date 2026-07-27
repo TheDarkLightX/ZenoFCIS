@@ -11,6 +11,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+#![deny(clippy::panic)]
 
 extern crate alloc;
 
@@ -33,7 +34,8 @@ use zeno_fcis_value::{MapEntry, Value, ValueError};
 /// The previous unchecked constructor is intentionally absent:
 ///
 /// ```compile_fail
-/// use zeno_fcis_collections::{LogicalEntry, Value};
+/// use zeno_fcis_collections::LogicalEntry;
+/// use zeno_fcis_value::Value;
 ///
 /// let _ = LogicalEntry::new(vec![0], Value::Unit, Value::Unit);
 /// ```
@@ -173,6 +175,22 @@ mod private {
 /// This trait is sealed: only vetted backends within this crate can implement
 /// it, preventing untested external implementations from entering the
 /// protocol boundary.
+///
+/// Panicking materialization shortcuts are intentionally absent:
+///
+/// ```compile_fail
+/// use zeno_fcis_collections::{BTreeMapBackend, PersistentMap};
+///
+/// let map = BTreeMapBackend::empty();
+/// let _ = map.to_value_map();
+/// ```
+///
+/// ```compile_fail
+/// use zeno_fcis_collections::{BTreeMapBackend, PersistentMap};
+///
+/// let map = BTreeMapBackend::empty();
+/// let _ = map.canonical_bytes();
+/// ```
 pub trait PersistentMap: Clone + private::Sealed {
     /// Creates an empty map.
     fn empty() -> Self;
@@ -221,16 +239,6 @@ pub trait PersistentMap: Clone + private::Sealed {
         Value::map_canonical(entries?).map_err(MapError::from)
     }
 
-    /// Materializes a `Value::Map` in canonical order.
-    ///
-    /// # Panics
-    /// Panics if entries are not in strict sorted order or have duplicate keys.
-    /// Use `try_to_value_map` for fallible construction.
-    fn to_value_map(&self) -> Value {
-        self.try_to_value_map()
-            .unwrap_or_else(|e| panic!("materialize map: {e}"))
-    }
-
     /// Returns canonical bytes for the materialized map.
     ///
     /// Returns an error if the map cannot be encoded.
@@ -238,16 +246,6 @@ pub trait PersistentMap: Clone + private::Sealed {
         self.try_to_value_map()?
             .canonical_bytes()
             .map_err(MapError::from)
-    }
-
-    /// Returns canonical bytes for the materialized map.
-    ///
-    /// # Panics
-    /// Panics if the map cannot be encoded. Use `try_canonical_bytes` for
-    /// fallible construction.
-    fn canonical_bytes(&self) -> Vec<u8> {
-        self.try_canonical_bytes()
-            .unwrap_or_else(|e| panic!("canonical encode: {e}"))
     }
 }
 
@@ -280,5 +278,5 @@ pub use imbl_backend::ImblBackend;
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-#[allow(missing_docs)]
+#[allow(missing_docs, clippy::panic)]
 mod tests;

@@ -89,7 +89,10 @@ fn bench_root_generation(c: &mut Criterion) {
             .iter()
             .fold(BTreeMapBackend::empty(), |m, e| m.insert(e.clone()));
         group.bench_with_input(BenchmarkId::new("btreemap", size), &map, |b, map| {
-            b.iter(|| map.canonical_bytes());
+            b.iter(|| {
+                map.try_canonical_bytes()
+                    .unwrap_or_else(|error| panic!("canonical bytes: {error}"))
+            });
         });
     }
     group.finish();

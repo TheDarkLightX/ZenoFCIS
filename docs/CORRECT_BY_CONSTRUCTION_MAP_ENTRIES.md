@@ -96,6 +96,7 @@ between the reference, `rpds`, and `imbl` backends.
 - compile-fail tests and bounded runtime tests are not unbounded verification;
 - no collection backend is promoted to a production default;
 - no authenticated-tree, database, migration, or project-profile claim is
-  added;
-- this package does not remove the separately documented panicking convenience
-  methods on `PersistentMap`.
+  added.
+
+The subsequent fallible-only materialization boundary is documented in
+`FALLIBLE_PERSISTENT_MAP_API.md`.
