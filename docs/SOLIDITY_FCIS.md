@@ -1,0 +1,180 @@
+# Solidity FCIS scaffold v1
+
+ZenoFCIS can generate a deliberately bounded Solidity architecture for local-state smart contracts:
+
+```text
+private storage projection
+        + command calldata
+        + shell-captured execution context
+        -> internal pure decision
+        -> Accept(next state) | Reject(stable reason)
+        -> invariant check
+        -> atomic storage commit
+        -> committed transition event
+```
+
+The goal is to make the safe architecture the easiest architecture to extend. The v1 generator is intentionally smaller than a general smart-contract framework. It is suitable for closed state machines whose authoritative effects are updates to the generated contract's own storage.
+
+It is not yet a general DeFi effect runtime.
+
+## Generation API
+
+Enable the existing `codegen` feature and construct a closed Solidity-specific specification:
+
+```rust
+use zeno_fcis::{
+    SolidityContractSpec, SolidityField, SolidityScalar, generate_solidity,
+    inspect_solidity_source,
+};
+
+fn field(name: &str, scalar: SolidityScalar) -> SolidityField {
+    SolidityField::try_new(name, scalar).expect("reviewed identifier")
+}
+
+let spec = SolidityContractSpec::try_new(
+    "CounterFcis",
+    vec![
+        field("owner", SolidityScalar::Address),
+        field("counter", SolidityScalar::U128),
+    ],
+    vec![field("delta", SolidityScalar::U128)],
+    vec!["Unauthorized".into(), "Overflow".into()],
+)?;
+
+let generated = generate_solidity(&spec)?;
+assert!(inspect_solidity_source(generated.source()).is_clean());
+std::fs::write(generated.path(), generated.source())?;
+```
+
+The generator emits one abstract Solidity contract. A project derives from that contract and implements only three hooks:
+
+```solidity
+function _commandAdmissible(
+    Command memory command,
+    Context memory context
+) internal pure override returns (bool);
+
+function _invariant(
+    State memory stateValue
+) internal pure override returns (bool);
+
+function _decide(
+    State memory stateValue,
+    Command memory command,
+    Context memory context
+) internal pure override returns (Decision memory);
+```
+
+The Solidity compiler therefore rejects core implementations that directly read contract storage, read `msg`, `block`, or `tx`, emit events, or perform non-pure calls through these hooks.
+
+## Generated authority boundary
+
+The generated base contract owns:
+
+- one-time initialization restricted to the deployment-time initialization authority;
+- private storage fields for the complete admitted state projection;
+- exact state capture before every transition;
+- a domain-separated state hash and command hash;
+- an expected-state-hash precondition to reject stale commands;
+- a recomputed-root check to detect unexpected mutation of the generated storage projection;
+- shell-captured caller, block timestamp, block number, and chain ID;
+- pure command admission, invariant, and decision hooks;
+- validation of `Accept`/`Reject` and rejection-reason consistency;
+- invariant validation before every accepted commit;
+- a non-reentrant execution gate;
+- storage writes before event publication;
+- a domain-separated candidate hash and committed-transition event.
+
+The generated `execute` function is not virtual. Generated storage and root fields are private. Derived contracts cannot override the commit algorithm or directly mutate the generated state projection.
+
+## V1 admitted value surface
+
+V1 accepts only fixed-size ABI scalar fields:
+
+- `bool`
+- `address`
+- `bytes32`
+- `uint8`, `uint16`, `uint32`, `uint64`, `uint128`, `uint256`
+- `int8`, `int16`, `int32`, `int64`, `int128`, `int256`
+
+State and command fields are ordered protocol data. Reordering fields changes ABI encoding, state hashes, command hashes, and candidate hashes and must therefore be treated as a protocol migration.
+
+Dynamic byte strings, strings, arrays, mappings, nested records, tagged sums, and arbitrary user-defined Solidity types are not admitted by v1. This avoids hidden iteration, ambiguous bounds, storage aliasing, and unreviewed encoding behavior in the first backend.
+
+## Rejection model
+
+The caller supplies stable rejection-reason names in explicit precedence order. The generator reserves `RejectReason.None` for accepted decisions.
+
+The shell rejects impossible combinations:
+
+```text
+Reject + None       -> invalid decision
+Accept + non-None   -> invalid decision
+Reject + reason     -> revert TransitionRejected(reason)
+Accept + None       -> validate invariant and commit
+```
+
+Rejected EVM transactions do not commit events or storage. V1 therefore models project-level rejections as custom-error reverts and does not yet expose ZenoFCIS `CommittedFailure` semantics.
+
+## Defense-in-depth source inspection
+
+`inspect_solidity_source` conservatively scans non-comment, non-string source text for mechanisms forbidden by the effect-free profile:
+
+- inline assembly and unchecked arithmetic;
+- low-level `.call`, `.staticcall`, `.delegatecall`, and `.callcode`;
+- `.send` and `.transfer`;
+- `selfdestruct` and legacy `suicide`;
+- `tx.origin`;
+- raw `sstore` and `tstore` references;
+- contract creation expressions.
+
+This scanner is not a Solidity parser. It is a cheap fail-closed policy check intended for generated and agent-authored source before stronger gates run. Compiler checks, pinned compiler known-bug review, static analysis, property tests, formal verification, differential tests, and independent audit remain required according to risk.
+
+## Safe agent or “vibe coding” workflow
+
+A code-generating agent should be allowed to edit only a derived core contract and tests. It should not edit the generated base shell.
+
+Recommended gate order:
+
+```text
+reviewed SolidityContractSpec
+        -> deterministic generated base
+        -> generated-source digest retained
+        -> agent implements only pure hooks
+        -> source-policy inspection
+        -> pinned solc compile
+        -> unit and invariant tests
+        -> fuzz / property tests
+        -> SMTChecker or other formal analysis
+        -> independent review
+        -> deployment-specific authorization
+```
+
+Regenerate rather than hand-editing the base contract. Treat a changed generator identity, field order, reason order, pragma, generated source, or compiler version as evidence requiring review.
+
+## Why the scope is narrow
+
+FCIS separates semantic authority from effect authority, but external calls are themselves an authority boundary. A general generator that accepts arbitrary call targets, calldata, delegate calls, token callbacks, oracle answers, bridge messages, or upgrade hooks would merely move unsafe imperative code into a generic interpreter.
+
+ZenoFCIS should add those capabilities only as closed, typed, bounded plans with explicit validators and domain-specific adapters. The first backend therefore generates no external interaction at all.
+
+## Follow-on packages
+
+A production-oriented Solidity roadmap should add separate reviewed layers rather than widening v1 silently:
+
+1. schema-bound Solidity type generation with exact Rust/Python/Solidity vectors;
+2. canonical patch generation for bounded storage projections;
+3. typed effect catalogs for vetted ERC-20/721/1155 operations without arbitrary calldata;
+4. authenticated oracle and bridge context adapters;
+5. same-candidate receipts and cross-language decision commitments;
+6. Foundry fuzz tests, invariant tests, gas ceilings, and mutation testing;
+7. pinned `solc` compilation plus known-compiler-bug policy;
+8. SMTChecker and external analyzer evidence;
+9. upgrade-safe storage-layout evidence, if upgradeability is admitted at all;
+10. ZenoDEX profile parity against the Rust/Python functional core.
+
+## Explicit nonclaims
+
+This package does not claim that generated or derived contracts are audited, economically correct, side-channel resistant, MEV resistant, oracle safe, upgrade safe, or authorized for production value.
+
+It does not make arbitrary agent-generated Solidity safe. It makes one restricted architecture easier to generate, inspect, and test while refusing several dangerous mechanisms by default.
