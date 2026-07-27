@@ -1,0 +1,9 @@
+generator=zeno-fcis-solidity/2
+machine_hash=bd5c612ad6484fa025e8f2b6dee9a868a9a54bd7beb8c2904760011b854039de
+solc=0.8.36
+openzeppelin-contracts=5.6.1
+optimizer=true
+optimizer_runs=200
+via_ir=false
+capability.7.token=0x0303030303030303030303030303030303030303
+capability.7.runtime_code_hash=0x0404040404040404040404040404040404040404040404040404040404040404
