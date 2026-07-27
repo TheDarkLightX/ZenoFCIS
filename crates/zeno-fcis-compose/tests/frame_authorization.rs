@@ -1,3 +1,5 @@
+//! Regression laws for directional composition-frame authorization.
+
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_compose::{
     AccessPath, ClaimEvidence, ComponentContract, ComponentId, CompositionBlocker,
