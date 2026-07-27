@@ -41,6 +41,8 @@ Arbitrary EVM calls, arbitrary Solana CPIs, arbitrary calldata, delegate executi
 - SHA-256 machine, state, command, context, plan, and candidate receipts;
 - a generation manifest and agent-editing policy.
 
+The original effect-free Solidity scaffold remains available for small local-state machines. New value-moving applications should start from the shared on-chain model and the capability-bound v2 generator rather than widening the v1 shell by hand.
+
 The generator expects OpenZeppelin Contracts `5.6.1`. The generated import path is conventional; dependency locking, source digest retention, and compiler invocation belong in the consuming project and its CI evidence.
 
 ## Observation policy
