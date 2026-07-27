@@ -1,0 +1,41 @@
+name: agent-rustfmt-solidity
+
+on:
+  push:
+    branches:
+      - agent/solidity-fcis-v1-20260727
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent-rustfmt-solidity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: true
+          ref: agent/solidity-fcis-v1-20260727
+
+      - name: Install pinned Rust formatter
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+
+      - name: Format exact workspace
+        run: cargo +1.97.1 fmt --all
+
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/zeno-fcis-codegen/src/lib.rs crates/zeno-fcis-codegen/src/solidity.rs crates/zeno-fcis/src/lib.rs
+          git commit -m "Format Solidity FCIS generator"
+          git push origin HEAD:agent/solidity-fcis-v1-20260727
