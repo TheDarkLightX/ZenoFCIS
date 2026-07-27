@@ -1,0 +1,79 @@
+name: agent-trace-solana-finalizer
+
+on:
+  pull_request:
+  push:
+    branches:
+      - agent/solana-fcis-v1-20260727
+
+permissions:
+  contents: write
+
+jobs:
+  trace:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: true
+          ref: agent/solana-fcis-v1-20260727
+
+      - name: Trace transformation stages
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import traceback
+
+          report = []
+          try:
+              text = Path("crates/zeno-fcis-codegen/src/solana_anchor.rs").read_text(encoding="utf-8")
+              report.append("read-solana")
+              block_start = text.index('\n    let shell_source = files\n        .iter()\n        .find(|file| file.path().ends_with("programs/"))')
+              block_end = text.index('\n    let shell_source = files\n        .iter()\n        .find(|file| file.path().contains("programs/")', block_start)
+              report.append(f"shell-block={block_start}:{block_end}")
+              assert text.count('ProjectCore, State, MACHINE_HASH}};') == 1
+              report.append("import-marker")
+              assert text.count('state.version = 1;') == 1
+              report.append("version-marker")
+              assert text.count('-> EffectPlan {{\\n    EffectPlan {{') == 1
+              report.append("effect-marker")
+              start = text.index("fn encode_bytes32(")
+              end = text.index("fn rust_type", start)
+              report.append(f"encode-block={start}:{end}")
+
+              codegen = Path("crates/zeno-fcis-codegen/src/lib.rs").read_text(encoding="utf-8")
+              assert codegen.count("mod root_envelope;\n") == 1
+              assert codegen.count("pub use render::{GENERATOR_ID, generate};\n") == 1
+              report.append("codegen-markers")
+
+              umbrella = Path("crates/zeno-fcis/src/lib.rs").read_text(encoding="utf-8")
+              markers = [
+                  "    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GeneratedOnchainBundle,\n",
+                  "    GeneratedOnchainFile, GeneratedSolidity, GenerationSpec, MAX_ONCHAIN_CAPABILITIES,\n",
+                  "    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,\n",
+                  "    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,\n    generate_advanced_solidity, generate_solidity, inspect_solidity_source,\n",
+              ]
+              for index, marker in enumerate(markers):
+                  report.append(f"umbrella-{index}={umbrella.count(marker)}")
+              report.append("complete")
+          except Exception:
+              report.append(traceback.format_exc())
+
+          Path(".agent-diagnostics").mkdir(exist_ok=True)
+          Path(".agent-diagnostics/solana-finalizer-trace.txt").write_text(
+              "\n".join(report) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Commit trace
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .agent-diagnostics/solana-finalizer-trace.txt
+          git commit -m "Trace Solana finalizer failure"
+          git pull --rebase origin agent/solana-fcis-v1-20260727
+          git push origin HEAD:agent/solana-fcis-v1-20260727
