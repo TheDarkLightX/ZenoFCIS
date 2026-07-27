@@ -47,7 +47,7 @@ pub(crate) fn render_rust_project(
     output.push_str(
         "use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};\n",
     );
-    output.push_str("use zeno_fcis_compose::AccessPath;\n");
+    output.push_str("use zeno_fcis_compose::{AccessPath, PathAtom};\n");
     output.push_str("use zeno_fcis_core::BudgetUsed;\n");
     output.push_str("use zeno_fcis_plan::{Effect, OutboxEntry};\n");
     output.push_str("use zeno_fcis_project::{\n");
@@ -397,10 +397,7 @@ fn render_generated_transition(
     output.push_str("impl<'a, H: CommitmentHasher> GeneratedTransition<'a, H> {\n");
     render_generated_root_read_methods(output, catalog)?;
     render_generated_root_update_methods(output, catalog)?;
-    output.push_str("    /// Records one exact context observation.\n");
-    output.push_str("    pub fn observe_context(&mut self, path: AccessPath) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str("        self.inner.observe_context(path)?;\n        Ok(self)\n");
-    output.push_str("    }\n\n");
+    render_generated_context_observation_methods(output, catalog)?;
     render_generated_effect_methods(output, catalog)?;
     render_generated_channel_methods(output, catalog)?;
     output.push_str("    /// Records an ordinary rejection when `condition` is false.\n");
@@ -421,6 +418,37 @@ fn render_generated_transition(
     output.push_str("        Ok(self.inner.seal()?)\n");
     output.push_str("    }\n");
     output.push_str("}\n\n");
+    Ok(())
+}
+
+fn render_generated_context_observation_methods(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+) -> Result<(), BootstrapError> {
+    let context_type = zeno_fcis_schema::TypeId::new(catalog.profile().context_type().get());
+    let context = catalog
+        .schema()
+        .type_by_id(context_type)
+        .ok_or(BootstrapError::UnknownSchemaType(context_type))?;
+    let TypeKind::Record { fields } = context.kind() else {
+        output
+            .push_str("    /// Records observation of the complete schema-typed context value.\n");
+        output.push_str("    pub fn observe_context_root(&mut self) -> Result<&mut Self, GeneratedProjectError> {\n");
+        output.push_str("        let path = AccessPath::try_new(CONTEXT_TYPE_ID, vec![])\n");
+        output.push_str("            .map_err(TransitionError::from)?;\n");
+        output.push_str("        self.inner.observe_context(path)?;\n        Ok(self)\n");
+        output.push_str("    }\n\n");
+        return Ok(());
+    };
+    for field in fields {
+        let field_name = field.name().as_str();
+        writeln!(
+            output,
+            "    /// Records observation of context field `{field_name}`.\n    pub fn observe_context_{field_name}(\n        &mut self,\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        let path = AccessPath::try_new(\n            CONTEXT_TYPE_ID,\n            vec![PathAtom::Field({})],\n        )\n        .map_err(TransitionError::from)?;\n        self.inner.observe_context(path)?;\n        Ok(self)\n    }}\n",
+            field.id().get()
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
     Ok(())
 }
 
