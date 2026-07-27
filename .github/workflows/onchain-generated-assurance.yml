@@ -1,0 +1,107 @@
+name: onchain-generated-assurance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeno-fcis-onchain-generated-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generated-onchain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SOLC_VERSION: 0.8.36
+      SOLC_BUILD: 8a079791
+      SOLC_SHA256: c8d35afdddc3cd2743ee88b8f25e0fecd16e2bdd5f2120f37e52cd9cc45ae0e6
+      OPENZEPPELIN_COMMIT: 5fd1781b1454fd1ef8e722282f86f9293cacf256
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Regenerate retained fixtures
+        run: |
+          rm -rf /tmp/onchain-generated
+          cargo +1.97.1 run \
+            -p zeno-fcis-codegen-fixture \
+            --bin generate_onchain_fixtures \
+            --locked -- \
+            /tmp/onchain-generated
+          diff -ru --no-dereference fixtures/onchain-generated /tmp/onchain-generated
+
+      - name: Install SHA-verified Solidity compiler
+        run: |
+          curl --fail --location --proto '=https' --tlsv1.2 \
+            --output /tmp/solc \
+            "https://binaries.soliditylang.org/linux-amd64/solc-linux-amd64-v${SOLC_VERSION}+commit.${SOLC_BUILD}"
+          printf '%s  %s\n' "${SOLC_SHA256}" /tmp/solc | sha256sum --check --strict
+          chmod 0555 /tmp/solc
+          /tmp/solc --version | grep --fixed-strings "Version: ${SOLC_VERSION}+commit.${SOLC_BUILD}.Linux.g++"
+
+      - name: Checkout exact OpenZeppelin source
+        run: |
+          rm -rf /tmp/openzeppelin-contracts
+          git clone --filter=blob:none --no-checkout \
+            https://github.com/OpenZeppelin/openzeppelin-contracts.git \
+            /tmp/openzeppelin-contracts
+          git -C /tmp/openzeppelin-contracts fetch --depth=1 origin "${OPENZEPPELIN_COMMIT}"
+          git -C /tmp/openzeppelin-contracts checkout --detach "${OPENZEPPELIN_COMMIT}"
+          test "$(git -C /tmp/openzeppelin-contracts rev-parse HEAD)" = "${OPENZEPPELIN_COMMIT}"
+          test "$(python3 -c 'import json; print(json.load(open("/tmp/openzeppelin-contracts/contracts/package.json"))["version"])')" = "5.6.1"
+
+      - name: Compile retained Solidity fixture
+        run: |
+          rm -rf /tmp/solidity-build
+          mkdir -p /tmp/solidity-build
+          /tmp/solc \
+            --base-path fixtures/onchain-generated/solidity/treasury_machine \
+            --allow-paths fixtures/onchain-generated/solidity/treasury_machine,/tmp/openzeppelin-contracts/contracts \
+            --optimize \
+            --optimize-runs 200 \
+            --abi \
+            --bin \
+            --metadata \
+            --overwrite \
+            --output-dir /tmp/solidity-build \
+            "@openzeppelin/contracts/=/tmp/openzeppelin-contracts/contracts/" \
+            fixtures/onchain-generated/solidity/treasury_machine/TreasuryMachineFixture.sol
+          test -s /tmp/solidity-build/TreasuryMachineFixture.bin
+          test -s /tmp/solidity-build/TreasuryMachineFixture.abi
+
+      - name: Compile retained Anchor workspace
+        run: |
+          rm -rf /tmp/solana-generated
+          cp -a fixtures/onchain-generated/solana /tmp/solana-generated
+          cargo +1.97.1 generate-lockfile --manifest-path /tmp/solana-generated/Cargo.toml
+          cargo +1.97.1 check \
+            --manifest-path /tmp/solana-generated/Cargo.toml \
+            --workspace \
+            --all-targets \
+            --locked
+
+      - name: Check generator implementation
+        run: |
+          cargo +1.97.1 fmt --all -- --check
+          cargo +1.97.1 clippy \
+            -p zeno-fcis-codegen \
+            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis \
+            --all-targets --all-features --locked -- -D warnings
+          cargo +1.97.1 test \
+            -p zeno-fcis-codegen \
+            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis \
+            --all-features --locked
