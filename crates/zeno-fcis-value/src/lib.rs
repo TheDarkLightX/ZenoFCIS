@@ -357,10 +357,27 @@ impl Value {
         Self::Bytes(bytes.into_boxed_slice())
     }
 
-    /// Creates ASCII text.
+    /// Creates ASCII text admitted by the default payload ceiling.
+    ///
+    /// A single text leaf cannot exceed
+    /// [`ValueLimits::DEFAULT_MAX_PAYLOAD_BYTES`]. Enclosing values must still
+    /// call [`Self::validate_limits`] because several individually admitted
+    /// leaves can exceed the aggregate payload budget.
     pub fn text_ascii(text: String) -> Result<Self, TextError> {
+        Self::text_ascii_with_max(text, ValueLimits::DEFAULT_MAX_PAYLOAD_BYTES)
+    }
+
+    fn text_ascii_with_max(text: String, maximum: usize) -> Result<Self, TextError> {
         if !text.is_ascii() {
             return Err(TextError::NonAscii);
+        }
+        let actual = text.len();
+        if actual > maximum {
+            return Err(TextError::TooLong(LengthError {
+                minimum: 0,
+                maximum,
+                actual,
+            }));
         }
         Ok(Self::Text(text.into_boxed_str()))
     }
@@ -607,12 +624,20 @@ pub struct ValueLimits {
     pub max_collection_len: u32,
 }
 
+impl ValueLimits {
+    /// Default maximum aggregate byte and text payload bytes.
+    ///
+    /// [`Value::text_ascii`] also uses this ceiling for one text leaf so that
+    /// its successful output is admissible under the default payload budget.
+    pub const DEFAULT_MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
+}
+
 impl Default for ValueLimits {
     fn default() -> Self {
         Self {
             max_depth: 64,
             max_nodes: 1_000_000,
-            max_payload_bytes: 64 * 1024 * 1024,
+            max_payload_bytes: u64::try_from(Self::DEFAULT_MAX_PAYLOAD_BYTES).unwrap_or(u64::MAX),
             max_collection_len: 1_000_000,
         }
     }
@@ -811,6 +836,73 @@ mod tests {
         assert!(value.is_ok());
         let error = BoundedVec::<u8, 1, 3>::try_from_vec(Vec::new());
         assert!(error.is_err());
+    }
+
+    #[test]
+    fn value_ascii_text_accepts_exact_bound() {
+        let value = Value::text_ascii_with_max(String::from("abc"), 3);
+        assert_eq!(value, Ok(Value::Text(String::from("abc").into_boxed_str())));
+    }
+
+    #[test]
+    fn value_ascii_text_rejects_one_over_bound() {
+        let error = Value::text_ascii_with_max(String::from("abcd"), 3);
+        match error {
+            Err(TextError::TooLong(length)) => {
+                assert_eq!(length.minimum(), 0);
+                assert_eq!(length.maximum(), 3);
+                assert_eq!(length.actual(), 4);
+            }
+            other => panic!("expected exact text length error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn value_ascii_text_preserves_non_ascii_precedence() {
+        assert_eq!(
+            Value::text_ascii_with_max(String::from("é"), 0),
+            Err(TextError::NonAscii)
+        );
+    }
+
+    #[test]
+    fn default_text_ceiling_matches_default_payload_limit() {
+        assert_eq!(
+            ValueLimits::default().max_payload_bytes,
+            u64::try_from(ValueLimits::DEFAULT_MAX_PAYLOAD_BYTES).unwrap_or(u64::MAX)
+        );
+    }
+
+    #[test]
+    fn admitted_text_keeps_exact_zcve_bytes() {
+        let value =
+            Value::text_ascii(String::from("abc")).unwrap_or_else(|error| panic!("text: {error}"));
+        assert_eq!(
+            value.zcve_bytes(),
+            Ok(vec![zcve::TAG_TEXT, 0, 0, 0, 3, b'a', b'b', b'c'])
+        );
+    }
+
+    #[test]
+    fn individually_admitted_text_leaves_still_obey_aggregate_limits() {
+        let first = Value::text_ascii(String::from("ab"));
+        let second = Value::text_ascii(String::from("cd"));
+        assert!(first.is_ok() && second.is_ok());
+        let value = Value::vector(vec![
+            first.unwrap_or_else(|error| panic!("first text: {error}")),
+            second.unwrap_or_else(|error| panic!("second text: {error}")),
+        ]);
+        let limits = ValueLimits {
+            max_payload_bytes: 3,
+            ..ValueLimits::default()
+        };
+        assert_eq!(
+            value.validate_limits(limits),
+            Err(ValueError::PayloadLimit {
+                limit: 3,
+                attempted: 4,
+            })
+        );
     }
 
     #[test]
