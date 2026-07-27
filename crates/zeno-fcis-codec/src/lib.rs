@@ -21,6 +21,7 @@ use zeno_fcis_value::zcve::{
 };
 use zeno_fcis_value::{AdmittedValue, Field, MapEntry, Value, ValueError, ValueLimits};
 const ENVELOPE_MAGIC: &[u8; 8] = b"ZFCISV1\0";
+const ENVELOPE_OVERHEAD_BYTES: u64 = 8 + 4 + 32 + 4;
 const HASH_MAGIC: &[u8; 14] = b"ZENOFCIS-HASH\0";
 
 /// A 256-bit commitment value.
@@ -215,6 +216,125 @@ impl Envelope {
     }
 }
 
+/// A canonical envelope admitted under the reviewed default value and input
+/// limits.
+///
+/// Construction owns an [`AdmittedValue`] and retains its exact canonical
+/// payload length. Private fields prevent callers from pairing a different
+/// value with that retained length:
+///
+/// ```compile_fail
+/// use zeno_fcis_codec::{AdmittedEnvelope, Hash32};
+/// use zeno_fcis_value::{AdmittedValue, Value};
+///
+/// let value = AdmittedValue::try_new(Value::Unit)?;
+/// let _ = AdmittedEnvelope {
+///     type_id: 1,
+///     schema_hash: Hash32::ZERO,
+///     value,
+///     payload_length: 1,
+/// };
+/// # Ok::<(), zeno_fcis_value::ValueError>(())
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdmittedEnvelope {
+    type_id: u32,
+    schema_hash: Hash32,
+    value: AdmittedValue,
+    payload_length: u32,
+}
+
+impl AdmittedEnvelope {
+    /// Creates an envelope whose complete canonical bytes fit the default
+    /// decoder input limit.
+    pub fn try_new(
+        type_id: u32,
+        schema_hash: Hash32,
+        value: AdmittedValue,
+    ) -> Result<Self, EncodeError> {
+        Self::try_new_with_limit(
+            type_id,
+            schema_hash,
+            value,
+            DecodeLimits::DEFAULT_MAX_INPUT_BYTES,
+        )
+    }
+
+    fn try_new_with_limit(
+        type_id: u32,
+        schema_hash: Hash32,
+        value: AdmittedValue,
+        max_input_bytes: u64,
+    ) -> Result<Self, EncodeError> {
+        let payload = value.canonical_bytes()?;
+        let payload_length =
+            u32::try_from(payload.len()).map_err(|_| EncodeError::LengthOverflow)?;
+        let attempted = ENVELOPE_OVERHEAD_BYTES
+            .checked_add(u64::from(payload_length))
+            .ok_or(EncodeError::LengthOverflow)?;
+        if attempted > max_input_bytes {
+            return Err(EncodeError::EnvelopeInputLimit {
+                limit: max_input_bytes,
+                attempted,
+            });
+        }
+        Ok(Self {
+            type_id,
+            schema_hash,
+            value,
+            payload_length,
+        })
+    }
+
+    /// Admits an existing raw envelope under the reviewed default limits.
+    pub fn try_from_envelope(envelope: Envelope) -> Result<Self, EncodeError> {
+        let value = AdmittedValue::try_new(envelope.value).map_err(map_value_encode_error)?;
+        Self::try_new(envelope.type_id, envelope.schema_hash, value)
+    }
+
+    /// Returns the type identifier.
+    #[must_use]
+    pub const fn type_id(&self) -> u32 {
+        self.type_id
+    }
+
+    /// Returns the schema hash.
+    #[must_use]
+    pub const fn schema_hash(&self) -> Hash32 {
+        self.schema_hash
+    }
+
+    /// Returns the admitted immutable value.
+    #[must_use]
+    pub const fn value(&self) -> &AdmittedValue {
+        &self.value
+    }
+
+    /// Returns the exact canonical payload length retained at admission.
+    #[must_use]
+    pub const fn payload_length(&self) -> u32 {
+        self.payload_length
+    }
+
+    /// Returns the complete canonical envelope length.
+    #[must_use]
+    pub fn encoded_length(&self) -> u64 {
+        ENVELOPE_OVERHEAD_BYTES + u64::from(self.payload_length)
+    }
+
+    /// Consumes the wrapper and returns the admitted value.
+    #[must_use]
+    pub fn into_value(self) -> AdmittedValue {
+        self.value
+    }
+
+    /// Consumes the wrapper and returns the compatible raw envelope.
+    #[must_use]
+    pub fn into_envelope(self) -> Envelope {
+        Envelope::new(self.type_id, self.schema_hash, self.value.into_value())
+    }
+}
+
 impl CanonicalEncode for Envelope {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(ENVELOPE_MAGIC);
@@ -222,6 +342,16 @@ impl CanonicalEncode for Envelope {
         output.extend_from_slice(self.schema_hash.as_bytes());
         let payload = self.value.canonical_bytes()?;
         put_bytes(output, &payload)
+    }
+}
+
+impl CanonicalEncode for AdmittedEnvelope {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(ENVELOPE_MAGIC);
+        output.extend_from_slice(&self.type_id.to_be_bytes());
+        output.extend_from_slice(self.schema_hash.as_bytes());
+        output.extend_from_slice(&self.payload_length.to_be_bytes());
+        self.value.encode_to(output)
     }
 }
 
@@ -237,10 +367,15 @@ pub struct DecodeLimits {
 impl Default for DecodeLimits {
     fn default() -> Self {
         Self {
-            max_input_bytes: 64 * 1024 * 1024,
+            max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
             value: ValueLimits::default(),
         }
     }
+}
+
+impl DecodeLimits {
+    /// Reviewed default maximum for complete input bytes.
+    pub const DEFAULT_MAX_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 }
 
 /// Decodes one value and rejects trailing bytes and noncanonical aliases.
@@ -575,6 +710,13 @@ pub enum EncodeError {
     MapKeyMismatch,
     /// Domain names must be non-empty bounded ASCII.
     InvalidDomain,
+    /// A complete admitted envelope exceeds the default decoder input limit.
+    EnvelopeInputLimit {
+        /// Reviewed input limit.
+        limit: u64,
+        /// Attempted complete envelope bytes.
+        attempted: u64,
+    },
     /// The value itself violates closed-value invariants.
     InvalidValue(ValueError),
 }
@@ -590,6 +732,10 @@ impl fmt::Display for EncodeError {
                 formatter.write_str("map encoded key does not match semantic key")
             }
             Self::InvalidDomain => formatter.write_str("invalid domain-separation tag"),
+            Self::EnvelopeInputLimit { limit, attempted } => write!(
+                formatter,
+                "canonical envelope bytes {attempted} exceeds input limit {limit}"
+            ),
             Self::InvalidValue(error) => error.fmt(formatter),
         }
     }
@@ -864,6 +1010,94 @@ mod tests {
         assert_eq!(
             decode_envelope(&bytes, DecodeLimits::default()),
             Ok(envelope)
+        );
+    }
+
+    #[test]
+    fn admitted_envelope_matches_raw_bytes_and_is_repeatable() {
+        let raw = Envelope::new(
+            7,
+            Hash32::new([3; 32]),
+            Value::tuple(vec![Value::U128(9), Value::Bool(true)]),
+        );
+        let raw_bytes = raw
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("raw envelope: {error}"));
+        let admitted_value = AdmittedValue::try_new(raw.value().clone())
+            .unwrap_or_else(|error| panic!("value admission: {error}"));
+        let admitted = AdmittedEnvelope::try_new(raw.type_id(), raw.schema_hash(), admitted_value)
+            .unwrap_or_else(|error| panic!("envelope admission: {error}"));
+        let first = admitted
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("first encoding: {error}"));
+        let second = admitted
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("second encoding: {error}"));
+
+        assert_eq!(first, raw_bytes);
+        assert_eq!(second, raw_bytes);
+        assert_eq!(
+            decode_envelope(&first, DecodeLimits::default()),
+            Ok(raw.clone())
+        );
+        assert_eq!(
+            admitted.encoded_length(),
+            u64::try_from(raw_bytes.len()).unwrap_or(u64::MAX)
+        );
+        assert_eq!(
+            admitted.payload_length(),
+            u32::try_from(
+                raw.value()
+                    .canonical_bytes()
+                    .unwrap_or_else(|error| panic!("raw value: {error}"))
+                    .len()
+            )
+            .unwrap_or(u32::MAX)
+        );
+        assert_eq!(admitted.into_envelope(), raw);
+    }
+
+    #[test]
+    fn admitted_envelope_limit_is_exact() {
+        let admitted_value = AdmittedValue::try_new(Value::Bool(true))
+            .unwrap_or_else(|error| panic!("value admission: {error}"));
+        let exact = ENVELOPE_OVERHEAD_BYTES + 1;
+        let admitted = AdmittedEnvelope::try_new_with_limit(
+            1,
+            Hash32::new([1; 32]),
+            admitted_value.clone(),
+            exact,
+        );
+        assert!(admitted.is_ok());
+        assert_eq!(
+            AdmittedEnvelope::try_new_with_limit(
+                1,
+                Hash32::new([1; 32]),
+                admitted_value,
+                exact - 1,
+            ),
+            Err(EncodeError::EnvelopeInputLimit {
+                limit: exact - 1,
+                attempted: exact,
+            })
+        );
+    }
+
+    #[test]
+    fn raw_envelope_admission_is_fail_closed() {
+        let valid = Envelope::new(1, Hash32::new([2; 32]), Value::U128(3));
+        let admitted = AdmittedEnvelope::try_from_envelope(valid.clone())
+            .unwrap_or_else(|error| panic!("envelope admission: {error}"));
+        assert_eq!(admitted.into_envelope(), valid);
+
+        let invalid = Envelope::new(
+            1,
+            Hash32::new([2; 32]),
+            Value::Text(String::from("é").into_boxed_str()),
+        );
+        assert_eq!(
+            AdmittedEnvelope::try_from_envelope(invalid),
+            Err(EncodeError::NonAsciiText)
         );
     }
 }
