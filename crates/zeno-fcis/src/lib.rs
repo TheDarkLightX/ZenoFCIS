@@ -151,9 +151,9 @@ pub use zeno_fcis_refine::{
 };
 #[cfg(feature = "schema")]
 pub use zeno_fcis_schema::{
-    EnumVariantDef, FieldDef, FieldId, Schema, SchemaAdmittedEnvelope, SchemaEnvelopeError,
-    SchemaError, SchemaLimits, SchemaMetrics, SchemaName, SumVariantDef, TypeDef, TypeId, TypeKind,
-    ValidationLimits, ValidationReport, ValueValidationError, VariantId,
+    EnumVariantDef, FieldDef, FieldId, Schema, SchemaAdmittedEnvelope, SchemaAdmittedTypeEnvelope,
+    SchemaEnvelopeError, SchemaError, SchemaLimits, SchemaMetrics, SchemaName, SumVariantDef,
+    TypeDef, TypeId, TypeKind, ValidationLimits, ValidationReport, ValueValidationError, VariantId,
 };
 #[cfg(feature = "secret")]
 pub use zeno_fcis_secret::{
