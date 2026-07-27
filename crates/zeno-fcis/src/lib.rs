@@ -113,8 +113,8 @@ pub use zeno_fcis_compose::{
     PathSet, Wiring, conflicts, verify_assume_guarantee, verify_deterministic_parallel,
 };
 pub use zeno_fcis_core::{
-    Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, Decision, DecisionKind, Failed,
-    Rejected, Resource, StableReason, Transition, first_reason,
+    Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, BudgetedDecision, Decision,
+    DecisionKind, Failed, Rejected, Resource, StableReason, Transition, first_reason,
 };
 #[cfg(feature = "verified-sha256")]
 pub use zeno_fcis_crypto::LibcruxSha256;
