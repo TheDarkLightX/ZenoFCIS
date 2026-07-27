@@ -737,13 +737,11 @@ mod tests {
 
     #[test]
     fn value_round_trip_is_exact() {
+        let bytes = Value::bytes(vec![1, 2]).unwrap_or_else(|error| panic!("bytes: {error}"));
         let value = Value::record_canonical(vec![
             Field::new(1, Value::U128(42)),
             Field::new(2, Value::Bool(true)),
-            Field::new(
-                3,
-                Value::tuple(vec![Value::I128(-7), Value::bytes(vec![1, 2])]),
-            ),
+            Field::new(3, Value::tuple(vec![Value::I128(-7), bytes])),
         ]);
         assert!(value.is_ok());
         let value = match value {

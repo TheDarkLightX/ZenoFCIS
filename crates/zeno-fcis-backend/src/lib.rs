@@ -1121,12 +1121,14 @@ impl<E: BackendEngine, V: BackendVerifier> CandidateChecker for SynthesisBackend
                     composition_claim,
                 }
             }
-            BackendOutcome::Rejected(rejected) => CheckResult::Rejected {
-                counterexample: bind_verified_counterexample(
-                    rejected.counterexample(),
-                    certificate_hash,
-                ),
-            },
+            BackendOutcome::Rejected(rejected) => {
+                let Some(counterexample) =
+                    bind_verified_counterexample(rejected.counterexample(), certificate_hash)
+                else {
+                    return CheckResult::Indeterminate;
+                };
+                CheckResult::Rejected { counterexample }
+            }
             BackendOutcome::Incomplete(_) | BackendOutcome::Indeterminate(_) => {
                 CheckResult::Indeterminate
             }
@@ -1134,11 +1136,9 @@ impl<E: BackendEngine, V: BackendVerifier> CandidateChecker for SynthesisBackend
     }
 }
 
-fn bind_verified_counterexample(counterexample: &Value, certificate_hash: Hash32) -> Value {
-    Value::tuple(vec![
-        counterexample.clone(),
-        Value::bytes(certificate_hash.as_bytes().to_vec()),
-    ])
+fn bind_verified_counterexample(counterexample: &Value, certificate_hash: Hash32) -> Option<Value> {
+    let certificate = Value::bytes(certificate_hash.as_bytes().to_vec()).ok()?;
+    Some(Value::tuple(vec![counterexample.clone(), certificate]))
 }
 
 fn bind_verified_claim(
