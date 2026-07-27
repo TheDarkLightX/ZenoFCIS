@@ -18,7 +18,7 @@ The semantic kernel treats values, decisions, resource budgets, canonical bytes,
 
 The workspace now includes the complete package ladder:
 
-- semantic values, decisions, deterministic budgets, ZCVE/1 canonical encoding, exact commitments, preconditioned patches, closed plans, receipts, and complete candidate bundles;
+- semantic values with default-bounded `Value::text_ascii` admission, decisions, deterministic budgets, ZCVE/1 canonical encoding, exact commitments, preconditioned patches, closed plans, receipts, and complete candidate bundles;
 - assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation plus deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
