@@ -36,6 +36,7 @@ mod catalog_fixture;
 mod tests {
     use super::generated::*;
     use super::generated::{VectorExpect, VectorKind};
+    use zeno_fcis_catalog::NonZeroHash;
     use zeno_fcis_codec::{
         CanonicalEncode, CommitmentHasher, DecodeLimits, Domain, Hash32, commitment, decode_value,
     };
@@ -317,6 +318,124 @@ mod tests {
         assert_eq!(effect.ordinal(), 7);
         assert_eq!(effect.operation(), 20);
         assert_eq!(effect.payload(), &zeno_fcis_value::Value::U128(9));
+    }
+
+    #[test]
+    fn generated_typed_effect_and_channel_stage_exact_catalog_values() {
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let authority = NonZeroHash::try_new(Hash32::new([1; 32]))
+            .unwrap_or_else(|error| panic!("nonzero authority rejected: {error}"));
+        let mut transition = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        transition
+            .emit_effect_20(7, authority, &Amount(9))
+            .unwrap_or_else(|error| panic!("typed effect failed: {error}"))
+            .enqueue_channel_30(8, &Label("destination".into()), &Event::Stop)
+            .unwrap_or_else(|error| panic!("typed channel failed: {error}"));
+        let decision = transition
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        let artifacts = match &decision {
+            Decision::Accept(artifacts) => artifacts,
+            other => panic!("expected accept, got {other:?}"),
+        };
+        let effects = artifacts.candidate().bundle().commit_plan().effects();
+        assert_eq!(effects.len(), 1);
+        assert_eq!(effects[0].ordinal(), 7);
+        assert_eq!(effects[0].operation(), 20);
+        assert_eq!(effects[0].authority(), authority.get());
+        assert_eq!(effects[0].subject(), Hash32::ZERO);
+        assert_eq!(effects[0].payload(), &zeno_fcis_value::Value::U128(9));
+        let entries = artifacts.candidate().bundle().outbox_plan().entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].ordinal(), 8);
+        assert_eq!(entries[0].channel(), 30);
+        assert_eq!(
+            entries[0].destination(),
+            &zeno_fcis_value::Value::Text("destination".into())
+        );
+        assert_eq!(
+            entries[0].payload(),
+            &zeno_fcis_value::Value::Sum {
+                type_id: 9,
+                variant: 1,
+                payload: None
+            }
+        );
+        validate_transition_decision::<RustCryptoSha256>(
+            &decision,
+            project.catalog(),
+            envelope.value().value(),
+            state_domain(),
+        )
+        .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
+    fn generated_typed_staging_rejects_invalid_values_without_staging() {
+        assert!(NonZeroHash::try_new(Hash32::ZERO).is_err());
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let authority = NonZeroHash::try_new(Hash32::new([1; 32]))
+            .unwrap_or_else(|error| panic!("nonzero authority rejected: {error}"));
+        let mut transition = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        assert!(matches!(
+            transition.emit_effect_20(1, authority, &Amount(1_000_001)),
+            Err(GeneratedProjectError::Adapter(AdapterError::IntegerRange))
+        ));
+        assert!(matches!(
+            transition.enqueue_channel_30(2, &Label("".into()), &Event::Stop),
+            Err(GeneratedProjectError::Adapter(AdapterError::Length))
+        ));
+        let decision = transition
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        let artifacts = match decision {
+            Decision::Accept(artifacts) => artifacts,
+            other => panic!("expected accept, got {other:?}"),
+        };
+        assert!(
+            artifacts
+                .candidate()
+                .bundle()
+                .commit_plan()
+                .effects()
+                .is_empty()
+        );
+        assert!(
+            artifacts
+                .candidate()
+                .bundle()
+                .outbox_plan()
+                .entries()
+                .is_empty()
+        );
     }
 
     #[test]
