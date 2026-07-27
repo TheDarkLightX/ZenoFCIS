@@ -40,6 +40,16 @@ fn make_entry_text(key_text: &str, value_byte: u8) -> LogicalEntry {
         .unwrap_or_else(|error| panic!("logical entry: {error}"))
 }
 
+fn materialized_value<M: PersistentMap>(map: &M) -> Value {
+    map.try_to_value_map()
+        .unwrap_or_else(|error| panic!("materialize map: {error}"))
+}
+
+fn materialized_bytes<M: PersistentMap>(map: &M) -> Vec<u8> {
+    map.try_canonical_bytes()
+        .unwrap_or_else(|error| panic!("canonical bytes: {error}"))
+}
+
 // ---------------------------------------------------------------------------
 // BTreeMapBackend: basic operations
 // ---------------------------------------------------------------------------
@@ -90,8 +100,8 @@ fn btreemap_insertion_history_independence() {
         .insert(make_entry(2, 20))
         .insert(make_entry(3, 30));
     assert_eq!(order_a.to_entries(), order_b.to_entries());
-    assert_eq!(order_a.canonical_bytes(), order_b.canonical_bytes());
-    assert_eq!(order_a.to_value_map(), order_b.to_value_map());
+    assert_eq!(materialized_bytes(&order_a), materialized_bytes(&order_b));
+    assert_eq!(materialized_value(&order_a), materialized_value(&order_b));
 }
 
 // ---------------------------------------------------------------------------
@@ -160,9 +170,9 @@ fn btreemap_old_version_stability() {
     let v1 = BTreeMapBackend::empty()
         .insert(make_entry(1, 10))
         .insert(make_entry(2, 20));
-    let v1_bytes = v1.canonical_bytes();
+    let v1_bytes = materialized_bytes(&v1);
     let _v2 = v1.insert(make_entry(3, 30));
-    assert_eq!(v1.canonical_bytes(), v1_bytes);
+    assert_eq!(materialized_bytes(&v1), v1_bytes);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,8 +185,8 @@ fn btreemap_canonical_bytes_deterministic() {
         .insert(make_entry_text("a", 1))
         .insert(make_entry_text("b", 2))
         .insert(make_entry_text("c", 3));
-    let bytes_a = map.canonical_bytes();
-    let bytes_b = map.canonical_bytes();
+    let bytes_a = materialized_bytes(&map);
+    let bytes_b = materialized_bytes(&map);
     assert_eq!(bytes_a, bytes_b);
 }
 
@@ -220,7 +230,7 @@ fn btreemap_differential_insert_remove_sequence() {
         subject = subject.remove(&encoded_key_for(i));
         assert_eq!(reference.to_entries(), subject.to_entries());
     }
-    assert_eq!(reference.canonical_bytes(), subject.canonical_bytes());
+    assert_eq!(materialized_bytes(&reference), materialized_bytes(&subject));
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +265,7 @@ mod rpds_tests {
             .insert(make_entry(2, 20))
             .insert(make_entry(3, 30));
         assert_eq!(order_a.to_entries(), order_b.to_entries());
-        assert_eq!(order_a.canonical_bytes(), order_b.canonical_bytes());
+        assert_eq!(materialized_bytes(&order_a), materialized_bytes(&order_b));
     }
 
     #[test]
@@ -279,13 +289,13 @@ mod rpds_tests {
             rpds = rpds.insert(entry);
         }
         assert_eq!(btree.to_entries(), rpds.to_entries());
-        assert_eq!(btree.canonical_bytes(), rpds.canonical_bytes());
+        assert_eq!(materialized_bytes(&btree), materialized_bytes(&rpds));
         for i in (1..=20u8).filter(|i| i % 3 == 0) {
             btree = btree.remove(&encoded_key_for(i));
             rpds = rpds.remove(&encoded_key_for(i));
         }
         assert_eq!(btree.to_entries(), rpds.to_entries());
-        assert_eq!(btree.canonical_bytes(), rpds.canonical_bytes());
+        assert_eq!(materialized_bytes(&btree), materialized_bytes(&rpds));
     }
 }
 
@@ -321,7 +331,7 @@ mod imbl_tests {
             .insert(make_entry(2, 20))
             .insert(make_entry(3, 30));
         assert_eq!(order_a.to_entries(), order_b.to_entries());
-        assert_eq!(order_a.canonical_bytes(), order_b.canonical_bytes());
+        assert_eq!(materialized_bytes(&order_a), materialized_bytes(&order_b));
     }
 
     #[test]
@@ -345,13 +355,13 @@ mod imbl_tests {
             imbl = imbl.insert(entry);
         }
         assert_eq!(btree.to_entries(), imbl.to_entries());
-        assert_eq!(btree.canonical_bytes(), imbl.canonical_bytes());
+        assert_eq!(materialized_bytes(&btree), materialized_bytes(&imbl));
         for i in (1..=20u8).filter(|i| i % 3 == 0) {
             btree = btree.remove(&encoded_key_for(i));
             imbl = imbl.remove(&encoded_key_for(i));
         }
         assert_eq!(btree.to_entries(), imbl.to_entries());
-        assert_eq!(btree.canonical_bytes(), imbl.canonical_bytes());
+        assert_eq!(materialized_bytes(&btree), materialized_bytes(&imbl));
     }
 }
 
@@ -384,7 +394,7 @@ fn btreemap_try_canonical_bytes_succeeds() {
 #[test]
 fn btreemap_empty_map_value_is_map() {
     let map = BTreeMapBackend::empty();
-    let value = map.to_value_map();
+    let value = materialized_value(&map);
     assert_eq!(value.kind(), zeno_fcis_value::ValueKind::Map);
 }
 
@@ -470,8 +480,8 @@ fn btreemap_canonical_bytes_round_trip_is_stable() {
         .insert(make_entry(1, 10))
         .insert(make_entry(2, 20))
         .insert(make_entry(3, 30));
-    let bytes_v1 = map.canonical_bytes();
-    let bytes_v2 = map.canonical_bytes();
+    let bytes_v1 = materialized_bytes(&map);
+    let bytes_v2 = materialized_bytes(&map);
     assert_eq!(bytes_v1, bytes_v2, "canonical bytes must be deterministic");
     assert!(
         bytes_v1.len() > 10,
@@ -488,8 +498,8 @@ fn btreemap_canonical_bytes_differ_for_different_maps() {
         .insert(make_entry(1, 10))
         .insert(make_entry(2, 99));
     assert_ne!(
-        map_a.canonical_bytes(),
-        map_b.canonical_bytes(),
+        materialized_bytes(&map_a),
+        materialized_bytes(&map_b),
         "different values must produce different canonical bytes"
     );
 }
@@ -522,7 +532,7 @@ fn btreemap_insertion_order_independence_all_permutations() {
         for entry in &entries {
             map = map.insert(entry.clone());
         }
-        map.canonical_bytes()
+        materialized_bytes(&map)
     };
     for perm in &permutations {
         let mut map = BTreeMapBackend::empty();
@@ -530,7 +540,7 @@ fn btreemap_insertion_order_independence_all_permutations() {
             map = map.insert(entries[idx].clone());
         }
         assert_eq!(
-            map.canonical_bytes(),
+            materialized_bytes(&map),
             reference,
             "insertion order {:?} produced different canonical bytes",
             perm
@@ -544,12 +554,12 @@ fn btreemap_remove_then_reinsert_is_identity() {
         .insert(make_entry(1, 10))
         .insert(make_entry(2, 20))
         .insert(make_entry(3, 30));
-    let original_bytes = original.canonical_bytes();
+    let original_bytes = materialized_bytes(&original);
     let key = encoded_key_for(2);
     let after_remove = original.remove(&key);
     let after_reinsert = after_remove.insert(make_entry(2, 20));
     assert_eq!(
-        after_reinsert.canonical_bytes(),
+        materialized_bytes(&after_reinsert),
         original_bytes,
         "remove then reinsert must produce identical canonical bytes"
     );
@@ -562,8 +572,8 @@ fn btreemap_update_value_changes_bytes_but_key_set_stable() {
         .insert(make_entry(2, 20));
     let updated = original.insert(make_entry(2, 99));
     assert_ne!(
-        original.canonical_bytes(),
-        updated.canonical_bytes(),
+        materialized_bytes(&original),
+        materialized_bytes(&updated),
         "updating a value must change canonical bytes"
     );
     assert_eq!(
