@@ -1,0 +1,12 @@
+unsafe_core=1
+unsafe_shell=1
+redundant_shell_lookup=1
+import_marker=1
+hardcoded_version=1
+effect_builder=1
+encode_start=1
+rust_type_start=0
+map_method=1
+codegen_module=0
+codegen_export=0
+umbrella_export=0
