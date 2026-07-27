@@ -237,7 +237,9 @@ impl fmt::Display for SolidityGenerationError {
                 formatter.write_str("Solidity type and reason names must begin uppercase")
             }
             Self::EmptyList(kind) => write!(formatter, "empty Solidity list: {kind:?}"),
-            Self::LimitExceeded(kind) => write!(formatter, "Solidity list limit exceeded: {kind:?}"),
+            Self::LimitExceeded(kind) => {
+                write!(formatter, "Solidity list limit exceeded: {kind:?}")
+            }
             Self::DuplicateName => formatter.write_str("duplicate Solidity name"),
             Self::ReservedReason => formatter.write_str("rejection reason None is reserved"),
             Self::Formatting => formatter.write_str("Solidity source formatting failed"),
@@ -376,11 +378,17 @@ pub fn inspect_solidity_source(source: &str) -> SoliditySafetyReport {
         (".call", SoliditySafetyFindingKind::LowLevelCall),
         (".transfer", SoliditySafetyFindingKind::EtherTransfer),
         (".send", SoliditySafetyFindingKind::EtherTransfer),
-        ("selfdestruct", SoliditySafetyFindingKind::ContractDestruction),
+        (
+            "selfdestruct",
+            SoliditySafetyFindingKind::ContractDestruction,
+        ),
         ("suicide", SoliditySafetyFindingKind::ContractDestruction),
         ("tx.origin", SoliditySafetyFindingKind::TxOrigin),
         ("sstore", SoliditySafetyFindingKind::RawStorageOpcode),
-        ("tstore", SoliditySafetyFindingKind::RawTransientStorageOpcode),
+        (
+            "tstore",
+            SoliditySafetyFindingKind::RawTransientStorageOpcode,
+        ),
         ("create2", SoliditySafetyFindingKind::ContractCreation),
         ("new ", SoliditySafetyFindingKind::ContractCreation),
     ];
@@ -420,7 +428,10 @@ fn render_header(
         "/// @dev Effect-free FCIS shell: no external calls, delegate calls, or upgrade hooks."
     )?;
     writeln!(source, "abstract contract {} {{", spec.contract_name())?;
-    writeln!(source, "    string public constant ZENO_FCIS_GENERATOR = \"{SOLIDITY_GENERATOR_ID}\";")?;
+    writeln!(
+        source,
+        "    string public constant ZENO_FCIS_GENERATOR = \"{SOLIDITY_GENERATOR_ID}\";"
+    )?;
     writeln!(source)?;
     Ok(())
 }
@@ -496,15 +507,27 @@ fn render_storage_and_errors(
     }
     writeln!(source)?;
 
-    writeln!(source, "    error UnauthorizedInitializer(address expected, address actual);")?;
+    writeln!(
+        source,
+        "    error UnauthorizedInitializer(address expected, address actual);"
+    )?;
     writeln!(source, "    error AlreadyInitialized();")?;
     writeln!(source, "    error NotInitialized();")?;
     writeln!(source, "    error Reentrancy();")?;
-    writeln!(source, "    error StaleState(bytes32 expected, bytes32 actual);")?;
-    writeln!(source, "    error StateRootCorrupted(bytes32 committed, bytes32 actual);")?;
+    writeln!(
+        source,
+        "    error StaleState(bytes32 expected, bytes32 actual);"
+    )?;
+    writeln!(
+        source,
+        "    error StateRootCorrupted(bytes32 committed, bytes32 actual);"
+    )?;
     writeln!(source, "    error CommandNotAdmissible();")?;
     writeln!(source, "    error InvariantViolation();")?;
-    writeln!(source, "    error InvalidDecision(DecisionKind kind, RejectReason reason);")?;
+    writeln!(
+        source,
+        "    error InvalidDecision(DecisionKind kind, RejectReason reason);"
+    )?;
     writeln!(source, "    error TransitionRejected(RejectReason reason);")?;
     writeln!(source)?;
 
@@ -530,24 +553,42 @@ fn render_constructor_and_views(
     writeln!(source, "    }}")?;
     writeln!(source)?;
 
-    writeln!(source, "    function initializationAuthority() external view returns (address) {{")?;
+    writeln!(
+        source,
+        "    function initializationAuthority() external view returns (address) {{"
+    )?;
     writeln!(source, "        return _initializer;")?;
     writeln!(source, "    }}")?;
     writeln!(source)?;
 
-    writeln!(source, "    function isInitialized() external view returns (bool) {{")?;
+    writeln!(
+        source,
+        "    function isInitialized() external view returns (bool) {{"
+    )?;
     writeln!(source, "        return _initialized;")?;
     writeln!(source, "    }}")?;
     writeln!(source)?;
 
-    writeln!(source, "    function currentStateHash() external view returns (bytes32) {{")?;
-    writeln!(source, "        if (!_initialized) revert NotInitialized();")?;
+    writeln!(
+        source,
+        "    function currentStateHash() external view returns (bytes32) {{"
+    )?;
+    writeln!(
+        source,
+        "        if (!_initialized) revert NotInitialized();"
+    )?;
     writeln!(source, "        return _stateHash;")?;
     writeln!(source, "    }}")?;
     writeln!(source)?;
 
-    writeln!(source, "    function currentState() external view returns (State memory) {{")?;
-    writeln!(source, "        if (!_initialized) revert NotInitialized();")?;
+    writeln!(
+        source,
+        "    function currentState() external view returns (State memory) {{"
+    )?;
+    writeln!(
+        source,
+        "        if (!_initialized) revert NotInitialized();"
+    )?;
     writeln!(source, "        return _readState();")?;
     writeln!(source, "    }}")?;
     writeln!(source)?;
@@ -555,18 +596,36 @@ fn render_constructor_and_views(
 }
 
 fn render_initialize(source: &mut String) -> Result<(), SolidityGenerationError> {
-    writeln!(source, "    function initialize(State calldata initialState) external {{")?;
+    writeln!(
+        source,
+        "    function initialize(State calldata initialState) external {{"
+    )?;
     writeln!(source, "        if (msg.sender != _initializer) {{")?;
-    writeln!(source, "            revert UnauthorizedInitializer(_initializer, msg.sender);")?;
+    writeln!(
+        source,
+        "            revert UnauthorizedInitializer(_initializer, msg.sender);"
+    )?;
     writeln!(source, "        }}")?;
-    writeln!(source, "        if (_initialized) revert AlreadyInitialized();")?;
+    writeln!(
+        source,
+        "        if (_initialized) revert AlreadyInitialized();"
+    )?;
     writeln!(source, "        State memory admitted = initialState;")?;
-    writeln!(source, "        if (!_invariant(admitted)) revert InvariantViolation();")?;
+    writeln!(
+        source,
+        "        if (!_invariant(admitted)) revert InvariantViolation();"
+    )?;
     writeln!(source, "        _writeState(admitted);")?;
-    writeln!(source, "        bytes32 admittedHash = _hashState(admitted);")?;
+    writeln!(
+        source,
+        "        bytes32 admittedHash = _hashState(admitted);"
+    )?;
     writeln!(source, "        _stateHash = admittedHash;")?;
     writeln!(source, "        _initialized = true;")?;
-    writeln!(source, "        emit Initialized(admittedHash, msg.sender);")?;
+    writeln!(
+        source,
+        "        emit Initialized(admittedHash, msg.sender);"
+    )?;
     writeln!(source, "    }}")?;
     writeln!(source)?;
     Ok(())
@@ -580,17 +639,32 @@ fn render_execute(
         source,
         "    function execute(Command calldata command, bytes32 expectedStateHash) external returns (bytes32 postStateHash) {{"
     )?;
-    writeln!(source, "        if (!_initialized) revert NotInitialized();")?;
+    writeln!(
+        source,
+        "        if (!_initialized) revert NotInitialized();"
+    )?;
     writeln!(source, "        if (_gate != 1) revert Reentrancy();")?;
     writeln!(source, "        _gate = 2;")?;
     writeln!(source)?;
     writeln!(source, "        State memory beforeState = _readState();")?;
-    writeln!(source, "        bytes32 actualStateHash = _hashState(beforeState);")?;
+    writeln!(
+        source,
+        "        bytes32 actualStateHash = _hashState(beforeState);"
+    )?;
     writeln!(source, "        if (actualStateHash != _stateHash) {{")?;
-    writeln!(source, "            revert StateRootCorrupted(_stateHash, actualStateHash);")?;
+    writeln!(
+        source,
+        "            revert StateRootCorrupted(_stateHash, actualStateHash);"
+    )?;
     writeln!(source, "        }}")?;
-    writeln!(source, "        if (actualStateHash != expectedStateHash) {{")?;
-    writeln!(source, "            revert StaleState(expectedStateHash, actualStateHash);")?;
+    writeln!(
+        source,
+        "        if (actualStateHash != expectedStateHash) {{"
+    )?;
+    writeln!(
+        source,
+        "            revert StaleState(expectedStateHash, actualStateHash);"
+    )?;
     writeln!(source, "        }}")?;
     writeln!(source)?;
     writeln!(source, "        Command memory admittedCommand = command;")?;
@@ -609,14 +683,23 @@ fn render_execute(
         source,
         "        Decision memory decision = _decide(beforeState, admittedCommand, context);"
     )?;
-    writeln!(source, "        if (decision.kind == DecisionKind.Reject) {{")?;
-    writeln!(source, "            if (decision.reason == RejectReason.None) {{")?;
+    writeln!(
+        source,
+        "        if (decision.kind == DecisionKind.Reject) {{"
+    )?;
+    writeln!(
+        source,
+        "            if (decision.reason == RejectReason.None) {{"
+    )?;
     writeln!(
         source,
         "                revert InvalidDecision(decision.kind, decision.reason);"
     )?;
     writeln!(source, "            }}")?;
-    writeln!(source, "            revert TransitionRejected(decision.reason);")?;
+    writeln!(
+        source,
+        "            revert TransitionRejected(decision.reason);"
+    )?;
     writeln!(source, "        }}")?;
     writeln!(
         source,
@@ -632,9 +715,18 @@ fn render_execute(
         "        if (!_invariant(decision.nextState)) revert InvariantViolation();"
     )?;
     writeln!(source)?;
-    writeln!(source, "        postStateHash = _hashState(decision.nextState);")?;
-    writeln!(source, "        bytes32 commandHash = _hashCommand(admittedCommand);")?;
-    writeln!(source, "        bytes32 candidateHash = keccak256(abi.encode(")?;
+    writeln!(
+        source,
+        "        postStateHash = _hashState(decision.nextState);"
+    )?;
+    writeln!(
+        source,
+        "        bytes32 commandHash = _hashCommand(admittedCommand);"
+    )?;
+    writeln!(
+        source,
+        "        bytes32 candidateHash = keccak256(abi.encode("
+    )?;
     writeln!(
         source,
         "            \"zeno-fcis/solidity/candidate/v1/{}\",",
@@ -665,7 +757,10 @@ fn render_storage_helpers(
     source: &mut String,
     spec: &SolidityContractSpec,
 ) -> Result<(), SolidityGenerationError> {
-    writeln!(source, "    function _readState() private view returns (State memory current) {{")?;
+    writeln!(
+        source,
+        "    function _readState() private view returns (State memory current) {{"
+    )?;
     for field in spec.state_fields() {
         writeln!(
             source,
@@ -677,7 +772,10 @@ fn render_storage_helpers(
     writeln!(source, "    }}")?;
     writeln!(source)?;
 
-    writeln!(source, "    function _writeState(State memory nextState) private {{")?;
+    writeln!(
+        source,
+        "    function _writeState(State memory nextState) private {{"
+    )?;
     for field in spec.state_fields() {
         writeln!(
             source,
@@ -765,10 +863,7 @@ enum IdentifierRole {
     Type,
 }
 
-fn validate_identifier(
-    value: &str,
-    role: IdentifierRole,
-) -> Result<(), SolidityGenerationError> {
+fn validate_identifier(value: &str, role: IdentifierRole) -> Result<(), SolidityGenerationError> {
     if value.is_empty() || value.len() > 96 || is_reserved_keyword(value) {
         return Err(SolidityGenerationError::InvalidIdentifier);
     }
