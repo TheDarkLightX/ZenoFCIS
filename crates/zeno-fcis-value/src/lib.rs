@@ -643,8 +643,9 @@ pub struct ValueLimits {
 impl ValueLimits {
     /// Default maximum aggregate byte and text payload bytes.
     ///
-    /// [`Value::text_ascii`] also uses this ceiling for one text leaf so that
-    /// its successful output is admissible under the default payload budget.
+    /// [`Value::text_ascii`] and [`Value::bytes`] also use this ceiling for one
+    /// leaf so their successful outputs are admissible under the default
+    /// payload budget.
     pub const DEFAULT_MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
 }
 
@@ -668,6 +669,60 @@ pub struct ValueMetrics {
     pub payload_bytes: u64,
     /// Maximum observed depth.
     pub depth: u32,
+}
+
+/// An owned value admitted by the reviewed default canonical limits.
+///
+/// Construction performs one complete [`ValueLimits::default`] validation and
+/// retains the exact observed metrics. Private fields prevent callers from
+/// pairing an unvalidated value with invented metrics:
+///
+/// ```compile_fail
+/// use zeno_fcis_value::{AdmittedValue, Value, ValueMetrics};
+///
+/// let _ = AdmittedValue {
+///     value: Value::Unit,
+///     metrics: ValueMetrics::default(),
+/// };
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdmittedValue {
+    value: Value,
+    metrics: ValueMetrics,
+}
+
+impl AdmittedValue {
+    /// Owns a value after validating the exact default canonical envelope.
+    pub fn try_new(value: Value) -> Result<Self, ValueError> {
+        let metrics = value.validate_limits(ValueLimits::default())?;
+        Ok(Self { value, metrics })
+    }
+
+    /// Returns the admitted immutable value.
+    #[must_use]
+    pub const fn value(&self) -> &Value {
+        &self.value
+    }
+
+    /// Returns the exact metrics observed during admission.
+    #[must_use]
+    pub const fn metrics(&self) -> ValueMetrics {
+        self.metrics
+    }
+
+    /// Consumes the witness and returns the underlying value.
+    #[must_use]
+    pub fn into_value(self) -> Value {
+        self.value
+    }
+
+    /// Appends exact ZCVE/1 bytes without repeating limit validation.
+    ///
+    /// This is sound because construction owns the value, fields are private,
+    /// and the public API exposes no mutable access to the admitted value.
+    pub fn encode_zcve_to(&self, output: &mut Vec<u8>) -> Result<(), ValueError> {
+        encode_zcve_value(&self.value, output)
+    }
 }
 
 fn validate_value(
@@ -852,6 +907,64 @@ mod tests {
         assert!(value.is_ok());
         let error = BoundedVec::<u8, 1, 3>::try_from_vec(Vec::new());
         assert!(error.is_err());
+    }
+
+    #[test]
+    fn admitted_value_retains_exact_default_metrics_and_value() {
+        let bytes = Value::bytes(vec![1, 2]).unwrap_or_else(|error| panic!("bytes: {error}"));
+        let text =
+            Value::text_ascii(String::from("ab")).unwrap_or_else(|error| panic!("text: {error}"));
+        let value = Value::tuple(vec![bytes, text]);
+        let admitted = AdmittedValue::try_new(value.clone())
+            .unwrap_or_else(|error| panic!("admission: {error}"));
+
+        assert_eq!(
+            admitted.metrics(),
+            ValueMetrics {
+                nodes: 3,
+                payload_bytes: 4,
+                depth: 1,
+            }
+        );
+        assert_eq!(admitted.value(), &value);
+
+        let mut admitted_bytes = Vec::new();
+        admitted
+            .encode_zcve_to(&mut admitted_bytes)
+            .unwrap_or_else(|error| panic!("admitted encode: {error}"));
+        assert_eq!(
+            admitted_bytes,
+            value
+                .zcve_bytes()
+                .unwrap_or_else(|error| panic!("value encode: {error}"))
+        );
+        assert_eq!(admitted.into_value(), value);
+    }
+
+    #[test]
+    fn admitted_value_rejects_raw_non_ascii_text() {
+        let value = Value::Text(String::from("é").into_boxed_str());
+        assert_eq!(AdmittedValue::try_new(value), Err(ValueError::NonAsciiText));
+    }
+
+    #[test]
+    fn admitted_value_is_bound_to_default_limits() {
+        let mut value = Value::Unit;
+        for _ in 0..65 {
+            value = Value::vector(vec![value]);
+        }
+        let permissive = ValueLimits {
+            max_depth: 65,
+            ..ValueLimits::default()
+        };
+        assert!(value.validate_limits(permissive).is_ok());
+        assert_eq!(
+            AdmittedValue::try_new(value),
+            Err(ValueError::DepthLimit {
+                limit: 64,
+                attempted: 65,
+            })
+        );
     }
 
     #[test]

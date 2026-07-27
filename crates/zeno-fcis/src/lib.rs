@@ -181,6 +181,6 @@ pub use zeno_fcis_transition::{
     TransitionResourceReport, validate_transition_decision,
 };
 pub use zeno_fcis_value::{
-    AsciiText, BoundedVec, Field, LengthError, MapEntry, NonEmptyVec, OwnedBytes, TextError, Value,
-    ValueError, ValueKind, ValueLimits, ValueMetrics,
+    AdmittedValue, AsciiText, BoundedVec, Field, LengthError, MapEntry, NonEmptyVec, OwnedBytes,
+    TextError, Value, ValueError, ValueKind, ValueLimits, ValueMetrics,
 };
