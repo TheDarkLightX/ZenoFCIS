@@ -419,6 +419,17 @@ mod tests {
                 hash(21),
             )
             .unwrap_or_else(|error| panic!("effect: {error}")),
+            EffectDefinition::try_new(
+                id(22),
+                name("write-exact"),
+                TypeId::new(1),
+                HashRequirement::exact(hash(22))
+                    .unwrap_or_else(|error| panic!("authority requirement: {error}")),
+                HashRequirement::exact(hash(23))
+                    .unwrap_or_else(|error| panic!("subject requirement: {error}")),
+                hash(24),
+            )
+            .unwrap_or_else(|error| panic!("effect: {error}")),
         ];
         let mut channels = vec![
             ChannelDefinition::try_new(
@@ -566,6 +577,21 @@ mod tests {
         assert!(text.contains("pub enum RejectReasonId {"));
         assert!(text.contains("pub enum CommittedFailureReasonId {"));
         assert!(text.contains("pub struct GeneratedTransition<'a, H: CommitmentHasher> {"));
+        assert!(text.contains(
+            "pub fn emit_effect_20(\n        &mut self,\n        ordinal: u32,\n        authority: zeno_fcis_catalog::NonZeroHash,\n        payload: &crate::generated::Amount,"
+        ));
+        assert!(text.contains(
+            "let effect = effect_20(\n            ordinal,\n            authority.get(),\n            Hash32::ZERO,"
+        ));
+        assert!(text.contains(
+            "pub fn emit_effect_21(\n        &mut self,\n        ordinal: u32,\n        authority: Hash32,\n        subject: Hash32,\n        payload: &crate::generated::Signed,"
+        ));
+        assert!(text.contains(
+            "pub fn emit_effect_22(\n        &mut self,\n        ordinal: u32,\n        payload: &crate::generated::Amount,"
+        ));
+        assert!(text.contains(
+            "pub fn enqueue_channel_30(\n        &mut self,\n        ordinal: u32,\n        destination: &crate::generated::Label,\n        payload: &crate::generated::Event,"
+        ));
         assert!(text.contains("reason: RejectReasonId"));
         assert!(text.contains("reason: CommittedFailureReasonId"));
         assert!(text.contains("Result<GeneratedTransition<'a, H>, GeneratedProjectError>"));
@@ -587,6 +613,8 @@ mod tests {
         assert!(!text.contains("pub admitted: SchemaAdmittedTypeEnvelope"));
         assert!(!text.contains("pub commitment: Hash32"));
         assert!(!text.contains("pub inner: CataloguedTransitionBuilder"));
+        assert!(!text.contains("pub fn emit(&mut self, effect: Effect)"));
+        assert!(!text.contains("pub fn enqueue(&mut self, entry: OutboxEntry)"));
         assert!(!text.contains("reason_id: SemanticId"));
         assert!(!text.contains("Result<CataloguedTransitionBuilder<'a, H>"));
     }
