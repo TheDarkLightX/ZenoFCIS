@@ -126,8 +126,8 @@ pub use zeno_fcis_crypto::{KnownAnswerReport, ProviderVerificationError, verify_
 #[cfg(feature = "sha256-parity")]
 pub use zeno_fcis_crypto::{ProviderParityReport, verify_provider_parity};
 pub use zeno_fcis_patch::{
-    AppliedPatch, CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath,
-    hash_precondition_value, hash_value, value_at,
+    AppliedPatch, CanonicalPatch, PatchDecodeError, PatchDecodeLimits, PatchError, PatchOp,
+    PathSegment, ValuePath, decode_canonical_patch, hash_precondition_value, hash_value, value_at,
 };
 pub use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanError};
 #[cfg(feature = "zenodex-profile")]
