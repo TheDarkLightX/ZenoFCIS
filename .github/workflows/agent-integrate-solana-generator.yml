@@ -1,0 +1,197 @@
+name: agent-integrate-solana-generator
+
+on:
+  push:
+    branches:
+      - agent/solana-fcis-v1-20260727
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: true
+          ref: agent/solana-fcis-v1-20260727
+
+      - name: Integrate and repair generator
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/zeno-fcis-codegen/src/solana_anchor.rs")
+          text = path.read_text(encoding="utf-8")
+
+          text = text.replace(
+              '("unsafe", SolanaCoreSafetyFindingKind::UnsafeCode),',
+              '("unsafe {", SolanaCoreSafetyFindingKind::UnsafeCode),',
+          )
+          text = text.replace(
+              '("unsafe", SolanaShellSafetyFindingKind::UnsafeCode),',
+              '("unsafe {", SolanaShellSafetyFindingKind::UnsafeCode),',
+          )
+
+          old = '''    let shell_source = files
+              .iter()
+              .find(|file| file.path().ends_with("programs/"))
+              .map(GeneratedOnchainFile::content);
+          if !inspect_solana_core_source(core_source).is_clean() || shell_source.is_some() {
+              return Err(OnchainModelError::InvalidBinding);
+          }
+          '''
+          new = '''    if !inspect_solana_core_source(core_source).is_clean() {
+              return Err(OnchainModelError::InvalidBinding);
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("core-source validation block not found")
+          text = text.replace(old, new)
+
+          old = '''    render_error_enum(&mut output, machine)?;
+              render_program_helpers(&mut output, spec, &bindings)?;
+              Ok(output)
+          }
+          '''
+          new = '''    render_error_enum(&mut output, machine)?;
+              render_program_helpers(&mut output, spec, &bindings)?;
+              let version_marker = "state.version = 1;";
+              let version_value = format!("state.version = {};", machine.version());
+              Ok(output.replace(version_marker, &version_value))
+          }
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("program return block not found")
+          text = text.replace(old, new)
+
+          old = '-> EffectPlan {{\\n    EffectPlan {{'
+          new = '-> EffectPlan {{\\n    let _ = (before_state, command, context);\\n    EffectPlan {{'
+          if text.count(old) != 1:
+              raise SystemExit("effect builder body not found")
+          text = text.replace(old, new)
+
+          start = text.index("fn encode_bytes32(")
+          end = text.index("\nfn rust_type", start)
+          replacement = r'''fn encode_bytes32(scalar: OnchainScalar, name: &str) -> String {
+              match scalar {
+                  OnchainScalar::Bool => format!(
+                      "{{ let mut output = [0_u8; 32]; output[31] = u8::from({name}); output }}"
+                  ),
+                  OnchainScalar::Bytes32 => name.to_owned(),
+                  OnchainScalar::U8 => encode_unsigned_bytes32(name, 1),
+                  OnchainScalar::U16 => encode_unsigned_bytes32(name, 2),
+                  OnchainScalar::U32 => encode_unsigned_bytes32(name, 4),
+                  OnchainScalar::U64 => encode_unsigned_bytes32(name, 8),
+                  OnchainScalar::U128 => encode_unsigned_bytes32(name, 16),
+                  OnchainScalar::I8 => encode_signed_bytes32(name, 1),
+                  OnchainScalar::I16 => encode_signed_bytes32(name, 2),
+                  OnchainScalar::I32 => encode_signed_bytes32(name, 4),
+                  OnchainScalar::I64 => encode_signed_bytes32(name, 8),
+                  OnchainScalar::I128 => encode_signed_bytes32(name, 16),
+              }
+          }
+
+          fn encode_unsigned_bytes32(name: &str, width: usize) -> String {
+              let start = 32_usize.saturating_sub(width);
+              format!(
+                  "{{ let mut output = [0_u8; 32]; let bytes = {name}.to_be_bytes(); output[{start}..].copy_from_slice(&bytes); output }}"
+              )
+          }
+
+          fn encode_signed_bytes32(name: &str, width: usize) -> String {
+              let start = 32_usize.saturating_sub(width);
+              format!(
+                  "{{ let mut output = if {name} < 0 {{ [0xff_u8; 32] }} else {{ [0_u8; 32] }}; let bytes = {name}.to_be_bytes(); output[{start}..].copy_from_slice(&bytes); output }}"
+              )
+          }
+          '''
+          text = text[:start] + replacement + text[end:]
+          text = text.replace(".map(u8::to_string)", ".map(|byte| byte.to_string())")
+          path.write_text(text, encoding="utf-8")
+
+          path = Path("crates/zeno-fcis-codegen/src/lib.rs")
+          text = path.read_text(encoding="utf-8")
+          old = "mod root_envelope;\nmod solidity;"
+          new = "mod root_envelope;\nmod solana_anchor;\nmod solidity;"
+          if text.count(old) != 1:
+              raise SystemExit("codegen module insertion point not found")
+          text = text.replace(old, new)
+          old = "pub use render::{GENERATOR_ID, generate};\npub use solidity::{"
+          new = '''pub use render::{GENERATOR_ID, generate};
+          pub use solana_anchor::{
+              ANCHOR_VERSION, MAX_SOLANA_GENERATED_FILE_BYTES, SOLANA_ANCHOR_GENERATOR_ID,
+              SOLANA_TOOLCHAIN_VERSION, SolanaAnchorSpec, SolanaCoreSafetyFindingKind,
+              SolanaFungibleBinding, SolanaSafetyFinding, SolanaSafetyReport,
+              SolanaShellSafetyFindingKind, generate_solana_anchor, inspect_solana_core_source,
+              inspect_solana_shell_source,
+          };
+          pub use solidity::{'''
+          if text.count(old) != 1:
+              raise SystemExit("codegen export insertion point not found")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+
+          path = Path("crates/zeno-fcis/src/lib.rs")
+          text = path.read_text(encoding="utf-8")
+          old = '''    MAX_ONCHAIN_REASONS, MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
+              ONCHAIN_MACHINE_FORMAT_VERSION, OPENZEPPELIN_CONTRACTS_VERSION, ObservationPolicy,
+          '''
+          new = '''    ANCHOR_VERSION, MAX_ONCHAIN_REASONS, MAX_SOLANA_GENERATED_FILE_BYTES,
+              MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
+              ONCHAIN_MACHINE_FORMAT_VERSION, OPENZEPPELIN_CONTRACTS_VERSION, ObservationPolicy,
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("umbrella first export point not found")
+          text = text.replace(old, new)
+          old = '''    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
+              SOLIDITY_ADVANCED_GENERATOR_ID, SOLIDITY_GENERATOR_ID, SOLIDITY_PINNED_VERSION,
+          '''
+          new = '''    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
+              SOLANA_ANCHOR_GENERATOR_ID, SOLANA_TOOLCHAIN_VERSION, SOLIDITY_ADVANCED_GENERATOR_ID,
+              SOLIDITY_GENERATOR_ID, SOLIDITY_PINNED_VERSION, SolanaAnchorSpec,
+              SolanaCoreSafetyFindingKind, SolanaFungibleBinding, SolanaSafetyFinding,
+              SolanaSafetyReport, SolanaShellSafetyFindingKind,
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("umbrella second export point not found")
+          text = text.replace(old, new)
+          old = '''    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,
+              generate_advanced_solidity, generate_solidity, inspect_solidity_source,
+          '''
+          new = '''    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,
+              generate_advanced_solidity, generate_solana_anchor, generate_solidity,
+              inspect_solana_core_source, inspect_solana_shell_source, inspect_solidity_source,
+          '''
+          if text.count(old) != 1:
+              raise SystemExit("umbrella function export point not found")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+
+          path = Path("README.md")
+          text = path.read_text(encoding="utf-8")
+          old = "bounded Solidity and chain-neutral on-chain FCIS generators"
+          new = "bounded Solidity, Solana/Anchor, and chain-neutral on-chain FCIS generators"
+          if text.count(old) == 1:
+              text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Remove temporary integration workflow
+        run: rm .github/workflows/agent-integrate-solana-generator.yml
+
+      - name: Install pinned formatter
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+
+      - name: Format workspace
+        run: cargo +1.97.1 fmt --all
+
+      - name: Commit integrated generator
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Integrate Solana Anchor FCIS generator"
+          git push origin HEAD:agent/solana-fcis-v1-20260727
