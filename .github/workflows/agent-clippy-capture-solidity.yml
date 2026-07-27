@@ -1,4 +1,4 @@
-name: agent-clippy-capture-solidity
+name: agent-fix-solidity-clippy
 
 on:
   push:
@@ -9,10 +9,10 @@ permissions:
   contents: write
 
 jobs:
-  capture:
+  fix:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Checkout branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -20,21 +20,40 @@ jobs:
           persist-credentials: true
           ref: agent/solidity-fcis-v1-20260727
 
-      - name: Install pinned Rust and Clippy
-        run: rustup toolchain install 1.97.1 --profile minimal --component clippy
-
-      - name: Capture Clippy diagnostics
-        shell: bash
+      - name: Apply exact Clippy repair
         run: |
-          set +e
-          cargo +1.97.1 clippy -p zeno-fcis-codegen -p zeno-fcis --all-targets --all-features --locked -- -D warnings > /tmp/solidity-clippy.log 2>&1
-          status=$?
-          set -e
-          mkdir -p .agent-diagnostics
-          cp /tmp/solidity-clippy.log .agent-diagnostics/solidity-clippy.log
-          printf '%s\n' "$status" > .agent-diagnostics/solidity-clippy.status
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/zeno-fcis-codegen/src/solidity.rs")
+          source = path.read_text(encoding="utf-8")
+          old = '''    match String::from_utf8(output) {
+              Ok(value) => value,
+              Err(_) => String::new(),
+          }
+          '''
+          new = '''    String::from_utf8(output).unwrap_or_default()
+          '''
+          if source.count(old) != 1:
+              raise SystemExit("expected exactly one UTF-8 fallback block")
+          path.write_text(source.replace(old, new), encoding="utf-8")
+          PY
+
+      - name: Install pinned formatter
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt
+
+      - name: Format repair
+        run: cargo +1.97.1 fmt --all
+
+      - name: Remove temporary diagnostics
+        run: |
+          rm -rf .agent-diagnostics
+          rm .github/workflows/agent-clippy-capture-solidity.yml
+
+      - name: Commit clean repair
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .agent-diagnostics/solidity-clippy.log .agent-diagnostics/solidity-clippy.status
-          git commit -m "Capture Solidity Clippy diagnostics"
+          git add -A
+          git commit -m "Fix Solidity generator Clippy finding"
           git push origin HEAD:agent/solidity-fcis-v1-20260727
