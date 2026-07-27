@@ -25,6 +25,8 @@ Construction inputs are:
 - exact caller-supplied `BudgetUsed` from the pure transition;
 - one explicit `TransitionLimits` envelope.
 
+The generic builder retains this low-level interface. Bootstrap-generated projects expose the narrower path documented in `GENERATED_CATALOG_TRANSITION.md`: a private reconstructed catalog plus `SchemaAdmittedEnvelope`, with no caller-supplied raw catalog or `Value`.
+
 Builder operations may:
 
 - observe a `ValuePath` in the immutable pre-state;

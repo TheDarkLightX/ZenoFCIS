@@ -18,7 +18,7 @@ The generated bundle contains:
 - the complete stable registry as a readable table;
 - typed Rust reason, effect, and channel identifiers;
 - effect and outbox smart constructors with schema-generated payload and destination types;
-- a typed transition-construction entry point;
+- a private-field `GeneratedProject` that reconstructs the exact catalog and starts transitions only from the schema-generated root envelope;
 - Rust and Python mounted-runtime skeletons pointing at the common adapter boundary;
 - a migration stub that grants no migration authority;
 - an evidence manifest whose requirements begin unsatisfied;
@@ -30,7 +30,7 @@ The generated bundle contains:
 
 The catalog remains authoritative for schema types, stable identifiers, reason disposition and precedence, effect authority rules, channel shapes, registry commitments, and resource limits. The generator controls only deterministic file selection and rendering.
 
-Generated smart constructors enforce Rust-level payload/destination type selection. Final `ProjectCatalog` validation remains mandatory because authority and subject commitments, aggregate limits, and project policy are catalog obligations.
+Generated smart constructors enforce Rust-level payload/destination type selection. `GeneratedProject::try_new` reconstructs the complete catalog, revalidates every cross-binding, and compares its exact schema, profile, catalog, and provider identities with generation-time constants. `admit_root` converts the generated typed root and admits it under the catalog provider, including when the nested schema-codegen provider differs. Its transition method accepts a `SchemaAdmittedEnvelope`, not a raw `Value`, and the generated catalog field is private. Final catalog validation remains authoritative for authority and subject commitments, aggregate limits, and project policy.
 
 The migration and evidence files are explicit empty obligations. They cannot promote a profile, prove a theorem, authorize an incompatible migration, or attest runtime refinement.
 
@@ -47,6 +47,8 @@ Generation fails atomically. No partial bundle is returned after a collision, ha
 - generated paths are strictly ordered and unique;
 - the manifest binds every non-manifest file, the exact catalog/profile/schema-generation identities, generator version, and hash-provider identity;
 - typed constructors use the exact stable effect/channel IDs and schema type names;
+- the generated project reconstructs the exact input catalog and refuses a different provider, schema commitment, profile commitment, catalog commitment, or root type;
+- the generated transition entry point accepts no caller-supplied catalog or raw state value;
 - evidence and migration output starts explicitly incomplete;
 - invalid package/module names, wrong hash provider, one-over file limits, and file collisions fail closed;
 - generated source is compiled in the permanent fixture crate before review.
@@ -67,5 +69,6 @@ No new external library is used. The generator trusts the existing catalog, proj
 - A generated starter is not a complete application or production deployment.
 - Generated CI does not prove business correctness.
 - A typed constructor does not satisfy authority policy until catalog validation succeeds.
+- Exact catalog reconstruction does not establish that the catalog's business policy is correct.
 - Runtime, migration, and evidence skeletons contain no implementation or proof.
 - Bounded regeneration and fixture tests are not unbounded formal verification.
