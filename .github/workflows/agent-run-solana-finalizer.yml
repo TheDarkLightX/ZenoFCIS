@@ -26,6 +26,27 @@ jobs:
           ref: agent/solana-fcis-v1-20260727
           show-progress: false
 
+      - name: Preserve Rust escape sequences in finalizer
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tools/agent_finalize_solana.py")
+          lines = path.read_text(encoding="utf-8").splitlines()
+          changed = 0
+          output = []
+          for line in lines:
+              stripped = line.lstrip()
+              if stripped.startswith('"-> EffectPlan'):
+                  indentation = line[: len(line) - len(stripped)]
+                  line = indentation + "r" + stripped
+                  changed += 1
+              output.append(line)
+          if changed != 2:
+              raise SystemExit(f"expected two effect-plan literals, changed {changed}")
+          path.write_text("\n".join(output) + "\n", encoding="utf-8")
+          PY
+
       - name: Syntax-check finalizer
         run: python3 -m py_compile tools/agent_finalize_solana.py
 
