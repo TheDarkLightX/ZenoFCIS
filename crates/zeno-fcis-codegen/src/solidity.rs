@@ -1096,10 +1096,7 @@ fn sanitize_non_code(source: &str) -> String {
         index += 1;
     }
 
-    match String::from_utf8(output) {
-        Ok(value) => value,
-        Err(_) => String::new(),
-    }
+    String::from_utf8(output).unwrap_or_default()
 }
 
 fn token_boundary_matches(haystack: &str, offset: usize, needle: &str) -> bool {
