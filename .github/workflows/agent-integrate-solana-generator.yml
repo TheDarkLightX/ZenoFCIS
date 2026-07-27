@@ -12,7 +12,7 @@ jobs:
   integrate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Checkout exact branch
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -24,6 +24,7 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("crates/zeno-fcis-codegen/src/solana_anchor.rs")
           text = path.read_text(encoding="utf-8")
@@ -37,40 +38,34 @@ jobs:
               '("unsafe {", SolanaShellSafetyFindingKind::UnsafeCode),',
           )
 
-          old = '''    let shell_source = files
-              .iter()
-              .find(|file| file.path().ends_with("programs/"))
-              .map(GeneratedOnchainFile::content);
-          if !inspect_solana_core_source(core_source).is_clean() || shell_source.is_some() {
-              return Err(OnchainModelError::InvalidBinding);
-          }
-          '''
-          new = '''    if !inspect_solana_core_source(core_source).is_clean() {
-              return Err(OnchainModelError::InvalidBinding);
-          }
-          '''
-          if text.count(old) != 1:
-              raise SystemExit("core-source validation block not found")
-          text = text.replace(old, new)
+          pattern = re.compile(
+              r'\n    let shell_source = files\n'
+              r'        \.iter\(\)\n'
+              r'        \.find\(\|file\| file\.path\(\)\.ends_with\("programs/"\)\)\n'
+              r'        \.map\(GeneratedOnchainFile::content\);\n'
+              r'    if !inspect_solana_core_source\(core_source\)\.is_clean\(\) \|\| shell_source\.is_some\(\) \{\n'
+              r'        return Err\(OnchainModelError::InvalidBinding\);\n'
+              r'    \}\n'
+          )
+          text, count = pattern.subn(
+              '\n    if !inspect_solana_core_source(core_source).is_clean() {\n'
+              '        return Err(OnchainModelError::InvalidBinding);\n'
+              '    }\n',
+              text,
+          )
+          if count != 1:
+              raise SystemExit(f"expected one redundant shell lookup, found {count}")
 
-          old = '''    render_error_enum(&mut output, machine)?;
-              render_program_helpers(&mut output, spec, &bindings)?;
-              Ok(output)
-          }
-          '''
-          new = '''    render_error_enum(&mut output, machine)?;
-              render_program_helpers(&mut output, spec, &bindings)?;
-              let version_marker = "state.version = 1;";
-              let version_value = format!("state.version = {};", machine.version());
-              Ok(output.replace(version_marker, &version_value))
-          }
-          '''
-          if text.count(old) != 1:
-              raise SystemExit("program return block not found")
-          text = text.replace(old, new)
+          text = text.replace(
+              'ProjectCore, State, MACHINE_HASH}};',
+              'ProjectCore, State, MACHINE_HASH, MACHINE_VERSION}};',
+          )
+          if text.count('state.version = 1;') != 1:
+              raise SystemExit("expected one hardcoded machine version")
+          text = text.replace('state.version = 1;', 'state.version = MACHINE_VERSION;')
 
-          old = '-> EffectPlan {{\\n    EffectPlan {{'
-          new = '-> EffectPlan {{\\n    let _ = (before_state, command, context);\\n    EffectPlan {{'
+          old = '-> EffectPlan {{\n    EffectPlan {{'
+          new = '-> EffectPlan {{\n    let _ = (before_state, command, context);\n    EffectPlan {{'
           if text.count(old) != 1:
               raise SystemExit("effect builder body not found")
           text = text.replace(old, new)
@@ -116,67 +111,54 @@ jobs:
 
           path = Path("crates/zeno-fcis-codegen/src/lib.rs")
           text = path.read_text(encoding="utf-8")
-          old = "mod root_envelope;\nmod solidity;"
-          new = "mod root_envelope;\nmod solana_anchor;\nmod solidity;"
-          if text.count(old) != 1:
-              raise SystemExit("codegen module insertion point not found")
-          text = text.replace(old, new)
-          old = "pub use render::{GENERATOR_ID, generate};\npub use solidity::{"
-          new = '''pub use render::{GENERATOR_ID, generate};
-          pub use solana_anchor::{
+          if "mod solana_anchor;" not in text:
+              marker = "mod root_envelope;\n"
+              if text.count(marker) != 1:
+                  raise SystemExit("codegen module insertion point not found")
+              text = text.replace(marker, marker + "mod solana_anchor;\n")
+          if "pub use solana_anchor::{" not in text:
+              marker = "pub use render::{GENERATOR_ID, generate};\n"
+              block = '''pub use solana_anchor::{
               ANCHOR_VERSION, MAX_SOLANA_GENERATED_FILE_BYTES, SOLANA_ANCHOR_GENERATOR_ID,
               SOLANA_TOOLCHAIN_VERSION, SolanaAnchorSpec, SolanaCoreSafetyFindingKind,
               SolanaFungibleBinding, SolanaSafetyFinding, SolanaSafetyReport,
               SolanaShellSafetyFindingKind, generate_solana_anchor, inspect_solana_core_source,
               inspect_solana_shell_source,
           };
-          pub use solidity::{'''
-          if text.count(old) != 1:
-              raise SystemExit("codegen export insertion point not found")
-          path.write_text(text.replace(old, new), encoding="utf-8")
+          '''
+              if text.count(marker) != 1:
+                  raise SystemExit("codegen export insertion point not found")
+              text = text.replace(marker, marker + block)
+          path.write_text(text, encoding="utf-8")
 
           path = Path("crates/zeno-fcis/src/lib.rs")
           text = path.read_text(encoding="utf-8")
-          old = '''    MAX_ONCHAIN_REASONS, MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
-              ONCHAIN_MACHINE_FORMAT_VERSION, OPENZEPPELIN_CONTRACTS_VERSION, ObservationPolicy,
-          '''
-          new = '''    ANCHOR_VERSION, MAX_ONCHAIN_REASONS, MAX_SOLANA_GENERATED_FILE_BYTES,
-              MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
-              ONCHAIN_MACHINE_FORMAT_VERSION, OPENZEPPELIN_CONTRACTS_VERSION, ObservationPolicy,
-          '''
-          if text.count(old) != 1:
-              raise SystemExit("umbrella first export point not found")
-          text = text.replace(old, new)
-          old = '''    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
-              SOLIDITY_ADVANCED_GENERATOR_ID, SOLIDITY_GENERATOR_ID, SOLIDITY_PINNED_VERSION,
-          '''
-          new = '''    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
-              SOLANA_ANCHOR_GENERATOR_ID, SOLANA_TOOLCHAIN_VERSION, SOLIDITY_ADVANCED_GENERATOR_ID,
-              SOLIDITY_GENERATOR_ID, SOLIDITY_PINNED_VERSION, SolanaAnchorSpec,
-              SolanaCoreSafetyFindingKind, SolanaFungibleBinding, SolanaSafetyFinding,
-              SolanaSafetyReport, SolanaShellSafetyFindingKind,
-          '''
-          if text.count(old) != 1:
-              raise SystemExit("umbrella second export point not found")
-          text = text.replace(old, new)
-          old = '''    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,
-              generate_advanced_solidity, generate_solidity, inspect_solidity_source,
-          '''
-          new = '''    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,
-              generate_advanced_solidity, generate_solana_anchor, generate_solidity,
-              inspect_solana_core_source, inspect_solana_shell_source, inspect_solidity_source,
-          '''
-          if text.count(old) != 1:
-              raise SystemExit("umbrella function export point not found")
-          path.write_text(text.replace(old, new), encoding="utf-8")
+          if "SOLANA_ANCHOR_GENERATOR_ID" not in text:
+              text = text.replace(
+                  "    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GeneratedOnchainBundle,\n",
+                  "    ANCHOR_VERSION, CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile,\n    GeneratedOnchainBundle,\n",
+              )
+              text = text.replace(
+                  "    GeneratedOnchainFile, GeneratedSolidity, GenerationSpec, MAX_ONCHAIN_CAPABILITIES,\n",
+                  "    GeneratedOnchainFile, GeneratedSolidity, GenerationSpec, MAX_ONCHAIN_CAPABILITIES,\n    MAX_SOLANA_GENERATED_FILE_BYTES,\n",
+              )
+              text = text.replace(
+                  "    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,\n",
+                  "    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,\n    SOLANA_ANCHOR_GENERATOR_ID, SOLANA_TOOLCHAIN_VERSION, SolanaAnchorSpec,\n    SolanaCoreSafetyFindingKind, SolanaFungibleBinding, SolanaSafetyFinding,\n    SolanaSafetyReport, SolanaShellSafetyFindingKind,\n",
+              )
+              text = text.replace(
+                  "    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,\n    generate_advanced_solidity, generate_solidity, inspect_solidity_source,\n",
+                  "    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,\n    generate_advanced_solidity, generate_solana_anchor, generate_solidity,\n    inspect_solana_core_source, inspect_solana_shell_source, inspect_solidity_source,\n",
+              )
+          path.write_text(text, encoding="utf-8")
 
           path = Path("README.md")
           text = path.read_text(encoding="utf-8")
-          old = "bounded Solidity and chain-neutral on-chain FCIS generators"
-          new = "bounded Solidity, Solana/Anchor, and chain-neutral on-chain FCIS generators"
-          if text.count(old) == 1:
-              text = text.replace(old, new)
-              path.write_text(text, encoding="utf-8")
+          text = text.replace(
+              "bounded Solidity and chain-neutral on-chain FCIS generators",
+              "bounded Solidity, Solana/Anchor, and chain-neutral on-chain FCIS generators",
+          )
+          path.write_text(text, encoding="utf-8")
           PY
 
       - name: Remove temporary integration workflow
