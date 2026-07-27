@@ -26,11 +26,11 @@ pub use model::{
     CodegenError, FORMATTER_ID, GeneratedBundle, GeneratedFile, GenerationSpec, VectorKind,
 };
 pub use onchain::{
-    GeneratedOnchainBundle, GeneratedOnchainFile, MAX_ONCHAIN_CAPABILITIES, MAX_ONCHAIN_EVENTS,
-    MAX_ONCHAIN_EVENT_FIELDS, MAX_ONCHAIN_FIELDS, MAX_ONCHAIN_PLAN_SLOTS, MAX_ONCHAIN_REASONS,
-    ONCHAIN_MACHINE_FORMAT_VERSION, ObservationPolicy, OnchainCapability, OnchainCapabilityKind,
-    OnchainEvent, OnchainField, OnchainListKind, OnchainMachineSpec, OnchainModelError,
-    OnchainReason, OnchainScalar, RecipientPolicy,
+    GeneratedOnchainBundle, GeneratedOnchainFile, MAX_ONCHAIN_CAPABILITIES,
+    MAX_ONCHAIN_EVENT_FIELDS, MAX_ONCHAIN_EVENTS, MAX_ONCHAIN_FIELDS, MAX_ONCHAIN_PLAN_SLOTS,
+    MAX_ONCHAIN_REASONS, ONCHAIN_MACHINE_FORMAT_VERSION, ObservationPolicy, OnchainCapability,
+    OnchainCapabilityKind, OnchainEvent, OnchainField, OnchainListKind, OnchainMachineSpec,
+    OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
 };
 pub use render::{GENERATOR_ID, generate};
 pub use solidity::{
@@ -198,7 +198,10 @@ mod tests {
             .unwrap_or_else(|| panic!("rust output missing"));
         let text = core::str::from_utf8(rust.bytes())
             .unwrap_or_else(|error| panic!("rust not UTF-8: {error}"));
-        assert!(text.contains("VectorKind::Malformed"), "missing malformed category");
+        assert!(
+            text.contains("VectorKind::Malformed"),
+            "missing malformed category"
+        );
         assert!(
             text.contains("VectorKind::NonCanonical"),
             "missing noncanonical category"
@@ -230,7 +233,13 @@ mod tests {
             .unwrap_or_else(|| panic!("python output missing"));
         let text = core::str::from_utf8(python.bytes())
             .unwrap_or_else(|error| panic!("python not UTF-8: {error}"));
-        assert!(text.contains("def replay()"), "python module must define replay()");
-        assert!(text.contains("VECTORS = ["), "python module must define VECTORS");
+        assert!(
+            text.contains("def replay()"),
+            "python module must define replay()"
+        );
+        assert!(
+            text.contains("VECTORS = ["),
+            "python module must define VECTORS"
+        );
     }
 }
