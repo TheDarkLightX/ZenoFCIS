@@ -36,16 +36,20 @@ mod catalog_fixture;
 mod tests {
     use super::generated::*;
     use super::generated::{VectorExpect, VectorKind};
-    use zeno_fcis_codec::{CommitmentHasher, DecodeLimits, Domain, Hash32, decode_value};
+    use zeno_fcis_codec::{
+        CanonicalEncode, CommitmentHasher, DecodeLimits, Domain, Hash32, commitment, decode_value,
+    };
     use zeno_fcis_core::{BudgetUsed, Decision};
     use zeno_fcis_crypto::RustCryptoSha256;
     use zeno_fcis_schema::{
         Schema, SchemaAdmittedEnvelope, SchemaEnvelopeError, SchemaLimits, TypeDef, TypeId,
         TypeKind, ValidationLimits, ValueValidationError,
     };
-    use zeno_fcis_transition::{TransitionError, TransitionLimits, validate_transition_decision};
+    use zeno_fcis_transition::{TransitionLimits, validate_transition_decision};
 
-    use crate::bootstrap_project::{GeneratedProject, GeneratedProjectError};
+    use crate::bootstrap_project::{
+        GeneratedCommandEnvelope, GeneratedContextEnvelope, GeneratedProject, GeneratedProjectError,
+    };
     use crate::catalog_fixture::fixture_catalog;
 
     struct WrongHash;
@@ -99,6 +103,18 @@ mod tests {
     fn generated_project() -> GeneratedProject {
         GeneratedProject::try_new::<RustCryptoSha256>()
             .unwrap_or_else(|error| panic!("generated project rejected: {error}"))
+    }
+
+    fn admitted_command(project: &GeneratedProject) -> GeneratedCommandEnvelope {
+        project
+            .admit_command::<RustCryptoSha256>(&Event::Stop, ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("generated command rejected: {error}"))
+    }
+
+    fn admitted_context(project: &GeneratedProject) -> GeneratedContextEnvelope {
+        project
+            .admit_context::<RustCryptoSha256>(&Flag(false), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("generated context rejected: {error}"))
     }
 
     #[test]
@@ -338,19 +354,27 @@ mod tests {
         let envelope = project
             .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
             .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
         let decision = project
             .begin_transition::<RustCryptoSha256>(
                 &envelope,
                 state_domain(),
-                Hash32::new([1; 32]),
-                Hash32::new([2; 32]),
+                &command,
+                &context,
                 BudgetUsed::default(),
                 TransitionLimits::default(),
             )
             .unwrap_or_else(|error| panic!("transition start failed: {error}"))
             .seal()
             .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
-        assert!(matches!(decision, Decision::Accept(_)));
+        let artifacts = match &decision {
+            Decision::Accept(artifacts) => artifacts,
+            other => panic!("expected accept, got {other:?}"),
+        };
+        let bindings = artifacts.candidate().bundle().body().bindings();
+        assert_eq!(bindings.command_hash, command.commitment());
+        assert_eq!(bindings.context_hash, context.commitment());
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
             project.catalog(),
@@ -358,6 +382,105 @@ mod tests {
             state_domain(),
         )
         .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
+    fn generated_inputs_bind_exact_types_schema_domains_and_commitments() {
+        let project = generated_project();
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        assert_eq!(command.admitted().type_id(), TypeId::new(9));
+        assert_eq!(context.admitted().type_id(), TypeId::new(5));
+        assert_eq!(
+            command.admitted().schema_hash(),
+            project.catalog().schema_hash()
+        );
+        assert_eq!(
+            context.admitted().schema_hash(),
+            project.catalog().schema_hash()
+        );
+        assert_eq!(command.validation_report().nodes, 1);
+        assert_eq!(context.validation_report().nodes, 1);
+
+        let command_bytes = command
+            .admitted()
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("command encoding failed: {error}"));
+        let command_domain = Domain::new(
+            crate::bootstrap_project::COMMAND_DOMAIN,
+            crate::bootstrap_project::INPUT_COMMITMENT_FORMAT_VERSION,
+        )
+        .unwrap_or_else(|error| panic!("command domain failed: {error}"));
+        assert_eq!(
+            command.commitment(),
+            commitment::<RustCryptoSha256>(command_domain, &command_bytes)
+                .unwrap_or_else(|error| panic!("command commitment failed: {error}"))
+        );
+
+        let context_bytes = context
+            .admitted()
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("context encoding failed: {error}"));
+        let context_domain = Domain::new(
+            crate::bootstrap_project::CONTEXT_DOMAIN,
+            crate::bootstrap_project::INPUT_COMMITMENT_FORMAT_VERSION,
+        )
+        .unwrap_or_else(|error| panic!("context domain failed: {error}"));
+        assert_eq!(
+            context.commitment(),
+            commitment::<RustCryptoSha256>(context_domain, &context_bytes)
+                .unwrap_or_else(|error| panic!("context commitment failed: {error}"))
+        );
+        let command_under_context_domain =
+            commitment::<RustCryptoSha256>(context_domain, &command_bytes)
+                .unwrap_or_else(|error| panic!("role-separated commitment failed: {error}"));
+        assert_ne!(command.commitment(), command_under_context_domain);
+        assert_ne!(command.commitment(), Hash32::ZERO);
+        assert_ne!(context.commitment(), Hash32::ZERO);
+    }
+
+    #[test]
+    fn generated_input_commitments_are_deterministic_and_value_sensitive() {
+        let project = generated_project();
+        let first = admitted_command(&project);
+        let second = admitted_command(&project);
+        let changed = project
+            .admit_command::<RustCryptoSha256>(&Event::Move(Amount(1)), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("changed command rejected: {error}"));
+        assert_eq!(first, second);
+        assert_ne!(first.commitment(), changed.commitment());
+
+        let false_context = admitted_context(&project);
+        let true_context = project
+            .admit_context::<RustCryptoSha256>(&Flag(true), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("changed context rejected: {error}"));
+        assert_ne!(false_context.commitment(), true_context.commitment());
+    }
+
+    #[test]
+    fn generated_input_admission_enforces_provider_and_validation_bounds() {
+        let project = generated_project();
+        let invalid = Event::Move(Amount(1_000_001));
+        assert_eq!(
+            project.admit_command::<WrongHash>(&invalid, ValidationLimits::default()),
+            Err(GeneratedProjectError::HashAlgorithmMismatch)
+        );
+        assert_eq!(
+            project.admit_command::<RustCryptoSha256>(&invalid, ValidationLimits::default()),
+            Err(GeneratedProjectError::Adapter(AdapterError::IntegerRange))
+        );
+        assert_eq!(
+            project.admit_context::<RustCryptoSha256>(
+                &Flag(false),
+                ValidationLimits {
+                    max_depth: 0,
+                    max_nodes: 0,
+                },
+            ),
+            Err(GeneratedProjectError::Envelope(
+                SchemaEnvelopeError::SchemaValidation(ValueValidationError::BudgetExceeded)
+            ))
+        );
     }
 
     #[test]
@@ -387,11 +510,13 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("wrong-provider envelope failed: {error}"));
         let project = generated_project();
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
         let result = project.begin_transition::<RustCryptoSha256>(
             &wrong,
             state_domain(),
-            Hash32::new([1; 32]),
-            Hash32::new([2; 32]),
+            &command,
+            &context,
             BudgetUsed::default(),
             TransitionLimits::default(),
         );
@@ -421,11 +546,13 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("wrong-root envelope failed: {error}"));
         let project = generated_project();
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
         let result = project.begin_transition::<RustCryptoSha256>(
             &wrong,
             state_domain(),
-            Hash32::new([1; 32]),
-            Hash32::new([2; 32]),
+            &command,
+            &context,
             BudgetUsed::default(),
             TransitionLimits::default(),
         );
@@ -444,32 +571,19 @@ mod tests {
             .to_root_envelope::<RustCryptoSha256>(ValidationLimits::default())
             .unwrap_or_else(|error| panic!("root envelope failed: {error:?}"));
         let project = generated_project();
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
         let wrong_provider = project.begin_transition::<WrongHash>(
             &envelope,
             state_domain(),
-            Hash32::ZERO,
-            Hash32::ZERO,
+            &command,
+            &context,
             BudgetUsed::default(),
             TransitionLimits::default(),
         );
         assert!(matches!(
             wrong_provider,
             Err(GeneratedProjectError::HashAlgorithmMismatch)
-        ));
-
-        let zero_command = project.begin_transition::<RustCryptoSha256>(
-            &envelope,
-            state_domain(),
-            Hash32::ZERO,
-            Hash32::new([2; 32]),
-            BudgetUsed::default(),
-            TransitionLimits::default(),
-        );
-        assert!(matches!(
-            zero_command,
-            Err(GeneratedProjectError::Transition(
-                TransitionError::ZeroCommandHash
-            ))
         ));
     }
 }

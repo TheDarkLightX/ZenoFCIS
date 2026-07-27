@@ -15,8 +15,8 @@ Runtime construction receives only:
 
 - the same selected commitment provider;
 - a `SchemaAdmittedEnvelope` produced under the exact generated schema commitment and root type;
+- nominal generated command and context witnesses admitted under the profile's exact non-root schema types;
 - an explicit versioned state commitment domain;
-- nonzero command and authenticated-context commitments;
 - explicit `BudgetUsed` and `TransitionLimits` values.
 
 ## Outputs
@@ -27,6 +27,7 @@ Generated source contains:
 - deterministic reconstruction of all catalog definitions, profile registry entries, bindings, and `CatalogLimits`;
 - a private-field `GeneratedProject` that owns the reconstructed catalog;
 - a typed-root `GeneratedProject::admit_root` method that uses the catalog provider even when schema code generation used a different provider;
+- typed `admit_command` and `admit_context` methods that derive visible role-separated commitments;
 - an envelope-bound `GeneratedProject::begin_transition` method;
 - local fail-closed diagnostics for provider, catalog, profile, schema, root-type, and transition failures.
 
@@ -36,7 +37,7 @@ Successful startup returns the existing `CataloguedTransitionBuilder`. Sealing a
 
 The input catalog remains authoritative. Generation copies existing schema types, stable identifiers, reason dispositions and precedence, registry commitments, policy commitments, provider identity, and resource limits. It does not select or alter any of them.
 
-`GeneratedProject::try_new` reconstructs those values, recomputes the schema commitment, validates all catalog cross-bindings, and compares the exact profile and complete catalog commitments with the generation-time constants. `admit_root` converts only the generated typed root and admits it with the catalog's schema and selected catalog provider. `begin_transition` rechecks the provider and complete stored catalog identity, then requires the exact schema commitment and root type carried by the admitted envelope before invoking the generic builder.
+`GeneratedProject::try_new` reconstructs those values, recomputes the schema commitment, validates all catalog cross-bindings, and compares the exact profile and complete catalog commitments with the generation-time constants. `admit_root` converts only the generated typed root and admits it with the catalog's schema and selected catalog provider. Command and context admission use the profile's exact type IDs and derive commitments over their complete schema-bound envelope bytes under `<domain-prefix>/command` and `<domain-prefix>/context`. `begin_transition` rechecks the provider, complete stored catalog identity, root witness, command witness, context witness, and both derived commitments before invoking the generic builder.
 
 The local error order is:
 
@@ -74,7 +75,8 @@ The compiled generated fixture verifies:
 - rejection of an envelope with a different schema commitment;
 - rejection of a different root type even when a test provider forces the expected schema commitment;
 - provider and generated-binding failures precede generic transition-input failures;
-- a zero command commitment is reported by the generic transition layer only after all generated bindings pass;
+- command and context commitments are deterministic, value-sensitive in bounded fixtures, role-domain separated, and nonzero;
+- candidate bindings carry the exact generated command and context commitments;
 - generated source contains no raw-`Value` or caller-supplied-catalog transition entry point.
 
 ## Assumptions
@@ -82,7 +84,7 @@ The compiled generated fixture verifies:
 - The generation input catalog and selected commitment provider were reviewed together.
 - The generated schema reconstruction preserves the input schema exactly.
 - The selected `CommitmentHasher` implementation correctly implements its advertised identity.
-- State-domain selection, command/context commitment derivation, business predicates, and reported logical budget usage remain caller responsibilities.
+- State-domain selection, business predicates, authenticated-context provenance, and reported logical budget usage remain caller responsibilities.
 - Generated output is used at its retained digest or reviewed again after modification.
 
 ## Explicit nonclaims
