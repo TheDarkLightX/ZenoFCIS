@@ -3,8 +3,10 @@
 //! The generator emits ordinary Rust and Python constants, typed domain
 //! adapters with strict `to_value`/`try_from_value` conversions, typed patch
 //! path constructors, positive and negative codec vectors, exact canonical
-//! schema bytes, and a content-addressed manifest. Generated artifacts contain
-//! no hidden procedural macros and can be diffed or regenerated independently.
+//! schema bytes, and a content-addressed manifest. It also exposes a separate,
+//! deliberately bounded Solidity FCIS scaffold generator for effect-free local
+//! state machines. Generated artifacts contain no hidden procedural macros and
+//! can be diffed or regenerated independently.
 
 #![forbid(unsafe_code)]
 
@@ -14,6 +16,7 @@ mod model;
 mod python;
 mod render;
 mod root_envelope;
+mod solidity;
 mod vectors;
 
 pub use fixture::{fixture_schema, fixture_spec};
@@ -21,6 +24,12 @@ pub use model::{
     CodegenError, FORMATTER_ID, GeneratedBundle, GeneratedFile, GenerationSpec, VectorKind,
 };
 pub use render::{GENERATOR_ID, generate};
+pub use solidity::{
+    GeneratedSolidity, MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
+    SOLIDITY_GENERATOR_ID, SOLIDITY_PRAGMA, SolidityContractSpec, SolidityField,
+    SolidityGenerationError, SolidityListKind, SoliditySafetyFinding, SoliditySafetyFindingKind,
+    SoliditySafetyReport, SolidityScalar, generate_solidity, inspect_solidity_source,
+};
 
 #[cfg(test)]
 mod tests {
