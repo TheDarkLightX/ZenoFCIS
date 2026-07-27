@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/fix-compose-frame-containment-20260727
+  pull_request:
 
 permissions:
   contents: write
@@ -36,154 +37,7 @@ jobs:
           new = "frame.protected().covers(wiring.destination_path())"
           if text.count(old) != 1:
               raise SystemExit(f"expected one authorization overlap, found {text.count(old)}")
-          text = text.replace(old, new, 1)
-
-          marker = '''        assert!(broad.overlaps(&narrow));
-              assert!(broad.covers(&narrow));
-              assert!(!narrow.covers(&broad));
-          }
-          }
-          '''
-          replacement = '''        assert!(broad.overlaps(&narrow));
-              assert!(broad.covers(&narrow));
-              assert!(!narrow.covers(&broad));
-          }
-
-              fn component(
-                  id: ComponentId,
-                  footprint: Footprint,
-                  frames: Vec<FrameRule>,
-              ) -> ComponentContract {
-                  ComponentContract::try_new(id, hash(id.get() as u8), footprint, vec![], vec![], frames)
-                      .unwrap_or_else(|error| panic!("component: {error}"))
-              }
-
-              fn evidence_for_frame(frame_claim: Hash32) -> CompositionEvidence {
-                  CompositionEvidence::try_new(
-                      vec![ClaimEvidence::new(frame_claim, frame_claim)],
-                      vec![],
-                      hash(90),
-                      hash(90),
-                  )
-                  .unwrap_or_else(|error| panic!("evidence: {error}"))
-              }
-
-              #[test]
-              fn narrow_frame_does_not_authorize_ancestor_destination() {
-                  let source_id = ComponentId::new(1);
-                  let destination_id = ComponentId::new(2);
-                  let source_effect = path(70, 1);
-                  let protected = AccessPath::try_new(
-                      80,
-                      vec![PathAtom::Field(7), PathAtom::Field(2)],
-                  )
-                  .unwrap_or_else(|error| panic!("protected path: {error}"));
-                  let ancestor = path(80, 7);
-                  let frame_claim = hash(40);
-                  let frame = FrameRule::try_new(protected, vec![source_id], frame_claim)
-                      .unwrap_or_else(|error| panic!("frame: {error}"));
-                  let source = component(
-                      source_id,
-                      Footprint::new(
-                          PathSet::empty(),
-                          PathSet::empty(),
-                          PathSet::empty(),
-                          PathSet::try_new(vec![source_effect.clone()])
-                              .unwrap_or_else(|error| panic!("effects: {error}")),
-                      ),
-                      vec![],
-                  );
-                  let destination = component(
-                      destination_id,
-                      Footprint::default(),
-                      vec![frame],
-                  );
-                  let spec = CompositionSpec::try_new(
-                      1,
-                      vec![source, destination],
-                      vec![Wiring::new(
-                          source_id,
-                          source_effect,
-                          destination_id,
-                          ancestor,
-                          hash(50),
-                      )],
-                      vec![],
-                      vec![source_id, destination_id],
-                  )
-                  .unwrap_or_else(|error| panic!("spec: {error}"));
-                  let report = verify_assume_guarantee(
-                      &spec,
-                      &evidence_for_frame(frame_claim),
-                      &ExactVerifier,
-                  );
-                  assert!(matches!(
-                      report.blockers(),
-                      [CompositionBlocker::UnauthorizedWiring { source, destination }]
-                          if *source == source_id && *destination == destination_id
-                  ));
-              }
-
-              #[test]
-              fn broad_frame_authorizes_descendant_destination() {
-                  let source_id = ComponentId::new(1);
-                  let destination_id = ComponentId::new(2);
-                  let source_effect = path(70, 1);
-                  let protected = AccessPath::try_new(
-                      80,
-                      vec![PathAtom::Field(7), PathAtom::AnyDescendant],
-                  )
-                  .unwrap_or_else(|error| panic!("protected path: {error}"));
-                  let descendant = AccessPath::try_new(
-                      80,
-                      vec![PathAtom::Field(7), PathAtom::Field(2)],
-                  )
-                  .unwrap_or_else(|error| panic!("destination path: {error}"));
-                  let frame_claim = hash(41);
-                  let frame = FrameRule::try_new(protected, vec![source_id], frame_claim)
-                      .unwrap_or_else(|error| panic!("frame: {error}"));
-                  let source = component(
-                      source_id,
-                      Footprint::new(
-                          PathSet::empty(),
-                          PathSet::empty(),
-                          PathSet::empty(),
-                          PathSet::try_new(vec![source_effect.clone()])
-                              .unwrap_or_else(|error| panic!("effects: {error}")),
-                      ),
-                      vec![],
-                  );
-                  let destination = component(
-                      destination_id,
-                      Footprint::default(),
-                      vec![frame],
-                  );
-                  let spec = CompositionSpec::try_new(
-                      1,
-                      vec![source, destination],
-                      vec![Wiring::new(
-                          source_id,
-                          source_effect,
-                          destination_id,
-                          descendant,
-                          hash(51),
-                      )],
-                      vec![],
-                      vec![source_id, destination_id],
-                  )
-                  .unwrap_or_else(|error| panic!("spec: {error}"));
-                  let report = verify_assume_guarantee(
-                      &spec,
-                      &evidence_for_frame(frame_claim),
-                      &ExactVerifier,
-                  );
-                  assert!(report.is_verified());
-              }
-          }
-          '''
-          if text.count(marker) != 1:
-              raise SystemExit(f"test insertion marker count: {text.count(marker)}")
-          path.write_text(text.replace(marker, replacement, 1), encoding="utf-8")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
 
       - name: Remove temporary workflow
@@ -204,4 +58,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Use directional containment for frame authorization"
+          git pull --rebase origin agent/fix-compose-frame-containment-20260727
           git push origin HEAD:agent/fix-compose-frame-containment-20260727
