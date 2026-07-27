@@ -22,7 +22,8 @@ Construction inputs are:
 - one immutable pre-state `Value`;
 - one explicit versioned state commitment domain;
 - nonzero command and authenticated-context commitments;
-- exact caller-supplied `BudgetUsed` from the pure transition;
+- exact caller-supplied `BudgetUsed`, normally extracted from the pure
+  transition's returned `BudgetedDecision`;
 - one explicit `TransitionLimits` envelope.
 
 The generic builder retains this low-level interface. Bootstrap-generated projects expose the narrower path documented in `GENERATED_CATALOG_TRANSITION.md`, `GENERATED_COMMAND_CONTEXT_ENVELOPES.md`, `GENERATED_TYPED_ROOT_READS.md`, `GENERATED_NO_RAW_MUTATIONS.md`, `GENERATED_TYPED_CONTEXT_OBSERVATIONS.md`, and `GENERATED_TYPED_REASONS.md`: a private reconstructed catalog plus schema-admitted root, command, and context witnesses and a private-inner transition wrapper. That path has no caller-supplied raw catalog, state `Value`, command hash, context hash, reason `SemanticId`, direct-field read path, raw insertion/deletion method, or raw context-observation path.
@@ -88,7 +89,7 @@ The implementation must test:
 
 The builder decides construction consistency and catalog admission. It does not decide business predicates: callers supply booleans only to select already reviewed catalog reasons. It does not execute effects or outbox delivery, acquire time or randomness, perform I/O, choose schemas, choose stable identifiers, or promote evidence.
 
-The crate adds no external dependency. It trusts the existing value, codec, core, patch, plan, receipt, composition, project, schema, and catalog invariants plus the selected commitment provider. It assumes caller `BudgetUsed` accurately reflects logical work performed before builder entry; the builder binds that report but does not reconstruct hidden computation.
+The crate adds no external dependency. It trusts the existing value, codec, core, patch, plan, receipt, composition, project, schema, and catalog invariants plus the selected commitment provider. It assumes caller `BudgetUsed` is taken from the exact `BudgetedDecision` for the transition being sealed and that the implementation charged all modeled work. The builder binds that report but does not reconstruct hidden computation or independently prove accounting completeness.
 
 ## Explicit nonclaims
 
