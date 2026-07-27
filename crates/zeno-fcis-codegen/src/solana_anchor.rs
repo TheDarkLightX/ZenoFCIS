@@ -15,11 +15,13 @@ use crate::onchain::{
 };
 
 /// Stable semantic identity for the Solana Anchor backend.
-pub const SOLANA_ANCHOR_GENERATOR_ID: &str = "zeno-fcis-solana-anchor/1";
+pub const SOLANA_ANCHOR_GENERATOR_ID: &str = "zeno-fcis-solana-anchor/2";
 /// Exact Anchor release recorded by generated manifests.
 pub const ANCHOR_VERSION: &str = "1.0.2";
 /// Exact Solana/Agave toolchain family recorded by generated manifests.
 pub const SOLANA_TOOLCHAIN_VERSION: &str = "3.1.10";
+/// Exact Solana SHA-256 adapter used by generated programs.
+pub const SOLANA_SHA256_HASHER_VERSION: &str = "3.1.0";
 /// Hard maximum for one generated UTF-8 file.
 pub const MAX_SOLANA_GENERATED_FILE_BYTES: usize = 768 * 1024;
 
@@ -493,7 +495,7 @@ fn render_program(
             .map(|field| usize::from(field.scalar().byte_width()))
             .sum::<usize>();
     let mut output = String::new();
-    output.push_str("#![forbid(unsafe_code)]\n\nuse anchor_lang::prelude::*;\nuse anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};\n");
+    output.push_str("#![forbid(unsafe_code)]\n\nuse anchor_lang::prelude::*;\nuse anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};\nuse solana_sha256_hasher::{hash, hashv};\n");
     writeln!(
         output,
         "use {core_crate}::{{Command, Context as CoreContext, Core, Decision, DecisionKind, EffectPlan, EventPlan, ProjectCore, State, MACHINE_HASH, MACHINE_VERSION}};"
@@ -650,7 +652,7 @@ fn render_program_helpers(
         )?;
         writeln!(
             output,
-            "            token_interface::transfer_checked(CpiContext::new_with_signer(ctx.accounts.{name}_token_program.to_account_info(), cpi_accounts, signer), amount, ctx.accounts.{name}_mint.decimals)?;"
+            "            token_interface::transfer_checked(CpiContext::new_with_signer(ctx.accounts.{name}_token_program.key(), cpi_accounts, signer), amount, ctx.accounts.{name}_mint.decimals)?;"
         )?;
         output.push_str("        }\n");
     }
@@ -698,7 +700,7 @@ fn render_program_helpers(
         )?;
     }
     output.push_str("    _ => err!(FcisError::InvalidCapability),\n} }\n");
-    output.push_str("fn expected_recipient(code: u16, before_state: &State, command: &Command, context: &CoreContext) -> [u8; 32] { match code {\n");
+    output.push_str("fn expected_recipient(code: u16, _before_state: &State, _command: &Command, _context: &CoreContext) -> [u8; 32] { match code {\n");
     for capability in machine.capabilities() {
         writeln!(
             output,
@@ -738,7 +740,7 @@ fn render_hash_helpers(
             append_expression("value", field)
         )?;
     }
-    output.push_str("    anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
+    output.push_str("    hash(&bytes).to_bytes() }\n");
     output.push_str("fn hash_command(value: &Command) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/command/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH);\n");
     for field in machine.command_fields() {
         writeln!(
@@ -748,14 +750,15 @@ fn render_hash_helpers(
             append_expression("value", field)
         )?;
     }
-    output.push_str("    anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
-    output.push_str("fn hash_context(value: &CoreContext) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/context/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.actor); bytes.extend_from_slice(&value.chain_domain); bytes.extend_from_slice(&value.sequence.to_be_bytes()); bytes.extend_from_slice(&value.slot.to_be_bytes()); bytes.extend_from_slice(&value.unix_timestamp.to_be_bytes()); anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
+    output.push_str("    hash(&bytes).to_bytes() }\n");
+    output.push_str("fn hash_context(value: &CoreContext) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/context/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.actor); bytes.extend_from_slice(&value.chain_domain); bytes.extend_from_slice(&value.sequence.to_be_bytes()); bytes.extend_from_slice(&value.slot.to_be_bytes()); bytes.extend_from_slice(&value.unix_timestamp.to_be_bytes()); hash(&bytes).to_bytes() }\n");
     output.push_str("fn hash_chain_domain(state: &Pubkey) -> [u8; 32] { hashv_owned(&[b\"zeno-fcis/solana/domain/v1\\0\", &crate::ID.to_bytes(), &state.to_bytes(), &MACHINE_HASH]) }\n");
-    output.push_str("fn hash_event(value: &EventPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/event/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.code.to_be_bytes()); bytes.push(value.field_count); for item in value.data { bytes.extend_from_slice(&item); } anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
-    output.push_str("fn hash_effect(value: &EffectPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/effect/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.capability.to_be_bytes()); bytes.extend_from_slice(&value.asset_id); bytes.extend_from_slice(&value.recipient); bytes.extend_from_slice(&value.amount.to_be_bytes()); anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }\n");
+    output.push_str("fn hash_event(value: &EventPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/event/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.code.to_be_bytes()); bytes.push(value.field_count); for item in value.data { bytes.extend_from_slice(&item); } hash(&bytes).to_bytes() }\n");
+    output.push_str("fn hash_effect(value: &EffectPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b\"zeno-fcis/solana/effect/v1\\0\"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.capability.to_be_bytes()); bytes.extend_from_slice(&value.asset_id); bytes.extend_from_slice(&value.recipient); bytes.extend_from_slice(&value.amount.to_be_bytes()); hash(&bytes).to_bytes() }\n");
     output.push_str("fn hash_event_plan(value: &Decision) -> [u8; 32] { let mut result = hashv_owned(&[b\"zeno-fcis/solana/event-plan/v1\\0\", &MACHINE_HASH, &[value.event_count]]); for index in 0..usize::from(value.event_count) { result = hashv_owned(&[&result, &hash_event(&value.events[index])]); } result }\n");
     output.push_str("fn hash_effect_plan(value: &Decision) -> [u8; 32] { let mut result = hashv_owned(&[b\"zeno-fcis/solana/effect-plan/v1\\0\", &MACHINE_HASH, &[value.effect_count]]); for index in 0..usize::from(value.effect_count) { result = hashv_owned(&[&result, &hash_effect(&value.effects[index])]); } result }\n");
-    output.push_str("fn hashv_owned(values: &[&[u8]]) -> [u8; 32] { anchor_lang::solana_program::hash::hashv(values).to_bytes() }\n\n");
+    output
+        .push_str("fn hashv_owned(values: &[&[u8]]) -> [u8; 32] { hashv(values).to_bytes() }\n\n");
     Ok(())
 }
 
@@ -859,7 +862,7 @@ fn render_core_cargo(base: &str) -> String {
 
 fn render_program_cargo(base: &str) -> String {
     format!(
-        "[package]\nname = \"{base}\"\nversion = \"0.1.0\"\nedition = \"2024\"\npublish = false\n\n[lib]\ncrate-type = [\"cdylib\", \"lib\"]\nname = \"{base}\"\n\n[features]\ndefault = []\ncpi = [\"no-entrypoint\"]\nno-entrypoint = []\nno-idl = []\nno-log-ix-name = []\nidl-build = [\"anchor-lang/idl-build\", \"anchor-spl/idl-build\"]\n\n[dependencies]\nanchor-lang = \"={ANCHOR_VERSION}\"\nanchor-spl = {{ version = \"={ANCHOR_VERSION}\", features = [\"token\", \"token_2022\"] }}\n{base}-core = {{ path = \"../../crates/{base}-core\" }}\n"
+        "[package]\nname = \"{base}\"\nversion = \"0.1.0\"\nedition = \"2024\"\npublish = false\n\n[lib]\ncrate-type = [\"cdylib\", \"lib\"]\nname = \"{base}\"\n\n[features]\ndefault = []\nanchor-debug = [\"anchor-lang/anchor-debug\"]\ncpi = [\"no-entrypoint\"]\ncustom-heap = []\ncustom-panic = []\nno-entrypoint = []\nno-idl = []\nno-log-ix-name = []\nidl-build = [\"anchor-lang/idl-build\", \"anchor-spl/idl-build\"]\n\n[dependencies]\nanchor-lang = \"={ANCHOR_VERSION}\"\nanchor-spl = {{ version = \"={ANCHOR_VERSION}\", features = [\"token\", \"token_2022\"] }}\nsolana-sha256-hasher = {{ version = \"={SOLANA_SHA256_HASHER_VERSION}\", features = [\"sha2\"] }}\n{base}-core = {{ path = \"../../crates/{base}-core\" }}\n\n[lints.rust]\nunexpected_cfgs = {{ level = \"warn\", check-cfg = ['cfg(target_os, values(\"solana\"))'] }}\n"
     )
 }
 
@@ -869,6 +872,10 @@ fn render_manifest(spec: &SolanaAnchorSpec) -> String {
     let _ = writeln!(output, "machine_hash={}", spec.machine().machine_hash());
     let _ = writeln!(output, "anchor={ANCHOR_VERSION}");
     let _ = writeln!(output, "solana={SOLANA_TOOLCHAIN_VERSION}");
+    let _ = writeln!(
+        output,
+        "solana-sha256-hasher={SOLANA_SHA256_HASHER_VERSION}"
+    );
     let _ = writeln!(output, "program_id={}", base58_encode(spec.program_id()));
     let _ = writeln!(output, "state_seed={}", spec.state_seed());
     output.push_str("core_dependencies=0\ncore_no_std=true\noverflow_checks=true\nverified_build=required\nupgrade_authority_review=required\n");
@@ -989,7 +996,7 @@ fn sanitize_non_code(source: &str) -> String {
 
 fn recipient_expression(policy: RecipientPolicy, machine: &OnchainMachineSpec) -> String {
     match policy {
-        RecipientPolicy::Caller => "context.actor".to_owned(),
+        RecipientPolicy::Caller => "_context.actor".to_owned(),
         RecipientPolicy::Fixed(value) => rust_bytes(value),
         RecipientPolicy::CommandField(id) => {
             let name = machine
@@ -998,7 +1005,7 @@ fn recipient_expression(policy: RecipientPolicy, machine: &OnchainMachineSpec) -
                 .find(|field| field.id() == id)
                 .map(OnchainField::name)
                 .unwrap_or("invalid_recipient");
-            format!("command.{name}")
+            format!("_command.{name}")
         }
         RecipientPolicy::StateField(id) => {
             let name = machine
@@ -1007,7 +1014,7 @@ fn recipient_expression(policy: RecipientPolicy, machine: &OnchainMachineSpec) -
                 .find(|field| field.id() == id)
                 .map(OnchainField::name)
                 .unwrap_or("invalid_recipient");
-            format!("before_state.{name}")
+            format!("_before_state.{name}")
         }
     }
 }
@@ -1238,9 +1245,23 @@ mod tests {
             .find(|file| file.path().contains("programs/") && file.path().ends_with("src/lib.rs"))
             .map(GeneratedOnchainFile::content)
             .unwrap_or_default();
+        let program_manifest = bundle
+            .files()
+            .iter()
+            .find(|file| {
+                file.path().starts_with("programs/") && file.path().ends_with("Cargo.toml")
+            })
+            .map(GeneratedOnchainFile::content)
+            .unwrap_or_default();
         assert!(shell.contains("token_interface::transfer_checked"));
+        assert!(shell.contains("_token_program.key()"));
+        assert!(shell.contains("use solana_sha256_hasher::{hash, hashv};"));
+        assert!(!shell.contains("solana_program::hash"));
         assert!(shell.contains("seeds = [STATE_SEED, authority.key().as_ref()]"));
         assert!(shell.contains("expected_state_hash"));
+        assert!(program_manifest.contains("solana-sha256-hasher = { version = \"=3.1.0\""));
+        assert!(program_manifest.contains("custom-heap = []"));
+        assert!(program_manifest.contains("cfg(target_os, values(\"solana\"))"));
         assert!(!shell.contains("UncheckedAccount"));
         assert!(!shell.contains("remaining_accounts"));
         assert!(inspect_solana_shell_source(shell).is_clean());
