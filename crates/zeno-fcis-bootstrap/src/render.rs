@@ -563,6 +563,12 @@ mod tests {
         assert!(text.contains("pub fn admit_root<H: CommitmentHasher>"));
         assert!(text.contains("pub struct GeneratedCommandEnvelope {"));
         assert!(text.contains("pub struct GeneratedContextEnvelope {"));
+        assert!(text.contains("pub enum RejectReasonId {"));
+        assert!(text.contains("pub enum CommittedFailureReasonId {"));
+        assert!(text.contains("pub struct GeneratedTransition<'a, H: CommitmentHasher> {"));
+        assert!(text.contains("reason: RejectReasonId"));
+        assert!(text.contains("reason: CommittedFailureReasonId"));
+        assert!(text.contains("Result<GeneratedTransition<'a, H>, GeneratedProjectError>"));
         assert!(text.contains("pub fn admit_command<H: CommitmentHasher>"));
         assert!(text.contains("command: &crate::generated::Event"));
         assert!(text.contains("pub fn admit_context<H: CommitmentHasher>"));
@@ -580,6 +586,9 @@ mod tests {
         assert!(!text.contains("context_hash: Hash32"));
         assert!(!text.contains("pub admitted: SchemaAdmittedTypeEnvelope"));
         assert!(!text.contains("pub commitment: Hash32"));
+        assert!(!text.contains("pub inner: CataloguedTransitionBuilder"));
+        assert!(!text.contains("reason_id: SemanticId"));
+        assert!(!text.contains("Result<CataloguedTransitionBuilder<'a, H>"));
     }
 
     #[test]
