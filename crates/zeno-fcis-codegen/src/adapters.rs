@@ -702,11 +702,7 @@ fn render_map(
     let _ = writeln!(output, "            let value = entry.value.to_value()?;");
     let _ = writeln!(
         output,
-        "            let encoded_key = key.canonical_bytes()?;"
-    );
-    let _ = writeln!(
-        output,
-        "            entries.push(MapEntry::new(encoded_key, key, value));"
+        "            entries.push(MapEntry::try_new(key, value)?);"
     );
     let _ = writeln!(output, "        }}");
     let _ = writeln!(output, "        Ok(Value::normalize_map(entries)?)");

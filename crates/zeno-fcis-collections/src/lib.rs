@@ -29,6 +29,14 @@ use zeno_fcis_value::{MapEntry, Value, ValueError};
 /// This is the sole authority for map equality, ordering, and canonical
 /// encoding. Backend-specific internal shapes are never used for protocol
 /// meaning.
+///
+/// The previous unchecked constructor is intentionally absent:
+///
+/// ```compile_fail
+/// use zeno_fcis_collections::{LogicalEntry, Value};
+///
+/// let _ = LogicalEntry::new(vec![0], Value::Unit, Value::Unit);
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LogicalEntry {
     encoded_key: Box<[u8]>,
@@ -37,20 +45,6 @@ pub struct LogicalEntry {
 }
 
 impl LogicalEntry {
-    /// Creates a logical entry.
-    ///
-    /// This constructor does not validate that `encoded_key` matches the
-    /// canonical encoding of `key`. Use [`try_new`](Self::try_new) for
-    /// validated construction.
-    #[must_use]
-    pub fn new(encoded_key: Vec<u8>, key: Value, value: Value) -> Self {
-        Self {
-            encoded_key: encoded_key.into_boxed_slice(),
-            key,
-            value,
-        }
-    }
-
     /// Creates a validated logical entry, checking that `encoded_key` matches
     /// the canonical encoding of `key`.
     ///
@@ -70,6 +64,15 @@ impl LogicalEntry {
             key,
             value,
         })
+    }
+
+    /// Reconstructs an entry from parts previously admitted by [`Self::try_new`].
+    pub(crate) fn from_stored_parts(encoded_key: Vec<u8>, key: Value, value: Value) -> Self {
+        Self {
+            encoded_key: encoded_key.into_boxed_slice(),
+            key,
+            value,
+        }
     }
 
     /// Returns the authoritative encoded key bytes.
@@ -200,12 +203,22 @@ pub trait PersistentMap: Clone + private::Sealed {
     /// duplicate keys. Backends sort entries in `to_entries()`, so this only
     /// fails if the backend's sort is broken.
     fn try_to_value_map(&self) -> Result<Value, MapError> {
-        let entries: Vec<MapEntry> = self
+        let entries: Result<Vec<MapEntry>, MapError> = self
             .to_entries()
             .into_iter()
-            .map(|e| MapEntry::new(e.encoded_key.to_vec(), e.key, e.value))
+            .map(|entry| {
+                let (stored_key, key, value) = entry.into_parts();
+                let map_entry = MapEntry::try_new(key, value).map_err(MapError::from)?;
+                if stored_key.as_ref() != map_entry.encoded_key() {
+                    return Err(MapError::KeyEncodingMismatch {
+                        expected: map_entry.encoded_key().to_vec().into_boxed_slice(),
+                        actual: stored_key,
+                    });
+                }
+                Ok(map_entry)
+            })
             .collect();
-        Value::map_canonical(entries).map_err(MapError::from)
+        Value::map_canonical(entries?).map_err(MapError::from)
     }
 
     /// Materializes a `Value::Map` in canonical order.

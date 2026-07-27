@@ -68,7 +68,7 @@ impl PersistentMap for RpdsBackend {
         let mut entries: Vec<LogicalEntry> = self
             .entries
             .iter()
-            .map(|(ek, (k, v))| LogicalEntry::new(ek.clone(), k.clone(), v.clone()))
+            .map(|(ek, (k, v))| LogicalEntry::from_stored_parts(ek.clone(), k.clone(), v.clone()))
             .collect();
         entries.sort_by(|a, b| a.encoded_key().cmp(b.encoded_key()));
         entries

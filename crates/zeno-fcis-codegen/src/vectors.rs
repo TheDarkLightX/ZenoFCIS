@@ -386,10 +386,10 @@ fn map_minimal(
     let mut entries = Vec::with_capacity(keys.len());
     for key_value in keys {
         let value_value = minimal_value(schema, value)?;
-        let encoded_key = key_value
-            .canonical_bytes()
-            .map_err(|_| CodegenError::VectorConstruction)?;
-        entries.push(MapEntry::new(encoded_key, key_value, value_value));
+        entries.push(
+            MapEntry::try_new(key_value, value_value)
+                .map_err(|_| CodegenError::VectorConstruction)?,
+        );
     }
     Value::normalize_map(entries).map_err(|_| CodegenError::VectorConstruction)
 }
@@ -407,10 +407,10 @@ fn map_maximal(
             Some(v) => v,
             None => minimal_value(schema, value)?,
         };
-        let encoded_key = key_value
-            .canonical_bytes()
-            .map_err(|_| CodegenError::VectorConstruction)?;
-        entries.push(MapEntry::new(encoded_key, key_value, value_value));
+        entries.push(
+            MapEntry::try_new(key_value, value_value)
+                .map_err(|_| CodegenError::VectorConstruction)?,
+        );
     }
     Value::normalize_map(entries)
         .map(Some)

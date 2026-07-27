@@ -492,10 +492,9 @@ fn replace_at(
                 .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
                 .map_err(|_| PatchError::PathNotFound)?;
             let mut next = entries.to_vec();
-            let encoded_key = next[index].encoded_key().to_vec();
             let key = next[index].key().clone();
             let child = replace_at(next[index].value(), rest, replacement)?;
-            next[index] = MapEntry::new(encoded_key, key, child);
+            next[index] = MapEntry::try_new(key, child).map_err(PatchError::InvalidValue)?;
             Value::map_canonical(next).map_err(PatchError::InvalidValue)
         }
         _ => Err(PatchError::PathTypeMismatch),
@@ -529,10 +528,12 @@ fn insert_at(
                 match next.binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref())) {
                     Ok(_) => Err(PatchError::ExpectedAbsent),
                     Err(index) => {
-                        next.insert(
-                            index,
-                            MapEntry::new(encoded_key.to_vec(), key.clone(), inserted),
-                        );
+                        let entry = MapEntry::try_new(key.clone(), inserted)
+                            .map_err(PatchError::InvalidValue)?;
+                        if entry.encoded_key() != encoded_key.as_ref() {
+                            return Err(PatchError::MapKeyMismatch);
+                        }
+                        next.insert(index, entry);
                         Value::map_canonical(next).map_err(PatchError::InvalidValue)
                     }
                 }
@@ -588,10 +589,9 @@ fn insert_at(
                 .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
                 .map_err(|_| PatchError::PathNotFound)?;
             let mut next = entries.to_vec();
-            let encoded_key = next[index].encoded_key().to_vec();
             let key = next[index].key().clone();
             let child = insert_at(next[index].value(), rest, map_key, inserted)?;
-            next[index] = MapEntry::new(encoded_key, key, child);
+            next[index] = MapEntry::try_new(key, child).map_err(PatchError::InvalidValue)?;
             Value::map_canonical(next).map_err(PatchError::InvalidValue)
         }
         _ => Err(PatchError::PathTypeMismatch),
@@ -671,10 +671,9 @@ fn delete_at(value: &Value, segments: &[PathSegment]) -> Result<Value, PatchErro
                 .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
                 .map_err(|_| PatchError::PathNotFound)?;
             let mut next = entries.to_vec();
-            let encoded_key = next[index].encoded_key().to_vec();
             let key = next[index].key().clone();
             let child = delete_at(next[index].value(), rest)?;
-            next[index] = MapEntry::new(encoded_key, key, child);
+            next[index] = MapEntry::try_new(key, child).map_err(PatchError::InvalidValue)?;
             Value::map_canonical(next).map_err(PatchError::InvalidValue)
         }
         _ => Err(PatchError::PathTypeMismatch),
