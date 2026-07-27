@@ -32,11 +32,43 @@ pub use zeno_fcis_codegen::{fixture_schema, fixture_spec};
 mod tests {
     use super::generated::*;
     use super::generated::{VectorExpect, VectorKind};
-    use zeno_fcis_codec::{DecodeLimits, decode_value};
-    use zeno_fcis_schema::{Schema, TypeId, ValidationLimits};
+    use zeno_fcis_codec::{CommitmentHasher, DecodeLimits, Hash32, decode_value};
+    use zeno_fcis_crypto::RustCryptoSha256;
+    use zeno_fcis_schema::{
+        Schema, SchemaEnvelopeError, TypeId, ValidationLimits, ValueValidationError,
+    };
+
+    struct WrongHash;
+
+    impl CommitmentHasher for WrongHash {
+        const ALGORITHM_ID: &'static str = "test/wrong-hash";
+
+        fn hash(_: &[u8]) -> Hash32 {
+            Hash32::new([0xa5; 32])
+        }
+    }
 
     fn schema() -> Schema {
         zeno_fcis_codegen::fixture_schema().unwrap_or_else(|e| panic!("fixture schema failed: {e}"))
+    }
+
+    fn minimal_state() -> BalanceState {
+        BalanceState {
+            amount: Amount(0),
+            signed: Signed(-1000),
+            label: Label("a".into()),
+            blob: Blob(vec![].into_boxed_slice()),
+            flag: Flag(false),
+            nil: Nil,
+            tag: Tag::Idle,
+            point: Point {
+                field_0: Amount(0),
+                field_1: Tag::Idle,
+            },
+            event: Event::Stop,
+            labels: Labels(vec![].into_boxed_slice()),
+            scores: Scores(vec![].into_boxed_slice()),
+        }
     }
 
     #[test]
@@ -97,39 +129,72 @@ mod tests {
 
     #[test]
     fn typed_adapter_round_trips_minimal() {
-        let amount = Amount(0);
-        let signed = Signed(-1000);
-        let label = Label("a".into());
-        let blob = Blob(vec![].into_boxed_slice());
-        let flag = Flag(false);
-        let nil = Nil;
-        let tag = Tag::Idle;
-        let point = Point {
-            field_0: Amount(0),
-            field_1: Tag::Idle,
-        };
-        let event = Event::Stop;
-        let labels = Labels(vec![].into_boxed_slice());
-        let scores = Scores(vec![].into_boxed_slice());
-        let state = BalanceState {
-            amount,
-            signed,
-            label,
-            blob,
-            flag,
-            nil,
-            tag,
-            point,
-            event,
-            labels,
-            scores,
-        };
+        let state = minimal_state();
         let value = state
             .to_value()
             .unwrap_or_else(|e| panic!("to_value failed: {e:?}"));
         let round_tripped = BalanceState::try_from_value(value)
             .unwrap_or_else(|e| panic!("try_from_value failed: {e:?}"));
         assert_eq!(state, round_tripped);
+    }
+
+    #[test]
+    fn generated_root_reconstructs_the_exact_source_schema() {
+        let generated = BalanceState::zfcis_schema()
+            .unwrap_or_else(|error| panic!("generated schema failed: {error}"));
+        let source = schema();
+        assert_eq!(generated, source);
+        let generated_hash = generated
+            .schema_hash::<RustCryptoSha256>()
+            .unwrap_or_else(|error| panic!("generated schema hash failed: {error}"));
+        assert_eq!(format!("{generated_hash}"), SCHEMA_HASH_HEX);
+    }
+
+    #[test]
+    fn generated_root_envelope_binds_schema_type_and_metrics() {
+        let state = minimal_state();
+        let expected = state
+            .to_value()
+            .unwrap_or_else(|error| panic!("root conversion failed: {error:?}"));
+        let envelope = state
+            .to_root_envelope::<RustCryptoSha256>(ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("root envelope failed: {error:?}"));
+        assert_eq!(envelope.root_type(), TypeId::new(ROOT_TYPE_ID));
+        assert_eq!(format!("{}", envelope.schema_hash()), SCHEMA_HASH_HEX);
+        assert_eq!(envelope.value().value(), &expected);
+        assert_eq!(envelope.validation_report().nodes, 14);
+        assert_eq!(envelope.validation_report().maximum_depth, 2);
+    }
+
+    #[test]
+    fn generated_root_envelope_rejects_wrong_hash_provider() {
+        assert_eq!(
+            minimal_state().to_root_envelope::<WrongHash>(ValidationLimits::default()),
+            Err(AdapterError::SchemaHashMismatch)
+        );
+    }
+
+    #[test]
+    fn generated_root_envelope_enforces_caller_validation_budget() {
+        assert_eq!(
+            minimal_state().to_root_envelope::<RustCryptoSha256>(ValidationLimits {
+                max_depth: 0,
+                max_nodes: 0,
+            }),
+            Err(AdapterError::SchemaEnvelope(
+                SchemaEnvelopeError::SchemaValidation(ValueValidationError::BudgetExceeded)
+            ))
+        );
+    }
+
+    #[test]
+    fn typed_value_failure_precedes_provider_mismatch() {
+        let mut state = minimal_state();
+        state.amount = Amount(1_000_001);
+        assert_eq!(
+            state.to_root_envelope::<WrongHash>(ValidationLimits::default()),
+            Err(AdapterError::IntegerRange)
+        );
     }
 
     #[test]
