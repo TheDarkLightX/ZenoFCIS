@@ -40,6 +40,7 @@ mod tests {
     use zeno_fcis_codec::{
         CanonicalEncode, CommitmentHasher, DecodeLimits, Domain, Hash32, commitment, decode_value,
     };
+    use zeno_fcis_compose::PathAtom;
     use zeno_fcis_core::{BudgetUsed, Decision};
     use zeno_fcis_crypto::RustCryptoSha256;
     use zeno_fcis_patch::{PatchOp, PathSegment};
@@ -489,6 +490,73 @@ mod tests {
             }
             .to_value()
             .unwrap_or_else(|error| panic!("updated state conversion failed: {error:?}"))
+        );
+        validate_transition_decision::<RustCryptoSha256>(
+            &decision,
+            project.catalog(),
+            envelope.value().value(),
+            state_domain(),
+        )
+        .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
+    fn generated_typed_root_read_returns_exact_type_and_records_only_read_footprint() {
+        let project = generated_project();
+        let state = BalanceState {
+            amount: Amount(9),
+            ..minimal_state()
+        };
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&state, ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let mut transition = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                &command,
+                &context,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"));
+        assert_eq!(
+            transition
+                .read_amount()
+                .unwrap_or_else(|error| panic!("typed root read failed: {error}")),
+            Amount(9)
+        );
+        let decision = transition
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        let artifacts = match &decision {
+            Decision::Accept(artifacts) => artifacts,
+            other => panic!("expected accept, got {other:?}"),
+        };
+        assert!(
+            artifacts
+                .candidate()
+                .bundle()
+                .patch()
+                .operations()
+                .is_empty()
+        );
+        assert_eq!(artifacts.candidate().footprint().reads().paths().len(), 1);
+        let observed = &artifacts.candidate().footprint().reads().paths()[0];
+        assert_eq!(
+            observed.namespace(),
+            crate::bootstrap_project::STATE_TYPE_ID
+        );
+        assert_eq!(observed.atoms(), &[PathAtom::Field(1)]);
+        assert!(
+            artifacts
+                .candidate()
+                .footprint()
+                .writes()
+                .paths()
+                .is_empty()
         );
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
