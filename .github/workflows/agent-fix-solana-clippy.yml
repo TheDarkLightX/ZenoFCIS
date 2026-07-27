@@ -33,23 +33,16 @@ jobs:
 
           path = Path("crates/zeno-fcis-codegen/src/solana_anchor.rs")
           text = path.read_text(encoding="utf-8")
-          old = '''        write!(
-              output,
-              "{}, field_count: {}, ..EventPlan::default() }};\\n",
-              event.code(),
-              event.fields().len()
-          )?;
-          '''
-          new = '''        writeln!(
-              output,
-              "{}, field_count: {}, ..EventPlan::default() }};",
-              event.code(),
-              event.fields().len()
-          )?;
-          '''
-          if text.count(old) != 1:
-              raise SystemExit(f"expected one write-with-newline block, found {text.count(old)}")
-          path.write_text(text.replace(old, new), encoding="utf-8")
+          target = '            "{}, field_count: {}, ..EventPlan::default() }};\\n",\n'
+          replacement = '            "{}, field_count: {}, ..EventPlan::default() }};",\n'
+          if text.count(target) != 1:
+              raise SystemExit(f"expected one trailing-newline format string, found {text.count(target)}")
+          text = text.replace(target, replacement, 1)
+          prefix = '        write!(\n            output,\n            "{}, field_count: {}, ..EventPlan::default() }};",\n'
+          fixed = '        writeln!(\n            output,\n            "{}, field_count: {}, ..EventPlan::default() }};",\n'
+          if text.count(prefix) != 1:
+              raise SystemExit(f"expected one event-builder write call, found {text.count(prefix)}")
+          path.write_text(text.replace(prefix, fixed, 1), encoding="utf-8")
           PY
 
       - name: Remove temporary diagnostics
