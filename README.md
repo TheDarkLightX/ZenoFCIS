@@ -76,7 +76,11 @@ The `zeno-fcis` umbrella keeps the semantic kernel small by default. Enable the 
 zeno-fcis = { version = "=0.1.0", features = ["full"] }
 ```
 
-Important optional features include `codegen`, `evidence`, `mounted-runtime`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
+The umbrella crate's default and `no_std` feature sets are project-neutral.
+Enable `zenodex-profile` for the ZenoDEX profile exports or `mounted-zenodex`
+for that profile plus its concrete mounted runtime.
+
+Important optional features include `codegen`, `evidence`, `mounted-runtime`, `zenodex-profile`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
 
 ## Architecture
 
