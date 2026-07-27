@@ -29,14 +29,24 @@ pub mod bootstrap_runtime {
 pub use zeno_fcis_codegen::{fixture_schema, fixture_spec};
 
 #[cfg(test)]
+#[path = "../catalog_fixture.rs"]
+mod catalog_fixture;
+
+#[cfg(test)]
 mod tests {
     use super::generated::*;
     use super::generated::{VectorExpect, VectorKind};
-    use zeno_fcis_codec::{CommitmentHasher, DecodeLimits, Hash32, decode_value};
+    use zeno_fcis_codec::{CommitmentHasher, DecodeLimits, Domain, Hash32, decode_value};
+    use zeno_fcis_core::{BudgetUsed, Decision};
     use zeno_fcis_crypto::RustCryptoSha256;
     use zeno_fcis_schema::{
-        Schema, SchemaEnvelopeError, TypeId, ValidationLimits, ValueValidationError,
+        Schema, SchemaAdmittedEnvelope, SchemaEnvelopeError, SchemaLimits, TypeDef, TypeId,
+        TypeKind, ValidationLimits, ValueValidationError,
     };
+    use zeno_fcis_transition::{TransitionError, TransitionLimits, validate_transition_decision};
+
+    use crate::bootstrap_project::{GeneratedProject, GeneratedProjectError};
+    use crate::catalog_fixture::fixture_catalog;
 
     struct WrongHash;
 
@@ -45,6 +55,16 @@ mod tests {
 
         fn hash(_: &[u8]) -> Hash32 {
             Hash32::new([0xa5; 32])
+        }
+    }
+
+    struct ExpectedSchemaHash;
+
+    impl CommitmentHasher for ExpectedSchemaHash {
+        const ALGORITHM_ID: &'static str = "test/forced-generated-schema-hash";
+
+        fn hash(_: &[u8]) -> Hash32 {
+            crate::bootstrap_project::SCHEMA_HASH
         }
     }
 
@@ -69,6 +89,16 @@ mod tests {
             labels: Labels(vec![].into_boxed_slice()),
             scores: Scores(vec![].into_boxed_slice()),
         }
+    }
+
+    fn state_domain() -> Domain<'static> {
+        Domain::new("codegen-fixture/state", 1)
+            .unwrap_or_else(|error| panic!("state domain rejected: {error}"))
+    }
+
+    fn generated_project() -> GeneratedProject {
+        GeneratedProject::try_new::<RustCryptoSha256>()
+            .unwrap_or_else(|error| panic!("generated project rejected: {error}"))
     }
 
     #[test]
@@ -270,5 +300,176 @@ mod tests {
         assert_eq!(effect.ordinal(), 7);
         assert_eq!(effect.operation(), 20);
         assert_eq!(effect.payload(), &zeno_fcis_value::Value::U128(9));
+    }
+
+    #[test]
+    fn generated_project_reconstructs_exact_catalog_profile_and_schema() {
+        let project = generated_project();
+        let expected = fixture_catalog(schema());
+        assert_eq!(project.catalog(), &expected);
+        assert_eq!(
+            project
+                .catalog()
+                .commitment::<RustCryptoSha256>()
+                .unwrap_or_else(|error| panic!("catalog commitment failed: {error}")),
+            crate::bootstrap_project::CATALOG_HASH
+        );
+        assert_eq!(
+            project.catalog().profile_hash(),
+            crate::bootstrap_project::PROFILE_HASH
+        );
+        assert_eq!(
+            project.catalog().schema_hash(),
+            crate::bootstrap_project::SCHEMA_HASH
+        );
+    }
+
+    #[test]
+    fn generated_project_rejects_wrong_commitment_provider() {
+        assert_eq!(
+            GeneratedProject::try_new::<WrongHash>(),
+            Err(GeneratedProjectError::HashAlgorithmMismatch)
+        );
+    }
+
+    #[test]
+    fn generated_project_starts_and_seals_accept_from_root_envelope() {
+        let project = generated_project();
+        let envelope = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("catalog root admission failed: {error}"));
+        let decision = project
+            .begin_transition::<RustCryptoSha256>(
+                &envelope,
+                state_domain(),
+                Hash32::new([1; 32]),
+                Hash32::new([2; 32]),
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("transition start failed: {error}"))
+            .seal()
+            .unwrap_or_else(|error| panic!("transition seal failed: {error}"));
+        assert!(matches!(decision, Decision::Accept(_)));
+        validate_transition_decision::<RustCryptoSha256>(
+            &decision,
+            project.catalog(),
+            envelope.value().value(),
+            state_domain(),
+        )
+        .unwrap_or_else(|error| panic!("transition decision invalid: {error}"));
+    }
+
+    #[test]
+    fn generated_root_admission_checks_provider_before_typed_conversion() {
+        let project = generated_project();
+        let mut invalid = minimal_state();
+        invalid.amount = Amount(1_000_001);
+        assert_eq!(
+            project.admit_root::<WrongHash>(&invalid, ValidationLimits::default()),
+            Err(GeneratedProjectError::HashAlgorithmMismatch)
+        );
+        assert_eq!(
+            project.admit_root::<RustCryptoSha256>(&invalid, ValidationLimits::default()),
+            Err(GeneratedProjectError::Adapter(AdapterError::IntegerRange))
+        );
+    }
+
+    #[test]
+    fn generated_transition_rejects_wrong_schema_envelope() {
+        let value = minimal_state()
+            .to_value()
+            .unwrap_or_else(|error| panic!("root conversion failed: {error:?}"));
+        let wrong = SchemaAdmittedEnvelope::try_new::<WrongHash>(
+            &schema(),
+            value,
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("wrong-provider envelope failed: {error}"));
+        let project = generated_project();
+        let result = project.begin_transition::<RustCryptoSha256>(
+            &wrong,
+            state_domain(),
+            Hash32::new([1; 32]),
+            Hash32::new([2; 32]),
+            BudgetUsed::default(),
+            TransitionLimits::default(),
+        );
+        assert!(matches!(
+            result,
+            Err(GeneratedProjectError::SchemaHashMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn generated_transition_rejects_wrong_root_type_after_schema_binding() {
+        let limits = SchemaLimits::default();
+        let definition = TypeDef::try_new(TypeId::new(77), "OtherRoot", TypeKind::Unit, limits)
+            .unwrap_or_else(|error| panic!("wrong-root type rejected: {error}"));
+        let schema = Schema::try_new(
+            "WrongRootSchema",
+            1,
+            TypeId::new(77),
+            vec![definition],
+            limits,
+        )
+        .unwrap_or_else(|error| panic!("wrong-root schema rejected: {error}"));
+        let wrong = SchemaAdmittedEnvelope::try_new::<ExpectedSchemaHash>(
+            &schema,
+            zeno_fcis_value::Value::Unit,
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("wrong-root envelope failed: {error}"));
+        let project = generated_project();
+        let result = project.begin_transition::<RustCryptoSha256>(
+            &wrong,
+            state_domain(),
+            Hash32::new([1; 32]),
+            Hash32::new([2; 32]),
+            BudgetUsed::default(),
+            TransitionLimits::default(),
+        );
+        assert!(matches!(
+            result,
+            Err(GeneratedProjectError::RootTypeMismatch {
+                expected: 12,
+                actual: 77
+            })
+        ));
+    }
+
+    #[test]
+    fn generated_binding_failures_precede_transition_input_failures() {
+        let envelope = minimal_state()
+            .to_root_envelope::<RustCryptoSha256>(ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("root envelope failed: {error:?}"));
+        let project = generated_project();
+        let wrong_provider = project.begin_transition::<WrongHash>(
+            &envelope,
+            state_domain(),
+            Hash32::ZERO,
+            Hash32::ZERO,
+            BudgetUsed::default(),
+            TransitionLimits::default(),
+        );
+        assert!(matches!(
+            wrong_provider,
+            Err(GeneratedProjectError::HashAlgorithmMismatch)
+        ));
+
+        let zero_command = project.begin_transition::<RustCryptoSha256>(
+            &envelope,
+            state_domain(),
+            Hash32::ZERO,
+            Hash32::new([2; 32]),
+            BudgetUsed::default(),
+            TransitionLimits::default(),
+        );
+        assert!(matches!(
+            zero_command,
+            Err(GeneratedProjectError::Transition(
+                TransitionError::ZeroCommandHash
+            ))
+        ));
     }
 }
