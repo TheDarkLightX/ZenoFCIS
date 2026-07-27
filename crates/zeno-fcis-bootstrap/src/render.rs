@@ -629,6 +629,10 @@ mod tests {
         assert!(!text.contains("pub fn enqueue(&mut self, entry: OutboxEntry)"));
         assert!(!text.contains("pub fn read(&mut self, path: ValuePath) -> Result<&'a Value"));
         assert!(!text.contains("pub fn update(&mut self, path: ValuePath, value: Value)"));
+        assert!(!text.contains("pub fn insert(&mut self, path: ValuePath"));
+        assert!(!text.contains("pub fn delete(&mut self, path: ValuePath"));
+        assert!(!text.contains("ValuePath"));
+        assert!(!text.contains("zeno_fcis_value::Value"));
         assert!(!text.contains("reason_id: SemanticId"));
         assert!(!text.contains("Result<CataloguedTransitionBuilder<'a, H>"));
     }
