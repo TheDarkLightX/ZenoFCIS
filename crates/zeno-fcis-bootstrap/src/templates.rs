@@ -46,7 +46,9 @@ pub(crate) fn render_rust_project(
     output.push_str(
         "use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};\n",
     );
+    output.push_str("use zeno_fcis_compose::AccessPath;\n");
     output.push_str("use zeno_fcis_core::BudgetUsed;\n");
+    output.push_str("use zeno_fcis_patch::ValuePath;\n");
     output.push_str("use zeno_fcis_plan::{Effect, OutboxEntry};\n");
     output.push_str("use zeno_fcis_project::{\n");
     output.push_str(
@@ -60,7 +62,12 @@ pub(crate) fn render_rust_project(
     );
     output.push_str("    TypeId, ValidationLimits, ValidationReport,\n");
     output.push_str("};\n");
-    output.push_str("use zeno_fcis_transition::{CataloguedTransitionBuilder, TransitionError, TransitionLimits};\n");
+    output.push_str("use zeno_fcis_transition::{\n");
+    output.push_str(
+        "    CataloguedTransitionBuilder, TransitionDecision, TransitionError, TransitionLimits,\n",
+    );
+    output.push_str("};\n");
+    output.push_str("use zeno_fcis_value::Value;\n");
     output.push('\n');
     writeln!(
         output,
@@ -194,6 +201,67 @@ fn render_reason_enum(output: &mut String, catalog: &ProjectCatalog) -> Result<(
         .map_err(|_| BootstrapError::Render)?;
     }
     output.push_str("        }\n    }\n}\n\n");
+    render_typed_reason_enum(output, catalog, ReasonDisposition::Reject, "RejectReasonId")?;
+    render_typed_reason_enum(
+        output,
+        catalog,
+        ReasonDisposition::CommittedFailure,
+        "CommittedFailureReasonId",
+    )?;
+    Ok(())
+}
+
+fn render_typed_reason_enum(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+    disposition: ReasonDisposition,
+    type_name: &str,
+) -> Result<(), BootstrapError> {
+    let class = match disposition {
+        ReasonDisposition::Reject => "ordinary rejection",
+        ReasonDisposition::CommittedFailure => "committed failure",
+    };
+    writeln!(output, "/// Stable catalogued {class} identifiers.")
+        .map_err(|_| BootstrapError::Render)?;
+    output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    writeln!(output, "pub enum {type_name} {{").map_err(|_| BootstrapError::Render)?;
+    for reason in catalog
+        .manifest()
+        .reasons()
+        .iter()
+        .filter(|reason| reason.disposition() == disposition)
+    {
+        writeln!(
+            output,
+            "    /// `{}` at precedence {}.\n    Reason{},",
+            reason.name().as_str(),
+            reason.precedence(),
+            reason.id().get()
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
+    writeln!(output, "}}\n\nimpl {type_name} {{").map_err(|_| BootstrapError::Render)?;
+    output.push_str("    /// Returns the corresponding general generated reason.\n");
+    output.push_str("    pub const fn reason_id(self) -> ReasonId {\n        match self {\n");
+    for reason in catalog
+        .manifest()
+        .reasons()
+        .iter()
+        .filter(|reason| reason.disposition() == disposition)
+    {
+        writeln!(
+            output,
+            "            Self::Reason{} => ReasonId::Reason{},",
+            reason.id().get(),
+            reason.id().get()
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
+    output.push_str("        }\n    }\n");
+    output.push_str("    /// Reconstructs the reviewed nonzero semantic identifier.\n");
+    output.push_str("    pub fn try_semantic_id(self) -> Result<SemanticId, ProfileError> {\n");
+    output.push_str("        self.reason_id().try_semantic_id()\n    }\n");
+    output.push_str("}\n\n");
     Ok(())
 }
 
@@ -313,6 +381,64 @@ fn render_generated_input_envelopes(output: &mut String) {
     output.push_str("}\n\n");
 }
 
+fn render_generated_transition(output: &mut String) {
+    output.push_str("/// Generated high-level transition with typed reason application.\n");
+    output.push_str("///\n");
+    output.push_str("/// The generic builder remains private so this path cannot apply raw reason identifiers.\n");
+    output.push_str("pub struct GeneratedTransition<'a, H: CommitmentHasher> {\n");
+    output.push_str("    inner: CataloguedTransitionBuilder<'a, H>,\n");
+    output.push_str("}\n\n");
+    output.push_str("impl<'a, H: CommitmentHasher> GeneratedTransition<'a, H> {\n");
+    output.push_str(
+        "    /// Observes one immutable pre-state path and records its read footprint.\n",
+    );
+    output.push_str("    pub fn read(&mut self, path: ValuePath) -> Result<&'a Value, GeneratedProjectError> {\n");
+    output.push_str("        Ok(self.inner.read(path)?)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Stages one preconditioned update.\n");
+    output.push_str("    pub fn update(&mut self, path: ValuePath, value: Value) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str("        self.inner.update(path, value)?;\n        Ok(self)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Stages one absent field or map-entry insertion.\n");
+    output.push_str("    pub fn insert(&mut self, path: ValuePath, map_key: Option<Value>, value: Value) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str("        self.inner.insert(path, map_key, value)?;\n        Ok(self)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Stages one preconditioned deletion.\n");
+    output.push_str("    pub fn delete(&mut self, path: ValuePath) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str("        self.inner.delete(path)?;\n        Ok(self)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Records one exact context observation.\n");
+    output.push_str("    pub fn observe_context(&mut self, path: AccessPath) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str("        self.inner.observe_context(path)?;\n        Ok(self)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Stages one authoritative effect.\n");
+    output.push_str("    pub fn emit(&mut self, effect: Effect) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str("        self.inner.emit(effect)?;\n        Ok(self)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Stages one external-delivery obligation.\n");
+    output.push_str("    pub fn enqueue(&mut self, entry: OutboxEntry) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str("        self.inner.enqueue(entry)?;\n        Ok(self)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    /// Records an ordinary rejection when `condition` is false.\n");
+    output.push_str("    pub fn require(&mut self, condition: bool, reason: RejectReasonId) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str(
+        "        self.inner.require(condition, reason.try_semantic_id()?)?;\n        Ok(self)\n",
+    );
+    output.push_str("    }\n\n");
+    output.push_str("    /// Records a committed failure when `condition` is true.\n");
+    output.push_str("    pub fn fail_if(&mut self, condition: bool, reason: CommittedFailureReasonId) -> Result<&mut Self, GeneratedProjectError> {\n");
+    output.push_str(
+        "        self.inner.fail_if(condition, reason.try_semantic_id()?)?;\n        Ok(self)\n",
+    );
+    output.push_str("    }\n\n");
+    output.push_str("    /// Canonicalizes, validates, resource-binds, and seals one decision.\n");
+    output
+        .push_str("    pub fn seal(self) -> Result<TransitionDecision, GeneratedProjectError> {\n");
+    output.push_str("        Ok(self.inner.seal()?)\n");
+    output.push_str("    }\n");
+    output.push_str("}\n\n");
+}
+
 #[allow(clippy::too_many_lines)]
 fn render_generated_project(
     output: &mut String,
@@ -322,6 +448,7 @@ fn render_generated_project(
     context_type: &str,
 ) -> Result<(), BootstrapError> {
     render_generated_input_envelopes(output);
+    render_generated_transition(output);
     output.push_str("/// Local generated-binding construction or admission failure.\n");
     output.push_str("///\n");
     output.push_str("/// This diagnostic order is not application rejection precedence.\n");
@@ -500,8 +627,7 @@ fn render_generated_project(
     output.push_str("        context: &GeneratedContextEnvelope,\n");
     output.push_str("        budget_used: BudgetUsed,\n");
     output.push_str("        limits: TransitionLimits,\n");
-    output
-        .push_str("    ) -> Result<CataloguedTransitionBuilder<'a, H>, GeneratedProjectError> {\n");
+    output.push_str("    ) -> Result<GeneratedTransition<'a, H>, GeneratedProjectError> {\n");
     output.push_str("        self.validate_catalog::<H>()?;\n");
     output.push_str("        if pre_state.schema_hash() != SCHEMA_HASH {\n");
     output.push_str("            return Err(GeneratedProjectError::SchemaHashMismatch { expected: SCHEMA_HASH, actual: pre_state.schema_hash() });\n");
@@ -511,12 +637,13 @@ fn render_generated_project(
     output.push_str("        }\n");
     output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Command, command.admitted(), command.commitment())?;\n");
     output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Context, context.admitted(), context.commitment())?;\n");
-    output.push_str("        Ok(CataloguedTransitionBuilder::try_new(\n");
+    output.push_str("        let inner = CataloguedTransitionBuilder::try_new(\n");
     output.push_str(
         "            &self.catalog, pre_state.value().value(), state_domain, command.commitment(),\n",
     );
     output.push_str("            context.commitment(), budget_used, limits,\n");
-    output.push_str("        )?)\n");
+    output.push_str("        )?;\n");
+    output.push_str("        Ok(GeneratedTransition { inner })\n");
     output.push_str("    }\n\n");
     output.push_str("    fn validate_input<H: CommitmentHasher>(\n");
     output.push_str("        kind: GeneratedInputKind,\n");

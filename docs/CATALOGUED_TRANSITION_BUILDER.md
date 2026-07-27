@@ -25,7 +25,7 @@ Construction inputs are:
 - exact caller-supplied `BudgetUsed` from the pure transition;
 - one explicit `TransitionLimits` envelope.
 
-The generic builder retains this low-level interface. Bootstrap-generated projects expose the narrower path documented in `GENERATED_CATALOG_TRANSITION.md` and `GENERATED_COMMAND_CONTEXT_ENVELOPES.md`: a private reconstructed catalog plus schema-admitted root, command, and context witnesses, with no caller-supplied raw catalog, state `Value`, command hash, or context hash.
+The generic builder retains this low-level interface. Bootstrap-generated projects expose the narrower path documented in `GENERATED_CATALOG_TRANSITION.md`, `GENERATED_COMMAND_CONTEXT_ENVELOPES.md`, and `GENERATED_TYPED_REASONS.md`: a private reconstructed catalog plus schema-admitted root, command, and context witnesses and a private-inner transition wrapper. That path has no caller-supplied raw catalog, state `Value`, command hash, context hash, or reason `SemanticId`.
 
 Builder operations may:
 
