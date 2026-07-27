@@ -351,10 +351,26 @@ pub enum Value {
 }
 
 impl Value {
-    /// Creates owned bytes.
-    #[must_use]
-    pub fn bytes(bytes: Vec<u8>) -> Self {
-        Self::Bytes(bytes.into_boxed_slice())
+    /// Creates owned bytes admitted by the default payload ceiling.
+    ///
+    /// A single byte leaf cannot exceed
+    /// [`ValueLimits::DEFAULT_MAX_PAYLOAD_BYTES`]. Enclosing values must still
+    /// call [`Self::validate_limits`] because several individually admitted
+    /// leaves can exceed the aggregate payload budget.
+    pub fn bytes(bytes: Vec<u8>) -> Result<Self, LengthError> {
+        Self::bytes_with_max(bytes, ValueLimits::DEFAULT_MAX_PAYLOAD_BYTES)
+    }
+
+    fn bytes_with_max(bytes: Vec<u8>, maximum: usize) -> Result<Self, LengthError> {
+        let actual = bytes.len();
+        if actual > maximum {
+            return Err(LengthError {
+                minimum: 0,
+                maximum,
+                actual,
+            });
+        }
+        Ok(Self::Bytes(bytes.into_boxed_slice()))
     }
 
     /// Creates ASCII text admitted by the default payload ceiling.
@@ -839,6 +855,58 @@ mod tests {
     }
 
     #[test]
+    fn value_bytes_accept_exact_bound() {
+        assert_eq!(
+            Value::bytes_with_max(vec![1, 2, 3], 3),
+            Ok(Value::Bytes(vec![1, 2, 3].into_boxed_slice()))
+        );
+    }
+
+    #[test]
+    fn value_bytes_reject_one_over_bound() {
+        let error = Value::bytes_with_max(vec![1, 2, 3, 4], 3);
+        match error {
+            Err(length) => {
+                assert_eq!(length.minimum(), 0);
+                assert_eq!(length.maximum(), 3);
+                assert_eq!(length.actual(), 4);
+            }
+            Ok(value) => panic!("expected exact byte length error, got {value:?}"),
+        }
+    }
+
+    #[test]
+    fn admitted_bytes_keep_exact_zcve_bytes() {
+        let value = Value::bytes(vec![1, 2, 3]).unwrap_or_else(|error| panic!("bytes: {error}"));
+        assert_eq!(
+            value.zcve_bytes(),
+            Ok(vec![zcve::TAG_BYTES, 0, 0, 0, 3, 1, 2, 3])
+        );
+    }
+
+    #[test]
+    fn individually_admitted_byte_leaves_still_obey_aggregate_limits() {
+        let first = Value::bytes(vec![1, 2]);
+        let second = Value::bytes(vec![3, 4]);
+        assert!(first.is_ok() && second.is_ok());
+        let value = Value::vector(vec![
+            first.unwrap_or_else(|error| panic!("first bytes: {error}")),
+            second.unwrap_or_else(|error| panic!("second bytes: {error}")),
+        ]);
+        let limits = ValueLimits {
+            max_payload_bytes: 3,
+            ..ValueLimits::default()
+        };
+        assert_eq!(
+            value.validate_limits(limits),
+            Err(ValueError::PayloadLimit {
+                limit: 3,
+                attempted: 4,
+            })
+        );
+    }
+
+    #[test]
     fn value_ascii_text_accepts_exact_bound() {
         let value = Value::text_ascii_with_max(String::from("abc"), 3);
         assert_eq!(value, Ok(Value::Text(String::from("abc").into_boxed_str())));
@@ -866,7 +934,7 @@ mod tests {
     }
 
     #[test]
-    fn default_text_ceiling_matches_default_payload_limit() {
+    fn default_helper_ceiling_matches_default_payload_limit() {
         assert_eq!(
             ValueLimits::default().max_payload_bytes,
             u64::try_from(ValueLimits::DEFAULT_MAX_PAYLOAD_BYTES).unwrap_or(u64::MAX)
@@ -938,7 +1006,8 @@ mod tests {
 
     #[test]
     fn structural_limits_are_checked_transitively() {
-        let value = Value::vector(vec![Value::vector(vec![Value::bytes(vec![1, 2, 3])])]);
+        let bytes = Value::bytes(vec![1, 2, 3]).unwrap_or_else(|error| panic!("bytes: {error}"));
+        let value = Value::vector(vec![Value::vector(vec![bytes])]);
         let limits = ValueLimits {
             max_depth: 1,
             ..ValueLimits::default()
