@@ -35,28 +35,36 @@ jobs:
           text = path.read_text(encoding="utf-8")
           old = "frame.protected().overlaps(wiring.destination_path())"
           new = "frame.protected().covers(wiring.destination_path())"
-          if text.count(old) != 1:
-              raise SystemExit(f"expected one authorization overlap, found {text.count(old)}")
-          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          if text.count(old) == 1:
+              path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          elif text.count(new) != 1:
+              raise SystemExit("frame authorization predicate not found")
           PY
-
-      - name: Remove temporary workflow
-        run: rm .github/workflows/agent-fix-compose-frame-containment.yml
 
       - name: Install pinned Rust
         run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
 
-      - name: Format and test
+      - name: Capture focused gates
+        id: gates
+        shell: bash
         run: |
-          cargo +1.97.1 fmt --all
-          cargo +1.97.1 clippy -p zeno-fcis-compose --all-targets --locked -- -D warnings
-          cargo +1.97.1 test -p zeno-fcis-compose --all-features --locked
+          set +e
+          {
+            cargo +1.97.1 fmt --all
+            cargo +1.97.1 clippy -p zeno-fcis-compose --all-targets --locked -- -D warnings
+            cargo +1.97.1 test -p zeno-fcis-compose --all-features --locked
+          } > /tmp/frame-containment.log 2>&1
+          status=$?
+          set -e
+          mkdir -p .agent-diagnostics
+          cp /tmp/frame-containment.log .agent-diagnostics/frame-containment.log
+          printf '%s\n' "$status" > .agent-diagnostics/frame-containment.status
 
-      - name: Commit repair
+      - name: Commit source and diagnostics
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Use directional containment for frame authorization"
+          git commit -m "Capture frame containment repair diagnostics"
           git pull --rebase origin agent/fix-compose-frame-containment-20260727
           git push origin HEAD:agent/fix-compose-frame-containment-20260727
