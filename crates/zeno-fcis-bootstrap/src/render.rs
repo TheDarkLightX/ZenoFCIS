@@ -51,7 +51,7 @@ pub fn generate_project<H: CommitmentHasher>(
     )?;
     assembly.push(
         "rust/project.rs".to_owned(),
-        render_rust_project(catalog, spec)?.into_bytes(),
+        render_rust_project(catalog, spec, catalog_hash, profile_hash, schema_hash)?.into_bytes(),
     )?;
     assembly.push(
         "rust/runtime.rs".to_owned(),
@@ -559,6 +559,12 @@ mod tests {
         assert!(text.contains("payload: &crate::generated::Amount"));
         assert!(text.contains("Channel30 = 30"));
         assert!(text.contains("destination: &crate::generated::Label"));
+        assert!(text.contains("pub struct GeneratedProject {"));
+        assert!(text.contains("pub fn admit_root<H: CommitmentHasher>"));
+        assert!(text.contains("pre_state: &'a SchemaAdmittedEnvelope"));
+        assert!(text.contains("let actual_catalog_hash = self.catalog.commitment::<H>()?"));
+        assert!(!text.contains("pre_state: &'a Value"));
+        assert!(!text.contains("catalog: &'a ProjectCatalog"));
     }
 
     #[test]
