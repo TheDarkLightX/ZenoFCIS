@@ -24,7 +24,7 @@ The generated functional core is a separate crate with:
 - generated typed event/effect constructors;
 - a single agent-editable `project.rs` implementation.
 
-The default implementation is inert: command admission and initialization invariants return false. A generated workspace therefore cannot initialize or move assets until project logic is deliberately implemented.
+The default implementation is inert: command admission and initialization invariants return false. A generated workspace therefore cannot initialize or move assets until project logic is deliberately implemented. This fail-closed starter is intentional: forgetting to replace or review the project core produces an unusable program rather than a permissive one.
 
 The source policy rejects Anchor/Solana runtime access, account types, CPIs, remaining accounts, host I/O, randomness, floats, unsafe code, panic paths, and incomplete implementation macros in the agent-authored core.
 
