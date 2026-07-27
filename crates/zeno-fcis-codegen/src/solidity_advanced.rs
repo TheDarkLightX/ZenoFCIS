@@ -5,13 +5,13 @@
 //! commit, receipts, and effect interpretation. Derived contracts implement
 //! only compiler-enforced `internal pure` hooks.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 
 use crate::onchain::{
     GeneratedOnchainBundle, GeneratedOnchainFile, ObservationPolicy, OnchainCapability,
-    OnchainCapabilityKind, OnchainEvent, OnchainField, OnchainMachineSpec, OnchainModelError,
-    OnchainScalar, RecipientPolicy,
+    OnchainCapabilityKind, OnchainField, OnchainMachineSpec, OnchainModelError, OnchainScalar,
+    RecipientPolicy,
 };
 use crate::solidity::inspect_solidity_source;
 
@@ -158,7 +158,7 @@ fn render_contract(spec: &SolidityAdvancedSpec) -> Result<String, OnchainModelEr
 
     output.push_str("// SPDX-License-Identifier: MIT OR Apache-2.0\n");
     writeln!(output, "pragma solidity {SOLIDITY_PINNED_VERSION};")?;
-    output.push_str("\n");
+    output.push('\n');
     output.push_str("import {IERC20} from \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";\n");
     output.push_str(
         "import {SafeERC20} from \"@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol\";\n\n",
@@ -191,7 +191,7 @@ fn render_contract(spec: &SolidityAdvancedSpec) -> Result<String, OnchainModelEr
         "    uint8 private constant MAX_EFFECT_SLOTS = {};",
         machine.max_effect_slots()
     )?;
-    output.push_str("\n");
+    output.push('\n');
 
     output.push_str("    enum DecisionKind { Accept, Reject }\n\n");
     render_struct(&mut output, "State", machine.state_fields())?;
@@ -237,7 +237,7 @@ fn render_contract(spec: &SolidityAdvancedSpec) -> Result<String, OnchainModelEr
             field.name()
         )?;
     }
-    output.push_str("\n");
+    output.push('\n');
 
     output.push_str("    error UnauthorizedInitializer(address expected, address actual);\n");
     output.push_str("    error AlreadyInitialized();\n");
@@ -331,7 +331,7 @@ fn render_execute(
     output.push_str("        bytes32 candidateHash = sha256(abi.encode(MACHINE_HASH, actualStateHash, postStateHash, commandHash, contextHash, eventPlanHash, effectPlanHash));\n");
     output.push_str("        _writeState(decision.nextState);\n");
     output.push_str("        _stateHash = postStateHash;\n");
-    output.push_str("        unchecked { _sequence += 1; }\n");
+    output.push_str("        _sequence += 1;\n");
     output.push_str("        for (uint256 index = 0; index < decision.eventCount; ++index) {\n");
     output.push_str("            EventPlan memory plannedEvent = decision.events[index];\n");
     output.push_str("            emit DomainEvent(plannedEvent.code, _hashEvent(plannedEvent), plannedEvent.data, plannedEvent.fieldCount);\n");
