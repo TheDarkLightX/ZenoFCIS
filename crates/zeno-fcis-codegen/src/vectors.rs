@@ -214,13 +214,10 @@ fn minimal_value(schema: &Schema, type_id: TypeId) -> Result<Value, CodegenError
         TypeKind::Bool => Ok(Value::Bool(false)),
         TypeKind::U128 { min, .. } => Ok(Value::U128(*min)),
         TypeKind::I128 { min, .. } => Ok(Value::I128(*min)),
-        TypeKind::Bytes { min_len, .. } => Ok(Value::bytes(vec![
-            0;
-            usize::try_from(*min_len)
-                .map_err(|_| {
-                    CodegenError::VectorConstruction
-                })?
-        ])),
+        TypeKind::Bytes { min_len, .. } => {
+            let length = usize::try_from(*min_len).map_err(|_| CodegenError::VectorConstruction)?;
+            Value::bytes(vec![0; length]).map_err(|_| CodegenError::VectorConstruction)
+        }
         TypeKind::Text { min_len, .. } => Ok(text_minimal(*min_len)?),
         TypeKind::Enum { variants } => Ok(enum_minimal(definition.id().get(), variants)),
         TypeKind::Tuple { items } => {
@@ -267,13 +264,12 @@ fn maximal_value(schema: &Schema, type_id: TypeId) -> Result<Option<Value>, Code
         TypeKind::Bool => Ok(Some(Value::Bool(true))),
         TypeKind::U128 { max, .. } => Ok(Some(Value::U128(*max))),
         TypeKind::I128 { max, .. } => Ok(Some(Value::I128(*max))),
-        TypeKind::Bytes { max_len, .. } => Ok(Some(Value::bytes(vec![
-            0;
-            usize::try_from(*max_len)
-                .map_err(|_| {
-                    CodegenError::VectorConstruction
-                })?
-        ]))),
+        TypeKind::Bytes { max_len, .. } => {
+            let length = usize::try_from(*max_len).map_err(|_| CodegenError::VectorConstruction)?;
+            Value::bytes(vec![0; length])
+                .map(Some)
+                .map_err(|_| CodegenError::VectorConstruction)
+        }
         TypeKind::Text { max_len, .. } => Ok(Some(text_minimal(*max_len)?)),
         TypeKind::Enum { variants } => Ok(Some(enum_maximal(definition.id().get(), variants))),
         TypeKind::Tuple { items } => {
@@ -459,9 +455,12 @@ fn distinct_keys(schema: &Schema, key: TypeId, count: u32) -> Result<Vec<Value>,
         }
         TypeKind::Bytes { .. } => {
             for offset in 0..u32::try_from(count).map_err(|_| CodegenError::VectorConstruction)? {
-                keys.push(Value::bytes(vec![
-                    u8::try_from(offset).map_err(|_| CodegenError::VectorConstruction)?,
-                ]));
+                keys.push(
+                    Value::bytes(vec![
+                        u8::try_from(offset).map_err(|_| CodegenError::VectorConstruction)?,
+                    ])
+                    .map_err(|_| CodegenError::VectorConstruction)?,
+                );
             }
         }
         TypeKind::Unit => {
