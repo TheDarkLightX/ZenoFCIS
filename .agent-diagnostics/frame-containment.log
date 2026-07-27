@@ -1,0 +1,36 @@
+[1m[92m    Updating[0m crates.io index
+[1m[92m    Checking[0m zeno-fcis-value v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-value)
+[1m[92m    Checking[0m zeno-fcis-codec v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-codec)
+[1m[92m    Checking[0m zeno-fcis-compose v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-compose)
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1.17s
+[1m[92m   Compiling[0m zeno-fcis-value v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-value)
+[1m[92m   Compiling[0m zeno-fcis-codec v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-codec)
+[1m[92m   Compiling[0m zeno-fcis-compose v0.1.0 (/home/runner/work/ZenoFCIS/ZenoFCIS/crates/zeno-fcis-compose)
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 0.95s
+[1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/zeno_fcis_compose-a8da964f74e83918)
+
+running 5 tests
+test tests::complete_assume_guarantee_evidence_verifies ... ok
+test tests::read_write_conflict_is_detected_in_both_directions ... ok
+test tests::parallel_promotion_requires_sequential_parity ... ok
+test tests::wildcard_and_prefix_paths_overlap ... ok
+test tests::wiring_source_must_be_declared_as_an_effect ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m     Running[0m tests/frame_authorization.rs (target/debug/deps/frame_authorization-c382bcac843835fe)
+
+running 4 tests
+test broad_frame_authorizes_descendant_destination ... ok
+test exact_frame_authorizes_exact_destination ... ok
+test frame_does_not_authorize_sibling_destination ... ok
+test narrow_frame_does_not_authorize_ancestor_destination ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m   Doc-tests[0m zeno_fcis_compose
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
