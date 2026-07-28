@@ -116,12 +116,12 @@ pub use zeno_fcis_codegen::{
     SOLANA_ANCHOR_GENERATOR_ID, SOLANA_SHA256_HASHER_VERSION, SOLANA_TOOLCHAIN_VERSION,
     SOLIDITY_ADVANCED_GENERATOR_ID, SOLIDITY_GENERATOR_ID, SOLIDITY_PINNED_VERSION,
     SOLIDITY_PRAGMA, SolanaAnchorSpec, SolanaCoreSafetyFindingKind, SolanaFungibleBinding,
-    SolanaSafetyFinding, SolanaSafetyReport, SolanaShellSafetyFindingKind, SolidityAdvancedSpec,
-    SolidityContractSpec, SolidityField, SolidityFungibleBinding, SolidityGenerationError,
-    SolidityListKind, SoliditySafetyFinding, SoliditySafetyFindingKind, SoliditySafetyReport,
-    SolidityScalar, generate, generate_advanced_solidity, generate_solana_anchor,
-    generate_solidity, inspect_solana_core_source, inspect_solana_shell_source,
-    inspect_solidity_source,
+    SolanaSafetyFinding, SolanaSafetyReport, SolanaShellSafetyFindingKind, SolanaTokenProgram,
+    SolidityAdvancedSpec, SolidityContractSpec, SolidityField, SolidityFungibleBinding,
+    SolidityGenerationError, SolidityListKind, SoliditySafetyFinding, SoliditySafetyFindingKind,
+    SoliditySafetyReport, SolidityScalar, generate, generate_advanced_solidity,
+    generate_solana_anchor, generate_solidity, inspect_solana_core_source,
+    inspect_solana_shell_source, inspect_solidity_source,
 };
 pub use zeno_fcis_compose::{
     AccessPath, Assumption, AssumptionDischarge, ClaimEvidence, ComponentContract, ComponentId,
