@@ -9,12 +9,13 @@ ZenoFCIS separates protocol meaning from runtime mechanism.
    and commitment-provider interfaces.
 2. Semantic structures: project profiles, schemas, patches, plans,
    composition, and receipts add closed protocol values without ambient I/O.
-3. Construction and checking: catalogs, transitions, refinement, evidence,
-   authenticated-state planning, bounded synthesis, and backend protocols
-   validate and compose those values.
+3. Construction and checking: catalogs, transitions, relational laws,
+   refinement, evidence, authenticated-state planning, bounded synthesis, and
+   backend protocols validate and compose those values.
 4. Nominal authority: `zeno-fcis-authority` binds an externally admitted
-   invocation to one approved provider, reviewed transition type, interpreter
-   type, deployment profile, state domain, catalog, and resource envelope.
+   invocation to one approved provider, reviewed transition type, exact project
+   law-engine type and verified law set, interpreter type, deployment profile,
+   state domain, catalog, and resource envelope.
 5. Imperative adapters: mounted runtimes, code generation, SQLite, and other
    external tools interpret or persist already bounded values. The SQLite
    production port accepts only `CatalogAuthorizedTransition`.
@@ -25,11 +26,12 @@ alloc`, forbids unsafe Rust, and has no ambient I/O.
 ## Current nonclaims
 
 The workspace implements all layers above as bounded Rust libraries and
-reference adapters. It does not yet establish project-specific conservation
-and invariant preservation, strict decoded SQLite bundle/outbox set equality,
-complete effect/outbox conflict semantics, exhaustive-domain refinement
-manifests, production authenticated storage, or chain deployment
-qualification. Concrete Lean, Flux, Kani, SMT, ESSO, and Morph engines also
-require separately mounted checkers and exact evidence. These gaps block an
-official production value-moving profile even though the nominal authority
-topology is implemented.
+reference adapters. It now makes a complete profile-bound relational-law set
+and fresh per-invocation evaluation mandatory before production authorization.
+Each promoted project still has to supply and independently qualify its exact
+conservation/invariant definitions and checker implementation. Strict decoded
+SQLite bundle/outbox set equality, complete effect/outbox conflict semantics,
+exhaustive-domain refinement manifests, production authenticated storage, and
+chain deployment qualification also remain open. Concrete Lean, Flux, Kani,
+SMT, private ESSO, and Morph checkers require separately mounted adapters and
+exact evidence. These gaps block an official production value-moving profile.
