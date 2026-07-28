@@ -13,10 +13,14 @@ development, and release-process validation.
 - backend-neutral protocols for Lean, SMT/Z3, CVC5, Kani, Flux, private ESSO,
   and other independently checked tools;
 - deterministic-parallel planning with complete static footprint evidence;
-- human quickstarts, LLM guidance, crate and feature maps, full rustdoc, and
-  checked external-consumer examples;
+- human quickstarts, LLM guidance, crate and feature maps, complete public API
+  rustdoc pages, and checked external-consumer examples;
 - `.crate`, source, rustdoc, and Linux diagnostic-binary archives;
 - checksums, source/package manifests, CycloneDX SBOM, and provenance inputs.
+
+The reproducible offline rustdoc archive excludes Rustdoc `1.97.1`'s
+nondeterministic merged global-search shards. All public crate API and source
+pages remain; the archive includes an exact notice explaining the boundary.
 
 ## Supported core claim
 
