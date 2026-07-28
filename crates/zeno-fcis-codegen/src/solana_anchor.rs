@@ -700,7 +700,7 @@ fn render_program_helpers(
         )?;
     }
     output.push_str("    _ => err!(FcisError::InvalidCapability),\n} }\n");
-    output.push_str("fn expected_recipient(code: u16, _before_state: &State, _command: &Command, _context: &CoreContext) -> [u8; 32] { match code {\n");
+    output.push_str("fn expected_recipient(code: u16, before_state: &State, command: &Command, context: &CoreContext) -> [u8; 32] { let _ = (before_state, command, context); match code {\n");
     for capability in machine.capabilities() {
         writeln!(
             output,
@@ -996,7 +996,7 @@ fn sanitize_non_code(source: &str) -> String {
 
 fn recipient_expression(policy: RecipientPolicy, machine: &OnchainMachineSpec) -> String {
     match policy {
-        RecipientPolicy::Caller => "_context.actor".to_owned(),
+        RecipientPolicy::Caller => "context.actor".to_owned(),
         RecipientPolicy::Fixed(value) => rust_bytes(value),
         RecipientPolicy::CommandField(id) => {
             let name = machine
@@ -1005,7 +1005,7 @@ fn recipient_expression(policy: RecipientPolicy, machine: &OnchainMachineSpec) -
                 .find(|field| field.id() == id)
                 .map(OnchainField::name)
                 .unwrap_or("invalid_recipient");
-            format!("_command.{name}")
+            format!("command.{name}")
         }
         RecipientPolicy::StateField(id) => {
             let name = machine
@@ -1014,7 +1014,7 @@ fn recipient_expression(policy: RecipientPolicy, machine: &OnchainMachineSpec) -
                 .find(|field| field.id() == id)
                 .map(OnchainField::name)
                 .unwrap_or("invalid_recipient");
-            format!("_before_state.{name}")
+            format!("before_state.{name}")
         }
     }
 }
