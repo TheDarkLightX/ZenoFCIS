@@ -184,7 +184,11 @@ Composition v2 is one layer of correctness by construction:
 5. structured evidence must discharge every declared theorem;
 6. authorization must refuse transitions lacking required project invariants and law evidence.
 
-Layer 6 is not completed by this composition package. First-class project invariant and conservation laws are specified separately and must be integrated with catalog authorization before a value-movement correctness claim.
+Layer 6 is not implemented by this composition package. The current integrated
+stack supplies it through `zeno-fcis-laws`, `zeno-fcis-authority`, and an
+authority-owned `ComposedDomainProgram`. Each project must still define and
+independently qualify its exact invariants, conservation laws, evidence
+checkers, interpreter, and deployment bindings.
 
 ## Explicit nonclaims
 

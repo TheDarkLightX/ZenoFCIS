@@ -60,6 +60,7 @@ is selected.
 
 - This does not alter or generalize the ZenoDEX protocol profile itself.
 - This does not make experimental adapters part of Core V1.
-- This does not define a final 1.0 feature-stability policy.
+- The current [feature matrix](FEATURE_MATRIX.md) classifies the implemented
+  surfaces; it does not freeze a final 1.0 feature-stability policy.
 - This makes no production-readiness or compatibility claim for project-specific
   integrations.
