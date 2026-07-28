@@ -4,19 +4,25 @@
 from __future__ import annotations
 
 import re
-import tomllib
 from pathlib import Path
 
+import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FILES = (
     Path("README.md"),
+    Path("CHANGELOG.md"),
     Path("llms.txt"),
     Path("docs/INDEX.md"),
+    Path("docs/INSTALLATION.md"),
     Path("docs/QUICKSTART.md"),
+    Path("docs/API_REFERENCE.md"),
     Path("docs/CRATE_MAP.md"),
     Path("docs/FEATURE_MATRIX.md"),
     Path("docs/LLM_USAGE.md"),
+    Path("docs/RC1_RELEASE_NOTES.md"),
+    Path("docs/PACKAGING.md"),
+    Path("docs/RELEASE_ASSURANCE.md"),
     Path("crates/zeno-fcis/examples/minimal_core.rs"),
     Path("crates/zeno-fcis/examples/checked_backend.rs"),
     Path("fixtures/external-consumer/Cargo.toml"),
@@ -25,17 +31,26 @@ REQUIRED_FILES = (
 )
 VERSIONED_DOCS = (
     Path("README.md"),
+    Path("CHANGELOG.md"),
     Path("llms.txt"),
+    Path("docs/INSTALLATION.md"),
     Path("docs/QUICKSTART.md"),
+    Path("docs/API_REFERENCE.md"),
     Path("docs/CRATE_MAP.md"),
     Path("docs/FEATURE_MATRIX.md"),
+    Path("docs/RC1_RELEASE_NOTES.md"),
+    Path("docs/PACKAGING.md"),
 )
 REQUIRED_README_MARKERS = (
     "use zeno_fcis::prelude::*;",
     "docs/QUICKSTART.md",
+    "docs/INSTALLATION.md",
+    "docs/API_REFERENCE.md",
     "docs/CRATE_MAP.md",
     "docs/FEATURE_MATRIX.md",
     "docs/LLM_USAGE.md",
+    "docs/RC1_RELEASE_NOTES.md",
+    "docs/PACKAGING.md",
     "--example minimal_core",
     "--example checked_backend",
 )
