@@ -204,4 +204,5 @@ Permanent tests reject:
   liveness, fairness, side-channel resistance, deployment qualification, or
   project business-law correctness.
 - This package does not change ZCVE/1, existing composition-v2 bytes, schemas,
-  stable identifiers, rejection precedence, or workspace version `0.1.0`.
+  stable identifiers, or rejection precedence. RC packaging changes Cargo
+  package versions only.
