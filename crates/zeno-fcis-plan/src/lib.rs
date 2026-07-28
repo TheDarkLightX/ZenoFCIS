@@ -292,9 +292,12 @@ pub fn decode_commit_plan(
         });
     }
     // Every effect is carried in a u32-length-prefixed blob.
-    let capacity = initial_collection_capacity(effect_count, cursor.remaining(), 4)?;
     let mut state = PlanDecodeState::default();
-    let mut effects = Vec::with_capacity(capacity);
+    let mut effects = Vec::with_capacity(initial_collection_capacity(
+        effect_count,
+        cursor.remaining(),
+        4,
+    )?);
     for _ in 0..effect_count {
         effects.push(decode_effect(cursor.take_blob()?, limits, &mut state)?);
     }
@@ -326,9 +329,12 @@ pub fn decode_outbox_plan(
         });
     }
     // Every outbox entry is carried in a u32-length-prefixed blob.
-    let capacity = initial_collection_capacity(entry_count, cursor.remaining(), 4)?;
     let mut state = PlanDecodeState::default();
-    let mut entries = Vec::with_capacity(capacity);
+    let mut entries = Vec::with_capacity(initial_collection_capacity(
+        entry_count,
+        cursor.remaining(),
+        4,
+    )?);
     for _ in 0..entry_count {
         entries.push(decode_outbox_entry(
             cursor.take_blob()?,
