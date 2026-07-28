@@ -20,6 +20,7 @@ members = [
     "crates/zeno-fcis-shell",
     "crates/zeno-fcis-compose",
     "crates/zeno-fcis-domain",
+    "crates/zeno-fcis-composed-program",
     "crates/zeno-fcis-refine",
     "crates/zeno-fcis-profile-zenodex",
     "crates/zeno-fcis-codegen",
