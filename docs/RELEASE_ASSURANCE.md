@@ -30,7 +30,9 @@ Cargo package versions follow semantic versioning for the Rust API. Protocol com
 
 A Rust patch release must not change canonical bytes, commitment preimages, stable reason precedence, or acceptance semantics under an existing protocol identifier. Such a change requires a new protocol identifier and migration evidence even when the Rust signature is unchanged.
 
-Before `1.0.0`, ordinary Rust APIs may change between minor versions. Existing protocol identifiers remain immutable.
+During the `1.0.0-rc.*` series, ordinary Rust APIs may change between release
+candidates. Existing protocol identifiers remain immutable. Final Cargo API
+stability begins at `1.0.0`.
 
 ## Required release gate
 
@@ -39,6 +41,8 @@ Run from a clean checkout of the exact release commit:
 ```bash
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
+python3 tools/rc1_package.py self-test
+python3 tools/rc1_package.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
@@ -47,6 +51,7 @@ RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked
 cargo +1.97.1 deny check
 cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings
 python3 tools/release_manifest.py --require-clean > SOURCE-MANIFEST.json
+python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
 ```
 
 The CI workflows add:
@@ -91,7 +96,9 @@ For a release candidate, retain:
 4. generated schema/codegen manifests and cross-language replay output for every promoted profile;
 5. mounted-runtime refinement fixtures for the exact external runtime build;
 6. any proof/checker evidence referenced by a promotion certificate;
-7. a signed audit or review report when the deployment policy requires one.
+7. all public `.crate` files, rustdoc, source and diagnostic binary archives,
+   CycloneDX SBOM, provenance inputs, RC manifest, and checksums;
+8. a signed audit or review report when the deployment policy requires one.
 
 Evidence is additive. A newer test run does not retroactively validate older source or external runtime artifacts.
 

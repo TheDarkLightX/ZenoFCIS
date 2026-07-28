@@ -37,13 +37,14 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0-rc.1"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/TheDarkLightX/ZenoFCIS"
 homepage = "https://github.com/TheDarkLightX/ZenoFCIS"
 authors = ["TheDarkLightX and ZenoFCIS contributors"]
+readme = "README.md"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

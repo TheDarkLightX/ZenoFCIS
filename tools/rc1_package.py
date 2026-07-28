@@ -1,0 +1,793 @@
+#!/usr/bin/env python3
+"""Validate and assemble the deterministic ZenoFCIS release-candidate set."""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import gzip
+import hashlib
+import io
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tarfile
+import uuid
+import zipfile
+from pathlib import Path
+from urllib.parse import quote
+
+import tomllib
+
+ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_SET_PATH = ROOT / "release" / "package-set.toml"
+LOCK_PATH = ROOT / "Cargo.lock"
+FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
+
+
+class RcError(ValueError):
+    """A fail-closed release-candidate validation error."""
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    subcommands = parser.add_subparsers(dest="command", required=True)
+    subcommands.add_parser("check")
+    subcommands.add_parser("self-test")
+    build = subcommands.add_parser("build")
+    build.add_argument("--output", type=Path, required=True)
+    return parser.parse_args()
+
+
+def run(
+    arguments: list[str],
+    *,
+    capture: bool = False,
+    binary: bool = False,
+    environment: dict[str, str] | None = None,
+) -> str | bytes:
+    result = subprocess.run(
+        arguments,
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.PIPE if capture else None,
+        stderr=None,
+        text=not binary,
+        env=environment,
+    )
+    if not capture:
+        return b"" if binary else ""
+    if binary:
+        if not isinstance(result.stdout, bytes):
+            raise RcError("binary command returned text")
+        return result.stdout
+    if not isinstance(result.stdout, str):
+        raise RcError("text command returned bytes")
+    return result.stdout
+
+
+def load_toml(path: Path) -> dict[str, object]:
+    document = tomllib.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise RcError(f"{path.relative_to(ROOT)} is not a TOML table")
+    return document
+
+
+def package_set() -> dict[str, object]:
+    document = load_toml(PACKAGE_SET_PATH)
+    if document.get("format") != "zeno-fcis/package-set/1":
+        raise RcError("unsupported package-set format")
+    return document
+
+
+def cargo_metadata(*, complete: bool) -> dict[str, object]:
+    arguments = [
+        "cargo",
+        "+1.97.1",
+        "metadata",
+        "--format-version",
+        "1",
+        "--locked",
+    ]
+    if not complete:
+        arguments.append("--no-deps")
+    encoded = run(arguments, capture=True)
+    if not isinstance(encoded, str):
+        raise RcError("cargo metadata did not return text")
+    document = json.loads(encoded)
+    if not isinstance(document, dict):
+        raise RcError("cargo metadata is not an object")
+    return document
+
+
+def require_string(document: dict[str, object], field: str) -> str:
+    value = document.get(field)
+    if not isinstance(value, str) or not value:
+        raise RcError(f"package-set field {field!r} must be a nonempty string")
+    return value
+
+
+def require_string_list(document: dict[str, object], field: str) -> list[str]:
+    value = document.get(field)
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        raise RcError(f"package-set field {field!r} must be a string list")
+    return list(value)
+
+
+def workspace_packages(metadata: dict[str, object]) -> list[dict[str, object]]:
+    packages = metadata.get("packages")
+    members = metadata.get("workspace_members")
+    if not isinstance(packages, list) or not isinstance(members, list):
+        raise RcError("cargo metadata omits workspace packages")
+    member_ids = set(members)
+    selected = [
+        package
+        for package in packages
+        if isinstance(package, dict) and package.get("id") in member_ids
+    ]
+    if len(selected) != len(member_ids):
+        raise RcError("cargo metadata workspace member set is incomplete")
+    return selected
+
+
+def validate_package_documents(
+    configured: dict[str, object], metadata: dict[str, object]
+) -> tuple[dict[str, object], dict[str, object]]:
+    packages = workspace_packages(metadata)
+    version = require_string(configured, "version")
+    toolchain = require_string(configured, "rust_toolchain")
+    if toolchain != "1.97.1":
+        raise RcError("RC1 must use pinned Rust 1.97.1")
+
+    order = require_string_list(configured, "publish_order")
+    private = require_string_list(configured, "private_packages")
+    if len(order) != len(set(order)):
+        raise RcError("publish order contains a duplicate")
+    if len(private) != len(set(private)):
+        raise RcError("private package set contains a duplicate")
+
+    by_name: dict[str, dict[str, object]] = {}
+    for package in packages:
+        name = package.get("name")
+        if not isinstance(name, str) or name in by_name:
+            raise RcError("workspace package names are invalid or duplicated")
+        by_name[name] = package
+
+    public_actual = {
+        name for name, package in by_name.items() if package.get("publish") != []
+    }
+    private_actual = set(by_name).difference(public_actual)
+    if set(order) != public_actual:
+        missing = sorted(public_actual.difference(order))
+        extra = sorted(set(order).difference(public_actual))
+        raise RcError(f"publish set mismatch: missing={missing}, extra={extra}")
+    if set(private) != private_actual:
+        raise RcError(
+            "private package mismatch: "
+            f"expected={sorted(private_actual)}, configured={sorted(private)}"
+        )
+
+    order_index = {name: index for index, name in enumerate(order)}
+    for name, package in by_name.items():
+        if package.get("version") != version:
+            raise RcError(f"{name}: package version is not {version}")
+        if package.get("rust_version") != "1.97":
+            raise RcError(f"{name}: rust-version is not 1.97")
+        for field in ("description", "license", "repository", "readme"):
+            value = package.get(field)
+            if not isinstance(value, str) or not value:
+                raise RcError(f"{name}: missing package metadata {field}")
+        readme = Path(str(package["readme"]))
+        if not readme.is_file():
+            raise RcError(f"{name}: package README does not exist")
+
+        dependencies = package.get("dependencies")
+        if not isinstance(dependencies, list):
+            raise RcError(f"{name}: dependency metadata is malformed")
+        for dependency in dependencies:
+            if not isinstance(dependency, dict):
+                raise RcError(f"{name}: dependency metadata is malformed")
+            dependency_name = dependency.get("name")
+            if dependency_name not in by_name:
+                continue
+            if dependency.get("req") != f"={version}":
+                raise RcError(
+                    f"{name}: internal dependency {dependency_name} is not pinned "
+                    f"to ={version}"
+                )
+            if (
+                name in order_index
+                and dependency.get("kind") != "dev"
+                and dependency_name in order_index
+                and order_index[str(dependency_name)] >= order_index[name]
+            ):
+                raise RcError(
+                    f"{name}: dependency {dependency_name} is not earlier in "
+                    "publish_order"
+                )
+
+    binaries = configured.get("binaries")
+    if not isinstance(binaries, list) or not binaries:
+        raise RcError("package set must declare at least one binary")
+    for binary in binaries:
+        if not isinstance(binary, dict):
+            raise RcError("binary declaration is malformed")
+        package_name = binary.get("package")
+        target_name = binary.get("target")
+        if package_name not in by_name or not isinstance(target_name, str):
+            raise RcError("binary package or target is invalid")
+        targets = by_name[str(package_name)].get("targets")
+        if not isinstance(targets, list) or not any(
+            isinstance(target, dict)
+            and target.get("name") == target_name
+            and "bin" in target.get("kind", [])
+            for target in targets
+        ):
+            raise RcError(f"missing binary target {package_name}/{target_name}")
+
+    return configured, metadata
+
+
+def validate_package_set() -> tuple[dict[str, object], dict[str, object]]:
+    return validate_package_documents(package_set(), cargo_metadata(complete=False))
+
+
+def run_self_test(configured: dict[str, object], metadata: dict[str, object]) -> None:
+    def expect_failure(
+        changed_configured: dict[str, object],
+        changed_metadata: dict[str, object],
+        label: str,
+    ) -> None:
+        try:
+            validate_package_documents(changed_configured, changed_metadata)
+        except RcError:
+            return
+        raise RcError(f"self-test mutation survived: {label}")
+
+    duplicate_configured = copy.deepcopy(configured)
+    duplicate_order = require_string_list(duplicate_configured, "publish_order")
+    duplicate_order.append(duplicate_order[0])
+    duplicate_configured["publish_order"] = duplicate_order
+    expect_failure(duplicate_configured, copy.deepcopy(metadata), "duplicate package")
+
+    reversed_configured = copy.deepcopy(configured)
+    reversed_configured["publish_order"] = list(
+        reversed(require_string_list(reversed_configured, "publish_order"))
+    )
+    expect_failure(
+        reversed_configured, copy.deepcopy(metadata), "invalid publish order"
+    )
+
+    wrong_version_metadata = copy.deepcopy(metadata)
+    wrong_version_packages = wrong_version_metadata.get("packages")
+    if not isinstance(wrong_version_packages, list) or not wrong_version_packages:
+        raise RcError("self-test package set is unavailable")
+    first_package = wrong_version_packages[0]
+    if not isinstance(first_package, dict):
+        raise RcError("self-test package is malformed")
+    first_package["version"] = "9.9.9"
+    expect_failure(copy.deepcopy(configured), wrong_version_metadata, "package version")
+
+    wrong_pin_metadata = copy.deepcopy(metadata)
+    wrong_pin_packages = wrong_pin_metadata.get("packages")
+    changed_pin = False
+    if isinstance(wrong_pin_packages, list):
+        workspace_names = {
+            package.get("name")
+            for package in wrong_pin_packages
+            if isinstance(package, dict)
+        }
+        for package in wrong_pin_packages:
+            if not isinstance(package, dict):
+                continue
+            dependencies = package.get("dependencies")
+            if not isinstance(dependencies, list):
+                continue
+            for dependency in dependencies:
+                if (
+                    isinstance(dependency, dict)
+                    and dependency.get("name") in workspace_names
+                ):
+                    dependency["req"] = "*"
+                    changed_pin = True
+                    break
+            if changed_pin:
+                break
+    if not changed_pin:
+        raise RcError("self-test could not find an internal dependency")
+    expect_failure(copy.deepcopy(configured), wrong_pin_metadata, "dependency pin")
+
+    hidden_public_metadata = copy.deepcopy(metadata)
+    hidden_packages = hidden_public_metadata.get("packages")
+    if not isinstance(hidden_packages, list):
+        raise RcError("self-test package set is unavailable")
+    fixture = next(
+        (
+            package
+            for package in hidden_packages
+            if isinstance(package, dict)
+            and package.get("name") == "zeno-fcis-codegen-fixture"
+        ),
+        None,
+    )
+    if fixture is None:
+        raise RcError("self-test fixture package is unavailable")
+    fixture["publish"] = None
+    expect_failure(
+        copy.deepcopy(configured), hidden_public_metadata, "hidden public package"
+    )
+
+    wrong_binary_configured = copy.deepcopy(configured)
+    binaries = wrong_binary_configured.get("binaries")
+    if (
+        not isinstance(binaries, list)
+        or not binaries
+        or not isinstance(binaries[0], dict)
+    ):
+        raise RcError("self-test binary declaration is unavailable")
+    binaries[0]["target"] = "missing-binary"
+    expect_failure(wrong_binary_configured, copy.deepcopy(metadata), "binary target")
+
+
+def git_text(*arguments: str) -> str:
+    value = run(["git", *arguments], capture=True)
+    if not isinstance(value, str):
+        raise RcError("git returned binary output")
+    return value.strip()
+
+
+def require_clean_commit() -> str:
+    commit = git_text("rev-parse", "HEAD")
+    if len(commit) != 40 or any(
+        character not in "0123456789abcdef" for character in commit
+    ):
+        raise RcError("HEAD is not a full lowercase Git commit")
+    if git_text("status", "--porcelain", "--untracked-files=all"):
+        raise RcError("RC assembly requires a clean exact checkout")
+    return commit
+
+
+def write_json(path: Path, document: object) -> None:
+    path.write_text(
+        json.dumps(document, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def normalized_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    return info
+
+
+def deterministic_tree_archive(source: Path, destination: Path, prefix: str) -> None:
+    with (
+        destination.open("wb") as raw,
+        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed,
+        tarfile.open(
+            fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT
+        ) as archive,
+    ):
+        for path in sorted(source.rglob("*")):
+            if path.name == ".lock":
+                continue
+            relative = path.relative_to(source)
+            archive_name = str(Path(prefix) / relative)
+            info = normalized_tar_info(archive.gettarinfo(str(path), archive_name))
+            if info.isfile():
+                with path.open("rb") as content:
+                    archive.addfile(info, content)
+            else:
+                archive.addfile(info)
+
+
+def deterministic_binary_archive(binary: Path, destination: Path, prefix: str) -> None:
+    members = [
+        (binary, binary.name, 0o755),
+        (ROOT / "README.md", "README.md", 0o644),
+        (ROOT / "LICENSE-APACHE", "LICENSE-APACHE", 0o644),
+        (ROOT / "LICENSE-MIT", "LICENSE-MIT", 0o644),
+        (ROOT / "docs" / "INSTALLATION.md", "INSTALLATION.md", 0o644),
+    ]
+    with (
+        destination.open("wb") as raw,
+        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed,
+        tarfile.open(
+            fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT
+        ) as archive,
+    ):
+        for source, name, mode in members:
+            content = source.read_bytes()
+            info = tarfile.TarInfo(str(Path(prefix) / name))
+            info.size = len(content)
+            info.mode = mode
+            normalized_tar_info(info)
+            archive.addfile(info, io.BytesIO(content))
+
+
+def source_archive(destination: Path, prefix: str) -> None:
+    content = run(
+        ["git", "archive", "--format=tar", f"--prefix={prefix}/", "HEAD"],
+        capture=True,
+        binary=True,
+    )
+    if not isinstance(content, bytes):
+        raise RcError("git archive did not return bytes")
+    with (
+        destination.open("wb") as raw,
+        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed,
+    ):
+        compressed.write(content)
+
+
+def cargo_lock_checksums() -> dict[tuple[str, str, str], str]:
+    document = load_toml(LOCK_PATH)
+    packages = document.get("package")
+    if not isinstance(packages, list):
+        raise RcError("Cargo.lock has no package set")
+    checksums: dict[tuple[str, str, str], str] = {}
+    for package in packages:
+        if not isinstance(package, dict):
+            continue
+        name = package.get("name")
+        version = package.get("version")
+        source = package.get("source")
+        checksum = package.get("checksum")
+        if all(isinstance(item, str) for item in (name, version, source, checksum)):
+            checksums[(str(name), str(version), str(source))] = str(checksum)
+    return checksums
+
+
+def bom_ref(package: dict[str, object]) -> str:
+    name = quote(str(package["name"]), safe="-._~")
+    version = quote(str(package["version"]), safe="-._~")
+    source = package.get("source")
+    base = f"pkg:cargo/{name}@{version}"
+    if isinstance(source, str):
+        return f"{base}?repository_url={quote(source, safe='')}"
+    return base
+
+
+def build_sbom(
+    metadata: dict[str, object], commit: str, version: str
+) -> dict[str, object]:
+    packages = metadata.get("packages")
+    resolve = metadata.get("resolve")
+    if not isinstance(packages, list) or not isinstance(resolve, dict):
+        raise RcError("complete Cargo metadata omits packages or resolution")
+    checksums = cargo_lock_checksums()
+    by_id = {
+        str(package["id"]): package
+        for package in packages
+        if isinstance(package, dict) and "id" in package
+    }
+    components = []
+    for package in sorted(
+        by_id.values(),
+        key=lambda item: (
+            str(item["name"]),
+            str(item["version"]),
+            str(item.get("source")),
+        ),
+    ):
+        component: dict[str, object] = {
+            "type": "library",
+            "bom-ref": bom_ref(package),
+            "name": package["name"],
+            "version": package["version"],
+            "purl": bom_ref(package),
+        }
+        license_value = package.get("license")
+        if isinstance(license_value, str) and license_value:
+            component["licenses"] = [{"expression": license_value}]
+        source = package.get("source")
+        if isinstance(source, str):
+            checksum = checksums.get(
+                (str(package["name"]), str(package["version"]), source)
+            )
+            if checksum is not None:
+                component["hashes"] = [{"alg": "SHA-256", "content": checksum}]
+        if package.get("id") in metadata.get("workspace_members", []):
+            component["properties"] = [{"name": "zeno-fcis:workspace", "value": "true"}]
+        components.append(component)
+
+    nodes = resolve.get("nodes")
+    if not isinstance(nodes, list):
+        raise RcError("Cargo resolution nodes are malformed")
+    dependencies = []
+    for node in nodes:
+        if not isinstance(node, dict) or node.get("id") not in by_id:
+            continue
+        dependency_ids = node.get("dependencies")
+        if not isinstance(dependency_ids, list):
+            raise RcError("Cargo resolution dependency list is malformed")
+        dependencies.append(
+            {
+                "ref": bom_ref(by_id[str(node["id"])]),
+                "dependsOn": sorted(
+                    bom_ref(by_id[str(dependency)])
+                    for dependency in dependency_ids
+                    if str(dependency) in by_id
+                ),
+            }
+        )
+
+    timestamp = git_text("show", "-s", "--format=%cI", commit)
+    serial = uuid.uuid5(
+        uuid.NAMESPACE_URL, f"https://github.com/TheDarkLightX/ZenoFCIS@{commit}"
+    )
+    return {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "serialNumber": f"urn:uuid:{serial}",
+        "version": 1,
+        "metadata": {
+            "timestamp": timestamp,
+            "component": {
+                "type": "library",
+                "bom-ref": f"pkg:cargo/zeno-fcis@{version}",
+                "name": "zeno-fcis",
+                "version": version,
+                "purl": f"pkg:cargo/zeno-fcis@{version}",
+            },
+            "properties": [
+                {"name": "zeno-fcis:source-commit", "value": commit},
+                {"name": "zeno-fcis:rust-toolchain", "value": "1.97.1"},
+            ],
+        },
+        "components": components,
+        "dependencies": sorted(dependencies, key=lambda item: str(item["ref"])),
+    }
+
+
+def artifact_entries(output: Path, excluded: set[Path]) -> list[dict[str, object]]:
+    entries = []
+    for path in sorted(item for item in output.rglob("*") if item.is_file()):
+        if path in excluded:
+            continue
+        entries.append(
+            {
+                "path": path.relative_to(output).as_posix(),
+                "sha256": sha256(path),
+                "size": path.stat().st_size,
+            }
+        )
+    return entries
+
+
+def deterministic_bundle(output: Path, destination: Path) -> None:
+    with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_STORED) as archive:
+        for path in sorted(item for item in output.rglob("*") if item.is_file()):
+            if path == destination:
+                continue
+            info = zipfile.ZipInfo(path.relative_to(output).as_posix(), FIXED_ZIP_TIME)
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, path.read_bytes())
+
+
+def build(output: Path) -> None:
+    configured, _ = validate_package_set()
+    version = require_string(configured, "version")
+    commit = require_clean_commit()
+    if output.exists() and any(output.iterdir()):
+        raise RcError("output directory must not exist or must be empty")
+    output.mkdir(parents=True, exist_ok=True)
+    packages_dir = output / "packages"
+    binaries_dir = output / "binaries"
+    docs_dir = output / "docs"
+    source_dir = output / "source"
+    for directory in (packages_dir, binaries_dir, docs_dir, source_dir):
+        directory.mkdir()
+    build_target = output / ".cargo-target"
+    build_environment = dict(os.environ)
+    for variable in ("CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS", "RUSTDOCFLAGS"):
+        build_environment.pop(variable, None)
+    build_environment["CARGO_TARGET_DIR"] = str(build_target)
+
+    source_manifest_text = run(
+        ["python3", "tools/release_manifest.py", "--require-clean"], capture=True
+    )
+    if not isinstance(source_manifest_text, str):
+        raise RcError("source manifest returned binary data")
+    source_manifest = output / "SOURCE-MANIFEST.json"
+    source_manifest.write_text(source_manifest_text, encoding="utf-8")
+
+    package_arguments = [
+        "cargo",
+        "+1.97.1",
+        "package",
+        "--workspace",
+        "--locked",
+        "--no-verify",
+    ]
+    for private_name in require_string_list(configured, "private_packages"):
+        package_arguments.extend(["--exclude", private_name])
+    run(package_arguments, environment=build_environment)
+    for name in require_string_list(configured, "publish_order"):
+        archive = build_target / "package" / f"{name}-{version}.crate"
+        if not archive.is_file():
+            raise RcError(f"cargo did not create {archive.name}")
+        shutil.copyfile(archive, packages_dir / archive.name)
+
+    rustdoc_environment = dict(build_environment)
+    remap_flag = f"--remap-path-prefix={build_target}=/zeno-fcis-target"
+    rustdoc_environment["RUSTFLAGS"] = remap_flag
+    rustdoc_environment["RUSTDOCFLAGS"] = f"-D warnings {remap_flag}"
+    rustdoc_arguments = [
+        "cargo",
+        "+1.97.1",
+        "doc",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "--no-deps",
+        "--jobs",
+        "1",
+    ]
+    for private_name in require_string_list(configured, "private_packages"):
+        rustdoc_arguments.extend(["--exclude", private_name])
+    run(rustdoc_arguments, environment=rustdoc_environment)
+    if (build_target / "doc" / "zeno_fcis_codegen_fixture").exists():
+        raise RcError("private fixture leaked into public rustdoc")
+    deterministic_tree_archive(
+        build_target / "doc",
+        docs_dir / f"zeno-fcis-rustdoc-{version}.tar.gz",
+        f"zeno-fcis-rustdoc-{version}",
+    )
+
+    binaries = configured["binaries"]
+    if not isinstance(binaries, list):
+        raise RcError("binary metadata changed during assembly")
+    host_targets: set[str] = set()
+    for binary in binaries:
+        if not isinstance(binary, dict):
+            raise RcError("binary metadata is malformed")
+        package_name = str(binary["package"])
+        target_name = str(binary["target"])
+        run(
+            [
+                "cargo",
+                "+1.97.1",
+                "build",
+                "--release",
+                "--locked",
+                "-p",
+                package_name,
+                "--bin",
+                target_name,
+            ],
+            environment=build_environment,
+        )
+        executable_name = f"{target_name}.exe" if os.name == "nt" else target_name
+        executable = build_target / "release" / executable_name
+        if not executable.is_file():
+            raise RcError(f"release binary {executable_name} is missing")
+        verbose_version = run(["rustc", "+1.97.1", "-vV"], capture=True)
+        if not isinstance(verbose_version, str):
+            raise RcError("rustc version output is binary")
+        host_lines = [
+            line.removeprefix("host: ")
+            for line in verbose_version.splitlines()
+            if line.startswith("host: ")
+        ]
+        if len(host_lines) != 1:
+            raise RcError("rustc host target is unavailable")
+        host = host_lines[0]
+        host_targets.add(host)
+        archive_name = f"zeno-fcis-tools-{version}-{host}.tar.gz"
+        deterministic_binary_archive(
+            executable,
+            binaries_dir / archive_name,
+            f"zeno-fcis-tools-{version}-{host}",
+        )
+    shutil.rmtree(build_target)
+
+    source_archive(
+        source_dir / f"zeno-fcis-{version}-source.tar.gz",
+        f"zeno-fcis-{version}",
+    )
+
+    complete_metadata = cargo_metadata(complete=True)
+    sbom_path = output / "SBOM.cdx.json"
+    write_json(sbom_path, build_sbom(complete_metadata, commit, version))
+
+    provenance_inputs = {
+        "format": "zeno-fcis/provenance-inputs/1",
+        "version": version,
+        "source_commit": commit,
+        "rust_toolchain": "1.97.1",
+        "host_targets": sorted(host_targets),
+        "source_manifest_sha256": sha256(source_manifest),
+        "sbom_sha256": sha256(sbom_path),
+        "commands": [
+            "cargo +1.97.1 package --workspace --locked --no-verify --exclude zeno-fcis-codegen-fixture",
+            "cargo +1.97.1 build --release --locked -p zeno-fcis-adapter-zenodex --bin mount-zenodex-zusd",
+            "RUSTFLAGS=--remap-path-prefix=<target>=/zeno-fcis-target RUSTDOCFLAGS='-D warnings --remap-path-prefix=<target>=/zeno-fcis-target' cargo +1.97.1 doc --workspace --all-features --locked --no-deps --jobs 1 --exclude zeno-fcis-codegen-fixture",
+        ],
+        "nonclaim": "inputs for a future signed attestation; not a signature or SLSA provenance",
+    }
+    write_json(output / "PROVENANCE-INPUTS.json", provenance_inputs)
+
+    manifest_path = output / "RC-MANIFEST.json"
+    checksums_path = output / "SHA256SUMS"
+    bundle_path = output / f"zeno-fcis-{version}-rc-bundle.zip"
+    entries = artifact_entries(output, {manifest_path, checksums_path, bundle_path})
+    write_json(
+        manifest_path,
+        {
+            "format": "zeno-fcis/release-candidate-manifest/1",
+            "version": version,
+            "source_commit": commit,
+            "rust_toolchain": "1.97.1",
+            "artifacts": entries,
+            "nonclaims": [
+                "not a production deployment authorization",
+                "not an independent audit",
+                "not a signature or SLSA attestation",
+            ],
+        },
+    )
+    checksum_files = [
+        path
+        for path in sorted(item for item in output.rglob("*") if item.is_file())
+        if path not in {checksums_path, bundle_path}
+    ]
+    checksums_path.write_text(
+        "".join(
+            f"{sha256(path)}  {path.relative_to(output).as_posix()}\n"
+            for path in checksum_files
+        ),
+        encoding="utf-8",
+    )
+    deterministic_bundle(output, bundle_path)
+    print(
+        f"rc1-package: built {len(require_string_list(configured, 'publish_order'))} "
+        f"crate packages and {len(entries)} retained artifacts at {commit}"
+    )
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        configured, _ = validate_package_set()
+        if args.command == "check":
+            print(
+                "rc1-package: PASS "
+                f"({len(require_string_list(configured, 'publish_order'))} public, "
+                f"{len(require_string_list(configured, 'private_packages'))} private, "
+                f"version {require_string(configured, 'version')})"
+            )
+        elif args.command == "self-test":
+            run_self_test(configured, cargo_metadata(complete=False))
+            print("rc1-package: self-test PASS (6 hostile mutations rejected)")
+        else:
+            build(args.output.resolve())
+        return 0
+    except (
+        RcError,
+        OSError,
+        subprocess.CalledProcessError,
+        json.JSONDecodeError,
+    ) as error:
+        print(f"rc1-package: FAIL: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -2,12 +2,16 @@
 
 ## Start here
 
-1. [Quickstart](QUICKSTART.md)
-2. [Crate map](CRATE_MAP.md)
-3. [Feature matrix](FEATURE_MATRIX.md)
-4. [Architecture](ARCHITECTURE.md)
-5. [LLM usage](LLM_USAGE.md)
-6. [Release assurance](RELEASE_ASSURANCE.md)
+1. [Installation](INSTALLATION.md)
+2. [Quickstart](QUICKSTART.md)
+3. [API reference](API_REFERENCE.md)
+4. [Crate map](CRATE_MAP.md)
+5. [Feature matrix](FEATURE_MATRIX.md)
+6. [Architecture](ARCHITECTURE.md)
+7. [LLM usage](LLM_USAGE.md)
+8. [RC1 release notes](RC1_RELEASE_NOTES.md)
+9. [Packaging](PACKAGING.md)
+10. [Release assurance](RELEASE_ASSURANCE.md)
 
 ## Project definition and typed construction
 
@@ -69,7 +73,8 @@ and other tools can use the same public boundaries.
 
 ## Status
 
-The workspace remains version `0.1.0` and pre-release. The documentation
-describes implemented APIs and explicit boundaries. It does not claim a stable
-Cargo V1 API, general production qualification, a concurrent runtime, or an
+The workspace is version `1.0.0-rc.1`, the first public API and packaging
+candidate. The documentation describes implemented APIs and explicit
+boundaries. Final Cargo V1 stability begins only at `1.0.0`. The RC does not
+claim general deployment qualification, a bundled concurrent runtime, or an
 end-to-end proof for arbitrary downstream projects.
