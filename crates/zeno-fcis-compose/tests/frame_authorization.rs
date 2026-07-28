@@ -1,17 +1,35 @@
 //! Regression laws for directional composition-frame authorization.
 
-use zeno_fcis_codec::Hash32;
+use zeno_fcis_codec::{CommitmentHasher, Hash32};
 use zeno_fcis_compose::{
     AccessPath, ClaimEvidence, ComponentContract, ComponentId, CompositionBlocker,
-    CompositionEvidence, CompositionSpec, EvidenceVerifier, Footprint, FrameRule, PathAtom,
-    PathSet, Wiring, verify_assume_guarantee,
+    CompositionClaim, CompositionEvidence, CompositionSpec, EvidenceVerifier, Footprint, FrameRule,
+    PathAtom, PathSet, Wiring, verify_assume_guarantee,
 };
+
+#[derive(Clone, Copy, Debug)]
+struct TestHasher;
+
+impl CommitmentHasher for TestHasher {
+    const ALGORITHM_ID: &'static str = "test-only/1";
+
+    fn hash(bytes: &[u8]) -> Hash32 {
+        let mut output = [0_u8; 32];
+        for (index, byte) in bytes.iter().enumerate() {
+            let slot = index % output.len();
+            output[slot] = output[slot]
+                .wrapping_add(*byte)
+                .rotate_left((index % 8) as u32);
+        }
+        Hash32::new(output)
+    }
+}
 
 struct ExactVerifier;
 
 impl EvidenceVerifier for ExactVerifier {
-    fn verify(&self, claim: Hash32, artifact: Hash32) -> bool {
-        claim == artifact
+    fn verify(&self, claim: &CompositionClaim, artifact: Hash32) -> bool {
+        claim.commitment::<TestHasher>().ok() == Some(artifact)
     }
 }
 
@@ -42,16 +60,6 @@ fn source_component(id: ComponentId, effect: AccessPath) -> ComponentContract {
     )
 }
 
-fn evidence(frame_claim: Hash32) -> CompositionEvidence {
-    CompositionEvidence::try_new(
-        vec![ClaimEvidence::new(frame_claim, frame_claim)],
-        vec![],
-        hash(90),
-        hash(90),
-    )
-    .unwrap_or_else(|error| panic!("evidence: {error}"))
-}
-
 fn report_for(
     protected: AccessPath,
     destination_path: AccessPath,
@@ -64,10 +72,11 @@ fn report_for(
     let source_id = ComponentId::new(1);
     let destination_id = ComponentId::new(2);
     let source_effect = path(70, vec![PathAtom::Field(1)]);
+    let protected_for_claim = protected.clone();
     let frame = FrameRule::try_new(protected, vec![source_id], frame_claim)
         .unwrap_or_else(|error| panic!("frame: {error}"));
     let spec = CompositionSpec::try_new(
-        1,
+        2,
         vec![
             source_component(source_id, source_effect.clone()),
             component(destination_id, Footprint::default(), vec![frame]),
@@ -83,7 +92,25 @@ fn report_for(
         vec![source_id, destination_id],
     )
     .unwrap_or_else(|error| panic!("spec: {error}"));
-    let report = verify_assume_guarantee(&spec, &evidence(frame_claim), &ExactVerifier);
+    let spec_hash = spec
+        .commitment::<TestHasher>()
+        .unwrap_or_else(|error| panic!("spec hash: {error}"));
+    let statement = CompositionClaim::Frame {
+        spec_hash,
+        component: destination_id,
+        protected: protected_for_claim,
+        claim: frame_claim,
+    };
+    let artifact = statement
+        .commitment::<TestHasher>()
+        .unwrap_or_else(|error| panic!("frame evidence: {error}"));
+    let evidence = CompositionEvidence::try_new(
+        vec![ClaimEvidence::new(frame_claim, artifact)],
+        vec![],
+        None,
+    )
+    .unwrap_or_else(|error| panic!("evidence: {error}"));
+    let report = verify_assume_guarantee::<TestHasher, _>(&spec, &evidence, &ExactVerifier);
     (source_id, destination_id, report)
 }
 
