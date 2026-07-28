@@ -94,7 +94,9 @@ impl HashRequirement {
         Ok(Self::Exact(NonZeroHash::try_new(value)?))
     }
 
-    fn admits(self, value: Hash32) -> bool {
+    /// Returns whether one commitment satisfies this closed requirement.
+    #[must_use]
+    pub fn admits(self, value: Hash32) -> bool {
         match self {
             Self::Any => true,
             Self::Absent => value == Hash32::ZERO,

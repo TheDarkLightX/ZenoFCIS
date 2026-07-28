@@ -235,6 +235,13 @@ pub trait CatalogTransitionProgram<H: ApprovedCommitmentProvider> {
     /// Program-specific execution failure.
     type Error;
 
+    /// Returns the exact reviewed semantic program/build commitment.
+    ///
+    /// The owning authority requires this value to equal its independently
+    /// supplied [`ExecutionBinding::transition_build_hash`]. Nominal Rust type
+    /// identity alone does not bind configuration values stored inside `Self`.
+    fn transition_build_hash(&self) -> Hash32;
+
     /// Executes the reviewed transition over exact shell-owned inputs.
     fn execute(
         &self,
@@ -440,6 +447,9 @@ where
         laws: VerifiedProjectLaws<H, L>,
         program: P,
     ) -> Result<Self, AuthorityError> {
+        if program.transition_build_hash() != execution.transition_build_hash() {
+            return Err(AuthorityError::Mismatch(AuthorityField::TransitionBuild));
+        }
         let policy = AuthorizationPolicy::try_new(
             catalog,
             state_domain,
@@ -523,6 +533,11 @@ where
         &self,
         invocation: InvocationWitness<H, P, L, I>,
     ) -> Result<CatalogAuthorizationDecision<H, P, L, I>, CatalogExecutionError<P::Error>> {
+        if self.program.transition_build_hash() != self.policy.execution.transition_build_hash() {
+            return Err(CatalogExecutionError::Authority(AuthorityError::Mismatch(
+                AuthorityField::TransitionBuild,
+            )));
+        }
         if invocation.policy_id != self.policy.policy_id {
             return Err(CatalogExecutionError::Authority(AuthorityError::Mismatch(
                 AuthorityField::PolicyId,
@@ -1545,6 +1560,8 @@ pub enum AuthorityField {
     Reason,
     /// Shell-owned transition limits.
     TransitionLimits,
+    /// Exact reviewed transition program/build identity.
+    TransitionBuild,
 }
 
 /// Authorization admission or construction failure.
@@ -1724,6 +1741,10 @@ mod tests {
     impl CatalogTransitionProgram<RustCryptoSha256> for AcceptProgram {
         type Error = TransitionError;
 
+        fn transition_build_hash(&self) -> Hash32 {
+            hash(50)
+        }
+
         fn execute(
             &self,
             input: ReviewedTransitionInput<'_>,
@@ -1747,6 +1768,10 @@ mod tests {
 
     impl CatalogTransitionProgram<RustCryptoSha256> for RejectProgram {
         type Error = TransitionError;
+
+        fn transition_build_hash(&self) -> Hash32 {
+            hash(50)
+        }
 
         fn execute(
             &self,
@@ -1772,6 +1797,10 @@ mod tests {
 
     impl CatalogTransitionProgram<RustCryptoSha256> for WrongLimitsProgram {
         type Error = TransitionError;
+
+        fn transition_build_hash(&self) -> Hash32 {
+            hash(50)
+        }
 
         fn execute(
             &self,
@@ -2319,6 +2348,35 @@ mod tests {
             CatalogExecutionError::Authority(AuthorityError::Mismatch(
                 AuthorityField::TransitionLimits
             ))
+        ));
+    }
+
+    #[test]
+    fn authority_rejects_transition_program_build_mismatch() {
+        let catalog = fixture_catalog();
+        let provider = verify_approved_provider::<RustCryptoSha256>()
+            .unwrap_or_else(|error| panic!("approved provider: {error}"));
+        let wrong_execution =
+            ExecutionBinding::try_new(hash(49), hash(51), hash(52), hash(53), hash(54))
+                .unwrap_or_else(|error| panic!("execution binding: {error}"));
+        let result = CatalogCommitAuthority::<
+            RustCryptoSha256,
+            AcceptProgram,
+            TestLawEngine,
+            TestInterpreter,
+        >::try_new(
+            &catalog,
+            StateDomainBinding::try_new("authority/fixture/state", 1)
+                .unwrap_or_else(|error| panic!("state domain: {error}")),
+            wrong_execution,
+            transition_limits(),
+            &provider,
+            verified_laws(&catalog),
+            AcceptProgram,
+        );
+        assert!(matches!(
+            result,
+            Err(AuthorityError::Mismatch(AuthorityField::TransitionBuild))
         ));
     }
 }
