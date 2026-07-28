@@ -34,6 +34,9 @@ pub use zeno_fcis_codegen as codegen;
 pub use zeno_fcis_collections as collections;
 /// Proof-carrying assume-guarantee contracts and deterministic composition evidence.
 pub use zeno_fcis_compose as compose;
+#[cfg(feature = "composed-program")]
+/// One authority-owned program for fixed composed domain machines.
+pub use zeno_fcis_composed_program as composed_program;
 /// Decision algebra, budgets, reasons, and transition traits.
 pub use zeno_fcis_core as core;
 #[cfg(any(
@@ -139,6 +142,11 @@ pub use zeno_fcis_compose::{
     ParallelConflictLaw, ParallelParityEvidence, ParallelVerificationContext, PathAtom, PathSet,
     ProviderGuarantee, Wiring, conflicts, verify_assume_guarantee, verify_deterministic_parallel,
 };
+#[cfg(feature = "composed-program")]
+pub use zeno_fcis_composed_program::{
+    COMPOSED_PROGRAM_FORMAT_VERSION, ComposedDomainProgram, ComposedProgramError, ExternalOutput,
+    ProjectionPlan, derive_semantic_program_hash,
+};
 pub use zeno_fcis_core::{
     Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, BudgetedDecision, Decision,
     DecisionKind, Failed, Rejected, Resource, StableReason, Transition, first_reason,
@@ -218,7 +226,8 @@ pub use zeno_fcis_transition::{
     MAX_TRANSITION_MAP_KEY_BYTES, MAX_TRANSITION_OBSERVED_PATHS, MAX_TRANSITION_PATCH_OPERATIONS,
     MAX_TRANSITION_REASONS, MAX_TRANSITION_STATE_DEPTH, MAX_TRANSITION_STATE_NODES,
     TRANSITION_FORMAT_VERSION, TransitionArtifacts, TransitionDecision, TransitionError,
-    TransitionLimits, TransitionReject, TransitionResourceReport, validate_transition_decision,
+    TransitionLimits, TransitionReject, TransitionResourceReport, canonical_access_path,
+    validate_transition_decision,
 };
 pub use zeno_fcis_value::{
     AdmittedValue, AsciiText, BoundedVec, Field, LengthError, MapEntry, NonEmptyVec, OwnedBytes,

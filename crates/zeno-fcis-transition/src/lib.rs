@@ -587,7 +587,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
             self.limits.max_observed_paths,
             LimitKind::Reads,
         )?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -600,7 +600,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
     /// Stages one preconditioned update and records its read/write footprint.
     pub fn update(&mut self, path: ValuePath, value: Value) -> Result<&mut Self, TransitionError> {
         self.ensure_patch_and_state_path_capacity()?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -625,7 +625,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
         value: Value,
     ) -> Result<&mut Self, TransitionError> {
         self.ensure_patch_and_state_path_capacity()?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -643,7 +643,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
     /// Stages one preconditioned deletion and records its read/write footprint.
     pub fn delete(&mut self, path: ValuePath) -> Result<&mut Self, TransitionError> {
         self.ensure_patch_and_state_path_capacity()?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -996,7 +996,12 @@ fn validate_resource_report<H: CommitmentHasher>(
     Ok(())
 }
 
-fn state_access_path<H: CommitmentHasher>(
+/// Converts one concrete value path into its canonical hierarchical footprint path.
+///
+/// Map-key segments are replaced by the protocol-defined commitment of their
+/// already-canonical encoded key bytes. Wildcards cannot be introduced through
+/// this conversion.
+pub fn canonical_access_path<H: CommitmentHasher>(
     namespace: u32,
     path: &ValuePath,
     max_map_key_bytes: u32,

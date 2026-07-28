@@ -24,6 +24,9 @@ The workspace now includes the complete package ladder:
   context, and port matrices; narrow per-machine interfaces; routes derived
   exactly from global composition wiring; deterministic merge-order execution;
   global reject rollback; and terminal committed-failure preservation;
+- one authority-owned composed-domain program with closed root-to-context maps,
+  nominal machine ownership, complete state projection, fail-closed internal
+  routing, and exact catalogued effect/outbox projection;
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
@@ -86,7 +89,7 @@ The umbrella crate's default and `no_std` feature sets are project-neutral.
 Enable `zenodex-profile` for the ZenoDEX profile exports or `mounted-zenodex`
 for that profile plus its concrete mounted runtime.
 
-Important optional features include `authority`, `domain-machines`, `codegen`,
+Important optional features include `authority`, `domain-machines`, `composed-program`, `codegen`,
 `evidence`, `mounted-runtime`, `zenodex-profile`, `mounted-zenodex`,
 `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and
 `persistent-collections`.
@@ -116,6 +119,8 @@ matrix is derived from `CompositionSpec`; state and invocation matrices bind
 the exact executable composition and cannot be replayed across another
 same-shaped topology. See
 [`docs/FIXED_STATE_DOMAIN_MACHINES.md`](docs/FIXED_STATE_DOMAIN_MACHINES.md).
+The production bridge is documented in
+[`docs/COMPOSED_DOMAIN_PROGRAM.md`](docs/COMPOSED_DOMAIN_PROGRAM.md).
 
 ## Verification
 
