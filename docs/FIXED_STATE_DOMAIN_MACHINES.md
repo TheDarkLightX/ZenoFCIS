@@ -78,9 +78,14 @@ Construction authority is deliberately split:
 5. The global executor validates every local candidate against the exact
    interface before it can enter a successor matrix.
 
-A later authority package must bind a verified composition report, complete
-footprint evidence, project relational laws, an exact invocation witness, and
-this executor's complete result before any production shell may commit it.
+`zeno-fcis-composed-program` now owns the reviewed root projections, exact
+machine implementations and build commitments, closed reason domains, output
+treatment, and deterministic budgets. It turns this executor into one
+`CatalogTransitionProgram`. `zeno-fcis-authority` then binds the exact
+invocation, catalog, project laws, provider, interpreter, deployment, replay
+policy, and transition build before constructing production commit authority.
+Production parallel promotion still requires complete static footprint
+evidence and equality with the canonical sequential result.
 
 ## Trusted dependencies
 
@@ -208,13 +213,14 @@ This package does not:
 - support cyclic wiring, fanout, fan-in, or dynamic component creation;
 - infer business invariants, conservation, authority, or validate project
   reason disposition and rejection precedence;
-- convert output ports into authoritative effects or outbox obligations;
+- convert output ports into authoritative effects or outbox obligations inside
+  this crate; that mapping belongs to `zeno-fcis-composed-program`;
 - provide canonical decoders for fixed-domain artifacts in version 1;
 - verify a proof artifact or make ESSO, Lean, SMT, Z3, CVC5, Kani, Flux, or any
   other backend mandatory;
 - establish compiler, database, chain, operating-system, or hardware
   refinement;
-- grant production authority.
+- grant production authority by itself.
 
 Private tools such as ESSO may consume or verify the canonical artifacts through
 the existing tool-neutral backend protocol. Universal users may plug in Lean,

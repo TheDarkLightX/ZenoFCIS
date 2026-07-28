@@ -1,7 +1,9 @@
 # Security policy
 
-ZenoFCIS is pre-release research software. It has no production-authority or
-value-custody claim.
+ZenoFCIS is pre-release software. It includes a nominal catalog, law,
+invocation, provider, interpreter, deployment, and replay-bound commit-authority
+mechanism. That library mechanism does not qualify any downstream deployment
+or establish a value-custody, audit-completion, or general production claim.
 
 Please report suspected vulnerabilities privately through GitHub's security
 advisory interface. Do not include secrets, private keys, or live exploit data

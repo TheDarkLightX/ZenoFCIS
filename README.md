@@ -14,6 +14,45 @@ immutable state + command + policy + authenticated context
 
 The semantic kernel treats values, decisions, resource budgets, canonical bytes, and commitments as explicit protocol data. It forbids unsafe Rust and is designed for `no_std + alloc` use without clocks, randomness, networking, filesystems, databases, or executable effect closures.
 
+## Start here
+
+For a project-neutral multi-domain application, enable the composed-program
+path and import the curated prelude:
+
+```toml
+[dependencies]
+zeno-fcis = { version = "=0.1.0", default-features = false, features = [
+    "composed-program",
+] }
+```
+
+```rust
+use zeno_fcis::prelude::*;
+```
+
+The supported application path is:
+
+```text
+ProjectProfile + ProjectCatalog
+    -> generated transition or typed domain machines
+    -> ComposedDomainProgram
+    -> verified project laws
+    -> CatalogCommitAuthority
+    -> authorized shell publication
+```
+
+Read the [quickstart](docs/QUICKSTART.md), [crate map](docs/CRATE_MAP.md),
+[feature matrix](docs/FEATURE_MATRIX.md), and [LLM integration guide](docs/LLM_USAGE.md).
+Runnable examples are checked permanently:
+
+```bash
+cargo +1.97.1 run -p zeno-fcis --example minimal_core --locked
+cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
+```
+
+The `full` feature is intended for workspace integration and exploration.
+Reusable libraries should select only the features needed at their boundary.
+
 ## Implemented workspace
 
 The workspace now includes the complete package ladder:
@@ -78,11 +117,12 @@ This establishes bounded executable integration for the mounted profile. It
 does not authorize production effects, cover multiple vaults or other ZenoDEX
 lanes, or replace an audit or unbounded refinement proof.
 
-The `zeno-fcis` umbrella keeps the semantic kernel small by default. Enable the complete integration surface explicitly:
+The `zeno-fcis` umbrella keeps the semantic kernel small by default. Application
+code should enable the smallest explicit feature set, for example:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=0.1.0", features = ["full"] }
+zeno-fcis = { version = "=0.1.0", default-features = false, features = ["composed-program"] }
 ```
 
 The umbrella crate's default and `no_std` feature sets are project-neutral.

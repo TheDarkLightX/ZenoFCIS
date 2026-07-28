@@ -1,5 +1,12 @@
 # ZenoFCIS downstream-agent execution prompt
 
+> **Historical document.** This prompt describes the original PR #1 through
+> PR #5 work-package stack and must not be used as a current branch or package
+> instruction. Current agents should start with [LLM usage](LLM_USAGE.md), the
+> [quickstart](QUICKSTART.md), and the exact source and open PR stack. Stable
+> identifiers, authority, proof, promotion, and release decisions remain owner
+> controlled.
+
 Copy the prompt below into a fresh coding agent. Replace only the selected work-package name. Do not combine packages.
 
 ---
