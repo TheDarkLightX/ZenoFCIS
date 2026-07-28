@@ -21,6 +21,8 @@ Generated shells retain effect authority. An agent implements only pure admissio
 
 Arbitrary EVM calls, arbitrary Solana CPIs, arbitrary calldata, delegate execution, dynamic account lists, and unreviewed token bindings are not generic capabilities. Adding one requires a new reviewed backend profile.
 
+These restrictions constrain what generated project logic may express. They do not sandbox the agent, compiler, build scripts, dependencies, or analyzers. Dedicated temporary build paths provide workspace separation only. See the [execution and sandbox boundary](EXECUTION_SANDBOX_BOUNDARY.md).
+
 ## Solidity v2
 
 `generate_advanced_solidity` emits:

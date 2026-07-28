@@ -76,7 +76,9 @@ It does not by itself prove:
 
 ## Validation layers
 
-Repository Rust CI validates the `zeno-fcis-solana-anchor/3` generator implementation, deterministic rendering, source-policy checks, and public API integration. Initialization requires the authority to be both a signer and a System Program-owned account, matching the authority type admitted by later execution. A separate retained generated-workspace gate is required to compile the emitted Anchor program with its exact dependency graph. Instruction-level tests remain a distinct requirement; generator and host compilation evidence are not deployment evidence.
+Repository Rust CI validates the `zeno-fcis-solana-anchor/3` generator implementation, deterministic rendering, source-policy checks, and public API integration. Initialization requires the authority to be both a signer and a System Program-owned account, matching the authority type admitted by later execution.
+
+The retained generated-workspace gate runs host `cargo check --workspace --all-targets --locked` against the exact retained dependency graph. It does not invoke Anchor CLI or `build-sbf`, produce SBF/ELF, execute instructions, establish a verified build, or bind a deployed program. The `solana=3.1.10` manifest field records the declared target-toolchain family; the current host gate does not exercise that toolchain. See the [execution and sandbox boundary](EXECUTION_SANDBOX_BOUNDARY.md).
 
 ## Required promotion evidence
 
