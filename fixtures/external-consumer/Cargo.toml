@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 zeno-fcis = {
-    version = "=0.1.0",
+    version = "=1.0.0-rc.1",
     path = "../../crates/zeno-fcis",
     default-features = false,
     features = ["std", "bootstrap", "composed-program", "backend"]
