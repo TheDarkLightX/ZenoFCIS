@@ -23,7 +23,8 @@ The workspace now includes the complete package ladder:
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
-- nominal catalog authorization that owns the reviewed transition program, admits an external command/context/principal/replay invocation, pins a sealed known-answer-verified provider plus exact interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only for committing decisions;
+- tool-neutral, profile-bound relational-law manifests for state invariants, conservation, mint/burn authority, debit/credit-to-effect equality, fees and rounding, authority/subject/recipient relations, rejection purity, and committed-failure effects, with retained proof evidence and fresh bounded per-invocation evaluation;
+- nominal catalog authorization that owns the reviewed transition program and exact project-law engine, admits an external command/context/principal/replay invocation, pins a sealed known-answer-verified provider plus exact interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only after every applicable law is satisfied;
 - a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
 - a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
@@ -91,6 +92,7 @@ The repository keeps computation and coordination separate:
 pure transition
     -> immutable, content-addressed candidate
     -> external invocation + catalog/provider/deployment validation
+    -> complete project-law evaluation
     -> nominal CatalogAuthorizedTransition
     -> policy-pinned atomic shell publication
     -> idempotent outbox delivery
@@ -115,7 +117,7 @@ See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`
 
 ## Assurance posture
 
-This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, fail-closed promotion rules, and an implemented nominal commit-authorization boundary. The pinned ZenoDEX single-vault zUSD mount is bounded executable refinement evidence. Production value-moving promotion remains blocked by project conservation/invariant laws, strict decoded SQLite bundle/outbox set reconstruction, the open composition/refinement/authenticated-state findings, chain-specific deployment qualification, and independent exact-head audit. It does not claim audit completion, economic correctness, side-channel resistance, full ZenoDEX coverage, or that an external JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
+This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, fail-closed promotion rules, mandatory tool-neutral relational-law evaluation, and a nominal commit-authorization boundary. The pinned ZenoDEX single-vault zUSD mount is bounded executable refinement evidence. Production value-moving promotion still requires each promoted profile to supply independently reviewed conservation/invariant definitions and checkers; it is also blocked by strict decoded SQLite bundle/outbox set reconstruction, the open composition/refinement/authenticated-state findings, chain-specific deployment qualification, and independent exact-head audit. It does not claim audit completion, economic correctness, side-channel resistance, full ZenoDEX coverage, or that an external JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
 
 ## License
 

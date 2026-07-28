@@ -46,6 +46,9 @@ pub use zeno_fcis_crypto as crypto;
 #[cfg(feature = "evidence")]
 /// Canonical evidence envelopes and independent checker adapters.
 pub use zeno_fcis_evidence as evidence;
+#[cfg(feature = "laws")]
+/// Tool-neutral project invariants, conservation laws, and checked proof subjects.
+pub use zeno_fcis_laws as laws;
 /// Preconditioned canonical state patches.
 pub use zeno_fcis_patch as patch;
 /// Closed authoritative and outbox plans.
@@ -81,6 +84,16 @@ pub use zeno_fcis_synthesis as synthesis;
 pub use zeno_fcis_transition as transition;
 /// Transitively immutable closed values.
 pub use zeno_fcis_value as value;
+
+#[cfg(feature = "laws")]
+pub use zeno_fcis_laws::{
+    DecisionScope, LAW_EVALUATION_FORMAT_VERSION, LAW_MANIFEST_FORMAT_VERSION,
+    LAW_SET_FORMAT_VERSION, LawCheckInput, LawDecisionView, LawDefinition, LawEngineFailure,
+    LawError, LawEvaluation, LawEvidenceInput, LawEvidenceRequirement, LawEvidenceVerifier,
+    LawFamilyDisposition, LawFamilyPolicy, LawField, LawKind, LawLimits, LawManifest,
+    LawObservation, LawProofDecision, LawProofSubject, LawStatus, ProjectLawEngine,
+    VerifiedLawEvidence, VerifiedProjectLaws, verify_project_laws,
+};
 
 #[cfg(feature = "authority")]
 pub use zeno_fcis_authority::{

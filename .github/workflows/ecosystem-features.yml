@@ -40,6 +40,8 @@ jobs:
           cargo +1.97.1 test -p zeno-fcis-backend --all-features --locked
           cargo +1.97.1 check -p zeno-fcis-transition --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-transition --all-features --locked
+          cargo +1.97.1 check -p zeno-fcis-laws --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 test -p zeno-fcis-laws --all-features --locked
           cargo +1.97.1 check -p zeno-fcis-authority --no-default-features --features rustcrypto --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-authority --all-features --locked
 
@@ -59,6 +61,7 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features catalog --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features transition --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features laws --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features authority --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features security --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features secret --locked --target wasm32-unknown-unknown

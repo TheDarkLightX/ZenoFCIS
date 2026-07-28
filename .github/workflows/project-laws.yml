@@ -1,0 +1,88 @@
+name: project-relational-laws
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeno-fcis-project-relational-laws-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  project-relational-laws:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Format
+        run: cargo +1.97.1 fmt --all -- --check
+
+      - name: Compile laws and evidence boundary
+        run: |
+          cargo +1.97.1 clippy \
+            -p zeno-fcis-evidence \
+            -p zeno-fcis-catalog \
+            -p zeno-fcis-laws \
+            -p zeno-fcis-authority \
+            -p zeno-fcis-shell-sqlite \
+            --all-targets --all-features --locked -- -D warnings
+
+      - name: Relational-law and negative evidence tests
+        run: |
+          cargo +1.97.1 test \
+            -p zeno-fcis-evidence \
+            -p zeno-fcis-catalog \
+            -p zeno-fcis-laws \
+            -p zeno-fcis-authority \
+            -p zeno-fcis-shell-sqlite \
+            --all-features --locked
+          cargo +1.97.1 test \
+            -p zeno-fcis-laws \
+            -p zeno-fcis-authority \
+            -p zeno-fcis-shell-sqlite \
+            --doc --all-features --locked
+
+      - name: no_std law surface
+        run: |
+          cargo +1.97.1 check \
+            -p zeno-fcis-laws \
+            --no-default-features --locked \
+            --target wasm32-unknown-unknown
+          cargo +1.97.1 check \
+            -p zeno-fcis \
+            --no-default-features --features laws --locked \
+            --target wasm32-unknown-unknown
+          cargo +1.97.1 check \
+            -p zeno-fcis-authority \
+            --no-default-features --features rustcrypto --locked \
+            --target wasm32-unknown-unknown
+
+      - name: Documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          cargo +1.97.1 doc \
+            -p zeno-fcis-evidence \
+            -p zeno-fcis-catalog \
+            -p zeno-fcis-laws \
+            -p zeno-fcis-authority \
+            -p zeno-fcis-shell-sqlite \
+            --all-features --locked --no-deps
+
+      - name: Static assurance checks
+        run: python3 tools/check_assurance.py

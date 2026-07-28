@@ -17,6 +17,7 @@ use zeno_fcis_codec::{
     decode_value,
 };
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_laws::ProjectLawEngine;
 use zeno_fcis_patch::{PatchError, hash_value};
 use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_receipt::{CandidateId, SealError};
@@ -84,7 +85,7 @@ CREATE TABLE outbox (
 PRAGMA user_version = 2;
 ";
 
-type SqliteMarker<P, I> = PhantomData<fn() -> (P, I)>;
+type SqliteMarker<P, L, I> = PhantomData<fn() -> (P, L, I)>;
 
 /// Persistent snapshot of the authoritative semantic state.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -257,28 +258,30 @@ impl IdempotentDestination for MemoryDestination {
 }
 
 /// Concrete SQLite shell pinned to one exact production authorization policy.
-pub struct SqliteShell<P, I>
+pub struct SqliteShell<P, L, I>
 where
     P: CatalogTransitionProgram<RustCryptoSha256>,
+    L: ProjectLawEngine,
 {
     connection: Connection,
     policy_id: Hash32,
     state_domain_name: String,
     state_domain_version: u16,
     interpreter: I,
-    marker: SqliteMarker<P, I>,
+    marker: SqliteMarker<P, L, I>,
 }
 
-impl<P, I> SqliteShell<P, I>
+impl<P, L, I> SqliteShell<P, L, I>
 where
     P: CatalogTransitionProgram<RustCryptoSha256>,
+    L: ProjectLawEngine,
 {
     /// Opens or initializes a file-backed shell.
     pub fn open(
         path: impl AsRef<Path>,
-        authority: &CatalogCommitAuthority<RustCryptoSha256, P, I>,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
         initial_state: &SchemaAdmittedEnvelope,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, I>,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open(path).map_err(SqliteShellError::Sqlite)?;
         Self::from_connection(connection, authority, initial_state, interpreter)
@@ -286,9 +289,9 @@ where
 
     /// Opens an in-memory shell for deterministic refinement and fault tests.
     pub fn open_in_memory(
-        authority: &CatalogCommitAuthority<RustCryptoSha256, P, I>,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
         initial_state: &SchemaAdmittedEnvelope,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, I>,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open_in_memory().map_err(SqliteShellError::Sqlite)?;
         Self::from_connection(connection, authority, initial_state, interpreter)
@@ -296,9 +299,9 @@ where
 
     fn from_connection(
         connection: Connection,
-        authority: &CatalogCommitAuthority<RustCryptoSha256, P, I>,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
         initial_state: &SchemaAdmittedEnvelope,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, I>,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         zeno_fcis_authority::AuthorizedShellState::new(authority, initial_state)
             .map_err(SqliteShellError::Authority)?;
@@ -455,7 +458,7 @@ where
     /// Atomically publishes one exact nominally authorized transition.
     pub fn commit(
         &mut self,
-        authorized: CatalogAuthorizedTransition<RustCryptoSha256, P, I>,
+        authorized: CatalogAuthorizedTransition<RustCryptoSha256, P, L, I>,
     ) -> Result<CommitStatus, SqliteShellError> {
         self.commit_with_crash_point(authorized, None)
     }
@@ -463,7 +466,7 @@ where
     /// Runs the commit protocol with one deterministic injected crash point.
     pub fn commit_with_crash_point(
         &mut self,
-        authorized: CatalogAuthorizedTransition<RustCryptoSha256, P, I>,
+        authorized: CatalogAuthorizedTransition<RustCryptoSha256, P, L, I>,
         crash: Option<CrashPoint>,
     ) -> Result<CommitStatus, SqliteShellError> {
         if crash == Some(CrashPoint::BeforeTransaction) {
@@ -1085,8 +1088,14 @@ mod tests {
         CatalogAuthorizationDecision, ExecutionBinding, ReviewedTransitionInput, StateDomainBinding,
     };
     use zeno_fcis_catalog::{CatalogLimits, CatalogManifest, ChannelDefinition, ProjectCatalog};
-    use zeno_fcis_core::{BudgetUsed, Decision};
+    use zeno_fcis_core::{BudgetUsed, Decision, DecisionKind};
     use zeno_fcis_crypto::verify_approved_provider;
+    use zeno_fcis_evidence::EvidenceEnvelope;
+    use zeno_fcis_laws::{
+        DecisionScope, LawCheckInput, LawDefinition, LawEvidenceRequirement, LawEvidenceVerifier,
+        LawFamilyPolicy, LawKind, LawLimits, LawObservation, LawProofDecision, LawProofSubject,
+        LawStatus, VerifiedProjectLaws, verify_project_laws,
+    };
     use zeno_fcis_patch::ValuePath;
     use zeno_fcis_project::{
         DomainPrefix, ProfileBindings, ProjectProfile, RegistryEntry, RegistryKind, SemanticId,
@@ -1127,6 +1136,59 @@ mod tests {
             .unwrap_or_else(|error| panic!("registry entry: {error}"))
     }
 
+    fn law_manifest() -> zeno_fcis_laws::LawManifest {
+        let families = LawKind::ALL
+            .into_iter()
+            .map(|kind| {
+                if matches!(
+                    kind,
+                    LawKind::StateInvariant
+                        | LawKind::RejectNoAuthority
+                        | LawKind::CommittedFailureEffects
+                ) {
+                    LawFamilyPolicy::required(kind)
+                } else {
+                    LawFamilyPolicy::not_applicable(kind, hash(94))
+                        .unwrap_or_else(|error| panic!("law family: {error}"))
+                }
+            })
+            .collect();
+        let definitions = vec![
+            LawDefinition::try_new(
+                id(1_001),
+                name("state-invariant"),
+                LawKind::StateInvariant,
+                DecisionScope::Committing,
+                hash(101),
+                hash(111),
+                LawEvidenceRequirement::RuntimeOnly,
+            )
+            .unwrap_or_else(|error| panic!("state law: {error}")),
+            LawDefinition::try_new(
+                id(1_002),
+                name("reject-no-authority"),
+                LawKind::RejectNoAuthority,
+                DecisionScope::Reject,
+                hash(102),
+                hash(112),
+                LawEvidenceRequirement::RuntimeOnly,
+            )
+            .unwrap_or_else(|error| panic!("reject law: {error}")),
+            LawDefinition::try_new(
+                id(1_003),
+                name("committed-failure-effects"),
+                LawKind::CommittedFailureEffects,
+                DecisionScope::CommittedFailure,
+                hash(103),
+                hash(113),
+                LawEvidenceRequirement::RuntimeOnly,
+            )
+            .unwrap_or_else(|error| panic!("failure law: {error}")),
+        ];
+        zeno_fcis_laws::LawManifest::try_new(families, definitions)
+            .unwrap_or_else(|error| panic!("law manifest: {error}"))
+    }
+
     fn catalog() -> ProjectCatalog {
         let schema = Schema::try_new(
             "SqliteAuthorityFixture",
@@ -1159,12 +1221,17 @@ mod tests {
         let manifest =
             CatalogManifest::try_new::<RustCryptoSha256>(Vec::new(), Vec::new(), vec![channel])
                 .unwrap_or_else(|error| panic!("manifest: {error}"));
+        let laws = law_manifest();
         let mut entries = vec![
             registry_entry(RegistryKind::StateType, 1, "state"),
             registry_entry(RegistryKind::CommandType, 2, "command"),
             registry_entry(RegistryKind::ContextType, 3, "context"),
         ];
         entries.extend_from_slice(manifest.registry_entries());
+        entries.extend(
+            laws.registry_entries::<RustCryptoSha256>()
+                .unwrap_or_else(|error| panic!("law registry: {error}")),
+        );
         let profile = ProjectProfile::try_new(
             name("sqlite-fixture"),
             name("core"),
@@ -1184,7 +1251,9 @@ mod tests {
                 codec_hash: hash(41),
                 effect_registry_hash: manifest.effect_registry_hash(),
                 channel_registry_hash: manifest.channel_registry_hash(),
-                policy_hash: hash(42),
+                policy_hash: laws
+                    .commitment::<RustCryptoSha256>()
+                    .unwrap_or_else(|error| panic!("law commitment: {error}")),
             },
             entries,
         )
@@ -1196,6 +1265,61 @@ mod tests {
             CatalogLimits::default(),
         )
         .unwrap_or_else(|error| panic!("catalog: {error}"))
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    struct SqliteLawEngine;
+
+    impl ProjectLawEngine for SqliteLawEngine {
+        fn evaluate(
+            &self,
+            input: &LawCheckInput<'_>,
+            _: LawLimits,
+        ) -> Result<Vec<LawObservation>, zeno_fcis_laws::LawEngineFailure> {
+            match input.decision().kind() {
+                DecisionKind::Accept => Ok(vec![
+                    LawObservation::try_new(id(1_001), LawStatus::Satisfied, hash(91))
+                        .unwrap_or_else(|error| panic!("law observation: {error}")),
+                ]),
+                DecisionKind::Reject => Ok(Vec::new()),
+                DecisionKind::CommittedFailure => Ok(vec![
+                    LawObservation::try_new(id(1_001), LawStatus::Satisfied, hash(91))
+                        .unwrap_or_else(|error| panic!("law observation: {error}")),
+                    LawObservation::try_new(id(1_003), LawStatus::Satisfied, hash(91))
+                        .unwrap_or_else(|error| panic!("law observation: {error}")),
+                ]),
+            }
+        }
+    }
+
+    struct SqliteEvidenceVerifier;
+
+    impl LawEvidenceVerifier for SqliteEvidenceVerifier {
+        fn verifier_identity(&self) -> Hash32 {
+            hash(92)
+        }
+
+        fn verify(&self, _: &LawProofSubject, _: &EvidenceEnvelope, _: &[u8]) -> LawProofDecision {
+            LawProofDecision::Attested {
+                verification_claim: hash(93),
+            }
+        }
+    }
+
+    fn verified_laws(
+        catalog: &ProjectCatalog,
+    ) -> VerifiedProjectLaws<RustCryptoSha256, SqliteLawEngine> {
+        verify_project_laws::<RustCryptoSha256, _, _>(
+            catalog,
+            law_manifest(),
+            hash(90),
+            Vec::new(),
+            LawLimits::default(),
+            hash(91),
+            SqliteLawEngine,
+            &SqliteEvidenceVerifier,
+        )
+        .unwrap_or_else(|error| panic!("verified laws: {error}"))
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -1230,8 +1354,9 @@ mod tests {
         }
     }
 
-    type TestAuthority = CatalogCommitAuthority<RustCryptoSha256, SqliteProgram, MemoryDestination>;
-    type TestShell = SqliteShell<SqliteProgram, MemoryDestination>;
+    type TestAuthority =
+        CatalogCommitAuthority<RustCryptoSha256, SqliteProgram, SqliteLawEngine, MemoryDestination>;
+    type TestShell = SqliteShell<SqliteProgram, SqliteLawEngine, MemoryDestination>;
 
     fn limits() -> TransitionLimits {
         TransitionLimits::try_new(4, 4, 4, 64, 8, 64)
@@ -1249,6 +1374,7 @@ mod tests {
                 .unwrap_or_else(|error| panic!("execution: {error}")),
             limits(),
             &provider,
+            verified_laws(catalog),
             SqliteProgram,
         )
         .unwrap_or_else(|error| panic!("authority: {error}"))
@@ -1287,7 +1413,12 @@ mod tests {
         authority: &TestAuthority,
         catalog: &ProjectCatalog,
         replay: u8,
-    ) -> CatalogAuthorizedTransition<RustCryptoSha256, SqliteProgram, MemoryDestination> {
+    ) -> CatalogAuthorizedTransition<
+        RustCryptoSha256,
+        SqliteProgram,
+        SqliteLawEngine,
+        MemoryDestination,
+    > {
         let invocation = authority
             .admit_invocation(
                 initial_state(catalog),
@@ -1298,7 +1429,7 @@ mod tests {
                 hash(replay),
             )
             .unwrap_or_else(|error| panic!("invocation: {error}"));
-        let decision: CatalogAuthorizationDecision<_, _, _> = authority
+        let decision: CatalogAuthorizationDecision<_, _, _, _> = authority
             .execute(invocation)
             .unwrap_or_else(|error| panic!("execute: {error}"));
         match decision {
@@ -1514,7 +1645,7 @@ mod tests {
             )
             .unwrap_or_else(|error| panic!("legacy schema: {error}"));
         assert!(matches!(
-            SqliteShell::<SqliteProgram, MemoryDestination>::from_connection(
+            SqliteShell::<SqliteProgram, SqliteLawEngine, MemoryDestination>::from_connection(
                 connection,
                 &authority,
                 &initial,
