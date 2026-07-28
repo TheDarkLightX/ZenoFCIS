@@ -48,11 +48,14 @@ No dependency was added. External library types do not cross this boundary.
 
 ## Deterministic resource bounds
 
-The complete input length and declared item count are checked before allocating
-the corresponding item vector. Each destination and payload is decoded under
-the selected per-value bounds. Node and payload metrics are accumulated with
-checked arithmetic across the complete plan. Any limit violation returns before
-a plan is constructed.
+The complete input length and declared item count are checked before decoding
+items. Initial vector reservation is additionally bounded by the remaining wire
+bytes: every effect and outbox entry requires at least its u32 blob-length
+prefix. A short count-only input therefore cannot reserve the declared number
+of elements. Each destination and payload is decoded under the selected
+per-value bounds. Node and payload metrics are accumulated with checked
+arithmetic across the complete plan. Any limit violation returns before a plan
+is constructed.
 
 Host time and allocation strategy are not protocol evidence. The explicit
 logical bounds are deterministic inputs to the decoder.
@@ -84,6 +87,8 @@ The regression matrix covers:
 - unknown nested value tags;
 - trailing bytes inside an item and after a complete plan;
 - truncated length-delimited items;
+- count-only declarations at the maximum admitted cardinality without their
+  required item bytes;
 - empty canonical plans.
 
 ## Assumptions
@@ -103,3 +108,5 @@ The regression matrix covers:
 - This does not prove availability, liveness, constant-time behavior, or
   production suitability.
 - Bounded regression tests are not an unbounded proof of decoder correctness.
+- This does not impose a process-wide allocator quota. A valid large plan can
+  still require memory proportional to its admitted input and logical values.

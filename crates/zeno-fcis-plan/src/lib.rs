@@ -291,7 +291,8 @@ pub fn decode_commit_plan(
             actual: effect_count,
         });
     }
-    let capacity = usize::try_from(effect_count).map_err(|_| PlanDecodeError::LengthOverflow)?;
+    // Every effect is carried in a u32-length-prefixed blob.
+    let capacity = initial_collection_capacity(effect_count, cursor.remaining(), 4)?;
     let mut state = PlanDecodeState::default();
     let mut effects = Vec::with_capacity(capacity);
     for _ in 0..effect_count {
@@ -324,7 +325,8 @@ pub fn decode_outbox_plan(
             actual: entry_count,
         });
     }
-    let capacity = usize::try_from(entry_count).map_err(|_| PlanDecodeError::LengthOverflow)?;
+    // Every outbox entry is carried in a u32-length-prefixed blob.
+    let capacity = initial_collection_capacity(entry_count, cursor.remaining(), 4)?;
     let mut state = PlanDecodeState::default();
     let mut entries = Vec::with_capacity(capacity);
     for _ in 0..entry_count {
@@ -437,6 +439,18 @@ fn decode_plan_value(
 struct PlanDecodeState {
     value_nodes: u64,
     value_payload_bytes: u64,
+}
+
+fn initial_collection_capacity(
+    count: u32,
+    remaining_wire_bytes: usize,
+    minimum_wire_bytes_per_item: usize,
+) -> Result<usize, PlanDecodeError> {
+    let count = usize::try_from(count).map_err(|_| PlanDecodeError::LengthOverflow)?;
+    let wire_bound = remaining_wire_bytes
+        .checked_div(minimum_wire_bytes_per_item)
+        .ok_or(PlanDecodeError::LengthOverflow)?;
+    Ok(count.min(wire_bound))
 }
 
 struct PlanCursor<'a> {
@@ -749,6 +763,30 @@ mod tests {
             decode_outbox_plan(&0_u32.to_be_bytes(), PlanDecodeLimits::default()),
             Ok(OutboxPlan::empty())
         );
+    }
+
+    #[test]
+    fn collection_reservation_is_bounded_by_remaining_wire_bytes() {
+        assert_eq!(initial_collection_capacity(4_096, 0, 4), Ok(0));
+        assert_eq!(initial_collection_capacity(4_096, 15, 4), Ok(3));
+        assert_eq!(initial_collection_capacity(2, 100, 4), Ok(2));
+        assert_eq!(
+            initial_collection_capacity(1, 1, 0),
+            Err(PlanDecodeError::LengthOverflow)
+        );
+    }
+
+    #[test]
+    fn truncated_large_plan_declarations_are_rejected() {
+        let bytes = 4_096_u32.to_be_bytes();
+        assert!(matches!(
+            decode_commit_plan(&bytes, PlanDecodeLimits::default()),
+            Err(PlanDecodeError::UnexpectedEnd { .. })
+        ));
+        assert!(matches!(
+            decode_outbox_plan(&bytes, PlanDecodeLimits::default()),
+            Err(PlanDecodeError::UnexpectedEnd { .. })
+        ));
     }
 
     #[test]

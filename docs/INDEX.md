@@ -59,6 +59,7 @@ and other tools can use the same public boundaries.
 - [Admitted envelopes](ADMITTED_ENVELOPE.md)
 - [Bounded text](BOUNDED_TEXT_ADMISSION.md)
 - [Bounded bytes](BOUNDED_BYTE_ADMISSION.md)
+- [Decoder allocation hardening](DECODER_ALLOCATION_HARDENING.md)
 - [Strict canonical patch decoder](STRICT_CANONICAL_PATCH_DECODER.md)
 - [Strict canonical plan decoders](STRICT_CANONICAL_PLAN_DECODERS.md)
 - [Correct-by-construction map entries](CORRECT_BY_CONSTRUCTION_MAP_ENTRIES.md)
