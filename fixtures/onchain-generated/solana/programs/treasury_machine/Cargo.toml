@@ -10,7 +10,10 @@ name = "treasury_machine"
 
 [features]
 default = []
+anchor-debug = ["anchor-lang/anchor-debug"]
 cpi = ["no-entrypoint"]
+custom-heap = []
+custom-panic = []
 no-entrypoint = []
 no-idl = []
 no-log-ix-name = []
@@ -19,4 +22,8 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 [dependencies]
 anchor-lang = "=1.0.2"
 anchor-spl = { version = "=1.0.2", features = ["token", "token_2022"] }
+solana-sha256-hasher = { version = "=3.1.0", features = ["sha2"] }
 treasury_machine-core = { path = "../../crates/treasury_machine-core" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

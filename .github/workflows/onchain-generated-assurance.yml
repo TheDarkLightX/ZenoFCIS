@@ -40,6 +40,12 @@ jobs:
             --bin generate_onchain_fixtures \
             --locked -- \
             /tmp/onchain-generated
+          # Dedicated paths prevent source/output confusion; they are not a security sandbox.
+          test ! -e /tmp/onchain-generated/solana/Cargo.lock
+          test -s fixtures/onchain-generated/solana/Cargo.lock
+          cp \
+            fixtures/onchain-generated/solana/Cargo.lock \
+            /tmp/onchain-generated/solana/Cargo.lock
           diff -ru --no-dereference fixtures/onchain-generated /tmp/onchain-generated
 
       - name: Install SHA-verified Solidity compiler
@@ -64,11 +70,19 @@ jobs:
 
       - name: Compile retained Solidity fixture
         run: |
-          rm -rf /tmp/solidity-build
-          mkdir -p /tmp/solidity-build
+          rm -rf /tmp/solidity-build /tmp/solidity-work
+          mkdir -p \
+            /tmp/solidity-build \
+            /tmp/solidity-work/@openzeppelin/contracts \
+            /tmp/solidity-work/treasury_machine
+          cp -a \
+            fixtures/onchain-generated/solidity/treasury_machine/. \
+            /tmp/solidity-work/treasury_machine/
+          cp -a \
+            /tmp/openzeppelin-contracts/contracts/. \
+            /tmp/solidity-work/@openzeppelin/contracts/
           /tmp/solc \
-            --base-path fixtures/onchain-generated/solidity/treasury_machine \
-            --allow-paths fixtures/onchain-generated/solidity/treasury_machine,/tmp/openzeppelin-contracts/contracts \
+            --base-path /tmp/solidity-work \
             --optimize \
             --optimize-runs 200 \
             --abi \
@@ -76,8 +90,7 @@ jobs:
             --metadata \
             --overwrite \
             --output-dir /tmp/solidity-build \
-            "@openzeppelin/contracts/=/tmp/openzeppelin-contracts/contracts/" \
-            fixtures/onchain-generated/solidity/treasury_machine/TreasuryMachineFixture.sol
+            treasury_machine/TreasuryMachineFixture.sol
           test -s /tmp/solidity-build/TreasuryMachineFixture.bin
           test -s /tmp/solidity-build/TreasuryMachineFixture.abi
 
@@ -85,7 +98,7 @@ jobs:
         run: |
           rm -rf /tmp/solana-generated
           cp -a fixtures/onchain-generated/solana /tmp/solana-generated
-          cargo +1.97.1 generate-lockfile --manifest-path /tmp/solana-generated/Cargo.toml
+          test -s /tmp/solana-generated/Cargo.lock
           cargo +1.97.1 check \
             --manifest-path /tmp/solana-generated/Cargo.toml \
             --workspace \

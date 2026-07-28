@@ -2,6 +2,7 @@
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
+use solana_sha256_hasher::{hash, hashv};
 use treasury_machine_core::{Command, Context as CoreContext, Core, Decision, DecisionKind, EffectPlan, EventPlan, ProjectCore, State, MACHINE_HASH, MACHINE_VERSION};
 
 declare_id!("cGfHiC6Kgg3FpFZvgwGcswsCRtp4aBP2fzuXRQPizuN");
@@ -89,8 +90,8 @@ impl ExecuteArgs { fn command(&self) -> Command { Command {
 pub struct Initialize<'info> {
     #[account(init, payer = authority, space = MachineState::SPACE, seeds = [STATE_SEED, authority.key().as_ref()], bump)]
     pub state: Account<'info, MachineState>,
-    #[account(mut)]
-    pub authority: Signer<'info>,
+    #[account(mut, signer)]
+    pub authority: SystemAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -107,7 +108,7 @@ pub struct Execute<'info> {
     pub payout_vault: InterfaceAccount<'info, TokenAccount>,
     #[account(mut, token::mint = payout_mint, token::token_program = payout_token_program)]
     pub payout_destination: InterfaceAccount<'info, TokenAccount>,
-    #[account(address = Pubkey::new_from_array([3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]))]
+    #[account(address = Pubkey::new_from_array([6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169]))]
     pub payout_token_program: Interface<'info, TokenInterface>,
 }
 
@@ -179,7 +180,7 @@ fn apply_effects(ctx: &Context<Execute>, decision: &Decision) -> Result<()> {
             let signer_seeds: &[&[u8]] = &[STATE_SEED, authority_key.as_ref(), &bump];
             let signer = &[signer_seeds];
             let cpi_accounts = TransferChecked { from: ctx.accounts.payout_vault.to_account_info(), mint: ctx.accounts.payout_mint.to_account_info(), to: ctx.accounts.payout_destination.to_account_info(), authority: ctx.accounts.state.to_account_info() };
-            token_interface::transfer_checked(CpiContext::new_with_signer(ctx.accounts.payout_token_program.to_account_info(), cpi_accounts, signer), amount, ctx.accounts.payout_mint.decimals)?;
+            token_interface::transfer_checked(CpiContext::new_with_signer(ctx.accounts.payout_token_program.key(), cpi_accounts, signer), amount, ctx.accounts.payout_mint.decimals)?;
         }
         _ => return err!(FcisError::InvalidCapability),
     } }
@@ -203,7 +204,7 @@ fn capability_max_uses(code: u16) -> Result<u8> { match code {
     7 => Ok(1),
     _ => err!(FcisError::InvalidCapability),
 } }
-fn expected_recipient(code: u16, before_state: &State, command: &Command, context: &CoreContext) -> [u8; 32] { match code {
+fn expected_recipient(code: u16, before_state: &State, command: &Command, context: &CoreContext) -> [u8; 32] { let _ = (before_state, command, context); match code {
     7 => command.recipient,
     _ => [0_u8; 32],
 } }
@@ -217,16 +218,16 @@ fn rejection_error(code: u16) -> anchor_lang::error::Error { match code {
 fn hash_state(value: &State) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/state/v1\0"); bytes.extend_from_slice(&MACHINE_HASH);
     bytes.extend_from_slice(&1u16.to_be_bytes()); bytes.extend_from_slice(&value.owner);
     bytes.extend_from_slice(&2u16.to_be_bytes()); bytes.extend_from_slice(&value.balance.to_be_bytes());
-    anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }
+    hash(&bytes).to_bytes() }
 fn hash_command(value: &Command) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/command/v1\0"); bytes.extend_from_slice(&MACHINE_HASH);
     bytes.extend_from_slice(&1u16.to_be_bytes()); bytes.extend_from_slice(&value.recipient);
     bytes.extend_from_slice(&2u16.to_be_bytes()); bytes.extend_from_slice(&value.amount.to_be_bytes());
-    anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }
-fn hash_context(value: &CoreContext) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/context/v1\0"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.actor); bytes.extend_from_slice(&value.chain_domain); bytes.extend_from_slice(&value.sequence.to_be_bytes()); bytes.extend_from_slice(&value.slot.to_be_bytes()); bytes.extend_from_slice(&value.unix_timestamp.to_be_bytes()); anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }
+    hash(&bytes).to_bytes() }
+fn hash_context(value: &CoreContext) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/context/v1\0"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.actor); bytes.extend_from_slice(&value.chain_domain); bytes.extend_from_slice(&value.sequence.to_be_bytes()); bytes.extend_from_slice(&value.slot.to_be_bytes()); bytes.extend_from_slice(&value.unix_timestamp.to_be_bytes()); hash(&bytes).to_bytes() }
 fn hash_chain_domain(state: &Pubkey) -> [u8; 32] { hashv_owned(&[b"zeno-fcis/solana/domain/v1\0", &crate::ID.to_bytes(), &state.to_bytes(), &MACHINE_HASH]) }
-fn hash_event(value: &EventPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/event/v1\0"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.code.to_be_bytes()); bytes.push(value.field_count); for item in value.data { bytes.extend_from_slice(&item); } anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }
-fn hash_effect(value: &EffectPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/effect/v1\0"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.capability.to_be_bytes()); bytes.extend_from_slice(&value.asset_id); bytes.extend_from_slice(&value.recipient); bytes.extend_from_slice(&value.amount.to_be_bytes()); anchor_lang::solana_program::hash::hash(&bytes).to_bytes() }
+fn hash_event(value: &EventPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/event/v1\0"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.code.to_be_bytes()); bytes.push(value.field_count); for item in value.data { bytes.extend_from_slice(&item); } hash(&bytes).to_bytes() }
+fn hash_effect(value: &EffectPlan) -> [u8; 32] { let mut bytes = Vec::new(); bytes.extend_from_slice(b"zeno-fcis/solana/effect/v1\0"); bytes.extend_from_slice(&MACHINE_HASH); bytes.extend_from_slice(&value.capability.to_be_bytes()); bytes.extend_from_slice(&value.asset_id); bytes.extend_from_slice(&value.recipient); bytes.extend_from_slice(&value.amount.to_be_bytes()); hash(&bytes).to_bytes() }
 fn hash_event_plan(value: &Decision) -> [u8; 32] { let mut result = hashv_owned(&[b"zeno-fcis/solana/event-plan/v1\0", &MACHINE_HASH, &[value.event_count]]); for index in 0..usize::from(value.event_count) { result = hashv_owned(&[&result, &hash_event(&value.events[index])]); } result }
 fn hash_effect_plan(value: &Decision) -> [u8; 32] { let mut result = hashv_owned(&[b"zeno-fcis/solana/effect-plan/v1\0", &MACHINE_HASH, &[value.effect_count]]); for index in 0..usize::from(value.effect_count) { result = hashv_owned(&[&result, &hash_effect(&value.effects[index])]); } result }
-fn hashv_owned(values: &[&[u8]]) -> [u8; 32] { anchor_lang::solana_program::hash::hashv(values).to_bytes() }
+fn hashv_owned(values: &[&[u8]]) -> [u8; 32] { hashv(values).to_bytes() }
 

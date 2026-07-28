@@ -1,5 +1,7 @@
 /target/
 Cargo.lock
+!fixtures/onchain-generated/solana/Cargo.lock
+/fixtures/onchain-generated/solana/target/
 *.profraw
 *.profdata
 .DS_Store
