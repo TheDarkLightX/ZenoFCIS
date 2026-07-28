@@ -28,6 +28,7 @@ std = [
     "zeno-fcis-receipt/std",
     "zeno-fcis-shell/std",
     "zeno-fcis-compose/std",
+    "zeno-fcis-domain?/std",
     "zeno-fcis-refine/std",
     "zeno-fcis-profile-zenodex?/std",
     "zeno-fcis-schema?/std",
@@ -52,6 +53,7 @@ authority = [
     "dep:zeno-fcis-authority",
     "zeno-fcis-authority/rustcrypto",
 ]
+domain-machines = ["schema", "dep:zeno-fcis-domain"]
 security = ["dep:zeno-fcis-security"]
 secret = ["dep:zeno-fcis-secret"]
 codegen = ["schema", "dep:zeno-fcis-codegen"]
@@ -80,6 +82,7 @@ full = [
     "transition",
     "laws",
     "authority",
+    "domain-machines",
     "security",
     "secret",
     "codegen",
@@ -109,6 +112,7 @@ zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan", default-featu
 zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt", default-features = false }
 zeno-fcis-shell = { version = "=0.1.0", path = "../zeno-fcis-shell", default-features = false }
 zeno-fcis-compose = { version = "=0.1.0", path = "../zeno-fcis-compose", default-features = false }
+zeno-fcis-domain = { version = "=0.1.0", path = "../zeno-fcis-domain", default-features = false, optional = true }
 zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine", default-features = false }
 zeno-fcis-profile-zenodex = { version = "=0.1.0", path = "../zeno-fcis-profile-zenodex", default-features = false, optional = true }
 zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema", default-features = false, optional = true }
