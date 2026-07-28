@@ -1008,7 +1008,7 @@ pub fn verify_assume_guarantee<V: EvidenceVerifier>(
             .component(wiring.destination_component())
             .is_some_and(|destination| {
                 destination.frames().iter().any(|frame| {
-                    frame.protected().overlaps(wiring.destination_path())
+                    frame.protected().covers(wiring.destination_path())
                         && frame
                             .allowed_writers()
                             .binary_search(&wiring.source_component())
