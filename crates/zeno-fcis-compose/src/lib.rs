@@ -5,7 +5,9 @@
 //! bound to the exact canonical composition specification and independently
 //! checked by an [`EvidenceVerifier`]. Effects and outbox obligations conflict
 //! conservatively unless the specification declares an exact commutativity law
-//! with accepted evidence.
+//! with accepted evidence. Production parallel authorization additionally
+//! requires authority-owned bindings and independently verified evidence that
+//! every component's declared footprint covers all admitted executions.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
@@ -20,8 +22,12 @@ use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Ha
 
 /// Canonical format version for composition specifications and proof claims.
 pub const COMPOSITION_FORMAT_VERSION: u16 = 2;
+/// Canonical format version for complete-footprint claims and witnesses.
+pub const FOOTPRINT_WITNESS_FORMAT_VERSION: u16 = 1;
 /// Maximum atoms in one hierarchical access path.
 pub const MAX_PATH_ATOMS: usize = 64;
+/// Maximum exact inputs in one exhaustive footprint-domain manifest.
+pub const MAX_EXHAUSTIVE_FOOTPRINT_INPUTS: usize = 16_384;
 const MAX_PATHS_PER_SET: usize = 4_096;
 const MAX_COMPONENTS: usize = 4_096;
 const MAX_CLAIMS: usize = 16_384;
@@ -237,6 +243,12 @@ impl PathSet {
     pub fn covers(&self, path: &AccessPath) -> bool {
         self.paths.iter().any(|declared| declared.covers(path))
     }
+
+    /// Returns whether every observed path is covered by a declared member.
+    #[must_use]
+    pub fn covers_all(&self, observed: &Self) -> bool {
+        observed.paths.iter().all(|path| self.covers(path))
+    }
 }
 
 impl CanonicalEncode for PathSet {
@@ -292,6 +304,18 @@ impl Footprint {
     #[must_use]
     pub const fn effects(&self) -> &PathSet {
         &self.effects
+    }
+
+    /// Returns whether this declaration covers one execution-observed footprint.
+    ///
+    /// This is a per-execution conformance check. It does not prove that the
+    /// declaration covers every admitted input.
+    #[must_use]
+    pub fn covers_observed(&self, observed: &Self) -> bool {
+        self.reads.covers_all(&observed.reads)
+            && self.writes.covers_all(&observed.writes)
+            && self.contexts.covers_all(&observed.contexts)
+            && self.effects.covers_all(&observed.effects)
     }
 }
 
@@ -1063,6 +1087,673 @@ impl CanonicalEncode for CompositionSpec {
     }
 }
 
+/// Coverage status for one transition decision class.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum DecisionCoverageStatus {
+    /// At least one admitted input exercises the decision class.
+    Covered = 0,
+    /// The proof establishes that the decision class is unreachable.
+    ProvedUnreachable = 1,
+}
+
+impl CanonicalEncode for DecisionCoverageStatus {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.push(*self as u8);
+        Ok(())
+    }
+}
+
+/// Explicit coverage of every FCIS decision class.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct DecisionClassCoverage {
+    accept: DecisionCoverageStatus,
+    reject: DecisionCoverageStatus,
+    committed_failure: DecisionCoverageStatus,
+}
+
+impl DecisionClassCoverage {
+    /// Creates coverage that names all three decision classes.
+    #[must_use]
+    pub const fn new(
+        accept: DecisionCoverageStatus,
+        reject: DecisionCoverageStatus,
+        committed_failure: DecisionCoverageStatus,
+    ) -> Self {
+        Self {
+            accept,
+            reject,
+            committed_failure,
+        }
+    }
+
+    /// Returns the `Accept` coverage status.
+    #[must_use]
+    pub const fn accept(self) -> DecisionCoverageStatus {
+        self.accept
+    }
+
+    /// Returns the `Reject` coverage status.
+    #[must_use]
+    pub const fn reject(self) -> DecisionCoverageStatus {
+        self.reject
+    }
+
+    /// Returns the `CommittedFailure` coverage status.
+    #[must_use]
+    pub const fn committed_failure(self) -> DecisionCoverageStatus {
+        self.committed_failure
+    }
+}
+
+impl CanonicalEncode for DecisionClassCoverage {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        self.accept.encode_to(output)?;
+        self.reject.encode_to(output)?;
+        self.committed_failure.encode_to(output)
+    }
+}
+
+/// Canonical unique finite input domain for an exhaustive footprint proof.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExhaustiveFootprintDomain {
+    domain_definition_hash: Hash32,
+    enumeration_algorithm_hash: Hash32,
+    input_hashes: Box<[Hash32]>,
+}
+
+impl ExhaustiveFootprintDomain {
+    /// Creates a bounded exact input set and rejects zero or duplicate inputs.
+    pub fn try_new(
+        domain_definition_hash: Hash32,
+        enumeration_algorithm_hash: Hash32,
+        mut input_hashes: Vec<Hash32>,
+    ) -> Result<Self, ContractError> {
+        if domain_definition_hash == Hash32::ZERO || enumeration_algorithm_hash == Hash32::ZERO {
+            return Err(ContractError::ZeroHash);
+        }
+        if input_hashes.is_empty() || input_hashes.len() > MAX_EXHAUSTIVE_FOOTPRINT_INPUTS {
+            return Err(ContractError::ExhaustiveDomainCardinality);
+        }
+        if input_hashes.contains(&Hash32::ZERO) {
+            return Err(ContractError::ZeroHash);
+        }
+        input_hashes.sort();
+        if input_hashes.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ContractError::DuplicateExhaustiveInput);
+        }
+        Ok(Self {
+            domain_definition_hash,
+            enumeration_algorithm_hash,
+            input_hashes: input_hashes.into_boxed_slice(),
+        })
+    }
+
+    /// Returns the reviewed finite-domain definition.
+    #[must_use]
+    pub const fn domain_definition_hash(&self) -> Hash32 {
+        self.domain_definition_hash
+    }
+
+    /// Returns the exact enumeration algorithm commitment.
+    #[must_use]
+    pub const fn enumeration_algorithm_hash(&self) -> Hash32 {
+        self.enumeration_algorithm_hash
+    }
+
+    /// Returns the canonical unique input commitments.
+    #[must_use]
+    pub const fn input_hashes(&self) -> &[Hash32] {
+        &self.input_hashes
+    }
+
+    /// Computes the canonical exhaustive-domain commitment.
+    pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
+        hash_footprint_canonical::<H>("zeno-fcis/exhaustive-footprint-domain", self)
+    }
+}
+
+impl CanonicalEncode for ExhaustiveFootprintDomain {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-EXHAUSTIVE-FOOTPRINT-DOMAIN\0");
+        output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
+        output.extend_from_slice(self.domain_definition_hash.as_bytes());
+        output.extend_from_slice(self.enumeration_algorithm_hash.as_bytes());
+        put_u32_length(output, self.input_hashes.len())?;
+        for input in &self.input_hashes {
+            output.extend_from_slice(input.as_bytes());
+        }
+        Ok(())
+    }
+}
+
+/// Closed proof method for complete static footprints.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum FootprintProofKind {
+    /// Generated closed control flow with a mechanically derived footprint.
+    GeneratedControlFlow = 0,
+    /// Static analysis covering every operation site and path.
+    StaticAnalysis = 1,
+    /// Exhaustive enumeration of one canonical finite input domain.
+    ExhaustiveFiniteDomain = 2,
+    /// A theorem checked by an independent proof verifier.
+    Theorem = 3,
+}
+
+impl CanonicalEncode for FootprintProofKind {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.push(*self as u8);
+        Ok(())
+    }
+}
+
+/// Validated proof-method descriptor for a complete-footprint claim.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FootprintProofMethod {
+    kind: FootprintProofKind,
+    method_hash: Hash32,
+    policy_hash: Hash32,
+    exhaustive_domain: Option<Box<ExhaustiveFootprintDomain>>,
+}
+
+impl FootprintProofMethod {
+    /// Describes generated closed control flow and its derivation policy.
+    pub fn generated_control_flow(
+        generator_hash: Hash32,
+        derivation_policy_hash: Hash32,
+    ) -> Result<Self, ContractError> {
+        Self::try_new(
+            FootprintProofKind::GeneratedControlFlow,
+            generator_hash,
+            derivation_policy_hash,
+            None,
+        )
+    }
+
+    /// Describes a pinned static analyzer and analysis policy.
+    pub fn static_analysis(
+        analyzer_hash: Hash32,
+        analysis_policy_hash: Hash32,
+    ) -> Result<Self, ContractError> {
+        Self::try_new(
+            FootprintProofKind::StaticAnalysis,
+            analyzer_hash,
+            analysis_policy_hash,
+            None,
+        )
+    }
+
+    /// Describes exhaustive checking of one canonical unique finite domain.
+    pub fn exhaustive_finite_domain(
+        checker_hash: Hash32,
+        coverage_policy_hash: Hash32,
+        domain: ExhaustiveFootprintDomain,
+    ) -> Result<Self, ContractError> {
+        Self::try_new(
+            FootprintProofKind::ExhaustiveFiniteDomain,
+            checker_hash,
+            coverage_policy_hash,
+            Some(Box::new(domain)),
+        )
+    }
+
+    /// Describes one theorem and its reviewed assumption set.
+    pub fn theorem(theorem_hash: Hash32, assumptions_hash: Hash32) -> Result<Self, ContractError> {
+        Self::try_new(
+            FootprintProofKind::Theorem,
+            theorem_hash,
+            assumptions_hash,
+            None,
+        )
+    }
+
+    fn try_new(
+        kind: FootprintProofKind,
+        method_hash: Hash32,
+        policy_hash: Hash32,
+        exhaustive_domain: Option<Box<ExhaustiveFootprintDomain>>,
+    ) -> Result<Self, ContractError> {
+        if method_hash == Hash32::ZERO || policy_hash == Hash32::ZERO {
+            return Err(ContractError::ZeroHash);
+        }
+        if matches!(kind, FootprintProofKind::ExhaustiveFiniteDomain) != exhaustive_domain.is_some()
+        {
+            return Err(ContractError::InvalidFootprintProofMethod);
+        }
+        Ok(Self {
+            kind,
+            method_hash,
+            policy_hash,
+            exhaustive_domain,
+        })
+    }
+
+    /// Returns the closed proof-method kind.
+    #[must_use]
+    pub const fn kind(&self) -> FootprintProofKind {
+        self.kind
+    }
+
+    /// Returns the exact method, generator, analyzer, checker, or theorem identity.
+    #[must_use]
+    pub const fn method_hash(&self) -> Hash32 {
+        self.method_hash
+    }
+
+    /// Returns the derivation, analysis, coverage, or assumption policy.
+    #[must_use]
+    pub const fn policy_hash(&self) -> Hash32 {
+        self.policy_hash
+    }
+
+    /// Returns the exact finite domain when the method is exhaustive enumeration.
+    #[must_use]
+    pub fn exhaustive_domain(&self) -> Option<&ExhaustiveFootprintDomain> {
+        self.exhaustive_domain.as_deref()
+    }
+}
+
+impl CanonicalEncode for FootprintProofMethod {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        self.kind.encode_to(output)?;
+        output.extend_from_slice(self.method_hash.as_bytes());
+        output.extend_from_slice(self.policy_hash.as_bytes());
+        match &self.exhaustive_domain {
+            None => output.push(0),
+            Some(domain) => {
+                output.push(1);
+                put_blob(output, &domain.canonical_bytes()?)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Authority-owned identities and declaration for one component footprint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FootprintAuthorityBinding {
+    component: ComponentId,
+    profile_hash: Hash32,
+    transition_program_hash: Hash32,
+    footprint: Footprint,
+    outbox: PathSet,
+    schema_hash: Hash32,
+    catalog_hash: Hash32,
+    algorithm_hash: Hash32,
+    source_revision_hash: Hash32,
+    proof_toolchain_hash: Hash32,
+    verifier_hash: Hash32,
+}
+
+impl FootprintAuthorityBinding {
+    /// Creates an exact nonzero authority binding.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_new(
+        component: ComponentId,
+        profile_hash: Hash32,
+        transition_program_hash: Hash32,
+        footprint: Footprint,
+        outbox: PathSet,
+        schema_hash: Hash32,
+        catalog_hash: Hash32,
+        algorithm_hash: Hash32,
+        source_revision_hash: Hash32,
+        proof_toolchain_hash: Hash32,
+        verifier_hash: Hash32,
+    ) -> Result<Self, ContractError> {
+        if component.get() == 0 {
+            return Err(ContractError::ZeroIdentifier);
+        }
+        if [
+            profile_hash,
+            transition_program_hash,
+            schema_hash,
+            catalog_hash,
+            algorithm_hash,
+            source_revision_hash,
+            proof_toolchain_hash,
+            verifier_hash,
+        ]
+        .contains(&Hash32::ZERO)
+        {
+            return Err(ContractError::ZeroHash);
+        }
+        Ok(Self {
+            component,
+            profile_hash,
+            transition_program_hash,
+            footprint,
+            outbox,
+            schema_hash,
+            catalog_hash,
+            algorithm_hash,
+            source_revision_hash,
+            proof_toolchain_hash,
+            verifier_hash,
+        })
+    }
+
+    /// Returns the exact component identity.
+    #[must_use]
+    pub const fn component(&self) -> ComponentId {
+        self.component
+    }
+
+    /// Returns the exact project profile commitment.
+    #[must_use]
+    pub const fn profile_hash(&self) -> Hash32 {
+        self.profile_hash
+    }
+
+    /// Returns the exact transition-program build commitment.
+    #[must_use]
+    pub const fn transition_program_hash(&self) -> Hash32 {
+        self.transition_program_hash
+    }
+
+    /// Returns the declared complete state/context/effect footprint.
+    #[must_use]
+    pub const fn footprint(&self) -> &Footprint {
+        &self.footprint
+    }
+
+    /// Returns the declared complete outbox footprint.
+    #[must_use]
+    pub const fn outbox(&self) -> &PathSet {
+        &self.outbox
+    }
+
+    /// Returns the exact schema commitment.
+    #[must_use]
+    pub const fn schema_hash(&self) -> Hash32 {
+        self.schema_hash
+    }
+
+    /// Returns the exact catalog commitment.
+    #[must_use]
+    pub const fn catalog_hash(&self) -> Hash32 {
+        self.catalog_hash
+    }
+
+    /// Returns the exact transition algorithm commitment.
+    #[must_use]
+    pub const fn algorithm_hash(&self) -> Hash32 {
+        self.algorithm_hash
+    }
+
+    /// Returns the exact source revision commitment.
+    #[must_use]
+    pub const fn source_revision_hash(&self) -> Hash32 {
+        self.source_revision_hash
+    }
+
+    /// Returns the authority-approved proof/checker toolchain identity.
+    #[must_use]
+    pub const fn proof_toolchain_hash(&self) -> Hash32 {
+        self.proof_toolchain_hash
+    }
+
+    /// Returns the authority-approved independent verifier identity.
+    #[must_use]
+    pub const fn verifier_hash(&self) -> Hash32 {
+        self.verifier_hash
+    }
+
+    /// Commits to the complete evidence envelope.
+    pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
+        hash_footprint_canonical::<H>("zeno-fcis/complete-footprint-evidence", self)
+    }
+}
+
+impl CanonicalEncode for FootprintAuthorityBinding {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        self.component.encode_to(output)?;
+        output.extend_from_slice(self.profile_hash.as_bytes());
+        output.extend_from_slice(self.transition_program_hash.as_bytes());
+        put_blob(output, &self.footprint.canonical_bytes()?)?;
+        put_blob(output, &self.outbox.canonical_bytes()?)?;
+        output.extend_from_slice(self.schema_hash.as_bytes());
+        output.extend_from_slice(self.catalog_hash.as_bytes());
+        output.extend_from_slice(self.algorithm_hash.as_bytes());
+        output.extend_from_slice(self.source_revision_hash.as_bytes());
+        output.extend_from_slice(self.proof_toolchain_hash.as_bytes());
+        output.extend_from_slice(self.verifier_hash.as_bytes());
+        Ok(())
+    }
+}
+
+/// Complete theorem statement for one static footprint declaration.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FootprintCompletenessClaim {
+    binding: FootprintAuthorityBinding,
+    proof_method: FootprintProofMethod,
+    decision_coverage: DecisionClassCoverage,
+    coverage_hash: Hash32,
+}
+
+impl FootprintCompletenessClaim {
+    /// Creates an exact bounded completeness claim.
+    pub fn try_new(
+        binding: FootprintAuthorityBinding,
+        proof_method: FootprintProofMethod,
+        decision_coverage: DecisionClassCoverage,
+        coverage_hash: Hash32,
+    ) -> Result<Self, ContractError> {
+        if coverage_hash == Hash32::ZERO {
+            return Err(ContractError::ZeroHash);
+        }
+        Ok(Self {
+            binding,
+            proof_method,
+            decision_coverage,
+            coverage_hash,
+        })
+    }
+
+    /// Returns the exact authority binding being proved.
+    #[must_use]
+    pub const fn binding(&self) -> &FootprintAuthorityBinding {
+        &self.binding
+    }
+
+    /// Returns the closed proof method.
+    #[must_use]
+    pub const fn proof_method(&self) -> &FootprintProofMethod {
+        &self.proof_method
+    }
+
+    /// Returns explicit coverage of all three decision classes.
+    #[must_use]
+    pub const fn decision_coverage(&self) -> DecisionClassCoverage {
+        self.decision_coverage
+    }
+
+    /// Returns the exact coverage or theorem-query identity.
+    #[must_use]
+    pub const fn coverage_hash(&self) -> Hash32 {
+        self.coverage_hash
+    }
+
+    /// Returns the exact proof/checker toolchain identity.
+    #[must_use]
+    pub const fn toolchain_hash(&self) -> Hash32 {
+        self.binding.proof_toolchain_hash()
+    }
+
+    /// Computes the canonical complete-footprint claim commitment.
+    pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
+        hash_footprint_canonical::<H>("zeno-fcis/complete-footprint-claim", self)
+    }
+}
+
+impl CanonicalEncode for FootprintCompletenessClaim {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-COMPLETE-FOOTPRINT-CLAIM\0");
+        output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
+        put_blob(output, &self.binding.canonical_bytes()?)?;
+        put_blob(output, &self.proof_method.canonical_bytes()?)?;
+        self.decision_coverage.encode_to(output)?;
+        output.extend_from_slice(self.coverage_hash.as_bytes());
+        Ok(())
+    }
+}
+
+/// Untrusted evidence offered for one complete-footprint claim.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FootprintCompletenessEvidence {
+    claim: FootprintCompletenessClaim,
+    artifact: Hash32,
+    verifier_hash: Hash32,
+}
+
+impl FootprintCompletenessEvidence {
+    /// Creates an evidence envelope with exact artifact and verifier identities.
+    pub fn try_new(
+        claim: FootprintCompletenessClaim,
+        artifact: Hash32,
+        verifier_hash: Hash32,
+    ) -> Result<Self, ContractError> {
+        if artifact == Hash32::ZERO || verifier_hash == Hash32::ZERO {
+            return Err(ContractError::ZeroHash);
+        }
+        Ok(Self {
+            claim,
+            artifact,
+            verifier_hash,
+        })
+    }
+
+    /// Returns the complete claimed theorem statement.
+    #[must_use]
+    pub const fn claim(&self) -> &FootprintCompletenessClaim {
+        &self.claim
+    }
+
+    /// Returns the retained proof, analysis, derivation, or replay artifact.
+    #[must_use]
+    pub const fn artifact(&self) -> Hash32 {
+        self.artifact
+    }
+
+    /// Returns the claimed independent verifier identity.
+    #[must_use]
+    pub const fn verifier_hash(&self) -> Hash32 {
+        self.verifier_hash
+    }
+}
+
+impl CanonicalEncode for FootprintCompletenessEvidence {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-COMPLETE-FOOTPRINT-EVIDENCE\0");
+        output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
+        put_blob(output, &self.claim.canonical_bytes()?)?;
+        output.extend_from_slice(self.artifact.as_bytes());
+        output.extend_from_slice(self.verifier_hash.as_bytes());
+        Ok(())
+    }
+}
+
+/// Independent verifier for exact complete-footprint statements.
+pub trait FootprintEvidenceVerifier {
+    /// Returns the pinned verifier implementation and configuration identity.
+    fn verifier_hash(&self) -> Hash32;
+
+    /// Returns true only when the retained artifact proves the complete claim.
+    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: Hash32) -> bool;
+}
+
+/// Nominal proof that one exact static footprint covers every admitted input.
+///
+/// Fields are private. Production code obtains this value only through
+/// [`verify_complete_footprint`].
+///
+/// ```compile_fail
+/// use zeno_fcis_compose::CompleteFootprintWitness;
+///
+/// fn forge() -> CompleteFootprintWitness {
+///     CompleteFootprintWitness {
+///         claim: todo!(),
+///         artifact: todo!(),
+///         verifier_hash: todo!(),
+///     }
+/// }
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CompleteFootprintWitness {
+    claim: FootprintCompletenessClaim,
+    artifact: Hash32,
+    verifier_hash: Hash32,
+}
+
+impl CompleteFootprintWitness {
+    /// Returns the verified theorem statement.
+    #[must_use]
+    pub const fn claim(&self) -> &FootprintCompletenessClaim {
+        &self.claim
+    }
+
+    /// Returns the exact authority binding covered by the witness.
+    #[must_use]
+    pub const fn binding(&self) -> &FootprintAuthorityBinding {
+        self.claim.binding()
+    }
+
+    /// Returns the retained proof artifact commitment.
+    #[must_use]
+    pub const fn artifact(&self) -> Hash32 {
+        self.artifact
+    }
+
+    /// Returns the independent verifier commitment.
+    #[must_use]
+    pub const fn verifier_hash(&self) -> Hash32 {
+        self.verifier_hash
+    }
+
+    /// Computes the canonical verified-witness commitment.
+    pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
+        hash_footprint_canonical::<H>("zeno-fcis/complete-footprint-witness", self)
+    }
+}
+
+impl CanonicalEncode for CompleteFootprintWitness {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-COMPLETE-FOOTPRINT-WITNESS\0");
+        output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
+        put_blob(output, &self.claim.canonical_bytes()?)?;
+        output.extend_from_slice(self.artifact.as_bytes());
+        output.extend_from_slice(self.verifier_hash.as_bytes());
+        Ok(())
+    }
+}
+
+/// Verifies exact evidence and mints the nominal complete-footprint witness.
+pub fn verify_complete_footprint<V: FootprintEvidenceVerifier>(
+    expected: &FootprintAuthorityBinding,
+    evidence: FootprintCompletenessEvidence,
+    verifier: &V,
+) -> Result<CompleteFootprintWitness, FootprintWitnessError> {
+    if evidence.claim.binding() != expected {
+        return Err(FootprintWitnessError::AuthorityBindingMismatch);
+    }
+    let verifier_hash = verifier.verifier_hash();
+    if verifier_hash == Hash32::ZERO
+        || evidence.verifier_hash != verifier_hash
+        || expected.verifier_hash() != verifier_hash
+    {
+        return Err(FootprintWitnessError::VerifierIdentityMismatch);
+    }
+    if !verifier.verify(&evidence.claim, evidence.artifact) {
+        return Err(FootprintWitnessError::UnverifiedEvidence);
+    }
+    Ok(CompleteFootprintWitness {
+        claim: evidence.claim,
+        artifact: evidence.artifact,
+        verifier_hash,
+    })
+}
+
 /// Evidence binding one local claim to one external proof artifact.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ClaimEvidence {
@@ -1678,6 +2369,56 @@ impl CompositionReport {
     }
 }
 
+/// Nominal authorization for one exact deterministic-parallel composition.
+///
+/// Fields are private. This value exists only after the normal composition
+/// obligations and one complete-footprint witness per component have passed.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DeterministicParallelAuthorization {
+    spec_hash: Hash32,
+    context: ParallelVerificationContext,
+    footprint_witnesses: Box<[CompleteFootprintWitness]>,
+}
+
+impl DeterministicParallelAuthorization {
+    /// Returns the exact authorized composition specification.
+    #[must_use]
+    pub const fn spec_hash(&self) -> Hash32 {
+        self.spec_hash
+    }
+
+    /// Returns the exact sequential-versus-parallel verification context.
+    #[must_use]
+    pub const fn context(&self) -> &ParallelVerificationContext {
+        &self.context
+    }
+
+    /// Returns canonical component-ordered complete-footprint witnesses.
+    #[must_use]
+    pub const fn footprint_witnesses(&self) -> &[CompleteFootprintWitness] {
+        &self.footprint_witnesses
+    }
+
+    /// Computes the complete authorization commitment.
+    pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
+        hash_footprint_canonical::<H>("zeno-fcis/deterministic-parallel-authorization", self)
+    }
+}
+
+impl CanonicalEncode for DeterministicParallelAuthorization {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-DETERMINISTIC-PARALLEL-AUTHORIZATION\0");
+        output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
+        output.extend_from_slice(self.spec_hash.as_bytes());
+        put_blob(output, &self.context.canonical_bytes()?)?;
+        put_u32_length(output, self.footprint_witnesses.len())?;
+        for witness in &self.footprint_witnesses {
+            put_blob(output, &witness.canonical_bytes()?)?;
+        }
+        Ok(())
+    }
+}
+
 /// Checks exact guarantee proofs, provider-bound assumption closure, frames, and coupling.
 #[must_use]
 pub fn verify_assume_guarantee<H: CommitmentHasher, V: EvidenceVerifier>(
@@ -1886,6 +2627,94 @@ pub fn verify_deterministic_parallel<H: CommitmentHasher, V: EvidenceVerifier>(
     }
 }
 
+/// Authorizes deterministic-parallel use only with exact complete footprints.
+///
+/// Untrusted footprint evidence is sorted by component identity and verified
+/// inside this call with the authority-selected `footprint_verifier`. The
+/// resulting witnesses form an exact set equal to the components in `spec`.
+pub fn authorize_deterministic_parallel<
+    H: CommitmentHasher,
+    V: EvidenceVerifier,
+    F: FootprintEvidenceVerifier,
+>(
+    spec: &CompositionSpec,
+    evidence: &CompositionEvidence,
+    expected_context: &ParallelVerificationContext,
+    expected_bindings: &[FootprintAuthorityBinding],
+    mut footprint_evidence: Vec<FootprintCompletenessEvidence>,
+    verifier: &V,
+    footprint_verifier: &F,
+) -> Result<DeterministicParallelAuthorization, ParallelAuthorizationError> {
+    if expected_bindings.len() != spec.components().len() {
+        return Err(ParallelAuthorizationError::AuthorityBindingSetCardinality);
+    }
+    let mut canonical_bindings = expected_bindings.to_vec();
+    canonical_bindings.sort_by_key(FootprintAuthorityBinding::component);
+    if canonical_bindings
+        .windows(2)
+        .any(|pair| pair[0].component() == pair[1].component())
+    {
+        return Err(ParallelAuthorizationError::DuplicateAuthorityBinding);
+    }
+    if footprint_evidence.len() != spec.components().len() {
+        return Err(ParallelAuthorizationError::FootprintEvidenceSetCardinality);
+    }
+    footprint_evidence.sort_by_key(|item| item.claim().binding().component());
+    if footprint_evidence
+        .windows(2)
+        .any(|pair| pair[0].claim().binding().component() == pair[1].claim().binding().component())
+    {
+        return Err(ParallelAuthorizationError::DuplicateFootprintEvidence);
+    }
+    let mut footprint_witnesses = Vec::with_capacity(footprint_evidence.len());
+    for (((component, expected), supplied), index) in spec
+        .components()
+        .iter()
+        .zip(&canonical_bindings)
+        .zip(footprint_evidence)
+        .zip(0_u32..)
+    {
+        if expected.component() != component.id()
+            || expected.profile_hash() != component.profile_hash()
+            || expected.footprint() != component.footprint()
+            || expected.outbox() != component.outbox()
+        {
+            return Err(ParallelAuthorizationError::AuthorityBindingMismatch {
+                component: component.id(),
+            });
+        }
+        if supplied.claim().binding() != expected {
+            return Err(
+                ParallelAuthorizationError::FootprintEvidenceBindingMismatch {
+                    component: component.id(),
+                },
+            );
+        }
+        let witness =
+            verify_complete_footprint(expected, supplied, footprint_verifier).map_err(|error| {
+                ParallelAuthorizationError::FootprintEvidence {
+                    component: component.id(),
+                    index,
+                    error,
+                }
+            })?;
+        footprint_witnesses.push(witness);
+    }
+
+    let report = verify_deterministic_parallel::<H, V>(spec, evidence, expected_context, verifier);
+    if !report.is_verified() {
+        return Err(ParallelAuthorizationError::Composition(report));
+    }
+    let spec_hash = spec
+        .commitment::<H>()
+        .map_err(ParallelAuthorizationError::Contract)?;
+    Ok(DeterministicParallelAuthorization {
+        spec_hash,
+        context: expected_context.clone(),
+        footprint_witnesses: footprint_witnesses.into_boxed_slice(),
+    })
+}
+
 fn component_conflicts(left: &ComponentContract, right: &ComponentContract) -> Vec<Conflict> {
     let mut output = conflicts(left.footprint(), right.footprint());
     let left_effects = !left.footprint().effects().is_empty();
@@ -1937,6 +2766,16 @@ fn hash_canonical<H: CommitmentHasher>(
     commitment::<H>(domain, &bytes).map_err(ContractError::Encode)
 }
 
+fn hash_footprint_canonical<H: CommitmentHasher>(
+    domain_name: &'static str,
+    value: &impl CanonicalEncode,
+) -> Result<Hash32, ContractError> {
+    let bytes = value.canonical_bytes().map_err(ContractError::Encode)?;
+    let domain = Domain::new(domain_name, FOOTPRINT_WITNESS_FORMAT_VERSION)
+        .map_err(ContractError::Encode)?;
+    commitment::<H>(domain, &bytes).map_err(ContractError::Encode)
+}
+
 fn put_u16_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
     let length = u16::try_from(length).map_err(|_| EncodeError::LengthOverflow)?;
     output.extend_from_slice(&length.to_be_bytes());
@@ -1954,6 +2793,117 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
     output.extend_from_slice(bytes);
     Ok(())
 }
+
+/// Failure to mint a nominal complete-footprint witness.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum FootprintWitnessError {
+    /// The evidence describes a different authority-owned component binding.
+    AuthorityBindingMismatch,
+    /// The claimed verifier differs from the verifier that made the decision.
+    VerifierIdentityMismatch,
+    /// The independent verifier rejected the retained evidence.
+    UnverifiedEvidence,
+}
+
+impl fmt::Display for FootprintWitnessError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AuthorityBindingMismatch => {
+                formatter.write_str("footprint evidence does not match the authority binding")
+            }
+            Self::VerifierIdentityMismatch => {
+                formatter.write_str("footprint verifier identity does not match")
+            }
+            Self::UnverifiedEvidence => {
+                formatter.write_str("footprint completeness evidence was not verified")
+            }
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for FootprintWitnessError {}
+
+/// Failure to authorize deterministic-parallel execution.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ParallelAuthorizationError {
+    /// The authority binding count differs from the component count.
+    AuthorityBindingSetCardinality,
+    /// More than one authority binding names the same component.
+    DuplicateAuthorityBinding,
+    /// An authority binding does not exactly match its component contract.
+    AuthorityBindingMismatch {
+        /// Component whose binding differed.
+        component: ComponentId,
+    },
+    /// The footprint-evidence count differs from the component count.
+    FootprintEvidenceSetCardinality,
+    /// More than one footprint-evidence item names the same component.
+    DuplicateFootprintEvidence,
+    /// Footprint evidence does not exactly match the authority-owned binding.
+    FootprintEvidenceBindingMismatch {
+        /// Component whose evidence binding differed.
+        component: ComponentId,
+    },
+    /// The authority-selected footprint verifier rejected an evidence item.
+    FootprintEvidence {
+        /// Component whose evidence failed.
+        component: ComponentId,
+        /// Canonical component-order evidence index.
+        index: u32,
+        /// Exact witness-minting failure.
+        error: FootprintWitnessError,
+    },
+    /// Ordinary composition, conflict, or parity obligations failed.
+    Composition(CompositionReport),
+    /// Canonical composition identity construction failed.
+    Contract(ContractError),
+}
+
+impl fmt::Display for ParallelAuthorizationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::AuthorityBindingSetCardinality => {
+                formatter.write_str("footprint authority binding set has the wrong cardinality")
+            }
+            Self::DuplicateAuthorityBinding => {
+                formatter.write_str("footprint authority binding is duplicated")
+            }
+            Self::AuthorityBindingMismatch { component } => write!(
+                formatter,
+                "footprint authority binding does not match component {}",
+                component.get()
+            ),
+            Self::FootprintEvidenceSetCardinality => {
+                formatter.write_str("complete-footprint evidence set has the wrong cardinality")
+            }
+            Self::DuplicateFootprintEvidence => {
+                formatter.write_str("complete-footprint evidence is duplicated")
+            }
+            Self::FootprintEvidenceBindingMismatch { component } => write!(
+                formatter,
+                "complete-footprint evidence does not match component {}",
+                component.get()
+            ),
+            Self::FootprintEvidence {
+                component,
+                index,
+                error,
+            } => write!(
+                formatter,
+                "complete-footprint evidence {index} for component {} failed: {error}",
+                component.get()
+            ),
+            Self::Composition(_) => {
+                formatter.write_str("deterministic-parallel composition is not verified")
+            }
+            Self::Contract(error) => write!(formatter, "composition identity failed: {error}"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for ParallelAuthorizationError {}
 
 /// Contract construction failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1994,6 +2944,12 @@ pub enum ContractError {
     InvalidParallelLaw,
     /// Two parallel laws cover the same pair and conflict kind.
     DuplicateParallelLaw,
+    /// An exhaustive finite-domain manifest is empty or exceeds its bound.
+    ExhaustiveDomainCardinality,
+    /// An exhaustive finite-domain manifest repeats an input commitment.
+    DuplicateExhaustiveInput,
+    /// A footprint proof method has an inconsistent closed shape.
+    InvalidFootprintProofMethod,
     /// Canonical encoding or commitment construction failed.
     Encode(EncodeError),
 }
@@ -2036,6 +2992,15 @@ impl fmt::Display for ContractError {
             Self::InvalidParallelLaw => formatter.write_str("parallel conflict law is invalid"),
             Self::DuplicateParallelLaw => {
                 formatter.write_str("parallel conflict law is duplicated")
+            }
+            Self::ExhaustiveDomainCardinality => {
+                formatter.write_str("exhaustive footprint domain is empty or too large")
+            }
+            Self::DuplicateExhaustiveInput => {
+                formatter.write_str("exhaustive footprint domain repeats an input")
+            }
+            Self::InvalidFootprintProofMethod => {
+                formatter.write_str("complete-footprint proof method is inconsistent")
             }
             Self::Encode(error) => write!(formatter, "composition encoding failed: {error}"),
         }

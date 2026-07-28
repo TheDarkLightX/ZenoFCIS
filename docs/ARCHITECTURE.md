@@ -30,9 +30,10 @@ reference adapters. It now makes a complete profile-bound relational-law set
 and fresh per-invocation evaluation mandatory before production authorization.
 Each promoted project still has to supply and independently qualify its exact
 conservation/invariant definitions and checker implementation. Strict decoded
-SQLite bundle/outbox set equality, complete static footprint witnesses for
-production parallel promotion, exhaustive-domain refinement manifests,
+SQLite bundle/outbox set equality, concrete qualified complete-footprint proofs
+for each production component, exhaustive-domain refinement manifests,
 production authenticated storage, and chain deployment qualification also
-remain open. Concrete Lean, Flux, Kani, SMT, private ESSO, and Morph checkers
-require separately mounted adapters and
-exact evidence. These gaps block an official production value-moving profile.
+remain open. The generic complete-footprint witness and parallel-authorization
+API is implemented; concrete Lean, Flux, Kani, SMT, private ESSO, and Morph
+checkers still require separately mounted adapters and exact evidence. These
+gaps block an official production value-moving profile.

@@ -192,6 +192,8 @@ committed outbox entry idempotently and under the authority-owned interpreter.
 - [ ] Every effect and channel has schema, authority, and deterministic limits.
 - [ ] Commands and context are admitted under exact role-separated bindings.
 - [ ] Domain machines expose narrow typed interfaces and complete footprints.
+- [ ] Every component has an authority-bound `CompleteFootprintWitness` from a
+      release-selected verifier.
 - [ ] The canonical sequential composition is deterministic and budgeted.
 - [ ] Required invariants, conservation, authority, and failure laws are complete.
 - [ ] Formal evidence is checked by the release-selected verifier.
@@ -206,7 +208,7 @@ ZenoFCIS does not currently provide:
 
 - Cargo API stability or a completed official V1 release;
 - a concurrent scheduler, threaded shell, or production parallel runtime;
-- proof that handwritten footprints are complete;
+- a bundled proof that project-specific handwritten footprints are complete;
 - automatic invention of project schemas, identifiers, laws, or policies;
 - a bundled universal solver, theorem prover, ESSO installation, or proof of a
   checker implementation;

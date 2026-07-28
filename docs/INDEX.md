@@ -26,6 +26,7 @@
 ## Composition and production authority
 
 - [Formal composition v2](FORMAL_COMPOSITION_V2.md)
+- [Complete static footprint witnesses](COMPLETE_FOOTPRINT_WITNESS.md)
 - [Fixed-size state domain machines](FIXED_STATE_DOMAIN_MACHINES.md)
 - [Composed domain program](COMPOSED_DOMAIN_PROGRAM.md)
 - [Composed root projection conformance](COMPOSED_ROOT_PROJECTION_CONFORMANCE.md)
