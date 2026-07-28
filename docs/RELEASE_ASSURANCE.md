@@ -99,7 +99,7 @@ Evidence is additive. A newer test run does not retroactively validate older sou
 
 Any failed gate blocks release. Repair occurs in a new commit, followed by a complete rerun from a clean checkout. Do not reuse a source manifest, generated artifact, refinement fixture, or checker certificate across changed source unless its content address and all bound identifiers are unchanged and independently verified.
 
-SQLite shell recovery uses exact replay bindings and committed outbox records. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Operators must never edit replay, receipt, or outbox rows to force progress.
+SQLite schema v2 consumes a nominal `CatalogAuthorizedTransition` and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Populated unversioned stores fail closed pending an explicit migration. Operators must never edit policy, authorization, replay, receipt, or outbox rows to force progress.
 
 ## Explicit non-claims
 
@@ -110,6 +110,6 @@ The repository currently supplies reviewed reference implementations and strict 
 - that a concrete ESSO, SMT solver, theorem prover, compiler, or LLM is bundled as a synthesis backend;
 - that generated or imported evidence is true without its independent checker;
 - that SQLite durability settings replace deployment-specific storage validation;
-- audit completion, economic correctness, side-channel resistance, or production authorization.
+- audit completion, project-specific economic correctness, side-channel resistance, complete SQLite row-set reconstruction, or production qualification of a value-moving profile.
 
 Those claims require separately bound evidence and an explicit deployment decision.

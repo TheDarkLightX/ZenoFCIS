@@ -23,12 +23,13 @@ The workspace now includes the complete package ladder:
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
+- nominal catalog authorization that owns the reviewed transition program, admits an external command/context/principal/replay invocation, pins a sealed known-answer-verified provider plus exact interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only for committing decisions;
 - a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
 - a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
 - an explicit dual-root sparse authenticated-state reference with membership/absence proofs, expected-version publication, and full-rebuild equality checks;
 - verifier-gated bounded synthesis over canonical closed candidate domains with content-addressed certificates and honest incomplete-search results;
-- crash-atomic SQLite publication, exact replay binding, a transactional outbox, idempotent delivery, and crash-point refinement tests;
+- crash-atomic policy-pinned SQLite publication that consumes only nominally authorized transitions, persists exact authorization/invocation/replay/bundle identities, rejects legacy unversioned stores, owns a policy-bound interpreter instance for outbox delivery, and retains crash-point refinement tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
 
@@ -80,7 +81,7 @@ The umbrella crate's default and `no_std` feature sets are project-neutral.
 Enable `zenodex-profile` for the ZenoDEX profile exports or `mounted-zenodex`
 for that profile plus its concrete mounted runtime.
 
-Important optional features include `codegen`, `evidence`, `mounted-runtime`, `zenodex-profile`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
+Important optional features include `authority`, `codegen`, `evidence`, `mounted-runtime`, `zenodex-profile`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
 
 ## Architecture
 
@@ -89,14 +90,15 @@ The repository keeps computation and coordination separate:
 ```text
 pure transition
     -> immutable, content-addressed candidate
-    -> independent validation
-    -> atomic shell publication
+    -> external invocation + catalog/provider/deployment validation
+    -> nominal CatalogAuthorizedTransition
+    -> policy-pinned atomic shell publication
     -> idempotent outbox delivery
 ```
 
 Persistent backends are sealed behind a pure logical-map interface. Updates return new structurally shared versions; equality and canonical bytes depend on logical entries only. Map-entry ordering bytes are derived from the semantic key, the explicit persistent-entry boundary rejects mismatched key bytes, and materialization exposes only fallible APIs.
 
-Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; the pure validators decide whether that data is admissible.
+Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; pure validators decide whether that data is admissible. A structurally valid `CommitBundle` remains reference data and cannot enter the production SQLite commit port directly.
 
 ## Verification
 
@@ -113,7 +115,7 @@ See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`
 
 ## Assurance posture
 
-This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, and fail-closed promotion rules. The pinned ZenoDEX single-vault zUSD mount is bounded executable refinement evidence. It does not claim audit completion, economic correctness, side-channel resistance, production authorization, full ZenoDEX coverage, or that an external ZenoDEX, JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
+This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, fail-closed promotion rules, and an implemented nominal commit-authorization boundary. The pinned ZenoDEX single-vault zUSD mount is bounded executable refinement evidence. Production value-moving promotion remains blocked by project conservation/invariant laws, strict decoded SQLite bundle/outbox set reconstruction, the open composition/refinement/authenticated-state findings, chain-specific deployment qualification, and independent exact-head audit. It does not claim audit completion, economic correctness, side-channel resistance, full ZenoDEX coverage, or that an external JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
 
 ## License
 

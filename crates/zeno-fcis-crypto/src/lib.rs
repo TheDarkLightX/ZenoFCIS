@@ -12,6 +12,7 @@
 extern crate std;
 
 use core::fmt;
+use core::marker::PhantomData;
 
 use zeno_fcis_codec::{CommitmentHasher, Domain, Hash32, commitment};
 
@@ -28,6 +29,9 @@ use libcrux_sha2::{Digest as _, Sha256 as LibcruxEngine};
 #[cfg(feature = "rustcrypto")]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct RustCryptoSha256;
+
+#[cfg(feature = "rustcrypto")]
+impl private::Sealed for RustCryptoSha256 {}
 
 #[cfg(feature = "rustcrypto")]
 impl CommitmentHasher for RustCryptoSha256 {
@@ -47,6 +51,9 @@ impl CommitmentHasher for RustCryptoSha256 {
 pub struct LibcruxSha256;
 
 #[cfg(feature = "libcrux")]
+impl private::Sealed for LibcruxSha256 {}
+
+#[cfg(feature = "libcrux")]
 impl CommitmentHasher for LibcruxSha256 {
     const ALGORITHM_ID: &'static str = "sha2-256/libcrux-0.0.8-hacl";
 
@@ -61,6 +68,103 @@ impl CommitmentHasher for LibcruxSha256 {
         engine.finish(&mut output);
         Hash32::new(output)
     }
+}
+
+mod private {
+    pub trait Sealed {}
+}
+
+/// Stable nominal identity of a provider admitted at a production authority boundary.
+///
+/// Unlike [`CommitmentHasher::ALGORITHM_ID`], this identity cannot be claimed by an
+/// external implementation because [`ApprovedCommitmentProvider`] is sealed.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(u16)]
+pub enum ApprovedProviderId {
+    /// RustCrypto `sha2` 0.11.0 SHA-256 provider.
+    RustCryptoSha256_0_11_0 = 1,
+    /// libcrux 0.0.8 HACL* SHA-256 provider.
+    LibcruxSha256_0_0_8Hacl = 2,
+}
+
+impl ApprovedProviderId {
+    /// Returns the stable canonical numeric identity.
+    #[must_use]
+    pub const fn code(self) -> u16 {
+        self as u16
+    }
+}
+
+/// A commitment provider whose concrete Rust type is registered by this crate.
+///
+/// The sealed bound prevents an external hasher from copying an approved textual
+/// algorithm identifier and entering a production authorization API.
+///
+/// ```compile_fail
+/// use zeno_fcis_codec::{CommitmentHasher, Hash32};
+/// use zeno_fcis_crypto::{ApprovedCommitmentProvider, ApprovedProviderId};
+///
+/// struct Impostor;
+///
+/// impl CommitmentHasher for Impostor {
+///     const ALGORITHM_ID: &'static str = "sha256/rustcrypto-sha2-0.11.0";
+///     fn hash(_: &[u8]) -> Hash32 { Hash32::new([1; 32]) }
+/// }
+///
+/// // Fails because the private sealing trait cannot be implemented externally.
+/// impl ApprovedCommitmentProvider for Impostor {
+///     const PROVIDER_ID: ApprovedProviderId =
+///         ApprovedProviderId::RustCryptoSha256_0_11_0;
+/// }
+/// ```
+pub trait ApprovedCommitmentProvider: CommitmentHasher + private::Sealed {
+    /// Stable nominal provider identity.
+    const PROVIDER_ID: ApprovedProviderId;
+}
+
+#[cfg(feature = "rustcrypto")]
+impl ApprovedCommitmentProvider for RustCryptoSha256 {
+    const PROVIDER_ID: ApprovedProviderId = ApprovedProviderId::RustCryptoSha256_0_11_0;
+}
+
+#[cfg(feature = "libcrux")]
+impl ApprovedCommitmentProvider for LibcruxSha256 {
+    const PROVIDER_ID: ApprovedProviderId = ApprovedProviderId::LibcruxSha256_0_0_8Hacl;
+}
+
+/// Unforgeable witness that one sealed provider passed the fixed known-answer suite.
+///
+/// Private fields and the sealed provider bound prevent callers from constructing a
+/// token for an arbitrary [`CommitmentHasher`]. The token is build-local evidence; it
+/// is not compiled-binary or hardware attestation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct VerifiedProvider<H: ApprovedCommitmentProvider> {
+    report: KnownAnswerReport,
+    marker: PhantomData<fn() -> H>,
+}
+
+impl<H: ApprovedCommitmentProvider> VerifiedProvider<H> {
+    /// Returns the nominal provider identity.
+    #[must_use]
+    pub const fn provider_id(&self) -> ApprovedProviderId {
+        H::PROVIDER_ID
+    }
+
+    /// Returns the fixed-vector report that created this token.
+    #[must_use]
+    pub const fn report(&self) -> KnownAnswerReport {
+        self.report
+    }
+}
+
+/// Runs fixed known-answer checks and returns a nominal production-provider token.
+pub fn verify_approved_provider<H: ApprovedCommitmentProvider>()
+-> Result<VerifiedProvider<H>, ProviderVerificationError> {
+    let report = verify_known_answers::<H>()?;
+    Ok(VerifiedProvider {
+        report,
+        marker: PhantomData,
+    })
 }
 
 /// Successful fixed-vector verification for one provider.

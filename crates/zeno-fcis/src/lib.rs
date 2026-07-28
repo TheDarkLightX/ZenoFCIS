@@ -12,6 +12,9 @@ pub use zeno_fcis_adapter_zenodex as adapter_zenodex;
 #[cfg(feature = "authenticated-state")]
 /// Versioned sparse authenticated-state planning and proof verification.
 pub use zeno_fcis_authenticated as authenticated;
+#[cfg(feature = "authority")]
+/// Nominal catalog, invocation, provider, interpreter, and deployment commit authority.
+pub use zeno_fcis_authority as authority;
 #[cfg(feature = "backend")]
 /// Checked project-neutral backend protocol for private and external engines.
 pub use zeno_fcis_backend as backend;
@@ -79,6 +82,15 @@ pub use zeno_fcis_transition as transition;
 /// Transitively immutable closed values.
 pub use zeno_fcis_value as value;
 
+#[cfg(feature = "authority")]
+pub use zeno_fcis_authority::{
+    AUTHORIZATION_FORMAT_VERSION, AuthorizationBody, AuthorizationId, AuthorizationPolicy,
+    AuthorizationRecord, AuthorizedCommitResult, AuthorizedShellError, AuthorizedShellState,
+    BoundInterpreter, CatalogAuthorizationDecision, CatalogAuthorizedReject,
+    CatalogAuthorizedTransition, CatalogCommitAuthority, CatalogExecutionError,
+    CatalogTransitionProgram, ExecutionBinding, INVOCATION_INPUT_FORMAT_VERSION, InvocationWitness,
+    ReviewedTransitionInput, StateDomainBinding,
+};
 #[cfg(feature = "backend")]
 pub use zeno_fcis_backend::{
     AcceptedOutcome, BackendCapabilities, BackendCertificate, BackendEngine, BackendError,
@@ -175,15 +187,15 @@ pub use zeno_fcis_security::{
 };
 pub use zeno_fcis_shell::{
     CommitResult, CommitStatus, OutboxRecord, ReplayRecord, ShellError, ShellState, acknowledge,
-    commit,
+    apply_reference_bundle,
 };
 #[cfg(feature = "transition")]
 pub use zeno_fcis_transition::{
-    ArtifactField, CataloguedTransitionBuilder, LimitKind, MAX_TRANSITION_MAP_KEY_BYTES,
-    MAX_TRANSITION_OBSERVED_PATHS, MAX_TRANSITION_PATCH_OPERATIONS, MAX_TRANSITION_REASONS,
-    MAX_TRANSITION_STATE_DEPTH, MAX_TRANSITION_STATE_NODES, TRANSITION_FORMAT_VERSION,
-    TransitionArtifacts, TransitionDecision, TransitionError, TransitionLimits, TransitionReject,
-    TransitionResourceReport, validate_transition_decision,
+    ArtifactField, CataloguedTransitionBuilder, ExpectedInvocationBindings, LimitKind,
+    MAX_TRANSITION_MAP_KEY_BYTES, MAX_TRANSITION_OBSERVED_PATHS, MAX_TRANSITION_PATCH_OPERATIONS,
+    MAX_TRANSITION_REASONS, MAX_TRANSITION_STATE_DEPTH, MAX_TRANSITION_STATE_NODES,
+    TRANSITION_FORMAT_VERSION, TransitionArtifacts, TransitionDecision, TransitionError,
+    TransitionLimits, TransitionReject, TransitionResourceReport, validate_transition_decision,
 };
 pub use zeno_fcis_value::{
     AdmittedValue, AsciiText, BoundedVec, Field, LengthError, MapEntry, NonEmptyVec, OwnedBytes,

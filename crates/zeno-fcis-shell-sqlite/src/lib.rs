@@ -3,10 +3,15 @@
 #![forbid(unsafe_code)]
 
 use core::fmt;
+use core::marker::PhantomData;
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
+use zeno_fcis_authority::{
+    AuthorizedShellError, BoundInterpreter, CatalogAuthorizedTransition, CatalogCommitAuthority,
+    CatalogTransitionProgram,
+};
 use zeno_fcis_codec::{
     CanonicalEncode, DecodeError, DecodeLimits, Domain, EncodeError, Hash32, commitment,
     decode_value,
@@ -14,32 +19,57 @@ use zeno_fcis_codec::{
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_patch::{PatchError, hash_value};
 use zeno_fcis_plan::OutboxEntry;
-use zeno_fcis_receipt::{CandidateId, CommitBundle, SealError};
+use zeno_fcis_receipt::{CandidateId, SealError};
+use zeno_fcis_schema::SchemaAdmittedEnvelope;
 use zeno_fcis_shell::CommitStatus;
 use zeno_fcis_value::Value;
 
-const SCHEMA: &str = "
+const SQLITE_SCHEMA_VERSION: i64 = 2;
+
+const SCHEMA_V2: &str = "
 PRAGMA foreign_keys = ON;
 PRAGMA synchronous = FULL;
+CREATE TABLE shell_identity (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    policy_id BLOB NOT NULL CHECK (length(policy_id) = 32),
+    state_domain_name TEXT NOT NULL,
+    state_domain_version INTEGER NOT NULL CHECK (state_domain_version >= 0)
+);
 CREATE TABLE IF NOT EXISTS semantic_state (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     state_bytes BLOB NOT NULL,
     semantic_root BLOB NOT NULL CHECK (length(semantic_root) = 32),
     version INTEGER NOT NULL CHECK (version >= 0)
 );
-CREATE TABLE IF NOT EXISTS bundles (
-    candidate_id BLOB PRIMARY KEY CHECK (length(candidate_id) = 32),
+CREATE TABLE authorizations (
+    authorization_id BLOB PRIMARY KEY CHECK (length(authorization_id) = 32),
+    policy_id BLOB NOT NULL CHECK (length(policy_id) = 32),
+    invocation_id BLOB NOT NULL CHECK (length(invocation_id) = 32),
+    replay_id BLOB NOT NULL UNIQUE CHECK (length(replay_id) = 32),
+    candidate_id BLOB NOT NULL UNIQUE CHECK (length(candidate_id) = 32),
+    authorization_bytes BLOB NOT NULL,
     bundle_bytes BLOB NOT NULL,
     receipt_bytes BLOB NOT NULL
 );
-CREATE TABLE IF NOT EXISTS replay (
-    replay_id BLOB PRIMARY KEY CHECK (length(replay_id) = 32),
-    candidate_id BLOB NOT NULL CHECK (length(candidate_id) = 32),
+CREATE TABLE bundles (
+    candidate_id BLOB PRIMARY KEY CHECK (length(candidate_id) = 32),
+    authorization_id BLOB NOT NULL UNIQUE CHECK (length(authorization_id) = 32),
     bundle_bytes BLOB NOT NULL,
+    receipt_bytes BLOB NOT NULL,
+    FOREIGN KEY(authorization_id) REFERENCES authorizations(authorization_id)
+);
+CREATE TABLE replay (
+    replay_id BLOB PRIMARY KEY CHECK (length(replay_id) = 32),
+    authorization_id BLOB NOT NULL UNIQUE CHECK (length(authorization_id) = 32),
+    candidate_id BLOB NOT NULL CHECK (length(candidate_id) = 32),
+    authorization_bytes BLOB NOT NULL,
+    bundle_bytes BLOB NOT NULL,
+    FOREIGN KEY(authorization_id) REFERENCES authorizations(authorization_id),
     FOREIGN KEY(candidate_id) REFERENCES bundles(candidate_id)
 );
-CREATE TABLE IF NOT EXISTS outbox (
+CREATE TABLE outbox (
     delivery_id BLOB PRIMARY KEY CHECK (length(delivery_id) = 32),
+    authorization_id BLOB NOT NULL CHECK (length(authorization_id) = 32),
     candidate_id BLOB NOT NULL CHECK (length(candidate_id) = 32),
     ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
     channel INTEGER NOT NULL CHECK (channel >= 0),
@@ -47,10 +77,14 @@ CREATE TABLE IF NOT EXISTS outbox (
     payload_bytes BLOB NOT NULL,
     entry_hash BLOB NOT NULL CHECK (length(entry_hash) = 32),
     acknowledged INTEGER NOT NULL DEFAULT 0 CHECK (acknowledged IN (0, 1)),
-    UNIQUE(candidate_id, ordinal),
+    UNIQUE(authorization_id, ordinal),
+    FOREIGN KEY(authorization_id) REFERENCES authorizations(authorization_id),
     FOREIGN KEY(candidate_id) REFERENCES bundles(candidate_id)
 );
+PRAGMA user_version = 2;
 ";
+
+type SqliteMarker<P, I> = PhantomData<fn() -> (P, I)>;
 
 /// Persistent snapshot of the authoritative semantic state.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -125,6 +159,7 @@ pub enum CrashPoint {
 pub struct PendingDelivery {
     delivery_id: Hash32,
     entry_hash: Hash32,
+    authorization_id: Hash32,
     candidate_id: CandidateId,
     entry: OutboxEntry,
 }
@@ -140,6 +175,12 @@ impl PendingDelivery {
     #[must_use]
     pub const fn entry_hash(&self) -> Hash32 {
         self.entry_hash
+    }
+
+    /// Returns the deployment-specific authorization that owns the obligation.
+    #[must_use]
+    pub const fn authorization_id(&self) -> Hash32 {
+        self.authorization_id
     }
 
     /// Returns the candidate that owns the obligation.
@@ -215,61 +256,69 @@ impl IdempotentDestination for MemoryDestination {
     }
 }
 
-/// Concrete SQLite shell with one explicit semantic-state domain.
-pub struct SqliteShell {
+/// Concrete SQLite shell pinned to one exact production authorization policy.
+pub struct SqliteShell<P, I>
+where
+    P: CatalogTransitionProgram<RustCryptoSha256>,
+{
     connection: Connection,
+    policy_id: Hash32,
     state_domain_name: String,
     state_domain_version: u16,
+    interpreter: I,
+    marker: SqliteMarker<P, I>,
 }
 
-impl SqliteShell {
+impl<P, I> SqliteShell<P, I>
+where
+    P: CatalogTransitionProgram<RustCryptoSha256>,
+{
     /// Opens or initializes a file-backed shell.
     pub fn open(
         path: impl AsRef<Path>,
-        initial_state: &Value,
-        state_domain_name: impl Into<String>,
-        state_domain_version: u16,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, I>,
+        initial_state: &SchemaAdmittedEnvelope,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open(path).map_err(SqliteShellError::Sqlite)?;
-        Self::from_connection(
-            connection,
-            initial_state,
-            state_domain_name.into(),
-            state_domain_version,
-        )
+        Self::from_connection(connection, authority, initial_state, interpreter)
     }
 
     /// Opens an in-memory shell for deterministic refinement and fault tests.
     pub fn open_in_memory(
-        initial_state: &Value,
-        state_domain_name: impl Into<String>,
-        state_domain_version: u16,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, I>,
+        initial_state: &SchemaAdmittedEnvelope,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open_in_memory().map_err(SqliteShellError::Sqlite)?;
-        Self::from_connection(
-            connection,
-            initial_state,
-            state_domain_name.into(),
-            state_domain_version,
-        )
+        Self::from_connection(connection, authority, initial_state, interpreter)
     }
 
     fn from_connection(
         connection: Connection,
-        initial_state: &Value,
-        state_domain_name: String,
-        state_domain_version: u16,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, I>,
+        initial_state: &SchemaAdmittedEnvelope,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, I>,
     ) -> Result<Self, SqliteShellError> {
-        Domain::new(&state_domain_name, state_domain_version).map_err(SqliteShellError::Encode)?;
-        connection
-            .execute_batch(SCHEMA)
-            .map_err(SqliteShellError::Sqlite)?;
+        zeno_fcis_authority::AuthorizedShellState::new(authority, initial_state)
+            .map_err(SqliteShellError::Authority)?;
+        initialize_schema(&connection)?;
+        let policy = authority.policy();
+        let (interpreter_policy, interpreter) = interpreter.into_parts();
+        if interpreter_policy != policy.policy_id() {
+            return Err(SqliteShellError::PolicyMismatch);
+        }
+        let state_domain_name = policy.state_domain().name().to_owned();
+        let state_domain_version = policy.state_domain().version();
         let mut shell = Self {
             connection,
+            policy_id: policy.policy_id(),
             state_domain_name,
             state_domain_version,
+            interpreter,
+            marker: PhantomData,
         };
-        shell.initialize_or_validate(initial_state)?;
+        shell.initialize_or_validate(initial_state.value().value())?;
         Ok(shell)
     }
 
@@ -285,6 +334,42 @@ impl SqliteShell {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(SqliteShellError::Sqlite)?;
+        let identity = transaction
+            .query_row(
+                "SELECT policy_id, state_domain_name, state_domain_version FROM shell_identity WHERE singleton = 1",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, Vec<u8>>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, i64>(2)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(SqliteShellError::Sqlite)?;
+        match identity {
+            None => {
+                transaction
+                    .execute(
+                        "INSERT INTO shell_identity(singleton, policy_id, state_domain_name, state_domain_version) VALUES (1, ?1, ?2, ?3)",
+                        params![
+                            self.policy_id.as_bytes().as_slice(),
+                            self.state_domain_name.as_str(),
+                            i64::from(self.state_domain_version),
+                        ],
+                    )
+                    .map_err(SqliteShellError::Sqlite)?;
+            }
+            Some((policy, domain_name, domain_version)) => {
+                if parse_hash(&policy)? != self.policy_id
+                    || domain_name != self.state_domain_name
+                    || nonnegative_u32(domain_version)? != u32::from(self.state_domain_version)
+                {
+                    return Err(SqliteShellError::PolicyMismatch);
+                }
+            }
+        }
         let existing = transaction
             .query_row(
                 "SELECT state_bytes, semantic_root, version FROM semantic_state WHERE singleton = 1",
@@ -323,6 +408,12 @@ impl SqliteShell {
 
     /// Returns a fully validated read snapshot and row counts.
     pub fn snapshot(&self) -> Result<StoredSnapshot, SqliteShellError> {
+        validate_shell_identity(
+            &self.connection,
+            self.policy_id,
+            &self.state_domain_name,
+            self.state_domain_version,
+        )?;
         let (state_bytes, root_bytes, version) = self
             .connection
             .query_row(
@@ -355,20 +446,24 @@ impl SqliteShell {
         })
     }
 
-    /// Atomically publishes one exact complete bundle.
+    /// Returns the exact policy-bound interpreter instance owned by this shell.
+    #[must_use]
+    pub const fn interpreter(&self) -> &I {
+        &self.interpreter
+    }
+
+    /// Atomically publishes one exact nominally authorized transition.
     pub fn commit(
         &mut self,
-        replay_id: Hash32,
-        bundle: &CommitBundle,
+        authorized: CatalogAuthorizedTransition<RustCryptoSha256, P, I>,
     ) -> Result<CommitStatus, SqliteShellError> {
-        self.commit_with_crash_point(replay_id, bundle, None)
+        self.commit_with_crash_point(authorized, None)
     }
 
     /// Runs the commit protocol with one deterministic injected crash point.
     pub fn commit_with_crash_point(
         &mut self,
-        replay_id: Hash32,
-        bundle: &CommitBundle,
+        authorized: CatalogAuthorizedTransition<RustCryptoSha256, P, I>,
         crash: Option<CrashPoint>,
     ) -> Result<CommitStatus, SqliteShellError> {
         if crash == Some(CrashPoint::BeforeTransaction) {
@@ -378,16 +473,42 @@ impl SqliteShell {
         }
         let domain = Domain::new(&self.state_domain_name, self.state_domain_version)
             .map_err(SqliteShellError::Encode)?;
+        if authorized.body().policy_id() != self.policy_id {
+            return Err(SqliteShellError::PolicyMismatch);
+        }
+        let authorization_id = authorized.authorization_id().hash();
+        let authorization_bytes = authorized
+            .canonical_bytes()
+            .map_err(SqliteShellError::Encode)?;
+        let invocation_id = authorized.body().invocation_id();
+        let replay_id = authorized.replay_id();
+        let bundle = authorized.bundle();
         let bundle_bytes = bundle.canonical_bytes().map_err(SqliteShellError::Encode)?;
         let candidate = bundle.candidate_id();
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(SqliteShellError::Sqlite)?;
+        validate_shell_identity(
+            &transaction,
+            self.policy_id,
+            &self.state_domain_name,
+            self.state_domain_version,
+        )?;
 
-        if let Some((candidate_bytes, existing_bundle)) = replay_row(&transaction, replay_id)? {
+        if let Some((
+            existing_authorization,
+            candidate_bytes,
+            existing_authorization_bytes,
+            existing_bundle,
+        )) = replay_row(&transaction, replay_id)?
+        {
             let existing_candidate = CandidateId::new(parse_hash(&candidate_bytes)?);
-            if existing_candidate != candidate || existing_bundle != bundle_bytes {
+            if parse_hash(&existing_authorization)? != authorization_id
+                || existing_candidate != candidate
+                || existing_authorization_bytes != authorization_bytes
+                || existing_bundle != bundle_bytes
+            {
                 return Err(SqliteShellError::ReplayConflict);
             }
             transaction.commit().map_err(SqliteShellError::Sqlite)?;
@@ -454,9 +575,25 @@ impl SqliteShell {
             .map_err(SqliteShellError::Encode)?;
         transaction
             .execute(
-                "INSERT INTO bundles(candidate_id, bundle_bytes, receipt_bytes) VALUES (?1, ?2, ?3)",
+                "INSERT INTO authorizations(authorization_id, policy_id, invocation_id, replay_id, candidate_id, authorization_bytes, bundle_bytes, receipt_bytes) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    authorization_id.as_bytes().as_slice(),
+                    self.policy_id.as_bytes().as_slice(),
+                    invocation_id.as_bytes().as_slice(),
+                    replay_id.as_bytes().as_slice(),
+                    candidate.hash().as_bytes().as_slice(),
+                    authorization_bytes.as_slice(),
+                    bundle_bytes.as_slice(),
+                    receipt_bytes.as_slice(),
+                ],
+            )
+            .map_err(map_constraint)?;
+        transaction
+            .execute(
+                "INSERT INTO bundles(candidate_id, authorization_id, bundle_bytes, receipt_bytes) VALUES (?1, ?2, ?3, ?4)",
                 params![
                     candidate.hash().as_bytes().as_slice(),
+                    authorization_id.as_bytes().as_slice(),
                     bundle_bytes.as_slice(),
                     receipt_bytes,
                 ],
@@ -464,10 +601,12 @@ impl SqliteShell {
             .map_err(map_constraint)?;
         transaction
             .execute(
-                "INSERT INTO replay(replay_id, candidate_id, bundle_bytes) VALUES (?1, ?2, ?3)",
+                "INSERT INTO replay(replay_id, authorization_id, candidate_id, authorization_bytes, bundle_bytes) VALUES (?1, ?2, ?3, ?4, ?5)",
                 params![
                     replay_id.as_bytes().as_slice(),
+                    authorization_id.as_bytes().as_slice(),
                     candidate.hash().as_bytes().as_slice(),
+                    authorization_bytes.as_slice(),
                     bundle_bytes.as_slice(),
                 ],
             )
@@ -479,7 +618,7 @@ impl SqliteShell {
         }
 
         for entry in bundle.outbox_plan().entries() {
-            insert_outbox(&transaction, candidate, entry)?;
+            insert_outbox(&transaction, authorization_id, candidate, entry)?;
         }
         if crash == Some(CrashPoint::AfterOutboxWrite) {
             return Err(SqliteShellError::InjectedCrash(
@@ -496,28 +635,44 @@ impl SqliteShell {
         Ok(CommitStatus::Committed)
     }
 
-    /// Returns the first pending outbox record in candidate/ordinal order.
+    /// Returns the first pending outbox record in authorization/ordinal order.
     pub fn next_pending(&self) -> Result<Option<PendingDelivery>, SqliteShellError> {
+        validate_shell_identity(
+            &self.connection,
+            self.policy_id,
+            &self.state_domain_name,
+            self.state_domain_version,
+        )?;
         let row = self
             .connection
             .query_row(
-                "SELECT delivery_id, entry_hash, candidate_id, ordinal, channel, destination_bytes, payload_bytes FROM outbox WHERE acknowledged = 0 ORDER BY candidate_id, ordinal LIMIT 1",
+                "SELECT delivery_id, entry_hash, authorization_id, candidate_id, ordinal, channel, destination_bytes, payload_bytes FROM outbox WHERE acknowledged = 0 ORDER BY authorization_id, ordinal LIMIT 1",
                 [],
                 |row| {
                     Ok((
                         row.get::<_, Vec<u8>>(0)?,
                         row.get::<_, Vec<u8>>(1)?,
                         row.get::<_, Vec<u8>>(2)?,
-                        row.get::<_, i64>(3)?,
+                        row.get::<_, Vec<u8>>(3)?,
                         row.get::<_, i64>(4)?,
-                        row.get::<_, Vec<u8>>(5)?,
+                        row.get::<_, i64>(5)?,
                         row.get::<_, Vec<u8>>(6)?,
+                        row.get::<_, Vec<u8>>(7)?,
                     ))
                 },
             )
             .optional()
             .map_err(SqliteShellError::Sqlite)?;
-        let Some((delivery, entry_hash, candidate, ordinal, channel, destination, payload)) = row
+        let Some((
+            delivery,
+            entry_hash,
+            authorization,
+            candidate,
+            ordinal,
+            channel,
+            destination,
+            payload,
+        )) = row
         else {
             return Ok(None);
         };
@@ -530,13 +685,20 @@ impl SqliteShell {
         let pending = PendingDelivery {
             delivery_id: parse_hash(&delivery)?,
             entry_hash: parse_hash(&entry_hash)?,
+            authorization_id: parse_hash(&authorization)?,
             candidate_id: CandidateId::new(parse_hash(&candidate)?),
             entry,
         };
+        validate_authorization_mapping(
+            &self.connection,
+            self.policy_id,
+            pending.authorization_id,
+            pending.candidate_id,
+        )?;
         if hash_outbox_entry(&pending.entry)? != pending.entry_hash
             || pending
                 .entry
-                .delivery_id::<RustCryptoSha256>(pending.candidate_id.hash())
+                .delivery_id::<RustCryptoSha256>(pending.authorization_id)
                 .map_err(SqliteShellError::Encode)?
                 != pending.delivery_id
         {
@@ -555,6 +717,12 @@ impl SqliteShell {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(SqliteShellError::Sqlite)?;
+        validate_shell_identity(
+            &transaction,
+            self.policy_id,
+            &self.state_domain_name,
+            self.state_domain_version,
+        )?;
         let row = transaction
             .query_row(
                 "SELECT entry_hash, acknowledged FROM outbox WHERE delivery_id = ?1",
@@ -585,14 +753,15 @@ impl SqliteShell {
     }
 
     /// Delivers and acknowledges the first pending obligation.
-    pub fn deliver_next<D: IdempotentDestination>(
-        &mut self,
-        destination: &mut D,
-    ) -> Result<bool, SqliteShellError> {
+    pub fn deliver_next(&mut self) -> Result<bool, SqliteShellError>
+    where
+        I: IdempotentDestination,
+    {
         let Some(pending) = self.next_pending()? else {
             return Ok(false);
         };
-        let observed = destination
+        let observed = self
+            .interpreter
             .deliver(pending.delivery_id, pending.entry_hash, &pending.entry)
             .map_err(|error| SqliteShellError::Destination(error.to_string()))?;
         self.acknowledge(pending.delivery_id, observed)?;
@@ -600,7 +769,88 @@ impl SqliteShell {
     }
 }
 
-type ReplayRow = (Vec<u8>, Vec<u8>);
+fn initialize_schema(connection: &Connection) -> Result<(), SqliteShellError> {
+    let version = connection
+        .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+        .map_err(SqliteShellError::Sqlite)?;
+    let existing_tables = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('shell_identity', 'semantic_state', 'authorizations', 'bundles', 'replay', 'outbox')",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(SqliteShellError::Sqlite)?;
+    match version {
+        0 if existing_tables == 0 => connection
+            .execute_batch(SCHEMA_V2)
+            .map_err(SqliteShellError::Sqlite),
+        0 => Err(SqliteShellError::LegacySchema),
+        SQLITE_SCHEMA_VERSION if existing_tables == 6 => connection
+            .execute_batch("PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;")
+            .map_err(SqliteShellError::Sqlite),
+        SQLITE_SCHEMA_VERSION => Err(SqliteShellError::CorruptSchema),
+        other => Err(SqliteShellError::UnsupportedSchemaVersion(other)),
+    }
+}
+
+fn validate_shell_identity(
+    connection: &Connection,
+    policy_id: Hash32,
+    state_domain_name: &str,
+    state_domain_version: u16,
+) -> Result<(), SqliteShellError> {
+    let identity = connection
+        .query_row(
+            "SELECT policy_id, state_domain_name, state_domain_version FROM shell_identity WHERE singleton = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, Vec<u8>>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(SqliteShellError::Sqlite)?;
+    let Some((stored_policy, stored_name, stored_version)) = identity else {
+        return Err(SqliteShellError::PolicyMismatch);
+    };
+    if parse_hash(&stored_policy)? != policy_id
+        || stored_name != state_domain_name
+        || nonnegative_u32(stored_version)? != u32::from(state_domain_version)
+    {
+        return Err(SqliteShellError::PolicyMismatch);
+    }
+    Ok(())
+}
+
+fn validate_authorization_mapping(
+    connection: &Connection,
+    policy_id: Hash32,
+    authorization_id: Hash32,
+    candidate_id: CandidateId,
+) -> Result<(), SqliteShellError> {
+    let row = connection
+        .query_row(
+            "SELECT policy_id, candidate_id FROM authorizations WHERE authorization_id = ?1",
+            [authorization_id.as_bytes().as_slice()],
+            |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?)),
+        )
+        .optional()
+        .map_err(SqliteShellError::Sqlite)?;
+    let Some((stored_policy, stored_candidate)) = row else {
+        return Err(SqliteShellError::CorruptOutbox);
+    };
+    if parse_hash(&stored_policy)? != policy_id
+        || CandidateId::new(parse_hash(&stored_candidate)?) != candidate_id
+    {
+        return Err(SqliteShellError::CorruptOutbox);
+    }
+    Ok(())
+}
+
+type ReplayRow = (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 
 fn replay_row(
     transaction: &Transaction<'_>,
@@ -608,9 +858,9 @@ fn replay_row(
 ) -> Result<Option<ReplayRow>, SqliteShellError> {
     transaction
         .query_row(
-            "SELECT candidate_id, bundle_bytes FROM replay WHERE replay_id = ?1",
+            "SELECT authorization_id, candidate_id, authorization_bytes, bundle_bytes FROM replay WHERE replay_id = ?1",
             [replay_id.as_bytes().as_slice()],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .optional()
         .map_err(SqliteShellError::Sqlite)
@@ -618,11 +868,12 @@ fn replay_row(
 
 fn insert_outbox(
     transaction: &Transaction<'_>,
+    authorization_id: Hash32,
     candidate: CandidateId,
     entry: &OutboxEntry,
 ) -> Result<(), SqliteShellError> {
     let delivery_id = entry
-        .delivery_id::<RustCryptoSha256>(candidate.hash())
+        .delivery_id::<RustCryptoSha256>(authorization_id)
         .map_err(SqliteShellError::Encode)?;
     let entry_hash = hash_outbox_entry(entry)?;
     let destination = entry
@@ -635,9 +886,10 @@ fn insert_outbox(
         .map_err(SqliteShellError::Encode)?;
     transaction
         .execute(
-            "INSERT INTO outbox(delivery_id, candidate_id, ordinal, channel, destination_bytes, payload_bytes, entry_hash, acknowledged) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 0)",
+            "INSERT INTO outbox(delivery_id, authorization_id, candidate_id, ordinal, channel, destination_bytes, payload_bytes, entry_hash, acknowledged) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 0)",
             params![
                 delivery_id.as_bytes().as_slice(),
+                authorization_id.as_bytes().as_slice(),
                 candidate.hash().as_bytes().as_slice(),
                 i64::from(entry.ordinal()),
                 i64::from(entry.channel()),
@@ -735,6 +987,16 @@ pub enum SqliteShellError {
     Patch(PatchError),
     /// Candidate bundle validation failed.
     Bundle(SealError),
+    /// Nominal authority validation failed before opening the database.
+    Authority(AuthorizedShellError),
+    /// A legacy unversioned schema requires an explicit reviewed migration.
+    LegacySchema,
+    /// The database schema version is not supported by this adapter.
+    UnsupportedSchemaVersion(i64),
+    /// The declared schema version is missing required tables.
+    CorruptSchema,
+    /// The database belongs to another authorization policy or state domain.
+    PolicyMismatch,
     /// Stored hash is not exactly 32 bytes.
     InvalidHashLength,
     /// Stored integer cannot be represented by the protocol type.
@@ -781,6 +1043,17 @@ impl fmt::Display for SqliteShellError {
             Self::Decode(error) => write!(formatter, "canonical decoding failed: {error}"),
             Self::Patch(error) => write!(formatter, "semantic patch failed: {error}"),
             Self::Bundle(error) => write!(formatter, "bundle validation failed: {error}"),
+            Self::Authority(error) => write!(formatter, "authorization failed: {error}"),
+            Self::LegacySchema => formatter.write_str(
+                "legacy unversioned SQLite schema requires an explicit reviewed migration",
+            ),
+            Self::UnsupportedSchemaVersion(version) => {
+                write!(formatter, "unsupported SQLite schema version {version}")
+            }
+            Self::CorruptSchema => formatter.write_str("SQLite schema is incomplete"),
+            Self::PolicyMismatch => {
+                formatter.write_str("SQLite shell authorization policy mismatch")
+            }
             Self::InvalidHashLength => formatter.write_str("stored hash length is invalid"),
             Self::IntegerRange => formatter.write_str("stored integer is out of range"),
             Self::VersionOverflow => formatter.write_str("database version overflow"),
@@ -808,80 +1081,264 @@ impl std::error::Error for SqliteShellError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeno_fcis_core::DecisionKind;
-    use zeno_fcis_patch::{CanonicalPatch, PatchOp, PathSegment, ValuePath};
-    use zeno_fcis_plan::{CommitPlan, OutboxPlan};
-    use zeno_fcis_receipt::{CandidateBindings, CandidateBuilder};
-    use zeno_fcis_shell::{ShellState, commit as reference_commit};
-    use zeno_fcis_value::Field;
+    use zeno_fcis_authority::{
+        CatalogAuthorizationDecision, ExecutionBinding, ReviewedTransitionInput, StateDomainBinding,
+    };
+    use zeno_fcis_catalog::{CatalogLimits, CatalogManifest, ChannelDefinition, ProjectCatalog};
+    use zeno_fcis_core::{BudgetUsed, Decision};
+    use zeno_fcis_crypto::verify_approved_provider;
+    use zeno_fcis_patch::ValuePath;
+    use zeno_fcis_project::{
+        DomainPrefix, ProfileBindings, ProjectProfile, RegistryEntry, RegistryKind, SemanticId,
+        StableName,
+    };
+    use zeno_fcis_schema::{
+        Schema, SchemaAdmittedTypeEnvelope, SchemaLimits, TypeDef, TypeId, TypeKind,
+        ValidationLimits,
+    };
+    use zeno_fcis_shell::{ShellState, apply_reference_bundle as reference_commit};
+    use zeno_fcis_transition::{
+        CataloguedTransitionBuilder, TransitionDecision, TransitionError, TransitionLimits,
+    };
 
     fn state_domain() -> Domain<'static> {
         Domain::new("test/sqlite-state", 1).unwrap_or_else(|error| panic!("domain: {error}"))
     }
 
-    fn initial_state() -> Value {
-        Value::Record(Vec::<Field>::new().into_boxed_slice())
+    fn hash(byte: u8) -> Hash32 {
+        Hash32::new([byte; 32])
     }
 
-    fn bundle(state: &Value) -> CommitBundle {
-        let root = hash_value::<RustCryptoSha256>(state_domain(), state)
-            .unwrap_or_else(|error| panic!("root: {error}"));
-        let patch = CanonicalPatch::try_new(
+    fn name(value: &str) -> StableName {
+        StableName::try_new(value).unwrap_or_else(|error| panic!("name: {error}"))
+    }
+
+    fn id(value: u32) -> SemanticId {
+        SemanticId::try_new(value).unwrap_or_else(|error| panic!("id: {error}"))
+    }
+
+    fn type_def(raw_id: u32, label: &str, kind: TypeKind) -> TypeDef {
+        TypeDef::try_new(TypeId::new(raw_id), label, kind, SchemaLimits::default())
+            .unwrap_or_else(|error| panic!("type: {error}"))
+    }
+
+    fn registry_entry(kind: RegistryKind, raw_id: u32, label: &str) -> RegistryEntry {
+        RegistryEntry::try_new(kind, id(raw_id), name(label), hash(raw_id as u8))
+            .unwrap_or_else(|error| panic!("registry entry: {error}"))
+    }
+
+    fn catalog() -> ProjectCatalog {
+        let schema = Schema::try_new(
+            "SqliteAuthorityFixture",
             1,
-            root,
-            vec![PatchOp::Insert {
-                path: ValuePath::new(vec![PathSegment::Field(1)]),
-                map_key: None,
-                value: Value::U128(11),
-            }],
+            TypeId::new(1),
+            vec![
+                type_def(1, "State", TypeKind::U128 { min: 0, max: 100 }),
+                type_def(2, "Command", TypeKind::Bool),
+                type_def(3, "Context", TypeKind::Bool),
+                type_def(
+                    4,
+                    "Destination",
+                    TypeKind::Text {
+                        min_len: 1,
+                        max_len: 32,
+                    },
+                ),
+            ],
+            SchemaLimits::default(),
         )
-        .unwrap_or_else(|error| panic!("patch: {error}"));
-        let outbox = OutboxPlan::try_new(vec![OutboxEntry::new(
-            0,
-            7,
-            Value::Text("destination".into()),
-            Value::U128(11),
-        )])
-        .unwrap_or_else(|error| panic!("outbox: {error}"));
-        CandidateBuilder::seal::<RustCryptoSha256>(
-            state,
-            state_domain(),
-            DecisionKind::Accept,
-            None,
-            CandidateBindings {
-                profile_hash: Hash32::new([1; 32]),
-                command_hash: Hash32::new([2; 32]),
-                context_hash: Hash32::new([3; 32]),
-                precedence_hash: Hash32::new([4; 32]),
-                algorithm_hash: Hash32::new([5; 32]),
-                budget_hash: Hash32::new([6; 32]),
+        .unwrap_or_else(|error| panic!("schema: {error}"));
+        let channel = ChannelDefinition::try_new(
+            id(7),
+            name("delivery"),
+            TypeId::new(4),
+            TypeId::new(1),
+            hash(7),
+        )
+        .unwrap_or_else(|error| panic!("channel: {error}"));
+        let manifest =
+            CatalogManifest::try_new::<RustCryptoSha256>(Vec::new(), Vec::new(), vec![channel])
+                .unwrap_or_else(|error| panic!("manifest: {error}"));
+        let mut entries = vec![
+            registry_entry(RegistryKind::StateType, 1, "state"),
+            registry_entry(RegistryKind::CommandType, 2, "command"),
+            registry_entry(RegistryKind::ContextType, 3, "context"),
+        ];
+        entries.extend_from_slice(manifest.registry_entries());
+        let profile = ProjectProfile::try_new(
+            name("sqlite-fixture"),
+            name("core"),
+            id(100),
+            1,
+            id(1),
+            id(2),
+            id(3),
+            DomainPrefix::try_new("sqlite/fixture")
+                .unwrap_or_else(|error| panic!("domain prefix: {error}")),
+            ProfileBindings {
+                schema_hash: schema
+                    .schema_hash::<RustCryptoSha256>()
+                    .unwrap_or_else(|error| panic!("schema hash: {error}")),
+                precedence_hash: manifest.precedence_hash(),
+                algorithm_hash: hash(40),
+                codec_hash: hash(41),
+                effect_registry_hash: manifest.effect_registry_hash(),
+                channel_registry_hash: manifest.channel_registry_hash(),
+                policy_hash: hash(42),
             },
-            patch,
-            CommitPlan::empty(),
-            outbox,
+            entries,
         )
-        .unwrap_or_else(|error| panic!("bundle: {error}"))
+        .unwrap_or_else(|error| panic!("profile: {error}"));
+        ProjectCatalog::try_new::<RustCryptoSha256>(
+            profile,
+            schema,
+            manifest,
+            CatalogLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("catalog: {error}"))
     }
 
-    fn shell(state: &Value) -> SqliteShell {
-        SqliteShell::open_in_memory(state, "test/sqlite-state", 1)
-            .unwrap_or_else(|error| panic!("shell: {error}"))
+    #[derive(Clone, Copy, Debug)]
+    struct SqliteProgram;
+
+    impl CatalogTransitionProgram<RustCryptoSha256> for SqliteProgram {
+        type Error = TransitionError;
+
+        fn execute(
+            &self,
+            input: ReviewedTransitionInput<'_>,
+        ) -> Result<TransitionDecision, Self::Error> {
+            let expected = input.expected_bindings();
+            let mut builder = CataloguedTransitionBuilder::<RustCryptoSha256>::try_new(
+                input.catalog(),
+                input.pre_state().value().value(),
+                input.state_domain(),
+                expected.command_hash(),
+                expected.context_hash(),
+                BudgetUsed::default(),
+                input.limits(),
+            )?;
+            builder.update(ValuePath::new(Vec::new()), Value::U128(11))?;
+            builder.enqueue(OutboxEntry::new(
+                0,
+                7,
+                Value::text_ascii(String::from("destination"))
+                    .unwrap_or_else(|error| panic!("destination: {error}")),
+                Value::U128(11),
+            ))?;
+            builder.seal()
+        }
+    }
+
+    type TestAuthority = CatalogCommitAuthority<RustCryptoSha256, SqliteProgram, MemoryDestination>;
+    type TestShell = SqliteShell<SqliteProgram, MemoryDestination>;
+
+    fn limits() -> TransitionLimits {
+        TransitionLimits::try_new(4, 4, 4, 64, 8, 64)
+            .unwrap_or_else(|error| panic!("limits: {error}"))
+    }
+
+    fn authority(catalog: &ProjectCatalog, deployment: u8) -> TestAuthority {
+        let provider = verify_approved_provider::<RustCryptoSha256>()
+            .unwrap_or_else(|error| panic!("provider: {error}"));
+        CatalogCommitAuthority::try_new(
+            catalog,
+            StateDomainBinding::try_new("test/sqlite-state", 1)
+                .unwrap_or_else(|error| panic!("state domain: {error}")),
+            ExecutionBinding::try_new(hash(50), hash(51), hash(52), hash(deployment), hash(54))
+                .unwrap_or_else(|error| panic!("execution: {error}")),
+            limits(),
+            &provider,
+            SqliteProgram,
+        )
+        .unwrap_or_else(|error| panic!("authority: {error}"))
+    }
+
+    fn initial_state(catalog: &ProjectCatalog) -> SchemaAdmittedEnvelope {
+        SchemaAdmittedEnvelope::try_new::<RustCryptoSha256>(
+            catalog.schema(),
+            Value::U128(0),
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("initial state: {error}"))
+    }
+
+    fn command(catalog: &ProjectCatalog) -> SchemaAdmittedTypeEnvelope {
+        SchemaAdmittedTypeEnvelope::try_new::<RustCryptoSha256>(
+            catalog.schema(),
+            TypeId::new(2),
+            Value::Bool(true),
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("command: {error}"))
+    }
+
+    fn context(catalog: &ProjectCatalog) -> SchemaAdmittedTypeEnvelope {
+        SchemaAdmittedTypeEnvelope::try_new::<RustCryptoSha256>(
+            catalog.schema(),
+            TypeId::new(3),
+            Value::Bool(true),
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("context: {error}"))
+    }
+
+    fn authorized(
+        authority: &TestAuthority,
+        catalog: &ProjectCatalog,
+        replay: u8,
+    ) -> CatalogAuthorizedTransition<RustCryptoSha256, SqliteProgram, MemoryDestination> {
+        let invocation = authority
+            .admit_invocation(
+                initial_state(catalog),
+                command(catalog),
+                context(catalog),
+                hash(60),
+                hash(61),
+                hash(replay),
+            )
+            .unwrap_or_else(|error| panic!("invocation: {error}"));
+        let decision: CatalogAuthorizationDecision<_, _, _> = authority
+            .execute(invocation)
+            .unwrap_or_else(|error| panic!("execute: {error}"));
+        match decision {
+            Decision::Accept(accepted) => accepted.into_candidate(),
+            Decision::Reject(_) | Decision::CommittedFailure(_) => {
+                panic!("fixture program must accept")
+            }
+        }
+    }
+
+    fn shell(authority: &TestAuthority, initial: &SchemaAdmittedEnvelope) -> TestShell {
+        SqliteShell::open_in_memory(
+            authority,
+            initial,
+            authority.bind_interpreter(MemoryDestination::default()),
+        )
+        .unwrap_or_else(|error| panic!("shell: {error}"))
     }
 
     #[test]
     fn sqlite_trace_matches_reference_commit() {
-        let state = initial_state();
-        let bundle = bundle(&state);
-        let replay = Hash32::new([9; 32]);
-        let reference = ShellState::new::<RustCryptoSha256>(state.clone(), state_domain())
-            .unwrap_or_else(|error| panic!("reference: {error}"));
-        let expected =
-            reference_commit::<RustCryptoSha256>(&reference, state_domain(), replay, &bundle)
-                .unwrap_or_else(|error| panic!("reference commit: {error}"));
-        let mut database = shell(&state);
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let initial = initial_state(&catalog);
+        let replay = hash(9);
+        let reference =
+            ShellState::new::<RustCryptoSha256>(initial.value().value().clone(), state_domain())
+                .unwrap_or_else(|error| panic!("reference: {error}"));
+        let expected_authorization = authorized(&authority, &catalog, 9);
+        let expected = reference_commit::<RustCryptoSha256>(
+            &reference,
+            state_domain(),
+            replay,
+            expected_authorization.bundle(),
+        )
+        .unwrap_or_else(|error| panic!("reference commit: {error}"));
+        let mut database = shell(&authority, &initial);
         assert_eq!(
             database
-                .commit(replay, &bundle)
+                .commit(authorized(&authority, &catalog, 9))
                 .unwrap_or_else(|error| panic!("commit: {error}")),
             CommitStatus::Committed
         );
@@ -894,7 +1351,7 @@ mod tests {
         assert_eq!(snapshot.pending_outbox(), 1);
         assert_eq!(
             database
-                .commit(replay, &bundle)
+                .commit(authorized(&authority, &catalog, 9))
                 .unwrap_or_else(|error| panic!("replay: {error}")),
             CommitStatus::IdempotentReplay
         );
@@ -902,8 +1359,9 @@ mod tests {
 
     #[test]
     fn every_precommit_crash_rolls_back_complete_set() {
-        let state = initial_state();
-        let bundle = bundle(&state);
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let initial = initial_state(&catalog);
         for point in [
             CrashPoint::BeforeTransaction,
             CrashPoint::AfterValidation,
@@ -912,12 +1370,15 @@ mod tests {
             CrashPoint::AfterOutboxWrite,
             CrashPoint::BeforeCommit,
         ] {
-            let mut database = shell(&state);
+            let mut database = shell(&authority, &initial);
             let before = database
                 .snapshot()
                 .unwrap_or_else(|error| panic!("before: {error}"));
             assert!(matches!(
-                database.commit_with_crash_point(Hash32::new([8; 32]), &bundle, Some(point)),
+                database.commit_with_crash_point(
+                    authorized(&authority, &catalog, 8),
+                    Some(point),
+                ),
                 Err(SqliteShellError::InjectedCrash(observed)) if observed == point
             ));
             let after = database
@@ -929,30 +1390,32 @@ mod tests {
 
     #[test]
     fn postcommit_crash_recovers_by_replay_and_pending_delivery() {
-        let state = initial_state();
-        let bundle = bundle(&state);
-        let replay = Hash32::new([7; 32]);
-        let mut database = shell(&state);
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let initial = initial_state(&catalog);
+        let mut database = shell(&authority, &initial);
         assert!(matches!(
-            database.commit_with_crash_point(replay, &bundle, Some(CrashPoint::AfterCommit)),
+            database.commit_with_crash_point(
+                authorized(&authority, &catalog, 7),
+                Some(CrashPoint::AfterCommit),
+            ),
             Err(SqliteShellError::InjectedCrash(CrashPoint::AfterCommit))
         ));
         assert_eq!(
             database
-                .commit(replay, &bundle)
+                .commit(authorized(&authority, &catalog, 7))
                 .unwrap_or_else(|error| panic!("retry: {error}")),
             CommitStatus::IdempotentReplay
         );
-        let mut destination = MemoryDestination::default();
         assert!(
             database
-                .deliver_next(&mut destination)
+                .deliver_next()
                 .unwrap_or_else(|error| panic!("deliver: {error}"))
         );
-        assert_eq!(destination.delivered_count(), 1);
+        assert_eq!(database.interpreter().delivered_count(), 1);
         assert!(
             !database
-                .deliver_next(&mut destination)
+                .deliver_next()
                 .unwrap_or_else(|error| panic!("redeliver: {error}"))
         );
         assert_eq!(
@@ -966,11 +1429,12 @@ mod tests {
 
     #[test]
     fn acknowledgement_binds_exact_entry_hash() {
-        let state = initial_state();
-        let bundle = bundle(&state);
-        let mut database = shell(&state);
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let initial = initial_state(&catalog);
+        let mut database = shell(&authority, &initial);
         database
-            .commit(Hash32::new([6; 32]), &bundle)
+            .commit(authorized(&authority, &catalog, 6))
             .unwrap_or_else(|error| panic!("commit: {error}"));
         let pending = database
             .next_pending()
@@ -983,5 +1447,80 @@ mod tests {
         database
             .acknowledge(pending.delivery_id(), pending.entry_hash())
             .unwrap_or_else(|error| panic!("ack: {error}"));
+    }
+
+    #[test]
+    fn database_rejects_authorization_from_another_deployment_policy() {
+        let catalog = catalog();
+        let first_authority = authority(&catalog, 53);
+        let other_authority = authority(&catalog, 55);
+        let initial = initial_state(&catalog);
+        let mut database = shell(&first_authority, &initial);
+        assert!(matches!(
+            database.commit(authorized(&other_authority, &catalog, 6)),
+            Err(SqliteShellError::PolicyMismatch)
+        ));
+    }
+
+    #[test]
+    fn database_rejects_interpreter_bound_by_another_policy() {
+        let catalog = catalog();
+        let first_authority = authority(&catalog, 53);
+        let other_authority = authority(&catalog, 55);
+        let initial = initial_state(&catalog);
+        assert!(matches!(
+            SqliteShell::open_in_memory(
+                &first_authority,
+                &initial,
+                other_authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::PolicyMismatch)
+        ));
+    }
+
+    #[test]
+    fn persisted_policy_corruption_is_detected_before_read_or_commit() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let initial = initial_state(&catalog);
+        let mut database = shell(&authority, &initial);
+        database
+            .connection
+            .execute(
+                "UPDATE shell_identity SET policy_id = ?1 WHERE singleton = 1",
+                [hash(99).as_bytes().as_slice()],
+            )
+            .unwrap_or_else(|error| panic!("corrupt policy: {error}"));
+        assert!(matches!(
+            database.snapshot(),
+            Err(SqliteShellError::PolicyMismatch)
+        ));
+        assert!(matches!(
+            database.commit(authorized(&authority, &catalog, 6)),
+            Err(SqliteShellError::PolicyMismatch)
+        ));
+    }
+
+    #[test]
+    fn legacy_unversioned_database_fails_closed() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let initial = initial_state(&catalog);
+        let connection = Connection::open_in_memory()
+            .unwrap_or_else(|error| panic!("legacy connection: {error}"));
+        connection
+            .execute_batch(
+                "CREATE TABLE semantic_state(singleton INTEGER PRIMARY KEY, state_bytes BLOB, semantic_root BLOB, version INTEGER);",
+            )
+            .unwrap_or_else(|error| panic!("legacy schema: {error}"));
+        assert!(matches!(
+            SqliteShell::<SqliteProgram, MemoryDestination>::from_connection(
+                connection,
+                &authority,
+                &initial,
+                authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::LegacySchema)
+        ));
     }
 }
