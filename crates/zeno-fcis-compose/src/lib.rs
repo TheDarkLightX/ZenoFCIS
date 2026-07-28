@@ -16,9 +16,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{
-    CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment,
-};
+use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 
 /// Canonical format version for composition specifications and proof claims.
 pub const COMPOSITION_FORMAT_VERSION: u16 = 2;
@@ -470,9 +468,7 @@ impl FrameRule {
             return Err(ContractError::ZeroHash);
         }
         allowed_writers.sort();
-        if allowed_writers
-            .iter()
-            .any(|component| component.get() == 0)
+        if allowed_writers.iter().any(|component| component.get() == 0)
             || allowed_writers.windows(2).any(|pair| pair[0] == pair[1])
         {
             return Err(ContractError::DuplicateComponent);
@@ -933,7 +929,7 @@ impl CompositionSpec {
                 return Err(ContractError::UnknownComponent);
             }
         }
-        if coupling_claims.iter().any(|claim| *claim == Hash32::ZERO) {
+        if coupling_claims.contains(&Hash32::ZERO) {
             return Err(ContractError::ZeroHash);
         }
         coupling_claims.sort();
@@ -1488,7 +1484,7 @@ pub enum CompositionClaim {
     /// Complete sequential-versus-parallel equivalence statement.
     ParallelParity {
         /// Exact expected verification context.
-        context: ParallelVerificationContext,
+        context: Box<ParallelVerificationContext>,
         /// Normative sequential result.
         sequential_result: Hash32,
         /// Composed result.
@@ -1690,7 +1686,8 @@ pub fn verify_assume_guarantee<H: CommitmentHasher, V: EvidenceVerifier>(
 ) -> CompositionReport {
     let Ok(spec_hash) = spec.commitment::<H>() else {
         return CompositionReport {
-            blockers: vec![CompositionBlocker::CompositionIdentityFailure].into_boxed_slice(),
+            blockers: Vec::from([CompositionBlocker::CompositionIdentityFailure])
+                .into_boxed_slice(),
         };
     };
     let mut blockers = Vec::new();
@@ -1873,7 +1870,7 @@ pub fn verify_deterministic_parallel<H: CommitmentHasher, V: EvidenceVerifier>(
                 blockers.push(CompositionBlocker::SequentialParityMismatch);
             }
             let claim = CompositionClaim::ParallelParity {
-                context: parity.context().clone(),
+                context: Box::new(parity.context().clone()),
                 sequential_result: parity.sequential_result(),
                 composed_result: parity.composed_result(),
             };
@@ -1934,8 +1931,8 @@ fn hash_canonical<H: CommitmentHasher>(
     value: &impl CanonicalEncode,
 ) -> Result<Hash32, ContractError> {
     let bytes = value.canonical_bytes().map_err(ContractError::Encode)?;
-    let domain = Domain::new(domain_name, COMPOSITION_FORMAT_VERSION)
-        .map_err(ContractError::Encode)?;
+    let domain =
+        Domain::new(domain_name, COMPOSITION_FORMAT_VERSION).map_err(ContractError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(ContractError::Encode)
 }
 
@@ -2188,10 +2185,13 @@ mod tests {
             vec![],
             vec![],
         );
-        let spec = CompositionSpec::try_new(2, vec![provider, consumer], vec![], vec![], vec![
-            ComponentId::new(1),
-            ComponentId::new(2),
-        ])
+        let spec = CompositionSpec::try_new(
+            2,
+            vec![provider, consumer],
+            vec![],
+            vec![],
+            vec![ComponentId::new(1), ComponentId::new(2)],
+        )
         .unwrap_or_else(|error| panic!("spec: {error}"));
         let spec_hash = spec
             .commitment::<TestHasher>()
@@ -2226,8 +2226,10 @@ mod tests {
             None,
         )
         .unwrap_or_else(|error| panic!("evidence: {error}"));
-        assert!(verify_assume_guarantee::<TestHasher, _>(&spec, &evidence, &ExactVerifier)
-            .is_verified());
+        assert!(
+            verify_assume_guarantee::<TestHasher, _>(&spec, &evidence, &ExactVerifier)
+                .is_verified()
+        );
 
         let wrong_provider = ProviderGuarantee::try_new(ComponentId::new(2), guarantee_claim)
             .unwrap_or_else(|error| panic!("wrong provider: {error}"));
@@ -2244,12 +2246,10 @@ mod tests {
             None,
         )
         .unwrap_or_else(|error| panic!("substituted evidence: {error}"));
-        assert!(!verify_assume_guarantee::<TestHasher, _>(
-            &spec,
-            &substituted_evidence,
-            &ExactVerifier
-        )
-        .is_verified());
+        assert!(
+            !verify_assume_guarantee::<TestHasher, _>(&spec, &substituted_evidence, &ExactVerifier)
+                .is_verified()
+        );
     }
 
     #[test]
@@ -2297,7 +2297,7 @@ mod tests {
         let expected = context(&spec);
         let result_hash = hash(80);
         let parity_claim = CompositionClaim::ParallelParity {
-            context: expected.clone(),
+            context: Box::new(expected.clone()),
             sequential_result: result_hash,
             composed_result: result_hash,
         };
@@ -2322,13 +2322,15 @@ mod tests {
             Some(parity),
         )
         .unwrap_or_else(|error| panic!("evidence: {error}"));
-        assert!(verify_deterministic_parallel::<TestHasher, _>(
-            &spec,
-            &evidence,
-            &expected,
-            &ExactVerifier
-        )
-        .is_verified());
+        assert!(
+            verify_deterministic_parallel::<TestHasher, _>(
+                &spec,
+                &evidence,
+                &expected,
+                &ExactVerifier
+            )
+            .is_verified()
+        );
     }
 
     #[test]
@@ -2418,7 +2420,7 @@ mod tests {
         .unwrap_or_else(|error| panic!("mutated: {error}"));
         let result_hash = hash(80);
         let claim = CompositionClaim::ParallelParity {
-            context: mutated.clone(),
+            context: Box::new(mutated.clone()),
             sequential_result: result_hash,
             composed_result: result_hash,
         };
@@ -2433,14 +2435,16 @@ mod tests {
         .unwrap_or_else(|error| panic!("parity: {error}"));
         let evidence = CompositionEvidence::try_new(vec![], vec![], Some(parity))
             .unwrap_or_else(|error| panic!("evidence: {error}"));
-        assert!(verify_deterministic_parallel::<TestHasher, _>(
-            &spec,
-            &evidence,
-            &expected,
-            &ExactVerifier
-        )
-        .blockers()
-        .iter()
-        .any(|item| matches!(item, CompositionBlocker::ParallelContextMismatch)));
+        assert!(
+            verify_deterministic_parallel::<TestHasher, _>(
+                &spec,
+                &evidence,
+                &expected,
+                &ExactVerifier
+            )
+            .blockers()
+            .iter()
+            .any(|item| matches!(item, CompositionBlocker::ParallelContextMismatch))
+        );
     }
 }
