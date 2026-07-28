@@ -551,8 +551,8 @@ fn decode_value_inner(
             let count = cursor.take_u32()?;
             state.collection(count)?;
             // One field requires its u16 identifier and at least one value tag.
-            let capacity = initial_collection_capacity(count, cursor.remaining(), 3)?;
-            let mut fields = Vec::with_capacity(capacity);
+            let mut fields =
+                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 3)?);
             let mut previous = None;
             for _ in 0..count {
                 let id = cursor.take_u16()?;
@@ -586,8 +586,8 @@ fn decode_value_inner(
             state.collection(count)?;
             // One entry requires two u32 blob lengths plus at least one value
             // tag in each encoded key and value.
-            let capacity = initial_collection_capacity(count, cursor.remaining(), 10)?;
-            let mut entries = Vec::with_capacity(capacity);
+            let mut entries =
+                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 10)?);
             let mut previous: Option<Vec<u8>> = None;
             for _ in 0..count {
                 let encoded_key = cursor.take_blob(state.limits.max_payload_bytes)?.to_vec();

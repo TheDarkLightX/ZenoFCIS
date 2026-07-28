@@ -85,6 +85,14 @@ class ForbiddenPattern:
     witness: str
 
 
+@dataclass(frozen=True)
+class DecoderAllocationRegion:
+    path: str
+    start_marker: str
+    end_marker: str
+    required_patterns: tuple[str, ...]
+
+
 FORBIDDEN_PATTERNS = (
     ForbiddenPattern("unsafe-block", re.compile(r"\bunsafe\s*\{"), "unsafe { operation(); }"),
     ForbiddenPattern("unsafe-function", re.compile(r"\bunsafe\s+fn\b"), "unsafe fn operation() {}"),
@@ -110,6 +118,51 @@ FORBIDDEN_PATTERNS = (
     ),
     ForbiddenPattern("floating-point", re.compile(r"\b(?:f32|f64)\b"), "let value: f64 = 1.0;"),
     ForbiddenPattern("mutable-static", re.compile(r"\bstatic\s+mut\b"), "static mut STATE: u8 = 0;"),
+)
+
+DECODER_ALLOCATION_REGIONS = (
+    DecoderAllocationRegion(
+        "crates/zeno-fcis-codec/src/lib.rs",
+        "fn decode_value_inner(",
+        "fn initial_collection_capacity(",
+        (
+            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),1,?\)\?\)",
+            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),3,?\)\?\)",
+            r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),10,?\)\?\)",
+        ),
+    ),
+    DecoderAllocationRegion(
+        "crates/zeno-fcis-patch/src/lib.rs",
+        "pub fn decode_canonical_patch(",
+        "fn decode_patch_operation(",
+        (
+            r"Vec::with_capacity\(initial_collection_capacity\(operation_count,cursor\.remaining\(\),4,?\)\?\)",
+        ),
+    ),
+    DecoderAllocationRegion(
+        "crates/zeno-fcis-patch/src/lib.rs",
+        "fn decode_value_path(",
+        "fn decode_patch_value(",
+        (
+            r"Vec::with_capacity\(initial_collection_capacity\(segment_count,cursor\.remaining\(\),1,?\)\?\)",
+        ),
+    ),
+    DecoderAllocationRegion(
+        "crates/zeno-fcis-plan/src/lib.rs",
+        "pub fn decode_commit_plan(",
+        "pub fn decode_outbox_plan(",
+        (
+            r"Vec::with_capacity\(initial_collection_capacity\(effect_count,cursor\.remaining\(\),4,?\)\?\)",
+        ),
+    ),
+    DecoderAllocationRegion(
+        "crates/zeno-fcis-plan/src/lib.rs",
+        "pub fn decode_outbox_plan(",
+        "fn enforce_plan_input_limit(",
+        (
+            r"Vec::with_capacity\(initial_collection_capacity\(entry_count,cursor\.remaining\(\),4,?\)\?\)",
+        ),
+    ),
 )
 
 
@@ -212,6 +265,52 @@ def check_semantic_source(crate_name: str) -> list[str]:
     return failures
 
 
+def check_decoder_region_text(
+    label: str,
+    text: str,
+    required_patterns: tuple[str, ...],
+) -> list[str]:
+    failures: list[str] = []
+    compact = re.sub(r"\s+", "", text)
+    capacity_count = compact.count("Vec::with_capacity(")
+    if capacity_count != len(required_patterns):
+        failures.append(
+            f"{label}: expected {len(required_patterns)} guarded collection allocation(s), "
+            f"found {capacity_count}"
+        )
+    for pattern in required_patterns:
+        count = len(re.findall(pattern, compact))
+        if count != 1:
+            failures.append(
+                f"{label}: required wire-bounded allocation pattern occurs {count} time(s): {pattern}"
+            )
+    return failures
+
+
+def check_decoder_allocation_guards() -> list[str]:
+    failures: list[str] = []
+    for requirement in DECODER_ALLOCATION_REGIONS:
+        path = ROOT / requirement.path
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as error:
+            failures.append(f"{requirement.path}: cannot read decoder source: {error}")
+            continue
+        start = text.find(requirement.start_marker)
+        if start < 0:
+            failures.append(f"{requirement.path}: missing marker {requirement.start_marker}")
+            continue
+        end = text.find(requirement.end_marker, start + len(requirement.start_marker))
+        if end < 0:
+            failures.append(f"{requirement.path}: missing marker {requirement.end_marker}")
+            continue
+        label = f"{requirement.path}:{line_number(text, start)}"
+        failures.extend(
+            check_decoder_region_text(label, text[start:end], requirement.required_patterns)
+        )
+    return failures
+
+
 def check_unsafe_prohibition(member: Path) -> list[str]:
     library = member / "src" / "lib.rs"
     if not library.is_file():
@@ -256,6 +355,17 @@ def run_self_test() -> list[str]:
     unexpected = [item.name for item in FORBIDDEN_PATTERNS if item.expression.search(safe_witness)]
     if unexpected:
         failures.append(f"safe witness rejected by: {', '.join(unexpected)}")
+
+    guarded = "Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 1)?)"
+    requirement = (
+        r"Vec::with_capacity\(initial_collection_capacity\(count,cursor\.remaining\(\),1,?\)\?\)",
+    )
+    guarded_failures = check_decoder_region_text("self-test", guarded, requirement)
+    if guarded_failures:
+        failures.append("decoder allocation self-test rejected its guarded witness")
+    mutant = "Vec::with_capacity(count)"
+    if not check_decoder_region_text("self-test-mutant", mutant, requirement):
+        failures.append("decoder allocation self-test accepted a raw-count mutant")
     return failures
 
 
@@ -289,6 +399,7 @@ def main() -> int:
 
     for crate_name in SEMANTIC_CRATES:
         failures.extend(check_semantic_source(crate_name))
+    failures.extend(check_decoder_allocation_guards())
     failures.extend(check_workflows())
 
     if failures:

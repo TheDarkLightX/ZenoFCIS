@@ -71,6 +71,11 @@ The executable regression suite covers:
    rejection, patch overlap rejection, and duplicate plan-ordinal rejection
    continue to pass.
 
+The permanent repository assurance checker also binds every audited production
+`Vec::with_capacity` call site directly to the wire-bounded helper. Its self-test
+requires a raw-count mutant to fail, so reverting a call site while leaving the
+helper tests intact is detected.
+
 These are bounded executable checks for the exact implementation. They are not
 an unbounded parser proof.
 

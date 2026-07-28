@@ -393,9 +393,12 @@ pub fn decode_canonical_patch(
         });
     }
     // Every operation is carried in a u32-length-prefixed blob.
-    let capacity = initial_collection_capacity(operation_count, cursor.remaining(), 4)?;
     let mut state = PatchDecodeState::default();
-    let mut operations = Vec::with_capacity(capacity);
+    let mut operations = Vec::with_capacity(initial_collection_capacity(
+        operation_count,
+        cursor.remaining(),
+        4,
+    )?);
     for _ in 0..operation_count {
         let encoded = cursor.take_blob()?;
         operations.push(decode_patch_operation(encoded, limits, &mut state)?);
@@ -473,8 +476,11 @@ fn decode_value_path(
         });
     }
     // Every path segment has at least its one-byte tag.
-    let capacity = initial_collection_capacity(segment_count, cursor.remaining(), 1)?;
-    let mut segments = Vec::with_capacity(capacity);
+    let mut segments = Vec::with_capacity(initial_collection_capacity(
+        segment_count,
+        cursor.remaining(),
+        1,
+    )?);
     for _ in 0..segment_count {
         let segment = match cursor.take_u8()? {
             PATH_TAG_FIELD => PathSegment::Field(cursor.take_u16()?),
