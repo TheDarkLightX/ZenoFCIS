@@ -40,6 +40,7 @@ jobs:
       - name: Apply assurance integration and normalize source
         run: |
           python3 internal/formal-cbc-hardening.py
+          python3 internal/formal-cbc-dedup.py
           cargo +1.97.1 generate-lockfile
           cargo +1.97.1 fmt --all
 
@@ -96,6 +97,7 @@ jobs:
             crates/zeno-fcis/src/lib.rs \
             tools/check_assurance.py \
             docs/FORMAL_CORRECTNESS_BY_CONSTRUCTION.md \
+            docs/LAW_AWARE_PRODUCTION_AUTHORITY.md \
             .github/workflows/ci.yml \
             .github/workflows/ecosystem-features.yml \
             .github/workflows/miri.yml \
