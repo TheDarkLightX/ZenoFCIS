@@ -15,7 +15,7 @@ use crate::onchain::{
 };
 
 /// Stable semantic identity for the Solana Anchor backend.
-pub const SOLANA_ANCHOR_GENERATOR_ID: &str = "zeno-fcis-solana-anchor/2";
+pub const SOLANA_ANCHOR_GENERATOR_ID: &str = "zeno-fcis-solana-anchor/3";
 /// Exact Anchor release recorded by generated manifests.
 pub const ANCHOR_VERSION: &str = "1.0.2";
 /// Exact Solana/Agave toolchain family recorded by generated manifests.
@@ -25,12 +25,55 @@ pub const SOLANA_SHA256_HASHER_VERSION: &str = "3.1.0";
 /// Hard maximum for one generated UTF-8 file.
 pub const MAX_SOLANA_GENERATED_FILE_BYTES: usize = 768 * 1024;
 
+/// Closed token-program family admitted by the initial Solana effect profile.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SolanaTokenProgram {
+    /// The original SPL Token program.
+    Legacy,
+}
+
+impl SolanaTokenProgram {
+    /// Returns the exact canonical program identifier.
+    #[must_use]
+    pub const fn program_id(self) -> [u8; 32] {
+        match self {
+            Self::Legacy => [
+                6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121, 172, 28,
+                180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0, 169,
+            ],
+        }
+    }
+
+    /// Admits only the legacy SPL Token program identifier.
+    ///
+    /// Token-2022 requires a separate reviewed profile because transfer fees,
+    /// hooks, and additional account requirements change effect semantics.
+    pub const fn try_from_program_id(program_id: [u8; 32]) -> Result<Self, OnchainModelError> {
+        if bytes32_equal(program_id, Self::Legacy.program_id()) {
+            Ok(Self::Legacy)
+        } else {
+            Err(OnchainModelError::InvalidBinding)
+        }
+    }
+}
+
+const fn bytes32_equal(left: [u8; 32], right: [u8; 32]) -> bool {
+    let mut index = 0_usize;
+    while index < 32 {
+        if left[index] != right[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
 /// Exact Solana binding for one shared fungible-transfer capability.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SolanaFungibleBinding {
     capability_code: u16,
     mint: [u8; 32],
-    token_program: [u8; 32],
+    token_program: SolanaTokenProgram,
     vault: [u8; 32],
 }
 
@@ -39,14 +82,10 @@ impl SolanaFungibleBinding {
     pub fn try_new(
         capability_code: u16,
         mint: [u8; 32],
-        token_program: [u8; 32],
+        token_program: SolanaTokenProgram,
         vault: [u8; 32],
     ) -> Result<Self, OnchainModelError> {
-        if capability_code == 0
-            || mint == [0_u8; 32]
-            || token_program == [0_u8; 32]
-            || vault == [0_u8; 32]
-        {
+        if capability_code == 0 || mint == [0_u8; 32] || vault == [0_u8; 32] {
             return Err(OnchainModelError::InvalidBinding);
         }
         Ok(Self {
@@ -69,9 +108,9 @@ impl SolanaFungibleBinding {
         self.mint
     }
 
-    /// Returns the exact Token or Token-2022 program public key bytes.
+    /// Returns the closed token-program profile.
     #[must_use]
-    pub const fn token_program(&self) -> [u8; 32] {
+    pub const fn token_program(&self) -> SolanaTokenProgram {
         self.token_program
     }
 
@@ -557,7 +596,7 @@ fn render_program(
     }
     output.push_str("} } }\n\n");
 
-    output.push_str("#[derive(Accounts)]\npub struct Initialize<'info> {\n    #[account(init, payer = authority, space = MachineState::SPACE, seeds = [STATE_SEED, authority.key().as_ref()], bump)]\n    pub state: Account<'info, MachineState>,\n    #[account(mut)]\n    pub authority: Signer<'info>,\n    pub system_program: Program<'info, System>,\n}\n\n");
+    output.push_str("#[derive(Accounts)]\npub struct Initialize<'info> {\n    #[account(init, payer = authority, space = MachineState::SPACE, seeds = [STATE_SEED, authority.key().as_ref()], bump)]\n    pub state: Account<'info, MachineState>,\n    #[account(mut, signer)]\n    pub authority: SystemAccount<'info>,\n    pub system_program: Program<'info, System>,\n}\n\n");
     output.push_str("#[derive(Accounts)]\npub struct Execute<'info> {\n    #[account(mut, seeds = [STATE_SEED, authority.key().as_ref()], bump = state.bump, has_one = authority)]\n    pub state: Account<'info, MachineState>,\n    #[account(address = state.authority)]\n    pub authority: SystemAccount<'info>,\n    pub actor: Signer<'info>,\n");
     for capability in machine.capabilities() {
         let name = to_lower_snake(capability.name());
@@ -581,7 +620,7 @@ fn render_program(
         writeln!(
             output,
             "    #[account(address = Pubkey::new_from_array({}))]\n    pub {name}_token_program: Interface<'info, TokenInterface>,",
-            rust_bytes(binding.token_program())
+            rust_bytes(binding.token_program().program_id())
         )?;
     }
     output.push_str("}\n\n");
@@ -890,7 +929,7 @@ fn render_manifest(spec: &SolanaAnchorSpec) -> String {
             output,
             "capability.{}.token_program={}",
             binding.capability_code(),
-            base58_encode(binding.token_program())
+            base58_encode(binding.token_program().program_id())
         );
         let _ = writeln!(
             output,
@@ -1188,7 +1227,8 @@ mod tests {
     }
 
     fn binding() -> SolanaFungibleBinding {
-        match SolanaFungibleBinding::try_new(7, [2_u8; 32], [3_u8; 32], [4_u8; 32]) {
+        match SolanaFungibleBinding::try_new(7, [2_u8; 32], SolanaTokenProgram::Legacy, [4_u8; 32])
+        {
             Ok(value) => value,
             Err(error) => panic!("binding rejected: {error}"),
         }
@@ -1268,6 +1308,24 @@ mod tests {
     }
 
     #[test]
+    fn initialize_authority_matches_execute_lifecycle_type() {
+        let bundle = match generate_solana_anchor(&spec()) {
+            Ok(value) => value,
+            Err(error) => panic!("generation failed: {error}"),
+        };
+        let shell = bundle
+            .files()
+            .iter()
+            .find(|file| file.path().contains("programs/") && file.path().ends_with("src/lib.rs"))
+            .map(GeneratedOnchainFile::content)
+            .unwrap_or_default();
+        assert!(
+            shell.contains("#[account(mut, signer)]\n    pub authority: SystemAccount<'info>,")
+        );
+        assert!(!shell.contains("#[account(mut)]\n    pub authority: Signer<'info>,"));
+    }
+
+    #[test]
     fn scanner_rejects_runtime_access_in_core() {
         let source = "use anchor_lang::prelude::*; fn run() { panic!(\"bad\"); }";
         let report = inspect_solana_core_source(source);
@@ -1286,6 +1344,30 @@ mod tests {
         assert_eq!(
             SolanaAnchorSpec::try_new(machine(), [9_u8; 32], "machine_state", Vec::new()),
             Err(OnchainModelError::InvalidBinding)
+        );
+    }
+
+    #[test]
+    fn token_program_ids_are_closed() {
+        assert_eq!(
+            SolanaTokenProgram::try_from_program_id(SolanaTokenProgram::Legacy.program_id()),
+            Ok(SolanaTokenProgram::Legacy)
+        );
+        let token_2022 = [
+            6, 221, 246, 225, 238, 117, 143, 222, 24, 66, 93, 188, 228, 108, 205, 218, 182, 26,
+            252, 77, 131, 185, 13, 39, 254, 189, 249, 40, 216, 161, 139, 252,
+        ];
+        assert_eq!(
+            SolanaTokenProgram::try_from_program_id(token_2022),
+            Err(OnchainModelError::InvalidBinding)
+        );
+        assert_eq!(
+            SolanaTokenProgram::try_from_program_id([3_u8; 32]),
+            Err(OnchainModelError::InvalidBinding)
+        );
+        assert_eq!(
+            base58_encode(SolanaTokenProgram::Legacy.program_id()),
+            "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         );
     }
 

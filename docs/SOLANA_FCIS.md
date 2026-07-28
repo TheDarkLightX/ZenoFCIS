@@ -49,13 +49,13 @@ The generated program owns:
 Each shared `FungibleTransfer` capability is bound to:
 
 - an exact mint public key;
-- an exact Token or Token-2022 program public key;
+- a closed `SolanaTokenProgram` choice whose v3 surface admits only the canonical legacy SPL Token program;
 - an exact source vault token account;
 - the state PDA as vault authority;
 - a destination token account whose owner must equal the normalized recipient selected by the reviewed capability policy;
 - a shared asset ID, amount ceiling, and per-transition use ceiling.
 
-The shell uses Anchor's typed token-interface `TransferChecked` CPI with PDA signer seeds. It does not accept arbitrary CPI program IDs, instructions, account metas, or remaining accounts.
+The shell uses Anchor's typed token-interface `TransferChecked` CPI with PDA signer seeds. It does not accept arbitrary CPI program IDs, instructions, account metas, or remaining accounts. Token-2022 is intentionally rejected in v3: transfer-fee and transfer-hook extensions change net-value and external-effect semantics and require a separate reviewed profile.
 
 All capability accounts are present in the fixed `Execute` account set even when a particular transition does not use them. This improves inspectability and avoids dynamic account-list authority, at the cost of transaction size and account-loading overhead.
 
@@ -76,7 +76,7 @@ It does not by itself prove:
 
 ## Validation layers
 
-Repository Rust CI validates the `zeno-fcis-solana-anchor/2` generator implementation, deterministic rendering, source-policy checks, and public API integration. A separate retained generated-workspace gate is required to compile the emitted Anchor program with its exact dependency graph. Instruction-level tests remain a distinct requirement; generator and host compilation evidence are not deployment evidence.
+Repository Rust CI validates the `zeno-fcis-solana-anchor/3` generator implementation, deterministic rendering, source-policy checks, and public API integration. Initialization requires the authority to be both a signer and a System Program-owned account, matching the authority type admitted by later execution. A separate retained generated-workspace gate is required to compile the emitted Anchor program with its exact dependency graph. Instruction-level tests remain a distinct requirement; generator and host compilation evidence are not deployment evidence.
 
 ## Required promotion evidence
 
