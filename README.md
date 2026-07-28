@@ -161,6 +161,10 @@ same-shaped topology. See
 [`docs/FIXED_STATE_DOMAIN_MACHINES.md`](docs/FIXED_STATE_DOMAIN_MACHINES.md).
 The production bridge is documented in
 [`docs/COMPOSED_DOMAIN_PROGRAM.md`](docs/COMPOSED_DOMAIN_PROGRAM.md).
+Its aggregate-root projection paths are required to equal the exact state paths
+declared by the corresponding machine interfaces; the bounded law and its
+nonclaims are documented in
+[`docs/COMPOSED_ROOT_PROJECTION_CONFORMANCE.md`](docs/COMPOSED_ROOT_PROJECTION_CONFORMANCE.md).
 
 ## Verification
 

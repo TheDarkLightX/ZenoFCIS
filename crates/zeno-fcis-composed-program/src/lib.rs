@@ -25,6 +25,7 @@ use core::marker::PhantomData;
 use zeno_fcis_authority::{CatalogTransitionProgram, ReviewedTransitionInput};
 use zeno_fcis_catalog::{CatalogError, ProjectCatalog};
 use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_compose::MAX_PATH_ATOMS;
 use zeno_fcis_core::{
     Budget, BudgetExceeded, BudgetLimits, BudgetUsed, Decision, DecisionKind, Resource,
 };
@@ -130,6 +131,15 @@ impl<const MACHINES: usize, const STATE_SLOTS: usize, const PORTS: usize>
         mut reason_domains: [Vec<SemanticId>; MACHINES],
         outputs: [[ExternalOutput; PORTS]; MACHINES],
     ) -> Result<Self, ComposedProgramError> {
+        if state_paths
+            .iter()
+            .flatten()
+            .chain(command_paths.iter())
+            .chain(context_paths.iter())
+            .any(|path| path.segments().len() > MAX_PATH_ATOMS)
+        {
+            return Err(ComposedProgramError::ProjectionPathTooDeep);
+        }
         let flattened = state_paths.iter().flatten().collect::<Vec<_>>();
         for (index, left) in flattened.iter().enumerate() {
             if flattened
@@ -278,6 +288,11 @@ where
             return Err(ComposedProgramError::ZeroMachineBuildHash);
         }
         validate_interfaces(catalog, &executable, &machines)?;
+        validate_state_projection_paths::<H, MACHINES, STATE_SLOTS, PORTS>(
+            catalog,
+            &executable,
+            &projection,
+        )?;
         validate_outputs(catalog, &executable, &projection)?;
         validate_reason_domains(catalog, &executable, &projection)?;
         validate_projection_capacity::<MACHINES, STATE_SLOTS, PORTS>(
@@ -871,6 +886,31 @@ fn validate_outputs<const M: usize, const S: usize, const P: usize>(
     Ok(())
 }
 
+fn validate_state_projection_paths<
+    H: ApprovedCommitmentProvider,
+    const M: usize,
+    const S: usize,
+    const P: usize,
+>(
+    catalog: &ProjectCatalog,
+    executable: &ExecutableComposition<M, S, P>,
+    projection: &ProjectionPlan<M, S, P>,
+) -> Result<(), ComposedProgramError> {
+    for machine in 0..M {
+        for slot in 0..S {
+            let projected = canonical_access_path::<H>(
+                catalog.profile().state_type().get(),
+                &projection.state_paths()[machine][slot],
+                0,
+            )?;
+            if &projected != executable.interfaces()[machine].state()[slot].path() {
+                return Err(ComposedProgramError::StateProjectionPathMismatch { machine, slot });
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_reason_domains<const M: usize, const S: usize, const P: usize>(
     catalog: &ProjectCatalog,
     executable: &ExecutableComposition<M, S, P>,
@@ -1085,6 +1125,8 @@ pub enum ComposedProgramError {
     OverlappingRootStatePaths,
     /// Map-key projections are excluded from the direct-subtree v1 profile.
     MapKeyProjectionUnsupported,
+    /// One direct projection exceeds the composition access-path depth bound.
+    ProjectionPathTooDeep,
     /// Every machine must declare a nonempty closed reason domain.
     EmptyReasonDomain,
     /// One machine reason domain contains the same identifier twice.
@@ -1104,6 +1146,13 @@ pub enum ComposedProgramError {
     InterfaceSchemaMismatch {
         /// Canonical machine row.
         machine: usize,
+    },
+    /// One aggregate-root projection differs from its exact machine-interface state path.
+    StateProjectionPathMismatch {
+        /// Canonical machine row.
+        machine: usize,
+        /// State slot inside the machine row.
+        slot: usize,
     },
     /// Output route and external treatment disagree.
     OutputRuleMismatch {

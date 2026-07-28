@@ -20,7 +20,8 @@ use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Ha
 
 /// Canonical format version for composition specifications and proof claims.
 pub const COMPOSITION_FORMAT_VERSION: u16 = 2;
-const MAX_PATH_ATOMS: usize = 64;
+/// Maximum atoms in one hierarchical access path.
+pub const MAX_PATH_ATOMS: usize = 64;
 const MAX_PATHS_PER_SET: usize = 4_096;
 const MAX_COMPONENTS: usize = 4_096;
 const MAX_CLAIMS: usize = 16_384;
