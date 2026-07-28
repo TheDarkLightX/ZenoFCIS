@@ -1,0 +1,66 @@
+name: authenticated-proof-context
+
+on:
+  push:
+    branches:
+      - main
+      - "agent/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeno-fcis-authenticated-proof-context-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  authenticated-proof-context:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+
+      - name: Format
+        run: cargo +1.97.1 fmt --all -- --check
+
+      - name: Compile authenticated proof boundary
+        run: |
+          cargo +1.97.1 clippy \
+            -p zeno-fcis-authenticated \
+            -p zeno-fcis \
+            --all-targets --all-features --locked -- -D warnings
+
+      - name: Context, mutation, and constructor laws
+        run: |
+          cargo +1.97.1 test \
+            -p zeno-fcis-authenticated \
+            --all-features --locked
+          cargo +1.97.1 test \
+            -p zeno-fcis-authenticated \
+            --doc --all-features --locked
+
+      - name: Umbrella authenticated-state feature
+        run: |
+          cargo +1.97.1 check \
+            -p zeno-fcis \
+            --no-default-features --features authenticated-state --locked
+
+      - name: Documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: |
+          cargo +1.97.1 doc \
+            -p zeno-fcis-authenticated \
+            -p zeno-fcis \
+            --all-features --locked --no-deps
+
+      - name: Static authority-boundary checks
+        run: python3 tools/check_assurance.py
