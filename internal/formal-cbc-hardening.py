@@ -560,7 +560,6 @@ replace_exact(
 """,
     "command mutation evidence test",
 )
-
 replace_exact(
     cbc,
     """    /// Patch application failed.
@@ -610,13 +609,4 @@ replace_exact(
     InputRole, LawBlocker, LawCheck, LawChecker, LawClaim,
 """,
     "CBC input exports",
-)
-replace_exact(
-    umbrella,
-    """    LawKind, LawRequirement, LawSet, LawSubject, LawVerificationOutcome, LawVerifiedTransition,
-""",
-    """    LawKind, LawRequirement, LawSet, LawSubject, LawVerificationContext,
-    LawVerificationOutcome, LawVerifiedTransition,
-""",
-    "CBC umbrella context export",
 )
