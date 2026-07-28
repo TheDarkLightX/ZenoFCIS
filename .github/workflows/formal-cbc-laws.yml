@@ -1,0 +1,52 @@
+name: formal-cbc-laws
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formal-cbc-laws-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  law-boundary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Check formatting
+        run: cargo +1.97.1 fmt --all -- --check
+
+      - name: Lint formal CBC boundary
+        run: cargo +1.97.1 clippy -p zeno-fcis-cbc --all-targets --all-features --locked -- -D warnings
+
+      - name: Test law construction and evidence binding
+        run: cargo +1.97.1 test -p zeno-fcis-cbc --all-features --locked
+
+      - name: Test documentation
+        run: cargo +1.97.1 test -p zeno-fcis-cbc --doc --all-features --locked
+
+      - name: Check no_std crate and umbrella feature
+        run: |
+          cargo +1.97.1 check -p zeno-fcis-cbc --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features cbc --locked --target wasm32-unknown-unknown
+
+      - name: Check warning-free documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo +1.97.1 doc -p zeno-fcis-cbc --all-features --locked --no-deps
