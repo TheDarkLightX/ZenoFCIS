@@ -74,7 +74,7 @@ The workspace now includes the complete package ladder:
 - a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
 - a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
-- an explicit dual-root sparse authenticated-state reference with membership/absence proofs, expected-version publication, and full-rebuild equality checks;
+- an explicit dual-root sparse authenticated-state reference with projector-bound profiles, context-verified membership/absence witnesses, expected-version publication, and full-rebuild equality checks;
 - verifier-gated bounded synthesis over canonical closed candidate domains with content-addressed certificates and honest incomplete-search results;
 - crash-atomic policy-pinned SQLite publication that consumes only nominally authorized transitions, persists exact authorization/invocation/replay/bundle identities, rejects legacy unversioned stores, owns a policy-bound interpreter instance for outbox delivery, and retains crash-point refinement tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
