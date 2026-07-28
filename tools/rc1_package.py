@@ -181,7 +181,10 @@ def validate_package_documents(
             value = package.get(field)
             if not isinstance(value, str) or not value:
                 raise RcError(f"{name}: missing package metadata {field}")
-        readme = Path(str(package["readme"]))
+        manifest_path = package.get("manifest_path")
+        if not isinstance(manifest_path, str) or not manifest_path:
+            raise RcError(f"{name}: package manifest path is unavailable")
+        readme = Path(manifest_path).parent / str(package["readme"])
         if not readme.is_file():
             raise RcError(f"{name}: package README does not exist")
 
@@ -271,6 +274,16 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
         raise RcError("self-test package is malformed")
     first_package["version"] = "9.9.9"
     expect_failure(copy.deepcopy(configured), wrong_version_metadata, "package version")
+
+    missing_readme_metadata = copy.deepcopy(metadata)
+    missing_readme_packages = missing_readme_metadata.get("packages")
+    if not isinstance(missing_readme_packages, list) or not missing_readme_packages:
+        raise RcError("self-test package set is unavailable")
+    readme_package = missing_readme_packages[0]
+    if not isinstance(readme_package, dict):
+        raise RcError("self-test package is malformed")
+    readme_package["readme"] = "missing-rc1-readme.md"
+    expect_failure(copy.deepcopy(configured), missing_readme_metadata, "package README")
 
     wrong_pin_metadata = copy.deepcopy(metadata)
     wrong_pin_packages = wrong_pin_metadata.get("packages")
@@ -775,7 +788,7 @@ def main() -> int:
             )
         elif args.command == "self-test":
             run_self_test(configured, cargo_metadata(complete=False))
-            print("rc1-package: self-test PASS (6 hostile mutations rejected)")
+            print("rc1-package: self-test PASS (7 hostile mutations rejected)")
         else:
             build(args.output.resolve())
         return 0
