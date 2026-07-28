@@ -98,6 +98,8 @@ Persistent backends are sealed behind a pure logical-map interface. Updates retu
 
 Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; the pure validators decide whether that data is admissible.
 
+Semantic confinement is not process containment. See the [execution and sandbox boundary](docs/EXECUTION_SANDBOX_BOUNDARY.md) for the separate guarantees supplied by pure cores, build staging, mounted adapters, host compilation, and chain virtual machines.
+
 ## Verification
 
 The main local gate is:

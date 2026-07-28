@@ -1,0 +1,13 @@
+[toolchain]
+anchor_version = "1.0.2"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+treasury_machine = "cGfHiC6Kgg3FpFZvgwGcswsCRtp4aBP2fzuXRQPizuN"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
