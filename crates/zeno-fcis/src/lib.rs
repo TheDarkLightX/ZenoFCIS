@@ -105,18 +105,23 @@ pub use zeno_fcis_codec::{
 };
 #[cfg(feature = "codegen")]
 pub use zeno_fcis_codegen::{
-    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GeneratedOnchainBundle,
-    GeneratedOnchainFile, GeneratedSolidity, GenerationSpec, MAX_ONCHAIN_CAPABILITIES,
-    MAX_ONCHAIN_EVENT_FIELDS, MAX_ONCHAIN_EVENTS, MAX_ONCHAIN_FIELDS, MAX_ONCHAIN_PLAN_SLOTS,
-    MAX_ONCHAIN_REASONS, MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
+    ANCHOR_VERSION, CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile,
+    GeneratedOnchainBundle, GeneratedOnchainFile, GeneratedSolidity, GenerationSpec,
+    MAX_ONCHAIN_CAPABILITIES, MAX_ONCHAIN_EVENT_FIELDS, MAX_ONCHAIN_EVENTS, MAX_ONCHAIN_FIELDS,
+    MAX_ONCHAIN_PLAN_SLOTS, MAX_ONCHAIN_REASONS, MAX_SOLANA_GENERATED_FILE_BYTES,
+    MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
     ONCHAIN_MACHINE_FORMAT_VERSION, OPENZEPPELIN_CONTRACTS_VERSION, ObservationPolicy,
     OnchainCapability, OnchainCapabilityKind, OnchainEvent, OnchainField, OnchainListKind,
     OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
+    SOLANA_ANCHOR_GENERATOR_ID, SOLANA_SHA256_HASHER_VERSION, SOLANA_TOOLCHAIN_VERSION,
     SOLIDITY_ADVANCED_GENERATOR_ID, SOLIDITY_GENERATOR_ID, SOLIDITY_PINNED_VERSION,
-    SOLIDITY_PRAGMA, SolidityAdvancedSpec, SolidityContractSpec, SolidityField,
-    SolidityFungibleBinding, SolidityGenerationError, SolidityListKind, SoliditySafetyFinding,
-    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,
-    generate_advanced_solidity, generate_solidity, inspect_solidity_source,
+    SOLIDITY_PRAGMA, SolanaAnchorSpec, SolanaCoreSafetyFindingKind, SolanaFungibleBinding,
+    SolanaSafetyFinding, SolanaSafetyReport, SolanaShellSafetyFindingKind, SolanaTokenProgram,
+    SolidityAdvancedSpec, SolidityContractSpec, SolidityField, SolidityFungibleBinding,
+    SolidityGenerationError, SolidityListKind, SoliditySafetyFinding, SoliditySafetyFindingKind,
+    SoliditySafetyReport, SolidityScalar, generate, generate_advanced_solidity,
+    generate_solana_anchor, generate_solidity, inspect_solana_core_source,
+    inspect_solana_shell_source, inspect_solidity_source,
 };
 pub use zeno_fcis_compose::{
     AccessPath, Assumption, AssumptionDischarge, ClaimEvidence, ComponentContract, ComponentId,
