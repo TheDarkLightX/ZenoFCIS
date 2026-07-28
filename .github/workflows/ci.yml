@@ -58,6 +58,7 @@ jobs:
             zeno-fcis-receipt \
             zeno-fcis-shell \
             zeno-fcis-compose \
+            zeno-fcis-domain \
             zeno-fcis-refine \
             zeno-fcis-profile-zenodex \
             zeno-fcis-schema \

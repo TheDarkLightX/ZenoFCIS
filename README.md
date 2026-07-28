@@ -20,6 +20,10 @@ The workspace now includes the complete package ladder:
 
 - semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches and closed commit/outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
 - assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
+- fixed-size executable domain machines with schema-admitted state, command,
+  context, and port matrices; narrow per-machine interfaces; routes derived
+  exactly from global composition wiring; deterministic merge-order execution;
+  global reject rollback; and terminal committed-failure preservation;
 - vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
 - closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
@@ -80,7 +84,10 @@ The umbrella crate's default and `no_std` feature sets are project-neutral.
 Enable `zenodex-profile` for the ZenoDEX profile exports or `mounted-zenodex`
 for that profile plus its concrete mounted runtime.
 
-Important optional features include `codegen`, `evidence`, `mounted-runtime`, `zenodex-profile`, `mounted-zenodex`, `authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and `persistent-collections`.
+Important optional features include `domain-machines`, `codegen`, `evidence`,
+`mounted-runtime`, `zenodex-profile`, `mounted-zenodex`,
+`authenticated-state`, `synthesis`, `sqlite-shell`, `collections`, and
+`persistent-collections`.
 
 ## Architecture
 
@@ -97,6 +104,14 @@ pure transition
 Persistent backends are sealed behind a pure logical-map interface. Updates return new structurally shared versions; equality and canonical bytes depend on logical entries only. Map-entry ordering bytes are derived from the semantic key, the explicit persistent-entry boundary rejects mismatched key bytes, and materialization exposes only fallible APIs.
 
 Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; the pure validators decide whether that data is admissible.
+
+The `zeno-fcis-domain` layer makes global composition executable without
+introducing hidden shared state. Every component receives only its fixed state
+row, one command, one context, and fixed typed input ports. The complete route
+matrix is derived from `CompositionSpec`; state and invocation matrices bind
+the exact executable composition and cannot be replayed across another
+same-shaped topology. See
+[`docs/FIXED_STATE_DOMAIN_MACHINES.md`](docs/FIXED_STATE_DOMAIN_MACHINES.md).
 
 ## Verification
 
