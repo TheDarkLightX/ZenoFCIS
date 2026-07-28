@@ -19,8 +19,14 @@ replace_exact(
 )
 replace_exact(
     compose,
-    "context: ParallelVerificationContext,",
-    "context: Box<ParallelVerificationContext>,",
+    """    ParallelParity {
+        /// Exact expected verification context.
+        context: ParallelVerificationContext,
+""",
+    """    ParallelParity {
+        /// Exact expected verification context.
+        context: Box<ParallelVerificationContext>,
+""",
     "boxed parity claim context",
 )
 replace_exact(
