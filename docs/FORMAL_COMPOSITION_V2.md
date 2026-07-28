@@ -59,7 +59,13 @@ The declaration is intended to be a static complete over-approximation. A transi
 3. exhaustive finite enumeration under a verified domain manifest;
 4. a separately verified footprint-completeness theorem.
 
-Composition v2 binds the declared footprint into the specification. A later implementation package must connect generated/project transition definitions to a nominal footprint-completeness witness before a production authority may use parallel promotion.
+Composition v2 binds the declared footprint into the specification. The
+implemented complete-footprint layer connects generated or project transition
+definitions to a nominal `CompleteFootprintWitness`. Production parallel
+promotion uses `authorize_deterministic_parallel`, which requires an exact
+authority-owned binding and verifies one matching evidence item into a witness
+for every component. See
+[Complete static footprint witnesses](COMPLETE_FOOTPRINT_WITNESS.md).
 
 ## Default conflicts
 
@@ -194,7 +200,8 @@ checkers, interpreter, and deployment bindings.
 
 A verified composition report does not establish:
 
-- completeness of a handwritten footprint declaration;
+- completeness of a handwritten footprint declaration without an accepted
+  `CompleteFootprintWitness` from a qualified verifier;
 - truth of a claim when the supplied verifier is unsound;
 - value conservation or economic correctness unless separately declared and proved;
 - exhaustive input coverage without an exact domain manifest;

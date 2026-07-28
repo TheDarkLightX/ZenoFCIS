@@ -49,7 +49,7 @@ These crates turn the foundational values into a safe application path.
 
 | Crate | Responsibility |
 |---|---|
-| `zeno-fcis-compose` | Component contracts, footprints, frames, wiring, conflicts, and proof-carrying composition evidence |
+| `zeno-fcis-compose` | Component contracts, footprints, complete-footprint witnesses, frames, wiring, conflicts, and proof-carrying parallel authorization |
 | `zeno-fcis-domain` | Fixed-size typed domain machines and canonical sequential execution |
 | `zeno-fcis-composed-program` | Root projection, nominal machine ownership, catalogued plan projection, and transition-program identity |
 | `zeno-fcis-laws` | Complete relational-law manifests, executable checks, retained evidence, and verified law sets |

@@ -138,6 +138,7 @@ Current nonclaim:
 > ZenoFCIS does not ship a concurrent scheduler, threaded shell, or production
 > parallel runtime.
 
-Production parallel promotion additionally needs a complete static footprint
-witness for every component and independently checked equality with the
-canonical sequential result.
+Production parallel promotion uses `CompleteFootprintWitness` for every
+component and independently checked equality with the canonical sequential
+result. Projects must still supply and qualify the concrete proof artifacts and
+verifier used to mint those witnesses.

@@ -58,7 +58,10 @@ Reusable libraries should select only the features needed at their boundary.
 The workspace now includes the complete package ladder:
 
 - semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches and closed commit/outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
-- assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
+- assume-guarantee composition, deterministic-parallel conflict checking,
+  backend-neutral complete static footprint claims, nominal footprint witnesses,
+  witness-gated parallel authorization, runtime refinement reports, promotion
+  policy, canonical evidence envelopes, and the first ZenoDEX profile;
 - fixed-size executable domain machines with schema-admitted state, command,
   context, and port matrices; narrow per-machine interfaces; routes derived
   exactly from global composition wiring; deterministic merge-order execution;
