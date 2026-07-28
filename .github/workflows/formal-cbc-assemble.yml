@@ -1,0 +1,107 @@
+name: formal-cbc-assemble
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: formal-cbc-assemble-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout formal CBC branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: agent/formal-cbc-laws-v1-20260728
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Checkout exact mounted ZenoDEX revision
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          repository: TheDarkLightX/ZenoDEX
+          ref: e3cf1aad40e487893230ae0c55f1f0dda62f9955
+          path: integration/zenodex
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Apply assurance integration and normalize source
+        run: |
+          python3 internal/formal-cbc-hardening.py
+          cargo +1.97.1 generate-lockfile
+          cargo +1.97.1 fmt --all
+
+      - name: Capture complete diagnostics
+        shell: bash
+        run: |
+          set +e
+          mkdir -p internal/formal-cbc-diagnostics
+          status=0
+          run_check() {
+            name="$1"
+            shift
+            "$@" >"internal/formal-cbc-diagnostics/${name}.log" 2>&1
+            code=$?
+            printf '%s\n' "$code" >"internal/formal-cbc-diagnostics/${name}.status"
+            if test "$code" -ne 0; then status="$code"; fi
+          }
+          run_check clippy cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
+          run_check tests cargo +1.97.1 test --workspace --all-features --locked
+          run_check doctests cargo +1.97.1 test --workspace --doc --all-features --locked
+          run_check cbc-no-std cargo +1.97.1 check -p zeno-fcis-cbc --no-default-features --locked --target wasm32-unknown-unknown
+          run_check umbrella-cbc-no-std cargo +1.97.1 check -p zeno-fcis --no-default-features --features cbc --locked --target wasm32-unknown-unknown
+          run_check rustdoc env RUSTDOCFLAGS=-Dwarnings cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+          printf '%s\n' "$status" > internal/formal-cbc-diagnostics/status.txt
+          exit 0
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: formal-cbc-diagnostics
+          path: internal/formal-cbc-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce ZenoFCIS result
+        run: test "$(cat internal/formal-cbc-diagnostics/status.txt)" = "0"
+
+      - name: Verify exact mounted ZenoDEX workspace
+        run: |
+          cargo +1.97.1 fmt --manifest-path integration/zenodex/rust-runtime/Cargo.toml --all -- --check
+          cargo +1.97.1 clippy --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --all-targets --locked -- -D warnings
+          cargo +1.97.1 test --manifest-path integration/zenodex/rust-runtime/Cargo.toml --workspace --locked
+
+      - name: Commit exact validated source
+        run: |
+          git config user.name 'ZenoFCIS formal CBC assembly'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            Cargo.toml \
+            Cargo.lock \
+            crates/zeno-fcis-cbc \
+            crates/zeno-fcis/Cargo.toml \
+            crates/zeno-fcis/src/lib.rs \
+            tools/check_assurance.py \
+            docs/FORMAL_CORRECTNESS_BY_CONSTRUCTION.md \
+            .github/workflows/ci.yml \
+            .github/workflows/ecosystem-features.yml \
+            .github/workflows/miri.yml \
+            .github/workflows/formal-cbc-laws.yml
+          if git diff --cached --quiet --exit-code; then
+            exit 0
+          fi
+          git commit -m 'feat: add first-class correctness-by-construction laws'
+          git push origin HEAD:agent/formal-cbc-laws-v1-20260728
