@@ -100,6 +100,11 @@ For a release candidate, retain:
    CycloneDX SBOM, provenance inputs, RC manifest, and checksums;
 8. a signed audit or review report when the deployment policy requires one.
 
+The retained rustdoc archive includes every public API and source page but
+excludes Rustdoc `1.97.1`'s nondeterministic merged cross-crate search index.
+`OFFLINE_SEARCH_DISABLED.txt` inside the archive records this exact
+reproducibility boundary.
+
 Evidence is additive. A newer test run does not retroactively validate older source or external runtime artifacts.
 
 ## Failure and recovery

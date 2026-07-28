@@ -21,9 +21,10 @@ First public release candidate for the reusable ZenoFCIS core library family.
 - tool-neutral evidence, refinement, synthesis, and checked-backend protocols;
 - reference authenticated state, persistent collections, SQLite publication,
   mounted-runtime adapters, secret handling, and side/covert-channel policy;
-- 32 publishable crates, a diagnostic ZenoDEX mount binary, complete rustdoc,
-  examples, checksums, package/source archives, CycloneDX SBOM generation, and
-  provenance inputs.
+- 32 publishable crates, a diagnostic ZenoDEX mount binary, complete public API
+  rustdoc pages, examples, checksums, package/source archives, CycloneDX SBOM
+  generation, and provenance inputs. The reproducible offline rustdoc archive
+  explicitly excludes Rustdoc `1.97.1`'s nondeterministic global-search index.
 
 ### Release-candidate limits
 

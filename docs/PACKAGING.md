@@ -38,6 +38,14 @@ packages every public crate with `--locked`, builds the diagnostic binary in
 release mode, generates warning-denied rustdoc, records the Cargo dependency
 graph as CycloneDX 1.6, and content-addresses every retained artifact.
 
+The offline rustdoc archive retains every public crate API and source page.
+Pinned Rustdoc `1.97.1` does not produce a byte-identical merged cross-crate
+search index across independent clean builds, so packaging removes
+`search.index` and records that boundary in `OFFLINE_SEARCH_DISABLED.txt`.
+The generated help and settings pages are normalized to the `zeno_fcis`
+umbrella crate because Rustdoc otherwise records the crate that finishes last.
+Use docs.rs or locally generated documentation when global search is required.
+
 The generated binary archive is host-target-specific. The read-only release
 candidate workflow currently qualifies the Linux x86-64 archive. Additional
 targets require their own exact-head workflow evidence before attachment to a
@@ -54,7 +62,9 @@ a write-enabled release workflow or weaken that policy.
 
 ## Nonclaims
 
-Successful packaging proves that artifacts are reproducibly assembled from an
-exact source revision and that Cargo package metadata is coherent. It does not
-constitute an independent audit, proof of downstream project laws, deployment
-qualification, signature, or SLSA attestation.
+Successful packaging proves that the declared artifacts are reproducibly
+assembled from an exact source revision and that Cargo package metadata is
+coherent. It does not claim byte reproducibility for Rustdoc's excluded global
+search index, and it does not constitute an independent audit, proof of
+downstream project laws, deployment qualification, signature, or SLSA
+attestation.
