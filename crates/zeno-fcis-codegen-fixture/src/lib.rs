@@ -48,7 +48,9 @@ mod tests {
         Schema, SchemaAdmittedEnvelope, SchemaEnvelopeError, SchemaLimits, TypeDef, TypeId,
         TypeKind, ValidationLimits, ValueValidationError,
     };
-    use zeno_fcis_transition::{TransitionLimits, validate_transition_decision};
+    use zeno_fcis_transition::{
+        ExpectedInvocationBindings, TransitionLimits, validate_transition_decision,
+    };
 
     use crate::bootstrap_project::{
         GeneratedCommandEnvelope, GeneratedContextEnvelope, GeneratedProject,
@@ -119,6 +121,14 @@ mod tests {
         project
             .admit_context::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
             .unwrap_or_else(|error| panic!("generated context rejected: {error}"))
+    }
+
+    fn expected_invocation(
+        command: &GeneratedCommandEnvelope,
+        context: &GeneratedContextEnvelope,
+    ) -> ExpectedInvocationBindings {
+        ExpectedInvocationBindings::try_new(command.commitment(), context.commitment())
+            .unwrap_or_else(|error| panic!("expected invocation rejected: {error}"))
     }
 
     #[test]
@@ -380,6 +390,7 @@ mod tests {
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
             project.catalog(),
+            expected_invocation(&command, &context),
             envelope.value().value(),
             state_domain(),
         )
@@ -494,6 +505,7 @@ mod tests {
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
             project.catalog(),
+            expected_invocation(&command, &context),
             envelope.value().value(),
             state_domain(),
         )
@@ -561,6 +573,7 @@ mod tests {
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
             project.catalog(),
+            expected_invocation(&command, &context),
             envelope.value().value(),
             state_domain(),
         )
@@ -609,6 +622,7 @@ mod tests {
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
             project.catalog(),
+            expected_invocation(&command, &context),
             envelope.value().value(),
             state_domain(),
         )
@@ -720,6 +734,7 @@ mod tests {
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
             project.catalog(),
+            expected_invocation(&command, &context),
             envelope.value().value(),
             state_domain(),
         )
@@ -761,6 +776,7 @@ mod tests {
         validate_transition_decision::<RustCryptoSha256>(
             &decision,
             project.catalog(),
+            expected_invocation(&command, &context),
             envelope.value().value(),
             state_domain(),
         )

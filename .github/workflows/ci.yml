@@ -51,6 +51,7 @@ jobs:
             zeno-fcis-project \
             zeno-fcis-catalog \
             zeno-fcis-transition \
+            zeno-fcis-authority \
             zeno-fcis-security \
             zeno-fcis-secret \
             zeno-fcis-patch \

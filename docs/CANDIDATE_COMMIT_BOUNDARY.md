@@ -19,7 +19,14 @@ preconditioned CanonicalPatch
 `CommittedFailure` owns a complete candidate because authoritative state has
 intentionally changed even though the requested operation failed.
 
-The pure reference shell publishes together:
+These relationships establish structural consistency. A `CommitBundle` does
+not prove that the exact reviewed transition produced it for an externally
+admitted command, context, principal, replay identity, provider, interpreter,
+and deployment. `zeno-fcis-authority` supplies that separate nominal boundary.
+Only its private-construction `CatalogAuthorizedTransition` may enter a
+production commit port.
+
+The pure reference shell function `apply_reference_bundle` publishes together:
 
 - the exact successor semantic state and root;
 - the replay binding;
@@ -30,6 +37,10 @@ The pure reference shell publishes together:
 A replay is idempotent only when its replay identity, candidate identity, and
 complete bundle are all identical. Destination acknowledgement is accepted only
 for the exact committed outbox-entry hash.
+
+The SQLite production port consumes the authorization value, not a raw bundle
+or a caller-selected replay identity. The replay identity is already bound into
+the admitted invocation and the resulting candidate.
 
 ## Initial restrictions
 

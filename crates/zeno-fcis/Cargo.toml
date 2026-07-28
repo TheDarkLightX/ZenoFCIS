@@ -19,6 +19,7 @@ std = [
     "zeno-fcis-project/std",
     "zeno-fcis-catalog?/std",
     "zeno-fcis-transition?/std",
+    "zeno-fcis-authority?/std",
     "zeno-fcis-security?/std",
     "zeno-fcis-secret?/std",
     "zeno-fcis-patch/std",
@@ -42,6 +43,12 @@ sha256-parity = [
 schema = ["dep:zeno-fcis-schema"]
 catalog = ["schema", "dep:zeno-fcis-catalog"]
 transition = ["catalog", "dep:zeno-fcis-transition"]
+authority = [
+    "transition",
+    "rustcrypto-sha256",
+    "dep:zeno-fcis-authority",
+    "zeno-fcis-authority/rustcrypto",
+]
 security = ["dep:zeno-fcis-security"]
 secret = ["dep:zeno-fcis-secret"]
 codegen = ["schema", "dep:zeno-fcis-codegen"]
@@ -57,7 +64,7 @@ mounted-zenodex = [
 authenticated-state = ["std", "dep:zeno-fcis-authenticated"]
 synthesis = ["dep:zeno-fcis-synthesis"]
 backend = ["synthesis", "dep:zeno-fcis-backend"]
-sqlite-shell = ["std", "dep:zeno-fcis-shell-sqlite"]
+sqlite-shell = ["std", "authority", "dep:zeno-fcis-shell-sqlite"]
 collections = ["std", "dep:zeno-fcis-collections"]
 persistent-collections = [
     "collections",
@@ -68,6 +75,7 @@ full = [
     "sha256-parity",
     "catalog",
     "transition",
+    "authority",
     "security",
     "secret",
     "codegen",
@@ -88,6 +96,7 @@ zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-f
 zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project", default-features = false }
 zeno-fcis-catalog = { version = "=0.1.0", path = "../zeno-fcis-catalog", default-features = false, optional = true }
 zeno-fcis-transition = { version = "=0.1.0", path = "../zeno-fcis-transition", default-features = false, optional = true }
+zeno-fcis-authority = { version = "=0.1.0", path = "../zeno-fcis-authority", default-features = false, optional = true }
 zeno-fcis-security = { version = "=0.1.0", path = "../zeno-fcis-security", default-features = false, optional = true }
 zeno-fcis-secret = { version = "=0.1.0", path = "../zeno-fcis-secret", default-features = false, optional = true }
 zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch", default-features = false }
