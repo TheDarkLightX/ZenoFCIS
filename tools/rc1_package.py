@@ -432,7 +432,7 @@ def normalized_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
 def deterministic_tree_archive(source: Path, destination: Path, prefix: str) -> None:
     with (
         destination.open("wb") as raw,
-        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed,
+        gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=0) as compressed,
         tarfile.open(
             fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT
         ) as archive,
@@ -443,11 +443,45 @@ def deterministic_tree_archive(source: Path, destination: Path, prefix: str) -> 
             relative = path.relative_to(source)
             archive_name = str(Path(prefix) / relative)
             info = normalized_tar_info(archive.gettarinfo(str(path), archive_name))
-            if info.isfile():
+            if info.isdir():
+                info.mode = 0o755
+                archive.addfile(info)
+            elif info.isfile():
+                info.mode = 0o644
                 with path.open("rb") as content:
                     archive.addfile(info, content)
             else:
-                archive.addfile(info)
+                raise RcError(
+                    f"deterministic tree archive rejects {relative}: "
+                    "only regular files and directories are supported"
+                )
+
+
+def run_tree_archive_mode_self_test() -> None:
+    with tempfile.TemporaryDirectory(prefix="zeno-fcis-archive-self-test-") as raw:
+        root = Path(raw)
+        sources = [root / "left", root / "right"]
+        archives = [root / "left.tar.gz", root / "right.tar.gz"]
+        for source in sources:
+            nested = source / "nested"
+            nested.mkdir(parents=True)
+            (nested / "api.html").write_text("same bytes", encoding="utf-8")
+
+        os.chmod(sources[0] / "nested", 0o700)
+        os.chmod(sources[0] / "nested" / "api.html", 0o600)
+        os.chmod(sources[1] / "nested", 0o775)
+        os.chmod(sources[1] / "nested" / "api.html", 0o664)
+
+        for source, archive in zip(sources, archives, strict=True):
+            deterministic_tree_archive(source, archive, "docs")
+        if archives[0].read_bytes() != archives[1].read_bytes():
+            raise RcError("tree archives differ across source permission modes")
+
+        with tarfile.open(archives[0], mode="r:gz") as archive:
+            modes = {member.name: member.mode for member in archive.getmembers()}
+        expected = {"docs/nested": 0o755, "docs/nested/api.html": 0o644}
+        if modes != expected:
+            raise RcError(f"tree archive modes are not canonical: {modes}")
 
 
 def normalize_rustdoc_tree(doc_root: Path) -> None:
@@ -858,9 +892,10 @@ def main() -> int:
         elif args.command == "self-test":
             run_self_test(configured, cargo_metadata(complete=False))
             run_rustdoc_normalization_self_test()
+            run_tree_archive_mode_self_test()
             print(
                 "rc1-package: self-test PASS "
-                "(7 hostile mutations rejected; rustdoc normalization verified)"
+                "(7 hostile mutations rejected; rustdoc and archive modes verified)"
             )
         else:
             build(args.output.resolve())
