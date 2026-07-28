@@ -29,7 +29,7 @@ pub use zeno_fcis_codegen as codegen;
 #[cfg(feature = "collections")]
 /// Backend-independent persistent collection interfaces and implementations.
 pub use zeno_fcis_collections as collections;
-/// Assume-guarantee contracts and deterministic composition evidence.
+/// Proof-carrying assume-guarantee contracts and deterministic composition evidence.
 pub use zeno_fcis_compose as compose;
 /// Decision algebra, budgets, reasons, and transition traits.
 pub use zeno_fcis_core as core;
@@ -109,9 +109,10 @@ pub use zeno_fcis_codegen::{
 };
 pub use zeno_fcis_compose::{
     AccessPath, Assumption, AssumptionDischarge, ClaimEvidence, ComponentContract, ComponentId,
-    CompositionBlocker, CompositionEvidence, CompositionReport, CompositionSpec, Conflict,
-    ConflictKind, ContractError, EvidenceVerifier, Footprint, FrameRule, Guarantee, PathAtom,
-    PathSet, Wiring, conflicts, verify_assume_guarantee, verify_deterministic_parallel,
+    CompositionBlocker, CompositionClaim, CompositionEvidence, CompositionReport, CompositionSpec,
+    Conflict, ConflictKind, ContractError, EvidenceVerifier, Footprint, FrameRule, Guarantee,
+    ParallelConflictLaw, ParallelParityEvidence, ParallelVerificationContext, PathAtom, PathSet,
+    ProviderGuarantee, Wiring, conflicts, verify_assume_guarantee, verify_deterministic_parallel,
 };
 pub use zeno_fcis_core::{
     Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, BudgetedDecision, Decision,
