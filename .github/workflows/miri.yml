@@ -13,7 +13,7 @@ permissions:
 jobs:
   semantic-core:
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 55
     env:
       MIRIFLAGS: -Zmiri-strict-provenance
     steps:
@@ -32,7 +32,8 @@ jobs:
           cargo +nightly-2026-07-21 miri test --locked \
             -p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec \
             -p zeno-fcis-project -p zeno-fcis-catalog \
-            -p zeno-fcis-transition -p zeno-fcis-security -p zeno-fcis-secret \
+            -p zeno-fcis-transition -p zeno-fcis-cbc \
+            -p zeno-fcis-security -p zeno-fcis-secret \
             -p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt \
             -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-refine \
             -p zeno-fcis-schema -p zeno-fcis-synthesis -p zeno-fcis-backend
