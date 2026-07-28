@@ -28,6 +28,7 @@
 - [Formal composition v2](FORMAL_COMPOSITION_V2.md)
 - [Fixed-size state domain machines](FIXED_STATE_DOMAIN_MACHINES.md)
 - [Composed domain program](COMPOSED_DOMAIN_PROGRAM.md)
+- [Composed root projection conformance](COMPOSED_ROOT_PROJECTION_CONFORMANCE.md)
 - [Project relational laws](PROJECT_RELATIONAL_LAWS.md)
 - [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md)
 - [Candidate and commit boundary](CANDIDATE_COMMIT_BOUNDARY.md)
