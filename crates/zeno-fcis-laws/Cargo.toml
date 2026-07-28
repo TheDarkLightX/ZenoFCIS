@@ -1,0 +1,40 @@
+[package]
+name = "zeno-fcis-laws"
+description = "Profile-bound executable invariant and value-conservation obligations for ZenoFCIS"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[features]
+default = ["std"]
+std = [
+    "zeno-fcis-catalog/std",
+    "zeno-fcis-codec/std",
+    "zeno-fcis-core/std",
+    "zeno-fcis-evidence/std",
+    "zeno-fcis-patch/std",
+    "zeno-fcis-plan/std",
+    "zeno-fcis-project/std",
+    "zeno-fcis-value/std",
+]
+
+[dependencies]
+zeno-fcis-catalog = { version = "=0.1.0", path = "../zeno-fcis-catalog", default-features = false }
+zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-evidence = { version = "=0.1.0", path = "../zeno-fcis-evidence", default-features = false }
+zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch", default-features = false }
+zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan", default-features = false }
+zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project", default-features = false }
+zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
+
+[dev-dependencies]
+zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine" }
+zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema" }
+
+[lints]
+workspace = true

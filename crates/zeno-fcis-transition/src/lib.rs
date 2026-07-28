@@ -18,8 +18,8 @@ use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Ha
 use zeno_fcis_compose::{AccessPath, ContractError, Footprint, PathAtom, PathSet};
 use zeno_fcis_core::{Accepted, BudgetUsed, Decision, DecisionKind, Failed, Rejected, Resource};
 use zeno_fcis_patch::{
-    CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath, hash_precondition_value,
-    hash_value, value_at,
+    AppliedPatch, CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath,
+    hash_precondition_value, hash_value, value_at,
 };
 use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanError};
 use zeno_fcis_project::{SemanticId, StableName};
@@ -334,6 +334,18 @@ impl TransitionArtifacts {
         pre_state: &Value,
         state_domain: Domain<'_>,
     ) -> Result<(), TransitionError> {
+        self.validate_and_apply::<H>(catalog, expected_invocation, pre_state, state_domain)
+            .map(|_| ())
+    }
+
+    /// Revalidates every relationship and returns the exact pure successor.
+    pub fn validate_and_apply<H: CommitmentHasher>(
+        &self,
+        catalog: &ProjectCatalog,
+        expected_invocation: ExpectedInvocationBindings,
+        pre_state: &Value,
+        state_domain: Domain<'_>,
+    ) -> Result<AppliedPatch, TransitionError> {
         let metrics =
             catalog.validate_plans(self.bundle.commit_plan(), self.bundle.outbox_plan())?;
         if metrics != self.catalog_metrics || self.resources.catalog_metrics != metrics {
@@ -383,7 +395,7 @@ impl TransitionArtifacts {
             applied.state(),
             self.resources.limits.state_validation_limits(),
         )?;
-        Ok(())
+        Ok(applied)
     }
 }
 

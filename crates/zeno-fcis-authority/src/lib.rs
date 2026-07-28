@@ -20,6 +20,9 @@ use zeno_fcis_catalog::{CatalogError, CatalogManifest, NonZeroHash, ProjectCatal
 use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::{Accepted, Decision, DecisionKind, Failed, Rejected};
 use zeno_fcis_crypto::{ApprovedCommitmentProvider, ApprovedProviderId, VerifiedProvider};
+use zeno_fcis_laws::{
+    LawCheckInput, LawDecisionView, LawError, LawEvaluation, ProjectLawEngine, VerifiedProjectLaws,
+};
 use zeno_fcis_patch::{PatchError, hash_value};
 use zeno_fcis_project::SemanticId;
 use zeno_fcis_receipt::{CandidateId, CommitBundle};
@@ -30,7 +33,7 @@ use zeno_fcis_transition::{
     TransitionLimits, TransitionReject,
 };
 
-type AuthorityMarker<H, P, I> = PhantomData<fn() -> (H, P, I)>;
+type AuthorityMarker<H, P, L, I> = PhantomData<fn() -> (H, P, L, I)>;
 
 /// Canonical authorization-envelope format version.
 pub const AUTHORIZATION_FORMAT_VERSION: u16 = 1;
@@ -240,10 +243,11 @@ pub trait CatalogTransitionProgram<H: ApprovedCommitmentProvider> {
 }
 
 /// Shell-owned catalog, provider, program, interpreter, deployment, limits, and replay policy.
-pub struct AuthorizationPolicy<H, P, I>
+pub struct AuthorizationPolicy<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     catalog: ProjectCatalog,
     catalog_hash: Hash32,
@@ -251,14 +255,18 @@ where
     execution: ExecutionBinding,
     transition_limits: TransitionLimits,
     provider_id: ApprovedProviderId,
+    law_set_hash: Hash32,
+    law_engine_build_hash: Hash32,
+    law_evidence_verifier_hash: Hash32,
     policy_id: Hash32,
-    marker: AuthorityMarker<H, P, I>,
+    marker: AuthorityMarker<H, P, L, I>,
 }
 
-impl<H, P, I> AuthorizationPolicy<H, P, I>
+impl<H, P, L, I> AuthorizationPolicy<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     fn try_new(
         catalog: &ProjectCatalog,
@@ -266,6 +274,7 @@ where
         execution: ExecutionBinding,
         transition_limits: TransitionLimits,
         provider: &VerifiedProvider<H>,
+        laws: &VerifiedProjectLaws<H, L>,
     ) -> Result<Self, AuthorityError> {
         let approved_manifest = CatalogManifest::try_new::<H>(
             catalog.manifest().reasons().to_vec(),
@@ -283,6 +292,22 @@ where
         }
         let catalog_hash = approved_catalog.commitment::<H>()?;
         require_nonzero(catalog_hash, AuthorityField::Catalog)?;
+        if laws.catalog_hash() != catalog_hash {
+            return Err(AuthorityError::Mismatch(AuthorityField::LawCatalog));
+        }
+        let source = laws.source_bindings();
+        if source.profile_hash() != approved_catalog.profile_hash()
+            || source.schema_hash() != approved_catalog.schema_hash()
+            || source.algorithm_hash() != approved_catalog.profile().bindings().algorithm_hash
+        {
+            return Err(AuthorityError::Mismatch(AuthorityField::LawSourceBindings));
+        }
+        require_nonzero(laws.law_set_hash(), AuthorityField::LawSet)?;
+        require_nonzero(laws.engine_build_hash(), AuthorityField::LawEngine)?;
+        require_nonzero(
+            laws.evidence_verifier_hash(),
+            AuthorityField::LawEvidenceVerifier,
+        )?;
         let mut policy = Self {
             catalog: approved_catalog,
             catalog_hash,
@@ -290,6 +315,9 @@ where
             execution,
             transition_limits,
             provider_id: provider.provider_id(),
+            law_set_hash: laws.law_set_hash(),
+            law_engine_build_hash: laws.engine_build_hash(),
+            law_evidence_verifier_hash: laws.evidence_verifier_hash(),
             policy_id: Hash32::ZERO,
             marker: PhantomData,
         };
@@ -334,6 +362,24 @@ where
         self.provider_id
     }
 
+    /// Returns the exact verified relational-law set owned by this policy.
+    #[must_use]
+    pub const fn law_set_hash(&self) -> Hash32 {
+        self.law_set_hash
+    }
+
+    /// Returns the reviewed per-invocation law-engine build identity.
+    #[must_use]
+    pub const fn law_engine_build_hash(&self) -> Hash32 {
+        self.law_engine_build_hash
+    }
+
+    /// Returns the independently mounted retained-evidence verifier identity.
+    #[must_use]
+    pub const fn law_evidence_verifier_hash(&self) -> Hash32 {
+        self.law_evidence_verifier_hash
+    }
+
     /// Returns the complete policy identity used to pin a shell.
     #[must_use]
     pub const fn policy_id(&self) -> Hash32 {
@@ -341,10 +387,11 @@ where
     }
 }
 
-impl<H, P, I> CanonicalEncode for AuthorizationPolicy<H, P, I>
+impl<H, P, L, I> CanonicalEncode for AuthorizationPolicy<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-AUTHORIZATION-POLICY\0");
@@ -356,25 +403,31 @@ where
         self.state_domain.encode_to(output)?;
         output.extend_from_slice(&self.provider_id.code().to_be_bytes());
         put_u16_blob(output, H::ALGORITHM_ID.as_bytes())?;
+        output.extend_from_slice(self.law_set_hash.as_bytes());
+        output.extend_from_slice(self.law_engine_build_hash.as_bytes());
+        output.extend_from_slice(self.law_evidence_verifier_hash.as_bytes());
         self.execution.encode_to(output)?;
         self.transition_limits.encode_to(output)
     }
 }
 
 /// Owns the only transition program allowed to mint one nominal authorization type.
-pub struct CatalogCommitAuthority<H, P, I>
+pub struct CatalogCommitAuthority<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
-    policy: AuthorizationPolicy<H, P, I>,
+    policy: AuthorizationPolicy<H, P, L, I>,
+    laws: VerifiedProjectLaws<H, L>,
     program: P,
 }
 
-impl<H, P, I> CatalogCommitAuthority<H, P, I>
+impl<H, P, L, I> CatalogCommitAuthority<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     /// Pins one exact catalog, program type, interpreter type, and deployment policy.
     #[allow(clippy::too_many_arguments)]
@@ -384,6 +437,7 @@ where
         execution: ExecutionBinding,
         transition_limits: TransitionLimits,
         provider: &VerifiedProvider<H>,
+        laws: VerifiedProjectLaws<H, L>,
         program: P,
     ) -> Result<Self, AuthorityError> {
         let policy = AuthorizationPolicy::try_new(
@@ -392,19 +446,24 @@ where
             execution,
             transition_limits,
             provider,
+            &laws,
         )?;
-        Ok(Self { policy, program })
+        Ok(Self {
+            policy,
+            laws,
+            program,
+        })
     }
 
     /// Returns the exact shell-owned policy.
     #[must_use]
-    pub const fn policy(&self) -> &AuthorizationPolicy<H, P, I> {
+    pub const fn policy(&self) -> &AuthorizationPolicy<H, P, L, I> {
         &self.policy
     }
 
     /// Binds one concrete interpreter instance to this exact policy.
     #[must_use]
-    pub fn bind_interpreter(&self, interpreter: I) -> BoundInterpreter<H, P, I> {
+    pub fn bind_interpreter(&self, interpreter: I) -> BoundInterpreter<H, P, L, I> {
         BoundInterpreter {
             policy_id: self.policy.policy_id,
             interpreter,
@@ -422,13 +481,13 @@ where
         principal_hash: Hash32,
         authentication_evidence_hash: Hash32,
         replay_id: Hash32,
-    ) -> Result<InvocationWitness<H, P, I>, AuthorityError> {
+    ) -> Result<InvocationWitness<H, P, L, I>, AuthorityError> {
         validate_envelope_bindings(&self.policy, &pre_state, &command, &context)?;
         let principal_hash = NonZeroHash::try_new(principal_hash)?;
         let authentication_evidence_hash = NonZeroHash::try_new(authentication_evidence_hash)?;
         let replay_id = NonZeroHash::try_new(replay_id)?;
-        let command_hash = command_commitment::<H, P, I>(&self.policy, &command)?;
-        let context_hash = context_commitment::<H, P, I>(
+        let command_hash = command_commitment::<H, P, L, I>(&self.policy, &command)?;
+        let context_hash = context_commitment::<H, P, L, I>(
             &self.policy,
             &context,
             principal_hash,
@@ -462,8 +521,8 @@ where
     /// Executes the pinned program and authorizes its complete three-way decision.
     pub fn execute(
         &self,
-        invocation: InvocationWitness<H, P, I>,
-    ) -> Result<CatalogAuthorizationDecision<H, P, I>, CatalogExecutionError<P::Error>> {
+        invocation: InvocationWitness<H, P, L, I>,
+    ) -> Result<CatalogAuthorizationDecision<H, P, L, I>, CatalogExecutionError<P::Error>> {
         if invocation.policy_id != self.policy.policy_id {
             return Err(CatalogExecutionError::Authority(AuthorityError::Mismatch(
                 AuthorityField::PolicyId,
@@ -486,7 +545,7 @@ where
             .program
             .execute(input)
             .map_err(CatalogExecutionError::Program)?;
-        authorize_decision(&self.policy, invocation, decision)
+        authorize_decision(&self.policy, &self.laws, invocation, decision)
             .map_err(CatalogExecutionError::Authority)
     }
 }
@@ -495,20 +554,22 @@ where
 ///
 /// Private fields prevent a same-type interpreter from being substituted at a
 /// commit port without passing through the owning [`CatalogCommitAuthority`].
-pub struct BoundInterpreter<H, P, I>
+pub struct BoundInterpreter<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     policy_id: Hash32,
     interpreter: I,
-    marker: AuthorityMarker<H, P, I>,
+    marker: AuthorityMarker<H, P, L, I>,
 }
 
-impl<H, P, I> BoundInterpreter<H, P, I>
+impl<H, P, L, I> BoundInterpreter<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     /// Returns the exact authorization policy that bound this instance.
     #[must_use]
@@ -524,10 +585,11 @@ where
 }
 
 /// Exact externally admitted pre-state, command, context, principal, and replay.
-pub struct InvocationWitness<H, P, I>
+pub struct InvocationWitness<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     policy_id: Hash32,
     pre_state: SchemaAdmittedEnvelope,
@@ -539,13 +601,14 @@ where
     authentication_evidence_hash: NonZeroHash,
     replay_id: NonZeroHash,
     invocation_id: Hash32,
-    marker: AuthorityMarker<H, P, I>,
+    marker: AuthorityMarker<H, P, L, I>,
 }
 
-impl<H, P, I> InvocationWitness<H, P, I>
+impl<H, P, L, I> InvocationWitness<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     /// Returns the policy identity that admitted this invocation.
     #[must_use]
@@ -608,10 +671,11 @@ where
     }
 }
 
-impl<H, P, I> CanonicalEncode for InvocationWitness<H, P, I>
+impl<H, P, L, I> CanonicalEncode for InvocationWitness<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-AUTHORIZATION-INVOCATION\0");
@@ -633,6 +697,8 @@ where
 pub struct AuthorizationBody {
     policy_id: Hash32,
     invocation_id: Hash32,
+    law_set_hash: Hash32,
+    law_evaluation_hash: Hash32,
     candidate_id: CandidateId,
     bundle_hash: Hash32,
     decision_kind: DecisionKind,
@@ -652,6 +718,18 @@ impl AuthorizationBody {
     #[must_use]
     pub const fn invocation_id(&self) -> Hash32 {
         self.invocation_id
+    }
+
+    /// Returns the verified project-law set used for authorization.
+    #[must_use]
+    pub const fn law_set_hash(&self) -> Hash32 {
+        self.law_set_hash
+    }
+
+    /// Returns the complete per-invocation relational-law evaluation.
+    #[must_use]
+    pub const fn law_evaluation_hash(&self) -> Hash32 {
+        self.law_evaluation_hash
     }
 
     /// Returns the implementation-neutral semantic candidate identity.
@@ -697,6 +775,8 @@ impl CanonicalEncode for AuthorizationBody {
         output.extend_from_slice(&AUTHORIZATION_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.policy_id.as_bytes());
         output.extend_from_slice(self.invocation_id.as_bytes());
+        output.extend_from_slice(self.law_set_hash.as_bytes());
+        output.extend_from_slice(self.law_evaluation_hash.as_bytes());
         output.extend_from_slice(self.candidate_id.hash().as_bytes());
         output.extend_from_slice(self.bundle_hash.as_bytes());
         output.push(decision_tag(self.decision_kind));
@@ -725,31 +805,35 @@ impl CanonicalEncode for AuthorizationBody {
 /// use zeno_fcis_crypto::ApprovedCommitmentProvider;
 /// use zeno_fcis_receipt::CommitBundle;
 ///
-/// fn raw_bundle_is_not_authority<H, P, I>(
+/// fn raw_bundle_is_not_authority<H, P, L, I>(
 ///     bundle: CommitBundle,
-/// ) -> CatalogAuthorizedTransition<H, P, I>
+/// ) -> CatalogAuthorizedTransition<H, P, L, I>
 /// where
 ///     H: ApprovedCommitmentProvider,
 ///     P: CatalogTransitionProgram<H>,
+///     L: zeno_fcis_laws::ProjectLawEngine,
 /// {
 ///     bundle.into()
 /// }
 /// ```
-pub struct CatalogAuthorizedTransition<H, P, I>
+pub struct CatalogAuthorizedTransition<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     authorization_id: AuthorizationId,
     body: AuthorizationBody,
-    invocation: InvocationWitness<H, P, I>,
+    invocation: InvocationWitness<H, P, L, I>,
+    law_evaluation: LawEvaluation,
     artifacts: TransitionArtifacts,
 }
 
-impl<H, P, I> CatalogAuthorizedTransition<H, P, I>
+impl<H, P, L, I> CatalogAuthorizedTransition<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     /// Returns the deployment-specific authorization identity.
     #[must_use]
@@ -765,8 +849,14 @@ where
 
     /// Returns the exact externally admitted invocation.
     #[must_use]
-    pub const fn invocation(&self) -> &InvocationWitness<H, P, I> {
+    pub const fn invocation(&self) -> &InvocationWitness<H, P, L, I> {
         &self.invocation
+    }
+
+    /// Returns the complete satisfied project-law evaluation.
+    #[must_use]
+    pub const fn law_evaluation(&self) -> &LawEvaluation {
+        &self.law_evaluation
     }
 
     /// Returns the replay identity selected before execution.
@@ -788,20 +878,22 @@ where
     }
 }
 
-impl<H, P, I> CanonicalEncode for CatalogAuthorizedTransition<H, P, I>
+impl<H, P, L, I> CanonicalEncode for CatalogAuthorizedTransition<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         encode_authorization_envelope(&self.body, &self.invocation, output)
     }
 }
 
-impl<H, P, I> fmt::Debug for CatalogAuthorizedTransition<H, P, I>
+impl<H, P, L, I> fmt::Debug for CatalogAuthorizedTransition<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -813,21 +905,24 @@ where
 }
 
 /// Externally bound ordinary rejection with no candidate or commit authority.
-pub struct CatalogAuthorizedReject<H, P, I>
+pub struct CatalogAuthorizedReject<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     rejection_id: Hash32,
     policy_id: Hash32,
-    invocation: InvocationWitness<H, P, I>,
+    invocation: InvocationWitness<H, P, L, I>,
+    law_evaluation: LawEvaluation,
     rejection: TransitionReject,
 }
 
-impl<H, P, I> CatalogAuthorizedReject<H, P, I>
+impl<H, P, L, I> CatalogAuthorizedReject<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     /// Returns the deployment-specific rejection identity.
     #[must_use]
@@ -843,8 +938,14 @@ where
 
     /// Returns the exact externally admitted invocation.
     #[must_use]
-    pub const fn invocation(&self) -> &InvocationWitness<H, P, I> {
+    pub const fn invocation(&self) -> &InvocationWitness<H, P, L, I> {
         &self.invocation
+    }
+
+    /// Returns the complete satisfied project-law evaluation.
+    #[must_use]
+    pub const fn law_evaluation(&self) -> &LawEvaluation {
+        &self.law_evaluation
     }
 
     /// Returns the unchanged-state rejection evidence.
@@ -854,16 +955,18 @@ where
     }
 }
 
-impl<H, P, I> CanonicalEncode for CatalogAuthorizedReject<H, P, I>
+impl<H, P, L, I> CanonicalEncode for CatalogAuthorizedReject<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-AUTHORIZED-REJECT\0");
         output.extend_from_slice(&AUTHORIZATION_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.policy_id.as_bytes());
         put_blob(output, &self.invocation.canonical_bytes()?)?;
+        put_blob(output, &self.law_evaluation.canonical_bytes()?)?;
         self.rejection.reason_id().encode_to(output)?;
         put_blob(output, &self.rejection.receipt().canonical_bytes()?)?;
         put_blob(output, &self.rejection.footprint().canonical_bytes()?)?;
@@ -871,10 +974,11 @@ where
     }
 }
 
-impl<H, P, I> fmt::Debug for CatalogAuthorizedReject<H, P, I>
+impl<H, P, L, I> fmt::Debug for CatalogAuthorizedReject<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -886,8 +990,11 @@ where
 }
 
 /// Complete externally bound three-way authorization decision.
-pub type CatalogAuthorizationDecision<H, P, I> =
-    Decision<CatalogAuthorizedTransition<H, P, I>, CatalogAuthorizedReject<H, P, I>, SemanticId>;
+pub type CatalogAuthorizationDecision<H, P, L, I> = Decision<
+    CatalogAuthorizedTransition<H, P, L, I>,
+    CatalogAuthorizedReject<H, P, L, I>,
+    SemanticId,
+>;
 
 /// Persisted exact production-authorization replay record.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -925,26 +1032,28 @@ impl AuthorizationRecord {
 }
 
 /// Immutable commit port pinned to one exact provider, program, interpreter, and policy.
-pub struct AuthorizedShellState<H, P, I>
+pub struct AuthorizedShellState<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     policy_id: Hash32,
     state_domain: StateDomainBinding,
     inner: ShellState,
     records: Box<[AuthorizationRecord]>,
-    marker: AuthorityMarker<H, P, I>,
+    marker: AuthorityMarker<H, P, L, I>,
 }
 
-impl<H, P, I> AuthorizedShellState<H, P, I>
+impl<H, P, L, I> AuthorizedShellState<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     /// Creates an empty authorized shell from one exact admitted initial state.
     pub fn new(
-        authority: &CatalogCommitAuthority<H, P, I>,
+        authority: &CatalogCommitAuthority<H, P, L, I>,
         initial_state: &SchemaAdmittedEnvelope,
     ) -> Result<Self, AuthorizedShellError> {
         validate_root_envelope(authority.policy(), initial_state)?;
@@ -982,8 +1091,8 @@ where
     /// Consumes one nominal authorization and atomically publishes its exact bundle.
     pub fn commit(
         self,
-        authorized: CatalogAuthorizedTransition<H, P, I>,
-    ) -> Result<AuthorizedCommitResult<H, P, I>, AuthorizedShellError> {
+        authorized: CatalogAuthorizedTransition<H, P, L, I>,
+    ) -> Result<AuthorizedCommitResult<H, P, L, I>, AuthorizedShellError> {
         if authorized.body.policy_id != self.policy_id {
             return Err(AuthorizedShellError::PolicyMismatch {
                 expected: self.policy_id,
@@ -1047,23 +1156,25 @@ where
 }
 
 /// Result of one nominally authorized pure-shell commit.
-pub struct AuthorizedCommitResult<H, P, I>
+pub struct AuthorizedCommitResult<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
-    state: AuthorizedShellState<H, P, I>,
+    state: AuthorizedShellState<H, P, L, I>,
     status: CommitStatus,
 }
 
-impl<H, P, I> AuthorizedCommitResult<H, P, I>
+impl<H, P, L, I> AuthorizedCommitResult<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     /// Returns the immutable authorized successor state.
     #[must_use]
-    pub const fn state(&self) -> &AuthorizedShellState<H, P, I> {
+    pub const fn state(&self) -> &AuthorizedShellState<H, P, L, I> {
         &self.state
     }
 
@@ -1075,19 +1186,21 @@ where
 
     /// Consumes the result and returns the successor state.
     #[must_use]
-    pub fn into_state(self) -> AuthorizedShellState<H, P, I> {
+    pub fn into_state(self) -> AuthorizedShellState<H, P, L, I> {
         self.state
     }
 }
 
-fn authorize_decision<H, P, I>(
-    policy: &AuthorizationPolicy<H, P, I>,
-    invocation: InvocationWitness<H, P, I>,
+fn authorize_decision<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
+    laws: &VerifiedProjectLaws<H, L>,
+    invocation: InvocationWitness<H, P, L, I>,
     decision: TransitionDecision,
-) -> Result<CatalogAuthorizationDecision<H, P, I>, AuthorityError>
+) -> Result<CatalogAuthorizationDecision<H, P, L, I>, AuthorityError>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     match decision {
         Decision::Accept(accepted) => {
@@ -1095,16 +1208,28 @@ where
             if artifacts.reason_id().is_some() {
                 return Err(AuthorityError::Mismatch(AuthorityField::Reason));
             }
-            let authorized = authorize_artifacts(policy, invocation, artifacts)?;
+            let authorized = authorize_artifacts(policy, laws, invocation, artifacts)?;
             Ok(Decision::Accept(Accepted::new(authorized)))
         }
         Decision::Reject(rejected) => {
             let rejection = rejected.into_reason();
             validate_transition_reject(policy, &invocation, &rejection)?;
+            let law_input = LawCheckInput::try_new(
+                policy.catalog_hash,
+                invocation.invocation_id,
+                invocation.pre_state.value().value(),
+                invocation.command.value().value(),
+                invocation.context.value().value(),
+                LawDecisionView::Reject {
+                    reason_id: rejection.reason_id().get(),
+                },
+            )?;
+            let law_evaluation = laws.evaluate(&law_input)?;
             let mut authorized = CatalogAuthorizedReject {
                 rejection_id: Hash32::ZERO,
                 policy_id: policy.policy_id,
                 invocation,
+                law_evaluation,
                 rejection,
             };
             authorized.rejection_id =
@@ -1117,25 +1242,27 @@ where
             if artifacts.reason_id() != Some(reason) {
                 return Err(AuthorityError::Mismatch(AuthorityField::Reason));
             }
-            let authorized = authorize_artifacts(policy, invocation, artifacts)?;
+            let authorized = authorize_artifacts(policy, laws, invocation, artifacts)?;
             Ok(Decision::CommittedFailure(Failed::new(authorized, reason)))
         }
     }
 }
 
-fn authorize_artifacts<H, P, I>(
-    policy: &AuthorizationPolicy<H, P, I>,
-    invocation: InvocationWitness<H, P, I>,
+fn authorize_artifacts<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
+    laws: &VerifiedProjectLaws<H, L>,
+    invocation: InvocationWitness<H, P, L, I>,
     artifacts: TransitionArtifacts,
-) -> Result<CatalogAuthorizedTransition<H, P, I>, AuthorityError>
+) -> Result<CatalogAuthorizedTransition<H, P, L, I>, AuthorityError>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     if artifacts.resources().limits() != policy.transition_limits {
         return Err(AuthorityError::Mismatch(AuthorityField::TransitionLimits));
     }
-    artifacts.validate::<H>(
+    let applied = artifacts.validate_and_apply::<H>(
         policy.catalog(),
         invocation.expected,
         invocation.pre_state.value().value(),
@@ -1145,10 +1272,42 @@ where
     if bundle.body().pre_root() != invocation.pre_root {
         return Err(AuthorityError::Mismatch(AuthorityField::PreRoot));
     }
+    let law_decision = match bundle.body().decision_kind() {
+        DecisionKind::Accept => LawDecisionView::Accept {
+            post_state: applied.state(),
+            patch: bundle.patch(),
+            commit_plan: bundle.commit_plan(),
+            outbox_plan: bundle.outbox_plan(),
+        },
+        DecisionKind::CommittedFailure => LawDecisionView::CommittedFailure {
+            reason_id: artifacts
+                .reason_id()
+                .ok_or(AuthorityError::Mismatch(AuthorityField::Reason))?
+                .get(),
+            post_state: applied.state(),
+            patch: bundle.patch(),
+            commit_plan: bundle.commit_plan(),
+            outbox_plan: bundle.outbox_plan(),
+        },
+        DecisionKind::Reject => {
+            return Err(AuthorityError::Mismatch(AuthorityField::Reason));
+        }
+    };
+    let law_input = LawCheckInput::try_new(
+        policy.catalog_hash,
+        invocation.invocation_id,
+        invocation.pre_state.value().value(),
+        invocation.command.value().value(),
+        invocation.context.value().value(),
+        law_decision,
+    )?;
+    let law_evaluation = laws.evaluate(&law_input)?;
     let bundle_hash = hash_canonical::<H>("zeno-fcis/authorized-bundle", bundle)?;
     let body = AuthorizationBody {
         policy_id: policy.policy_id,
         invocation_id: invocation.invocation_id,
+        law_set_hash: policy.law_set_hash,
+        law_evaluation_hash: law_evaluation.evaluation_hash(),
         candidate_id: bundle.candidate_id(),
         bundle_hash,
         decision_kind: bundle.body().decision_kind(),
@@ -1168,18 +1327,20 @@ where
         authorization_id: AuthorizationId(authorization_hash),
         body,
         invocation,
+        law_evaluation,
         artifacts,
     })
 }
 
-fn validate_transition_reject<H, P, I>(
-    policy: &AuthorizationPolicy<H, P, I>,
-    invocation: &InvocationWitness<H, P, I>,
+fn validate_transition_reject<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
+    invocation: &InvocationWitness<H, P, L, I>,
     rejection: &TransitionReject,
 ) -> Result<(), AuthorityError>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     if rejection.resources().limits() != policy.transition_limits {
         return Err(AuthorityError::Mismatch(AuthorityField::TransitionLimits));
@@ -1193,8 +1354,8 @@ where
     Ok(())
 }
 
-fn validate_envelope_bindings<H, P, I>(
-    policy: &AuthorizationPolicy<H, P, I>,
+fn validate_envelope_bindings<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
     pre_state: &SchemaAdmittedEnvelope,
     command: &SchemaAdmittedTypeEnvelope,
     context: &SchemaAdmittedTypeEnvelope,
@@ -1202,6 +1363,7 @@ fn validate_envelope_bindings<H, P, I>(
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     validate_root_envelope(policy, pre_state)?;
     for actual in [command.schema_hash(), context.schema_hash()] {
@@ -1218,13 +1380,14 @@ where
     Ok(())
 }
 
-fn validate_root_envelope<H, P, I>(
-    policy: &AuthorizationPolicy<H, P, I>,
+fn validate_root_envelope<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
     pre_state: &SchemaAdmittedEnvelope,
 ) -> Result<(), AuthorityError>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     if pre_state.schema_hash() != policy.catalog.schema_hash() {
         return Err(AuthorityError::Mismatch(AuthorityField::Schema));
@@ -1235,13 +1398,14 @@ where
     Ok(())
 }
 
-fn command_commitment<H, P, I>(
-    policy: &AuthorizationPolicy<H, P, I>,
+fn command_commitment<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
     command: &SchemaAdmittedTypeEnvelope,
 ) -> Result<Hash32, AuthorityError>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     let mut domain_name = policy
         .catalog
@@ -1256,8 +1420,8 @@ where
     Ok(value)
 }
 
-fn context_commitment<H, P, I>(
-    policy: &AuthorizationPolicy<H, P, I>,
+fn context_commitment<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
     context: &SchemaAdmittedTypeEnvelope,
     principal_hash: NonZeroHash,
     authentication_evidence_hash: NonZeroHash,
@@ -1266,6 +1430,7 @@ fn context_commitment<H, P, I>(
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"ZFCIS-COMPLETE-INVOCATION-CONTEXT\0");
@@ -1284,14 +1449,15 @@ where
     Ok(value)
 }
 
-fn encode_authorization_envelope<H, P, I>(
+fn encode_authorization_envelope<H, P, L, I>(
     body: &AuthorizationBody,
-    invocation: &InvocationWitness<H, P, I>,
+    invocation: &InvocationWitness<H, P, L, I>,
     output: &mut Vec<u8>,
 ) -> Result<(), EncodeError>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
 {
     output.extend_from_slice(b"ZFCIS-AUTHORIZED-TRANSITION\0");
     output.extend_from_slice(&AUTHORIZATION_FORMAT_VERSION.to_be_bytes());
@@ -1345,6 +1511,16 @@ pub enum AuthorityField {
     Catalog,
     /// Complete policy identity.
     PolicyId,
+    /// Project catalog committed by the verified law set.
+    LawCatalog,
+    /// Source/profile/schema/algorithm bindings of the verified law set.
+    LawSourceBindings,
+    /// Complete verified relational-law set.
+    LawSet,
+    /// Reviewed per-invocation law-engine build.
+    LawEngine,
+    /// Independent retained-evidence verifier.
+    LawEvidenceVerifier,
     /// Complete invocation identity.
     InvocationId,
     /// Deployment-specific authorization identity.
@@ -1386,6 +1562,8 @@ pub enum AuthorityError {
     Patch(PatchError),
     /// Catalogued transition validation failed.
     Transition(TransitionError),
+    /// Project relational-law validation or evaluation failed.
+    Laws(LawError),
 }
 
 impl From<CatalogError> for AuthorityError {
@@ -1412,6 +1590,12 @@ impl From<TransitionError> for AuthorityError {
     }
 }
 
+impl From<LawError> for AuthorityError {
+    fn from(error: LawError) -> Self {
+        Self::Laws(error)
+    }
+}
+
 impl fmt::Display for AuthorityError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1423,6 +1607,7 @@ impl fmt::Display for AuthorityError {
             Self::Transition(error) => {
                 write!(formatter, "authorization transition failed: {error}")
             }
+            Self::Laws(error) => write!(formatter, "authorization project laws failed: {error}"),
         }
     }
 }
@@ -1520,6 +1705,12 @@ mod tests {
     use zeno_fcis_catalog::{CatalogLimits, ReasonDefinition, ReasonDisposition};
     use zeno_fcis_core::BudgetUsed;
     use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
+    use zeno_fcis_evidence::EvidenceEnvelope;
+    use zeno_fcis_laws::{
+        DecisionScope, LawDefinition, LawEvidenceRequirement, LawEvidenceVerifier, LawFamilyPolicy,
+        LawKind, LawLimits, LawObservation, LawProofDecision, LawProofSubject, LawStatus,
+        ProjectLawEngine, VerifiedProjectLaws, verify_project_laws,
+    };
     use zeno_fcis_project::{
         DomainPrefix, ProfileBindings, ProjectProfile, RegistryEntry, RegistryKind, StableName,
     };
@@ -1603,6 +1794,62 @@ mod tests {
     #[derive(Clone, Copy, Debug)]
     struct TestInterpreter;
 
+    #[derive(Clone, Copy, Debug)]
+    struct TestLawEngine;
+
+    impl ProjectLawEngine for TestLawEngine {
+        fn evaluate(
+            &self,
+            input: &LawCheckInput<'_>,
+            _: LawLimits,
+        ) -> Result<Vec<LawObservation>, zeno_fcis_laws::LawEngineFailure> {
+            let witness = hash(91);
+            match input.decision().kind() {
+                DecisionKind::Accept => Ok(vec![
+                    LawObservation::try_new(semantic_id(1_001), LawStatus::Satisfied, witness)
+                        .unwrap_or_else(|error| panic!("law observation: {error}")),
+                ]),
+                DecisionKind::Reject => Ok(Vec::new()),
+                DecisionKind::CommittedFailure => Ok(vec![
+                    LawObservation::try_new(semantic_id(1_001), LawStatus::Satisfied, witness)
+                        .unwrap_or_else(|error| panic!("law observation: {error}")),
+                    LawObservation::try_new(semantic_id(1_003), LawStatus::Satisfied, witness)
+                        .unwrap_or_else(|error| panic!("law observation: {error}")),
+                ]),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug)]
+    struct ViolatingLawEngine;
+
+    impl ProjectLawEngine for ViolatingLawEngine {
+        fn evaluate(
+            &self,
+            _: &LawCheckInput<'_>,
+            _: LawLimits,
+        ) -> Result<Vec<LawObservation>, zeno_fcis_laws::LawEngineFailure> {
+            Ok(vec![
+                LawObservation::try_new(semantic_id(1_001), LawStatus::Violated, hash(95))
+                    .unwrap_or_else(|error| panic!("law observation: {error}")),
+            ])
+        }
+    }
+
+    struct TestEvidenceVerifier;
+
+    impl LawEvidenceVerifier for TestEvidenceVerifier {
+        fn verifier_identity(&self) -> Hash32 {
+            hash(92)
+        }
+
+        fn verify(&self, _: &LawProofSubject, _: &EvidenceEnvelope, _: &[u8]) -> LawProofDecision {
+            LawProofDecision::Attested {
+                verification_claim: hash(93),
+            }
+        }
+    }
+
     fn hash(byte: u8) -> Hash32 {
         Hash32::new([byte; 32])
     }
@@ -1630,6 +1877,59 @@ mod tests {
             .unwrap_or_else(|error| panic!("registry entry: {error}"))
     }
 
+    fn law_manifest() -> zeno_fcis_laws::LawManifest {
+        let families = LawKind::ALL
+            .into_iter()
+            .map(|kind| {
+                if matches!(
+                    kind,
+                    LawKind::StateInvariant
+                        | LawKind::RejectNoAuthority
+                        | LawKind::CommittedFailureEffects
+                ) {
+                    LawFamilyPolicy::required(kind)
+                } else {
+                    LawFamilyPolicy::not_applicable(kind, hash(94))
+                        .unwrap_or_else(|error| panic!("law family: {error}"))
+                }
+            })
+            .collect();
+        let definitions = vec![
+            LawDefinition::try_new(
+                semantic_id(1_001),
+                stable_name("state-invariant"),
+                LawKind::StateInvariant,
+                DecisionScope::Committing,
+                hash(101),
+                hash(111),
+                LawEvidenceRequirement::RuntimeOnly,
+            )
+            .unwrap_or_else(|error| panic!("state law: {error}")),
+            LawDefinition::try_new(
+                semantic_id(1_002),
+                stable_name("reject-no-authority"),
+                LawKind::RejectNoAuthority,
+                DecisionScope::Reject,
+                hash(102),
+                hash(112),
+                LawEvidenceRequirement::RuntimeOnly,
+            )
+            .unwrap_or_else(|error| panic!("reject law: {error}")),
+            LawDefinition::try_new(
+                semantic_id(1_003),
+                stable_name("committed-failure-effects"),
+                LawKind::CommittedFailureEffects,
+                DecisionScope::CommittedFailure,
+                hash(103),
+                hash(113),
+                LawEvidenceRequirement::RuntimeOnly,
+            )
+            .unwrap_or_else(|error| panic!("failure law: {error}")),
+        ];
+        zeno_fcis_laws::LawManifest::try_new(families, definitions)
+            .unwrap_or_else(|error| panic!("law manifest: {error}"))
+    }
+
     fn fixture_catalog() -> ProjectCatalog {
         let schema = Schema::try_new(
             "AuthorityFixture",
@@ -1654,12 +1954,17 @@ mod tests {
         let manifest =
             CatalogManifest::try_new::<RustCryptoSha256>(vec![reason], Vec::new(), Vec::new())
                 .unwrap_or_else(|error| panic!("manifest: {error}"));
+        let laws = law_manifest();
         let mut entries = vec![
             registry_entry(RegistryKind::StateType, 1, "state"),
             registry_entry(RegistryKind::CommandType, 2, "command"),
             registry_entry(RegistryKind::ContextType, 3, "context"),
         ];
         entries.extend_from_slice(manifest.registry_entries());
+        entries.extend(
+            laws.registry_entries::<RustCryptoSha256>()
+                .unwrap_or_else(|error| panic!("law registry: {error}")),
+        );
         let profile = ProjectProfile::try_new(
             stable_name("authority-fixture"),
             stable_name("core"),
@@ -1679,7 +1984,9 @@ mod tests {
                 codec_hash: hash(41),
                 effect_registry_hash: manifest.effect_registry_hash(),
                 channel_registry_hash: manifest.channel_registry_hash(),
-                policy_hash: hash(42),
+                policy_hash: laws
+                    .commitment::<RustCryptoSha256>()
+                    .unwrap_or_else(|error| panic!("law commitment: {error}")),
             },
             entries,
         )
@@ -1691,6 +1998,38 @@ mod tests {
             CatalogLimits::default(),
         )
         .unwrap_or_else(|error| panic!("catalog: {error}"))
+    }
+
+    fn verified_laws(
+        catalog: &ProjectCatalog,
+    ) -> VerifiedProjectLaws<RustCryptoSha256, TestLawEngine> {
+        verify_project_laws::<RustCryptoSha256, _, _>(
+            catalog,
+            law_manifest(),
+            hash(90),
+            Vec::new(),
+            LawLimits::default(),
+            hash(91),
+            TestLawEngine,
+            &TestEvidenceVerifier,
+        )
+        .unwrap_or_else(|error| panic!("verified laws: {error}"))
+    }
+
+    fn violating_laws(
+        catalog: &ProjectCatalog,
+    ) -> VerifiedProjectLaws<RustCryptoSha256, ViolatingLawEngine> {
+        verify_project_laws::<RustCryptoSha256, _, _>(
+            catalog,
+            law_manifest(),
+            hash(90),
+            Vec::new(),
+            LawLimits::default(),
+            hash(96),
+            ViolatingLawEngine,
+            &TestEvidenceVerifier,
+        )
+        .unwrap_or_else(|error| panic!("verified laws: {error}"))
     }
 
     fn transition_limits() -> TransitionLimits {
@@ -1712,7 +2051,8 @@ mod tests {
     fn accept_authority(
         catalog: &ProjectCatalog,
         deployment_byte: u8,
-    ) -> CatalogCommitAuthority<RustCryptoSha256, AcceptProgram, TestInterpreter> {
+    ) -> CatalogCommitAuthority<RustCryptoSha256, AcceptProgram, TestLawEngine, TestInterpreter>
+    {
         let provider = verify_approved_provider::<RustCryptoSha256>()
             .unwrap_or_else(|error| panic!("approved provider: {error}"));
         CatalogCommitAuthority::try_new(
@@ -1722,6 +2062,26 @@ mod tests {
             execution(deployment_byte),
             transition_limits(),
             &provider,
+            verified_laws(catalog),
+            AcceptProgram,
+        )
+        .unwrap_or_else(|error| panic!("commit authority: {error}"))
+    }
+
+    fn violating_authority(
+        catalog: &ProjectCatalog,
+    ) -> CatalogCommitAuthority<RustCryptoSha256, AcceptProgram, ViolatingLawEngine, TestInterpreter>
+    {
+        let provider = verify_approved_provider::<RustCryptoSha256>()
+            .unwrap_or_else(|error| panic!("approved provider: {error}"));
+        CatalogCommitAuthority::try_new(
+            catalog,
+            StateDomainBinding::try_new("authority/fixture/state", 1)
+                .unwrap_or_else(|error| panic!("state domain: {error}")),
+            execution(53),
+            transition_limits(),
+            &provider,
+            violating_laws(catalog),
             AcceptProgram,
         )
         .unwrap_or_else(|error| panic!("commit authority: {error}"))
@@ -1729,7 +2089,8 @@ mod tests {
 
     fn reject_authority(
         catalog: &ProjectCatalog,
-    ) -> CatalogCommitAuthority<RustCryptoSha256, RejectProgram, TestInterpreter> {
+    ) -> CatalogCommitAuthority<RustCryptoSha256, RejectProgram, TestLawEngine, TestInterpreter>
+    {
         let provider = verify_approved_provider::<RustCryptoSha256>()
             .unwrap_or_else(|error| panic!("approved provider: {error}"));
         CatalogCommitAuthority::try_new(
@@ -1739,6 +2100,7 @@ mod tests {
             execution(53),
             transition_limits(),
             &provider,
+            verified_laws(catalog),
             RejectProgram,
         )
         .unwrap_or_else(|error| panic!("reject authority: {error}"))
@@ -1746,7 +2108,8 @@ mod tests {
 
     fn wrong_limits_authority(
         catalog: &ProjectCatalog,
-    ) -> CatalogCommitAuthority<RustCryptoSha256, WrongLimitsProgram, TestInterpreter> {
+    ) -> CatalogCommitAuthority<RustCryptoSha256, WrongLimitsProgram, TestLawEngine, TestInterpreter>
+    {
         let provider = verify_approved_provider::<RustCryptoSha256>()
             .unwrap_or_else(|error| panic!("approved provider: {error}"));
         CatalogCommitAuthority::try_new(
@@ -1756,6 +2119,7 @@ mod tests {
             execution(53),
             transition_limits(),
             &provider,
+            verified_laws(catalog),
             WrongLimitsProgram,
         )
         .unwrap_or_else(|error| panic!("wrong-limits authority: {error}"))
@@ -1790,14 +2154,15 @@ mod tests {
         .unwrap_or_else(|error| panic!("context envelope: {error}"))
     }
 
-    fn admit<P>(
-        authority: &CatalogCommitAuthority<RustCryptoSha256, P, TestInterpreter>,
+    fn admit<P, L>(
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, TestInterpreter>,
         catalog: &ProjectCatalog,
         principal: u8,
         replay: u8,
-    ) -> InvocationWitness<RustCryptoSha256, P, TestInterpreter>
+    ) -> InvocationWitness<RustCryptoSha256, P, L, TestInterpreter>
     where
         P: CatalogTransitionProgram<RustCryptoSha256>,
+        L: ProjectLawEngine,
     {
         authority
             .admit_invocation(
@@ -1812,11 +2177,17 @@ mod tests {
     }
 
     fn accept(
-        authority: &CatalogCommitAuthority<RustCryptoSha256, AcceptProgram, TestInterpreter>,
+        authority: &CatalogCommitAuthority<
+            RustCryptoSha256,
+            AcceptProgram,
+            TestLawEngine,
+            TestInterpreter,
+        >,
         catalog: &ProjectCatalog,
         principal: u8,
         replay: u8,
-    ) -> CatalogAuthorizedTransition<RustCryptoSha256, AcceptProgram, TestInterpreter> {
+    ) -> CatalogAuthorizedTransition<RustCryptoSha256, AcceptProgram, TestLawEngine, TestInterpreter>
+    {
         match authority
             .execute(admit(authority, catalog, principal, replay))
             .unwrap_or_else(|error| panic!("execute: {error}"))
@@ -1870,6 +2241,34 @@ mod tests {
             other_replay.body().candidate_id()
         );
         assert_ne!(base.authorization_id(), other_replay.authorization_id());
+        assert_eq!(
+            base.body().law_set_hash(),
+            authority.policy().law_set_hash()
+        );
+        assert_eq!(
+            base.body().law_evaluation_hash(),
+            base.law_evaluation().evaluation_hash()
+        );
+    }
+
+    #[test]
+    fn violated_project_law_cannot_mint_commit_authority() {
+        let catalog = fixture_catalog();
+        let authority = violating_authority(&catalog);
+        let error = authority
+            .execute(admit(&authority, &catalog, 60, 62))
+            .err()
+            .unwrap_or_else(|| panic!("violated law must fail"));
+        assert!(matches!(
+            error,
+            CatalogExecutionError::Authority(AuthorityError::Laws(
+                LawError::LawNotSatisfied {
+                    law_id,
+                    status: LawStatus::Violated,
+                    ..
+                }
+            )) if law_id == semantic_id(1_001)
+        ));
     }
 
     #[test]
