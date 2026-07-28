@@ -1,0 +1,52 @@
+name: release-candidate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zeno-fcis-release-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+
+      - name: Check hostile package mutations
+        run: python3 tools/rc1_package.py self-test
+
+      - name: Check package authority and documentation
+        run: |
+          python3 tools/rc1_package.py check
+          python3 tools/check_library_docs.py
+
+      - name: Assemble exact release-candidate artifacts
+        run: python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
+
+      - name: Verify retained checksums
+        working-directory: /tmp/zeno-fcis-rc1
+        run: sha256sum --check SHA256SUMS
+
+      - name: Upload review artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zeno-fcis-1.0.0-rc.1-${{ github.sha }}
+          path: /tmp/zeno-fcis-rc1
+          if-no-files-found: error
+          retention-days: 14

@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 authors.workspace = true
+readme.workspace = true
 
 [features]
 default = ["std"]
@@ -20,14 +21,14 @@ std = [
 ]
 
 [dependencies]
-zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
-zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch", default-features = false }
-zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan", default-features = false }
-zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt", default-features = false }
-zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.1", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-patch = { version = "=1.0.0-rc.1", path = "../zeno-fcis-patch", default-features = false }
+zeno-fcis-plan = { version = "=1.0.0-rc.1", path = "../zeno-fcis-plan", default-features = false }
+zeno-fcis-receipt = { version = "=1.0.0-rc.1", path = "../zeno-fcis-receipt", default-features = false }
+zeno-fcis-value = { version = "=1.0.0-rc.1", path = "../zeno-fcis-value", default-features = false }
 
 [dev-dependencies]
-zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core" }
+zeno-fcis-core = { version = "=1.0.0-rc.1", path = "../zeno-fcis-core" }
 
 [lints]
 workspace = true
