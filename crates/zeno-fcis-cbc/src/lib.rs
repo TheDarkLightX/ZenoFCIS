@@ -23,16 +23,13 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use zeno_fcis_catalog::{CatalogError, ProjectCatalog};
-use zeno_fcis_codec::{
-    CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment,
-};
+use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::{Decision, DecisionKind};
 use zeno_fcis_patch::{CanonicalPatch, PatchError};
 use zeno_fcis_plan::{CommitPlan, OutboxPlan};
 use zeno_fcis_project::{RegistryKind, SemanticId, StableName};
-use zeno_fcis_transition::{
-    TransitionDecision, TransitionError, validate_transition_decision,
-};
+use zeno_fcis_receipt::SealError;
+use zeno_fcis_transition::{TransitionDecision, TransitionError, validate_transition_decision};
 use zeno_fcis_value::Value;
 
 /// Canonical format version for law sets, subjects, claims, evidence, and reports.
@@ -104,7 +101,9 @@ impl DecisionScope {
             Self::Accept => matches!(kind, DecisionKind::Accept),
             Self::Reject => matches!(kind, DecisionKind::Reject),
             Self::CommittedFailure => matches!(kind, DecisionKind::CommittedFailure),
-            Self::Committed => matches!(kind, DecisionKind::Accept | DecisionKind::CommittedFailure),
+            Self::Committed => {
+                matches!(kind, DecisionKind::Accept | DecisionKind::CommittedFailure)
+            }
         }
     }
 }
@@ -1140,14 +1139,39 @@ pub enum LawVerificationOutcome {
     Rejected(LawEvaluationFailure),
 }
 
+/// Complete borrowed inputs selected by a law-verification authority.
+pub struct LawVerificationContext<'a, 'd> {
+    law_set: &'a LawSet,
+    catalog: &'a ProjectCatalog,
+    pre_state: &'a Value,
+    state_domain: Domain<'d>,
+    evidence: &'a [LawEvidence],
+}
+
+impl<'a, 'd> LawVerificationContext<'a, 'd> {
+    /// Binds the exact law set, catalog, pre-state, state domain, and evidence.
+    #[must_use]
+    pub const fn new(
+        law_set: &'a LawSet,
+        catalog: &'a ProjectCatalog,
+        pre_state: &'a Value,
+        state_domain: Domain<'d>,
+        evidence: &'a [LawEvidence],
+    ) -> Self {
+        Self {
+            law_set,
+            catalog,
+            pre_state,
+            state_domain,
+            evidence,
+        }
+    }
+}
+
 /// Validates, reconstructs, evaluates, and nominally seals one transition.
 pub fn verify_transition_laws<H, C, V>(
-    law_set: &LawSet,
-    catalog: &ProjectCatalog,
-    pre_state: &Value,
-    state_domain: Domain<'_>,
+    context: &LawVerificationContext<'_, '_>,
     decision: TransitionDecision,
-    evidence: &[LawEvidence],
     checker: &C,
     verifier: &V,
 ) -> Result<LawVerificationOutcome, CbcError>
@@ -1157,13 +1181,19 @@ where
     V: LawEvidenceVerifier,
 {
     let subject = LawSubject::from_transition::<H>(
-        law_set,
-        catalog,
-        pre_state,
-        state_domain,
+        context.law_set,
+        context.catalog,
+        context.pre_state,
+        context.state_domain,
         &decision,
     )?;
-    let report = evaluate_subject::<H, C, V>(law_set, &subject, evidence, checker, verifier)?;
+    let report = evaluate_subject::<H, C, V>(
+        context.law_set,
+        &subject,
+        context.evidence,
+        checker,
+        verifier,
+    )?;
     if report.is_verified() {
         let report_hash = report.commitment::<H>()?;
         Ok(LawVerificationOutcome::Verified(LawVerifiedTransition {
@@ -1262,6 +1292,8 @@ pub enum CbcError {
     Transition(TransitionError),
     /// Patch application failed.
     Patch(PatchError),
+    /// Sealed bundle validation or reconstruction failed.
+    Seal(SealError),
     /// Canonical encoding or commitment construction failed.
     Encode(EncodeError),
 }
@@ -1281,6 +1313,12 @@ impl From<TransitionError> for CbcError {
 impl From<PatchError> for CbcError {
     fn from(error: PatchError) -> Self {
         Self::Patch(error)
+    }
+}
+
+impl From<SealError> for CbcError {
+    fn from(error: SealError) -> Self {
+        Self::Seal(error)
     }
 }
 
@@ -1309,6 +1347,7 @@ impl fmt::Display for CbcError {
             Self::Catalog(error) => write!(formatter, "CBC catalog failed: {error}"),
             Self::Transition(error) => write!(formatter, "CBC transition failed: {error}"),
             Self::Patch(error) => write!(formatter, "CBC patch failed: {error}"),
+            Self::Seal(error) => write!(formatter, "CBC sealed bundle failed: {error}"),
             Self::Encode(error) => write!(formatter, "CBC encoding failed: {error}"),
         }
     }
@@ -1445,7 +1484,10 @@ mod tests {
 
     #[test]
     fn executable_and_evidence_law_produces_verified_report() {
-        let definition = law(LawRequirement::ExecutableAndEvidence, DecisionScope::Committed);
+        let definition = law(
+            LawRequirement::ExecutableAndEvidence,
+            DecisionScope::Committed,
+        );
         let laws = set(definition.clone());
         let transition = subject(100);
         let evidence = exact_evidence(&laws, &definition, &transition, hash(30), hash(31));

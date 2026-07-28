@@ -106,8 +106,9 @@ pub use zeno_fcis_catalog::{
 pub use zeno_fcis_cbc::{
     CBC_FORMAT_VERSION, CbcError, DecisionScope, LawBlocker, LawCheck, LawChecker, LawClaim,
     LawDefinition, LawEvaluationFailure, LawEvaluationReport, LawEvidence, LawEvidenceVerifier,
-    LawKind, LawRequirement, LawSet, LawSubject, LawVerificationOutcome, LawVerifiedTransition,
-    MAX_CBC_BLOCKERS, MAX_CBC_EVIDENCE, MAX_CBC_LAWS, evaluate_subject, verify_transition_laws,
+    LawKind, LawRequirement, LawSet, LawSubject, LawVerificationContext, LawVerificationOutcome,
+    LawVerifiedTransition, MAX_CBC_BLOCKERS, MAX_CBC_EVIDENCE, MAX_CBC_LAWS, evaluate_subject,
+    verify_transition_laws,
 };
 pub use zeno_fcis_codec::{
     AdmittedEnvelope, CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain,
