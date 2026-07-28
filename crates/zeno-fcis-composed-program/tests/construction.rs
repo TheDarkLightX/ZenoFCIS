@@ -8,7 +8,8 @@ use zeno_fcis_catalog::{
 };
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_compose::{
-    AccessPath, ComponentContract, ComponentId, CompositionSpec, Footprint, PathSet,
+    AccessPath, ComponentContract, ComponentId, CompositionSpec, Footprint, MAX_PATH_ATOMS,
+    PathAtom, PathSet,
 };
 use zeno_fcis_composed_program::{
     ComposedDomainProgram, ComposedProgramError, ExternalOutput, ProjectionPlan,
@@ -28,15 +29,17 @@ use zeno_fcis_project::{
     StableName,
 };
 use zeno_fcis_schema::{
-    Schema, SchemaAdmittedTypeEnvelope, SchemaLimits, TypeDef, TypeId, TypeKind, ValidationLimits,
+    FieldDef, FieldId, Schema, SchemaAdmittedTypeEnvelope, SchemaLimits, TypeDef, TypeId, TypeKind,
+    ValidationLimits,
 };
-use zeno_fcis_value::Value;
+use zeno_fcis_value::{Field, Value};
 
 const COMPONENT: ComponentId = ComponentId::new(1);
 const STATE_TYPE: TypeId = TypeId::new(1);
 const COMMAND_TYPE: TypeId = TypeId::new(2);
 const CONTEXT_TYPE: TypeId = TypeId::new(3);
 const PAYLOAD_TYPE: TypeId = TypeId::new(4);
+const STATE_CELL_TYPE: TypeId = TypeId::new(5);
 
 fn must<T, E: Debug>(result: Result<T, E>) -> T {
     match result {
@@ -58,7 +61,11 @@ fn name(value: &str) -> StableName {
 }
 
 fn path(namespace: u32) -> AccessPath {
-    must(AccessPath::try_new(namespace, Vec::new()))
+    access_path(namespace, Vec::new())
+}
+
+fn access_path(namespace: u32, atoms: Vec<PathAtom>) -> AccessPath {
+    must(AccessPath::try_new(namespace, atoms))
 }
 
 fn set(paths: Vec<AccessPath>) -> PathSet {
@@ -66,25 +73,38 @@ fn set(paths: Vec<AccessPath>) -> PathSet {
 }
 
 fn schema() -> Schema {
-    let types = [
-        (STATE_TYPE, "State"),
-        (COMMAND_TYPE, "Command"),
-        (CONTEXT_TYPE, "Context"),
-        (PAYLOAD_TYPE, "Payload"),
-    ]
-    .map(|(type_id, label)| {
+    let bool_type = |type_id, label| {
         must(TypeDef::try_new(
             type_id,
             label,
             TypeKind::Bool,
             SchemaLimits::default(),
         ))
-    });
+    };
+    let types = vec![
+        must(TypeDef::try_new(
+            STATE_TYPE,
+            "State",
+            TypeKind::Record {
+                fields: vec![must(FieldDef::try_new(
+                    FieldId::new(1),
+                    "cell",
+                    STATE_CELL_TYPE,
+                ))]
+                .into_boxed_slice(),
+            },
+            SchemaLimits::default(),
+        )),
+        bool_type(COMMAND_TYPE, "Command"),
+        bool_type(CONTEXT_TYPE, "Context"),
+        bool_type(PAYLOAD_TYPE, "Payload"),
+        bool_type(STATE_CELL_TYPE, "StateCell"),
+    ];
     must(Schema::try_new(
         "ComposedProgramFixture",
         1,
         STATE_TYPE,
-        types.into_iter().collect(),
+        types,
         SchemaLimits::default(),
     ))
 }
@@ -129,8 +149,19 @@ fn manifest_with_requirements(
 }
 
 fn executable(schema: &Schema) -> ExecutableComposition<1, 1, 1> {
+    executable_with_state_path(schema, path(STATE_TYPE.get()))
+}
+
+fn executable_with_state_path(
+    schema: &Schema,
+    state: AccessPath,
+) -> ExecutableComposition<1, 1, 1> {
     let schema_hash = must(schema.schema_hash::<RustCryptoSha256>());
-    let state = path(STATE_TYPE.get());
+    let state_type = if state.atoms().is_empty() {
+        STATE_TYPE
+    } else {
+        STATE_CELL_TYPE
+    };
     let context = path(CONTEXT_TYPE.get());
     let output = path(20);
     let contract = must(ComponentContract::try_new(
@@ -163,7 +194,7 @@ fn executable(schema: &Schema) -> ExecutableComposition<1, 1, 1> {
         )),
         [must(TypedPathBinding::try_new(
             state,
-            must(EnvelopeBinding::try_new(STATE_TYPE, schema_hash)),
+            must(EnvelopeBinding::try_new(state_type, schema_hash)),
         ))],
         [None],
         [Some(must(TypedPathBinding::try_new(
@@ -175,8 +206,12 @@ fn executable(schema: &Schema) -> ExecutableComposition<1, 1, 1> {
 }
 
 fn projection(output: ExternalOutput) -> ProjectionPlan<1, 1, 1> {
+    projection_with_state_path(output, ValuePath::new(Vec::new()))
+}
+
+fn projection_with_state_path(output: ExternalOutput, state: ValuePath) -> ProjectionPlan<1, 1, 1> {
     must(ProjectionPlan::try_new(
-        [[ValuePath::new(Vec::new())]],
+        [[state]],
         [ValuePath::new(Vec::new())],
         [ValuePath::new(Vec::new())],
         [vec![id(10), id(11)]],
@@ -291,6 +326,37 @@ fn effect_output() -> ExternalOutput {
     }
 }
 
+fn assert_state_projection_path_mismatch(interface_path: AccessPath, projection_path: ValuePath) {
+    let schema = schema();
+    let manifest = manifest();
+    let executable = executable_with_state_path(&schema, interface_path);
+    let projection = projection_with_state_path(effect_output(), projection_path);
+    let machine_hashes = [hash(70)];
+    let algorithm_hash = must(derive_semantic_program_hash::<RustCryptoSha256, 1, 1, 1>(
+        &executable,
+        &projection,
+        &machine_hashes,
+        &machine_limits(),
+        projection_limits(),
+    ));
+    let catalog = catalog(&schema, manifest, algorithm_hash);
+    assert!(matches!(
+        ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
+            &catalog,
+            executable,
+            [fixture_machine(&schema)],
+            projection,
+            machine_hashes,
+            machine_limits(),
+            projection_limits(),
+        ),
+        Err(ComposedProgramError::StateProjectionPathMismatch {
+            machine: 0,
+            slot: 0
+        })
+    ));
+}
+
 #[test]
 fn exact_semantic_program_identity_is_constructible() {
     let schema = schema();
@@ -319,6 +385,62 @@ fn exact_semantic_program_identity_is_constructible() {
     );
     assert_eq!(program.semantic_program_hash(), algorithm_hash);
     assert_eq!(program.machine_build_hashes(), &[hash(70)]);
+}
+
+#[test]
+fn matching_schema_reachable_nonroot_state_projection_path_is_constructible() {
+    let schema = schema();
+    let valid_root = must(Value::record_canonical(vec![Field::new(
+        1,
+        Value::Bool(false),
+    )]));
+    must(schema.validate_value(STATE_TYPE, &valid_root, ValidationLimits::default()));
+    let manifest = manifest();
+    let executable = executable_with_state_path(
+        &schema,
+        access_path(STATE_TYPE.get(), vec![PathAtom::Field(1)]),
+    );
+    let projection =
+        projection_with_state_path(effect_output(), ValuePath::new(vec![PathSegment::Field(1)]));
+    let machine_hashes = [hash(70)];
+    let algorithm_hash = must(derive_semantic_program_hash::<RustCryptoSha256, 1, 1, 1>(
+        &executable,
+        &projection,
+        &machine_hashes,
+        &machine_limits(),
+        projection_limits(),
+    ));
+    let catalog = catalog(&schema, manifest, algorithm_hash);
+
+    assert!(
+        ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
+            &catalog,
+            executable,
+            [fixture_machine(&schema)],
+            projection,
+            machine_hashes,
+            machine_limits(),
+            projection_limits(),
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn state_projection_path_must_equal_the_exact_interface_path() {
+    assert_state_projection_path_mismatch(
+        path(STATE_TYPE.get()),
+        ValuePath::new(vec![PathSegment::Field(1)]),
+    );
+    assert_state_projection_path_mismatch(
+        access_path(STATE_TYPE.get(), vec![PathAtom::Field(1)]),
+        ValuePath::new(Vec::new()),
+    );
+    assert_state_projection_path_mismatch(
+        access_path(STATE_TYPE.get(), vec![PathAtom::Field(1)]),
+        ValuePath::new(vec![PathSegment::Field(2)]),
+    );
+    assert_state_projection_path_mismatch(path(STATE_TYPE.get() + 1), ValuePath::new(Vec::new()));
 }
 
 #[test]
@@ -412,7 +534,7 @@ fn fixed_effect_authority_must_satisfy_the_catalog() {
 }
 
 #[test]
-fn direct_projection_rejects_map_keys_and_overlapping_state() {
+fn direct_projection_rejects_map_keys_overlapping_state_and_excess_depth() {
     let map_path = ValuePath::new(vec![PathSegment::MapKey(vec![1_u8].into_boxed_slice())]);
     assert!(matches!(
         ProjectionPlan::<1, 1, 1>::try_new(
@@ -437,6 +559,54 @@ fn direct_projection_rejects_map_keys_and_overlapping_state() {
             [[]],
         ),
         Err(ComposedProgramError::OverlappingRootStatePaths)
+    ));
+
+    let exact_boundary = ValuePath::new(vec![PathSegment::Field(1); MAX_PATH_ATOMS]);
+    assert!(
+        ProjectionPlan::<1, 1, 0>::try_new(
+            [[exact_boundary.clone()]],
+            [exact_boundary.clone()],
+            [exact_boundary],
+            [vec![id(10)]],
+            [[]],
+        )
+        .is_ok()
+    );
+
+    let over_boundary = ValuePath::new(vec![PathSegment::Field(1); MAX_PATH_ATOMS + 1]);
+    assert!(matches!(
+        ProjectionPlan::<1, 1, 0>::try_new(
+            [[over_boundary]],
+            [ValuePath::new(Vec::new())],
+            [ValuePath::new(Vec::new())],
+            [vec![id(10)]],
+            [[]],
+        ),
+        Err(ComposedProgramError::ProjectionPathTooDeep)
+    ));
+
+    let over_command = ValuePath::new(vec![PathSegment::Field(1); MAX_PATH_ATOMS + 1]);
+    assert!(matches!(
+        ProjectionPlan::<1, 1, 0>::try_new(
+            [[ValuePath::new(Vec::new())]],
+            [over_command],
+            [ValuePath::new(Vec::new())],
+            [vec![id(10)]],
+            [[]],
+        ),
+        Err(ComposedProgramError::ProjectionPathTooDeep)
+    ));
+
+    let over_context = ValuePath::new(vec![PathSegment::Field(1); MAX_PATH_ATOMS + 1]);
+    assert!(matches!(
+        ProjectionPlan::<1, 1, 0>::try_new(
+            [[ValuePath::new(Vec::new())]],
+            [ValuePath::new(Vec::new())],
+            [over_context],
+            [vec![id(10)]],
+            [[]],
+        ),
+        Err(ComposedProgramError::ProjectionPathTooDeep)
     ));
 }
 
