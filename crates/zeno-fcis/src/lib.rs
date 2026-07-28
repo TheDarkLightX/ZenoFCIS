@@ -32,7 +32,7 @@ pub use zeno_fcis_codegen as codegen;
 #[cfg(feature = "collections")]
 /// Backend-independent persistent collection interfaces and implementations.
 pub use zeno_fcis_collections as collections;
-/// Assume-guarantee contracts and deterministic composition evidence.
+/// Proof-carrying assume-guarantee contracts and deterministic composition evidence.
 pub use zeno_fcis_compose as compose;
 /// Decision algebra, budgets, reasons, and transition traits.
 pub use zeno_fcis_core as core;
@@ -134,9 +134,10 @@ pub use zeno_fcis_codegen::{
 };
 pub use zeno_fcis_compose::{
     AccessPath, Assumption, AssumptionDischarge, ClaimEvidence, ComponentContract, ComponentId,
-    CompositionBlocker, CompositionEvidence, CompositionReport, CompositionSpec, Conflict,
-    ConflictKind, ContractError, EvidenceVerifier, Footprint, FrameRule, Guarantee, PathAtom,
-    PathSet, Wiring, conflicts, verify_assume_guarantee, verify_deterministic_parallel,
+    CompositionBlocker, CompositionClaim, CompositionEvidence, CompositionReport, CompositionSpec,
+    Conflict, ConflictKind, ContractError, EvidenceVerifier, Footprint, FrameRule, Guarantee,
+    ParallelConflictLaw, ParallelParityEvidence, ParallelVerificationContext, PathAtom, PathSet,
+    ProviderGuarantee, Wiring, conflicts, verify_assume_guarantee, verify_deterministic_parallel,
 };
 pub use zeno_fcis_core::{
     Accepted, Budget, BudgetExceeded, BudgetLimits, BudgetUsed, BudgetedDecision, Decision,
@@ -150,6 +151,15 @@ pub use zeno_fcis_crypto::RustCryptoSha256;
 pub use zeno_fcis_crypto::{KnownAnswerReport, ProviderVerificationError, verify_known_answers};
 #[cfg(feature = "sha256-parity")]
 pub use zeno_fcis_crypto::{ProviderParityReport, verify_provider_parity};
+#[cfg(feature = "domain-machines")]
+pub use zeno_fcis_domain::{
+    DOMAIN_MACHINE_FORMAT_VERSION, DomainError, DomainMachine, EnvelopeBinding,
+    ExecutableComposition, FixedInvocationMatrix, FixedOutputMatrix, FixedStateMatrix,
+    MAX_DOMAIN_MACHINES, MAX_PORTS_PER_MACHINE, MAX_STATE_SLOTS_PER_MACHINE, MAX_TOTAL_PORTS,
+    MAX_TOTAL_STATE_SLOTS, MachineCandidate, MachineExecutionReport, MachineFailure,
+    MachineInterface, MachineRejection, PortAddress, SystemCandidate, SystemExecution,
+    TypedPathBinding,
+};
 pub use zeno_fcis_patch::{
     AppliedPatch, CanonicalPatch, PatchDecodeError, PatchDecodeLimits, PatchError, PatchOp,
     PathSegment, ValuePath, decode_canonical_patch, hash_precondition_value, hash_value, value_at,
