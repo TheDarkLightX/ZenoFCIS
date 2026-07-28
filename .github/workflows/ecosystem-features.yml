@@ -13,7 +13,7 @@ permissions:
 jobs:
   features:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -33,13 +33,15 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis-crypto --no-default-features --features parity --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-crypto --all-features --locked
 
-      - name: Synthesis, backend, and transition matrix
+      - name: Synthesis, backend, transition, and CBC matrix
         run: |
           cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis-backend --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-backend --all-features --locked
           cargo +1.97.1 check -p zeno-fcis-transition --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 test -p zeno-fcis-transition --all-features --locked
+          cargo +1.97.1 check -p zeno-fcis-cbc --no-default-features --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 test -p zeno-fcis-cbc --all-features --locked
 
       - name: Security and secret matrix
         run: |
@@ -57,6 +59,7 @@ jobs:
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features backend --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features catalog --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features transition --locked --target wasm32-unknown-unknown
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --features cbc --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features security --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features secret --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --features codegen --locked
