@@ -94,7 +94,7 @@ production backends.
 | Crate | Responsibility |
 |---|---|
 | `zeno-fcis-shell` | Pure atomic commit, replay, and acknowledgement reference semantics |
-| `zeno-fcis-authenticated` | Bounded sparse authenticated-state reference and proofs |
+| `zeno-fcis-authenticated` | Configured projector-bound authenticated-state reference and context-verified sparse-proof witnesses |
 | `zeno-fcis-collections` | Logical persistent-map interface plus reference, `rpds`, and `imbl` implementations |
 
 `apply_reference_bundle` intentionally accepts raw structural data. Production

@@ -16,6 +16,8 @@ use zeno_fcis_value::Value;
 
 /// Maximum logical leaves in the inspectable reference backend.
 pub const MAX_REFERENCE_LEAVES: usize = 4_096;
+/// Canonical encoding version for authenticated update plans.
+pub const AUTHENTICATED_PLAN_ENCODING_VERSION: u16 = 2;
 const TREE_DEPTH: usize = 256;
 
 /// Explicit dual-root authenticated profile.
@@ -23,17 +25,24 @@ const TREE_DEPTH: usize = 256;
 pub struct AuthenticatedProfile {
     tree_id: Hash32,
     profile_hash: Hash32,
+    projector_hash: Hash32,
 }
 
 impl AuthenticatedProfile {
-    /// Creates a profile with explicit tree and activation identities.
-    pub fn try_new(tree_id: Hash32, profile_hash: Hash32) -> Result<Self, AuthError> {
-        if tree_id == Hash32::ZERO || profile_hash == Hash32::ZERO {
+    /// Creates a profile with explicit tree, activation, and projector identities.
+    pub fn try_new(
+        tree_id: Hash32,
+        profile_hash: Hash32,
+        projector_hash: Hash32,
+    ) -> Result<Self, AuthError> {
+        if tree_id == Hash32::ZERO || profile_hash == Hash32::ZERO || projector_hash == Hash32::ZERO
+        {
             return Err(AuthError::ZeroIdentity);
         }
         Ok(Self {
             tree_id,
             profile_hash,
+            projector_hash,
         })
     }
 
@@ -48,10 +57,21 @@ impl AuthenticatedProfile {
     pub const fn profile_hash(self) -> Hash32 {
         self.profile_hash
     }
+
+    /// Returns the declared state-projector commitment.
+    #[must_use]
+    pub const fn projector_hash(self) -> Hash32 {
+        self.projector_hash
+    }
 }
 
-/// Reviewed total projection from semantic state to authenticated logical leaves.
+/// Project-supplied projection expected to cover all authenticated logical leaves.
 pub trait StateProjector {
+    /// Declares the projector identity commitment.
+    ///
+    /// This is an identity binding, not implementation attestation. Production
+    /// setup must select the concrete projector implementation independently.
+    fn declared_projector_hash(&self) -> Hash32;
     /// Returns every logical leaf exactly once.
     fn project(&self, state: &Value) -> Result<Vec<(Hash32, Value)>, AuthError>;
 }
@@ -252,8 +272,10 @@ impl PlannedAuthenticatedCommit {
 
 impl CanonicalEncode for PlannedAuthenticatedCommit {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(&AUTHENTICATED_PLAN_ENCODING_VERSION.to_be_bytes());
         output.extend_from_slice(self.profile.tree_id.as_bytes());
         output.extend_from_slice(self.profile.profile_hash.as_bytes());
+        output.extend_from_slice(self.profile.projector_hash.as_bytes());
         output.extend_from_slice(&self.expected_version.to_be_bytes());
         output.extend_from_slice(&self.next_version.to_be_bytes());
         for hash in [
@@ -297,8 +319,50 @@ impl PlannedState {
     }
 }
 
-/// Plans an authenticated update only after the semantic patch applies exactly.
-pub fn plan_authenticated_update<P: StateProjector>(
+/// Configured authenticated-state planner that owns one projector implementation.
+///
+/// Request-time callers supply states and patches but cannot substitute a
+/// different projector. Projector correctness and completeness remain trusted
+/// setup obligations unless independently proved.
+pub struct AuthenticatedStatePlanner<P> {
+    profile: AuthenticatedProfile,
+    projector: P,
+}
+
+impl<P: StateProjector> AuthenticatedStatePlanner<P> {
+    /// Mounts one concrete projector under the expected authenticated profile.
+    pub fn try_new(profile: AuthenticatedProfile, projector: P) -> Result<Self, AuthError> {
+        if projector.declared_projector_hash() != profile.projector_hash() {
+            return Err(AuthError::ProjectorMismatch);
+        }
+        Ok(Self { profile, projector })
+    }
+
+    /// Returns the mounted authenticated profile.
+    #[must_use]
+    pub const fn profile(&self) -> AuthenticatedProfile {
+        self.profile
+    }
+
+    /// Plans an authenticated update only after the semantic patch applies exactly.
+    pub fn plan(
+        &self,
+        pre_state: &Value,
+        state_domain: Domain<'_>,
+        patch: &CanonicalPatch,
+        tree: &ReferenceSparseTree,
+    ) -> Result<PlannedState, AuthError> {
+        if tree.profile != self.profile {
+            return Err(AuthError::ProfileMismatch);
+        }
+        if self.projector.declared_projector_hash() != self.profile.projector_hash() {
+            return Err(AuthError::ProjectorMismatch);
+        }
+        plan_authenticated_update(pre_state, state_domain, patch, tree, &self.projector)
+    }
+}
+
+fn plan_authenticated_update<P: StateProjector>(
     pre_state: &Value,
     state_domain: Domain<'_>,
     patch: &CanonicalPatch,
@@ -366,7 +430,7 @@ pub enum ProofLeaf {
 /// Fixed-depth membership or absence proof.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SparseProof {
-    profile_hash: Hash32,
+    profile: AuthenticatedProfile,
     version: u64,
     root: Hash32,
     key: Hash32,
@@ -375,10 +439,28 @@ pub struct SparseProof {
 }
 
 impl SparseProof {
+    /// Returns the complete authenticated profile identity.
+    #[must_use]
+    pub const fn profile(&self) -> AuthenticatedProfile {
+        self.profile
+    }
+
+    /// Returns the operational tree identity.
+    #[must_use]
+    pub const fn tree_id(&self) -> Hash32 {
+        self.profile.tree_id()
+    }
+
     /// Returns the dual-root profile identity.
     #[must_use]
     pub const fn profile_hash(&self) -> Hash32 {
-        self.profile_hash
+        self.profile.profile_hash()
+    }
+
+    /// Returns the declared projector commitment.
+    #[must_use]
+    pub const fn projector_hash(&self) -> Hash32 {
+        self.profile.projector_hash()
     }
 
     /// Returns the tree version.
@@ -387,8 +469,60 @@ impl SparseProof {
         self.version
     }
 
-    /// Returns whether the proof recomputes its bound root.
-    pub fn verify(&self) -> Result<bool, AuthError> {
+    /// Returns the root embedded in the untrusted proof payload.
+    #[must_use]
+    pub const fn root(&self) -> Hash32 {
+        self.root
+    }
+
+    /// Returns the key embedded in the untrusted proof payload.
+    #[must_use]
+    pub const fn key(&self) -> Hash32 {
+        self.key
+    }
+
+    /// Returns the proof leaf.
+    #[must_use]
+    pub const fn leaf(&self) -> &ProofLeaf {
+        &self.leaf
+    }
+
+    /// Recomputes the root without establishing an external trust anchor.
+    ///
+    /// This method proves only internal consistency. Authorization decisions
+    /// should use [`Self::verify_against`], retain its nominal witness, and
+    /// separately compare the witness context with authority-owned state.
+    pub fn verify_internal_consistency(&self) -> Result<bool, AuthError> {
+        Ok(self.recompute_root()? == self.root)
+    }
+
+    /// Verifies this proof against the exact supplied expected context.
+    pub fn verify_against(
+        &self,
+        expected: SparseProofContext,
+    ) -> Result<ContextVerifiedSparseProof, AuthError> {
+        if self.profile != expected.profile {
+            return Err(AuthError::ProofProfileMismatch);
+        }
+        if self.version != expected.version {
+            return Err(AuthError::ProofVersionMismatch);
+        }
+        if self.root != expected.root {
+            return Err(AuthError::ProofRootMismatch);
+        }
+        if self.key != expected.key {
+            return Err(AuthError::ProofKeyMismatch);
+        }
+        if self.recompute_root()? != expected.root {
+            return Err(AuthError::InvalidProof);
+        }
+        Ok(ContextVerifiedSparseProof {
+            context: expected,
+            leaf: self.leaf.clone(),
+        })
+    }
+
+    fn recompute_root(&self) -> Result<Hash32, AuthError> {
         if self.siblings.len() != TREE_DEPTH {
             return Err(AuthError::ProofLength);
         }
@@ -404,7 +538,98 @@ impl SparseProof {
                 node_hash(self.siblings[depth], current)?
             };
         }
-        Ok(current == self.root)
+        Ok(current)
+    }
+}
+
+/// Caller-supplied expected context required to interpret a sparse proof.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SparseProofContext {
+    profile: AuthenticatedProfile,
+    version: u64,
+    root: Hash32,
+    key: Hash32,
+}
+
+impl SparseProofContext {
+    /// Creates an exact proof-verification context.
+    #[must_use]
+    pub const fn new(
+        profile: AuthenticatedProfile,
+        version: u64,
+        root: Hash32,
+        key: Hash32,
+    ) -> Self {
+        Self {
+            profile,
+            version,
+            root,
+            key,
+        }
+    }
+
+    /// Returns the complete authenticated profile identity.
+    #[must_use]
+    pub const fn profile(self) -> AuthenticatedProfile {
+        self.profile
+    }
+
+    /// Returns the expected tree version.
+    #[must_use]
+    pub const fn version(self) -> u64 {
+        self.version
+    }
+
+    /// Returns the expected authenticated root.
+    #[must_use]
+    pub const fn root(self) -> Hash32 {
+        self.root
+    }
+
+    /// Returns the expected logical key.
+    #[must_use]
+    pub const fn key(self) -> Hash32 {
+        self.key
+    }
+}
+
+/// A sparse proof verified against one exact caller-supplied context.
+///
+/// This witness has no public constructor. Callers must obtain it through
+/// [`SparseProof::verify_against`].
+/// The type does not attest that the supplied context came from a production
+/// authority; consumers must compare [`Self::context`] with authority-owned
+/// state or policy.
+///
+/// ```compile_fail
+/// use zeno_fcis_authenticated::{
+///     ContextVerifiedSparseProof, ProofLeaf, SparseProofContext,
+/// };
+///
+/// fn forge(
+///     context: SparseProofContext,
+///     leaf: ProofLeaf,
+/// ) -> ContextVerifiedSparseProof {
+///     ContextVerifiedSparseProof { context, leaf }
+/// }
+/// ```
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContextVerifiedSparseProof {
+    context: SparseProofContext,
+    leaf: ProofLeaf,
+}
+
+impl ContextVerifiedSparseProof {
+    /// Returns the exact context against which the proof was verified.
+    #[must_use]
+    pub const fn context(&self) -> SparseProofContext {
+        self.context
+    }
+
+    /// Returns the verified membership or absence result.
+    #[must_use]
+    pub const fn leaf(&self) -> &ProofLeaf {
+        &self.leaf
     }
 }
 
@@ -476,7 +701,7 @@ impl TreeReader for ReferenceSparseTree {
         let mut siblings = Vec::with_capacity(TREE_DEPTH);
         proof_siblings(&hashed, key, 0, &empties, &mut siblings)?;
         Ok(SparseProof {
-            profile_hash: self.profile.profile_hash,
+            profile: self.profile,
             version: self.version,
             root: self.root,
             key,
@@ -639,6 +864,8 @@ pub enum AuthError {
     TooManyLeaves,
     /// Projected pre-state differs from the mounted tree snapshot.
     ProjectionMismatch,
+    /// Supplied projector identity differs from the authenticated profile.
+    ProjectorMismatch,
     /// Tree profile does not match the plan.
     ProfileMismatch,
     /// Tree version is stale.
@@ -651,6 +878,16 @@ pub enum AuthError {
     VersionOverflow,
     /// Sparse proof does not have exactly 256 siblings.
     ProofLength,
+    /// Sparse proof profile, tree, or projector identity differs from the expected context.
+    ProofProfileMismatch,
+    /// Sparse proof version differs from the expected context.
+    ProofVersionMismatch,
+    /// Sparse proof root differs from the expected context.
+    ProofRootMismatch,
+    /// Sparse proof key differs from the expected context.
+    ProofKeyMismatch,
+    /// Sparse proof does not recompute the root supplied in the verification context.
+    InvalidProof,
     /// Semantic patch application failed.
     Patch(PatchError),
     /// Canonical encoding or hashing failed.
@@ -665,12 +902,24 @@ impl fmt::Display for AuthError {
             Self::DuplicateLeafKey => formatter.write_str("duplicate projected leaf key"),
             Self::TooManyLeaves => formatter.write_str("reference leaf bound exceeded"),
             Self::ProjectionMismatch => formatter.write_str("projected state does not match tree"),
+            Self::ProjectorMismatch => formatter.write_str("authenticated projector mismatch"),
             Self::ProfileMismatch => formatter.write_str("authenticated profile mismatch"),
             Self::VersionConflict => formatter.write_str("authenticated version conflict"),
             Self::RootConflict => formatter.write_str("authenticated root conflict"),
             Self::PostRootMismatch => formatter.write_str("authenticated post-root mismatch"),
             Self::VersionOverflow => formatter.write_str("authenticated version overflow"),
             Self::ProofLength => formatter.write_str("sparse proof must contain 256 siblings"),
+            Self::ProofProfileMismatch => {
+                formatter.write_str("sparse proof profile context mismatch")
+            }
+            Self::ProofVersionMismatch => {
+                formatter.write_str("sparse proof version context mismatch")
+            }
+            Self::ProofRootMismatch => formatter.write_str("sparse proof root context mismatch"),
+            Self::ProofKeyMismatch => formatter.write_str("sparse proof key context mismatch"),
+            Self::InvalidProof => {
+                formatter.write_str("sparse proof does not match the expected root")
+            }
             Self::Patch(error) => write!(formatter, "semantic patch failed: {error}"),
             Self::Encode(error) => write!(formatter, "authenticated encoding failed: {error}"),
         }
@@ -682,13 +931,42 @@ impl std::error::Error for AuthError {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zeno_fcis_codec::CommitmentHasher;
     use zeno_fcis_patch::{PatchOp, ValuePath, hash_value};
 
     struct RootProjector;
 
+    struct WrongIdentityProjector;
+
+    struct SameIdentityWrongSemanticsProjector;
+
     impl StateProjector for RootProjector {
+        fn declared_projector_hash(&self) -> Hash32 {
+            hash(6)
+        }
+
         fn project(&self, state: &Value) -> Result<Vec<(Hash32, Value)>, AuthError> {
             Ok(vec![(hash(9), state.clone())])
+        }
+    }
+
+    impl StateProjector for WrongIdentityProjector {
+        fn declared_projector_hash(&self) -> Hash32 {
+            hash(7)
+        }
+
+        fn project(&self, state: &Value) -> Result<Vec<(Hash32, Value)>, AuthError> {
+            RootProjector.project(state)
+        }
+    }
+
+    impl StateProjector for SameIdentityWrongSemanticsProjector {
+        fn declared_projector_hash(&self) -> Hash32 {
+            hash(6)
+        }
+
+        fn project(&self, _state: &Value) -> Result<Vec<(Hash32, Value)>, AuthError> {
+            Ok(Vec::new())
         }
     }
 
@@ -697,8 +975,21 @@ mod tests {
     }
 
     fn profile() -> AuthenticatedProfile {
-        AuthenticatedProfile::try_new(hash(1), hash(2))
+        AuthenticatedProfile::try_new(hash(1), hash(2), hash(6))
             .unwrap_or_else(|error| panic!("profile: {error}"))
+    }
+
+    fn planner() -> AuthenticatedStatePlanner<RootProjector> {
+        AuthenticatedStatePlanner::try_new(profile(), RootProjector)
+            .unwrap_or_else(|error| panic!("planner: {error}"))
+    }
+
+    #[test]
+    fn profile_rejects_zero_projector_identity() {
+        assert_eq!(
+            AuthenticatedProfile::try_new(hash(1), hash(2), Hash32::ZERO),
+            Err(AuthError::ZeroIdentity)
+        );
     }
 
     fn domain() -> Domain<'static> {
@@ -723,7 +1014,7 @@ mod tests {
     }
 
     #[test]
-    fn membership_and_absence_proofs_verify() {
+    fn membership_and_absence_proofs_verify_against_exact_context() {
         let tree = ReferenceSparseTree::try_new(
             profile(),
             7,
@@ -736,17 +1027,109 @@ mod tests {
         let absent = tree
             .prove(hash(5))
             .unwrap_or_else(|error| panic!("proof: {error}"));
-        assert!(
-            member
-                .verify()
-                .unwrap_or_else(|error| panic!("verify: {error}"))
+        let member_context =
+            SparseProofContext::new(tree.profile(), tree.version(), tree.root(), hash(3));
+        let absent_context =
+            SparseProofContext::new(tree.profile(), tree.version(), tree.root(), hash(5));
+        let verified_member = member
+            .verify_against(member_context)
+            .unwrap_or_else(|error| panic!("verify: {error}"));
+        let verified_absent = absent
+            .verify_against(absent_context)
+            .unwrap_or_else(|error| panic!("verify: {error}"));
+        assert_eq!(verified_member.context(), member_context);
+        assert!(matches!(
+            verified_member.leaf(),
+            ProofLeaf::Membership(Value::U128(3))
+        ));
+        assert!(matches!(verified_absent.leaf(), ProofLeaf::Absence));
+    }
+
+    #[test]
+    fn proof_context_substitution_fails_closed() {
+        let tree = ReferenceSparseTree::try_new(
+            profile(),
+            7,
+            vec![(hash(3), Value::U128(3)), (hash(4), Value::U128(4))],
+        )
+        .unwrap_or_else(|error| panic!("tree: {error}"));
+        let proof = tree
+            .prove(hash(3))
+            .unwrap_or_else(|error| panic!("proof: {error}"));
+        let exact = SparseProofContext::new(tree.profile(), tree.version(), tree.root(), hash(3));
+        let wrong_tree = AuthenticatedProfile::try_new(hash(8), hash(2), hash(6))
+            .unwrap_or_else(|error| panic!("profile: {error}"));
+        let wrong_profile = AuthenticatedProfile::try_new(hash(1), hash(8), hash(6))
+            .unwrap_or_else(|error| panic!("profile: {error}"));
+        let wrong_projector = AuthenticatedProfile::try_new(hash(1), hash(2), hash(8))
+            .unwrap_or_else(|error| panic!("profile: {error}"));
+
+        for profile in [wrong_tree, wrong_profile, wrong_projector] {
+            assert_eq!(
+                proof.verify_against(SparseProofContext::new(
+                    profile,
+                    exact.version(),
+                    exact.root(),
+                    exact.key(),
+                )),
+                Err(AuthError::ProofProfileMismatch)
+            );
+        }
+        assert_eq!(
+            proof.verify_against(SparseProofContext::new(
+                exact.profile(),
+                exact.version() + 1,
+                exact.root(),
+                exact.key(),
+            )),
+            Err(AuthError::ProofVersionMismatch)
         );
-        assert!(
-            absent
-                .verify()
-                .unwrap_or_else(|error| panic!("verify: {error}"))
+        assert_eq!(
+            proof.verify_against(SparseProofContext::new(
+                exact.profile(),
+                exact.version(),
+                hash(8),
+                exact.key(),
+            )),
+            Err(AuthError::ProofRootMismatch)
         );
-        assert!(matches!(absent.leaf, ProofLeaf::Absence));
+        assert_eq!(
+            proof.verify_against(SparseProofContext::new(
+                exact.profile(),
+                exact.version(),
+                exact.root(),
+                hash(8),
+            )),
+            Err(AuthError::ProofKeyMismatch)
+        );
+    }
+
+    #[test]
+    fn mutated_proof_fails_against_external_root() {
+        let tree = ReferenceSparseTree::try_new(
+            profile(),
+            7,
+            vec![(hash(3), Value::U128(3)), (hash(4), Value::U128(4))],
+        )
+        .unwrap_or_else(|error| panic!("tree: {error}"));
+        let proof = tree
+            .prove(hash(3))
+            .unwrap_or_else(|error| panic!("proof: {error}"));
+        let context = SparseProofContext::new(tree.profile(), tree.version(), tree.root(), hash(3));
+
+        let mut wrong_leaf = proof.clone();
+        wrong_leaf.leaf = ProofLeaf::Membership(Value::U128(9));
+        assert_eq!(
+            wrong_leaf.verify_against(context),
+            Err(AuthError::InvalidProof)
+        );
+
+        let mut wrong_sibling = proof;
+        wrong_sibling.siblings[0] = hash(9);
+        assert_eq!(
+            wrong_sibling.verify_against(context),
+            Err(AuthError::InvalidProof)
+        );
     }
 
     #[test]
@@ -777,7 +1160,8 @@ mod tests {
                 .unwrap_or_else(|error| panic!("project: {error}")),
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
-        let planned = plan_authenticated_update(&pre, domain(), &patch, &tree, &RootProjector)
+        let planned = planner()
+            .plan(&pre, domain(), &patch, &tree)
             .unwrap_or_else(|error| panic!("plan: {error}"));
         let expected = ReferenceSparseTree::try_new(
             profile(),
@@ -792,6 +1176,97 @@ mod tests {
         assert_eq!(tree.root(), expected.root());
         assert_eq!(tree.version(), 1);
         assert_eq!(planned.authenticated().node_batch().writes().len(), 1);
+    }
+
+    #[test]
+    fn planning_rejects_projector_identity_substitution() {
+        assert!(matches!(
+            AuthenticatedStatePlanner::try_new(profile(), WrongIdentityProjector),
+            Err(AuthError::ProjectorMismatch)
+        ));
+    }
+
+    #[test]
+    fn matching_declared_identity_is_not_semantic_attestation() {
+        assert!(
+            AuthenticatedStatePlanner::try_new(profile(), SameIdentityWrongSemanticsProjector)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn authenticated_plan_v2_binds_projector_commitment() {
+        let plan = PlannedAuthenticatedCommit {
+            profile: profile(),
+            expected_version: 0,
+            next_version: 1,
+            semantic_pre_root: hash(3),
+            semantic_post_root: hash(4),
+            patch_hash: hash(5),
+            authenticated_pre_root: hash(6),
+            authenticated_post_root: hash(7),
+            node_batch: NodeBatch {
+                writes: Box::new([]),
+            },
+            stale_nodes: Box::new([]),
+            post_leaves: BTreeMap::new(),
+        };
+        let bytes = plan
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("encode: {error}"));
+        let version_bytes = AUTHENTICATED_PLAN_ENCODING_VERSION.to_be_bytes();
+
+        assert_eq!(bytes.get(..2), Some(version_bytes.as_slice()));
+        assert_eq!(bytes.len(), 286);
+        assert_eq!(
+            RustCryptoSha256::hash(&bytes),
+            Hash32::new([
+                50, 213, 59, 177, 111, 205, 1, 42, 66, 131, 9, 224, 145, 110, 142, 46, 84, 195, 52,
+                193, 94, 38, 13, 199, 172, 57, 33, 157, 237, 18, 133, 175,
+            ])
+        );
+
+        for changed_profile in [
+            AuthenticatedProfile::try_new(hash(8), hash(2), hash(6)),
+            AuthenticatedProfile::try_new(hash(1), hash(8), hash(6)),
+            AuthenticatedProfile::try_new(hash(1), hash(2), hash(8)),
+        ] {
+            let mut other = plan.clone();
+            other.profile = changed_profile.unwrap_or_else(|error| panic!("profile: {error}"));
+            let other_bytes = other
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("encode: {error}"));
+            assert_ne!(bytes, other_bytes);
+        }
+
+        let mut populated = plan;
+        populated.node_batch = NodeBatch {
+            writes: vec![
+                LeafWrite::Put {
+                    key: hash(8),
+                    value: Value::U128(9),
+                },
+                LeafWrite::Delete { key: hash(9) },
+            ]
+            .into_boxed_slice(),
+        };
+        populated.stale_nodes = vec![StaleNodeCandidate {
+            stale_since_version: 10,
+            key: hash(11),
+            old_leaf_hash: hash(12),
+        }]
+        .into_boxed_slice();
+        let populated_bytes = populated
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("encode populated plan: {error}"));
+        assert_eq!(populated_bytes.len(), 445);
+        assert_eq!(
+            RustCryptoSha256::hash(&populated_bytes),
+            Hash32::new([
+                30, 144, 42, 116, 117, 242, 134, 23, 106, 168, 174, 98, 128, 173, 53, 65, 116, 231,
+                186, 240, 114, 190, 160, 226, 124, 10, 155, 25, 90, 39, 136, 143,
+            ])
+        );
     }
 
     #[test]
@@ -847,7 +1322,7 @@ mod tests {
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
         assert_eq!(
-            plan_authenticated_update(&pre, domain(), &patch, &tree, &RootProjector),
+            planner().plan(&pre, domain(), &patch, &tree),
             Err(AuthError::VersionOverflow)
         );
     }

@@ -48,6 +48,7 @@ and other tools can use the same public boundaries.
 
 - [SQLite shell refinement](SQLITE_SHELL_REFINEMENT.md)
 - [Authenticated-state adapter](AUTHENTICATED_STATE_ADAPTER.md)
+- [Authenticated sparse-proof context](AUTHENTICATED_PROOF_CONTEXT.md)
 - [Persistent collections](PERSISTENT_COLLECTIONS.md)
 - [SHA-256 provider policy](SHA256_PROVIDER_POLICY.md)
 - [Secret handling and constant time](SECRET_HANDLING_AND_CONSTANT_TIME.md)
