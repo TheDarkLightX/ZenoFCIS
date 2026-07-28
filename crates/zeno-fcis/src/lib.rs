@@ -21,6 +21,9 @@ pub use zeno_fcis_bootstrap as bootstrap;
 #[cfg(feature = "catalog")]
 /// Schema-bound reason, effect, channel, and plan-validation catalogs.
 pub use zeno_fcis_catalog as catalog;
+#[cfg(feature = "cbc")]
+/// First-class correctness-by-construction laws and nominal verified transitions.
+pub use zeno_fcis_cbc as cbc;
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
 #[cfg(feature = "codegen")]
@@ -98,6 +101,13 @@ pub use zeno_fcis_catalog::{
     CatalogError, CatalogLimits, CatalogManifest, CatalogMetrics, ChannelDefinition,
     EffectDefinition, EffectHashField, HashRequirement, NonZeroHash, ProjectCatalog,
     ReasonDefinition, ReasonDisposition, ValueRole,
+};
+#[cfg(feature = "cbc")]
+pub use zeno_fcis_cbc::{
+    CBC_FORMAT_VERSION, CbcError, DecisionScope, LawBlocker, LawCheck, LawChecker, LawClaim,
+    LawDefinition, LawEvaluationFailure, LawEvaluationReport, LawEvidence, LawEvidenceVerifier,
+    LawKind, LawRequirement, LawSet, LawSubject, LawVerificationOutcome, LawVerifiedTransition,
+    MAX_CBC_BLOCKERS, MAX_CBC_EVIDENCE, MAX_CBC_LAWS, evaluate_subject, verify_transition_laws,
 };
 pub use zeno_fcis_codec::{
     AdmittedEnvelope, CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain,
