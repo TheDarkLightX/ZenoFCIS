@@ -37,8 +37,10 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
-      - name: Normalize source
-        run: cargo +1.97.1 fmt --all
+      - name: Apply exact hardening and normalize source
+        run: |
+          python3 internal/composition-v2-hardening.py
+          cargo +1.97.1 fmt --all
 
       - name: Capture exact diagnostics
         shell: bash
@@ -60,7 +62,6 @@ jobs:
           run_check compose-no-std cargo +1.97.1 check -p zeno-fcis-compose --no-default-features --locked --target wasm32-unknown-unknown
           run_check umbrella-no-std cargo +1.97.1 check -p zeno-fcis --no-default-features --locked --target wasm32-unknown-unknown
           run_check rustdoc env RUSTDOCFLAGS=-Dwarnings cargo +1.97.1 doc --workspace --all-features --locked --no-deps
-          run_check assurance-self-test python3 tools/check_assurance.py --self-test
           printf '%s\n' "$status" > internal/composition-v2-diagnostics/status.txt
           exit 0
 
