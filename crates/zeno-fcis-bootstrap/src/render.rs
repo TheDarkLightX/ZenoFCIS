@@ -302,7 +302,7 @@ fn portable_path(path: &str) -> bool {
 mod tests {
     use zeno_fcis_catalog::{
         CatalogError, CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition,
-        HashRequirement, ReasonDefinition, ReasonDisposition,
+        HashRequirement, OperationSemantics, ReasonDefinition, ReasonDisposition,
     };
     use zeno_fcis_codegen::fixture_schema;
     use zeno_fcis_project::{
@@ -411,6 +411,8 @@ mod tests {
                 TypeId::new(1),
                 HashRequirement::Present,
                 HashRequirement::Absent,
+                OperationSemantics::non_value(hash(120))
+                    .unwrap_or_else(|error| panic!("semantics: {error}")),
                 hash(20),
             )
             .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -420,6 +422,8 @@ mod tests {
                 TypeId::new(2),
                 HashRequirement::Any,
                 HashRequirement::Any,
+                OperationSemantics::non_value(hash(121))
+                    .unwrap_or_else(|error| panic!("semantics: {error}")),
                 hash(21),
             )
             .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -431,6 +435,8 @@ mod tests {
                     .unwrap_or_else(|error| panic!("authority requirement: {error}")),
                 HashRequirement::exact(hash(23))
                     .unwrap_or_else(|error| panic!("subject requirement: {error}")),
+                OperationSemantics::non_value(hash(122))
+                    .unwrap_or_else(|error| panic!("semantics: {error}")),
                 hash(24),
             )
             .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -441,6 +447,8 @@ mod tests {
                 name("notify"),
                 TypeId::new(3),
                 TypeId::new(9),
+                OperationSemantics::non_value(hash(130))
+                    .unwrap_or_else(|error| panic!("semantics: {error}")),
                 hash(30),
             )
             .unwrap_or_else(|error| panic!("channel: {error}")),
@@ -449,6 +457,8 @@ mod tests {
                 name("notify-secondary"),
                 TypeId::new(4),
                 TypeId::new(5),
+                OperationSemantics::non_value(hash(131))
+                    .unwrap_or_else(|error| panic!("semantics: {error}")),
                 hash(31),
             )
             .unwrap_or_else(|error| panic!("channel: {error}")),

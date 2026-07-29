@@ -3,8 +3,8 @@
 use core::fmt::Debug;
 
 use zeno_fcis_catalog::{
-    CatalogLimits, CatalogManifest, EffectDefinition, HashRequirement, ProjectCatalog,
-    ReasonDefinition, ReasonDisposition,
+    CatalogLimits, CatalogManifest, EffectDefinition, HashRequirement, OperationSemantics,
+    ProjectCatalog, ReasonDefinition, ReasonDisposition,
 };
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_compose::{
@@ -139,6 +139,7 @@ fn manifest_with_requirements(
         PAYLOAD_TYPE,
         authority,
         subject,
+        must(OperationSemantics::non_value(hash(120))),
         hash(20),
     ))];
     must(CatalogManifest::try_new::<RustCryptoSha256>(

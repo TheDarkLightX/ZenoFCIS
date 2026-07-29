@@ -2,7 +2,9 @@
 
 use std::fmt::Write as _;
 
-use zeno_fcis_catalog::{HashRequirement, ProjectCatalog, ReasonDisposition};
+use zeno_fcis_catalog::{
+    HashRequirement, OperationSemantics, ProjectCatalog, ReasonDisposition, ValueFlowKind,
+};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_project::{ProfileBindings, RegistryKind};
 use zeno_fcis_schema::TypeKind;
@@ -41,8 +43,8 @@ pub(crate) fn render_rust_project(
     output.push_str("use core::fmt;\n");
     output.push_str("use zeno_fcis_catalog::{\n");
     output.push_str("    CatalogError, CatalogLimits, CatalogManifest, ChannelDefinition,\n");
-    output.push_str("    EffectDefinition, HashRequirement, ProjectCatalog, ReasonDefinition,\n");
-    output.push_str("    ReasonDisposition,\n");
+    output.push_str("    EffectDefinition, HashRequirement, OperationSemantics, ProjectCatalog,\n");
+    output.push_str("    ReasonDefinition, ReasonDisposition,\n");
     output.push_str("};\n");
     output.push_str(
         "use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};\n",
@@ -868,12 +870,13 @@ fn render_catalog_manifest_construction(
     for effect in catalog.manifest().effects() {
         writeln!(
             output,
-            "            EffectDefinition::try_new(SemanticId::try_new({})?, StableName::try_new({:?})?, TypeId::new({}), {}, {}, {})?,",
+            "            EffectDefinition::try_new(SemanticId::try_new({})?, StableName::try_new({:?})?, TypeId::new({}), {}, {}, {}, {})?,",
             effect.id().get(),
             effect.name().as_str(),
             effect.payload_type().get(),
             hash_requirement_expression(effect.authority_requirement()),
             hash_requirement_expression(effect.subject_requirement()),
+            operation_semantics_expression(effect.semantics()),
             hash_expression(effect.policy_hash())
         )
         .map_err(|_| BootstrapError::Render)?;
@@ -883,11 +886,12 @@ fn render_catalog_manifest_construction(
     for channel in catalog.manifest().channels() {
         writeln!(
             output,
-            "            ChannelDefinition::try_new(SemanticId::try_new({})?, StableName::try_new({:?})?, TypeId::new({}), TypeId::new({}), {})?,",
+            "            ChannelDefinition::try_new(SemanticId::try_new({})?, StableName::try_new({:?})?, TypeId::new({}), TypeId::new({}), {}, {})?,",
             channel.id().get(),
             channel.name().as_str(),
             channel.destination_type().get(),
             channel.payload_type().get(),
+            operation_semantics_expression(channel.semantics()),
             hash_expression(channel.delivery_policy_hash())
         )
         .map_err(|_| BootstrapError::Render)?;
@@ -977,6 +981,54 @@ fn hash_requirement_expression(requirement: HashRequirement) -> String {
                 hash_expression(expected.get())
             )
         }
+    }
+}
+
+fn operation_semantics_expression(semantics: &OperationSemantics) -> String {
+    if !semantics.is_value_moving() {
+        format!(
+            "OperationSemantics::non_value({})?",
+            hash_expression(semantics.classification_hash())
+        )
+    } else {
+        let flows = semantics
+            .flows()
+            .iter()
+            .map(|flow| match flow.custom_claim() {
+                Some((claim_id, claim_hash)) => format!(
+                    "zeno_fcis_catalog::ValueFlow::custom({}, SemanticId::try_new({})?, {})?",
+                    hash_expression(flow.asset_domain()),
+                    claim_id.get(),
+                    hash_expression(claim_hash)
+                ),
+                None => format!(
+                    "zeno_fcis_catalog::ValueFlow::standard({}, {})?",
+                    value_flow_kind_expression(flow.kind()),
+                    hash_expression(flow.asset_domain())
+                ),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            "OperationSemantics::value(vec![{flows}], {})?",
+            hash_expression(semantics.classification_hash())
+        )
+    }
+}
+
+const fn value_flow_kind_expression(kind: ValueFlowKind) -> &'static str {
+    match kind {
+        ValueFlowKind::Transfer => "zeno_fcis_catalog::ValueFlowKind::Transfer",
+        ValueFlowKind::Mint => "zeno_fcis_catalog::ValueFlowKind::Mint",
+        ValueFlowKind::Burn => "zeno_fcis_catalog::ValueFlowKind::Burn",
+        ValueFlowKind::EscrowLock => "zeno_fcis_catalog::ValueFlowKind::EscrowLock",
+        ValueFlowKind::EscrowRelease => "zeno_fcis_catalog::ValueFlowKind::EscrowRelease",
+        ValueFlowKind::FeeCharge => "zeno_fcis_catalog::ValueFlowKind::FeeCharge",
+        ValueFlowKind::Settlement => "zeno_fcis_catalog::ValueFlowKind::Settlement",
+        ValueFlowKind::ExternalValueDelivery => {
+            "zeno_fcis_catalog::ValueFlowKind::ExternalValueDelivery"
+        }
+        ValueFlowKind::Custom => "zeno_fcis_catalog::ValueFlowKind::Custom",
     }
 }
 

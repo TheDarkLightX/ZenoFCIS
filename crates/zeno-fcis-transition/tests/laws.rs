@@ -4,7 +4,7 @@ use std::string::String;
 
 use zeno_fcis_catalog::{
     CatalogError, CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition,
-    HashRequirement, ProjectCatalog, ReasonDefinition, ReasonDisposition,
+    HashRequirement, OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition,
 };
 use zeno_fcis_codec::{CommitmentHasher, Domain, Hash32};
 use zeno_fcis_compose::{AccessPath, PathAtom};
@@ -136,6 +136,8 @@ fn manifest() -> CatalogManifest {
             TypeId::new(4),
             HashRequirement::Present,
             HashRequirement::Absent,
+            OperationSemantics::non_value(hash(121))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(21),
         )
         .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -145,6 +147,8 @@ fn manifest() -> CatalogManifest {
             TypeId::new(4),
             HashRequirement::Present,
             HashRequirement::Absent,
+            OperationSemantics::non_value(hash(120))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(20),
         )
         .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -155,6 +159,8 @@ fn manifest() -> CatalogManifest {
             name("audit-channel"),
             TypeId::new(6),
             TypeId::new(7),
+            OperationSemantics::non_value(hash(131))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(31),
         )
         .unwrap_or_else(|error| panic!("channel: {error}")),
@@ -163,6 +169,8 @@ fn manifest() -> CatalogManifest {
             name("notify"),
             TypeId::new(6),
             TypeId::new(7),
+            OperationSemantics::non_value(hash(130))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(30),
         )
         .unwrap_or_else(|error| panic!("channel: {error}")),
