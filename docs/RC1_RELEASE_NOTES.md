@@ -29,6 +29,11 @@ validation primitives for FCIS applications. Production commit authority is a
 private nominal value created only through the documented catalog, invocation,
 provider, law, interpreter, and deployment checks.
 
+Authorized shell creation is also nominal: the policy binds the exact reviewed
+initial root, source/configuration/evidence, deployment instance, and complete
+genesis-law evaluation. SQLite schema v4 persists and revalidates that genesis
+authorization; reopen accepts no caller-supplied replacement state.
+
 ## Remaining blockers for 1.0.0
 
 1. Merge the exact reviewed stacked PR series onto `main` without semantic

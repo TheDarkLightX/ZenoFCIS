@@ -15,6 +15,10 @@ package makes those project laws mandatory inputs to production authorization.
 - Retained evidence for every proof-required law.
 - One exact reviewed `ProjectLawEngine`.
 - One nonzero law-engine build identity.
+- For genesis:
+  - one exact policy and genesis-binding identity;
+  - one schema-admitted initial root state;
+  - an explicit required-or-inapplicable declaration on every law.
 - For each invocation:
   - admitted pre-state;
   - admitted command;
@@ -32,6 +36,8 @@ package makes those project laws mandatory inputs to production authorization.
   - the law-engine type and build identity.
 - `LawEvaluation`, which exists only when every applicable required law
   deterministically reports `Satisfied`.
+- `GenesisLawEvaluation`, which exists only when every genesis-required law
+  deterministically reports `Satisfied` for the exact initial state and policy.
 - A law-set identity and evaluation identity included in every production
   authorization and rejection.
 
@@ -44,8 +50,10 @@ inspectable data. None grants commit authority.
 checks exact proof subjects, rehashes retained artifact bytes, and calls the
 production-owned `LawEvidenceVerifier` for every proof-required artifact.
 `CatalogCommitAuthority` owns the resulting verified law set and invokes its
-runtime law engine after structural transition validation and before
-constructing a private authorization.
+runtime law engine during the separate genesis ceremony and after structural
+transition validation. A successful genesis evaluation is bound into private
+`CatalogAuthorizedGenesis`; a successful invocation evaluation is bound into
+private transition authorization.
 
 The runtime law engine and formal-evidence verifier are trusted project
 adapters. Their identities are bound into policy, but a hash is not
@@ -110,6 +118,8 @@ No new external dependency is introduced.
 - At most 64 MiB of retained proof artifacts per law set by default.
 - At most 4,096 observations per invocation, further restricted by
   `LawLimits`.
+- Genesis uses the same observation bound and must return exactly the complete
+  required genesis-law identifier set.
 - Canonical law names and evidence values retain their existing bounded forms.
 - No wall clock, timeout, thread, filesystem, network, randomness, or ambient
   process state is observed by the semantic law layer.
@@ -139,6 +149,12 @@ No new external dependency is introduced.
     plan; this law is evaluated by the framework itself.
 12. A production authorization binds the exact law-set verification and
     invocation evaluation identities.
+13. Every law explicitly declares whether it applies to genesis. State
+    invariants are always required; reject-purity and committed-failure laws
+    are always inapplicable there.
+14. Genesis evaluation returns every required genesis law exactly once and no
+    other law; missing, duplicate, extra, violated, or indeterminate results
+    fail closed.
 
 ## Negative cases
 
@@ -153,6 +169,8 @@ No new external dependency is introduced.
 - Artifact digest mismatch, verifier refutation, or verifier indeterminacy.
 - Tool, query, assumption, coverage, or checker-profile substitution.
 - Missing, duplicate, hidden extra, violated, or indeterminate observations.
+- Missing or invalid genesis applicability, or a genesis observation set that
+  differs from the exact required set.
 - Debit, credit, fee, mint, burn, asset, recipient, authority, subject, and
   effect-count mutations in the executable fixture law engine.
 - Aggregate multi-effect imbalance.
