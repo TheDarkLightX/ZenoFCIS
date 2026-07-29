@@ -35,6 +35,9 @@ EXPECTED_PROBITY_INTEGRITY = (
     "sha512-tb2eOaE/lugOLm0DzRbW+x4FOQDxDJJldkRiMbybiluCX4AKIMqN6CZ9LQ20K5Y"
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
+EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
+    "1217dc0185cea2f120c80942f139f3bb9265ef06a1c0a141bb4995966b0249e6"
+)
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
 
@@ -106,6 +109,16 @@ def load_json_object(path: Path) -> dict[str, object]:
     return document
 
 
+def canonical_json_sha256(document: dict[str, object]) -> str:
+    encoded = json.dumps(
+        document,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def validate_developer_tooling_documents(
     package: dict[str, object],
     lock: dict[str, object],
@@ -131,6 +144,8 @@ def validate_developer_tooling_documents(
 
     if lock.get("lockfileVersion") != 3:
         raise RcError("package-lock.json must use lockfile version 3")
+    if canonical_json_sha256(lock) != EXPECTED_NPM_LOCK_CANONICAL_SHA256:
+        raise RcError("package-lock.json complete canonical graph changed")
     packages = lock.get("packages")
     if not isinstance(packages, dict):
         raise RcError("package-lock.json omits the packages map")
@@ -406,6 +421,30 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
         pass
     else:
         raise RcError("self-test mutation survived: Probity version")
+
+    changed_transitive_lock = copy.deepcopy(lock)
+    changed_transitive_packages = changed_transitive_lock.get("packages")
+    if not isinstance(changed_transitive_packages, dict):
+        raise RcError("self-test npm packages map is unavailable")
+    changed_transitive = changed_transitive_packages.get(
+        "node_modules/@openai/codex-sdk"
+    )
+    if not isinstance(changed_transitive, dict):
+        raise RcError("self-test could not find a transitive npm package")
+    changed_transitive["version"] = "9.9.9"
+    changed_transitive["integrity"] = "sha512-hostile-lock-graph-mutation"
+    try:
+        validate_developer_tooling_documents(
+            package,
+            changed_transitive_lock,
+            PROBITY_CONFIG_PATH.read_text(encoding="utf-8"),
+            NODE_VERSION_PATH.read_text(encoding="utf-8"),
+            require_string(configured, "version"),
+        )
+    except RcError:
+        pass
+    else:
+        raise RcError("self-test mutation survived: transitive npm lock graph")
 
     wrong_pin_metadata = copy.deepcopy(metadata)
     wrong_pin_packages = wrong_pin_metadata.get("packages")
@@ -1003,7 +1042,7 @@ def main() -> int:
             run_tree_archive_mode_self_test()
             print(
                 "rc-package: self-test PASS "
-                "(8 hostile mutations rejected; rustdoc and archive modes verified)"
+                "(9 hostile mutations rejected; rustdoc and archive modes verified)"
             )
         else:
             build(args.output.resolve())

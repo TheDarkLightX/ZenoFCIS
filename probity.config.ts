@@ -9,7 +9,7 @@ const rustCommandPolicy: Rule = (action) => {
   if (action.kind !== 'command') return { kind: 'pass' }
 
   const normalized = action.command.replace(/\\\r?\n/g, ' ')
-  const segments = normalized.split(/(?:&&|\|\||[;\n])/)
+  const segments = normalized.split(/(?:&&|\|\||\|&?|[;\n])/)
   for (const segment of segments) {
     const cargo = segment.match(
       /(?:^|\s)cargo\s+(\+\S+\s+)?(build|check|clippy|doc|run|test)\b(.*)$/,

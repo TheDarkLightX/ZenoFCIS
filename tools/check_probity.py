@@ -187,6 +187,8 @@ def main() -> int:
             "git tag v1.0.0-rc.2",
             "gh pr merge 91",
             "gh release create v1.0.0-rc.2",
+            "cargo +1.97.1 test --workspace --locked | cargo test",
+            "cargo +1.97.1 test --workspace --locked |& cargo test",
             "cargo test --workspace --locked",
             "cargo +1.97.1 test --workspace",
             "npm install",
@@ -244,7 +246,7 @@ def main() -> int:
         print(
             "probity: PASS "
             f"(Node {EXPECTED_NODE[1:]}, Probity {EXPECTED_PROBITY}, "
-            "13 hostile and 5 permitted actions)"
+            "15 hostile and 5 permitted actions)"
         )
         return 0
     except (ProbityCheckError, subprocess.CalledProcessError) as error:

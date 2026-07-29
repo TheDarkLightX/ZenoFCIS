@@ -107,8 +107,9 @@ The check has hostile witnesses for every forbidden-pattern rule. `--self-test` 
 
 Optional developer guardrails use a private npm package with exact Probity
 `1.10.0`, exact Node `22.23.1`, lockfile version 3, and a retained npm integrity
-digest. CI installs that graph with lifecycle scripts disabled and runs
-`npm audit`. It is excluded from Rust runtime and protocol authority.
+digest for the complete canonical lock graph. CI installs that graph with
+lifecycle scripts disabled and runs `npm audit`. It is excluded from Rust
+runtime and protocol authority.
 
 The source manifest binds the full commit, clean-tree status, pinned Rust toolchain file, every tracked path, file kind, byte length, and SHA-256 digest. It is deterministic and contains no timestamps or host-specific paths.
 
