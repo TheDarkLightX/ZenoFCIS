@@ -31,24 +31,24 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal
 
       - name: Check hostile package mutations
-        run: python3 tools/rc1_package.py self-test
+        run: python3 tools/rc_package.py self-test
 
       - name: Check package authority and documentation
         run: |
-          python3 tools/rc1_package.py check
+          python3 tools/rc_package.py check
           python3 tools/check_library_docs.py
 
       - name: Assemble exact release-candidate artifacts
-        run: python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
+        run: python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc
 
       - name: Verify retained checksums
-        working-directory: /tmp/zeno-fcis-rc1
+        working-directory: /tmp/zeno-fcis-rc
         run: sha256sum --check SHA256SUMS
 
       - name: Upload review artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: zeno-fcis-1.0.0-rc.1-${{ github.sha }}
-          path: /tmp/zeno-fcis-rc1
+          name: zeno-fcis-release-candidate-${{ github.sha }}
+          path: /tmp/zeno-fcis-rc
           if-no-files-found: error
           retention-days: 30

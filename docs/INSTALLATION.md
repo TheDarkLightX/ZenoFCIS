@@ -1,6 +1,6 @@
 # Installation
 
-ZenoFCIS `1.0.0-rc.1` is a Rust library release candidate. Rust `1.97.1` is
+ZenoFCIS `1.0.0-rc.2` is a Rust library release candidate. Rust `1.97.1` is
 the minimum supported toolchain for this candidate.
 
 ## Application dependency
@@ -10,7 +10,7 @@ application:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -27,8 +27,8 @@ crate:
 
 ```toml
 [dependencies]
-zeno-fcis-core = { version = "=1.0.0-rc.1", default-features = false }
-zeno-fcis-codec = { version = "=1.0.0-rc.1", default-features = false }
+zeno-fcis-core = { version = "=1.0.0-rc.2", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.2", default-features = false }
 ```
 
 All ZenoFCIS crates in one dependency graph should use the same exact release
@@ -39,13 +39,27 @@ candidate version.
 ```bash
 git clone https://github.com/TheDarkLightX/ZenoFCIS.git
 cd ZenoFCIS
-git checkout v1.0.0-rc.1
+git checkout v1.0.0-rc.2
 cargo +1.97.1 test --workspace --all-features --locked
 ```
 
 The tag is created only after the exact release-candidate commit passes every
 required gate. Until that tag exists, use the reviewed branch commit named in
 the RC pull request rather than an unpinned branch dependency.
+
+## Optional coding-agent guardrails
+
+Contributors using coding agents can install the exact locked development
+tooling under Node `22.23.1`:
+
+```bash
+npm ci --ignore-scripts
+python3 tools/check_probity.py
+```
+
+Probity is not a Rust, runtime, protocol, or published-crate dependency. See
+[deterministic developer guardrails](DEVELOPER_GUARDRAILS.md) for opt-in Codex
+hook setup and explicit nonclaims.
 
 ## Diagnostic binary
 
@@ -54,7 +68,7 @@ host diagnostic tool:
 
 ```bash
 cargo +1.97.1 install zeno-fcis-adapter-zenodex \
-  --version 1.0.0-rc.1 --locked
+  --version 1.0.0-rc.2 --locked
 ```
 
 `mount-zenodex-zusd` compares the pinned ZenoDEX Python and Rust transitions.

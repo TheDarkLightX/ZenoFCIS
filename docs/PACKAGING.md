@@ -1,6 +1,6 @@
-# RC1 packaging
+# Release-candidate packaging
 
-This document describes the ZenoFCIS `1.0.0-rc.1` artifact set.
+This document describes the ZenoFCIS `1.0.0-rc.2` artifact set.
 
 ## Package set
 
@@ -11,14 +11,14 @@ This document describes the ZenoFCIS `1.0.0-rc.1` artifact set.
 - one supported diagnostic binary target;
 - the exact Cargo version and Rust toolchain.
 
-`tools/rc1_package.py check` compares that manifest with Cargo metadata and
+`tools/rc_package.py check` compares that manifest with Cargo metadata and
 fails on missing packages, hidden public packages, duplicate entries, version
 drift, non-exact internal dependency pins, missing package metadata, or an
 invalid publication order.
 
 ## Artifact set
 
-`tools/rc1_package.py build --output <directory>` creates:
+`tools/rc_package.py build --output <directory>` creates:
 
 ```text
 packages/*.crate
@@ -37,6 +37,14 @@ The command requires a clean exact commit. It uses pinned Rust `1.97.1`,
 packages every public crate with `--locked`, builds the diagnostic binary in
 release mode, generates warning-denied rustdoc, records the Cargo dependency
 graph as CycloneDX 1.6, and content-addresses every retained artifact.
+
+The source archive also retains `package.json`, `package-lock.json`,
+`.node-version`, and `probity.config.ts` for optional development guardrails.
+The release packager validates their exact Node/Probity identities and binds
+the complete canonical npm lock graph, including every transitive package
+entry. `SBOM.cdx.json` describes the shipped Rust crate graph; the
+development-only npm graph is separately locked and audited and is not a
+runtime dependency of any published crate.
 
 The offline rustdoc archive retains every public crate API and source page.
 Pinned Rustdoc `1.97.1` does not produce a byte-identical merged cross-crate

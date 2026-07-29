@@ -15,7 +15,7 @@ proc-macro-error2 2.0.1
 -> libcrux-secrets 0.0.6
 -> libcrux-traits 0.0.8
 -> libcrux-sha2 0.0.8
--> zeno-fcis-crypto 1.0.0-rc.1
+-> zeno-fcis-crypto 1.0.0-rc.2
 ```
 
 Disposition:

@@ -9,11 +9,14 @@ declare its own output verified.
 Use this order:
 
 1. [Quickstart](QUICKSTART.md)
-2. [Crate map](CRATE_MAP.md)
-3. [Feature matrix](FEATURE_MATRIX.md)
-4. The boundary document for the crate being changed
-5. Public APIs in the exact source revision
-6. Tests and permanent read-only workflows for that boundary
+2. [Canonical bytes and admission](CANONICAL_BYTES.md)
+3. [Crate map](CRATE_MAP.md)
+4. [Feature matrix](FEATURE_MATRIX.md)
+5. The boundary document for the crate being changed
+6. Public APIs in the exact source revision
+7. Tests and permanent read-only workflows for that boundary
+8. [V1 product contract](V1_PRODUCT_CONTRACT.md) and the matching
+   [BDD/ATDD scenarios](ACCEPTANCE_TESTING.md) for adopter-visible behavior
 
 Treat `README.md`, this guide, and generated architecture files as navigation.
 Source, canonical protocol values, and independently checked evidence remain
@@ -34,6 +37,10 @@ human-reviewed ProjectProfile and ProjectCatalog
 
 An LLM may help write implementations at each step. It may not skip a step by
 constructing a lower-level artifact directly.
+
+When Probity is installed, follow the deterministic repository configuration.
+Run `python3 tools/atdd.py run --all` immediately before committing. Probity is
+a workflow guardrail and supplies no proof or production authority.
 
 ## What a model may propose
 
