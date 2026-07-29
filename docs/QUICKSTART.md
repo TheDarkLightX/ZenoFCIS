@@ -41,6 +41,17 @@ cargo +1.97.1 run -p zeno-fcis --example minimal_core --locked
 cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
 ```
 
+Run the complete adopter journey through the reviewable BDD/ATDD contract:
+
+```bash
+python3 tools/atdd.py list
+python3 tools/atdd.py run --all
+```
+
+The scenario registry is closed and executes fixed argument arrays. Feature
+prose cannot inject commands. See [V1 product contract](V1_PRODUCT_CONTRACT.md)
+and [BDD and acceptance testing](ACCEPTANCE_TESTING.md).
+
 `composed-program` enables the schema, catalog, transition, laws, authority,
 fixed-domain-machine, and composed-program layers. The semantic path supports
 `no_std + alloc`.

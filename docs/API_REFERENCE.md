@@ -45,6 +45,9 @@ release commit.
 
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
 the [crate map](CRATE_MAP.md) and generated rustdoc for exact signatures.
+The [V1 product contract](V1_PRODUCT_CONTRACT.md) identifies the supported
+adopter journeys, and the [acceptance guide](ACCEPTANCE_TESTING.md) maps each
+journey to fixed executable commands.
 The [genesis authorization guide](GENESIS_AUTHORIZATION.md) documents the
 required one-time initial-state ceremony and SQLite reopen contract. The
 [strict artifact and SQLite history guide](STRICT_ARTIFACT_AND_SQLITE_HISTORY.md)

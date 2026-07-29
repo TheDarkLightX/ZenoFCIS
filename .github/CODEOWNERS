@@ -8,6 +8,13 @@
 /tools/check_assurance.py @TheDarkLightX
 /tools/check_library_docs.py @TheDarkLightX
 /tools/rc_package.py @TheDarkLightX
+/tools/atdd.py @TheDarkLightX
+/tools/check_probity.py @TheDarkLightX
+/acceptance/ @TheDarkLightX
+/probity.config.ts @TheDarkLightX
+/package.json @TheDarkLightX
+/package-lock.json @TheDarkLightX
+/.node-version @TheDarkLightX
 /Cargo.toml @TheDarkLightX
 /Cargo.lock @TheDarkLightX
 /deny.toml @TheDarkLightX

@@ -25,6 +25,16 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_SET_PATH = ROOT / "release" / "package-set.toml"
 LOCK_PATH = ROOT / "Cargo.lock"
+NPM_PACKAGE_PATH = ROOT / "package.json"
+NPM_LOCK_PATH = ROOT / "package-lock.json"
+PROBITY_CONFIG_PATH = ROOT / "probity.config.ts"
+NODE_VERSION_PATH = ROOT / ".node-version"
+EXPECTED_NODE_VERSION = "22.23.1"
+EXPECTED_PROBITY_VERSION = "1.10.0"
+EXPECTED_PROBITY_INTEGRITY = (
+    "sha512-tb2eOaE/lugOLm0DzRbW+x4FOQDxDJJldkRiMbybiluCX4AKIMqN6CZ9LQ20K5Y"
+    "EBUePD8+S4/kRiqh8K/B0oA=="
+)
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
 
@@ -87,6 +97,83 @@ def load_toml(path: Path) -> dict[str, object]:
     if not isinstance(document, dict):
         raise RcError(f"{path.relative_to(ROOT)} is not a TOML table")
     return document
+
+
+def load_json_object(path: Path) -> dict[str, object]:
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise RcError(f"{path.relative_to(ROOT)} is not a JSON object")
+    return document
+
+
+def validate_developer_tooling_documents(
+    package: dict[str, object],
+    lock: dict[str, object],
+    config_text: str,
+    node_version: str,
+    release_version: str,
+) -> None:
+    if (
+        package.get("name") != "zeno-fcis-development"
+        or package.get("private") is not True
+    ):
+        raise RcError("package.json must describe the private development-tool package")
+    if package.get("version") != release_version:
+        raise RcError("package.json version does not match the release candidate")
+    engines = package.get("engines")
+    if not isinstance(engines, dict) or engines.get("node") != EXPECTED_NODE_VERSION:
+        raise RcError("package.json does not pin exact Node 22.23.1")
+    dependencies = package.get("devDependencies")
+    if dependencies != {"@nizos/probity": EXPECTED_PROBITY_VERSION}:
+        raise RcError("package.json must pin only Probity 1.10.0 as developer tooling")
+    if node_version.strip() != EXPECTED_NODE_VERSION:
+        raise RcError(".node-version does not pin exact Node 22.23.1")
+
+    if lock.get("lockfileVersion") != 3:
+        raise RcError("package-lock.json must use lockfile version 3")
+    packages = lock.get("packages")
+    if not isinstance(packages, dict):
+        raise RcError("package-lock.json omits the packages map")
+    root = packages.get("")
+    if not isinstance(root, dict):
+        raise RcError("package-lock.json omits the root package")
+    if (
+        root.get("version") != release_version
+        or root.get("devDependencies") != dependencies
+        or root.get("engines") != engines
+    ):
+        raise RcError("package-lock.json root metadata does not match package.json")
+    probity = packages.get("node_modules/@nizos/probity")
+    if not isinstance(probity, dict):
+        raise RcError("package-lock.json omits the Probity package")
+    if (
+        probity.get("version") != EXPECTED_PROBITY_VERSION
+        or probity.get("integrity") != EXPECTED_PROBITY_INTEGRITY
+        or probity.get("dev") is not True
+    ):
+        raise RcError("package-lock.json Probity identity or integrity changed")
+
+    required_config = (
+        "rustCommandPolicy",
+        "cargo\\s+(?:\\+\\S+\\s+)?update",
+        "cargo\\s+(?:\\+\\S+\\s+)?publish",
+        "python3\\s+tools\\/atdd\\.py\\s+run\\s+--all",
+    )
+    for marker in required_config:
+        if marker not in config_text:
+            raise RcError(f"probity.config.ts omits required marker {marker!r}")
+    if "enforceTdd" in config_text:
+        raise RcError("probity.config.ts may not enable AI-judged TDD authority")
+
+
+def validate_developer_tooling(release_version: str) -> None:
+    validate_developer_tooling_documents(
+        load_json_object(NPM_PACKAGE_PATH),
+        load_json_object(NPM_LOCK_PATH),
+        PROBITY_CONFIG_PATH.read_text(encoding="utf-8"),
+        NODE_VERSION_PATH.read_text(encoding="utf-8"),
+        release_version,
+    )
 
 
 def package_set() -> dict[str, object]:
@@ -250,7 +337,11 @@ def validate_package_documents(
 
 
 def validate_package_set() -> tuple[dict[str, object], dict[str, object]]:
-    return validate_package_documents(package_set(), cargo_metadata(complete=False))
+    configured, metadata = validate_package_documents(
+        package_set(), cargo_metadata(complete=False)
+    )
+    validate_developer_tooling(require_string(configured, "version"))
+    return configured, metadata
 
 
 def run_self_test(configured: dict[str, object], metadata: dict[str, object]) -> None:
@@ -298,6 +389,23 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
         raise RcError("self-test package is malformed")
     readme_package["readme"] = "missing-release-readme.md"
     expect_failure(copy.deepcopy(configured), missing_readme_metadata, "package README")
+
+    package = load_json_object(NPM_PACKAGE_PATH)
+    lock = load_json_object(NPM_LOCK_PATH)
+    wrong_probity = copy.deepcopy(package)
+    wrong_probity["devDependencies"] = {"@nizos/probity": "9.9.9"}
+    try:
+        validate_developer_tooling_documents(
+            wrong_probity,
+            lock,
+            PROBITY_CONFIG_PATH.read_text(encoding="utf-8"),
+            NODE_VERSION_PATH.read_text(encoding="utf-8"),
+            require_string(configured, "version"),
+        )
+    except RcError:
+        pass
+    else:
+        raise RcError("self-test mutation survived: Probity version")
 
     wrong_pin_metadata = copy.deepcopy(metadata)
     wrong_pin_packages = wrong_pin_metadata.get("packages")
@@ -895,7 +1003,7 @@ def main() -> int:
             run_tree_archive_mode_self_test()
             print(
                 "rc-package: self-test PASS "
-                "(7 hostile mutations rejected; rustdoc and archive modes verified)"
+                "(8 hostile mutations rejected; rustdoc and archive modes verified)"
             )
         else:
             build(args.output.resolve())

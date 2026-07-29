@@ -9,11 +9,14 @@
 5. [Feature matrix](FEATURE_MATRIX.md)
 6. [Architecture](ARCHITECTURE.md)
 7. [LLM usage](LLM_USAGE.md)
-8. [RC2 release notes](RC2_RELEASE_NOTES.md)
-9. [Historical RC1 release notes](RC1_RELEASE_NOTES.md)
-10. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
-11. [Packaging](PACKAGING.md)
-12. [Release assurance](RELEASE_ASSURANCE.md)
+8. [V1 product contract](V1_PRODUCT_CONTRACT.md)
+9. [BDD and acceptance testing](ACCEPTANCE_TESTING.md)
+10. [Deterministic developer guardrails](DEVELOPER_GUARDRAILS.md)
+11. [RC2 release notes](RC2_RELEASE_NOTES.md)
+12. [Historical RC1 release notes](RC1_RELEASE_NOTES.md)
+13. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
+14. [Packaging](PACKAGING.md)
+15. [Release assurance](RELEASE_ASSURANCE.md)
 
 ## Project definition and typed construction
 

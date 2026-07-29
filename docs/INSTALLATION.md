@@ -47,6 +47,20 @@ The tag is created only after the exact release-candidate commit passes every
 required gate. Until that tag exists, use the reviewed branch commit named in
 the RC pull request rather than an unpinned branch dependency.
 
+## Optional coding-agent guardrails
+
+Contributors using coding agents can install the exact locked development
+tooling under Node `22.23.1`:
+
+```bash
+npm ci --ignore-scripts
+python3 tools/check_probity.py
+```
+
+Probity is not a Rust, runtime, protocol, or published-crate dependency. See
+[deterministic developer guardrails](DEVELOPER_GUARDRAILS.md) for opt-in Codex
+hook setup and explicit nonclaims.
+
 ## Diagnostic binary
 
 The core library does not require a daemon or executable. The RC includes one

@@ -38,6 +38,13 @@ packages every public crate with `--locked`, builds the diagnostic binary in
 release mode, generates warning-denied rustdoc, records the Cargo dependency
 graph as CycloneDX 1.6, and content-addresses every retained artifact.
 
+The source archive also retains `package.json`, `package-lock.json`,
+`.node-version`, and `probity.config.ts` for optional development guardrails.
+The release packager validates their exact Node/Probity identities and package
+integrity. `SBOM.cdx.json` describes the shipped Rust crate graph; the
+development-only npm graph is separately locked and audited and is not a
+runtime dependency of any published crate.
+
 The offline rustdoc archive retains every public crate API and source page.
 Pinned Rustdoc `1.97.1` does not produce a byte-identical merged cross-crate
 search index across independent clean builds, so packaging removes

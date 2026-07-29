@@ -27,6 +27,11 @@ Second public release candidate for the reusable ZenoFCIS core library family.
   interpreter through `BoundDeliveryInterpreter`.
 - Release-candidate packaging now uses the version-neutral
   `tools/rc_package.py` entry point and current-version-derived artifact names.
+- RC2 now freezes its reusable product surface explicitly and binds nine
+  human-readable BDD scenarios to a closed executable ATDD registry.
+- Optional deterministic coding-agent guardrails pin Node `22.23.1` and
+  Probity `1.10.0`; hostile command and transcript mutations are permanent
+  acceptance evidence and AI-judged TDD is not enabled.
 
 ### Release-candidate limits
 

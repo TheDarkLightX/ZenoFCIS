@@ -45,6 +45,11 @@ Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
 [crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
 [LLM integration guide](docs/LLM_USAGE.md). The
+[V1 product contract](docs/V1_PRODUCT_CONTRACT.md) defines the RC2 feature
+freeze and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md)
+bind those journeys to fixed executable commands, while the optional
+[developer guardrails](docs/DEVELOPER_GUARDRAILS.md) reject selected unsafe
+coding-agent actions before execution. The
 [RC2 release notes](docs/RC2_RELEASE_NOTES.md) describe the exact candidate
 surface and remaining final-release blockers. The owner-facing
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
@@ -54,6 +59,7 @@ Runnable examples are checked permanently:
 ```bash
 cargo +1.97.1 run -p zeno-fcis --example minimal_core --locked
 cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
+python3 tools/atdd.py run --all
 ```
 
 The `full` feature is intended for workspace integration and exploration.
@@ -92,6 +98,9 @@ The workspace now includes the complete package ladder:
 - crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
+- a frozen V1 product contract, nine human-readable BDD scenarios, a closed
+  fail-closed ATDD registry, and optional deterministic Probity guardrails with
+  a pinned Node/npm graph and hostile command corpus.
 
 ## Demonstrated ZenoDEX runtime mount
 
@@ -205,9 +214,12 @@ The main local gate is:
 
 ```bash
 python3 tools/check_assurance.py --self-test
+python3 tools/atdd.py self-test
+python3 tools/atdd.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
+python3 tools/atdd.py run --all
 ```
 
 See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`, Miri, fuzz, supply-chain, and source-manifest gates. Package-specific boundaries are documented in `docs/`.

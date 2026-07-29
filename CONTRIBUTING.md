@@ -18,17 +18,29 @@ belong in an explicit outer adapter or shell.
 ## Development setup
 
 Use pinned Rust `1.97.1` and the committed `Cargo.lock`. Direct external
-dependencies require exact `=version` pins. Before submitting a change, run:
+dependencies require exact `=version` pins. Optional coding-agent guardrails
+use exact Node `22.23.1`, Probity `1.10.0`, and the committed
+`package-lock.json`:
+
+```bash
+npm ci --ignore-scripts
+python3 tools/check_probity.py
+```
+
+Before submitting a change, run:
 
 ```bash
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
 python3 tools/check_library_docs.py
+python3 tools/atdd.py self-test
+python3 tools/atdd.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
 cargo +1.97.1 test --workspace --doc --all-features --locked
 RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+python3 tools/atdd.py run --all
 ```
 
 Changes to packaging or a public crate must also run:
@@ -39,7 +51,10 @@ python3 tools/rc_package.py check
 ```
 
 Permanent CI adds `no_std`, Miri, fuzz-build, supply-chain, source-manifest,
-mounted-runtime, persistence, and assurance-specific gates.
+mounted-runtime, persistence, adopter-acceptance, deterministic developer
+guardrails, and assurance-specific gates. See
+[`docs/ACCEPTANCE_TESTING.md`](docs/ACCEPTANCE_TESTING.md) and
+[`docs/DEVELOPER_GUARDRAILS.md`](docs/DEVELOPER_GUARDRAILS.md).
 
 ## Protocol-visible changes
 
