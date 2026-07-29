@@ -46,7 +46,9 @@ Read the [installation guide](docs/INSTALLATION.md),
 [crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
 [LLM integration guide](docs/LLM_USAGE.md). The
 [RC1 release notes](docs/RC1_RELEASE_NOTES.md) describe the exact candidate
-surface and remaining final-release blockers.
+surface and remaining final-release blockers. The owner-facing
+[V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
+repository evidence from signing, publication, and external review actions.
 Runnable examples are checked permanently:
 
 ```bash
@@ -220,7 +222,8 @@ python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
 
 The build retains all public `.crate` packages, rustdoc, source and diagnostic
 binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
-[packaging reference](docs/PACKAGING.md).
+[packaging reference](docs/PACKAGING.md) and
+[V1 release checklist](docs/V1_RELEASE_CHECKLIST.md).
 
 ## Assurance posture
 

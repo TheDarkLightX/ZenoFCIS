@@ -4,6 +4,11 @@ This is the first release candidate for the reusable ZenoFCIS core library.
 It is intended for API review, downstream integration, formal-backend adapter
 development, and release-process validation.
 
+The [V1 release checklist](V1_RELEASE_CHECKLIST.md) is the normative owner
+runbook for exact-source validation, signed tagging, dependency-ordered crate
+publication, retained evidence, and rollback. Those external actions are not
+performed by the repository's read-only workflows.
+
 ## What users receive
 
 - 33 version-aligned publishable Rust crates and the `zeno-fcis` umbrella crate;

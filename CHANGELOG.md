@@ -4,7 +4,7 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
-## 1.0.0-rc.1 - 2026-07-28
+## 1.0.0-rc.1 - 2026-07-29
 
 First public release candidate for the reusable ZenoFCIS core library family.
 
@@ -41,6 +41,8 @@ First public release candidate for the reusable ZenoFCIS core library family.
 - retained-evidence projector qualification, required per-transition projection
   relations, nominal candidate-bound authenticated commits, and a production-facing
   authenticated publication port.
+- a checked V1 release runbook, declared code ownership, and read-only
+  reproducible package assembly for immutable `v1.0.0-rc.*` tags.
 
 ### Release-candidate limits
 
