@@ -319,7 +319,10 @@ version = "1.0.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-patch",
  "zeno-fcis-receipt",
+ "zeno-fcis-value",
 ]
 
 [[package]]
