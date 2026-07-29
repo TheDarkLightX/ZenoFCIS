@@ -25,6 +25,9 @@ First public release candidate for the reusable ZenoFCIS core library family.
   rustdoc pages, examples, checksums, package/source archives, CycloneDX SBOM
   generation, and provenance inputs. The reproducible offline rustdoc archive
   explicitly excludes Rustdoc `1.97.1`'s nondeterministic global-search index.
+- candidate-derived outbox delivery identities shared byte-for-byte by the
+  reference and SQLite shells, with SQLite schema v3 rejecting old
+  authorization-derived identities pending explicit migration.
 
 ### Release-candidate limits
 

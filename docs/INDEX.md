@@ -53,6 +53,7 @@ and other tools can use the same public boundaries.
 ## Persistence, shells, and security
 
 - [SQLite shell refinement](SQLITE_SHELL_REFINEMENT.md)
+- [Outbox delivery identity](OUTBOX_DELIVERY_IDENTITY.md)
 - [Authenticated-state adapter](AUTHENTICATED_STATE_ADAPTER.md)
 - [Authenticated sparse-proof context](AUTHENTICATED_PROOF_CONTEXT.md)
 - [Persistent collections](PERSISTENT_COLLECTIONS.md)
