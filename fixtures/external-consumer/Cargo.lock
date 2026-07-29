@@ -87,6 +87,8 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 name = "zeno-fcis"
 version = "1.0.0-rc.1"
 dependencies = [
+ "zeno-fcis-authenticated",
+ "zeno-fcis-authenticated-authority",
  "zeno-fcis-authority",
  "zeno-fcis-backend",
  "zeno-fcis-bootstrap",
@@ -112,6 +114,30 @@ dependencies = [
  "zeno-fcis-shell",
  "zeno-fcis-synthesis",
  "zeno-fcis-transition",
+ "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-authenticated"
+version = "1.0.0-rc.1"
+dependencies = [
+ "zeno-fcis-codec",
+ "zeno-fcis-crypto",
+ "zeno-fcis-patch",
+ "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-authenticated-authority"
+version = "1.0.0-rc.1"
+dependencies = [
+ "zeno-fcis-authenticated",
+ "zeno-fcis-authority",
+ "zeno-fcis-codec",
+ "zeno-fcis-crypto",
+ "zeno-fcis-laws",
+ "zeno-fcis-patch",
+ "zeno-fcis-receipt",
  "zeno-fcis-value",
 ]
 

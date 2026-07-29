@@ -54,6 +54,7 @@ These crates turn the foundational values into a safe application path.
 | `zeno-fcis-composed-program` | Root projection, nominal machine ownership, catalogued plan projection, and transition-program identity |
 | `zeno-fcis-laws` | Complete relational-law manifests, executable checks, retained evidence, and verified law sets |
 | `zeno-fcis-authority` | Exact invocation, provider, program, law, interpreter, deployment, replay, and commit authorization |
+| `zeno-fcis-authenticated-authority` | Retained-evidence projector qualification, per-transition projection laws, candidate-bound authenticated commits, and nominal authenticated publication |
 
 The recommended production path ends in a privately constructed
 `CatalogAuthorizedTransition`. Raw bundles remain inspectable data.
@@ -94,7 +95,7 @@ production backends.
 | Crate | Responsibility |
 |---|---|
 | `zeno-fcis-shell` | Pure atomic commit, replay, and acknowledgement reference semantics |
-| `zeno-fcis-authenticated` | Configured projector-bound authenticated-state reference and context-verified sparse-proof witnesses |
+| `zeno-fcis-authenticated` | Configured projector-bound authenticated-state reference, strict proof/plan decoding, and context-verified sparse-proof witnesses |
 | `zeno-fcis-collections` | Logical persistent-map interface plus reference, `rpds`, and `imbl` implementations |
 
 `apply_reference_bundle` intentionally accepts raw structural data. Production

@@ -23,6 +23,7 @@ REQUIRED_FILES = (
     Path("docs/RC1_RELEASE_NOTES.md"),
     Path("docs/PACKAGING.md"),
     Path("docs/RELEASE_ASSURANCE.md"),
+    Path("docs/AUTHENTICATED_AUTHORITY_BOUNDARY.md"),
     Path("crates/zeno-fcis/examples/minimal_core.rs"),
     Path("crates/zeno-fcis/examples/checked_backend.rs"),
     Path("fixtures/external-consumer/Cargo.toml"),

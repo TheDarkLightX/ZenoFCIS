@@ -48,6 +48,19 @@ pub mod prelude {
         ExecutionBinding, InvocationWitness, StateDomainBinding,
     };
 
+    #[cfg(feature = "authenticated-authority")]
+    pub use crate::{
+        AuthenticatedCommitAuthority, CatalogAuthorizedAuthenticatedCommit,
+        ProductionAuthenticatedCommitPort, ProjectionRelationDecision, ProjectionRelationEngine,
+        ProjectorQualificationClaim, ProjectorQualificationVerifier,
+    };
+
+    #[cfg(feature = "authenticated-state")]
+    pub use crate::{
+        AuthenticatedDecodeLimits, AuthenticatedProfile, ReferenceSparseTree, SparseProofContext,
+        StateProjector, decode_authenticated_plan, decode_sparse_proof,
+    };
+
     #[cfg(feature = "rustcrypto-sha256")]
     pub use crate::RustCryptoSha256;
 
@@ -82,6 +95,9 @@ pub use zeno_fcis_adapter_zenodex as adapter_zenodex;
 #[cfg(feature = "authenticated-state")]
 /// Versioned sparse authenticated-state planning and proof verification.
 pub use zeno_fcis_authenticated as authenticated;
+#[cfg(feature = "authenticated-authority")]
+/// Candidate-bound projector qualification and authenticated-state publication.
+pub use zeno_fcis_authenticated_authority as authenticated_authority;
 #[cfg(feature = "authority")]
 /// Nominal catalog, invocation, provider, interpreter, and deployment commit authority.
 pub use zeno_fcis_authority as authority;
@@ -169,6 +185,24 @@ pub use zeno_fcis_laws::{
     ProjectLawEngine, VerifiedLawEvidence, VerifiedProjectLaws, verify_project_laws,
 };
 
+#[cfg(feature = "authenticated-state")]
+pub use zeno_fcis_authenticated::{
+    AUTHENTICATED_PLAN_ENCODING_VERSION, AuthDecodeError, AuthError, AuthenticatedDecodeLimits,
+    AuthenticatedProfile, AuthenticatedStatePlanner, ContextVerifiedSparseProof,
+    DecodedAuthenticatedPlan, LeafWrite, NodeBatch, PlannedAuthenticatedCommit, PlannedState,
+    ProofLeaf, ReferenceSparseTree, SPARSE_PROOF_ENCODING_VERSION, SparseProof, SparseProofContext,
+    StaleNodeCandidate, StateProjector, TreeReader, TreeWriter, decode_authenticated_plan,
+    decode_sparse_proof,
+};
+#[cfg(feature = "authenticated-authority")]
+pub use zeno_fcis_authenticated_authority::{
+    AUTHENTICATED_AUTHORITY_FORMAT_VERSION, AuthenticatedAuthorityError,
+    AuthenticatedAuthorityField, AuthenticatedCommitAuthority, AuthenticatedPublication,
+    CatalogAuthorizedAuthenticatedCommit, ProductionAuthenticatedCommitPort,
+    ProjectionRelationDecision, ProjectionRelationEngine, ProjectionRelationEvaluation,
+    ProjectionRelationSubject, ProjectorQualification, ProjectorQualificationClaim,
+    ProjectorQualificationDecision, ProjectorQualificationLimits, ProjectorQualificationVerifier,
+};
 #[cfg(feature = "authority")]
 pub use zeno_fcis_authority::{
     AUTHORIZATION_FORMAT_VERSION, AuthorizationBody, AuthorizationId, AuthorizationPolicy,

@@ -57,6 +57,7 @@ and other tools can use the same public boundaries.
 - [Outbox delivery identity](OUTBOX_DELIVERY_IDENTITY.md)
 - [Authenticated-state adapter](AUTHENTICATED_STATE_ADAPTER.md)
 - [Authenticated sparse-proof context](AUTHENTICATED_PROOF_CONTEXT.md)
+- [Candidate-bound authenticated authority](AUTHENTICATED_AUTHORITY_BOUNDARY.md)
 - [Persistent collections](PERSISTENT_COLLECTIONS.md)
 - [SHA-256 provider policy](SHA256_PROVIDER_POLICY.md)
 - [Secret handling and constant time](SECRET_HANDLING_AND_CONSTANT_TIME.md)

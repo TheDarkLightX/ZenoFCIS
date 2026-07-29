@@ -8,8 +8,9 @@ semantic pre/post roots remain authoritative. Tree roots are a separate,
 explicit dual-root profile and cannot replace an existing ZenoDEX root.
 
 The public boundary contains `TreeReader`, `TreeWriter`,
-`PlannedAuthenticatedCommit`, `NodeBatch`, `StaleNodeCandidate`, bounded
-membership/absence proofs, caller-supplied `SparseProofContext`, and the
+`PlannedAuthenticatedCommit`, `DecodedAuthenticatedPlan`, `NodeBatch`,
+`StaleNodeCandidate`, bounded membership/absence proofs, caller-supplied
+`SparseProofContext`, and the
 private-construction `ContextVerifiedSparseProof` witness. A configured
 `AuthenticatedStatePlanner` owns one `StateProjector` across requests so a
 request-time caller cannot substitute another implementation. Its declared
@@ -37,7 +38,10 @@ commitment is part of `AuthenticatedProfile`.
 - membership and absence witnesses bind the exact key, value, tree, profile,
   declared projector commitment, root, and version supplied to the verifier;
 - deleted leaves become explicit stale-node candidates;
-- semantic root and authenticated root are always separate fields.
+- semantic root and authenticated root are always separate fields;
+- sparse proofs and authenticated plans admit persisted bytes only through
+  strict bounded, complete, canonical decoders;
+- decoded plans remain non-authoritative transport and cannot be applied.
 
 ## Bounds
 
@@ -53,10 +57,13 @@ domain-separation API. Internal tree shape is not consensus encoding. A
 production adapter must keep any external JMT node types private and prove that
 its incremental roots and proofs match this logical reference profile.
 
-Authenticated update-plan canonical encoding is version 2. It includes the
-projector commitment and is intentionally incompatible with the prior
-pre-release encoding. See
+Authenticated update-plan canonical encoding is version 2. Sparse-proof
+canonical encoding is version 1. Both have strict bounded decoders. The plan
+includes the projector commitment and is intentionally incompatible with the
+prior pre-release encoding. See
 [Authenticated sparse-proof context](AUTHENTICATED_PROOF_CONTEXT.md).
+Candidate-bound production use is specified by
+[Candidate-bound authenticated authority](AUTHENTICATED_AUTHORITY_BOUNDARY.md).
 
 ## Nonclaims
 
@@ -67,9 +74,11 @@ or migration for an existing single-root profile. Those require a mounted JMT
 implementation, the concrete shell transaction, and explicit activation of a
 dual-root profile.
 
-The projector commitment is a declared identity, not implementation
-attestation. The production setup owner must select the concrete projector and
-establish its correctness and completeness independently. A context-verified
-proof does not attest that its expected context came from production authority.
-Strict proof/plan decoding and candidate-bound authenticated publication remain
-separate work.
+The projector commitment alone is a declared identity, not implementation
+attestation. The higher `zeno-fcis-authenticated-authority` ring requires exact
+retained qualification evidence, an independently selected verifier, and a
+per-transition project relation before it creates nominal publication
+authority.
+A context-verified proof still does not attest that its expected context came
+from production authority. The bounded reference tree is not a production JMT,
+and verifier or relation-engine soundness remains a deployment trust boundary.

@@ -4,7 +4,13 @@ This document defines the release gate for the complete ZenoFCIS library family.
 
 ## Authority boundary
 
-The pure crates define decisions, canonical values, patches, plans, receipts, composition, refinement, authenticated-state planning, and bounded synthesis. They cannot perform ambient I/O. Concrete effects enter through explicit adapters and the SQLite shell.
+The pure crates define decisions, canonical values, patches, plans, receipts,
+composition, refinement, authenticated-state planning, and bounded synthesis.
+They cannot perform ambient I/O. Concrete effects enter through explicit
+adapters and the SQLite shell. The authenticated-authority ring qualifies one
+projector and per-transition projection relation, then exposes a nominal
+candidate-bound publication value. The included sparse tree remains a bounded
+reference writer.
 
 The authority rule is:
 
@@ -63,6 +69,8 @@ The CI workflows add:
 - compilation of the codec and candidate-bundle fuzz targets;
 - focused crash-atomic SQLite, authenticated-state, synthesis, mounted-adapter, and collection-backend tests;
 - strict validated-decision, canonical-domain-manifest, and exhaustive-coverage promotion tests;
+- strict sparse-proof and authenticated-plan decoding, projector qualification,
+  candidate-bound projection-relation, and nominal publication tests;
 - two independently generated source manifests compared byte-for-byte.
 
 ## Static policy
@@ -121,6 +129,8 @@ The repository currently supplies reviewed reference implementations and strict 
 
 - that an external ZenoDEX executable or Python runtime is bundled or production-approved;
 - that the reference sparse Merkle tree is a production database or a vetted Jellyfish Merkle Tree implementation;
+- that projector evidence or a relation witness is sound without the
+  deployment-selected independent verifier and reviewed relation engine;
 - that a concrete ESSO, SMT solver, theorem prover, compiler, or LLM is bundled as a synthesis backend;
 - that generated or imported evidence is true without its independent checker;
 - that equality between untrusted `NormalizedDecision` values grants
