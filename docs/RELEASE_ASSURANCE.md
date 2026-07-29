@@ -111,7 +111,7 @@ Evidence is additive. A newer test run does not retroactively validate older sou
 
 Any failed gate blocks release. Repair occurs in a new commit, followed by a complete rerun from a clean checkout. Do not reuse a source manifest, generated artifact, refinement fixture, or checker certificate across changed source unless its content address and all bound identifiers are unchanged and independently verified.
 
-SQLite schema v2 consumes a nominal `CatalogAuthorizedTransition` and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Populated unversioned stores fail closed pending an explicit migration. Operators must never edit policy, authorization, replay, receipt, or outbox rows to force progress.
+SQLite schema v3 consumes a nominal `CatalogAuthorizedTransition` and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. Delivery identities are derived from the implementation-neutral candidate and canonical outbox entry in both reference and SQLite shells. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Schema v2 and populated unversioned stores fail closed pending explicit migration. Operators must never edit policy, authorization, replay, receipt, or outbox rows to force progress.
 
 ## Explicit non-claims
 

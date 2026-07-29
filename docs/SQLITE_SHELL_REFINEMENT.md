@@ -23,7 +23,7 @@ publishes:
 - authorization ID, policy ID, invocation ID, replay ID, candidate ID, exact
   canonical authorization bytes, complete bundle bytes, and receipt bytes;
 - redundant exact bundle and replay rows constrained to the authorization;
-- every outbox entry, authorization-bound delivery ID, entry hash,
+- every outbox entry, candidate-bound delivery ID, entry hash,
   destination, and payload.
 
 The transaction commits only after all rows are written. Dropping the
@@ -40,15 +40,19 @@ constraints. A pending row must map its authorization to the same candidate
 under the shell policy. Destination acknowledgement must return the exact
 committed outbox-entry hash.
 
-Delivery IDs are derived under the deployment-specific `AuthorizationId`, not
-only the implementation-neutral `CandidateId`. `deliver_next` uses the exact
-owned interpreter instance; it accepts no caller-supplied destination.
+Delivery IDs are derived from the implementation-neutral `CandidateId` and
+canonical outbox entry. The deployment-specific `AuthorizationId` remains
+separate provenance and must map to that candidate under the shell policy.
+This makes pure reference and SQLite delivery identities byte-identical.
+`deliver_next` uses the exact owned interpreter instance; it accepts no
+caller-supplied destination.
 `MemoryDestination` is the included deterministic idempotent destination stub
 and rejects delivery-ID collisions.
 
-Schema v2 is explicit in SQLite `user_version`. A populated unversioned legacy
-database is rejected. No implicit migration assigns production authority to
-rows written under the former raw-bundle API.
+Schema v3 is explicit in SQLite `user_version`. Schema v2 is rejected pending
+an explicit migration because it derived delivery IDs from authorization IDs.
+A populated unversioned legacy database is also rejected. No implicit migration
+assigns production authority or silently reinterprets delivery identities.
 
 ## Failure model
 
