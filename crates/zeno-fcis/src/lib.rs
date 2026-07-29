@@ -156,21 +156,23 @@ pub use zeno_fcis_value as value;
 
 #[cfg(feature = "laws")]
 pub use zeno_fcis_laws::{
-    DecisionScope, LAW_EVALUATION_FORMAT_VERSION, LAW_MANIFEST_FORMAT_VERSION,
-    LAW_SET_FORMAT_VERSION, LawCheckInput, LawDecisionView, LawDefinition, LawEngineFailure,
-    LawError, LawEvaluation, LawEvidenceInput, LawEvidenceRequirement, LawEvidenceVerifier,
-    LawFamilyDisposition, LawFamilyPolicy, LawField, LawKind, LawLimits, LawManifest,
-    LawObservation, LawProofDecision, LawProofSubject, LawStatus, ProjectLawEngine,
-    VerifiedLawEvidence, VerifiedProjectLaws, verify_project_laws,
+    DecisionScope, GENESIS_LAW_EVALUATION_FORMAT_VERSION, GenesisApplicability,
+    GenesisLawCheckInput, GenesisLawEvaluation, LAW_EVALUATION_FORMAT_VERSION,
+    LAW_MANIFEST_FORMAT_VERSION, LAW_SET_FORMAT_VERSION, LawCheckInput, LawDecisionView,
+    LawDefinition, LawEngineFailure, LawError, LawEvaluation, LawEvidenceInput,
+    LawEvidenceRequirement, LawEvidenceVerifier, LawFamilyDisposition, LawFamilyPolicy, LawField,
+    LawKind, LawLimits, LawManifest, LawObservation, LawProofDecision, LawProofSubject, LawStatus,
+    ProjectLawEngine, VerifiedLawEvidence, VerifiedProjectLaws, verify_project_laws,
 };
 
 #[cfg(feature = "authority")]
 pub use zeno_fcis_authority::{
     AUTHORIZATION_FORMAT_VERSION, AuthorizationBody, AuthorizationId, AuthorizationPolicy,
     AuthorizationRecord, AuthorizedCommitResult, AuthorizedShellError, AuthorizedShellState,
-    BoundInterpreter, CatalogAuthorizationDecision, CatalogAuthorizedReject,
-    CatalogAuthorizedTransition, CatalogCommitAuthority, CatalogExecutionError,
-    CatalogTransitionProgram, ExecutionBinding, INVOCATION_INPUT_FORMAT_VERSION, InvocationWitness,
+    BoundInterpreter, CatalogAuthorizationDecision, CatalogAuthorizedGenesis,
+    CatalogAuthorizedReject, CatalogAuthorizedTransition, CatalogCommitAuthority,
+    CatalogExecutionError, CatalogTransitionProgram, ExecutionBinding, GenesisAuthorizationBody,
+    GenesisId, GenesisPolicyBinding, INVOCATION_INPUT_FORMAT_VERSION, InvocationWitness,
     ReviewedTransitionInput, StateDomainBinding,
 };
 #[cfg(feature = "backend")]

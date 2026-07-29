@@ -135,6 +135,11 @@ the evidence required by the manifest, and call `verify_project_laws`.
 Successful verification produces `VerifiedProjectLaws`; each invocation still
 receives a fresh bounded law evaluation.
 
+Every `LawDefinition` also declares `GenesisApplicability`. State invariants
+must be `Required`; decision-only laws must carry an explicit nonzero
+inapplicability rationale. Implement `ProjectLawEngine::evaluate_genesis` so
+the exact reviewed initial state is checked before a shell can be created.
+
 Formal tools are optional adapters:
 
 - public users can mount Lean, SMT/Z3, CVC5, Kani, Flux, or another checker;
@@ -156,7 +161,13 @@ not the request caller, owns:
 - transition program and build identity;
 - verified law set and exact law-engine type;
 - state domain, interpreter, deployment, and replay-policy bindings;
+- one `GenesisPolicyBinding` containing the expected initial root, reviewed
+  source/configuration/evidence commitments, and unique deployment instance;
 - transition resource limits.
+
+First admit the reviewed initial state and call
+`CatalogCommitAuthority::authorize_genesis`. This produces the only nominal
+`CatalogAuthorizedGenesis` accepted by an authorized shell constructor.
 
 For each request, admit the exact pre-state, command, authenticated context,
 principal, authentication evidence, and replay identity into an
@@ -180,6 +191,10 @@ Use `AuthorizedShellState` for the pure authorized publication model or enable
 exact authorized state, receipt, replay binding, and outbox obligations under
 expected-root compare-and-swap.
 
+Create a new shell with the consumed `CatalogAuthorizedGenesis`. Reopen an
+existing SQLite shell with `SqliteShell::open_existing`; reopening accepts no
+initial-state argument and revalidates the persisted genesis authorization.
+
 `zeno-fcis-shell::apply_reference_bundle` accepts raw `CommitBundle` data only
 as reference semantics. It is not a production commit port.
 
@@ -197,8 +212,13 @@ committed outbox entry idempotently and under the authority-owned interpreter.
       release-selected verifier.
 - [ ] The canonical sequential composition is deterministic and budgeted.
 - [ ] Required invariants, conservation, authority, and failure laws are complete.
+- [ ] Genesis applicability is explicit for every law and the reviewed initial
+      state satisfies every required genesis law.
 - [ ] Formal evidence is checked by the release-selected verifier.
-- [ ] The authority owns the program, laws, provider, interpreter, and deployment.
+- [ ] The authority owns the program, laws, provider, interpreter, deployment,
+      and exact genesis binding.
+- [ ] Shell creation consumes only `CatalogAuthorizedGenesis`; reopen accepts no
+      replacement initial state.
 - [ ] Only `CatalogAuthorizedTransition` reaches the production commit port.
 - [ ] Mounted implementations are compared over complete normalized decisions.
 - [ ] Crash, replay, CAS-conflict, and outbox behavior are tested.

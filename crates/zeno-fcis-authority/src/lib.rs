@@ -21,7 +21,8 @@ use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::{Accepted, Decision, DecisionKind, Failed, Rejected};
 use zeno_fcis_crypto::{ApprovedCommitmentProvider, ApprovedProviderId, VerifiedProvider};
 use zeno_fcis_laws::{
-    LawCheckInput, LawDecisionView, LawError, LawEvaluation, ProjectLawEngine, VerifiedProjectLaws,
+    GenesisLawCheckInput, GenesisLawEvaluation, LawCheckInput, LawDecisionView, LawError,
+    LawEvaluation, ProjectLawEngine, VerifiedProjectLaws,
 };
 use zeno_fcis_patch::{PatchError, hash_value};
 use zeno_fcis_project::SemanticId;
@@ -36,7 +37,7 @@ use zeno_fcis_transition::{
 type AuthorityMarker<H, P, L, I> = PhantomData<fn() -> (H, P, L, I)>;
 
 /// Canonical authorization-envelope format version.
-pub const AUTHORIZATION_FORMAT_VERSION: u16 = 1;
+pub const AUTHORIZATION_FORMAT_VERSION: u16 = 2;
 /// Command and complete invocation-context commitment format version.
 pub const INVOCATION_INPUT_FORMAT_VERSION: u16 = 1;
 
@@ -171,6 +172,82 @@ impl CanonicalEncode for ExecutionBinding {
     }
 }
 
+/// Reviewed immutable initial-state and deployment-instance commitments.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GenesisPolicyBinding {
+    expected_initial_root: NonZeroHash,
+    source_hash: NonZeroHash,
+    configuration_hash: NonZeroHash,
+    evidence_hash: NonZeroHash,
+    deployment_instance_hash: NonZeroHash,
+}
+
+impl GenesisPolicyBinding {
+    /// Creates one exact genesis policy from five required commitments.
+    pub fn try_new(
+        expected_initial_root: Hash32,
+        source_hash: Hash32,
+        configuration_hash: Hash32,
+        evidence_hash: Hash32,
+        deployment_instance_hash: Hash32,
+    ) -> Result<Self, AuthorityError> {
+        Ok(Self {
+            expected_initial_root: NonZeroHash::try_new(expected_initial_root)?,
+            source_hash: NonZeroHash::try_new(source_hash)?,
+            configuration_hash: NonZeroHash::try_new(configuration_hash)?,
+            evidence_hash: NonZeroHash::try_new(evidence_hash)?,
+            deployment_instance_hash: NonZeroHash::try_new(deployment_instance_hash)?,
+        })
+    }
+
+    /// Returns the exact reviewed initial semantic root.
+    #[must_use]
+    pub const fn expected_initial_root(self) -> Hash32 {
+        self.expected_initial_root.get()
+    }
+
+    /// Returns the reviewed genesis source/build commitment.
+    #[must_use]
+    pub const fn source_hash(self) -> Hash32 {
+        self.source_hash.get()
+    }
+
+    /// Returns the reviewed initial configuration commitment.
+    #[must_use]
+    pub const fn configuration_hash(self) -> Hash32 {
+        self.configuration_hash.get()
+    }
+
+    /// Returns the retained genesis evidence commitment.
+    #[must_use]
+    pub const fn evidence_hash(self) -> Hash32 {
+        self.evidence_hash.get()
+    }
+
+    /// Returns the unique shell/deployment-instance commitment.
+    #[must_use]
+    pub const fn deployment_instance_hash(self) -> Hash32 {
+        self.deployment_instance_hash.get()
+    }
+
+    /// Returns the complete genesis-policy binding identity.
+    pub fn commitment<H: ApprovedCommitmentProvider>(&self) -> Result<Hash32, AuthorityError> {
+        hash_canonical::<H>("zeno-fcis/genesis-policy-binding", self)
+    }
+}
+
+impl CanonicalEncode for GenesisPolicyBinding {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-GENESIS-POLICY\0");
+        output.extend_from_slice(&AUTHORIZATION_FORMAT_VERSION.to_be_bytes());
+        self.expected_initial_root.encode_to(output)?;
+        self.source_hash.encode_to(output)?;
+        self.configuration_hash.encode_to(output)?;
+        self.evidence_hash.encode_to(output)?;
+        self.deployment_instance_hash.encode_to(output)
+    }
+}
+
 /// Read-only input supplied to the shell-owned reviewed transition program.
 pub struct ReviewedTransitionInput<'a> {
     catalog: &'a ProjectCatalog,
@@ -260,6 +337,8 @@ where
     catalog_hash: Hash32,
     state_domain: StateDomainBinding,
     execution: ExecutionBinding,
+    genesis: GenesisPolicyBinding,
+    genesis_binding_hash: Hash32,
     transition_limits: TransitionLimits,
     provider_id: ApprovedProviderId,
     law_set_hash: Hash32,
@@ -279,6 +358,7 @@ where
         catalog: &ProjectCatalog,
         state_domain: StateDomainBinding,
         execution: ExecutionBinding,
+        genesis: GenesisPolicyBinding,
         transition_limits: TransitionLimits,
         provider: &VerifiedProvider<H>,
         laws: &VerifiedProjectLaws<H, L>,
@@ -315,11 +395,15 @@ where
             laws.evidence_verifier_hash(),
             AuthorityField::LawEvidenceVerifier,
         )?;
+        let genesis_binding_hash = genesis.commitment::<H>()?;
+        require_nonzero(genesis_binding_hash, AuthorityField::GenesisPolicy)?;
         let mut policy = Self {
             catalog: approved_catalog,
             catalog_hash,
             state_domain,
             execution,
+            genesis,
+            genesis_binding_hash,
             transition_limits,
             provider_id: provider.provider_id(),
             law_set_hash: laws.law_set_hash(),
@@ -355,6 +439,18 @@ where
     #[must_use]
     pub const fn execution(&self) -> ExecutionBinding {
         self.execution
+    }
+
+    /// Returns the exact reviewed genesis policy.
+    #[must_use]
+    pub const fn genesis(&self) -> GenesisPolicyBinding {
+        self.genesis
+    }
+
+    /// Returns the complete genesis-policy binding commitment.
+    #[must_use]
+    pub const fn genesis_binding_hash(&self) -> Hash32 {
+        self.genesis_binding_hash
     }
 
     /// Returns the exact transition resource envelope.
@@ -408,6 +504,8 @@ where
         output.extend_from_slice(self.catalog.schema_hash().as_bytes());
         output.extend_from_slice(self.catalog.manifest().precedence_hash().as_bytes());
         self.state_domain.encode_to(output)?;
+        self.genesis.encode_to(output)?;
+        output.extend_from_slice(self.genesis_binding_hash.as_bytes());
         output.extend_from_slice(&self.provider_id.code().to_be_bytes());
         put_u16_blob(output, H::ALGORITHM_ID.as_bytes())?;
         output.extend_from_slice(self.law_set_hash.as_bytes());
@@ -415,6 +513,158 @@ where
         output.extend_from_slice(self.law_evidence_verifier_hash.as_bytes());
         self.execution.encode_to(output)?;
         self.transition_limits.encode_to(output)
+    }
+}
+
+/// Deployment-specific identity of one authorized genesis ceremony.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct GenesisId(Hash32);
+
+impl GenesisId {
+    /// Returns the underlying commitment.
+    #[must_use]
+    pub const fn hash(self) -> Hash32 {
+        self.0
+    }
+}
+
+impl fmt::Display for GenesisId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+/// Inspectable fixed-shape body of one law-verified genesis authorization.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenesisAuthorizationBody {
+    policy_id: Hash32,
+    catalog_hash: Hash32,
+    genesis_binding_hash: Hash32,
+    initial_root: Hash32,
+    law_set_hash: Hash32,
+    law_evaluation_hash: Hash32,
+}
+
+impl GenesisAuthorizationBody {
+    /// Returns the complete shell policy identity.
+    #[must_use]
+    pub const fn policy_id(&self) -> Hash32 {
+        self.policy_id
+    }
+
+    /// Returns the exact project catalog commitment.
+    #[must_use]
+    pub const fn catalog_hash(&self) -> Hash32 {
+        self.catalog_hash
+    }
+
+    /// Returns the reviewed genesis-policy commitment.
+    #[must_use]
+    pub const fn genesis_binding_hash(&self) -> Hash32 {
+        self.genesis_binding_hash
+    }
+
+    /// Returns the exact admitted initial semantic root.
+    #[must_use]
+    pub const fn initial_root(&self) -> Hash32 {
+        self.initial_root
+    }
+
+    /// Returns the complete verified law-set identity.
+    #[must_use]
+    pub const fn law_set_hash(&self) -> Hash32 {
+        self.law_set_hash
+    }
+
+    /// Returns the complete genesis-law evaluation identity.
+    #[must_use]
+    pub const fn law_evaluation_hash(&self) -> Hash32 {
+        self.law_evaluation_hash
+    }
+}
+
+impl CanonicalEncode for GenesisAuthorizationBody {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-GENESIS-AUTHORIZATION-BODY\0");
+        output.extend_from_slice(&AUTHORIZATION_FORMAT_VERSION.to_be_bytes());
+        output.extend_from_slice(self.policy_id.as_bytes());
+        output.extend_from_slice(self.catalog_hash.as_bytes());
+        output.extend_from_slice(self.genesis_binding_hash.as_bytes());
+        output.extend_from_slice(self.initial_root.as_bytes());
+        output.extend_from_slice(self.law_set_hash.as_bytes());
+        output.extend_from_slice(self.law_evaluation_hash.as_bytes());
+        Ok(())
+    }
+}
+
+/// Private-construction authority to initialize one exact production store.
+///
+/// Raw schema admission cannot construct this type:
+///
+/// ```compile_fail
+/// use zeno_fcis_authority::CatalogAuthorizedGenesis;
+/// use zeno_fcis_schema::SchemaAdmittedEnvelope;
+///
+/// fn raw_is_not_genesis(value: SchemaAdmittedEnvelope) {
+///     let _: CatalogAuthorizedGenesis<(), (), (), ()> = value;
+/// }
+/// ```
+pub struct CatalogAuthorizedGenesis<H, P, L, I>
+where
+    H: ApprovedCommitmentProvider,
+    P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
+{
+    body: GenesisAuthorizationBody,
+    initial_state: SchemaAdmittedEnvelope,
+    law_evaluation: GenesisLawEvaluation,
+    genesis_id: GenesisId,
+    marker: AuthorityMarker<H, P, L, I>,
+}
+
+impl<H, P, L, I> CatalogAuthorizedGenesis<H, P, L, I>
+where
+    H: ApprovedCommitmentProvider,
+    P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
+{
+    /// Returns the complete inspectable genesis body.
+    #[must_use]
+    pub const fn body(&self) -> &GenesisAuthorizationBody {
+        &self.body
+    }
+
+    /// Returns the exact schema-admitted initial state.
+    #[must_use]
+    pub const fn initial_state(&self) -> &SchemaAdmittedEnvelope {
+        &self.initial_state
+    }
+
+    /// Returns the complete successful genesis-law evaluation.
+    #[must_use]
+    pub const fn law_evaluation(&self) -> &GenesisLawEvaluation {
+        &self.law_evaluation
+    }
+
+    /// Returns the deployment-specific genesis identity.
+    #[must_use]
+    pub const fn genesis_id(&self) -> GenesisId {
+        self.genesis_id
+    }
+}
+
+impl<H, P, L, I> CanonicalEncode for CatalogAuthorizedGenesis<H, P, L, I>
+where
+    H: ApprovedCommitmentProvider,
+    P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
+{
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-AUTHORIZED-GENESIS\0");
+        output.extend_from_slice(&AUTHORIZATION_FORMAT_VERSION.to_be_bytes());
+        put_blob(output, &self.body.canonical_bytes()?)?;
+        put_blob(output, &self.initial_state.canonical_bytes()?)?;
+        put_blob(output, &self.law_evaluation.canonical_bytes()?)
     }
 }
 
@@ -442,6 +692,7 @@ where
         catalog: &ProjectCatalog,
         state_domain: StateDomainBinding,
         execution: ExecutionBinding,
+        genesis: GenesisPolicyBinding,
         transition_limits: TransitionLimits,
         provider: &VerifiedProvider<H>,
         laws: VerifiedProjectLaws<H, L>,
@@ -454,6 +705,7 @@ where
             catalog,
             state_domain,
             execution,
+            genesis,
             transition_limits,
             provider,
             &laws,
@@ -479,6 +731,47 @@ where
             interpreter,
             marker: PhantomData,
         }
+    }
+
+    /// Evaluates the exact initial state and mints nominal genesis authority.
+    pub fn authorize_genesis(
+        &self,
+        initial_state: SchemaAdmittedEnvelope,
+    ) -> Result<CatalogAuthorizedGenesis<H, P, L, I>, AuthorityError> {
+        validate_root_envelope(&self.policy, &initial_state)?;
+        let initial_root = hash_value::<H>(
+            self.policy.state_domain.domain()?,
+            initial_state.value().value(),
+        )?;
+        if initial_root != self.policy.genesis.expected_initial_root() {
+            return Err(AuthorityError::Mismatch(AuthorityField::GenesisRoot));
+        }
+        let input = GenesisLawCheckInput::try_new(
+            self.policy.catalog_hash,
+            self.policy.policy_id,
+            self.policy.genesis_binding_hash,
+            initial_state.value().value(),
+        )?;
+        let law_evaluation = self.laws.evaluate_genesis(&input)?;
+        let body = GenesisAuthorizationBody {
+            policy_id: self.policy.policy_id,
+            catalog_hash: self.policy.catalog_hash,
+            genesis_binding_hash: self.policy.genesis_binding_hash,
+            initial_root,
+            law_set_hash: self.policy.law_set_hash,
+            law_evaluation_hash: law_evaluation.evaluation_hash(),
+        };
+        let mut genesis = CatalogAuthorizedGenesis {
+            body,
+            initial_state,
+            law_evaluation,
+            genesis_id: GenesisId(Hash32::ZERO),
+            marker: PhantomData,
+        };
+        let genesis_hash = hash_canonical::<H>("zeno-fcis/authorized-genesis", &genesis)?;
+        require_nonzero(genesis_hash, AuthorityField::GenesisId)?;
+        genesis.genesis_id = GenesisId(genesis_hash);
+        Ok(genesis)
     }
 
     /// Admits one exact externally supplied invocation.
@@ -1054,6 +1347,7 @@ where
     L: ProjectLawEngine,
 {
     policy_id: Hash32,
+    genesis_id: GenesisId,
     state_domain: StateDomainBinding,
     inner: ShellState,
     records: Box<[AuthorizationRecord]>,
@@ -1066,18 +1360,29 @@ where
     P: CatalogTransitionProgram<H>,
     L: ProjectLawEngine,
 {
-    /// Creates an empty authorized shell from one exact admitted initial state.
+    /// Creates an empty authorized shell from one exact law-verified genesis.
     pub fn new(
         authority: &CatalogCommitAuthority<H, P, L, I>,
-        initial_state: &SchemaAdmittedEnvelope,
+        genesis: CatalogAuthorizedGenesis<H, P, L, I>,
     ) -> Result<Self, AuthorizedShellError> {
-        validate_root_envelope(authority.policy(), initial_state)?;
+        if genesis.body.policy_id != authority.policy.policy_id {
+            return Err(AuthorizedShellError::PolicyMismatch {
+                expected: authority.policy.policy_id,
+                actual: genesis.body.policy_id,
+            });
+        }
         let inner = ShellState::new::<H>(
-            initial_state.value().value().clone(),
+            genesis.initial_state.value().value().clone(),
             authority.policy.state_domain.domain()?,
         )?;
+        if inner.root() != genesis.body.initial_root {
+            return Err(AuthorizedShellError::Authority(AuthorityError::Mismatch(
+                AuthorityField::GenesisRoot,
+            )));
+        }
         Ok(Self {
             policy_id: authority.policy.policy_id,
+            genesis_id: genesis.genesis_id,
             state_domain: authority.policy.state_domain.clone(),
             inner,
             records: Vec::new().into_boxed_slice(),
@@ -1089,6 +1394,12 @@ where
     #[must_use]
     pub const fn policy_id(&self) -> Hash32 {
         self.policy_id
+    }
+
+    /// Returns the exact genesis authorization that initialized this shell.
+    #[must_use]
+    pub const fn genesis_id(&self) -> GenesisId {
+        self.genesis_id
     }
 
     /// Returns the structural reference-shell state.
@@ -1160,6 +1471,7 @@ where
         Ok(AuthorizedCommitResult {
             state: Self {
                 policy_id: self.policy_id,
+                genesis_id: self.genesis_id,
                 state_domain: self.state_domain,
                 inner: result.into_state(),
                 records: records.into_boxed_slice(),
@@ -1526,6 +1838,12 @@ pub enum AuthorityField {
     Catalog,
     /// Complete policy identity.
     PolicyId,
+    /// Complete reviewed genesis policy.
+    GenesisPolicy,
+    /// Exact expected initial semantic root.
+    GenesisRoot,
+    /// Deployment-specific genesis authorization identity.
+    GenesisId,
     /// Project catalog committed by the verified law set.
     LawCatalog,
     /// Source/profile/schema/algorithm bindings of the verified law set.
@@ -1724,9 +2042,10 @@ mod tests {
     use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
     use zeno_fcis_evidence::EvidenceEnvelope;
     use zeno_fcis_laws::{
-        DecisionScope, LawDefinition, LawEvidenceRequirement, LawEvidenceVerifier, LawFamilyPolicy,
-        LawKind, LawLimits, LawObservation, LawProofDecision, LawProofSubject, LawStatus,
-        ProjectLawEngine, VerifiedProjectLaws, verify_project_laws,
+        DecisionScope, GenesisApplicability, GenesisLawCheckInput, LawDefinition,
+        LawEvidenceRequirement, LawEvidenceVerifier, LawFamilyPolicy, LawKind, LawLimits,
+        LawObservation, LawProofDecision, LawProofSubject, LawStatus, ProjectLawEngine,
+        VerifiedProjectLaws, verify_project_laws,
     };
     use zeno_fcis_project::{
         DomainPrefix, ProfileBindings, ProjectProfile, RegistryEntry, RegistryKind, StableName,
@@ -1847,6 +2166,17 @@ mod tests {
                 ]),
             }
         }
+
+        fn evaluate_genesis(
+            &self,
+            _: &GenesisLawCheckInput<'_>,
+            _: LawLimits,
+        ) -> Result<Vec<LawObservation>, zeno_fcis_laws::LawEngineFailure> {
+            Ok(vec![
+                LawObservation::try_new(semantic_id(1_001), LawStatus::Satisfied, hash(91))
+                    .unwrap_or_else(|error| panic!("genesis observation: {error}")),
+            ])
+        }
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -1861,6 +2191,17 @@ mod tests {
             Ok(vec![
                 LawObservation::try_new(semantic_id(1_001), LawStatus::Violated, hash(95))
                     .unwrap_or_else(|error| panic!("law observation: {error}")),
+            ])
+        }
+
+        fn evaluate_genesis(
+            &self,
+            _: &GenesisLawCheckInput<'_>,
+            _: LawLimits,
+        ) -> Result<Vec<LawObservation>, zeno_fcis_laws::LawEngineFailure> {
+            Ok(vec![
+                LawObservation::try_new(semantic_id(1_001), LawStatus::Violated, hash(95))
+                    .unwrap_or_else(|error| panic!("genesis observation: {error}")),
             ])
         }
     }
@@ -1929,6 +2270,7 @@ mod tests {
                 stable_name("state-invariant"),
                 LawKind::StateInvariant,
                 DecisionScope::Committing,
+                GenesisApplicability::Required,
                 hash(101),
                 hash(111),
                 LawEvidenceRequirement::RuntimeOnly,
@@ -1939,6 +2281,9 @@ mod tests {
                 stable_name("reject-no-authority"),
                 LawKind::RejectNoAuthority,
                 DecisionScope::Reject,
+                GenesisApplicability::NotApplicable {
+                    rationale_hash: hash(121),
+                },
                 hash(102),
                 hash(112),
                 LawEvidenceRequirement::RuntimeOnly,
@@ -1949,6 +2294,9 @@ mod tests {
                 stable_name("committed-failure-effects"),
                 LawKind::CommittedFailureEffects,
                 DecisionScope::CommittedFailure,
+                GenesisApplicability::NotApplicable {
+                    rationale_hash: hash(122),
+                },
                 hash(103),
                 hash(113),
                 LawEvidenceRequirement::RuntimeOnly,
@@ -2077,9 +2425,31 @@ mod tests {
         .unwrap_or_else(|error| panic!("execution binding: {error}"))
     }
 
+    fn genesis_policy(catalog: &ProjectCatalog, instance: u8) -> GenesisPolicyBinding {
+        let domain = Domain::new("authority/fixture/state", 1)
+            .unwrap_or_else(|error| panic!("state domain: {error}"));
+        let initial_root = hash_value::<RustCryptoSha256>(domain, root(catalog).value().value())
+            .unwrap_or_else(|error| panic!("initial root: {error}"));
+        GenesisPolicyBinding::try_new(initial_root, hash(70), hash(71), hash(72), hash(instance))
+            .unwrap_or_else(|error| panic!("genesis policy: {error}"))
+    }
+
     fn accept_authority(
         catalog: &ProjectCatalog,
         deployment_byte: u8,
+    ) -> CatalogCommitAuthority<RustCryptoSha256, AcceptProgram, TestLawEngine, TestInterpreter>
+    {
+        accept_authority_with_genesis(
+            catalog,
+            deployment_byte,
+            genesis_policy(catalog, deployment_byte),
+        )
+    }
+
+    fn accept_authority_with_genesis(
+        catalog: &ProjectCatalog,
+        deployment_byte: u8,
+        genesis: GenesisPolicyBinding,
     ) -> CatalogCommitAuthority<RustCryptoSha256, AcceptProgram, TestLawEngine, TestInterpreter>
     {
         let provider = verify_approved_provider::<RustCryptoSha256>()
@@ -2089,6 +2459,7 @@ mod tests {
             StateDomainBinding::try_new("authority/fixture/state", 1)
                 .unwrap_or_else(|error| panic!("state domain: {error}")),
             execution(deployment_byte),
+            genesis,
             transition_limits(),
             &provider,
             verified_laws(catalog),
@@ -2108,6 +2479,7 @@ mod tests {
             StateDomainBinding::try_new("authority/fixture/state", 1)
                 .unwrap_or_else(|error| panic!("state domain: {error}")),
             execution(53),
+            genesis_policy(catalog, 53),
             transition_limits(),
             &provider,
             violating_laws(catalog),
@@ -2127,6 +2499,7 @@ mod tests {
             StateDomainBinding::try_new("authority/fixture/state", 1)
                 .unwrap_or_else(|error| panic!("state domain: {error}")),
             execution(53),
+            genesis_policy(catalog, 53),
             transition_limits(),
             &provider,
             verified_laws(catalog),
@@ -2146,6 +2519,7 @@ mod tests {
             StateDomainBinding::try_new("authority/fixture/state", 1)
                 .unwrap_or_else(|error| panic!("state domain: {error}")),
             execution(53),
+            genesis_policy(catalog, 53),
             transition_limits(),
             &provider,
             verified_laws(catalog),
@@ -2232,7 +2606,10 @@ mod tests {
     fn exact_authorization_commits_and_replays_idempotently() {
         let catalog = fixture_catalog();
         let authority = accept_authority(&catalog, 53);
-        let shell = AuthorizedShellState::new(&authority, &root(&catalog))
+        let genesis = authority
+            .authorize_genesis(root(&catalog))
+            .unwrap_or_else(|error| panic!("genesis: {error}"));
+        let shell = AuthorizedShellState::new(&authority, genesis)
             .unwrap_or_else(|error| panic!("shell: {error}"));
         let first = shell
             .commit(accept(&authority, &catalog, 60, 62))
@@ -2309,7 +2686,10 @@ mod tests {
             first_authority.policy().policy_id(),
             other_authority.policy().policy_id()
         );
-        let shell = AuthorizedShellState::new(&first_authority, &root(&catalog))
+        let genesis = first_authority
+            .authorize_genesis(root(&catalog))
+            .unwrap_or_else(|error| panic!("genesis: {error}"));
+        let shell = AuthorizedShellState::new(&first_authority, genesis)
             .unwrap_or_else(|error| panic!("shell: {error}"));
         let error = shell
             .commit(accept(&other_authority, &catalog, 60, 62))
@@ -2369,6 +2749,7 @@ mod tests {
             StateDomainBinding::try_new("authority/fixture/state", 1)
                 .unwrap_or_else(|error| panic!("state domain: {error}")),
             wrong_execution,
+            genesis_policy(&catalog, 53),
             transition_limits(),
             &provider,
             verified_laws(&catalog),
@@ -2377,6 +2758,69 @@ mod tests {
         assert!(matches!(
             result,
             Err(AuthorityError::Mismatch(AuthorityField::TransitionBuild))
+        ));
+    }
+
+    #[test]
+    fn schema_valid_wrong_root_cannot_mint_genesis_authority() {
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        let other = SchemaAdmittedEnvelope::try_new::<RustCryptoSha256>(
+            catalog.schema(),
+            Value::Bool(true),
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("other root: {error}"));
+        assert!(matches!(
+            authority.authorize_genesis(other),
+            Err(AuthorityError::Mismatch(AuthorityField::GenesisRoot))
+        ));
+    }
+
+    #[test]
+    fn every_genesis_policy_field_changes_policy_and_genesis_identity() {
+        let catalog = fixture_catalog();
+        let base = accept_authority(&catalog, 53);
+        let base_genesis = base
+            .authorize_genesis(root(&catalog))
+            .unwrap_or_else(|error| panic!("base genesis: {error}"));
+        let initial_root = base.policy().genesis().expected_initial_root();
+        let variants = [
+            GenesisPolicyBinding::try_new(initial_root, hash(73), hash(71), hash(72), hash(53)),
+            GenesisPolicyBinding::try_new(initial_root, hash(70), hash(73), hash(72), hash(53)),
+            GenesisPolicyBinding::try_new(initial_root, hash(70), hash(71), hash(73), hash(53)),
+            GenesisPolicyBinding::try_new(initial_root, hash(70), hash(71), hash(72), hash(73)),
+        ];
+
+        for variant in variants {
+            let authority = accept_authority_with_genesis(
+                &catalog,
+                53,
+                variant.unwrap_or_else(|error| panic!("variant genesis policy: {error}")),
+            );
+            let genesis = authority
+                .authorize_genesis(root(&catalog))
+                .unwrap_or_else(|error| panic!("variant genesis: {error}"));
+            assert_ne!(authority.policy().policy_id(), base.policy().policy_id());
+            assert_ne!(genesis.genesis_id(), base_genesis.genesis_id());
+        }
+    }
+
+    #[test]
+    fn violated_genesis_law_cannot_initialize_authorized_shell() {
+        let catalog = fixture_catalog();
+        let authority = violating_authority(&catalog);
+        let error = authority
+            .authorize_genesis(root(&catalog))
+            .err()
+            .unwrap_or_else(|| panic!("violated genesis law must fail"));
+        assert!(matches!(
+            error,
+            AuthorityError::Laws(LawError::LawNotSatisfied {
+                law_id,
+                status: LawStatus::Violated,
+                ..
+            }) if law_id == semantic_id(1_001)
         ));
     }
 }
