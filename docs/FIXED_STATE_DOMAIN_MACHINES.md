@@ -213,7 +213,7 @@ This package does not:
 - support cyclic wiring, fanout, fan-in, or dynamic component creation;
 - infer business invariants, conservation, authority, or validate project
   reason disposition and rejection precedence;
-- convert output ports into authoritative effects or outbox obligations inside
+- convert output ports into non-executable commit evidence or durable outbox obligations inside
   this crate; that mapping belongs to `zeno-fcis-composed-program`;
 - provide canonical decoders for fixed-domain artifacts in version 1;
 - verify a proof artifact or make ESSO, Lean, SMT, Z3, CVC5, Kani, Flux, or any

@@ -6,8 +6,8 @@ identity:
 
 ```text
 preconditioned CanonicalPatch
-+ authoritative CommitPlan
-+ committed OutboxPlan
++ non-executable CommitPlan evidence
++ durable OutboxPlan obligations
 + exact profile/command/context/precedence/algorithm/budget bindings
         -> CandidateBody
         -> CandidateId
@@ -15,7 +15,7 @@ preconditioned CanonicalPatch
         -> CommitBundle
 ```
 
-`Reject` has no candidate, patch, authoritative effects, or outbox plan.
+`Reject` has no candidate, patch, commit evidence, or outbox plan.
 `CommittedFailure` owns a complete candidate because authoritative state has
 intentionally changed even though the requested operation failed.
 
@@ -31,7 +31,7 @@ The pure reference shell function `apply_reference_bundle` publishes together:
 - the exact successor semantic state and root;
 - the replay binding;
 - the receipt;
-- the complete bundle and authoritative plan;
+- the complete bundle and non-executable commit-evidence plan;
 - complete outbox delivery records, including payload and destination data.
 
 A replay is idempotent only when its replay identity, candidate identity, and
@@ -41,6 +41,10 @@ for the exact committed outbox-entry hash.
 The SQLite production port consumes the authorization value, not a raw bundle
 or a caller-selected replay identity. The replay identity is already bound into
 the admitted invocation and the resulting candidate.
+
+`CommitPlan` is never interpreted as executable work. Every external action,
+including value movement, must be represented as a catalogued durable outbox
+obligation. See [Commit evidence and durable outbox model](COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md).
 
 ## Initial restrictions
 

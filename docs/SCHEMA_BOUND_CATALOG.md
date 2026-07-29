@@ -57,6 +57,7 @@ Each effect binds:
 - a stable name;
 - an exact payload type in the closed schema;
 - authority and subject commitment requirements;
+- constructor-fixed `CommitEffectSemantics::EvidenceOnly` execution meaning;
 - an explicit `NonValue` or canonical asset-scoped `ValueFlow` classification;
 - a nonzero project-policy commitment.
 
@@ -69,11 +70,11 @@ Present
 Exact(nonzero hash)
 ```
 
-A commit plan fails closed when an operation is unknown, its payload does not satisfy the schema, or its authority/subject commitments violate the definition.
+A commit plan fails closed when an operation is unknown, its payload does not satisfy the schema, or its authority/subject commitments violate the definition. `ProjectCatalog` construction also rejects every value-moving effect because V1 commit-plan records are non-executable evidence.
 
 Value classifications distinguish transfer, mint, burn, escrow, fee,
 settlement, external-delivery, and custom registered relations. They are part
-of catalog format 2 and therefore part of the effect registry and project
+of catalog format 3 and therefore part of the effect registry and project
 identity. See [Catalog-derived economic law requirements](ECONOMIC_LAW_DERIVATION.md).
 
 ## Channel definitions
@@ -87,7 +88,7 @@ Each channel binds:
 - an explicit `NonValue` or canonical asset-scoped `ValueFlow` classification;
 - a nonzero delivery-policy commitment.
 
-The delivery-policy commitment may identify project-specific retry, acknowledgement, ordering, privacy, retention, or destination-idempotency rules. The generic catalog binds that policy but does not claim that an external destination obeys it.
+The delivery-policy commitment may identify project-specific retry, acknowledgement, ordering, privacy, retention, or destination-idempotency rules. The generic catalog binds that policy but does not claim that an external destination obeys it. Every external operation, including value movement, must use this durable outbox path.
 
 ## Resource envelope
 
@@ -120,8 +121,11 @@ The implemented laws are:
   effect or channel registry identity;
 - economic reclassification changes the manifest, profile, catalog, and every
   downstream verified-law-set identity.
+- every effect definition is non-executable evidence and a value-moving effect
+  prevents catalog construction, while the same value flow is admitted on a
+  durable channel.
 
-Negative tests cover noncontiguous precedence, wrong profile bindings, hidden profile effects, schema-root divergence, unknown effect and channel IDs, wrong effect authority and subject commitments, wrong effect/channel payload shapes, cross-class reasons, and aggregate payload overflow. Existing `CommitPlan` and `OutboxPlan` constructors separately reject duplicate ordinals and canonicalize operation order.
+Negative tests cover value-moving commit evidence, noncontiguous precedence, wrong profile bindings, hidden profile effects, schema-root divergence, unknown effect and channel IDs, wrong effect authority and subject commitments, wrong effect/channel payload shapes, cross-class reasons, and aggregate payload overflow. Existing `CommitPlan` and `OutboxPlan` constructors separately reject duplicate ordinals and canonicalize operation order.
 
 ## Trusted dependencies and assumptions
 
@@ -140,33 +144,33 @@ Projects should construct values in this order:
 4. Copy the manifest's hashes into `ProfileBindings`.
 5. Add the manifest's exact registry entries to `ProjectProfile`.
 6. Build `ProjectCatalog`, which rechecks every relationship.
-7. Require catalog validation before a shell interprets a commit or outbox plan.
+7. Require catalog validation before a shell publishes commit evidence or delivers an outbox plan.
 
 ## Project examples
 
 ### ZenoDEX
 
-Effects can represent mint, burn, collateral transfer, fee allocation, settlement, liquidation compensation, and authenticated-state publication. Channels can represent audit, oracle, settlement, and notification delivery.
+Effects can record non-executable authenticated decisions. Channels represent mint, burn, collateral transfer, settlement, liquidation compensation, audit, oracle, and notification delivery.
 
 ### ZenoStorage
 
-Effects can represent agreement updates, provider obligations, repair plans, settlement evidence, and repository publication. Channels can bind provider placement, retrieval, repair, payment, and audit destinations.
+Effects can record non-executable agreement and policy decisions. Channels bind provider placement, retrieval, repair, payment, repository publication, and audit destinations.
 
 ### ZenoMail
 
-Effects can represent mailbox, device, key-epoch, and delivery-state transitions. Channels can bind encrypted delivery, notification, storage placement, and acknowledgement payloads.
+Effects can record non-executable mailbox, device, and key-epoch decisions. Channels bind encrypted delivery, notification, storage placement, and acknowledgement payloads.
 
 ### PopperPad
 
-Effects can represent claim/evidence publication, quarantine, supersession, challenge, and bounty lifecycle changes. Channels can bind verifier execution, artifact storage, anchoring, and federation.
+Effects can record non-executable claim, quarantine, supersession, challenge, and bounty decisions. Channels bind publication, verifier execution, artifact storage, anchoring, and federation.
 
 ### Helix
 
-Effects can represent deterministic policy, case, claim, evidence, automation, and guarded-autopilot changes. Channels can bind collection, webhook, on-chain, federation, and operator-confirmation delivery.
+Effects can record non-executable policy, case, claim, and automation decisions. Channels bind collection, webhook, on-chain, federation, and operator-confirmation delivery.
 
 ### LucyOS
 
-Effects can represent capability/object lifecycle and scheduler decisions. Channels can represent IPC or inter-kernel messages. Hardware-facing machine operations should use a separately reviewed Lucy machine catalog with architecture-specific refinement evidence.
+Effects can record non-executable capability, object-lifecycle, and scheduler decisions. Channels can represent IPC, inter-kernel messages, and machine-operation obligations. Hardware-facing operations require a separately reviewed Lucy machine catalog and architecture-specific refinement evidence.
 
 ## Nonclaims
 
@@ -175,9 +179,11 @@ A valid catalog establishes that a plan uses reviewed IDs, types, bindings, and 
 - a project's business algorithm is correct;
 - a policy commitment describes a safe policy;
 - an external delivery succeeds;
-- a shell correctly interprets an operation;
+- a destination correctly performs an outbox obligation;
 - a classification commitment proves that an operation is non-value;
 - a migration preserves semantics;
 - a proof or runtime refinement has been completed.
 
 Those claims require project-specific invariants, runtime refinement, evidence, and promotion policy.
+
+See [Commit evidence and durable outbox model](COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md).

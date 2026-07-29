@@ -72,7 +72,7 @@ Start with closed values and identifiers:
    channels.
 3. Construct a `ProjectCatalog` with:
    - every rejection and committed-failure reason;
-   - every authoritative effect and its authority/subject requirements;
+   - every non-executable commit-evidence record and its authority/subject requirements;
    - every outbox channel and its destination and payload types;
    - deterministic plan and value limits.
 
@@ -108,7 +108,7 @@ For several domains:
 
 `ComposedDomainProgram` projects the exact root state, command, and context into
 fixed machine rows, executes the canonical sequential composition, and projects
-one successor patch, commit plan, and outbox plan. It returns an ordinary
+one successor patch, non-executable commit-evidence plan, and durable outbox plan. It returns an ordinary
 `TransitionDecision`; it grants no commit authority.
 
 Read:
@@ -160,7 +160,7 @@ not the request caller, owns:
 - approved commitment provider;
 - transition program and build identity;
 - verified law set and exact law-engine type;
-- state domain, interpreter, deployment, and replay-policy bindings;
+- state domain, outbox-delivery interpreter, deployment, and replay-policy bindings;
 - one `GenesisPolicyBinding` containing the expected initial root, reviewed
   source/configuration/evidence commitments, and unique deployment instance;
 - transition resource limits.
@@ -180,7 +180,7 @@ The result is:
   `CommittedFailure`.
 
 Do not accept a caller-created `CommitBundle`, `TransitionDecision`,
-`NormalizedDecision`, law result, provider, or interpreter at this boundary.
+`NormalizedDecision`, law result, provider, or delivery interpreter at this boundary.
 
 Read [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md).
 
@@ -199,13 +199,15 @@ initial-state argument and revalidates the persisted genesis authorization.
 as reference semantics. It is not a production commit port.
 
 External delivery stays in the imperative shell. It must interpret the exact
-committed outbox entry idempotently and under the authority-owned interpreter.
+committed outbox entry idempotently and under the authority-owned delivery
+interpreter. `CommitPlan` records are published as evidence and never executed.
 
 ## Project adoption checklist
 
 - [ ] Closed schema and stable registries are owner reviewed.
 - [ ] Rejection precedence is total and versioned.
-- [ ] Every effect and channel has schema, authority, and deterministic limits.
+- [ ] Every commit-evidence record and channel has schema, authority, and deterministic limits.
+- [ ] Every external operation and every value movement uses a durable outbox channel.
 - [ ] Commands and context are admitted under exact role-separated bindings.
 - [ ] Domain machines expose narrow typed interfaces and complete footprints.
 - [ ] Every component has an authority-bound `CompleteFootprintWitness` from a
@@ -215,13 +217,15 @@ committed outbox entry idempotently and under the authority-owned interpreter.
 - [ ] Genesis applicability is explicit for every law and the reviewed initial
       state satisfies every required genesis law.
 - [ ] Formal evidence is checked by the release-selected verifier.
-- [ ] The authority owns the program, laws, provider, interpreter, deployment,
+- [ ] The authority owns the program, laws, provider, delivery interpreter, deployment,
       and exact genesis binding.
 - [ ] Shell creation consumes only `CatalogAuthorizedGenesis`; reopen accepts no
       replacement initial state.
 - [ ] Only `CatalogAuthorizedTransition` reaches the production commit port.
 - [ ] Mounted implementations are compared over complete normalized decisions.
 - [ ] Crash, replay, CAS-conflict, and outbox behavior are tested.
+
+Read [Commit evidence and durable outbox model](COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md).
 
 ## Current nonclaims
 

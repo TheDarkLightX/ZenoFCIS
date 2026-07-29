@@ -683,7 +683,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
         Ok(self)
     }
 
-    /// Stages one authoritative effect and records its operation footprint.
+    /// Stages one non-executable commit-evidence record and its footprint.
     pub fn emit(&mut self, effect: Effect) -> Result<&mut Self, TransitionError> {
         ensure_capacity(
             self.effects.len(),

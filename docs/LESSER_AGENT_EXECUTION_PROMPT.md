@@ -44,7 +44,7 @@ Do not implement adjacent packages. A small complete draft PR is preferred over 
 - Semantic crates use `#![forbid(unsafe_code)]`.
 - The core has no ambient clock, randomness, filesystem, network, database, thread, async runtime, global mutable state, or interior mutability.
 - All protocol values are transitively owned and immutable.
-- Decisions are exactly `Accept | Reject | CommittedFailure`; ordinary rejection has no candidate or authoritative effect.
+- Decisions are exactly `Accept | Reject | CommittedFailure`; ordinary rejection has no candidate, commit evidence, or outbox obligation.
 - Stable reason precedence is explicit, total, versioned, and content-addressed.
 - ZCVE/1, schema identifiers, domain-separated preimages, roots, candidate IDs, and receipts are protocol meaning.
 - State updates are preconditioned canonical patches with expected pre-root and expected old-value commitments.

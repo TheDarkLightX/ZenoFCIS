@@ -15,7 +15,7 @@ The production boundary is:
 approved provider token
 + exact ProjectCatalog
 + state-domain binding
-+ transition/interpreter/deployment/replay-policy bindings
++ transition/outbox-delivery-interpreter/deployment/replay-policy bindings
 + verified project-law set and exact runtime law-engine type
 + schema-admitted pre-state, command, and authenticated context
 + principal and authentication-evidence commitments
@@ -51,7 +51,7 @@ Existing SQLite stores reopen without accepting caller-supplied initial state.
 - A known-answer-verified provider token.
 - An owned state-domain name and version.
 - Nonzero commitments to the reviewed transition build, provider build
-  evidence, effect interpreter, deployment, and replay policy.
+  evidence, outbox-delivery interpreter, deployment, and replay policy.
 - A `GenesisPolicyBinding` containing the expected initial root, reviewed
   source/configuration/evidence commitments, and unique deployment instance.
 - Schema-admitted pre-state, command, and authenticated-context envelopes.
@@ -59,7 +59,7 @@ Existing SQLite stores reopen without accepting caller-supplied initial state.
 - A complete `VerifiedProjectLaws` value binding the catalog, law manifest,
   retained formal evidence, runtime checker build, and independent evidence
   verifier.
-- The exact nominal transition-program, project-law engine, and interpreter
+- The exact nominal transition-program, project-law engine, and outbox-delivery interpreter
   types owned by the commit authority. Callers cannot submit a prebuilt
   `TransitionDecision` or select a checker per invocation.
 
@@ -94,7 +94,7 @@ under an `AuthorizationPolicy<H, P, L, I>` created with a
 `VerifiedProvider<H>` and `VerifiedProjectLaws<H, L>`. `P` is invoked inside
 `CatalogCommitAuthority::execute`; the decision is never an external
 constructor input. `L` is carried nominally through the policy, invocation,
-authorization, bound interpreter, and shell, preventing a different checker
+authorization, bound delivery interpreter, and shell, preventing a different checker
 type from minting a value accepted by that commit port.
 
 The law manifest and evidence protocol are tool-neutral. Public deployments
@@ -170,9 +170,9 @@ Wall-clock timeout is not protocol evidence.
 11. SQLite identity: schema version, policy, state domain, authorization,
     invocation, replay, candidate, bundle, receipt, and outbox rows publish in
     one transaction; the shell rechecks policy identity before later access.
-12. Interpreter ownership: a concrete interpreter enters SQLite only through a
-    private-construction `BoundInterpreter` minted by the same authority, then
-    remains owned by that shell for delivery.
+12. Delivery-interpreter ownership: a concrete destination enters SQLite only
+    through a private-construction `BoundDeliveryInterpreter` minted by the
+    same authority, then remains owned by that shell for outbox delivery.
 13. Law completeness: every law family is required or explicitly inapplicable;
     every applicable law is evaluated exactly once for the complete invocation
     and decision surface.
@@ -214,7 +214,7 @@ authorization records, partial transaction, or corrupted stored identity.
 - The ingress layer has authenticated the context and principal represented by
   the supplied commitments.
 - Owner review selected the exact transition, project-law engine, retained
-  evidence verifier, interpreter, deployment, and replay-policy commitments.
+  evidence verifier, outbox-delivery interpreter, deployment, and replay-policy commitments.
 - Collision resistance holds for the approved SHA-256 provider.
 - The concrete shell protects its database and process authority according to
   its deployment threat model.
@@ -223,7 +223,7 @@ authorization records, partial transaction, or corrupted stored identity.
 
 - A nonzero authentication-evidence hash is a binding, not proof that ingress
   authentication was correct.
-- A build, interpreter, or deployment hash is a binding, not binary attestation
+- A build, delivery-interpreter, or deployment hash is a binding, not binary attestation
   or refinement proof.
 - Known-answer verification identifies a sealed provider and checks fixed
   vectors; it does not prove the complete compiled binary or hardware.
@@ -238,7 +238,7 @@ authorization records, partial transaction, or corrupted stored identity.
 - [Flux: Liquid Types for Rust](https://doi.org/10.1145/3591283) is relevant
   to future refinement checking inside reviewed Rust implementations. A Flux
   proof would not by itself establish ingress authentication, runtime
-  provenance, interpreter identity, deployment binding, or SQLite row-set
+  provenance, delivery-interpreter identity, deployment binding, or SQLite row-set
   completeness.
 - The composition and exhaustive-refinement structural findings are closed by
   proof-carrying composition and validated manifest-backed promotion. Strict
@@ -248,3 +248,7 @@ authorization records, partial transaction, or corrupted stored identity.
   concrete Solidity/Solana deployment findings remain project-specific work.
 - Passing bounded tests is not an unbounded proof, independent audit, or a
   production-readiness claim.
+
+`CommitPlan` is non-executable evidence. Every external operation must use the
+durable outbox path described in
+[Commit evidence and durable outbox model](COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md).
