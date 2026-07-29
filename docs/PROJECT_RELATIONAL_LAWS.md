@@ -155,6 +155,12 @@ No new external dependency is introduced.
 14. Genesis evaluation returns every required genesis law exactly once and no
     other law; missing, duplicate, extra, violated, or indeterminate results
     fail closed.
+15. Value-moving effect and channel classifications mechanically derive their
+    minimum economic law families from the exact catalog.
+16. Every catalog-derived economic family covers both `Accept` and
+    `CommittedFailure`; one committing decision cannot be omitted.
+17. A custom value relation binds one exact registered law and claim whose
+    retained evidence is independently checked.
 
 ## Negative cases
 
@@ -174,6 +180,10 @@ No new external dependency is introduced.
 - Debit, credit, fee, mint, burn, asset, recipient, authority, subject, and
   effect-count mutations in the executable fixture law engine.
 - Aggregate multi-effect imbalance.
+- Value classification with missing conservation, debit/credit, mint/burn,
+  fee/rounding, authority, or committed-failure coverage.
+- Custom value classification with a missing law, substituted claim,
+  insufficient scope, or runtime-only evidence.
 - Attempt to authorize an ordinary rejection carrying authority artifacts,
   which is unrepresentable in `LawDecisionView`.
 
@@ -185,6 +195,9 @@ No new external dependency is introduced.
   retained artifacts and pins its complete execution environment.
 - Project-specific numeric units, rounding, asset semantics, and authority
   derivations are supplied by the reviewed law engine.
+- Effect and channel value classifications are selected and independently
+  reviewed by the project owner; their commitments are identity bindings, not
+  proofs by themselves.
 
 ## Explicit nonclaims
 

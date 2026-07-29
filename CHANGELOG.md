@@ -4,6 +4,16 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
+## Unreleased
+
+### Changed
+
+- Catalog format 2 requires every effect and channel to bind explicit reviewed
+  `OperationSemantics`, including canonical asset-scoped value-flow sets.
+- Verified project laws now derive non-waivable economic families and
+  committing-decision coverage from the exact catalog. Custom value relations
+  require one exact registered claim with independently retained evidence.
+
 ## 1.0.0-rc.1 - 2026-07-29
 
 First public release candidate for the reusable ZenoFCIS core library family.
