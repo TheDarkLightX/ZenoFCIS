@@ -16,9 +16,13 @@
 pub mod prelude {
     pub use crate::{
         Accepted, AdmittedEnvelope, AdmittedValue, AsciiText, Budget, BudgetExceeded, BudgetLimits,
-        BudgetUsed, BudgetedDecision, CanonicalEncode, Decision, DecisionKind, Domain, Failed,
-        Hash32, NonEmptyVec, OwnedBytes, ProjectProfile, RegistryEntry, RegistryKind, Rejected,
-        Resource, SemanticId, StableName, StableReason, Transition, Value,
+        BudgetUsed, BudgetedDecision, CanonicalEncode, Decision, DecisionKind,
+        DecisionValidationLimits, Domain, ExhaustiveDomainManifest, Failed, Hash32, NonEmptyVec,
+        OwnedBytes, ProjectProfile, PromotionEvaluationContext, RegistryEntry, RegistryKind,
+        Rejected, Resource, SemanticId, StableName, StableReason, Transition, ValidatedCoverage,
+        ValidatedNormalizedDecision, ValidatedPromotionEvidence, ValidatedPromotionReport,
+        ValidatedRefinementCase, Value, compare_validated_exact, evaluate_validated_promotion,
+        exhaustive_coverage_claim,
     };
 
     #[cfg(feature = "catalog")]
@@ -261,9 +265,13 @@ pub use zeno_fcis_receipt::{
     Receipt, RejectReceipt, SealError,
 };
 pub use zeno_fcis_refine::{
-    CoverageMode, DecisionArtifacts, Mismatch, NormalizedDecision, PromotionBlocker,
-    PromotionEvidence, PromotionPolicy, PromotionReport, ProofVerifier, RefineError,
-    RefinementCase, RefinementReport, ToolEvidence, ToolKind, compare_exact, evaluate_promotion,
+    CoverageMode, DecisionArtifacts, DecisionValidationBinding, DecisionValidationLimits,
+    ExhaustiveDomainManifest, Mismatch, NormalizedDecision, PromotionBlocker,
+    PromotionEvaluationContext, PromotionEvidence, PromotionPolicy, PromotionReport, ProofVerifier,
+    RefineError, RefinementCase, RefinementReport, ToolEvidence, ToolKind, ValidatedCoverage,
+    ValidatedNormalizedDecision, ValidatedPromotionEvidence, ValidatedPromotionReport,
+    ValidatedRefinementCase, compare_exact, compare_validated_exact, evaluate_promotion,
+    evaluate_validated_promotion, exhaustive_coverage_claim,
 };
 #[cfg(feature = "schema")]
 pub use zeno_fcis_schema::{

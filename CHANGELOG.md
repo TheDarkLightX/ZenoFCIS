@@ -19,6 +19,9 @@ First public release candidate for the reusable ZenoFCIS core library family.
 - proof-carrying composition with complete static footprint evidence and
   deterministic-parallel authorization;
 - tool-neutral evidence, refinement, synthesis, and checked-backend protocols;
+- strict invocation-bound decision reconstruction, derived refinement cases,
+  canonical exhaustive-domain manifests, independently verified coverage, and
+  content-addressed promotion reports;
 - reference authenticated state, persistent collections, SQLite publication,
   mounted-runtime adapters, secret handling, and side/covert-channel policy;
 - 32 publishable crates, a diagnostic ZenoDEX mount binary, complete public API
