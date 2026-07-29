@@ -40,8 +40,9 @@ graph as CycloneDX 1.6, and content-addresses every retained artifact.
 
 The source archive also retains `package.json`, `package-lock.json`,
 `.node-version`, and `probity.config.ts` for optional development guardrails.
-The release packager validates their exact Node/Probity identities and package
-integrity. `SBOM.cdx.json` describes the shipped Rust crate graph; the
+The release packager validates their exact Node/Probity identities and binds
+the complete canonical npm lock graph, including every transitive package
+entry. `SBOM.cdx.json` describes the shipped Rust crate graph; the
 development-only npm graph is separately locked and audited and is not a
 runtime dependency of any published crate.
 
