@@ -31,16 +31,18 @@ provider, law, interpreter, and deployment checks.
 
 Authorized shell creation is also nominal: the policy binds the exact reviewed
 initial root, source/configuration/evidence, deployment instance, and complete
-genesis-law evaluation. SQLite schema v4 persists and revalidates that genesis
-authorization; reopen accepts no caller-supplied replacement state.
+genesis-law evaluation. SQLite schema v5 persists that genesis authority and a
+gap-free authorized transition sequence. Reopen accepts no caller-supplied
+replacement state: it strictly decodes, reauthorizes, and reconstructs the
+complete authorization/bundle/receipt/replay/outbox relation and current state.
 
 ## Remaining blockers for 1.0.0
 
 1. Merge the exact reviewed stacked PR series onto `main` without semantic
    drift.
 2. Complete independent exact-head API and authority review of this RC.
-3. Close exhaustive-refinement evidence fabrication and exact SQLite
-   bundle/outbox reconstruction for the promoted production profiles.
+3. Close exhaustive-refinement evidence fabrication for promoted production
+   profiles.
 4. Qualify the selected authenticated-state and persistence deployment rather
    than promoting the bounded reference backends implicitly.
 5. Retain concrete evidence for every verifier and target advertised by a

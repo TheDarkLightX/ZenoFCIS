@@ -98,7 +98,7 @@ law engine whose implementation matches the registered claims. Nonzero hashes
 bind those selections; they do not prove them.
 
 This boundary does not invent project economics, prove an engine sound, attest
-a deployment, migrate SQLite schema v3, or reconstruct the full later
-authorization/bundle/outbox row set. Issue #55 remains a separate persistence
-qualification blocker. Bounded tests are not an unbounded correctness proof or
-an independent audit.
+a deployment, or migrate older SQLite schemas. SQLite schema v5 builds on this
+genesis authority by strictly reauthorizing and reconstructing the full later
+transition history and row set. Bounded tests are not an unbounded correctness
+proof or an independent audit.

@@ -111,7 +111,7 @@ Evidence is additive. A newer test run does not retroactively validate older sou
 
 Any failed gate blocks release. Repair occurs in a new commit, followed by a complete rerun from a clean checkout. Do not reuse a source manifest, generated artifact, refinement fixture, or checker certificate across changed source unless its content address and all bound identifiers are unchanged and independently verified.
 
-SQLite schema v4 creates a store only from nominal `CatalogAuthorizedGenesis`, persists the exact initial state/root/policy/law-evaluation/authorization identity, and revalidates that record on reopen without caller-supplied state. It consumes nominal `CatalogAuthorizedTransition` values and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. Delivery identities are derived from the implementation-neutral candidate and canonical outbox entry in both reference and SQLite shells. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Schema v3 and populated unversioned stores fail closed pending explicit migration. Operators must never edit genesis, policy, authorization, replay, receipt, or outbox rows to force progress.
+SQLite schema v5 creates a store only from nominal `CatalogAuthorizedGenesis`, persists the exact initial state/root/policy/law-evaluation/authorization identity, and revalidates that record on reopen without caller-supplied state. It consumes nominal `CatalogAuthorizedTransition` values and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. Reopen strictly decodes and reauthorizes the gap-free transition sequence, reconstructs exact row-set equality, and requires the resulting state/root/version to equal the current semantic row. Replay and pending delivery repeat exact persisted-candidate validation. Delivery identities are derived from the implementation-neutral candidate and canonical outbox entry in both reference and SQLite shells. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Schema v4 and earlier or populated unversioned stores fail closed pending explicit migration. Operators must never edit genesis, policy, authorization, replay, receipt, or outbox rows to force progress.
 
 ## Explicit non-claims
 
@@ -122,6 +122,6 @@ The repository currently supplies reviewed reference implementations and strict 
 - that a concrete ESSO, SMT solver, theorem prover, compiler, or LLM is bundled as a synthesis backend;
 - that generated or imported evidence is true without its independent checker;
 - that SQLite durability settings replace deployment-specific storage validation;
-- audit completion, project-specific economic correctness, side-channel resistance, complete SQLite row-set reconstruction, or production qualification of a value-moving profile.
+- audit completion, project-specific economic correctness, side-channel resistance, or production qualification of a value-moving profile.
 
 Those claims require separately bound evidence and an explicit deployment decision.
