@@ -252,6 +252,8 @@ It closes CMP-001 through CMP-005 within the generic composition package. CMP-00
 5. Repair exhaustive refinement and validated decision reconstruction, issue #61.
 6. Bind authenticated projectors and proof context, issue #62.
 7. Complete strict decoding and SQLite row-set cross-validation, issue #55.
+   This dated finding is closed by the schema-v5 exact-history package in the
+   `1.0.0-rc.1` candidate stack.
 8. Mount project-specific laws and full-decision parity across Rust, Python, and selected chain interpreters.
 9. Produce independent proof/audit evidence and rerun the audit at one exact release head.
 
