@@ -9,8 +9,9 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use zeno_fcis_authority::{
-    AuthorizationDecodeLimits, AuthorizedShellError, BoundInterpreter, CatalogAuthorizedGenesis,
-    CatalogAuthorizedTransition, CatalogCommitAuthority, CatalogTransitionProgram, GenesisId,
+    AuthorizationDecodeLimits, AuthorizedShellError, BoundDeliveryInterpreter,
+    CatalogAuthorizedGenesis, CatalogAuthorizedTransition, CatalogCommitAuthority,
+    CatalogTransitionProgram, GenesisId,
 };
 use zeno_fcis_codec::{
     CanonicalEncode, DecodeError, DecodeLimits, Domain, EncodeError, Hash32, commitment,
@@ -313,7 +314,7 @@ where
         path: impl AsRef<Path>,
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
         genesis: CatalogAuthorizedGenesis<RustCryptoSha256, P, L, I>,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
+        interpreter: BoundDeliveryInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open(path).map_err(SqliteShellError::Sqlite)?;
         Self::from_new_connection(connection, authority, genesis, interpreter)
@@ -323,7 +324,7 @@ where
     pub fn create_in_memory(
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
         genesis: CatalogAuthorizedGenesis<RustCryptoSha256, P, L, I>,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
+        interpreter: BoundDeliveryInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open_in_memory().map_err(SqliteShellError::Sqlite)?;
         Self::from_new_connection(connection, authority, genesis, interpreter)
@@ -333,7 +334,7 @@ where
     pub fn open_existing(
         path: impl AsRef<Path>,
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
+        interpreter: BoundDeliveryInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open(path).map_err(SqliteShellError::Sqlite)?;
         Self::from_existing_connection(connection, authority, interpreter)
@@ -343,7 +344,7 @@ where
         connection: Connection,
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
         genesis: CatalogAuthorizedGenesis<RustCryptoSha256, P, L, I>,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
+        interpreter: BoundDeliveryInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         initialize_schema_for_create(&connection)?;
         let policy = authority.policy();
@@ -383,7 +384,7 @@ where
     fn from_existing_connection(
         connection: Connection,
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
-        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
+        interpreter: BoundDeliveryInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         validate_existing_schema(&connection)?;
         let policy = authority.policy();
@@ -522,9 +523,9 @@ where
         })
     }
 
-    /// Returns the exact policy-bound interpreter instance owned by this shell.
+    /// Returns the exact policy-bound outbox-delivery interpreter.
     #[must_use]
-    pub const fn interpreter(&self) -> &I {
+    pub const fn delivery_interpreter(&self) -> &I {
         &self.interpreter
     }
 
@@ -1707,7 +1708,8 @@ mod tests {
         ReviewedTransitionInput, StateDomainBinding,
     };
     use zeno_fcis_catalog::{
-        CatalogLimits, CatalogManifest, ChannelDefinition, OperationSemantics, ProjectCatalog,
+        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, HashRequirement,
+        OperationSemantics, ProjectCatalog,
     };
     use zeno_fcis_core::{BudgetUsed, Decision, DecisionKind};
     use zeno_fcis_crypto::verify_approved_provider;
@@ -1719,6 +1721,7 @@ mod tests {
         verify_project_laws,
     };
     use zeno_fcis_patch::ValuePath;
+    use zeno_fcis_plan::Effect;
     use zeno_fcis_project::{
         DomainPrefix, ProfileBindings, ProjectProfile, RegistryEntry, RegistryKind, SemanticId,
         StableName,
@@ -1849,8 +1852,19 @@ mod tests {
             hash(7),
         )
         .unwrap_or_else(|error| panic!("channel: {error}"));
+        let effect = EffectDefinition::try_new(
+            id(8),
+            name("decision-evidence"),
+            TypeId::new(1),
+            HashRequirement::Present,
+            HashRequirement::Absent,
+            OperationSemantics::non_value(hash(108))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
+            hash(8),
+        )
+        .unwrap_or_else(|error| panic!("effect: {error}"));
         let manifest =
-            CatalogManifest::try_new::<RustCryptoSha256>(Vec::new(), Vec::new(), vec![channel])
+            CatalogManifest::try_new::<RustCryptoSha256>(Vec::new(), vec![effect], vec![channel])
                 .unwrap_or_else(|error| panic!("manifest: {error}"));
         let laws = law_manifest();
         let mut entries = vec![
@@ -1989,6 +2003,7 @@ mod tests {
                 input.limits(),
             )?;
             builder.update(ValuePath::new(Vec::new()), Value::U128(11))?;
+            builder.emit(Effect::new(0, 8, hash(80), Hash32::ZERO, Value::U128(11)))?;
             builder.enqueue(OutboxEntry::new(
                 0,
                 7,
@@ -2104,7 +2119,7 @@ mod tests {
         SqliteShell::create_in_memory(
             authority,
             genesis,
-            authority.bind_interpreter(MemoryDestination::default()),
+            authority.bind_delivery_interpreter(MemoryDestination::default()),
         )
         .unwrap_or_else(|error| panic!("shell: {error}"))
     }
@@ -2114,7 +2129,7 @@ mod tests {
         TestShell::from_existing_connection(
             connection,
             authority,
-            authority.bind_interpreter(MemoryDestination::default()),
+            authority.bind_delivery_interpreter(MemoryDestination::default()),
         )
         .unwrap_or_else(|error| panic!("reopen: {error}"))
     }
@@ -2241,7 +2256,7 @@ mod tests {
                 .deliver_next()
                 .unwrap_or_else(|error| panic!("deliver: {error}"))
         );
-        assert_eq!(database.interpreter().delivered_count(), 1);
+        assert_eq!(database.delivery_interpreter().delivered_count(), 1);
         assert!(
             !database
                 .deliver_next()
@@ -2254,6 +2269,35 @@ mod tests {
                 .pending_outbox(),
             0
         );
+    }
+
+    #[test]
+    fn commit_evidence_is_persisted_without_delivery() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let authorized = authorized(&authority, &catalog, 19);
+        assert_eq!(authorized.bundle().commit_plan().effects().len(), 1);
+        let mut database = shell(&authority, &catalog);
+        assert_eq!(
+            database
+                .commit(authorized)
+                .unwrap_or_else(|error| panic!("commit: {error}")),
+            CommitStatus::Committed
+        );
+        assert_eq!(database.delivery_interpreter().delivered_count(), 0);
+        assert_eq!(
+            database
+                .snapshot()
+                .unwrap_or_else(|error| panic!("snapshot: {error}"))
+                .pending_outbox(),
+            1
+        );
+        assert!(
+            database
+                .deliver_next()
+                .unwrap_or_else(|error| panic!("deliver: {error}"))
+        );
+        assert_eq!(database.delivery_interpreter().delivered_count(), 1);
     }
 
     #[test]
@@ -2421,7 +2465,7 @@ mod tests {
             TestShell::from_existing_connection(
                 connection,
                 &authority,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::CorruptHistory)
         ));
@@ -2439,7 +2483,7 @@ mod tests {
             TestShell::from_existing_connection(
                 connection,
                 &authority,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::CorruptHistory)
         ));
@@ -2469,7 +2513,7 @@ mod tests {
             SqliteShell::create_in_memory(
                 &first_authority,
                 genesis,
-                other_authority.bind_interpreter(MemoryDestination::default()),
+                other_authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::PolicyMismatch)
         ));
@@ -2545,7 +2589,7 @@ mod tests {
             TestShell::from_existing_connection(
                 connection,
                 &authority,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::CorruptGenesis)
         ));
@@ -2598,7 +2642,7 @@ mod tests {
             TestShell::from_existing_connection(
                 connection,
                 &authority,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::CorruptGenesis)
         ));
@@ -2619,7 +2663,7 @@ mod tests {
                 connection,
                 &authority,
                 genesis,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::AlreadyInitialized)
         ));
@@ -2637,7 +2681,7 @@ mod tests {
             TestShell::from_existing_connection(
                 connection,
                 &other_authority,
-                other_authority.bind_interpreter(MemoryDestination::default()),
+                other_authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::PolicyMismatch)
         ));
@@ -2654,7 +2698,7 @@ mod tests {
             TestShell::from_existing_connection(
                 connection,
                 &authority,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::UninitializedStore)
         ));
@@ -2679,7 +2723,7 @@ mod tests {
                 connection,
                 &authority,
                 genesis,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::LegacySchema)
         ));
@@ -2702,7 +2746,7 @@ mod tests {
                 connection,
                 &authority,
                 genesis,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::UnsupportedSchemaVersion(3))
         ));
@@ -2725,7 +2769,7 @@ mod tests {
                 connection,
                 &authority,
                 genesis,
-                authority.bind_interpreter(MemoryDestination::default()),
+                authority.bind_delivery_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::UnsupportedSchemaVersion(4))
         ));

@@ -31,14 +31,8 @@ pub(crate) fn fixture_catalog(schema: Schema) -> ProjectCatalog {
             TypeId::new(1),
             HashRequirement::Present,
             HashRequirement::Absent,
-            OperationSemantics::value(
-                vec![
-                    ValueFlow::standard(ValueFlowKind::Transfer, hash(121))
-                        .unwrap_or_else(|error| panic!("fixture flow rejected: {error}")),
-                ],
-                hash(120),
-            )
-            .unwrap_or_else(|error| panic!("fixture semantics rejected: {error}")),
+            OperationSemantics::non_value(hash(120))
+                .unwrap_or_else(|error| panic!("fixture semantics rejected: {error}")),
             hash(20),
         )
         .unwrap_or_else(|error| panic!("fixture effect rejected: {error}")),
@@ -49,8 +43,14 @@ pub(crate) fn fixture_catalog(schema: Schema) -> ProjectCatalog {
             name("notify"),
             TypeId::new(3),
             TypeId::new(9),
-            OperationSemantics::non_value(hash(130))
-                .unwrap_or_else(|error| panic!("fixture semantics rejected: {error}")),
+            OperationSemantics::value(
+                vec![
+                    ValueFlow::standard(ValueFlowKind::ExternalValueDelivery, hash(121))
+                        .unwrap_or_else(|error| panic!("fixture flow rejected: {error}")),
+                ],
+                hash(130),
+            )
+            .unwrap_or_else(|error| panic!("fixture semantics rejected: {error}")),
             hash(30),
         )
         .unwrap_or_else(|error| panic!("fixture channel rejected: {error}")),

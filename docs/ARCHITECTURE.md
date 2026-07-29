@@ -14,14 +14,18 @@ ZenoFCIS separates protocol meaning from runtime mechanism.
    backend protocols validate and compose those values.
 4. Nominal authority: `zeno-fcis-authority` binds an externally admitted
    invocation to one approved provider, reviewed transition type, exact project
-   law-engine type and verified law set, interpreter type, deployment profile,
+   law-engine type and verified law set, outbox-delivery-interpreter type, deployment profile,
    state domain, catalog, and resource envelope.
 5. Authenticated authority: `zeno-fcis-authenticated-authority` binds one
    qualified projector, exact authorized candidate, strict persisted plan,
    per-transition projection relation, and nominal authenticated publication.
 6. Imperative adapters: mounted runtimes, code generation, SQLite, and other
-   external tools interpret or persist already bounded values. The SQLite
+   external tools deliver or persist already bounded values. The SQLite
    production port accepts only `CatalogAuthorizedTransition`.
+
+`CommitPlan` contains non-executable evidence published atomically with state.
+`OutboxPlan` is the only generic durable external-work boundary, and value-moving
+effect definitions fail catalog construction.
 
 A lower ring never imports a higher ring. The semantic kernel is `no_std +
 alloc`, forbids unsafe Rust, and has no ambient I/O.

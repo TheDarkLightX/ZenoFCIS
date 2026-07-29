@@ -1,11 +1,12 @@
 //! Schema-bound reason, effect, and channel catalogs for ZenoFCIS projects.
 //!
 //! [`ProjectProfile`] commits registry identities, while this crate makes those
-//! commitments executable. A catalog binds stable reason precedence, effect
-//! payload and authority requirements, channel destination and payload schemas,
-//! and deterministic aggregate plan limits. Project shells may interpret plans,
-//! but they cannot silently invent an operation, reinterpret a payload, or
-//! exceed a reviewed resource envelope.
+//! commitments executable. A catalog binds stable reason precedence,
+//! non-executable commit evidence, durable outbox obligations, payload and
+//! authority requirements, destination schemas, and deterministic aggregate
+//! plan limits. Project shells may deliver outbox obligations, but they cannot
+//! silently execute a commit-evidence record, invent an operation, reinterpret
+//! a payload, or exceed a reviewed resource envelope.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
@@ -29,7 +30,7 @@ use zeno_fcis_schema::{Schema, SchemaError, TypeId, ValidationLimits, ValueValid
 use zeno_fcis_value::{Value, ValueError, ValueLimits, ValueMetrics};
 
 /// Canonical catalog format version.
-pub const CATALOG_FORMAT_VERSION: u16 = 2;
+pub const CATALOG_FORMAT_VERSION: u16 = 3;
 /// Maximum definitions in any one catalog namespace.
 pub const MAX_CATALOG_DEFINITIONS: usize = 65_536;
 /// Maximum bytes in a hash-provider identity.
@@ -295,6 +296,25 @@ impl CanonicalEncode for OperationSemantics {
     }
 }
 
+/// Closed execution classification for records in a [`CommitPlan`].
+///
+/// ZenoFCIS V1 publishes commit-plan records atomically as non-executable
+/// evidence. External work, including every value-moving operation, must be a
+/// durable [`OutboxPlan`] obligation instead.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum CommitEffectSemantics {
+    /// The record is committed evidence and is never executed by a shell.
+    EvidenceOnly = 0,
+}
+
+impl CanonicalEncode for CommitEffectSemantics {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.push(*self as u8);
+        Ok(())
+    }
+}
+
 /// Decision class to which a stable reason belongs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReasonDisposition {
@@ -398,7 +418,7 @@ impl CanonicalEncode for ReasonDefinition {
     }
 }
 
-/// One authoritative effect operation.
+/// One non-executable commit-evidence operation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectDefinition {
     id: SemanticId,
@@ -406,6 +426,7 @@ pub struct EffectDefinition {
     payload_type: TypeId,
     authority: HashRequirement,
     subject: HashRequirement,
+    commit_semantics: CommitEffectSemantics,
     semantics: OperationSemantics,
     policy_hash: NonZeroHash,
 }
@@ -427,6 +448,7 @@ impl EffectDefinition {
             payload_type,
             authority,
             subject,
+            commit_semantics: CommitEffectSemantics::EvidenceOnly,
             semantics,
             policy_hash: NonZeroHash::try_new(policy_hash)?,
         })
@@ -462,6 +484,12 @@ impl EffectDefinition {
         self.subject
     }
 
+    /// Returns the closed non-executable commit semantics.
+    #[must_use]
+    pub const fn commit_semantics(&self) -> CommitEffectSemantics {
+        self.commit_semantics
+    }
+
     /// Returns the reviewed economic classification.
     #[must_use]
     pub const fn semantics(&self) -> &OperationSemantics {
@@ -487,6 +515,7 @@ impl CanonicalEncode for EffectDefinition {
         output.extend_from_slice(&self.payload_type.get().to_be_bytes());
         self.authority.encode_to(output)?;
         self.subject.encode_to(output)?;
+        self.commit_semantics.encode_to(output)?;
         self.semantics.encode_to(output)?;
         self.policy_hash.encode_to(output)
     }
@@ -666,7 +695,7 @@ impl CatalogManifest {
         self.precedence_hash
     }
 
-    /// Returns the authoritative effect-registry commitment.
+    /// Returns the commit-evidence registry commitment.
     #[must_use]
     pub const fn effect_registry_hash(&self) -> Hash32 {
         self.effect_registry_hash
@@ -1002,6 +1031,9 @@ impl ProjectCatalog {
         }
         for effect in manifest.effects() {
             require_schema_type(&schema, effect.payload_type())?;
+            if effect.semantics().is_value_moving() {
+                return Err(CatalogError::ValueMovingCommitEvidence(effect.id()));
+            }
         }
         for channel in manifest.channels() {
             require_schema_type(&schema, channel.destination_type())?;
@@ -1506,6 +1538,8 @@ pub enum CatalogError {
     TooManyValueFlows,
     /// A value classification repeated one exact flow descriptor.
     DuplicateValueFlow,
+    /// A value-moving operation was placed in non-executable commit evidence.
+    ValueMovingCommitEvidence(SemanticId),
     /// A manifest was used with a different commitment provider.
     HashAlgorithmMismatch,
     /// One namespace exceeds the definition-count bound.
@@ -1666,6 +1700,11 @@ impl fmt::Display for CatalogError {
             Self::EmptyValueFlows => formatter.write_str("value semantics contain no flows"),
             Self::TooManyValueFlows => formatter.write_str("too many value-flow descriptors"),
             Self::DuplicateValueFlow => formatter.write_str("duplicate value-flow descriptor"),
+            Self::ValueMovingCommitEvidence(id) => write!(
+                formatter,
+                "effect {} is value-moving but CommitPlan records are non-executable evidence",
+                id.get()
+            ),
             Self::HashAlgorithmMismatch => formatter.write_str("catalog hash algorithm mismatch"),
             Self::TooManyDefinitions(kind) => write!(formatter, "too many {kind:?} definitions"),
             Self::DuplicateDefinitionId { kind, id } => {
@@ -2062,6 +2101,10 @@ mod tests {
     #[test]
     fn economic_reclassification_changes_registry_and_manifest_identity() {
         let (_, mut effects, _) = definitions();
+        assert_eq!(
+            effects[0].commit_semantics(),
+            CommitEffectSemantics::EvidenceOnly
+        );
         let non_value =
             CatalogManifest::try_new::<TestHasher>(Vec::new(), effects.clone(), Vec::new())
                 .unwrap_or_else(|error| panic!("non-value manifest: {error}"));
@@ -2082,6 +2125,39 @@ mod tests {
         assert_ne!(
             non_value.commitment::<TestHasher>(),
             value.commitment::<TestHasher>()
+        );
+
+        let schema = schema();
+        let profile = profile(&schema, &value);
+        assert_eq!(
+            ProjectCatalog::try_new::<TestHasher>(profile, schema, value, CatalogLimits::default(),),
+            Err(CatalogError::ValueMovingCommitEvidence(id(20)))
+        );
+    }
+
+    #[test]
+    fn durable_outbox_channels_may_carry_value_movement() {
+        let (reasons, effects, mut channels) = definitions();
+        channels[0].semantics = OperationSemantics::value(
+            vec![
+                ValueFlow::standard(ValueFlowKind::ExternalValueDelivery, hash(153))
+                    .unwrap_or_else(|error| panic!("flow: {error}")),
+            ],
+            hash(154),
+        )
+        .unwrap_or_else(|error| panic!("semantics: {error}"));
+        let manifest = CatalogManifest::try_new::<TestHasher>(reasons, effects, channels)
+            .unwrap_or_else(|error| panic!("manifest: {error}"));
+        let schema = schema();
+        let profile = profile(&schema, &manifest);
+        assert!(
+            ProjectCatalog::try_new::<TestHasher>(
+                profile,
+                schema,
+                manifest,
+                CatalogLimits::default(),
+            )
+            .is_ok()
         );
     }
 
