@@ -76,9 +76,9 @@ documented transaction behavior.
 
 ## Explicit Nonclaims
 
-- This repair does not close complete SQLite bundle/outbox row-set
-  reconstruction in issue #55.
+- SQLite schema v5 separately closes complete authorization/bundle/receipt/
+  replay/outbox row-set reconstruction before delivery.
 - It does not qualify a production destination or prove exactly-once behavior
   beyond the documented idempotent acknowledgement protocol.
-- It does not supply a migration from schema v2.
+- It does not supply a migration from schemas v4 or earlier.
 - It does not make `AuthorizationId` portable across deployments.

@@ -17,7 +17,10 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use zeno_fcis_catalog::{CatalogError, CatalogManifest, NonZeroHash, ProjectCatalog};
-use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{
+    CanonicalEncode, DecodeError, DecodeLimits, Domain, EncodeError, Hash32, commitment,
+    decode_envelope,
+};
 use zeno_fcis_core::{Accepted, Decision, DecisionKind, Failed, Rejected};
 use zeno_fcis_crypto::{ApprovedCommitmentProvider, ApprovedProviderId, VerifiedProvider};
 use zeno_fcis_laws::{
@@ -27,7 +30,10 @@ use zeno_fcis_laws::{
 use zeno_fcis_patch::{PatchError, hash_value};
 use zeno_fcis_project::SemanticId;
 use zeno_fcis_receipt::{CandidateId, CommitBundle};
-use zeno_fcis_schema::{SchemaAdmittedEnvelope, SchemaAdmittedTypeEnvelope, TypeId};
+use zeno_fcis_schema::{
+    SchemaAdmittedEnvelope, SchemaAdmittedTypeEnvelope, SchemaEnvelopeError, TypeId,
+    ValidationLimits,
+};
 use zeno_fcis_shell::{CommitStatus, ShellError, ShellState, apply_reference_bundle};
 use zeno_fcis_transition::{
     ExpectedInvocationBindings, TransitionArtifacts, TransitionDecision, TransitionError,
@@ -40,6 +46,33 @@ type AuthorityMarker<H, P, L, I> = PhantomData<fn() -> (H, P, L, I)>;
 pub const AUTHORIZATION_FORMAT_VERSION: u16 = 2;
 /// Command and complete invocation-context commitment format version.
 pub const INVOCATION_INPUT_FORMAT_VERSION: u16 = 1;
+
+const AUTHORIZATION_MAGIC: &[u8] = b"ZFCIS-AUTHORIZED-TRANSITION\0";
+const INVOCATION_MAGIC: &[u8] = b"ZFCIS-AUTHORIZATION-INVOCATION\0";
+
+/// Explicit resource bounds for persisted authorization re-admission.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AuthorizationDecodeLimits {
+    /// Maximum bytes in the complete authorization envelope.
+    pub max_input_bytes: u64,
+    /// Maximum bytes in the fixed-shape authorization body.
+    pub max_body_bytes: u64,
+    /// Maximum bytes in the complete invocation witness.
+    pub max_invocation_bytes: u64,
+    /// Per-value canonical envelope decoding limits.
+    pub envelope: DecodeLimits,
+}
+
+impl Default for AuthorizationDecodeLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: 128 * 1024 * 1024,
+            max_body_bytes: 64 * 1024,
+            max_invocation_bytes: 128 * 1024 * 1024,
+            envelope: DecodeLimits::default(),
+        }
+    }
+}
 
 /// Deployment-specific identity of one authorized transition.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -855,6 +888,248 @@ where
             .map_err(CatalogExecutionError::Program)?;
         authorize_decision(&self.policy, &self.laws, invocation, decision)
             .map_err(CatalogExecutionError::Authority)
+    }
+
+    /// Re-admits and re-executes one persisted canonical transition authorization.
+    ///
+    /// Persisted bytes never directly construct the nominal authorization
+    /// type. This method decodes only the externally supplied invocation,
+    /// re-admits its values against this authority's exact schema and limits,
+    /// executes the shell-owned reviewed program, and requires the newly
+    /// authorized canonical bytes to equal the complete persisted input.
+    pub fn reauthorize_canonical_transition(
+        &self,
+        bytes: &[u8],
+        limits: AuthorizationDecodeLimits,
+    ) -> Result<CatalogAuthorizedTransition<H, P, L, I>, AuthorizationDecodeError<P::Error>> {
+        enforce_authorization_limit(bytes, limits.max_input_bytes)?;
+        let mut cursor = AuthorizationCursor::new(bytes);
+        cursor.expect(AUTHORIZATION_MAGIC)?;
+        cursor.expect_version(AUTHORIZATION_FORMAT_VERSION)?;
+        let body = cursor.take_blob()?;
+        enforce_authorization_component(AuthorizationComponent::Body, body, limits.max_body_bytes)?;
+        let invocation_bytes = cursor.take_blob()?;
+        enforce_authorization_component(
+            AuthorizationComponent::Invocation,
+            invocation_bytes,
+            limits.max_invocation_bytes,
+        )?;
+        cursor.ensure_consumed()?;
+
+        let persisted = decode_persisted_invocation::<H, P, L, I>(
+            &self.policy,
+            invocation_bytes,
+            limits.envelope,
+        )?;
+        let invocation = self
+            .admit_invocation(
+                persisted.pre_state,
+                persisted.command,
+                persisted.context,
+                persisted.principal_hash,
+                persisted.authentication_evidence_hash,
+                persisted.replay_id,
+            )
+            .map_err(AuthorizationDecodeError::Authority)?;
+        let reconstructed_invocation = invocation
+            .canonical_bytes()
+            .map_err(AuthorizationDecodeError::Encode)?;
+        if reconstructed_invocation.as_slice() != invocation_bytes {
+            return Err(AuthorizationDecodeError::NonCanonicalInvocation);
+        }
+        let decision = self
+            .execute(invocation)
+            .map_err(AuthorizationDecodeError::Execution)?;
+        let authorization = match decision {
+            Decision::Accept(value) => value.into_candidate(),
+            Decision::CommittedFailure(value) => value.into_parts().0,
+            Decision::Reject(_) => return Err(AuthorizationDecodeError::NotCommitted),
+        };
+        let reconstructed = authorization
+            .canonical_bytes()
+            .map_err(AuthorizationDecodeError::Encode)?;
+        if reconstructed.as_slice() != bytes {
+            return Err(AuthorizationDecodeError::NonCanonicalAuthorization);
+        }
+        Ok(authorization)
+    }
+}
+
+struct PersistedInvocation {
+    pre_state: SchemaAdmittedEnvelope,
+    command: SchemaAdmittedTypeEnvelope,
+    context: SchemaAdmittedTypeEnvelope,
+    principal_hash: Hash32,
+    authentication_evidence_hash: Hash32,
+    replay_id: Hash32,
+}
+
+fn decode_persisted_invocation<H, P, L, I>(
+    policy: &AuthorizationPolicy<H, P, L, I>,
+    bytes: &[u8],
+    limits: DecodeLimits,
+) -> Result<PersistedInvocation, AuthorizationDecodeError<P::Error>>
+where
+    H: ApprovedCommitmentProvider,
+    P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
+{
+    let mut cursor = AuthorizationCursor::new(bytes);
+    cursor.expect(INVOCATION_MAGIC)?;
+    cursor.expect_version(AUTHORIZATION_FORMAT_VERSION)?;
+    let _persisted_policy_id = cursor.take_hash32()?;
+    let _persisted_pre_root = cursor.take_hash32()?;
+    let pre_state =
+        decode_envelope(cursor.take_blob()?, limits).map_err(AuthorizationDecodeError::Envelope)?;
+    let command =
+        decode_envelope(cursor.take_blob()?, limits).map_err(AuthorizationDecodeError::Envelope)?;
+    let context =
+        decode_envelope(cursor.take_blob()?, limits).map_err(AuthorizationDecodeError::Envelope)?;
+    let _persisted_command_hash = cursor.take_hash32()?;
+    let _persisted_context_hash = cursor.take_hash32()?;
+    let principal_hash = cursor.take_hash32()?;
+    let authentication_evidence_hash = cursor.take_hash32()?;
+    let replay_id = cursor.take_hash32()?;
+    cursor.ensure_consumed()?;
+
+    let validation = ValidationLimits {
+        max_depth: policy.transition_limits.max_state_depth(),
+        max_nodes: policy.transition_limits.max_state_nodes(),
+    };
+    let pre_state = SchemaAdmittedEnvelope::try_new::<H>(
+        policy.catalog.schema(),
+        pre_state.into_value(),
+        validation,
+    )
+    .map_err(AuthorizationDecodeError::Schema)?;
+    let command = SchemaAdmittedTypeEnvelope::try_new::<H>(
+        policy.catalog.schema(),
+        TypeId::new(policy.catalog.profile().command_type().get()),
+        command.into_value(),
+        validation,
+    )
+    .map_err(AuthorizationDecodeError::Schema)?;
+    let context = SchemaAdmittedTypeEnvelope::try_new::<H>(
+        policy.catalog.schema(),
+        TypeId::new(policy.catalog.profile().context_type().get()),
+        context.into_value(),
+        validation,
+    )
+    .map_err(AuthorizationDecodeError::Schema)?;
+    Ok(PersistedInvocation {
+        pre_state,
+        command,
+        context,
+        principal_hash,
+        authentication_evidence_hash,
+        replay_id,
+    })
+}
+
+fn enforce_authorization_limit<E>(
+    bytes: &[u8],
+    limit: u64,
+) -> Result<(), AuthorizationDecodeError<E>> {
+    let actual =
+        u64::try_from(bytes.len()).map_err(|_| AuthorizationDecodeError::LengthOverflow)?;
+    if actual > limit {
+        return Err(AuthorizationDecodeError::InputLimit { limit, actual });
+    }
+    Ok(())
+}
+
+fn enforce_authorization_component<E>(
+    component: AuthorizationComponent,
+    bytes: &[u8],
+    limit: u64,
+) -> Result<(), AuthorizationDecodeError<E>> {
+    let actual =
+        u64::try_from(bytes.len()).map_err(|_| AuthorizationDecodeError::LengthOverflow)?;
+    if actual > limit {
+        return Err(AuthorizationDecodeError::ComponentLimit {
+            component,
+            limit,
+            actual,
+        });
+    }
+    Ok(())
+}
+
+struct AuthorizationCursor<'a> {
+    bytes: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> AuthorizationCursor<'a> {
+    const fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, offset: 0 }
+    }
+
+    fn remaining(&self) -> usize {
+        self.bytes.len().saturating_sub(self.offset)
+    }
+
+    fn take<E>(&mut self, count: usize) -> Result<&'a [u8], AuthorizationDecodeError<E>> {
+        let end = self
+            .offset
+            .checked_add(count)
+            .ok_or(AuthorizationDecodeError::LengthOverflow)?;
+        let Some(bytes) = self.bytes.get(self.offset..end) else {
+            return Err(AuthorizationDecodeError::UnexpectedEnd {
+                offset: self.offset,
+                requested: count,
+            });
+        };
+        self.offset = end;
+        Ok(bytes)
+    }
+
+    fn take_u16<E>(&mut self) -> Result<u16, AuthorizationDecodeError<E>> {
+        let mut bytes = [0_u8; 2];
+        bytes.copy_from_slice(self.take(2)?);
+        Ok(u16::from_be_bytes(bytes))
+    }
+
+    fn take_u32<E>(&mut self) -> Result<u32, AuthorizationDecodeError<E>> {
+        let mut bytes = [0_u8; 4];
+        bytes.copy_from_slice(self.take(4)?);
+        Ok(u32::from_be_bytes(bytes))
+    }
+
+    fn take_hash32<E>(&mut self) -> Result<Hash32, AuthorizationDecodeError<E>> {
+        let mut bytes = [0_u8; 32];
+        bytes.copy_from_slice(self.take(32)?);
+        Ok(Hash32::new(bytes))
+    }
+
+    fn take_blob<E>(&mut self) -> Result<&'a [u8], AuthorizationDecodeError<E>> {
+        let length = usize::try_from(self.take_u32()?)
+            .map_err(|_| AuthorizationDecodeError::LengthOverflow)?;
+        self.take(length)
+    }
+
+    fn expect<E>(&mut self, expected: &[u8]) -> Result<(), AuthorizationDecodeError<E>> {
+        if self.take(expected.len())? != expected {
+            return Err(AuthorizationDecodeError::MagicMismatch);
+        }
+        Ok(())
+    }
+
+    fn expect_version<E>(&mut self, expected: u16) -> Result<(), AuthorizationDecodeError<E>> {
+        let actual = self.take_u16()?;
+        if actual != expected {
+            return Err(AuthorizationDecodeError::VersionMismatch { expected, actual });
+        }
+        Ok(())
+    }
+
+    fn ensure_consumed<E>(&self) -> Result<(), AuthorizationDecodeError<E>> {
+        if self.remaining() != 0 {
+            return Err(AuthorizationDecodeError::TrailingBytes {
+                offset: self.offset,
+            });
+        }
+        Ok(())
     }
 }
 
@@ -1901,6 +2176,75 @@ pub enum AuthorityError {
     Laws(LawError),
 }
 
+/// Bounded persisted-authorization re-admission failure.
+#[derive(Debug)]
+pub enum AuthorizationDecodeError<E> {
+    /// Complete input exceeds the configured byte limit.
+    InputLimit {
+        /// Configured maximum.
+        limit: u64,
+        /// Actual bytes.
+        actual: u64,
+    },
+    /// One nested authorization component exceeds its bound.
+    ComponentLimit {
+        /// Component whose bytes exceeded the bound.
+        component: AuthorizationComponent,
+        /// Configured maximum.
+        limit: u64,
+        /// Actual bytes.
+        actual: u64,
+    },
+    /// Length conversion or offset arithmetic overflowed.
+    LengthOverflow,
+    /// Input ended before a declared field was complete.
+    UnexpectedEnd {
+        /// Failed byte offset.
+        offset: usize,
+        /// Requested bytes.
+        requested: usize,
+    },
+    /// A fixed authorization or invocation prefix differs.
+    MagicMismatch,
+    /// A persisted authorization format version differs.
+    VersionMismatch {
+        /// Authority-owned version.
+        expected: u16,
+        /// Persisted version.
+        actual: u16,
+    },
+    /// Bytes remain after the complete canonical value.
+    TrailingBytes {
+        /// First trailing-byte offset.
+        offset: usize,
+    },
+    /// A nested canonical envelope failed to decode.
+    Envelope(DecodeError),
+    /// A decoded value failed exact schema re-admission.
+    Schema(SchemaEnvelopeError),
+    /// Invocation re-admission failed.
+    Authority(AuthorityError),
+    /// Shell-owned reviewed transition execution failed.
+    Execution(CatalogExecutionError<E>),
+    /// Persisted bytes reproduce an ordinary rejection, which carries no commit authority.
+    NotCommitted,
+    /// Reconstructed invocation bytes differ from the persisted invocation.
+    NonCanonicalInvocation,
+    /// Reconstructed authorization bytes differ from the persisted envelope.
+    NonCanonicalAuthorization,
+    /// Canonical reconstruction failed.
+    Encode(EncodeError),
+}
+
+/// Length-delimited persisted authorization component.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AuthorizationComponent {
+    /// Fixed-shape authorization body.
+    Body,
+    /// Complete externally admitted invocation.
+    Invocation,
+}
+
 impl From<CatalogError> for AuthorityError {
     fn from(error: CatalogError) -> Self {
         Self::Catalog(error)
@@ -1943,6 +2287,54 @@ impl fmt::Display for AuthorityError {
                 write!(formatter, "authorization transition failed: {error}")
             }
             Self::Laws(error) => write!(formatter, "authorization project laws failed: {error}"),
+        }
+    }
+}
+
+impl<E: fmt::Display> fmt::Display for AuthorizationDecodeError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InputLimit { limit, actual } => write!(
+                formatter,
+                "authorization input exceeds {limit} bytes: {actual}"
+            ),
+            Self::ComponentLimit {
+                component,
+                limit,
+                actual,
+            } => write!(
+                formatter,
+                "authorization {component:?} exceeds {limit} bytes: {actual}"
+            ),
+            Self::LengthOverflow => {
+                formatter.write_str("authorization length arithmetic overflowed")
+            }
+            Self::UnexpectedEnd { offset, requested } => write!(
+                formatter,
+                "authorization ended at byte {offset} while reading {requested} bytes"
+            ),
+            Self::MagicMismatch => formatter.write_str("authorization magic differs"),
+            Self::VersionMismatch { expected, actual } => write!(
+                formatter,
+                "authorization version differs: expected {expected}, got {actual}"
+            ),
+            Self::TrailingBytes { offset } => {
+                write!(formatter, "trailing authorization bytes at offset {offset}")
+            }
+            Self::Envelope(error) => write!(formatter, "authorization envelope failed: {error}"),
+            Self::Schema(error) => write!(formatter, "authorization schema failed: {error}"),
+            Self::Authority(error) => error.fmt(formatter),
+            Self::Execution(error) => error.fmt(formatter),
+            Self::NotCommitted => {
+                formatter.write_str("persisted invocation does not produce commit authority")
+            }
+            Self::NonCanonicalInvocation => {
+                formatter.write_str("persisted invocation does not reconstruct exactly")
+            }
+            Self::NonCanonicalAuthorization => {
+                formatter.write_str("persisted authorization does not reconstruct exactly")
+            }
+            Self::Encode(error) => error.fmt(formatter),
         }
     }
 }
@@ -2655,6 +3047,113 @@ mod tests {
             base.body().law_evaluation_hash(),
             base.law_evaluation().evaluation_hash()
         );
+    }
+
+    #[test]
+    fn persisted_authorization_is_reexecuted_into_exact_nominal_authority() {
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        let original = accept(&authority, &catalog, 60, 62);
+        let bytes = original
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("authorization bytes: {error}"));
+        let exact = AuthorizationDecodeLimits {
+            max_input_bytes: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+            ..AuthorizationDecodeLimits::default()
+        };
+        let reconstructed = authority
+            .reauthorize_canonical_transition(&bytes, exact)
+            .unwrap_or_else(|error| panic!("reauthorize: {error}"));
+        assert_eq!(
+            reconstructed.authorization_id(),
+            original.authorization_id()
+        );
+        assert_eq!(reconstructed.body(), original.body());
+        assert_eq!(reconstructed.bundle(), original.bundle());
+    }
+
+    #[test]
+    fn persisted_authorization_rejects_body_invocation_and_policy_substitution() {
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        let authorization = accept(&authority, &catalog, 60, 62);
+        let bytes = authorization
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("authorization bytes: {error}"));
+        let outer_header = AUTHORIZATION_MAGIC.len() + 2;
+        let mut body_tamper = bytes.clone();
+        body_tamper[outer_header + 4] ^= 1;
+        assert!(matches!(
+            authority.reauthorize_canonical_transition(
+                &body_tamper,
+                AuthorizationDecodeLimits::default()
+            ),
+            Err(AuthorizationDecodeError::NonCanonicalAuthorization)
+        ));
+
+        let body_length = u32::from_be_bytes([
+            bytes[outer_header],
+            bytes[outer_header + 1],
+            bytes[outer_header + 2],
+            bytes[outer_header + 3],
+        ]);
+        let invocation_offset =
+            outer_header + 4 + usize::try_from(body_length).unwrap_or(usize::MAX) + 4;
+        let invocation_policy_offset = invocation_offset + INVOCATION_MAGIC.len() + 2;
+        let mut invocation_tamper = bytes.clone();
+        invocation_tamper[invocation_policy_offset] ^= 1;
+        assert!(matches!(
+            authority.reauthorize_canonical_transition(
+                &invocation_tamper,
+                AuthorizationDecodeLimits::default()
+            ),
+            Err(AuthorizationDecodeError::NonCanonicalInvocation)
+        ));
+
+        let other_authority = accept_authority(&catalog, 55);
+        assert!(matches!(
+            other_authority
+                .reauthorize_canonical_transition(&bytes, AuthorizationDecodeLimits::default()),
+            Err(AuthorizationDecodeError::NonCanonicalInvocation)
+        ));
+    }
+
+    #[test]
+    fn persisted_authorization_decoder_fails_closed_on_bounds_and_shape() {
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        let bytes = accept(&authority, &catalog, 60, 62)
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("authorization bytes: {error}"));
+        let actual = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        assert!(matches!(
+            authority.reauthorize_canonical_transition(
+                &bytes,
+                AuthorizationDecodeLimits {
+                    max_input_bytes: actual.saturating_sub(1),
+                    ..AuthorizationDecodeLimits::default()
+                }
+            ),
+            Err(AuthorizationDecodeError::InputLimit {
+                limit,
+                actual: observed,
+            }) if limit == actual.saturating_sub(1) && observed == actual
+        ));
+
+        let mut trailing = bytes.clone();
+        trailing.push(0);
+        assert!(matches!(
+            authority
+                .reauthorize_canonical_transition(&trailing, AuthorizationDecodeLimits::default()),
+            Err(AuthorizationDecodeError::TrailingBytes { .. })
+        ));
+        assert!(matches!(
+            authority.reauthorize_canonical_transition(
+                &bytes[..bytes.len().saturating_sub(1)],
+                AuthorizationDecodeLimits::default()
+            ),
+            Err(AuthorizationDecodeError::UnexpectedEnd { .. })
+        ));
     }
 
     #[test]
