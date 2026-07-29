@@ -64,8 +64,11 @@ The workspace now includes the complete package ladder:
 - semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches and closed commit/outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
 - assume-guarantee composition, deterministic-parallel conflict checking,
   backend-neutral complete static footprint claims, nominal footprint witnesses,
-  witness-gated parallel authorization, runtime refinement reports, promotion
-  policy, canonical evidence envelopes, and the first ZenoDEX profile;
+  witness-gated parallel authorization, untrusted runtime refinement reports,
+  strict approved-provider reconstruction into nominal validated decisions,
+  canonical finite-domain manifests, independently verified exhaustive
+  coverage, content-addressed promotion reports, canonical evidence envelopes,
+  and the first ZenoDEX profile;
 - fixed-size executable domain machines with schema-admitted state, command,
   context, and port matrices; narrow per-machine interfaces; routes derived
   exactly from global composition wiring; deterministic merge-order execution;
@@ -123,6 +126,13 @@ cargo +1.97.1 run -p zeno-fcis-adapter-zenodex \
 This establishes bounded executable integration for the mounted profile. It
 does not authorize production effects, cover multiple vaults or other ZenoDEX
 lanes, or replace an audit or unbounded refinement proof.
+
+Mounted `NormalizedDecision` values remain untrusted transport. A production
+promotion path must reconstruct every receipt or complete bundle through
+`ValidatedNormalizedDecision`, derive case identities from the exact
+invocation, and use a verified `ExhaustiveDomainManifest` when claiming finite
+domain completeness. See
+[`docs/VALIDATED_REFINEMENT_AND_EXHAUSTIVE_COVERAGE.md`](docs/VALIDATED_REFINEMENT_AND_EXHAUSTIVE_COVERAGE.md).
 
 The `zeno-fcis` umbrella keeps the semantic kernel small by default. Application
 code should enable the smallest explicit feature set, for example:

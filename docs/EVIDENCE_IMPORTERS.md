@@ -112,7 +112,10 @@ crates under ZenoFCIS control.
   is non-zero, result is proven).
 - The evidence importer does not grant production authority. It produces
   evidence for the promotion gate, which is itself fail-closed.
-- The promotion gate does not replace the existing `evaluate_promotion`
-  function in `zeno-fcis-refine`. It provides an additional evidence-specific
-  gate that complements the refine crate's promotion pipeline.
+- Imported evidence does not make legacy `evaluate_promotion` authoritative.
+  That compatibility path accepts untrusted normalized decisions and always
+  reports `UnvalidatedDecisionArtifacts`. Production promotion uses strict
+  `ValidatedPromotionEvidence` and `evaluate_validated_promotion` after the
+  configured evidence importer and independent verifier have established the
+  exact claims.
 - No crate is published or claimed as production-ready.

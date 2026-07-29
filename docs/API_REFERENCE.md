@@ -37,6 +37,8 @@ release commit.
 | Global composed program | `zeno_fcis::composed_program` |
 | Composition proof obligations | `zeno_fcis::compose` |
 | Formal tool protocol | `zeno_fcis::backend`, `evidence`, `refine` |
+| Strict runtime decision reconstruction | `zeno_fcis::refine::{ValidatedNormalizedDecision, DecisionValidationLimits}` |
+| Verified finite-domain promotion | `zeno_fcis::refine::{ExhaustiveDomainManifest, ValidatedRefinementCase, ValidatedPromotionEvidence, evaluate_validated_promotion}` |
 | Reference and concrete shells | `zeno_fcis::shell`, `zeno-fcis-shell-sqlite` |
 
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
@@ -45,6 +47,10 @@ The [genesis authorization guide](GENESIS_AUTHORIZATION.md) documents the
 required one-time initial-state ceremony and SQLite reopen contract. The
 [strict artifact and SQLite history guide](STRICT_ARTIFACT_AND_SQLITE_HISTORY.md)
 documents persisted-artifact reauthorization and complete row-set validation.
+The [validated refinement guide](VALIDATED_REFINEMENT_AND_EXHAUSTIVE_COVERAGE.md)
+documents the separation between untrusted mounted transport, strict artifact
+reconstruction, canonical domain manifests, and independently verified
+promotion evidence.
 
 ## Stability
 

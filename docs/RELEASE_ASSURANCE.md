@@ -10,7 +10,8 @@ The authority rule is:
 
 ```text
 candidate generator or mounted runtime proposes data
-    -> independent checker validates exact data
+    -> strict decoder reconstructs exact invocation-bound artifacts
+    -> independent checker validates exact data and claimed coverage
     -> shell validates the complete candidate again
     -> one database transaction publishes state, replay binding, receipt, and outbox
 ```
@@ -61,6 +62,7 @@ The CI workflows add:
 - Miri interpretation of the semantic boundary tests;
 - compilation of the codec and candidate-bundle fuzz targets;
 - focused crash-atomic SQLite, authenticated-state, synthesis, mounted-adapter, and collection-backend tests;
+- strict validated-decision, canonical-domain-manifest, and exhaustive-coverage promotion tests;
 - two independently generated source manifests compared byte-for-byte.
 
 ## Static policy
@@ -121,6 +123,8 @@ The repository currently supplies reviewed reference implementations and strict 
 - that the reference sparse Merkle tree is a production database or a vetted Jellyfish Merkle Tree implementation;
 - that a concrete ESSO, SMT solver, theorem prover, compiler, or LLM is bundled as a synthesis backend;
 - that generated or imported evidence is true without its independent checker;
+- that equality between untrusted `NormalizedDecision` values grants
+  production promotion authority;
 - that SQLite durability settings replace deployment-specific storage validation;
 - audit completion, project-specific economic correctness, side-channel resistance, or production qualification of a value-moving profile.
 

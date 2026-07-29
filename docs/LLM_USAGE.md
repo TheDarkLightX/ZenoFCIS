@@ -88,6 +88,12 @@ Avoid in production integration:
 - hidden clocks, randomness, I/O, threads, async tasks, mutable globals, or
   executable closures in the semantic core.
 
+For promoted runtime refinement, use `ValidatedNormalizedDecision`, derived
+`ValidatedRefinementCase` identities, `ExhaustiveDomainManifest`, and
+`evaluate_validated_promotion`. An LLM may propose a manifest or evidence
+adapter. It may not declare a domain exhaustive, choose verifier identity, or
+convert matching untrusted runtime bytes into promotion authority.
+
 ## Formal backend rule
 
 Use the boundary:

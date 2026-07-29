@@ -197,11 +197,20 @@ and shell_safe(t)
 ### REF-001 — Exhaustive refinement can be fabricated by cardinality
 
 **Severity:** P1  
-**Status:** open; tracked by issue #61
+**Status:** closed on the validated-refinement V1 stack; originally tracked by
+issue #61
 
 The baseline exhaustive promotion checks case count against cardinality but does not verify exact unique domain enumeration. Repeated inputs can satisfy the count. Raw normalized decisions can also be self-consistently fabricated without strict artifact reconstruction.
 
 **Required repair:** canonical domain manifests, unique exact input membership, deterministic enumeration identity, independently verified coverage, and privately constructible validated normalized decisions.
+
+**Closure note, 2026-07-29:** `ValidatedNormalizedDecision` now requires strict
+receipt or bundle reconstruction against the exact invocation, pre-state,
+state domain, and approved provider. Derived case identities, canonical
+`ExhaustiveDomainManifest`, exact manifest/case set equality, independent
+enumeration evidence, and content-addressed promotion reports replace the
+cardinality-only production path. The complete legacy evaluator now always
+reports unvalidated decision artifacts and cannot create a promotable report.
 
 ### AUTH-001 — Production authorization is not yet law aware
 
@@ -249,7 +258,8 @@ It closes CMP-001 through CMP-005 within the generic composition package. CMP-00
 2. Merge proof-carrying composition v2 and close the remaining issue #56 items.
 3. Add first-class invariant/conservation law definitions and checkers, issue #58.
 4. Stack law-aware authorization on PR #63 so the production witness cannot exist without required laws.
-5. Repair exhaustive refinement and validated decision reconstruction, issue #61.
+5. Retain validated refinement and exact manifest-backed enumeration evidence
+   for every production-promoted runtime/profile pair.
 6. Bind authenticated projectors and proof context, issue #62.
 7. Complete strict decoding and SQLite row-set cross-validation, issue #55.
    This dated finding is closed by the schema-v5 exact-history package in the
