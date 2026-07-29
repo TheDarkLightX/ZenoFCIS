@@ -27,8 +27,8 @@ pub mod prelude {
 
     #[cfg(feature = "catalog")]
     pub use crate::{
-        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, ProjectCatalog,
-        ReasonDefinition, ReasonDisposition,
+        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, OperationSemantics,
+        ProjectCatalog, ReasonDefinition, ReasonDisposition, ValueFlow, ValueFlowKind,
     };
 
     #[cfg(feature = "transition")]
@@ -230,8 +230,9 @@ pub use zeno_fcis_bootstrap::{
 #[cfg(feature = "catalog")]
 pub use zeno_fcis_catalog::{
     CatalogError, CatalogLimits, CatalogManifest, CatalogMetrics, ChannelDefinition,
-    EffectDefinition, EffectHashField, HashRequirement, NonZeroHash, ProjectCatalog,
-    ReasonDefinition, ReasonDisposition, ValueRole,
+    EffectDefinition, EffectHashField, HashRequirement, MAX_VALUE_FLOWS, NonZeroHash,
+    OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition, ValueFlow,
+    ValueFlowKind, ValueRole,
 };
 pub use zeno_fcis_codec::{
     AdmittedEnvelope, CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain,

@@ -57,6 +57,7 @@ Each effect binds:
 - a stable name;
 - an exact payload type in the closed schema;
 - authority and subject commitment requirements;
+- an explicit `NonValue` or canonical asset-scoped `ValueFlow` classification;
 - a nonzero project-policy commitment.
 
 Authority and subject requirements are closed values:
@@ -70,6 +71,11 @@ Exact(nonzero hash)
 
 A commit plan fails closed when an operation is unknown, its payload does not satisfy the schema, or its authority/subject commitments violate the definition.
 
+Value classifications distinguish transfer, mint, burn, escrow, fee,
+settlement, external-delivery, and custom registered relations. They are part
+of catalog format 2 and therefore part of the effect registry and project
+identity. See [Catalog-derived economic law requirements](ECONOMIC_LAW_DERIVATION.md).
+
 ## Channel definitions
 
 Each channel binds:
@@ -78,6 +84,7 @@ Each channel binds:
 - a stable name;
 - an exact destination schema type;
 - an exact payload schema type;
+- an explicit `NonValue` or canonical asset-scoped `ValueFlow` classification;
 - a nonzero delivery-policy commitment.
 
 The delivery-policy commitment may identify project-specific retry, acknowledgement, ordering, privacy, retention, or destination-idempotency rules. The generic catalog binds that policy but does not claim that an external destination obeys it.
@@ -109,6 +116,10 @@ The implemented laws are:
 - the profile contains every exact reason, effect, and channel entry and no hidden entries in those namespaces;
 - each admitted plan ID is nonzero and registered, each value satisfies its declared schema, and each effect satisfies its authority and subject rules;
 - returned metrics equal the validated plan pair and never exceed the configured per-value or aggregate envelope.
+- value-flow sets are nonempty, bounded, canonical, and committed by the exact
+  effect or channel registry identity;
+- economic reclassification changes the manifest, profile, catalog, and every
+  downstream verified-law-set identity.
 
 Negative tests cover noncontiguous precedence, wrong profile bindings, hidden profile effects, schema-root divergence, unknown effect and channel IDs, wrong effect authority and subject commitments, wrong effect/channel payload shapes, cross-class reasons, and aggregate payload overflow. Existing `CommitPlan` and `OutboxPlan` constructors separately reject duplicate ordinals and canonicalize operation order.
 
@@ -123,7 +134,8 @@ Catalog validation is deterministic and performs no I/O, time reads, randomness,
 Projects should construct values in this order:
 
 1. Build the closed schema.
-2. Build reason, effect, and channel definitions.
+2. Build reason, effect, and channel definitions with explicit reviewed
+   `OperationSemantics` classifications.
 3. Build `CatalogManifest` under the selected commitment provider.
 4. Copy the manifest's hashes into `ProfileBindings`.
 5. Add the manifest's exact registry entries to `ProjectProfile`.
@@ -164,6 +176,7 @@ A valid catalog establishes that a plan uses reviewed IDs, types, bindings, and 
 - a policy commitment describes a safe policy;
 - an external delivery succeeds;
 - a shell correctly interprets an operation;
+- a classification commitment proves that an operation is non-value;
 - a migration preserves semantics;
 - a proof or runtime refinement has been completed.
 

@@ -1706,7 +1706,9 @@ mod tests {
         CatalogAuthorizationDecision, ExecutionBinding, GenesisPolicyBinding,
         ReviewedTransitionInput, StateDomainBinding,
     };
-    use zeno_fcis_catalog::{CatalogLimits, CatalogManifest, ChannelDefinition, ProjectCatalog};
+    use zeno_fcis_catalog::{
+        CatalogLimits, CatalogManifest, ChannelDefinition, OperationSemantics, ProjectCatalog,
+    };
     use zeno_fcis_core::{BudgetUsed, Decision, DecisionKind};
     use zeno_fcis_crypto::verify_approved_provider;
     use zeno_fcis_evidence::EvidenceEnvelope;
@@ -1842,6 +1844,8 @@ mod tests {
             name("delivery"),
             TypeId::new(4),
             TypeId::new(1),
+            OperationSemantics::non_value(hash(107))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(7),
         )
         .unwrap_or_else(|error| panic!("channel: {error}"));

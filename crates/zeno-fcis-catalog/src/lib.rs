@@ -29,7 +29,7 @@ use zeno_fcis_schema::{Schema, SchemaError, TypeId, ValidationLimits, ValueValid
 use zeno_fcis_value::{Value, ValueError, ValueLimits, ValueMetrics};
 
 /// Canonical catalog format version.
-pub const CATALOG_FORMAT_VERSION: u16 = 1;
+pub const CATALOG_FORMAT_VERSION: u16 = 2;
 /// Maximum definitions in any one catalog namespace.
 pub const MAX_CATALOG_DEFINITIONS: usize = 65_536;
 /// Maximum bytes in a hash-provider identity.
@@ -46,6 +46,8 @@ pub const MAX_TOTAL_PAYLOAD_BYTES: u64 = 1_073_741_824;
 pub const MAX_VALUE_DEPTH: u16 = 1_024;
 /// Maximum children in one collection value.
 pub const MAX_COLLECTION_LENGTH: u32 = 1_000_000;
+/// Maximum distinct value-flow descriptors on one effect or channel.
+pub const MAX_VALUE_FLOWS: usize = 64;
 
 /// A commitment that is statically known not to be the all-zero sentinel.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -118,6 +120,178 @@ impl CanonicalEncode for HashRequirement {
             }
         }
         Ok(())
+    }
+}
+
+/// One closed kind of economically meaningful flow.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum ValueFlowKind {
+    /// Value moves between owned subjects.
+    Transfer = 0,
+    /// New supply is created.
+    Mint = 1,
+    /// Existing supply is destroyed.
+    Burn = 2,
+    /// Value is locked into escrow.
+    EscrowLock = 3,
+    /// Value is released from escrow.
+    EscrowRelease = 4,
+    /// A fee, dust amount, or rounding remainder is charged or distributed.
+    FeeCharge = 5,
+    /// A settlement may combine transfers, fees, and balance reconciliation.
+    Settlement = 6,
+    /// Value crosses the FCIS boundary through an external delivery obligation.
+    ExternalValueDelivery = 7,
+    /// Project-specific value semantics are established by one registered claim.
+    Custom = 8,
+}
+
+impl CanonicalEncode for ValueFlowKind {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.push(*self as u8);
+        Ok(())
+    }
+}
+
+/// One asset-scoped value-flow descriptor.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ValueFlow {
+    kind: ValueFlowKind,
+    asset_domain: NonZeroHash,
+    custom_claim: Option<(SemanticId, NonZeroHash)>,
+}
+
+impl ValueFlow {
+    /// Creates one standard closed value flow.
+    pub fn standard(kind: ValueFlowKind, asset_domain: Hash32) -> Result<Self, CatalogError> {
+        if kind == ValueFlowKind::Custom {
+            return Err(CatalogError::MissingCustomValueClaim);
+        }
+        Ok(Self {
+            kind,
+            asset_domain: NonZeroHash::try_new(asset_domain)?,
+            custom_claim: None,
+        })
+    }
+
+    /// Creates a project-specific value flow bound to one exact registered claim.
+    pub fn custom(
+        asset_domain: Hash32,
+        claim_id: SemanticId,
+        claim_hash: Hash32,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
+            kind: ValueFlowKind::Custom,
+            asset_domain: NonZeroHash::try_new(asset_domain)?,
+            custom_claim: Some((claim_id, NonZeroHash::try_new(claim_hash)?)),
+        })
+    }
+
+    /// Returns the closed flow kind.
+    #[must_use]
+    pub const fn kind(self) -> ValueFlowKind {
+        self.kind
+    }
+
+    /// Returns the exact asset-domain commitment.
+    #[must_use]
+    pub const fn asset_domain(self) -> Hash32 {
+        self.asset_domain.get()
+    }
+
+    /// Returns the custom relational claim, when required by the flow kind.
+    #[must_use]
+    pub const fn custom_claim(self) -> Option<(SemanticId, Hash32)> {
+        match self.custom_claim {
+            Some((id, hash)) => Some((id, hash.get())),
+            None => None,
+        }
+    }
+}
+
+impl CanonicalEncode for ValueFlow {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        self.kind.encode_to(output)?;
+        self.asset_domain.encode_to(output)?;
+        match self.custom_claim {
+            None => output.push(0),
+            Some((id, hash)) => {
+                output.push(1);
+                id.encode_to(output)?;
+                hash.encode_to(output)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Constructor-only reviewed economic classification for one effect or channel.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OperationSemantics {
+    flows: Box<[ValueFlow]>,
+    classification_hash: NonZeroHash,
+}
+
+impl OperationSemantics {
+    /// Classifies an operation as non-value under explicit reviewed evidence.
+    pub fn non_value(classification_hash: Hash32) -> Result<Self, CatalogError> {
+        Ok(Self {
+            flows: Box::new([]),
+            classification_hash: NonZeroHash::try_new(classification_hash)?,
+        })
+    }
+
+    /// Classifies an operation with a bounded canonical set of value flows.
+    pub fn value(
+        mut flows: Vec<ValueFlow>,
+        classification_hash: Hash32,
+    ) -> Result<Self, CatalogError> {
+        if flows.is_empty() {
+            return Err(CatalogError::EmptyValueFlows);
+        }
+        if flows.len() > MAX_VALUE_FLOWS {
+            return Err(CatalogError::TooManyValueFlows);
+        }
+        flows.sort_unstable();
+        if flows.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(CatalogError::DuplicateValueFlow);
+        }
+        Ok(Self {
+            flows: flows.into_boxed_slice(),
+            classification_hash: NonZeroHash::try_new(classification_hash)?,
+        })
+    }
+
+    /// Returns the canonical value flows. Non-value operations return an empty slice.
+    #[must_use]
+    pub fn flows(&self) -> &[ValueFlow] {
+        &self.flows
+    }
+
+    /// Returns whether this operation is classified as value-moving.
+    #[must_use]
+    pub const fn is_value_moving(&self) -> bool {
+        !self.flows.is_empty()
+    }
+
+    /// Returns the reviewed classification commitment.
+    #[must_use]
+    pub const fn classification_hash(&self) -> Hash32 {
+        self.classification_hash.get()
+    }
+}
+
+impl CanonicalEncode for OperationSemantics {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.push(u8::from(self.is_value_moving()));
+        if self.is_value_moving() {
+            put_length(output, self.flows.len())?;
+            for flow in self.flows.iter() {
+                flow.encode_to(output)?;
+            }
+        }
+        self.classification_hash.encode_to(output)
     }
 }
 
@@ -232,6 +406,7 @@ pub struct EffectDefinition {
     payload_type: TypeId,
     authority: HashRequirement,
     subject: HashRequirement,
+    semantics: OperationSemantics,
     policy_hash: NonZeroHash,
 }
 
@@ -243,6 +418,7 @@ impl EffectDefinition {
         payload_type: TypeId,
         authority: HashRequirement,
         subject: HashRequirement,
+        semantics: OperationSemantics,
         policy_hash: Hash32,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
@@ -251,6 +427,7 @@ impl EffectDefinition {
             payload_type,
             authority,
             subject,
+            semantics,
             policy_hash: NonZeroHash::try_new(policy_hash)?,
         })
     }
@@ -285,6 +462,12 @@ impl EffectDefinition {
         self.subject
     }
 
+    /// Returns the reviewed economic classification.
+    #[must_use]
+    pub const fn semantics(&self) -> &OperationSemantics {
+        &self.semantics
+    }
+
     /// Returns the project policy commitment for this operation.
     #[must_use]
     pub const fn policy_hash(&self) -> Hash32 {
@@ -304,6 +487,7 @@ impl CanonicalEncode for EffectDefinition {
         output.extend_from_slice(&self.payload_type.get().to_be_bytes());
         self.authority.encode_to(output)?;
         self.subject.encode_to(output)?;
+        self.semantics.encode_to(output)?;
         self.policy_hash.encode_to(output)
     }
 }
@@ -315,6 +499,7 @@ pub struct ChannelDefinition {
     name: StableName,
     destination_type: TypeId,
     payload_type: TypeId,
+    semantics: OperationSemantics,
     delivery_policy_hash: NonZeroHash,
 }
 
@@ -325,6 +510,7 @@ impl ChannelDefinition {
         name: StableName,
         destination_type: TypeId,
         payload_type: TypeId,
+        semantics: OperationSemantics,
         delivery_policy_hash: Hash32,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
@@ -332,6 +518,7 @@ impl ChannelDefinition {
             name,
             destination_type,
             payload_type,
+            semantics,
             delivery_policy_hash: NonZeroHash::try_new(delivery_policy_hash)?,
         })
     }
@@ -360,6 +547,12 @@ impl ChannelDefinition {
         self.payload_type
     }
 
+    /// Returns the reviewed economic classification.
+    #[must_use]
+    pub const fn semantics(&self) -> &OperationSemantics {
+        &self.semantics
+    }
+
     /// Returns the delivery-policy commitment.
     #[must_use]
     pub const fn delivery_policy_hash(&self) -> Hash32 {
@@ -378,6 +571,7 @@ impl CanonicalEncode for ChannelDefinition {
         self.name.encode_to(output)?;
         output.extend_from_slice(&self.destination_type.get().to_be_bytes());
         output.extend_from_slice(&self.payload_type.get().to_be_bytes());
+        self.semantics.encode_to(output)?;
         self.delivery_policy_hash.encode_to(output)
     }
 }
@@ -1304,6 +1498,14 @@ pub enum CatalogError {
     ZeroDerivedCommitment,
     /// The hash-provider identity is empty, oversized, or non-ASCII.
     InvalidHashAlgorithmId,
+    /// A custom value flow omitted its required registered claim.
+    MissingCustomValueClaim,
+    /// A value classification contained no flow descriptors.
+    EmptyValueFlows,
+    /// A value classification exceeded [`MAX_VALUE_FLOWS`].
+    TooManyValueFlows,
+    /// A value classification repeated one exact flow descriptor.
+    DuplicateValueFlow,
     /// A manifest was used with a different commitment provider.
     HashAlgorithmMismatch,
     /// One namespace exceeds the definition-count bound.
@@ -1458,6 +1660,12 @@ impl fmt::Display for CatalogError {
                 formatter.write_str("derived catalog commitment is zero")
             }
             Self::InvalidHashAlgorithmId => formatter.write_str("invalid hash algorithm identity"),
+            Self::MissingCustomValueClaim => {
+                formatter.write_str("custom value flow is missing its registered claim")
+            }
+            Self::EmptyValueFlows => formatter.write_str("value semantics contain no flows"),
+            Self::TooManyValueFlows => formatter.write_str("too many value-flow descriptors"),
+            Self::DuplicateValueFlow => formatter.write_str("duplicate value-flow descriptor"),
             Self::HashAlgorithmMismatch => formatter.write_str("catalog hash algorithm mismatch"),
             Self::TooManyDefinitions(kind) => write!(formatter, "too many {kind:?} definitions"),
             Self::DuplicateDefinitionId { kind, id } => {
@@ -1650,6 +1858,8 @@ mod tests {
                     TypeId::new(4),
                     HashRequirement::Present,
                     HashRequirement::Absent,
+                    OperationSemantics::non_value(hash(120))
+                        .unwrap_or_else(|error| panic!("semantics: {error}")),
                     hash(20),
                 )
                 .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -1660,6 +1870,8 @@ mod tests {
                     name("notify"),
                     TypeId::new(5),
                     TypeId::new(6),
+                    OperationSemantics::non_value(hash(130))
+                        .unwrap_or_else(|error| panic!("semantics: {error}")),
                     hash(30),
                 )
                 .unwrap_or_else(|error| panic!("channel: {error}")),
@@ -1763,6 +1975,8 @@ mod tests {
                 TypeId::new(4),
                 HashRequirement::Any,
                 HashRequirement::Any,
+                OperationSemantics::non_value(hash(121))
+                    .unwrap_or_else(|error| panic!("semantics: {error}")),
                 hash(21),
             )
             .unwrap_or_else(|error| panic!("second effect: {error}")),
@@ -1773,6 +1987,8 @@ mod tests {
                 name("notify-secondary"),
                 TypeId::new(5),
                 TypeId::new(6),
+                OperationSemantics::non_value(hash(131))
+                    .unwrap_or_else(|error| panic!("semantics: {error}")),
                 hash(31),
             )
             .unwrap_or_else(|error| panic!("second channel: {error}")),
@@ -1791,6 +2007,82 @@ mod tests {
         .unwrap_or_else(|error| panic!("right: {error}"));
         assert_eq!(left, right);
         assert_eq!(left.canonical_bytes(), right.canonical_bytes());
+    }
+
+    #[test]
+    fn value_flows_are_nonempty_bounded_canonical_sets() {
+        assert_eq!(
+            OperationSemantics::value(Vec::new(), hash(140)),
+            Err(CatalogError::EmptyValueFlows)
+        );
+        let transfer = ValueFlow::standard(ValueFlowKind::Transfer, hash(141))
+            .unwrap_or_else(|error| panic!("flow: {error}"));
+        assert_eq!(
+            OperationSemantics::value(vec![transfer, transfer], hash(142)),
+            Err(CatalogError::DuplicateValueFlow)
+        );
+        let mint = ValueFlow::standard(ValueFlowKind::Mint, hash(141))
+            .unwrap_or_else(|error| panic!("flow: {error}"));
+        let left = OperationSemantics::value(vec![transfer, mint], hash(142))
+            .unwrap_or_else(|error| panic!("semantics: {error}"));
+        let right = OperationSemantics::value(vec![mint, transfer], hash(142))
+            .unwrap_or_else(|error| panic!("semantics: {error}"));
+        assert_eq!(left, right);
+        assert_eq!(left.canonical_bytes(), right.canonical_bytes());
+
+        let mut boundary = (1_u8..=64)
+            .map(|byte| {
+                ValueFlow::standard(ValueFlowKind::Transfer, hash(byte))
+                    .unwrap_or_else(|error| panic!("boundary flow: {error}"))
+            })
+            .collect::<Vec<_>>();
+        assert!(OperationSemantics::value(boundary.clone(), hash(143)).is_ok());
+        boundary.push(
+            ValueFlow::standard(ValueFlowKind::Transfer, hash(65))
+                .unwrap_or_else(|error| panic!("one-over flow: {error}")),
+        );
+        assert_eq!(
+            OperationSemantics::value(boundary, hash(143)),
+            Err(CatalogError::TooManyValueFlows)
+        );
+    }
+
+    #[test]
+    fn custom_flow_requires_exact_nonzero_claim_bindings() {
+        assert_eq!(
+            ValueFlow::standard(ValueFlowKind::Custom, hash(150)),
+            Err(CatalogError::MissingCustomValueClaim)
+        );
+        assert_eq!(
+            ValueFlow::custom(hash(150), id(500), Hash32::ZERO),
+            Err(CatalogError::ZeroCommitment)
+        );
+    }
+
+    #[test]
+    fn economic_reclassification_changes_registry_and_manifest_identity() {
+        let (_, mut effects, _) = definitions();
+        let non_value =
+            CatalogManifest::try_new::<TestHasher>(Vec::new(), effects.clone(), Vec::new())
+                .unwrap_or_else(|error| panic!("non-value manifest: {error}"));
+        effects[0].semantics = OperationSemantics::value(
+            vec![
+                ValueFlow::standard(ValueFlowKind::Transfer, hash(151))
+                    .unwrap_or_else(|error| panic!("flow: {error}")),
+            ],
+            hash(152),
+        )
+        .unwrap_or_else(|error| panic!("semantics: {error}"));
+        let value = CatalogManifest::try_new::<TestHasher>(Vec::new(), effects, Vec::new())
+            .unwrap_or_else(|error| panic!("value manifest: {error}"));
+        assert_ne!(
+            non_value.effect_registry_hash(),
+            value.effect_registry_hash()
+        );
+        assert_ne!(
+            non_value.commitment::<TestHasher>(),
+            value.commitment::<TestHasher>()
+        );
     }
 
     #[test]
