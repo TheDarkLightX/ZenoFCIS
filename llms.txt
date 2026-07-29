@@ -87,7 +87,11 @@ sequential result.
 - zeno-fcis-profile-zenodex and zeno-fcis-adapter-zenodex are project-specific.
 - zeno-fcis-shell is pure reference semantics.
 - authenticated-state and persistent collection implementations are reference
-  or optimization surfaces unless separately qualified.
+  or optimization surfaces unless separately qualified. The
+  `authenticated-authority` feature adds retained-evidence projector
+  qualification, exact candidate binding, strict persisted-plan
+  reauthorization, and a nominal production-facing publication port. It does
+  not turn the bounded reference tree into a production datastore.
 - code generation synchronizes reviewed definitions; it does not prove them.
 
 ## Validation commands

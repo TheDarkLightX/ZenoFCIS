@@ -74,6 +74,12 @@ mounted-zenodex = [
     "dep:zeno-fcis-adapter-zenodex",
 ]
 authenticated-state = ["std", "dep:zeno-fcis-authenticated"]
+authenticated-authority = [
+    "authenticated-state",
+    "authority",
+    "dep:zeno-fcis-authenticated-authority",
+    "zeno-fcis-authenticated-authority/rustcrypto",
+]
 synthesis = ["dep:zeno-fcis-synthesis"]
 backend = ["synthesis", "dep:zeno-fcis-backend"]
 sqlite-shell = ["std", "authority", "dep:zeno-fcis-shell-sqlite"]
@@ -98,6 +104,7 @@ full = [
     "evidence",
     "mounted-zenodex",
     "authenticated-state",
+    "authenticated-authority",
     "backend",
     "sqlite-shell",
     "persistent-collections",
@@ -131,6 +138,7 @@ zeno-fcis-evidence = { version = "=1.0.0-rc.1", path = "../zeno-fcis-evidence", 
 zeno-fcis-adapter = { version = "=1.0.0-rc.1", path = "../zeno-fcis-adapter", optional = true }
 zeno-fcis-adapter-zenodex = { version = "=1.0.0-rc.1", path = "../zeno-fcis-adapter-zenodex", optional = true }
 zeno-fcis-authenticated = { version = "=1.0.0-rc.1", path = "../zeno-fcis-authenticated", optional = true }
+zeno-fcis-authenticated-authority = { version = "=1.0.0-rc.1", path = "../zeno-fcis-authenticated-authority", default-features = false, optional = true }
 zeno-fcis-synthesis = { version = "=1.0.0-rc.1", path = "../zeno-fcis-synthesis", default-features = false, optional = true }
 zeno-fcis-backend = { version = "=1.0.0-rc.1", path = "../zeno-fcis-backend", default-features = false, optional = true }
 zeno-fcis-shell-sqlite = { version = "=1.0.0-rc.1", path = "../zeno-fcis-shell-sqlite", optional = true }

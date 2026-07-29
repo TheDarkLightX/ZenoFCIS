@@ -1165,6 +1165,7 @@ dependencies = [
  "zeno-fcis-adapter",
  "zeno-fcis-adapter-zenodex",
  "zeno-fcis-authenticated",
+ "zeno-fcis-authenticated-authority",
  "zeno-fcis-authority",
  "zeno-fcis-backend",
  "zeno-fcis-bootstrap",
@@ -1232,6 +1233,20 @@ dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
  "zeno-fcis-patch",
+ "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-authenticated-authority"
+version = "1.0.0-rc.1"
+dependencies = [
+ "zeno-fcis-authenticated",
+ "zeno-fcis-authority",
+ "zeno-fcis-codec",
+ "zeno-fcis-crypto",
+ "zeno-fcis-laws",
+ "zeno-fcis-patch",
+ "zeno-fcis-receipt",
  "zeno-fcis-value",
 ]
 

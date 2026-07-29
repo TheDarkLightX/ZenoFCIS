@@ -38,6 +38,7 @@ SEMANTIC_CRATES = (
     "zeno-fcis-profile-zenodex",
     "zeno-fcis-evidence",
     "zeno-fcis-authenticated",
+    "zeno-fcis-authenticated-authority",
     "zeno-fcis-synthesis",
     "zeno-fcis-backend",
 )
@@ -58,6 +59,7 @@ DEPENDENCY_RING = {
     "zeno-fcis-refine": 2,
     "zeno-fcis-evidence": 2,
     "zeno-fcis-authenticated": 2,
+    "zeno-fcis-authenticated-authority": 5,
     "zeno-fcis-synthesis": 2,
     "zeno-fcis-backend": 3,
     "zeno-fcis-catalog": 2,

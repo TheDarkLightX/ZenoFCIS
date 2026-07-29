@@ -31,6 +31,8 @@ release commit.
 | Pure transition construction | `zeno_fcis::transition` |
 | Project invariants and conservation | `zeno_fcis::laws` |
 | Nominal genesis and commit authorization | `zeno_fcis::authority` |
+| Strict authenticated proof/plan decoding | `zeno_fcis::authenticated::{AuthenticatedDecodeLimits, decode_sparse_proof, decode_authenticated_plan}` |
+| Qualified candidate-bound authenticated publication | `zeno_fcis::authenticated_authority::{AuthenticatedCommitAuthority, CatalogAuthorizedAuthenticatedCommit, ProductionAuthenticatedCommitPort}` |
 | Strict receipt and bundle decoding | `zeno_fcis::receipt::{ReceiptDecodeLimits, BundleDecodeLimits, decode_receipt, decode_reject_receipt, decode_commit_bundle}` |
 | Persisted authorization re-entry | `zeno_fcis::authority::{AuthorizationDecodeLimits, CatalogCommitAuthority::reauthorize_canonical_transition}` |
 | Fixed domain machines | `zeno_fcis::domain` |
@@ -51,6 +53,9 @@ The [validated refinement guide](VALIDATED_REFINEMENT_AND_EXHAUSTIVE_COVERAGE.md
 documents the separation between untrusted mounted transport, strict artifact
 reconstruction, canonical domain manifests, and independently verified
 promotion evidence.
+The [authenticated authority guide](AUTHENTICATED_AUTHORITY_BOUNDARY.md)
+documents retained projector qualification, per-transition projection laws,
+strict plan reauthorization, and nominal authenticated publication.
 
 ## Stability
 
