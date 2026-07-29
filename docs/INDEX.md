@@ -10,8 +10,9 @@
 6. [Architecture](ARCHITECTURE.md)
 7. [LLM usage](LLM_USAGE.md)
 8. [RC1 release notes](RC1_RELEASE_NOTES.md)
-9. [Packaging](PACKAGING.md)
-10. [Release assurance](RELEASE_ASSURANCE.md)
+9. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
+10. [Packaging](PACKAGING.md)
+11. [Release assurance](RELEASE_ASSURANCE.md)
 
 ## Project definition and typed construction
 

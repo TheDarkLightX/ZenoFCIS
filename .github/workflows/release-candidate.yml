@@ -6,6 +6,8 @@ on:
     branches:
       - main
       - "agent/**"
+    tags:
+      - "v1.0.0-rc.*"
 
 permissions:
   contents: read
@@ -49,4 +51,4 @@ jobs:
           name: zeno-fcis-1.0.0-rc.1-${{ github.sha }}
           path: /tmp/zeno-fcis-rc1
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30

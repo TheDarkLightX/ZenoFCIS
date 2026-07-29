@@ -12,7 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_FILES = (
     Path("README.md"),
     Path("CHANGELOG.md"),
+    Path("CONTRIBUTING.md"),
+    Path("SECURITY.md"),
     Path("llms.txt"),
+    Path(".github/CODEOWNERS"),
+    Path(".github/workflows/release-candidate.yml"),
     Path("docs/INDEX.md"),
     Path("docs/INSTALLATION.md"),
     Path("docs/QUICKSTART.md"),
@@ -21,6 +25,7 @@ REQUIRED_FILES = (
     Path("docs/FEATURE_MATRIX.md"),
     Path("docs/LLM_USAGE.md"),
     Path("docs/RC1_RELEASE_NOTES.md"),
+    Path("docs/V1_RELEASE_CHECKLIST.md"),
     Path("docs/PACKAGING.md"),
     Path("docs/RELEASE_ASSURANCE.md"),
     Path("docs/AUTHENTICATED_AUTHORITY_BOUNDARY.md"),
@@ -40,6 +45,7 @@ VERSIONED_DOCS = (
     Path("docs/CRATE_MAP.md"),
     Path("docs/FEATURE_MATRIX.md"),
     Path("docs/RC1_RELEASE_NOTES.md"),
+    Path("docs/V1_RELEASE_CHECKLIST.md"),
     Path("docs/PACKAGING.md"),
 )
 REQUIRED_README_MARKERS = (
@@ -51,9 +57,22 @@ REQUIRED_README_MARKERS = (
     "docs/FEATURE_MATRIX.md",
     "docs/LLM_USAGE.md",
     "docs/RC1_RELEASE_NOTES.md",
+    "docs/V1_RELEASE_CHECKLIST.md",
     "docs/PACKAGING.md",
     "--example minimal_core",
     "--example checked_backend",
+)
+REQUIRED_CODEOWNER_MARKERS = (
+    "* @TheDarkLightX",
+    "/release/ @TheDarkLightX",
+    "/crates/ @TheDarkLightX",
+    "/docs/ @TheDarkLightX",
+)
+REQUIRED_RELEASE_WORKFLOW_MARKERS = (
+    '"v1.0.0-rc.*"',
+    "contents: read",
+    "python3 tools/rc1_package.py build",
+    "retention-days: 30",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
@@ -86,6 +105,23 @@ def check_readme_markers(failures: list[str]) -> None:
             failures.append(f"README.md: missing consumer marker {marker!r}")
 
 
+def check_release_markers(failures: list[str]) -> None:
+    codeowners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
+    for marker in REQUIRED_CODEOWNER_MARKERS:
+        if marker not in codeowners:
+            failures.append(f".github/CODEOWNERS: missing owner marker {marker!r}")
+
+    workflow = (ROOT / ".github/workflows/release-candidate.yml").read_text(
+        encoding="utf-8"
+    )
+    for marker in REQUIRED_RELEASE_WORKFLOW_MARKERS:
+        if marker not in workflow:
+            failures.append(
+                ".github/workflows/release-candidate.yml: "
+                f"missing release marker {marker!r}"
+            )
+
+
 def check_markdown_links(failures: list[str]) -> None:
     files = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
     for source in files:
@@ -104,6 +140,7 @@ def main() -> int:
     version = workspace_version()
     check_version_markers(version, failures)
     check_readme_markers(failures)
+    check_release_markers(failures)
     check_markdown_links(failures)
     if failures:
         for failure in failures:
