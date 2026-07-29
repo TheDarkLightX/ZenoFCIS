@@ -1,0 +1,16 @@
+{
+  "name": "zeno-fcis-development",
+  "version": "1.0.0-rc.2",
+  "private": true,
+  "description": "Pinned deterministic developer guardrails for ZenoFCIS",
+  "license": "MIT OR Apache-2.0",
+  "engines": {
+    "node": "22.23.1"
+  },
+  "scripts": {
+    "guardrails": "python3 tools/check_probity.py"
+  },
+  "devDependencies": {
+    "@nizos/probity": "1.10.0"
+  }
+}

@@ -26,6 +26,13 @@ read-only and perform none of those owner actions.
 - Release packaging is version-neutral through `tools/rc_package.py`; the
   retained Rustdoc archive fixes regular-file and directory modes as well as
   timestamps and ownership, so builder umasks do not change archive digests.
+- The RC2 feature set is frozen in `V1_PRODUCT_CONTRACT.md`. Nine Gherkin
+  scenarios bind exactly to a closed executable ATDD registry covering the
+  first adopter journey, composition and authority, SQLite, and packaging.
+- Optional deterministic Probity guardrails pin Node `22.23.1` and Probity
+  `1.10.0`, reject hostile development and release commands, and require the
+  complete ATDD portfolio immediately before a coding-agent commit. The
+  AI-judged TDD rule is deliberately disabled.
 
 ## Complete candidate surface
 
@@ -49,6 +56,8 @@ code-generation fixture. The public family includes:
 - checked examples, human and LLM documentation, complete public Rustdoc,
   `.crate`, source, Rustdoc, and Linux diagnostic-binary archives, SHA-256
   manifests, a CycloneDX SBOM, and provenance inputs.
+- a product-level feature freeze, BDD requirements, executable ATDD evidence,
+  and optional pre-action developer guardrails.
 
 ## Supported core claim
 

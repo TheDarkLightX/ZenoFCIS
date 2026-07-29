@@ -15,6 +15,8 @@ Cargo workspace version: 1.0.0-rc.2
 package-set version:      1.0.0-rc.2
 Git tag:                  v1.0.0-rc.2
 Rust toolchain:           1.97.1
+Node developer tooling:  22.23.1
+Probity developer tool:  1.10.0
 package count:            33 public crates
 ```
 
@@ -49,6 +51,11 @@ Run from a clean checkout of the recorded commit:
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
 python3 tools/check_library_docs.py
+python3 tools/atdd.py self-test
+python3 tools/atdd.py check
+npm ci --ignore-scripts
+NODE_BIN=<exact-node-22.23.1> python3 tools/check_probity.py
+npm audit --audit-level=high
 python3 tools/rc_package.py self-test
 python3 tools/rc_package.py check
 cargo +1.97.1 fmt --all -- --check
@@ -58,11 +65,14 @@ cargo +1.97.1 test --workspace --doc --all-features --locked
 RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
 cargo +1.97.1 deny check
 cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings
+python3 tools/atdd.py run --all
 python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
 (cd /tmp/zeno-fcis-rc2 && sha256sum --check SHA256SUMS)
 ```
 
 - [ ] Every permanent read-only workflow passed at the exact commit.
+- [ ] The adopter-acceptance and deterministic developer-guardrail workflows
+      passed at the exact commit.
 - [ ] The release-candidate workflow produced 33 `.crate` packages and the
       complete retained artifact set documented in `PACKAGING.md`.
 - [ ] The advisory exception for `RUSTSEC-2026-0173` still matches

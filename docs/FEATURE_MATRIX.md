@@ -101,6 +101,10 @@ code constant-time or eliminate physical side/covert channels.
 select explicit features to keep their dependency, trusted-computing, and API
 surface small.
 
+The repository's BDD/ATDD and Probity configuration are development and
+acceptance tooling, not Cargo features. They do not enter any crate dependency
+graph or production authority.
+
 ## Common selections
 
 ```toml

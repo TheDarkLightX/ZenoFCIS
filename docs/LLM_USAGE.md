@@ -14,6 +14,8 @@ Use this order:
 4. The boundary document for the crate being changed
 5. Public APIs in the exact source revision
 6. Tests and permanent read-only workflows for that boundary
+7. [V1 product contract](V1_PRODUCT_CONTRACT.md) and the matching
+   [BDD/ATDD scenarios](ACCEPTANCE_TESTING.md) for adopter-visible behavior
 
 Treat `README.md`, this guide, and generated architecture files as navigation.
 Source, canonical protocol values, and independently checked evidence remain
@@ -34,6 +36,10 @@ human-reviewed ProjectProfile and ProjectCatalog
 
 An LLM may help write implementations at each step. It may not skip a step by
 constructing a lower-level artifact directly.
+
+When Probity is installed, follow the deterministic repository configuration.
+Run `python3 tools/atdd.py run --all` immediately before committing. Probity is
+a workflow guardrail and supplies no proof or production authority.
 
 ## What a model may propose
 

@@ -16,6 +16,9 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/CRATE_MAP.md: crate roles and trust boundaries
 - docs/FEATURE_MATRIX.md: umbrella features and environments
 - docs/LLM_USAGE.md: authority rules for model-assisted work
+- docs/V1_PRODUCT_CONTRACT.md: frozen RC2 features and supported adopter journeys
+- docs/ACCEPTANCE_TESTING.md: BDD scenarios and closed executable ATDD registry
+- docs/DEVELOPER_GUARDRAILS.md: optional deterministic Probity rules and setup
 - docs/ARCHITECTURE.md: dependency rings
 - docs/RC2_RELEASE_NOTES.md: current candidate surface and final-release blockers
 - docs/RC1_RELEASE_NOTES.md: historical first-candidate notes
@@ -99,11 +102,14 @@ sequential result.
 ## Validation commands
 
 python3 tools/check_assurance.py --self-test
+python3 tools/atdd.py self-test
+python3 tools/atdd.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
 cargo +1.97.1 test --workspace --doc --all-features --locked
 RUSTDOCFLAGS="-D warnings" cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+python3 tools/atdd.py run --all
 
 Do not report exact-head green unless permanent read-only workflows passed at
 that exact commit.
