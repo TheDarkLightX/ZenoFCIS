@@ -25,9 +25,9 @@ use zeno_fcis_schema::SchemaAdmittedEnvelope;
 use zeno_fcis_shell::CommitStatus;
 use zeno_fcis_value::Value;
 
-const SQLITE_SCHEMA_VERSION: i64 = 2;
+const SQLITE_SCHEMA_VERSION: i64 = 3;
 
-const SCHEMA_V2: &str = "
+const SCHEMA_V3: &str = "
 PRAGMA foreign_keys = ON;
 PRAGMA synchronous = FULL;
 CREATE TABLE shell_identity (
@@ -78,11 +78,11 @@ CREATE TABLE outbox (
     payload_bytes BLOB NOT NULL,
     entry_hash BLOB NOT NULL CHECK (length(entry_hash) = 32),
     acknowledged INTEGER NOT NULL DEFAULT 0 CHECK (acknowledged IN (0, 1)),
-    UNIQUE(authorization_id, ordinal),
+    UNIQUE(candidate_id, ordinal),
     FOREIGN KEY(authorization_id) REFERENCES authorizations(authorization_id),
     FOREIGN KEY(candidate_id) REFERENCES bundles(candidate_id)
 );
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 ";
 
 type SqliteMarker<P, L, I> = PhantomData<fn() -> (P, L, I)>;
@@ -638,7 +638,7 @@ where
         Ok(CommitStatus::Committed)
     }
 
-    /// Returns the first pending outbox record in authorization/ordinal order.
+    /// Returns the first pending outbox record in candidate/ordinal order.
     pub fn next_pending(&self) -> Result<Option<PendingDelivery>, SqliteShellError> {
         validate_shell_identity(
             &self.connection,
@@ -649,7 +649,7 @@ where
         let row = self
             .connection
             .query_row(
-                "SELECT delivery_id, entry_hash, authorization_id, candidate_id, ordinal, channel, destination_bytes, payload_bytes FROM outbox WHERE acknowledged = 0 ORDER BY authorization_id, ordinal LIMIT 1",
+                "SELECT delivery_id, entry_hash, authorization_id, candidate_id, ordinal, channel, destination_bytes, payload_bytes FROM outbox WHERE acknowledged = 0 ORDER BY candidate_id, ordinal LIMIT 1",
                 [],
                 |row| {
                     Ok((
@@ -701,7 +701,7 @@ where
         if hash_outbox_entry(&pending.entry)? != pending.entry_hash
             || pending
                 .entry
-                .delivery_id::<RustCryptoSha256>(pending.authorization_id)
+                .delivery_id::<RustCryptoSha256>(pending.candidate_id.hash())
                 .map_err(SqliteShellError::Encode)?
                 != pending.delivery_id
         {
@@ -785,7 +785,7 @@ fn initialize_schema(connection: &Connection) -> Result<(), SqliteShellError> {
         .map_err(SqliteShellError::Sqlite)?;
     match version {
         0 if existing_tables == 0 => connection
-            .execute_batch(SCHEMA_V2)
+            .execute_batch(SCHEMA_V3)
             .map_err(SqliteShellError::Sqlite),
         0 => Err(SqliteShellError::LegacySchema),
         SQLITE_SCHEMA_VERSION if existing_tables == 6 => connection
@@ -876,7 +876,7 @@ fn insert_outbox(
     entry: &OutboxEntry,
 ) -> Result<(), SqliteShellError> {
     let delivery_id = entry
-        .delivery_id::<RustCryptoSha256>(authorization_id)
+        .delivery_id::<RustCryptoSha256>(candidate.hash())
         .map_err(SqliteShellError::Encode)?;
     let entry_hash = hash_outbox_entry(entry)?;
     let destination = entry
@@ -1470,6 +1470,11 @@ mod tests {
             expected_authorization.bundle(),
         )
         .unwrap_or_else(|error| panic!("reference commit: {error}"));
+        let expected_pending = expected
+            .state()
+            .next_pending()
+            .unwrap_or_else(|| panic!("reference pending delivery"));
+        let authorization_id = expected_authorization.authorization_id().hash();
         let mut database = shell(&authority, &initial);
         assert_eq!(
             database
@@ -1484,6 +1489,31 @@ mod tests {
         assert_eq!(snapshot.root(), expected.state().root());
         assert_eq!(snapshot.bundle_count(), 1);
         assert_eq!(snapshot.pending_outbox(), 1);
+        let actual_pending = database
+            .next_pending()
+            .unwrap_or_else(|error| panic!("database pending: {error}"))
+            .unwrap_or_else(|| panic!("database pending delivery"));
+        assert_eq!(
+            actual_pending.candidate_id(),
+            expected_pending.candidate_id()
+        );
+        assert_eq!(actual_pending.entry(), expected_pending.entry());
+        assert_eq!(actual_pending.entry_hash(), expected_pending.entry_hash());
+        assert_eq!(actual_pending.delivery_id(), expected_pending.delivery_id());
+        assert_eq!(
+            actual_pending.delivery_id(),
+            actual_pending
+                .entry()
+                .delivery_id::<RustCryptoSha256>(actual_pending.candidate_id().hash())
+                .unwrap_or_else(|error| panic!("candidate delivery identity: {error}"))
+        );
+        assert_ne!(
+            actual_pending.delivery_id(),
+            actual_pending
+                .entry()
+                .delivery_id::<RustCryptoSha256>(authorization_id)
+                .unwrap_or_else(|error| panic!("authorization substitution: {error}"))
+        );
         assert_eq!(
             database
                 .commit(authorized(&authority, &catalog, 9))
@@ -1656,6 +1686,27 @@ mod tests {
                 authority.bind_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::LegacySchema)
+        ));
+    }
+
+    #[test]
+    fn schema_v2_requires_explicit_delivery_identity_migration() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let initial = initial_state(&catalog);
+        let connection =
+            Connection::open_in_memory().unwrap_or_else(|error| panic!("v2 connection: {error}"));
+        connection
+            .pragma_update(None, "user_version", 2)
+            .unwrap_or_else(|error| panic!("v2 schema version: {error}"));
+        assert!(matches!(
+            SqliteShell::<SqliteProgram, SqliteLawEngine, MemoryDestination>::from_connection(
+                connection,
+                &authority,
+                &initial,
+                authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::UnsupportedSchemaVersion(2))
         ));
     }
 }
