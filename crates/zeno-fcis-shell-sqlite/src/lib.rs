@@ -9,8 +9,8 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use zeno_fcis_authority::{
-    AuthorizedShellError, BoundInterpreter, CatalogAuthorizedTransition, CatalogCommitAuthority,
-    CatalogTransitionProgram,
+    AuthorizedShellError, BoundInterpreter, CatalogAuthorizedGenesis, CatalogAuthorizedTransition,
+    CatalogCommitAuthority, CatalogTransitionProgram, GenesisId,
 };
 use zeno_fcis_codec::{
     CanonicalEncode, DecodeError, DecodeLimits, Domain, EncodeError, Hash32, commitment,
@@ -21,13 +21,13 @@ use zeno_fcis_laws::ProjectLawEngine;
 use zeno_fcis_patch::{PatchError, hash_value};
 use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_receipt::{CandidateId, SealError};
-use zeno_fcis_schema::SchemaAdmittedEnvelope;
+use zeno_fcis_schema::{SchemaAdmittedEnvelope, ValidationLimits};
 use zeno_fcis_shell::CommitStatus;
 use zeno_fcis_value::Value;
 
-const SQLITE_SCHEMA_VERSION: i64 = 3;
+const SQLITE_SCHEMA_VERSION: i64 = 4;
 
-const SCHEMA_V3: &str = "
+const SCHEMA_V4: &str = "
 PRAGMA foreign_keys = ON;
 PRAGMA synchronous = FULL;
 CREATE TABLE shell_identity (
@@ -35,6 +35,17 @@ CREATE TABLE shell_identity (
     policy_id BLOB NOT NULL CHECK (length(policy_id) = 32),
     state_domain_name TEXT NOT NULL,
     state_domain_version INTEGER NOT NULL CHECK (state_domain_version >= 0)
+);
+CREATE TABLE genesis (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    genesis_id BLOB NOT NULL UNIQUE CHECK (length(genesis_id) = 32),
+    policy_id BLOB NOT NULL CHECK (length(policy_id) = 32),
+    genesis_binding_hash BLOB NOT NULL CHECK (length(genesis_binding_hash) = 32),
+    initial_root BLOB NOT NULL CHECK (length(initial_root) = 32),
+    law_set_hash BLOB NOT NULL CHECK (length(law_set_hash) = 32),
+    law_evaluation_hash BLOB NOT NULL CHECK (length(law_evaluation_hash) = 32),
+    initial_state_bytes BLOB NOT NULL,
+    authorization_bytes BLOB NOT NULL
 );
 CREATE TABLE IF NOT EXISTS semantic_state (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -82,7 +93,7 @@ CREATE TABLE outbox (
     FOREIGN KEY(authorization_id) REFERENCES authorizations(authorization_id),
     FOREIGN KEY(candidate_id) REFERENCES bundles(candidate_id)
 );
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 ";
 
 type SqliteMarker<P, L, I> = PhantomData<fn() -> (P, L, I)>;
@@ -265,6 +276,7 @@ where
 {
     connection: Connection,
     policy_id: Hash32,
+    genesis_id: GenesisId,
     state_domain_name: String,
     state_domain_version: u16,
     interpreter: I,
@@ -276,136 +288,157 @@ where
     P: CatalogTransitionProgram<RustCryptoSha256>,
     L: ProjectLawEngine,
 {
-    /// Opens or initializes a file-backed shell.
-    pub fn open(
+    /// Creates a new file-backed shell from one nominal genesis authorization.
+    pub fn create(
         path: impl AsRef<Path>,
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
-        initial_state: &SchemaAdmittedEnvelope,
+        genesis: CatalogAuthorizedGenesis<RustCryptoSha256, P, L, I>,
         interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open(path).map_err(SqliteShellError::Sqlite)?;
-        Self::from_connection(connection, authority, initial_state, interpreter)
+        Self::from_new_connection(connection, authority, genesis, interpreter)
     }
 
-    /// Opens an in-memory shell for deterministic refinement and fault tests.
-    pub fn open_in_memory(
+    /// Creates a new in-memory shell for deterministic refinement and fault tests.
+    pub fn create_in_memory(
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
-        initial_state: &SchemaAdmittedEnvelope,
+        genesis: CatalogAuthorizedGenesis<RustCryptoSha256, P, L, I>,
         interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
         let connection = Connection::open_in_memory().map_err(SqliteShellError::Sqlite)?;
-        Self::from_connection(connection, authority, initial_state, interpreter)
+        Self::from_new_connection(connection, authority, genesis, interpreter)
     }
 
-    fn from_connection(
-        connection: Connection,
+    /// Reopens an existing file-backed shell without accepting replacement genesis state.
+    pub fn open_existing(
+        path: impl AsRef<Path>,
         authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
-        initial_state: &SchemaAdmittedEnvelope,
         interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
     ) -> Result<Self, SqliteShellError> {
-        zeno_fcis_authority::AuthorizedShellState::new(authority, initial_state)
-            .map_err(SqliteShellError::Authority)?;
-        initialize_schema(&connection)?;
+        let connection = Connection::open(path).map_err(SqliteShellError::Sqlite)?;
+        Self::from_existing_connection(connection, authority, interpreter)
+    }
+
+    fn from_new_connection(
+        connection: Connection,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
+        genesis: CatalogAuthorizedGenesis<RustCryptoSha256, P, L, I>,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
+    ) -> Result<Self, SqliteShellError> {
+        initialize_schema_for_create(&connection)?;
         let policy = authority.policy();
         let (interpreter_policy, interpreter) = interpreter.into_parts();
         if interpreter_policy != policy.policy_id() {
             return Err(SqliteShellError::PolicyMismatch);
         }
+        let genesis_id = genesis.genesis_id();
+        let genesis_bytes = genesis
+            .canonical_bytes()
+            .map_err(SqliteShellError::Encode)?;
+        let body = genesis.body().clone();
+        let initial_state = genesis.initial_state().value().value().clone();
+        let initial_state_bytes = initial_state
+            .canonical_bytes()
+            .map_err(SqliteShellError::Encode)?;
+        zeno_fcis_authority::AuthorizedShellState::new(authority, genesis)
+            .map_err(SqliteShellError::Authority)?;
         let state_domain_name = policy.state_domain().name().to_owned();
         let state_domain_version = policy.state_domain().version();
         let mut shell = Self {
             connection,
             policy_id: policy.policy_id(),
+            genesis_id,
             state_domain_name,
             state_domain_version,
             interpreter,
             marker: PhantomData,
         };
-        shell.initialize_or_validate(initial_state.value().value())?;
+        shell.initialize_new(&body, &initial_state_bytes, &genesis_bytes)?;
         Ok(shell)
     }
 
-    fn initialize_or_validate(&mut self, initial_state: &Value) -> Result<(), SqliteShellError> {
-        let domain = Domain::new(&self.state_domain_name, self.state_domain_version)
-            .map_err(SqliteShellError::Encode)?;
-        let expected_root = hash_value::<RustCryptoSha256>(domain, initial_state)
-            .map_err(SqliteShellError::Patch)?;
-        let initial_bytes = initial_state
-            .canonical_bytes()
-            .map_err(SqliteShellError::Encode)?;
+    fn from_existing_connection(
+        connection: Connection,
+        authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
+        interpreter: BoundInterpreter<RustCryptoSha256, P, L, I>,
+    ) -> Result<Self, SqliteShellError> {
+        validate_existing_schema(&connection)?;
+        let policy = authority.policy();
+        let (interpreter_policy, interpreter) = interpreter.into_parts();
+        if interpreter_policy != policy.policy_id() {
+            return Err(SqliteShellError::PolicyMismatch);
+        }
+        validate_shell_identity(
+            &connection,
+            policy.policy_id(),
+            policy.state_domain().name(),
+            policy.state_domain().version(),
+        )?;
+        let genesis_id = validate_persisted_genesis(&connection, authority)?;
+        let shell = Self {
+            connection,
+            policy_id: policy.policy_id(),
+            genesis_id,
+            state_domain_name: policy.state_domain().name().to_owned(),
+            state_domain_version: policy.state_domain().version(),
+            interpreter,
+            marker: PhantomData,
+        };
+        shell.snapshot()?;
+        Ok(shell)
+    }
+
+    fn initialize_new(
+        &mut self,
+        body: &zeno_fcis_authority::GenesisAuthorizationBody,
+        initial_state_bytes: &[u8],
+        genesis_bytes: &[u8],
+    ) -> Result<(), SqliteShellError> {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(SqliteShellError::Sqlite)?;
-        let identity = transaction
+        let existing: i64 = transaction
             .query_row(
-                "SELECT policy_id, state_domain_name, state_domain_version FROM shell_identity WHERE singleton = 1",
+                "SELECT (SELECT COUNT(*) FROM shell_identity) + (SELECT COUNT(*) FROM genesis) + (SELECT COUNT(*) FROM semantic_state)",
                 [],
-                |row| {
-                    Ok((
-                        row.get::<_, Vec<u8>>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, i64>(2)?,
-                    ))
-                },
+                |row| row.get(0),
             )
-            .optional()
             .map_err(SqliteShellError::Sqlite)?;
-        match identity {
-            None => {
-                transaction
-                    .execute(
-                        "INSERT INTO shell_identity(singleton, policy_id, state_domain_name, state_domain_version) VALUES (1, ?1, ?2, ?3)",
-                        params![
-                            self.policy_id.as_bytes().as_slice(),
-                            self.state_domain_name.as_str(),
-                            i64::from(self.state_domain_version),
-                        ],
-                    )
-                    .map_err(SqliteShellError::Sqlite)?;
-            }
-            Some((policy, domain_name, domain_version)) => {
-                if parse_hash(&policy)? != self.policy_id
-                    || domain_name != self.state_domain_name
-                    || nonnegative_u32(domain_version)? != u32::from(self.state_domain_version)
-                {
-                    return Err(SqliteShellError::PolicyMismatch);
-                }
-            }
+        if existing != 0 {
+            return Err(SqliteShellError::AlreadyInitialized);
         }
-        let existing = transaction
-            .query_row(
-                "SELECT state_bytes, semantic_root, version FROM semantic_state WHERE singleton = 1",
-                [],
-                |row| {
-                    Ok((
-                        row.get::<_, Vec<u8>>(0)?,
-                        row.get::<_, Vec<u8>>(1)?,
-                        row.get::<_, i64>(2)?,
-                    ))
-                },
+        transaction
+            .execute(
+                "INSERT INTO shell_identity(singleton, policy_id, state_domain_name, state_domain_version) VALUES (1, ?1, ?2, ?3)",
+                params![
+                    self.policy_id.as_bytes().as_slice(),
+                    self.state_domain_name.as_str(),
+                    i64::from(self.state_domain_version),
+                ],
             )
-            .optional()
             .map_err(SqliteShellError::Sqlite)?;
-        match existing {
-            None => {
-                transaction
-                    .execute(
-                        "INSERT INTO semantic_state(singleton, state_bytes, semantic_root, version) VALUES (1, ?1, ?2, 0)",
-                        params![initial_bytes, expected_root.as_bytes().as_slice()],
-                    )
-                    .map_err(SqliteShellError::Sqlite)?;
-            }
-            Some((state_bytes, root_bytes, version)) => {
-                let state = decode_canonical_value(&state_bytes)?;
-                let actual_root = hash_value::<RustCryptoSha256>(domain, &state)
-                    .map_err(SqliteShellError::Patch)?;
-                let stored_root = parse_hash(&root_bytes)?;
-                if actual_root != stored_root || version < 0 {
-                    return Err(SqliteShellError::CorruptState);
-                }
-            }
-        }
+        transaction
+            .execute(
+                "INSERT INTO genesis(singleton, genesis_id, policy_id, genesis_binding_hash, initial_root, law_set_hash, law_evaluation_hash, initial_state_bytes, authorization_bytes) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    self.genesis_id.hash().as_bytes().as_slice(),
+                    self.policy_id.as_bytes().as_slice(),
+                    body.genesis_binding_hash().as_bytes().as_slice(),
+                    body.initial_root().as_bytes().as_slice(),
+                    body.law_set_hash().as_bytes().as_slice(),
+                    body.law_evaluation_hash().as_bytes().as_slice(),
+                    initial_state_bytes,
+                    genesis_bytes,
+                ],
+            )
+            .map_err(SqliteShellError::Sqlite)?;
+        transaction
+            .execute(
+                "INSERT INTO semantic_state(singleton, state_bytes, semantic_root, version) VALUES (1, ?1, ?2, 0)",
+                params![initial_state_bytes, body.initial_root().as_bytes().as_slice()],
+            )
+            .map_err(SqliteShellError::Sqlite)?;
         transaction.commit().map_err(SqliteShellError::Sqlite)
     }
 
@@ -453,6 +486,12 @@ where
     #[must_use]
     pub const fn interpreter(&self) -> &I {
         &self.interpreter
+    }
+
+    /// Returns the content-addressed genesis authorization persisted by this shell.
+    #[must_use]
+    pub const fn genesis_id(&self) -> GenesisId {
+        self.genesis_id
     }
 
     /// Atomically publishes one exact nominally authorized transition.
@@ -772,28 +811,143 @@ where
     }
 }
 
-fn initialize_schema(connection: &Connection) -> Result<(), SqliteShellError> {
+fn schema_version_and_table_count(connection: &Connection) -> Result<(i64, i64), SqliteShellError> {
     let version = connection
         .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
         .map_err(SqliteShellError::Sqlite)?;
     let existing_tables = connection
         .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('shell_identity', 'semantic_state', 'authorizations', 'bundles', 'replay', 'outbox')",
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('shell_identity', 'genesis', 'semantic_state', 'authorizations', 'bundles', 'replay', 'outbox')",
             [],
             |row| row.get::<_, i64>(0),
         )
         .map_err(SqliteShellError::Sqlite)?;
+    Ok((version, existing_tables))
+}
+
+fn initialize_schema_for_create(connection: &Connection) -> Result<(), SqliteShellError> {
+    let (version, existing_tables) = schema_version_and_table_count(connection)?;
     match version {
         0 if existing_tables == 0 => connection
-            .execute_batch(SCHEMA_V3)
+            .execute_batch(SCHEMA_V4)
             .map_err(SqliteShellError::Sqlite),
         0 => Err(SqliteShellError::LegacySchema),
-        SQLITE_SCHEMA_VERSION if existing_tables == 6 => connection
+        SQLITE_SCHEMA_VERSION if existing_tables == 7 => connection
             .execute_batch("PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;")
             .map_err(SqliteShellError::Sqlite),
         SQLITE_SCHEMA_VERSION => Err(SqliteShellError::CorruptSchema),
         other => Err(SqliteShellError::UnsupportedSchemaVersion(other)),
     }
+}
+
+fn validate_existing_schema(connection: &Connection) -> Result<(), SqliteShellError> {
+    let (version, existing_tables) = schema_version_and_table_count(connection)?;
+    match version {
+        0 if existing_tables == 0 => Err(SqliteShellError::UninitializedStore),
+        0 => Err(SqliteShellError::LegacySchema),
+        SQLITE_SCHEMA_VERSION if existing_tables == 7 => connection
+            .execute_batch("PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;")
+            .map_err(SqliteShellError::Sqlite),
+        SQLITE_SCHEMA_VERSION => Err(SqliteShellError::CorruptSchema),
+        other => Err(SqliteShellError::UnsupportedSchemaVersion(other)),
+    }
+}
+
+fn validate_persisted_genesis<P, L, I>(
+    connection: &Connection,
+    authority: &CatalogCommitAuthority<RustCryptoSha256, P, L, I>,
+) -> Result<GenesisId, SqliteShellError>
+where
+    P: CatalogTransitionProgram<RustCryptoSha256>,
+    L: ProjectLawEngine,
+{
+    type GenesisRow = (
+        Vec<u8>,
+        Vec<u8>,
+        Vec<u8>,
+        Vec<u8>,
+        Vec<u8>,
+        Vec<u8>,
+        Vec<u8>,
+        Vec<u8>,
+    );
+    let row = connection
+        .query_row(
+            "SELECT genesis_id, policy_id, genesis_binding_hash, initial_root, law_set_hash, law_evaluation_hash, initial_state_bytes, authorization_bytes FROM genesis WHERE singleton = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(SqliteShellError::Sqlite)?;
+    let Some((
+        stored_id,
+        stored_policy,
+        stored_binding,
+        stored_root,
+        stored_law_set,
+        stored_evaluation,
+        initial_state_bytes,
+        stored_authorization,
+    )): Option<GenesisRow> = row
+    else {
+        return Err(SqliteShellError::CorruptGenesis);
+    };
+    let value = decode_canonical_value(&initial_state_bytes)
+        .map_err(|_| SqliteShellError::CorruptGenesis)?;
+    let envelope = SchemaAdmittedEnvelope::try_new::<RustCryptoSha256>(
+        authority.policy().catalog().schema(),
+        value,
+        ValidationLimits::default(),
+    )
+    .map_err(|_| SqliteShellError::CorruptGenesis)?;
+    let expected = authority
+        .authorize_genesis(envelope)
+        .map_err(|_| SqliteShellError::CorruptGenesis)?;
+    let expected_bytes = expected
+        .canonical_bytes()
+        .map_err(SqliteShellError::Encode)?;
+    let body = expected.body();
+    if parse_hash(&stored_id)? != expected.genesis_id().hash()
+        || parse_hash(&stored_policy)? != body.policy_id()
+        || parse_hash(&stored_binding)? != body.genesis_binding_hash()
+        || parse_hash(&stored_root)? != body.initial_root()
+        || parse_hash(&stored_law_set)? != body.law_set_hash()
+        || parse_hash(&stored_evaluation)? != body.law_evaluation_hash()
+        || stored_authorization != expected_bytes
+    {
+        return Err(SqliteShellError::CorruptGenesis);
+    }
+    let (current_state, current_root, current_version) = connection
+        .query_row(
+            "SELECT state_bytes, semantic_root, version FROM semantic_state WHERE singleton = 1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, Vec<u8>>(0)?,
+                    row.get::<_, Vec<u8>>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            },
+        )
+        .map_err(SqliteShellError::Sqlite)?;
+    if nonnegative_u64(current_version)? == 0
+        && (current_state != initial_state_bytes
+            || parse_hash(&current_root)? != body.initial_root())
+    {
+        return Err(SqliteShellError::CorruptGenesis);
+    }
+    Ok(expected.genesis_id())
 }
 
 fn validate_shell_identity(
@@ -994,6 +1148,10 @@ pub enum SqliteShellError {
     Authority(AuthorizedShellError),
     /// A legacy unversioned schema requires an explicit reviewed migration.
     LegacySchema,
+    /// Creation was attempted over an already initialized authority store.
+    AlreadyInitialized,
+    /// Reopen was attempted on an empty database with no authorized genesis.
+    UninitializedStore,
     /// The database schema version is not supported by this adapter.
     UnsupportedSchemaVersion(i64),
     /// The declared schema version is missing required tables.
@@ -1008,6 +1166,8 @@ pub enum SqliteShellError {
     VersionOverflow,
     /// Stored semantic state or root is inconsistent.
     CorruptState,
+    /// Stored genesis authority cannot be reconstructed under the supplied policy.
+    CorruptGenesis,
     /// Stored outbox content or binding is inconsistent.
     CorruptOutbox,
     /// Candidate expected a different current root.
@@ -1050,6 +1210,10 @@ impl fmt::Display for SqliteShellError {
             Self::LegacySchema => formatter.write_str(
                 "legacy unversioned SQLite schema requires an explicit reviewed migration",
             ),
+            Self::AlreadyInitialized => formatter.write_str("SQLite shell is already initialized"),
+            Self::UninitializedStore => {
+                formatter.write_str("SQLite shell has no authorized genesis")
+            }
             Self::UnsupportedSchemaVersion(version) => {
                 write!(formatter, "unsupported SQLite schema version {version}")
             }
@@ -1061,6 +1225,9 @@ impl fmt::Display for SqliteShellError {
             Self::IntegerRange => formatter.write_str("stored integer is out of range"),
             Self::VersionOverflow => formatter.write_str("database version overflow"),
             Self::CorruptState => formatter.write_str("stored semantic state is inconsistent"),
+            Self::CorruptGenesis => {
+                formatter.write_str("stored genesis authorization is inconsistent")
+            }
             Self::CorruptOutbox => formatter.write_str("stored outbox row is inconsistent"),
             Self::RootConflict { expected, actual } => {
                 write!(formatter, "expected root {expected}, current root {actual}")
@@ -1085,16 +1252,18 @@ impl std::error::Error for SqliteShellError {}
 mod tests {
     use super::*;
     use zeno_fcis_authority::{
-        CatalogAuthorizationDecision, ExecutionBinding, ReviewedTransitionInput, StateDomainBinding,
+        CatalogAuthorizationDecision, ExecutionBinding, GenesisPolicyBinding,
+        ReviewedTransitionInput, StateDomainBinding,
     };
     use zeno_fcis_catalog::{CatalogLimits, CatalogManifest, ChannelDefinition, ProjectCatalog};
     use zeno_fcis_core::{BudgetUsed, Decision, DecisionKind};
     use zeno_fcis_crypto::verify_approved_provider;
     use zeno_fcis_evidence::EvidenceEnvelope;
     use zeno_fcis_laws::{
-        DecisionScope, LawCheckInput, LawDefinition, LawEvidenceRequirement, LawEvidenceVerifier,
-        LawFamilyPolicy, LawKind, LawLimits, LawObservation, LawProofDecision, LawProofSubject,
-        LawStatus, VerifiedProjectLaws, verify_project_laws,
+        DecisionScope, GenesisApplicability, GenesisLawCheckInput, LawCheckInput, LawDefinition,
+        LawEvidenceRequirement, LawEvidenceVerifier, LawFamilyPolicy, LawKind, LawLimits,
+        LawObservation, LawProofDecision, LawProofSubject, LawStatus, VerifiedProjectLaws,
+        verify_project_laws,
     };
     use zeno_fcis_patch::ValuePath;
     use zeno_fcis_project::{
@@ -1159,6 +1328,7 @@ mod tests {
                 name("state-invariant"),
                 LawKind::StateInvariant,
                 DecisionScope::Committing,
+                GenesisApplicability::Required,
                 hash(101),
                 hash(111),
                 LawEvidenceRequirement::RuntimeOnly,
@@ -1169,6 +1339,9 @@ mod tests {
                 name("reject-no-authority"),
                 LawKind::RejectNoAuthority,
                 DecisionScope::Reject,
+                GenesisApplicability::NotApplicable {
+                    rationale_hash: hash(121),
+                },
                 hash(102),
                 hash(112),
                 LawEvidenceRequirement::RuntimeOnly,
@@ -1179,6 +1352,9 @@ mod tests {
                 name("committed-failure-effects"),
                 LawKind::CommittedFailureEffects,
                 DecisionScope::CommittedFailure,
+                GenesisApplicability::NotApplicable {
+                    rationale_hash: hash(122),
+                },
                 hash(103),
                 hash(113),
                 LawEvidenceRequirement::RuntimeOnly,
@@ -1271,6 +1447,17 @@ mod tests {
     struct SqliteLawEngine;
 
     impl ProjectLawEngine for SqliteLawEngine {
+        fn evaluate_genesis(
+            &self,
+            _: &GenesisLawCheckInput<'_>,
+            _: LawLimits,
+        ) -> Result<Vec<LawObservation>, zeno_fcis_laws::LawEngineFailure> {
+            Ok(vec![
+                LawObservation::try_new(id(1_001), LawStatus::Satisfied, hash(91))
+                    .unwrap_or_else(|error| panic!("genesis law observation: {error}")),
+            ])
+        }
+
         fn evaluate(
             &self,
             input: &LawCheckInput<'_>,
@@ -1370,12 +1557,23 @@ mod tests {
     fn authority(catalog: &ProjectCatalog, deployment: u8) -> TestAuthority {
         let provider = verify_approved_provider::<RustCryptoSha256>()
             .unwrap_or_else(|error| panic!("provider: {error}"));
+        let state = initial_state(catalog);
+        let initial_root = hash_value::<RustCryptoSha256>(state_domain(), state.value().value())
+            .unwrap_or_else(|error| panic!("initial root: {error}"));
         CatalogCommitAuthority::try_new(
             catalog,
             StateDomainBinding::try_new("test/sqlite-state", 1)
                 .unwrap_or_else(|error| panic!("state domain: {error}")),
             ExecutionBinding::try_new(hash(50), hash(51), hash(52), hash(deployment), hash(54))
                 .unwrap_or_else(|error| panic!("execution: {error}")),
+            GenesisPolicyBinding::try_new(
+                initial_root,
+                hash(70),
+                hash(71),
+                hash(72),
+                hash(deployment),
+            )
+            .unwrap_or_else(|error| panic!("genesis policy: {error}")),
             limits(),
             &provider,
             verified_laws(catalog),
@@ -1444,13 +1642,26 @@ mod tests {
         }
     }
 
-    fn shell(authority: &TestAuthority, initial: &SchemaAdmittedEnvelope) -> TestShell {
-        SqliteShell::open_in_memory(
+    fn shell(authority: &TestAuthority, catalog: &ProjectCatalog) -> TestShell {
+        let genesis = authority
+            .authorize_genesis(initial_state(catalog))
+            .unwrap_or_else(|error| panic!("genesis: {error}"));
+        SqliteShell::create_in_memory(
             authority,
-            initial,
+            genesis,
             authority.bind_interpreter(MemoryDestination::default()),
         )
         .unwrap_or_else(|error| panic!("shell: {error}"))
+    }
+
+    fn reopen(database: TestShell, authority: &TestAuthority) -> TestShell {
+        let SqliteShell { connection, .. } = database;
+        TestShell::from_existing_connection(
+            connection,
+            authority,
+            authority.bind_interpreter(MemoryDestination::default()),
+        )
+        .unwrap_or_else(|error| panic!("reopen: {error}"))
     }
 
     #[test]
@@ -1475,7 +1686,7 @@ mod tests {
             .next_pending()
             .unwrap_or_else(|| panic!("reference pending delivery"));
         let authorization_id = expected_authorization.authorization_id().hash();
-        let mut database = shell(&authority, &initial);
+        let mut database = shell(&authority, &catalog);
         assert_eq!(
             database
                 .commit(authorized(&authority, &catalog, 9))
@@ -1526,7 +1737,6 @@ mod tests {
     fn every_precommit_crash_rolls_back_complete_set() {
         let catalog = catalog();
         let authority = authority(&catalog, 53);
-        let initial = initial_state(&catalog);
         for point in [
             CrashPoint::BeforeTransaction,
             CrashPoint::AfterValidation,
@@ -1535,7 +1745,7 @@ mod tests {
             CrashPoint::AfterOutboxWrite,
             CrashPoint::BeforeCommit,
         ] {
-            let mut database = shell(&authority, &initial);
+            let mut database = shell(&authority, &catalog);
             let before = database
                 .snapshot()
                 .unwrap_or_else(|error| panic!("before: {error}"));
@@ -1557,8 +1767,7 @@ mod tests {
     fn postcommit_crash_recovers_by_replay_and_pending_delivery() {
         let catalog = catalog();
         let authority = authority(&catalog, 53);
-        let initial = initial_state(&catalog);
-        let mut database = shell(&authority, &initial);
+        let mut database = shell(&authority, &catalog);
         assert!(matches!(
             database.commit_with_crash_point(
                 authorized(&authority, &catalog, 7),
@@ -1596,8 +1805,7 @@ mod tests {
     fn acknowledgement_binds_exact_entry_hash() {
         let catalog = catalog();
         let authority = authority(&catalog, 53);
-        let initial = initial_state(&catalog);
-        let mut database = shell(&authority, &initial);
+        let mut database = shell(&authority, &catalog);
         database
             .commit(authorized(&authority, &catalog, 6))
             .unwrap_or_else(|error| panic!("commit: {error}"));
@@ -1619,8 +1827,7 @@ mod tests {
         let catalog = catalog();
         let first_authority = authority(&catalog, 53);
         let other_authority = authority(&catalog, 55);
-        let initial = initial_state(&catalog);
-        let mut database = shell(&first_authority, &initial);
+        let mut database = shell(&first_authority, &catalog);
         assert!(matches!(
             database.commit(authorized(&other_authority, &catalog, 6)),
             Err(SqliteShellError::PolicyMismatch)
@@ -1632,11 +1839,13 @@ mod tests {
         let catalog = catalog();
         let first_authority = authority(&catalog, 53);
         let other_authority = authority(&catalog, 55);
-        let initial = initial_state(&catalog);
+        let genesis = first_authority
+            .authorize_genesis(initial_state(&catalog))
+            .unwrap_or_else(|error| panic!("genesis: {error}"));
         assert!(matches!(
-            SqliteShell::open_in_memory(
+            SqliteShell::create_in_memory(
                 &first_authority,
-                &initial,
+                genesis,
                 other_authority.bind_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::PolicyMismatch)
@@ -1647,8 +1856,7 @@ mod tests {
     fn persisted_policy_corruption_is_detected_before_read_or_commit() {
         let catalog = catalog();
         let authority = authority(&catalog, 53);
-        let initial = initial_state(&catalog);
-        let mut database = shell(&authority, &initial);
+        let mut database = shell(&authority, &catalog);
         database
             .connection
             .execute(
@@ -1667,10 +1875,146 @@ mod tests {
     }
 
     #[test]
+    fn reopen_revalidates_persisted_genesis_without_caller_state() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let mut database = shell(&authority, &catalog);
+        let expected_genesis = database.genesis_id();
+        database
+            .commit(authorized(&authority, &catalog, 6))
+            .unwrap_or_else(|error| panic!("commit before reopen: {error}"));
+        let expected_snapshot = database
+            .snapshot()
+            .unwrap_or_else(|error| panic!("snapshot: {error}"));
+
+        let reopened = reopen(database, &authority);
+
+        assert_eq!(reopened.genesis_id(), expected_genesis);
+        assert_eq!(
+            reopened
+                .snapshot()
+                .unwrap_or_else(|error| panic!("reopened snapshot: {error}")),
+            expected_snapshot
+        );
+    }
+
+    #[test]
+    fn reopen_rejects_version_zero_state_substitution() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let database = shell(&authority, &catalog);
+        let replacement = Value::U128(1);
+        let replacement_bytes = replacement
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("replacement bytes: {error}"));
+        let replacement_root = hash_value::<RustCryptoSha256>(state_domain(), &replacement)
+            .unwrap_or_else(|error| panic!("replacement root: {error}"));
+        database
+            .connection
+            .execute(
+                "UPDATE semantic_state SET state_bytes = ?1, semantic_root = ?2 WHERE singleton = 1",
+                params![replacement_bytes, replacement_root.as_bytes().as_slice()],
+            )
+            .unwrap_or_else(|error| panic!("substitute version-zero state: {error}"));
+        let SqliteShell { connection, .. } = database;
+
+        assert!(matches!(
+            TestShell::from_existing_connection(
+                connection,
+                &authority,
+                authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::CorruptGenesis)
+        ));
+    }
+
+    #[test]
+    fn reopen_rejects_tampered_genesis_authorization() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let database = shell(&authority, &catalog);
+        database
+            .connection
+            .execute(
+                "UPDATE genesis SET authorization_bytes = ?1 WHERE singleton = 1",
+                [vec![0_u8]],
+            )
+            .unwrap_or_else(|error| panic!("tamper genesis: {error}"));
+        let SqliteShell { connection, .. } = database;
+
+        assert!(matches!(
+            TestShell::from_existing_connection(
+                connection,
+                &authority,
+                authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::CorruptGenesis)
+        ));
+    }
+
+    #[test]
+    fn authorized_genesis_cannot_initialize_an_existing_store_twice() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let database = shell(&authority, &catalog);
+        let SqliteShell { connection, .. } = database;
+        let genesis = authority
+            .authorize_genesis(initial_state(&catalog))
+            .unwrap_or_else(|error| panic!("genesis: {error}"));
+
+        assert!(matches!(
+            TestShell::from_new_connection(
+                connection,
+                &authority,
+                genesis,
+                authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::AlreadyInitialized)
+        ));
+    }
+
+    #[test]
+    fn reopen_rejects_a_different_deployment_policy() {
+        let catalog = catalog();
+        let first_authority = authority(&catalog, 53);
+        let other_authority = authority(&catalog, 55);
+        let database = shell(&first_authority, &catalog);
+        let SqliteShell { connection, .. } = database;
+
+        assert!(matches!(
+            TestShell::from_existing_connection(
+                connection,
+                &other_authority,
+                other_authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::PolicyMismatch)
+        ));
+    }
+
+    #[test]
+    fn reopen_rejects_an_uninitialized_store() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let connection = Connection::open_in_memory()
+            .unwrap_or_else(|error| panic!("uninitialized connection: {error}"));
+
+        assert!(matches!(
+            TestShell::from_existing_connection(
+                connection,
+                &authority,
+                authority.bind_interpreter(MemoryDestination::default()),
+            ),
+            Err(SqliteShellError::UninitializedStore)
+        ));
+    }
+
+    #[test]
     fn legacy_unversioned_database_fails_closed() {
         let catalog = catalog();
         let authority = authority(&catalog, 53);
-        let initial = initial_state(&catalog);
+        let genesis = authority
+            .authorize_genesis(initial_state(&catalog))
+            .unwrap_or_else(|error| panic!("genesis: {error}"));
         let connection = Connection::open_in_memory()
             .unwrap_or_else(|error| panic!("legacy connection: {error}"));
         connection
@@ -1679,10 +2023,10 @@ mod tests {
             )
             .unwrap_or_else(|error| panic!("legacy schema: {error}"));
         assert!(matches!(
-            SqliteShell::<SqliteProgram, SqliteLawEngine, MemoryDestination>::from_connection(
+            SqliteShell::<SqliteProgram, SqliteLawEngine, MemoryDestination>::from_new_connection(
                 connection,
                 &authority,
-                &initial,
+                genesis,
                 authority.bind_interpreter(MemoryDestination::default()),
             ),
             Err(SqliteShellError::LegacySchema)
@@ -1690,23 +2034,25 @@ mod tests {
     }
 
     #[test]
-    fn schema_v2_requires_explicit_delivery_identity_migration() {
+    fn schema_v3_requires_explicit_genesis_migration() {
         let catalog = catalog();
         let authority = authority(&catalog, 53);
-        let initial = initial_state(&catalog);
+        let genesis = authority
+            .authorize_genesis(initial_state(&catalog))
+            .unwrap_or_else(|error| panic!("genesis: {error}"));
         let connection =
-            Connection::open_in_memory().unwrap_or_else(|error| panic!("v2 connection: {error}"));
+            Connection::open_in_memory().unwrap_or_else(|error| panic!("v3 connection: {error}"));
         connection
-            .pragma_update(None, "user_version", 2)
-            .unwrap_or_else(|error| panic!("v2 schema version: {error}"));
+            .pragma_update(None, "user_version", 3)
+            .unwrap_or_else(|error| panic!("v3 schema version: {error}"));
         assert!(matches!(
-            SqliteShell::<SqliteProgram, SqliteLawEngine, MemoryDestination>::from_connection(
+            SqliteShell::<SqliteProgram, SqliteLawEngine, MemoryDestination>::from_new_connection(
                 connection,
                 &authority,
-                &initial,
+                genesis,
                 authority.bind_interpreter(MemoryDestination::default()),
             ),
-            Err(SqliteShellError::UnsupportedSchemaVersion(2))
+            Err(SqliteShellError::UnsupportedSchemaVersion(3))
         ));
     }
 }

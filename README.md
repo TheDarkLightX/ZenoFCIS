@@ -37,7 +37,7 @@ ProjectProfile + ProjectCatalog
     -> generated transition or typed domain machines
     -> ComposedDomainProgram
     -> verified project laws
-    -> CatalogCommitAuthority
+    -> CatalogCommitAuthority + policy-bound genesis
     -> authorized shell publication
 ```
 
@@ -77,13 +77,13 @@ The workspace now includes the complete package ladder:
 - closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
 - tool-neutral, profile-bound relational-law manifests for state invariants, conservation, mint/burn authority, debit/credit-to-effect equality, fees and rounding, authority/subject/recipient relations, rejection purity, and committed-failure effects, with retained proof evidence and fresh bounded per-invocation evaluation;
-- nominal catalog authorization that owns the reviewed transition program and exact project-law engine, admits an external command/context/principal/replay invocation, pins a sealed known-answer-verified provider plus exact interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only after every applicable law is satisfied;
+- nominal catalog authorization that owns the reviewed transition program and exact project-law engine, binds the reviewed initial root/source/configuration/evidence/deployment instance, creates a private-construction `CatalogAuthorizedGenesis` only after every genesis-applicable law is satisfied, admits external command/context/principal/replay invocations, pins a sealed known-answer-verified provider plus exact interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only after every applicable transition law is satisfied;
 - a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
 - a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
 - an explicit dual-root sparse authenticated-state reference with projector-bound profiles, context-verified membership/absence witnesses, expected-version publication, and full-rebuild equality checks;
 - verifier-gated bounded synthesis over canonical closed candidate domains with content-addressed certificates and honest incomplete-search results;
-- crash-atomic policy-pinned SQLite publication that consumes only nominally authorized transitions, persists exact authorization/invocation/replay/bundle identities, rejects legacy unversioned stores, owns a policy-bound interpreter instance for outbox delivery, and retains crash-point refinement tests;
+- crash-atomic policy-pinned SQLite schema v4 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, revalidates persisted genesis authority, consumes only nominally authorized transitions, persists exact authorization/invocation/replay/bundle identities, rejects schema v3 and legacy stores pending explicit migration, owns a policy-bound interpreter instance for outbox delivery, and retains crash-point refinement tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
 
@@ -154,6 +154,12 @@ pure transition
     -> policy-pinned atomic shell publication
     -> idempotent outbox delivery
 ```
+
+Before that transition path can publish, the same authority must evaluate the
+reviewed initial state under every genesis-applicable law and mint a nominal
+`CatalogAuthorizedGenesis`. Creation consumes that witness exactly once;
+reopening accepts no replacement initial state. See
+[`docs/GENESIS_AUTHORIZATION.md`](docs/GENESIS_AUTHORIZATION.md).
 
 Persistent backends are sealed behind a pure logical-map interface. Updates return new structurally shared versions; equality and canonical bytes depend on logical entries only. Map-entry ordering bytes are derived from the semantic key, the explicit persistent-entry boundary rejects mismatched key bytes, and materialization exposes only fallible APIs.
 

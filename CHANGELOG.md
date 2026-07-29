@@ -28,6 +28,9 @@ First public release candidate for the reusable ZenoFCIS core library family.
 - candidate-derived outbox delivery identities shared byte-for-byte by the
   reference and SQLite shells, with SQLite schema v3 rejecting old
   authorization-derived identities pending explicit migration.
+- policy-bound, law-verified nominal genesis authorization; one-time pure and
+  SQLite shell creation; and SQLite schema v4 persisted-genesis revalidation
+  with schema v3 rejected pending explicit migration.
 
 ### Release-candidate limits
 

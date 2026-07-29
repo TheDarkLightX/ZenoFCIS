@@ -30,11 +30,13 @@ use zeno_fcis_project::{ProfileError, RegistryEntry, RegistryKind, SemanticId, S
 use zeno_fcis_value::Value;
 
 /// Canonical project-law manifest format version.
-pub const LAW_MANIFEST_FORMAT_VERSION: u16 = 1;
+pub const LAW_MANIFEST_FORMAT_VERSION: u16 = 2;
 /// Canonical verified law-set format version.
 pub const LAW_SET_FORMAT_VERSION: u16 = 1;
 /// Canonical per-invocation evaluation format version.
 pub const LAW_EVALUATION_FORMAT_VERSION: u16 = 1;
+/// Canonical genesis-law evaluation format version.
+pub const GENESIS_LAW_EVALUATION_FORMAT_VERSION: u16 = 1;
 /// Hard maximum number of definitions, evidence items, or observations.
 pub const MAX_PROJECT_LAWS: usize = 4_096;
 
@@ -199,6 +201,31 @@ impl CanonicalEncode for DecisionScope {
     }
 }
 
+/// Whether one project law participates in the separately authorized genesis ceremony.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GenesisApplicability {
+    /// The law must be evaluated for the exact initial state and policy.
+    Required,
+    /// The law is inapplicable to genesis under a reviewed nonzero rationale.
+    NotApplicable {
+        /// Commitment to the reviewed inapplicability rationale.
+        rationale_hash: Hash32,
+    },
+}
+
+impl CanonicalEncode for GenesisApplicability {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        match self {
+            Self::Required => output.push(0),
+            Self::NotApplicable { rationale_hash } => {
+                output.push(1);
+                output.extend_from_slice(rationale_hash.as_bytes());
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Tool-neutral evidence coverage required by one law.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LawEvidenceRequirement {
@@ -279,6 +306,7 @@ pub struct LawDefinition {
     name: StableName,
     kind: LawKind,
     scope: DecisionScope,
+    genesis: GenesisApplicability,
     claim_hash: Hash32,
     checker_profile_hash: Hash32,
     evidence: LawEvidenceRequirement,
@@ -292,6 +320,7 @@ impl LawDefinition {
         name: StableName,
         kind: LawKind,
         scope: DecisionScope,
+        genesis: GenesisApplicability,
         claim_hash: Hash32,
         checker_profile_hash: Hash32,
         evidence: LawEvidenceRequirement,
@@ -304,11 +333,13 @@ impl LawDefinition {
         }
         evidence.validate(claim_hash)?;
         validate_scope(kind, scope)?;
+        validate_genesis_applicability(kind, genesis)?;
         Ok(Self {
             id,
             name,
             kind,
             scope,
+            genesis,
             claim_hash,
             checker_profile_hash,
             evidence,
@@ -337,6 +368,12 @@ impl LawDefinition {
     #[must_use]
     pub const fn scope(&self) -> DecisionScope {
         self.scope
+    }
+
+    /// Returns whether this law must be checked for genesis.
+    #[must_use]
+    pub const fn genesis_applicability(&self) -> GenesisApplicability {
+        self.genesis
     }
 
     /// Returns the exact claim commitment.
@@ -374,6 +411,7 @@ impl CanonicalEncode for LawDefinition {
         self.name.encode_to(output)?;
         self.kind.encode_to(output)?;
         self.scope.encode_to(output)?;
+        self.genesis.encode_to(output)?;
         output.extend_from_slice(self.claim_hash.as_bytes());
         output.extend_from_slice(self.checker_profile_hash.as_bytes());
         self.evidence.encode_to(output)
@@ -922,6 +960,75 @@ impl CanonicalEncode for LawCheckInput<'_> {
     }
 }
 
+/// Exact policy and initial state supplied to the reviewed genesis-law checker.
+pub struct GenesisLawCheckInput<'a> {
+    catalog_hash: Hash32,
+    policy_id: Hash32,
+    genesis_binding_hash: Hash32,
+    initial_state: &'a Value,
+}
+
+impl<'a> GenesisLawCheckInput<'a> {
+    /// Constructs one exact genesis-law input.
+    pub fn try_new(
+        catalog_hash: Hash32,
+        policy_id: Hash32,
+        genesis_binding_hash: Hash32,
+        initial_state: &'a Value,
+    ) -> Result<Self, LawError> {
+        if catalog_hash == Hash32::ZERO {
+            return Err(LawError::ZeroBinding(LawField::Catalog));
+        }
+        if policy_id == Hash32::ZERO {
+            return Err(LawError::ZeroBinding(LawField::Policy));
+        }
+        if genesis_binding_hash == Hash32::ZERO {
+            return Err(LawError::ZeroBinding(LawField::Genesis));
+        }
+        Ok(Self {
+            catalog_hash,
+            policy_id,
+            genesis_binding_hash,
+            initial_state,
+        })
+    }
+
+    /// Returns the exact catalog commitment.
+    #[must_use]
+    pub const fn catalog_hash(&self) -> Hash32 {
+        self.catalog_hash
+    }
+
+    /// Returns the complete authorization-policy identity.
+    #[must_use]
+    pub const fn policy_id(&self) -> Hash32 {
+        self.policy_id
+    }
+
+    /// Returns the reviewed genesis-policy binding commitment.
+    #[must_use]
+    pub const fn genesis_binding_hash(&self) -> Hash32 {
+        self.genesis_binding_hash
+    }
+
+    /// Returns the exact schema-admitted initial semantic state.
+    #[must_use]
+    pub const fn initial_state(&self) -> &'a Value {
+        self.initial_state
+    }
+}
+
+impl CanonicalEncode for GenesisLawCheckInput<'_> {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-GENESIS-LAW-INPUT\0");
+        output.extend_from_slice(&GENESIS_LAW_EVALUATION_FORMAT_VERSION.to_be_bytes());
+        output.extend_from_slice(self.catalog_hash.as_bytes());
+        output.extend_from_slice(self.policy_id.as_bytes());
+        output.extend_from_slice(self.genesis_binding_hash.as_bytes());
+        put_blob(output, &self.initial_state.canonical_bytes()?)
+    }
+}
+
 /// Closed checker result for one applicable law.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -1008,6 +1115,13 @@ pub trait ProjectLawEngine {
     fn evaluate(
         &self,
         input: &LawCheckInput<'_>,
+        limits: LawLimits,
+    ) -> Result<Vec<LawObservation>, LawEngineFailure>;
+
+    /// Evaluates every law explicitly registered as applicable to genesis.
+    fn evaluate_genesis(
+        &self,
+        input: &GenesisLawCheckInput<'_>,
         limits: LawLimits,
     ) -> Result<Vec<LawObservation>, LawEngineFailure>;
 }
@@ -1144,6 +1258,59 @@ where
             });
         }
         LawEvaluation::try_new::<H>(self.law_set_hash, input_hash, decision, observations)
+    }
+
+    /// Evaluates the exact complete genesis-applicable law set.
+    pub fn evaluate_genesis(
+        &self,
+        input: &GenesisLawCheckInput<'_>,
+    ) -> Result<GenesisLawEvaluation, LawError> {
+        if input.catalog_hash != self.catalog_hash {
+            return Err(LawError::CatalogMismatch);
+        }
+        let input_hash = hash_canonical::<H>("zeno-fcis/genesis-law-input", input)?;
+        let mut expected = self
+            .manifest
+            .definitions
+            .iter()
+            .filter(|definition| matches!(definition.genesis, GenesisApplicability::Required))
+            .map(LawDefinition::id)
+            .collect::<Vec<_>>();
+        let mut observations = self
+            .engine
+            .evaluate_genesis(input, self.limits)
+            .map_err(LawError::Engine)?;
+        if observations.len()
+            > usize::try_from(self.limits.max_observations).map_err(|_| LawError::ResourceLimit)?
+        {
+            return Err(LawError::ResourceLimit);
+        }
+        expected.sort_unstable();
+        observations.sort_by_key(|observation| observation.law_id);
+        if observations
+            .windows(2)
+            .any(|pair| pair[0].law_id == pair[1].law_id)
+        {
+            return Err(LawError::DuplicateObservation);
+        }
+        let actual = observations
+            .iter()
+            .map(|observation| observation.law_id)
+            .collect::<Vec<_>>();
+        if actual != expected {
+            return Err(LawError::ObservationSetMismatch);
+        }
+        if let Some(observation) = observations
+            .iter()
+            .find(|observation| observation.status != LawStatus::Satisfied)
+        {
+            return Err(LawError::LawNotSatisfied {
+                law_id: observation.law_id,
+                status: observation.status,
+                witness_hash: observation.witness_hash,
+            });
+        }
+        GenesisLawEvaluation::try_new::<H>(self.law_set_hash, input_hash, observations)
     }
 }
 
@@ -1384,6 +1551,71 @@ impl CanonicalEncode for LawEvaluation {
     }
 }
 
+/// Successful complete evaluation of every genesis-applicable project law.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GenesisLawEvaluation {
+    law_set_hash: Hash32,
+    input_hash: Hash32,
+    observations: Box<[LawObservation]>,
+    evaluation_hash: Hash32,
+}
+
+impl GenesisLawEvaluation {
+    fn try_new<H: CommitmentHasher>(
+        law_set_hash: Hash32,
+        input_hash: Hash32,
+        observations: Vec<LawObservation>,
+    ) -> Result<Self, LawError> {
+        let mut value = Self {
+            law_set_hash,
+            input_hash,
+            observations: observations.into_boxed_slice(),
+            evaluation_hash: Hash32::ZERO,
+        };
+        value.evaluation_hash = hash_canonical::<H>("zeno-fcis/genesis-law-evaluation", &value)?;
+        Ok(value)
+    }
+
+    /// Returns the verified law-set identity.
+    #[must_use]
+    pub const fn law_set_hash(&self) -> Hash32 {
+        self.law_set_hash
+    }
+
+    /// Returns the exact genesis-law input identity.
+    #[must_use]
+    pub const fn input_hash(&self) -> Hash32 {
+        self.input_hash
+    }
+
+    /// Returns all successful observations in stable law-ID order.
+    #[must_use]
+    pub const fn observations(&self) -> &[LawObservation] {
+        &self.observations
+    }
+
+    /// Returns the complete genesis-law evaluation identity.
+    #[must_use]
+    pub const fn evaluation_hash(&self) -> Hash32 {
+        self.evaluation_hash
+    }
+}
+
+impl CanonicalEncode for GenesisLawEvaluation {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-GENESIS-LAW-EVALUATION\0");
+        output.extend_from_slice(&GENESIS_LAW_EVALUATION_FORMAT_VERSION.to_be_bytes());
+        output.extend_from_slice(self.law_set_hash.as_bytes());
+        output.extend_from_slice(self.input_hash.as_bytes());
+        put_u32_length(output, self.observations.len())?;
+        for observation in &self.observations {
+            observation.encode_to(output)?;
+        }
+        output.extend_from_slice(self.evaluation_hash.as_bytes());
+        Ok(())
+    }
+}
+
 struct LawSetBinding<'a> {
     catalog_hash: Hash32,
     manifest_hash: Hash32,
@@ -1423,6 +1655,30 @@ fn validate_scope(kind: LawKind, scope: DecisionScope) -> Result<(), LawError> {
         ) => Err(LawError::InvalidMandatoryScope(kind)),
         _ => Ok(()),
     }
+}
+
+fn validate_genesis_applicability(
+    kind: LawKind,
+    genesis: GenesisApplicability,
+) -> Result<(), LawError> {
+    match (kind, genesis) {
+        (LawKind::StateInvariant, GenesisApplicability::Required)
+        | (
+            LawKind::RejectNoAuthority | LawKind::CommittedFailureEffects,
+            GenesisApplicability::NotApplicable { .. },
+        ) => {}
+        (
+            LawKind::StateInvariant | LawKind::RejectNoAuthority | LawKind::CommittedFailureEffects,
+            _,
+        ) => return Err(LawError::InvalidGenesisApplicability(kind)),
+        _ => {}
+    }
+    if let GenesisApplicability::NotApplicable { rationale_hash } = genesis
+        && rationale_hash == Hash32::ZERO
+    {
+        return Err(LawError::ZeroBinding(LawField::Rationale));
+    }
+    Ok(())
 }
 
 fn validate_law_evidence(
@@ -1597,6 +1853,10 @@ pub enum LawField {
     Theorem,
     /// Project catalog.
     Catalog,
+    /// Complete authorization policy.
+    Policy,
+    /// Reviewed genesis-policy binding.
+    Genesis,
     /// Exact invocation.
     Invocation,
     /// Law observation or counterexample.
@@ -1630,6 +1890,8 @@ pub enum LawError {
     DuplicateLawName,
     /// A mandatory family uses a scope that weakens its meaning.
     InvalidMandatoryScope(LawKind),
+    /// A mandatory framework law has invalid genesis applicability.
+    InvalidGenesisApplicability(LawKind),
     /// A proof-assisted theorem does not equal the law claim.
     TheoremClaimMismatch,
     /// Exhaustive coverage declared zero members.
@@ -1750,6 +2012,14 @@ mod tests {
             name(label),
             kind,
             scope,
+            match kind {
+                LawKind::StateInvariant | LawKind::AssetConservation => {
+                    GenesisApplicability::Required
+                }
+                _ => GenesisApplicability::NotApplicable {
+                    rationale_hash: hash(format!("no-genesis-{label}").as_bytes()),
+                },
+            },
             hash(label.as_bytes()),
             hash(format!("checker-{label}").as_bytes()),
             requirement,
@@ -1980,6 +2250,32 @@ mod tests {
             }
             Ok(observations)
         }
+
+        fn evaluate_genesis(
+            &self,
+            _: &GenesisLawCheckInput<'_>,
+            _: LawLimits,
+        ) -> Result<Vec<LawObservation>, LawEngineFailure> {
+            let mut observations = vec![
+                LawObservation::try_new(id(100), LawStatus::Satisfied, hash(b"genesis-state"))
+                    .unwrap_or_else(|error| panic!("observation: {error}")),
+            ];
+            if !matches!(self.0, EngineMode::Missing) {
+                observations.push(
+                    LawObservation::try_new(
+                        id(101),
+                        if matches!(self.0, EngineMode::Violate) {
+                            LawStatus::Violated
+                        } else {
+                            LawStatus::Satisfied
+                        },
+                        hash(b"genesis-conservation"),
+                    )
+                    .unwrap_or_else(|error| panic!("observation: {error}")),
+                );
+            }
+            Ok(observations)
+        }
     }
 
     fn verified(mode: EngineMode) -> VerifiedProjectLaws<TestHasher, FixtureEngine> {
@@ -2023,6 +2319,18 @@ mod tests {
             },
         )
         .unwrap_or_else(|error| panic!("input: {error}"))
+    }
+
+    fn genesis_input<'a>(catalog: &ProjectCatalog, state: &'a Value) -> GenesisLawCheckInput<'a> {
+        GenesisLawCheckInput::try_new(
+            catalog
+                .commitment::<TestHasher>()
+                .unwrap_or_else(|error| panic!("catalog hash: {error}")),
+            hash(b"policy"),
+            hash(b"genesis-binding"),
+            state,
+        )
+        .unwrap_or_else(|error| panic!("genesis input: {error}"))
     }
 
     #[test]
@@ -2098,6 +2406,77 @@ mod tests {
         assert!(matches!(
             laws.evaluate(&input),
             Err(LawError::ObservationSetMismatch)
+        ));
+    }
+
+    #[test]
+    fn genesis_evaluates_the_exact_required_law_set() {
+        let manifest = manifest();
+        let catalog = catalog(&manifest);
+        let state = Value::Bool(false);
+        let input = genesis_input(&catalog, &state);
+        let evaluation = verified(EngineMode::Pass)
+            .evaluate_genesis(&input)
+            .unwrap_or_else(|error| panic!("genesis evaluation: {error}"));
+
+        assert_eq!(evaluation.observations().len(), 2);
+        assert_eq!(evaluation.observations()[0].law_id(), id(100));
+        assert_eq!(evaluation.observations()[1].law_id(), id(101));
+    }
+
+    #[test]
+    fn genesis_missing_or_violated_law_fails_closed() {
+        let manifest = manifest();
+        let catalog = catalog(&manifest);
+        let state = Value::Bool(false);
+        let input = genesis_input(&catalog, &state);
+
+        assert!(matches!(
+            verified(EngineMode::Missing).evaluate_genesis(&input),
+            Err(LawError::ObservationSetMismatch)
+        ));
+        assert!(matches!(
+            verified(EngineMode::Violate).evaluate_genesis(&input),
+            Err(LawError::LawNotSatisfied { law_id, .. }) if law_id == id(101)
+        ));
+    }
+
+    #[test]
+    fn mandatory_genesis_applicability_cannot_be_weakened() {
+        let state_result = LawDefinition::try_new(
+            id(200),
+            name("invalid-state-genesis"),
+            LawKind::StateInvariant,
+            DecisionScope::Committing,
+            GenesisApplicability::NotApplicable {
+                rationale_hash: hash(b"invalid"),
+            },
+            hash(b"state-claim"),
+            hash(b"state-checker"),
+            LawEvidenceRequirement::RuntimeOnly,
+        );
+        assert!(matches!(
+            state_result,
+            Err(LawError::InvalidGenesisApplicability(
+                LawKind::StateInvariant
+            ))
+        ));
+
+        let rejection_result = LawDefinition::try_new(
+            id(201),
+            name("invalid-reject-genesis"),
+            LawKind::RejectNoAuthority,
+            DecisionScope::Reject,
+            GenesisApplicability::Required,
+            hash(b"reject-claim"),
+            hash(b"reject-checker"),
+            LawEvidenceRequirement::RuntimeOnly,
+        );
+        assert!(matches!(
+            rejection_result,
+            Err(LawError::InvalidGenesisApplicability(
+                LawKind::RejectNoAuthority
+            ))
         ));
     }
 

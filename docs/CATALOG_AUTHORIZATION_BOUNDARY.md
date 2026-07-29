@@ -29,6 +29,22 @@ approved provider token
 
 Only `CatalogAuthorizedTransition` may cross a production commit port.
 
+Store creation is a separate authority path and does not add a fourth decision
+kind:
+
+```text
+exact ProjectCatalog/provider/state domain/execution policy
++ GenesisPolicyBinding
++ complete verified project-law set
++ schema-admitted reviewed initial state
+    -> exact root comparison
+    -> complete genesis-law evaluation
+    -> private CatalogAuthorizedGenesis
+    -> one-time authorized shell creation
+```
+
+Existing SQLite stores reopen without accepting caller-supplied initial state.
+
 ## Inputs
 
 - A `ProjectCatalog` reconstructed under a sealed approved commitment provider.
@@ -36,6 +52,8 @@ Only `CatalogAuthorizedTransition` may cross a production commit port.
 - An owned state-domain name and version.
 - Nonzero commitments to the reviewed transition build, provider build
   evidence, effect interpreter, deployment, and replay policy.
+- A `GenesisPolicyBinding` containing the expected initial root, reviewed
+  source/configuration/evidence commitments, and unique deployment instance.
 - Schema-admitted pre-state, command, and authenticated-context envelopes.
 - Nonzero principal, authentication-evidence, and replay commitments.
 - A complete `VerifiedProjectLaws` value binding the catalog, law manifest,
@@ -56,6 +74,10 @@ envelopes. They are never copied from the decision being validated.
 - A versioned `AuthorizationId` that binds the exact policy, invocation, law
   set, law evaluation, candidate, bundle, decision class, reason, and roots.
 - Exact canonical authorization bytes for persistence and replay comparison.
+- `CatalogAuthorizedGenesis<H, P, L, I>` for one exact reviewed initial state,
+  root, policy, and complete genesis-law evaluation.
+- A content-addressed `GenesisId` and canonical genesis authorization bytes for
+  persistent reopen validation.
 
 The existing `CandidateId` remains the implementation-neutral semantic
 identity. `AuthorizationId` is the deployment-specific production identity.
@@ -157,6 +179,14 @@ Wall-clock timeout is not protocol evidence.
     runtime engine build, evidence verifier, and per-invocation evaluation.
 16. Nominal checker: a different law-engine type cannot mint an authorization,
     interpreter token, or shell state of the selected production type.
+17. Genesis non-bypass: no authorized shell creation API accepts a raw admitted
+    state without `CatalogAuthorizedGenesis`.
+18. Genesis exactness: initial root, policy, source/configuration/evidence,
+    deployment instance, law set, and complete genesis evaluation are bound by
+    the `GenesisId`.
+19. Create/reopen separation: creation consumes the nominal genesis witness;
+    SQLite reopen accepts no initial-state replacement and reconstructs the
+    expected witness from persisted canonical state under the current authority.
 
 ## Negative Cases
 
@@ -167,6 +197,10 @@ deployment, replay policy, candidate, bundle, decision class, reason, or root.
 Validation also fails for a mismatched law catalog or source binding, changed
 law manifest, changed engine/verifier identity, incomplete observation set, or
 any violated or indeterminate law.
+
+Genesis authorization additionally fails for a changed initial root or state,
+source/configuration/evidence/deployment-instance binding, missing or extra
+genesis law observation, or violated/indeterminate genesis law.
 
 SQLite additionally fails closed for a policy mismatch, replay collision,
 candidate-to-authorization collision, populated legacy database without

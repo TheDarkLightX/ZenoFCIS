@@ -4,8 +4,16 @@
 
 `zeno-fcis-shell-sqlite` is a concrete imperative-shell adapter over pinned
 `rusqlite` with bundled SQLite. Its public commit port consumes a
-private-construction `CatalogAuthorizedTransition<RustCryptoSha256, P, I>`.
+private-construction `CatalogAuthorizedTransition<RustCryptoSha256, P, L, I>`.
 It does not accept a raw `CommitBundle` or caller-selected replay identity.
+
+Its creation port separately consumes one private-construction
+`CatalogAuthorizedGenesis<RustCryptoSha256, P, L, I>`. Reopening an existing
+store accepts no initial state and revalidates the persisted initial state,
+root, policy, law evaluation, authorization bytes, and `GenesisId` under the
+current authority before returning a usable shell.
+If semantic state is still at version zero, its canonical bytes and root must
+also equal that authorized genesis exactly.
 
 The shell type carries the exact reviewed transition-program type `P` and owns
 one concrete delivery-interpreter instance `I`. That instance must arrive in a
@@ -15,6 +23,10 @@ name/version. Opening under another policy, substituting a token from another
 policy, or mutating the stored identity fails closed.
 
 ## Atomic set
+
+Creation uses one `BEGIN IMMEDIATE` transaction to publish the shell identity,
+one canonical genesis row, and semantic state at version zero. Any populated
+store rejects a second creation attempt.
 
 One `BEGIN IMMEDIATE` transaction validates the expected semantic root and
 publishes:
@@ -49,10 +61,11 @@ caller-supplied destination.
 `MemoryDestination` is the included deterministic idempotent destination stub
 and rejects delivery-ID collisions.
 
-Schema v3 is explicit in SQLite `user_version`. Schema v2 is rejected pending
-an explicit migration because it derived delivery IDs from authorization IDs.
+Schema v4 is explicit in SQLite `user_version`. Schema v3 is rejected pending
+an explicit migration because it has no nominal genesis authorization row.
+Schema v2 also used authorization-derived delivery IDs and remains unsupported.
 A populated unversioned legacy database is also rejected. No implicit migration
-assigns production authority or silently reinterprets delivery identities.
+assigns genesis authority or silently reinterprets delivery identities.
 
 ## Failure model
 
@@ -68,6 +81,10 @@ Permanent fault-injection tests cover:
 
 The first six preserve the prior snapshot and publish no rows. The seventh
 recovers through exact replay and the pending outbox.
+
+Additional creation/reopen tests cover an uninitialized store, one-time
+creation, exact genesis revalidation without caller state, authorization-byte
+tampering, deployment-policy substitution, and explicit schema-v3 rejection.
 
 ## Trusted dependencies and bounds
 
