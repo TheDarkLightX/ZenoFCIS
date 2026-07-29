@@ -86,7 +86,10 @@ identity. `AuthorizationId` is the deployment-specific production identity.
 
 `CatalogAuthorizedTransition` has private fields and has no `Default`, decoder,
 `Deref`, public from-parts constructor, or conversion from `CommitBundle` or
-`NormalizedDecision`. Construction is possible only after complete validation
+`NormalizedDecision`. A raw normalized decision is untrusted transport;
+`ValidatedNormalizedDecision` can be constructed only through strict
+receipt/bundle reconstruction against an exact invocation, pre-state, state
+domain, and approved provider. Commit authority is possible only after complete validation
 under an `AuthorizationPolicy<H, P, L, I>` created with a
 `VerifiedProvider<H>` and `VerifiedProjectLaws<H, L>`. `P` is invoked inside
 `CatalogCommitAuthority::execute`; the decision is never an external
@@ -237,8 +240,9 @@ authorization records, partial transaction, or corrupted stored identity.
   proof would not by itself establish ingress authentication, runtime
   provenance, interpreter identity, deployment binding, or SQLite row-set
   completeness.
-- Composition, exhaustive-refinement, authenticated-projector, and concrete
-  Solidity/Solana deployment findings remain open under issues #56, #61, and
-  #62 and the chain-specific reviews.
+- The composition and exhaustive-refinement structural findings are closed by
+  proof-carrying composition and validated manifest-backed promotion. The
+  authenticated-projector and concrete Solidity/Solana deployment findings
+  remain open under issue #62 and the chain-specific reviews.
 - Passing bounded tests is not an unbounded proof, independent audit, or a
   production-readiness claim.

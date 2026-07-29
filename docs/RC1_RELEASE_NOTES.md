@@ -12,6 +12,11 @@ development, and release-process validation.
   fixed-size domain machines, and explicit global composition;
 - backend-neutral protocols for Lean, SMT/Z3, CVC5, Kani, Flux, private ESSO,
   and other independently checked tools;
+- strict reconstruction of mounted decision artifacts against an exact
+  invocation, pre-state, state domain, and nominal approved provider;
+- derived refinement case identities, canonical exhaustive-domain manifests,
+  independently verified exact enumeration claims, and content-addressed
+  promotion reports;
 - deterministic-parallel planning with complete static footprint evidence;
 - human quickstarts, LLM guidance, crate and feature maps, complete public API
   rustdoc pages, and checked external-consumer examples;
@@ -41,13 +46,11 @@ complete authorization/bundle/receipt/replay/outbox relation and current state.
 1. Merge the exact reviewed stacked PR series onto `main` without semantic
    drift.
 2. Complete independent exact-head API and authority review of this RC.
-3. Close exhaustive-refinement evidence fabrication for promoted production
-   profiles.
-4. Qualify the selected authenticated-state and persistence deployment rather
+3. Qualify the selected authenticated-state and persistence deployment rather
    than promoting the bounded reference backends implicitly.
-5. Retain concrete evidence for every verifier and target advertised by a
+4. Retain concrete evidence for every verifier and target advertised by a
    production profile.
-6. Produce signed release artifacts and hosted provenance from the protected
+5. Produce signed release artifacts and hosted provenance from the protected
    final tag.
 
 These blockers constrain production claims. They do not prevent downstream
