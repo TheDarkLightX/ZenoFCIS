@@ -12,7 +12,7 @@ zeno-fcis = {
     version = "=1.0.0-rc.1",
     path = "../../crates/zeno-fcis",
     default-features = false,
-    features = ["std", "bootstrap", "composed-program", "backend"]
+    features = ["std", "bootstrap", "composed-program", "backend", "authenticated-authority"]
 }
 
 [lints.rust]

@@ -24,7 +24,7 @@ First public release candidate for the reusable ZenoFCIS core library family.
   content-addressed promotion reports;
 - reference authenticated state, persistent collections, SQLite publication,
   mounted-runtime adapters, secret handling, and side/covert-channel policy;
-- 32 publishable crates, a diagnostic ZenoDEX mount binary, complete public API
+- 33 publishable crates, a diagnostic ZenoDEX mount binary, complete public API
   rustdoc pages, examples, checksums, package/source archives, CycloneDX SBOM
   generation, and provenance inputs. The reproducible offline rustdoc archive
   explicitly excludes Rustdoc `1.97.1`'s nondeterministic global-search index.
@@ -36,6 +36,11 @@ First public release candidate for the reusable ZenoFCIS core library family.
   and SQLite schema v5 full-history reauthorization with exact
   authorization/bundle/receipt/replay/outbox set reconstruction. Schema v4 and
   earlier stores are rejected pending explicit migration.
+- canonical sparse-proof and authenticated-plan decoding with explicit resource
+  limits, exact round-trip admission, and non-authoritative decoded plan values;
+- retained-evidence projector qualification, required per-transition projection
+  relations, nominal candidate-bound authenticated commits, and a production-facing
+  authenticated publication port.
 
 ### Release-candidate limits
 
