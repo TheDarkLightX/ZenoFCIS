@@ -72,7 +72,39 @@ zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["ba
 Avoid `full` in reusable libraries. It includes project-specific and reference
 surfaces that most consumers do not need. See [Feature matrix](FEATURE_MATRIX.md).
 
-## 2. Define reviewed project meaning
+## 2. Establish canonical byte identity
+
+ZenoFCIS does not use Rust layout, Serde, JSON field order, or a collection's
+internal shape as protocol identity. ZCVE/1 defines one encoding for every
+admitted semantic value.
+
+Treat external bytes as untrusted. Decode them with explicit limits, require
+complete input consumption, and let the codec re-encode and byte-compare the
+result before admission:
+
+```text
+bytes
+    -> bounded ZCVE/1 decode
+    -> structural canonicality checks
+    -> canonical re-encode
+    -> exact byte equality
+    -> admitted immutable value or rejection
+```
+
+Use generated schema-bound envelopes at application boundaries. Use
+`AdmittedValue` and `AdmittedEnvelope` only for lower-level integration.
+Compute roots, candidate identities, receipts, and evidence commitments from
+canonical admitted data, never from JSON, debug output, Serde layout, or
+database-native bytes.
+
+Byte-level canonicality provides deterministic identity and malleability
+resistance. It does not prove that a transfer is authorized, conserved, or
+correct. Those claims require the remaining schema, catalog, law, authority,
+and shell steps in this guide.
+
+Read [Canonical bytes and admission](CANONICAL_BYTES.md).
+
+## 3. Define reviewed project meaning
 
 Start with closed values and identifiers:
 
@@ -101,7 +133,7 @@ Read:
 - [Schema-bound catalog](SCHEMA_BOUND_CATALOG.md)
 - [Project bootstrap generator](PROJECT_BOOTSTRAP_GENERATOR.md)
 
-## 3. Implement the transition
+## 4. Implement the transition
 
 For one bounded domain, use the generated private-inner transition API or
 `CataloguedTransitionBuilder`. The generated API is preferred because it fixes
@@ -128,7 +160,7 @@ Read:
 - [Composed domain program](COMPOSED_DOMAIN_PROGRAM.md)
 - [Formal composition](FORMAL_COMPOSITION_V2.md)
 
-## 4. Define and verify project laws
+## 5. Define and verify project laws
 
 Schemas establish shape. Project laws establish relationships across the
 complete transition, such as:
@@ -162,7 +194,7 @@ Formal tools are optional adapters:
 Read [Project relational laws](PROJECT_RELATIONAL_LAWS.md) and
 [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md).
 
-## 5. Own production authority
+## 6. Own production authority
 
 Construct one `CatalogCommitAuthority` at application startup. The authority,
 not the request caller, owns:
@@ -195,7 +227,7 @@ Do not accept a caller-created `CommitBundle`, `TransitionDecision`,
 
 Read [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md).
 
-## 6. Publish through an authorized shell
+## 7. Publish through an authorized shell
 
 Use `AuthorizedShellState` for the pure authorized publication model or enable
 `sqlite-shell` for the crash-atomic SQLite adapter. The shell publishes the

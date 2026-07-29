@@ -14,6 +14,31 @@ immutable state + command + policy + authenticated context
 
 The semantic kernel treats values, decisions, resource budgets, canonical bytes, and commitments as explicit protocol data. It forbids unsafe Rust and is designed for `no_std + alloc` use without clocks, randomness, networking, filesystems, databases, or executable effect closures.
 
+## Canonical bytes and byte-level enforcement
+
+Canonical bytes are the one permitted byte representation of an admitted
+semantic value. ZCVE/1 fixes type tags, integer and length encodings, field and
+map-key order, collection shape, and optional/sum representation. Its bounded
+decoder rejects malformed structure, duplicate or reordered entries, trailing
+bytes, and every input that does not equal a canonical re-encoding of the
+decoded value:
+
+```text
+untrusted bytes
+    -> bounded structural decode
+    -> typed immutable value
+    -> canonical re-encode
+    -> require original bytes == re-encoded bytes
+    -> schema and authority admission
+```
+
+This makes state roots, candidate IDs, receipts, replay bindings, and evidence
+commitments deterministic across supported implementations. Canonical bytes
+are not encryption and do not establish business correctness by themselves.
+Schemas establish shape; catalogs, invocation witnesses, project laws, and
+nominal authority establish what the bytes mean and whether they may be
+published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
+
 ## Start here
 
 For a project-neutral multi-domain application, enable the composed-program
