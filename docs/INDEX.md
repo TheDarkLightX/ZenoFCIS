@@ -9,10 +9,11 @@
 5. [Feature matrix](FEATURE_MATRIX.md)
 6. [Architecture](ARCHITECTURE.md)
 7. [LLM usage](LLM_USAGE.md)
-8. [RC1 release notes](RC1_RELEASE_NOTES.md)
-9. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
-10. [Packaging](PACKAGING.md)
-11. [Release assurance](RELEASE_ASSURANCE.md)
+8. [RC2 release notes](RC2_RELEASE_NOTES.md)
+9. [Historical RC1 release notes](RC1_RELEASE_NOTES.md)
+10. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
+11. [Packaging](PACKAGING.md)
+12. [Release assurance](RELEASE_ASSURANCE.md)
 
 ## Project definition and typed construction
 
@@ -77,7 +78,7 @@ and other tools can use the same public boundaries.
 
 ## Status
 
-The workspace is version `1.0.0-rc.1`, the first public API and packaging
+The workspace is version `1.0.0-rc.2`, the current public API and packaging
 candidate. The documentation describes implemented APIs and explicit
 boundaries. Final Cargo V1 stability begins only at `1.0.0`. The RC does not
 claim general deployment qualification, a bundled concurrent runtime, or an

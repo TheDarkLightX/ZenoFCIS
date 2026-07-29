@@ -1,6 +1,6 @@
 # ZenoFCIS V1 release checklist
 
-This is the owner runbook for `1.0.0-rc.1` and the later `1.0.0` release. It
+This is the owner runbook for `1.0.0-rc.2` and the later `1.0.0` release. It
 separates repository evidence from external publication authority. Passing the
 repository gates makes a source revision eligible for release review. It does
 not merge a pull request, sign a tag, publish a crate, create a GitHub release,
@@ -8,12 +8,12 @@ complete an independent audit, or qualify a downstream deployment.
 
 ## Release identities
 
-For RC1, all of these values must agree:
+For RC2, all of these values must agree:
 
 ```text
-Cargo workspace version: 1.0.0-rc.1
-package-set version:      1.0.0-rc.1
-Git tag:                  v1.0.0-rc.1
+Cargo workspace version: 1.0.0-rc.2
+package-set version:      1.0.0-rc.2
+Git tag:                  v1.0.0-rc.2
 Rust toolchain:           1.97.1
 package count:            33 public crates
 ```
@@ -33,7 +33,7 @@ does not change any canonical protocol identifier.
 - [ ] Confirm `git status --short` is empty in a fresh checkout of that commit.
 - [ ] Confirm there are no unresolved security findings scoped as RC blockers.
 - [ ] Confirm `Cargo.toml`, `release/package-set.toml`, `CHANGELOG.md`,
-      `docs/RC1_RELEASE_NOTES.md`, and this checklist name `1.0.0-rc.1`.
+      `docs/RC2_RELEASE_NOTES.md`, and this checklist name `1.0.0-rc.2`.
 - [ ] Confirm each claimed platform, runtime mount, proof, or checker has exact
       source, toolchain, configuration, and retained-evidence identities.
 - [ ] Preserve every nonclaim that remains true.
@@ -49,8 +49,8 @@ Run from a clean checkout of the recorded commit:
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
 python3 tools/check_library_docs.py
-python3 tools/rc1_package.py self-test
-python3 tools/rc1_package.py check
+python3 tools/rc_package.py self-test
+python3 tools/rc_package.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
@@ -58,8 +58,8 @@ cargo +1.97.1 test --workspace --doc --all-features --locked
 RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked --no-deps
 cargo +1.97.1 deny check
 cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings
-python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
-(cd /tmp/zeno-fcis-rc1 && sha256sum --check SHA256SUMS)
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
+(cd /tmp/zeno-fcis-rc2 && sha256sum --check SHA256SUMS)
 ```
 
 - [ ] Every permanent read-only workflow passed at the exact commit.
@@ -80,15 +80,15 @@ complete rerun. Evidence from an earlier commit cannot validate the new one.
 Tagging is an owner action performed only after sections A and B pass.
 
 ```bash
-git tag --sign --annotate v1.0.0-rc.1 <exact-commit> \
-  --message "ZenoFCIS 1.0.0-rc.1"
-git push origin v1.0.0-rc.1
+git tag --sign --annotate v1.0.0-rc.2 <exact-commit> \
+  --message "ZenoFCIS 1.0.0-rc.2"
+git push origin v1.0.0-rc.2
 ```
 
 - [ ] Verify the tag signature and confirm the peeled tag target equals the
       recorded commit.
 - [ ] Confirm the read-only `release-candidate` workflow ran from
-      `refs/tags/v1.0.0-rc.1` and passed at that exact commit.
+      `refs/tags/v1.0.0-rc.2` and passed at that exact commit.
 - [ ] Download the tag workflow artifact and verify every checksum again.
 - [ ] Compare the tag-built checksums with both clean pre-tag builders.
 - [ ] Do not move, delete, or recreate a published tag to repair a failure.
@@ -110,7 +110,7 @@ cargo +1.97.1 publish --locked --package <next-package>
 - [ ] Before each command, confirm the package name is the next unpublished
       entry in the reviewed manifest.
 - [ ] After each command, confirm crates.io serves exactly version
-      `1.0.0-rc.1` and wait until dependencies are visible before continuing.
+      `1.0.0-rc.2` and wait until dependencies are visible before continuing.
 - [ ] Record the crates.io response and published package checksum.
 - [ ] Publish `zeno-fcis` last.
 - [ ] Run the checked external-consumer fixture against crates.io without a
@@ -128,7 +128,7 @@ cargo +1.97.1 check --manifest-path "$rc_smoke_dir/Cargo.toml"
 ```
 
 Inspect the generated lockfile and confirm every ZenoFCIS crate was resolved
-from crates.io at `1.0.0-rc.1` before deleting the disposable directory.
+from crates.io at `1.0.0-rc.2` before deleting the disposable directory.
 
 Do not automate this loop with an unreviewed script. Do not publish from a
 dirty tree, another commit, an unreviewed archive, or a local dependency
@@ -141,7 +141,7 @@ override.
       owner-selected detached signature or signed transparency-log reference.
 - [ ] Attach or link the hosted provenance/attestation for the exact tagged
       artifacts. `PROVENANCE-INPUTS.json` is input evidence, not an attestation.
-- [ ] Link `RC1_RELEASE_NOTES.md`, `SECURITY.md`, the independent review report,
+- [ ] Link `RC2_RELEASE_NOTES.md`, `SECURITY.md`, the independent review report,
       and known limitations.
 - [ ] Verify the GitHub release commit and all artifact digests from a separate
       machine.
@@ -151,14 +151,14 @@ override.
 
 ## F. Failure and rollback policy
 
-If any pre-publication check fails, stop and repair in a new commit. If the tag
-already exists, use `1.0.0-rc.2`; never retarget `v1.0.0-rc.1`.
+If any pre-publication check fails, stop and repair in a new commit. If the RC2
+tag already exists, use `1.0.0-rc.3`; never retarget `v1.0.0-rc.2`.
 
 If publication is partially complete:
 
 1. stop before publishing additional dependents;
 2. record exactly which immutable crate versions exist;
-3. do not reuse `1.0.0-rc.1` for changed source;
+3. do not reuse `1.0.0-rc.2` for changed source;
 4. yank an affected crate version when it is unsafe or unusable, while
    preserving the public incident record;
 5. repair and publish the complete coherent set as the next RC version.
@@ -167,7 +167,7 @@ If a security defect is discovered after publication, use the private process
 in `SECURITY.md`, coordinate disclosure, yank affected packages when needed,
 and issue a fixed release. Deleting artifacts or moving tags is not recovery.
 
-## G. Promotion from RC1 to 1.0.0
+## G. Promotion from RC2 to 1.0.0
 
 Final `1.0.0` requires a separate reviewed commit and tag. Before promotion:
 

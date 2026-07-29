@@ -21,7 +21,7 @@ path and import the curated prelude:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -45,7 +45,7 @@ Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
 [crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
 [LLM integration guide](docs/LLM_USAGE.md). The
-[RC1 release notes](docs/RC1_RELEASE_NOTES.md) describe the exact candidate
+[RC2 release notes](docs/RC2_RELEASE_NOTES.md) describe the exact candidate
 surface and remaining final-release blockers. The owner-facing
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
 repository evidence from signing, publication, and external review actions.
@@ -142,7 +142,7 @@ code should enable the smallest explicit feature set, for example:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["composed-program"] }
 ```
 
 The umbrella crate's default and `no_std` feature sets are project-neutral.
@@ -215,9 +215,9 @@ See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`
 RC packaging is fail closed and reviewable:
 
 ```bash
-python3 tools/rc1_package.py self-test
-python3 tools/rc1_package.py check
-python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
+python3 tools/rc_package.py self-test
+python3 tools/rc_package.py check
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
 ```
 
 The build retains all public `.crate` packages, rustdoc, source and diagnostic
@@ -227,7 +227,7 @@ binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 
 ## Assurance posture
 
-Version `1.0.0-rc.1` is the first public API and packaging candidate for the
+Version `1.0.0-rc.2` is the current public API and packaging candidate for the
 reusable core library. It is ready for downstream API evaluation and
 integration testing, while remaining a pre-release candidate until the
 independent exact-head review and final release gates pass. The pinned ZenoDEX

@@ -15,7 +15,7 @@ default = ["std"]
 std = ["zeno-fcis-codec/std"]
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.0.0-rc.1", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec", default-features = false }
 
 [lints]
 workspace = true

@@ -24,18 +24,18 @@ std = [
 ]
 
 [dependencies]
-zeno-fcis-catalog = { version = "=1.0.0-rc.1", path = "../zeno-fcis-catalog", default-features = false }
-zeno-fcis-codec = { version = "=1.0.0-rc.1", path = "../zeno-fcis-codec", default-features = false }
-zeno-fcis-core = { version = "=1.0.0-rc.1", path = "../zeno-fcis-core", default-features = false }
-zeno-fcis-evidence = { version = "=1.0.0-rc.1", path = "../zeno-fcis-evidence", default-features = false }
-zeno-fcis-patch = { version = "=1.0.0-rc.1", path = "../zeno-fcis-patch", default-features = false }
-zeno-fcis-plan = { version = "=1.0.0-rc.1", path = "../zeno-fcis-plan", default-features = false }
-zeno-fcis-project = { version = "=1.0.0-rc.1", path = "../zeno-fcis-project", default-features = false }
-zeno-fcis-value = { version = "=1.0.0-rc.1", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-catalog = { version = "=1.0.0-rc.2", path = "../zeno-fcis-catalog", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-core = { version = "=1.0.0-rc.2", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-evidence = { version = "=1.0.0-rc.2", path = "../zeno-fcis-evidence", default-features = false }
+zeno-fcis-patch = { version = "=1.0.0-rc.2", path = "../zeno-fcis-patch", default-features = false }
+zeno-fcis-plan = { version = "=1.0.0-rc.2", path = "../zeno-fcis-plan", default-features = false }
+zeno-fcis-project = { version = "=1.0.0-rc.2", path = "../zeno-fcis-project", default-features = false }
+zeno-fcis-value = { version = "=1.0.0-rc.2", path = "../zeno-fcis-value", default-features = false }
 
 [dev-dependencies]
-zeno-fcis-refine = { version = "=1.0.0-rc.1", path = "../zeno-fcis-refine" }
-zeno-fcis-schema = { version = "=1.0.0-rc.1", path = "../zeno-fcis-schema" }
+zeno-fcis-refine = { version = "=1.0.0-rc.2", path = "../zeno-fcis-refine" }
+zeno-fcis-schema = { version = "=1.0.0-rc.2", path = "../zeno-fcis-schema" }
 
 [lints]
 workspace = true

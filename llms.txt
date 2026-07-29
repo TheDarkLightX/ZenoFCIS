@@ -3,8 +3,8 @@
 ZenoFCIS is a Rust library family for high-assurance functional-core /
 imperative-shell systems.
 
-Current workspace version: 1.0.0-rc.1
-Current status: first public API and packaging candidate; final Cargo V1
+Current workspace version: 1.0.0-rc.2
+Current status: current public API and packaging candidate; final Cargo V1
 stability and general deployment qualification are not yet claimed
 Rust toolchain: 1.97.1 for repository validation
 
@@ -17,7 +17,8 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/FEATURE_MATRIX.md: umbrella features and environments
 - docs/LLM_USAGE.md: authority rules for model-assisted work
 - docs/ARCHITECTURE.md: dependency rings
-- docs/RC1_RELEASE_NOTES.md: candidate surface and final-release blockers
+- docs/RC2_RELEASE_NOTES.md: current candidate surface and final-release blockers
+- docs/RC1_RELEASE_NOTES.md: historical first-candidate notes
 - docs/V1_RELEASE_CHECKLIST.md: exact-source tag, publication, evidence, and rollback runbook
 - docs/PACKAGING.md: package authority and retained artifacts
 - docs/RELEASE_ASSURANCE.md: repository gates and nonclaims

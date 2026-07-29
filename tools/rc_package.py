@@ -155,7 +155,7 @@ def validate_package_documents(
     version = require_string(configured, "version")
     toolchain = require_string(configured, "rust_toolchain")
     if toolchain != "1.97.1":
-        raise RcError("RC1 must use pinned Rust 1.97.1")
+        raise RcError("release candidates must use pinned Rust 1.97.1")
 
     order = require_string_list(configured, "publish_order")
     private = require_string_list(configured, "private_packages")
@@ -296,7 +296,7 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
     readme_package = missing_readme_packages[0]
     if not isinstance(readme_package, dict):
         raise RcError("self-test package is malformed")
-    readme_package["readme"] = "missing-rc1-readme.md"
+    readme_package["readme"] = "missing-release-readme.md"
     expect_failure(copy.deepcopy(configured), missing_readme_metadata, "package README")
 
     wrong_pin_metadata = copy.deepcopy(metadata)
@@ -873,7 +873,7 @@ def build(output: Path) -> None:
     )
     deterministic_bundle(output, bundle_path)
     print(
-        f"rc1-package: built {len(require_string_list(configured, 'publish_order'))} "
+        f"rc-package: built {len(require_string_list(configured, 'publish_order'))} "
         f"crate packages and {len(entries)} retained artifacts at {commit}"
     )
 
@@ -884,7 +884,7 @@ def main() -> int:
         configured, _ = validate_package_set()
         if args.command == "check":
             print(
-                "rc1-package: PASS "
+                "rc-package: PASS "
                 f"({len(require_string_list(configured, 'publish_order'))} public, "
                 f"{len(require_string_list(configured, 'private_packages'))} private, "
                 f"version {require_string(configured, 'version')})"
@@ -894,7 +894,7 @@ def main() -> int:
             run_rustdoc_normalization_self_test()
             run_tree_archive_mode_self_test()
             print(
-                "rc1-package: self-test PASS "
+                "rc-package: self-test PASS "
                 "(7 hostile mutations rejected; rustdoc and archive modes verified)"
             )
         else:
@@ -906,7 +906,7 @@ def main() -> int:
         subprocess.CalledProcessError,
         json.JSONDecodeError,
     ) as error:
-        print(f"rc1-package: FAIL: {error}", file=sys.stderr)
+        print(f"rc-package: FAIL: {error}", file=sys.stderr)
         return 2
 
 

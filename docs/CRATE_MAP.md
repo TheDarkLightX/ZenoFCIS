@@ -2,7 +2,7 @@
 
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
-All workspace crates are version `1.0.0-rc.1`; the project has not published a
+All workspace crates are version `1.0.0-rc.2`; the project has not published a
 stable V1 API.
 
 ## Dependency direction

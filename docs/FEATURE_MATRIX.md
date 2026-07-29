@@ -1,7 +1,7 @@
 # ZenoFCIS feature matrix
 
 This matrix covers features on the `zeno-fcis` umbrella crate. The current
-workspace version is `1.0.0-rc.1`; “core” means the implemented
+workspace version is `1.0.0-rc.2`; “core” means the implemented
 project-neutral RC surface. Final Cargo V1 API stability begins at `1.0.0`.
 
 ## Environment labels
@@ -105,25 +105,25 @@ surface small.
 
 ```toml
 # Project-neutral semantic values and reference semantics
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false }
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false }
 
 # Single-domain, law-aware authorized transitions
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["authority"] }
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["authority"] }
 
 # Multi-domain deterministic composition
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["composed-program"] }
 
 # Host-side starter generation
-zeno-fcis = { version = "=1.0.0-rc.1", features = ["bootstrap"] }
+zeno-fcis = { version = "=1.0.0-rc.2", features = ["bootstrap"] }
 
 # Concrete local authorized persistence
-zeno-fcis = { version = "=1.0.0-rc.1", features = ["sqlite-shell"] }
+zeno-fcis = { version = "=1.0.0-rc.2", features = ["sqlite-shell"] }
 
 # Candidate-bound authenticated index publication
-zeno-fcis = { version = "=1.0.0-rc.1", features = ["authenticated-authority"] }
+zeno-fcis = { version = "=1.0.0-rc.2", features = ["authenticated-authority"] }
 
 # Tool-neutral checked backend protocol
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["backend"] }
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["backend"] }
 ```
 
 ## Deterministic-parallel status
