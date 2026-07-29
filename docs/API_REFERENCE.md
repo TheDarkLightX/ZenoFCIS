@@ -45,6 +45,9 @@ release commit.
 
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
 the [crate map](CRATE_MAP.md) and generated rustdoc for exact signatures.
+The [canonical-bytes guide](CANONICAL_BYTES.md) explains ZCVE/1 admission,
+decode/re-encode enforcement, commitments, and the boundary between byte
+identity and semantic authority.
 The [V1 product contract](V1_PRODUCT_CONTRACT.md) identifies the supported
 adopter journeys, and the [acceptance guide](ACCEPTANCE_TESTING.md) maps each
 journey to fixed executable commands.
