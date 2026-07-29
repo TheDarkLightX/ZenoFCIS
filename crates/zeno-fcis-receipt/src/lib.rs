@@ -315,7 +315,7 @@ impl CommitBundle {
         &self.patch
     }
 
-    /// Returns authoritative operations.
+    /// Returns non-executable committed evidence.
     #[must_use]
     pub const fn commit_plan(&self) -> &CommitPlan {
         &self.commit_plan

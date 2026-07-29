@@ -64,7 +64,7 @@ pub enum ExternalOutput {
     Inactive,
     /// The output is consumed only by the exact internal route matrix.
     Internal,
-    /// Every emitted value becomes one catalogued authoritative effect.
+    /// Every emitted value becomes one catalogued non-executable evidence record.
     Effect {
         /// Catalogued operation identifier.
         operation: SemanticId,

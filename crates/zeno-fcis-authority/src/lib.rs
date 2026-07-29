@@ -136,12 +136,12 @@ impl CanonicalEncode for StateDomainBinding {
     }
 }
 
-/// Reviewed execution and deployment commitments outside the pure transition.
+/// Reviewed execution, delivery, and deployment commitments outside the pure transition.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ExecutionBinding {
     transition_build_hash: NonZeroHash,
     provider_build_evidence_hash: NonZeroHash,
-    interpreter_profile_hash: NonZeroHash,
+    delivery_interpreter_profile_hash: NonZeroHash,
     deployment_profile_hash: NonZeroHash,
     replay_policy_hash: NonZeroHash,
 }
@@ -151,14 +151,16 @@ impl ExecutionBinding {
     pub fn try_new(
         transition_build_hash: Hash32,
         provider_build_evidence_hash: Hash32,
-        interpreter_profile_hash: Hash32,
+        delivery_interpreter_profile_hash: Hash32,
         deployment_profile_hash: Hash32,
         replay_policy_hash: Hash32,
     ) -> Result<Self, AuthorityError> {
         Ok(Self {
             transition_build_hash: NonZeroHash::try_new(transition_build_hash)?,
             provider_build_evidence_hash: NonZeroHash::try_new(provider_build_evidence_hash)?,
-            interpreter_profile_hash: NonZeroHash::try_new(interpreter_profile_hash)?,
+            delivery_interpreter_profile_hash: NonZeroHash::try_new(
+                delivery_interpreter_profile_hash,
+            )?,
             deployment_profile_hash: NonZeroHash::try_new(deployment_profile_hash)?,
             replay_policy_hash: NonZeroHash::try_new(replay_policy_hash)?,
         })
@@ -176,10 +178,10 @@ impl ExecutionBinding {
         self.provider_build_evidence_hash.get()
     }
 
-    /// Returns the effect-interpreter profile commitment.
+    /// Returns the outbox-delivery interpreter profile commitment.
     #[must_use]
-    pub const fn interpreter_profile_hash(self) -> Hash32 {
-        self.interpreter_profile_hash.get()
+    pub const fn delivery_interpreter_profile_hash(self) -> Hash32 {
+        self.delivery_interpreter_profile_hash.get()
     }
 
     /// Returns the deployment profile commitment.
@@ -199,7 +201,7 @@ impl CanonicalEncode for ExecutionBinding {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.transition_build_hash.encode_to(output)?;
         self.provider_build_evidence_hash.encode_to(output)?;
-        self.interpreter_profile_hash.encode_to(output)?;
+        self.delivery_interpreter_profile_hash.encode_to(output)?;
         self.deployment_profile_hash.encode_to(output)?;
         self.replay_policy_hash.encode_to(output)
     }
@@ -756,10 +758,13 @@ where
         &self.policy
     }
 
-    /// Binds one concrete interpreter instance to this exact policy.
+    /// Binds one concrete outbox-delivery interpreter to this exact policy.
     #[must_use]
-    pub fn bind_interpreter(&self, interpreter: I) -> BoundInterpreter<H, P, L, I> {
-        BoundInterpreter {
+    pub fn bind_delivery_interpreter(
+        &self,
+        interpreter: I,
+    ) -> BoundDeliveryInterpreter<H, P, L, I> {
+        BoundDeliveryInterpreter {
             policy_id: self.policy.policy_id,
             interpreter,
             marker: PhantomData,
@@ -1133,11 +1138,11 @@ impl<'a> AuthorizationCursor<'a> {
     }
 }
 
-/// Concrete interpreter instance nominally bound to one exact authorization policy.
+/// Concrete outbox-delivery interpreter bound to one authorization policy.
 ///
-/// Private fields prevent a same-type interpreter from being substituted at a
-/// commit port without passing through the owning [`CatalogCommitAuthority`].
-pub struct BoundInterpreter<H, P, L, I>
+/// Private fields prevent a same-type destination from being substituted at a
+/// delivery port without passing through the owning [`CatalogCommitAuthority`].
+pub struct BoundDeliveryInterpreter<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,
@@ -1148,7 +1153,7 @@ where
     marker: AuthorityMarker<H, P, L, I>,
 }
 
-impl<H, P, L, I> BoundInterpreter<H, P, L, I>
+impl<H, P, L, I> BoundDeliveryInterpreter<H, P, L, I>
 where
     H: ApprovedCommitmentProvider,
     P: CatalogTransitionProgram<H>,

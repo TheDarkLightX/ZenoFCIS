@@ -4,7 +4,7 @@
 
 Schemas, catalogs, patches, and plans establish bounded structural validity.
 They do not establish relations between the admitted pre-state, command,
-authenticated context, successor state, and authoritative effects. This
+authenticated context, successor state, commit evidence, and durable external obligations. This
 package makes those project laws mandatory inputs to production authorization.
 
 ## Inputs

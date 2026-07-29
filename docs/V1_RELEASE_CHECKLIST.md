@@ -175,7 +175,7 @@ Final `1.0.0` requires a separate reviewed commit and tag. Before promotion:
 - [ ] Complete an independent exact-head review of the final source and
       authority topology.
 - [ ] Close every issue designated as a core-library V1 blocker.
-- [ ] Reconfirm production-facing storage and effect-interpreter nonclaims;
+- [ ] Reconfirm production-facing storage and outbox-delivery-interpreter nonclaims;
       downstream qualification remains project specific.
 - [ ] Change the workspace and package-set versions to `1.0.0`, update all
       versioned documentation and external-consumer pins, and regenerate the

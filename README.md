@@ -63,7 +63,7 @@ Reusable libraries should select only the features needed at their boundary.
 
 The workspace now includes the complete package ladder:
 
-- semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches and closed commit/outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
+- semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches, non-executable commit-evidence plans, durable outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
 - assume-guarantee composition, deterministic-parallel conflict checking,
   backend-neutral complete static footprint claims, nominal footprint witnesses,
   witness-gated parallel authorization, untrusted runtime refinement reports,
@@ -82,14 +82,14 @@ The workspace now includes the complete package ladder:
 - closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
 - project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
 - tool-neutral, profile-bound relational-law manifests for state invariants, conservation, mint/burn authority, debit/credit-to-effect equality, fees and rounding, authority/subject/recipient relations, rejection purity, and committed-failure effects, with retained proof evidence and fresh bounded per-invocation evaluation;
-- nominal catalog authorization that owns the reviewed transition program and exact project-law engine, binds the reviewed initial root/source/configuration/evidence/deployment instance, creates a private-construction `CatalogAuthorizedGenesis` only after every genesis-applicable law is satisfied, admits external command/context/principal/replay invocations, pins a sealed known-answer-verified provider plus exact interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only after every applicable transition law is satisfied;
+- nominal catalog authorization that owns the reviewed transition program and exact project-law engine, binds the reviewed initial root/source/configuration/evidence/deployment instance, creates a private-construction `CatalogAuthorizedGenesis` only after every genesis-applicable law is satisfied, admits external command/context/principal/replay invocations, pins a sealed known-answer-verified provider plus exact outbox-delivery-interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only after every applicable transition law is satisfied;
 - a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
 - strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
 - a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
 - an explicit dual-root sparse authenticated-state reference with strict bounded proof/plan decoding, projector-bound profiles, context-verified membership/absence witnesses, expected-version publication, and full-rebuild equality checks;
 - a candidate-bound authenticated authority that verifies exact retained projector evidence at setup, requires a project-specific per-transition projection law, reconstructs persisted plans locally, and exposes a production-facing port that accepts only nominal `CatalogAuthorizedAuthenticatedCommit` values;
 - verifier-gated bounded synthesis over canonical closed candidate domains with content-addressed certificates and honest incomplete-search results;
-- crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound interpreter instance for outbox delivery, and retains crash-point and adversarial-corruption tests;
+- crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
 
@@ -233,11 +233,16 @@ integration testing, while remaining a pre-release candidate until the
 independent exact-head review and final release gates pass. The pinned ZenoDEX
 single-vault zUSD mount is bounded executable refinement evidence. Production
 value-moving promotion still requires each profile's independently reviewed
-laws and evidence, qualified concrete storage and effect interpreters,
+laws and evidence, qualified concrete storage and outbox-delivery interpreters,
 deployment qualification, and an exact-head audit. This RC does not claim
 audit completion, project-specific economic correctness, side-channel
 resistance, full ZenoDEX coverage, or approval of an external JMT, ESSO,
 solver, prover, compiler, or LLM runtime.
+
+The V1 execution model is explicit: `CommitPlan` is non-executable committed
+evidence, while every external operation and every value movement uses the
+durable replay-safe outbox. See the
+[execution-model specification](docs/COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md).
 
 ## License
 
