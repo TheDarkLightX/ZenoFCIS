@@ -213,6 +213,11 @@ def main() -> int:
             "git status --short",
             "python3 tools/atdd.py check",
             "cargo +1.97.1 test --workspace --locked",
+            (
+                "cargo +1.97.1 test \\\n"
+                "  --workspace \\\n"
+                "  --locked"
+            ),
         )
         for command in permitted:
             require_allow(node, command)
@@ -239,7 +244,7 @@ def main() -> int:
         print(
             "probity: PASS "
             f"(Node {EXPECTED_NODE[1:]}, Probity {EXPECTED_PROBITY}, "
-            "13 hostile and 4 permitted actions)"
+            "13 hostile and 5 permitted actions)"
         )
         return 0
     except (ProbityCheckError, subprocess.CalledProcessError) as error:

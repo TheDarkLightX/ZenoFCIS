@@ -17,6 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 FEATURE_ROOT = ROOT / "acceptance" / "features"
 ATDD_TAG = re.compile(r"@atdd-([a-z0-9]+(?:-[a-z0-9]+)*)")
 SCENARIO = re.compile(r"^\s*Scenario:\s*(\S.*)$")
+OTHER_GHERKIN_DECLARATION = re.compile(
+    r"^\s*(?:Feature|Rule|Background|Scenario Outline|Scenario Template|Examples):"
+)
 
 
 class AcceptanceError(ValueError):
@@ -149,17 +152,21 @@ def parse_feature_text(text: str, label: str) -> dict[str, tuple[int, str]]:
             pending = ATDD_TAG.findall(stripped)
             continue
         match = SCENARIO.match(line)
-        if match is None:
+        if match is not None:
+            if len(pending) != 1:
+                raise AcceptanceError(
+                    f"{label}:{line_number}: scenario requires exactly one @atdd-* tag"
+                )
+            scenario_id = pending[0]
+            if scenario_id in found:
+                raise AcceptanceError(f"{label}:{line_number}: duplicate {scenario_id}")
+            found[scenario_id] = (line_number, match.group(1))
+            pending = []
             continue
-        if len(pending) != 1:
+        if pending and OTHER_GHERKIN_DECLARATION.match(line):
             raise AcceptanceError(
-                f"{label}:{line_number}: scenario requires exactly one @atdd-* tag"
+                f"{label}:{line_number}: @atdd-* tag must bind the next Scenario"
             )
-        scenario_id = pending[0]
-        if scenario_id in found:
-            raise AcceptanceError(f"{label}:{line_number}: duplicate {scenario_id}")
-        found[scenario_id] = (line_number, match.group(1))
-        pending = []
     return found
 
 
@@ -213,6 +220,15 @@ def self_test() -> None:
             "  @atdd-a\n  Scenario: second\n"
         ),
         "multiple tags": "Feature: x\n  @atdd-a @atdd-b\n  Scenario: ambiguous\n",
+        "feature tag inheritance": (
+            "@atdd-a\nFeature: x\n  Scenario: inherited\n"
+        ),
+        "rule tag inheritance": (
+            "Feature: x\n"
+            "  @atdd-a\n"
+            "  Rule: tagged rule\n"
+            "    Scenario: inherited\n"
+        ),
     }
     for label, text in hostile.items():
         try:
@@ -264,7 +280,7 @@ def main() -> int:
     try:
         if args.command == "self-test":
             self_test()
-            print("atdd: self-test PASS (4 hostile bindings rejected)")
+            print("atdd: self-test PASS (6 hostile bindings rejected)")
             return 0
         found = validate_registry()
         if args.command == "check":
