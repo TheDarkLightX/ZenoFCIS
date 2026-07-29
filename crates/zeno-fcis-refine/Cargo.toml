@@ -24,15 +24,15 @@ rustcrypto = ["zeno-fcis-crypto/rustcrypto"]
 libcrux = ["zeno-fcis-crypto/libcrux"]
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.0.0-rc.1", path = "../zeno-fcis-codec", default-features = false }
-zeno-fcis-core = { version = "=1.0.0-rc.1", path = "../zeno-fcis-core", default-features = false }
-zeno-fcis-crypto = { version = "=1.0.0-rc.1", path = "../zeno-fcis-crypto", default-features = false }
-zeno-fcis-patch = { version = "=1.0.0-rc.1", path = "../zeno-fcis-patch", default-features = false }
-zeno-fcis-receipt = { version = "=1.0.0-rc.1", path = "../zeno-fcis-receipt", default-features = false }
-zeno-fcis-value = { version = "=1.0.0-rc.1", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-core = { version = "=1.0.0-rc.2", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-crypto = { version = "=1.0.0-rc.2", path = "../zeno-fcis-crypto", default-features = false }
+zeno-fcis-patch = { version = "=1.0.0-rc.2", path = "../zeno-fcis-patch", default-features = false }
+zeno-fcis-receipt = { version = "=1.0.0-rc.2", path = "../zeno-fcis-receipt", default-features = false }
+zeno-fcis-value = { version = "=1.0.0-rc.2", path = "../zeno-fcis-value", default-features = false }
 
 [dev-dependencies]
-zeno-fcis-plan = { version = "=1.0.0-rc.1", path = "../zeno-fcis-plan", default-features = false }
+zeno-fcis-plan = { version = "=1.0.0-rc.2", path = "../zeno-fcis-plan", default-features = false }
 
 [lints]
 workspace = true

@@ -34,8 +34,8 @@ RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked
 Changes to packaging or a public crate must also run:
 
 ```bash
-python3 tools/rc1_package.py self-test
-python3 tools/rc1_package.py check
+python3 tools/rc_package.py self-test
+python3 tools/rc_package.py check
 ```
 
 Permanent CI adds `no_std`, Miri, fuzz-build, supply-chain, source-manifest,

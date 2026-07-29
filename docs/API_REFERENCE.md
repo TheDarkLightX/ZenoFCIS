@@ -5,7 +5,7 @@
 After publication, rustdoc for the umbrella crate is available at:
 
 ```text
-https://docs.rs/zeno-fcis/1.0.0-rc.1/zeno_fcis/
+https://docs.rs/zeno-fcis/1.0.0-rc.2/zeno_fcis/
 ```
 
 Every public subcrate is published at the same exact version and receives its
@@ -59,6 +59,6 @@ strict plan reauthorization, and nominal authenticated publication.
 
 ## Stability
 
-`1.0.0-rc.1` freezes a candidate Rust API for review. Corrections may change
+`1.0.0-rc.2` freezes a candidate Rust API for review. Corrections may change
 that API in a later release candidate. Stable protocol identifiers remain
 independent of Cargo versions and may not be silently reinterpreted.

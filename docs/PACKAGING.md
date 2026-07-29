@@ -1,6 +1,6 @@
-# RC1 packaging
+# Release-candidate packaging
 
-This document describes the ZenoFCIS `1.0.0-rc.1` artifact set.
+This document describes the ZenoFCIS `1.0.0-rc.2` artifact set.
 
 ## Package set
 
@@ -11,14 +11,14 @@ This document describes the ZenoFCIS `1.0.0-rc.1` artifact set.
 - one supported diagnostic binary target;
 - the exact Cargo version and Rust toolchain.
 
-`tools/rc1_package.py check` compares that manifest with Cargo metadata and
+`tools/rc_package.py check` compares that manifest with Cargo metadata and
 fails on missing packages, hidden public packages, duplicate entries, version
 drift, non-exact internal dependency pins, missing package metadata, or an
 invalid publication order.
 
 ## Artifact set
 
-`tools/rc1_package.py build --output <directory>` creates:
+`tools/rc_package.py build --output <directory>` creates:
 
 ```text
 packages/*.crate

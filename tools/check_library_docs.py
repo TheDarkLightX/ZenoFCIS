@@ -25,6 +25,7 @@ REQUIRED_FILES = (
     Path("docs/FEATURE_MATRIX.md"),
     Path("docs/LLM_USAGE.md"),
     Path("docs/RC1_RELEASE_NOTES.md"),
+    Path("docs/RC2_RELEASE_NOTES.md"),
     Path("docs/V1_RELEASE_CHECKLIST.md"),
     Path("docs/PACKAGING.md"),
     Path("docs/RELEASE_ASSURANCE.md"),
@@ -44,7 +45,7 @@ VERSIONED_DOCS = (
     Path("docs/API_REFERENCE.md"),
     Path("docs/CRATE_MAP.md"),
     Path("docs/FEATURE_MATRIX.md"),
-    Path("docs/RC1_RELEASE_NOTES.md"),
+    Path("docs/RC2_RELEASE_NOTES.md"),
     Path("docs/V1_RELEASE_CHECKLIST.md"),
     Path("docs/PACKAGING.md"),
 )
@@ -56,7 +57,7 @@ REQUIRED_README_MARKERS = (
     "docs/CRATE_MAP.md",
     "docs/FEATURE_MATRIX.md",
     "docs/LLM_USAGE.md",
-    "docs/RC1_RELEASE_NOTES.md",
+    "docs/RC2_RELEASE_NOTES.md",
     "docs/V1_RELEASE_CHECKLIST.md",
     "docs/PACKAGING.md",
     "--example minimal_core",
@@ -71,7 +72,7 @@ REQUIRED_CODEOWNER_MARKERS = (
 REQUIRED_RELEASE_WORKFLOW_MARKERS = (
     '"v1.0.0-rc.*"',
     "contents: read",
-    "python3 tools/rc1_package.py build",
+    "python3 tools/rc_package.py build",
     "retention-days: 30",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")

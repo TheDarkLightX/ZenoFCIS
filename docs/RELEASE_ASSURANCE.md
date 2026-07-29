@@ -53,8 +53,8 @@ Run from a clean checkout of the exact release commit:
 ```bash
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
-python3 tools/rc1_package.py self-test
-python3 tools/rc1_package.py check
+python3 tools/rc_package.py self-test
+python3 tools/rc_package.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
@@ -63,7 +63,7 @@ RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked
 cargo +1.97.1 deny check
 cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings
 python3 tools/release_manifest.py --require-clean > SOURCE-MANIFEST.json
-python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
 ```
 
 The CI workflows add:

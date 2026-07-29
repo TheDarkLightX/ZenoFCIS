@@ -7,7 +7,7 @@
 /release/ @TheDarkLightX
 /tools/check_assurance.py @TheDarkLightX
 /tools/check_library_docs.py @TheDarkLightX
-/tools/rc1_package.py @TheDarkLightX
+/tools/rc_package.py @TheDarkLightX
 /Cargo.toml @TheDarkLightX
 /Cargo.lock @TheDarkLightX
 /deny.toml @TheDarkLightX
