@@ -1023,12 +1023,6 @@ impl CheckedExecution {
             Self::Lean(toolchain) => &toolchain.executable,
         }
     }
-    fn runtime_root(&self) -> Option<&Path> {
-        match self {
-            Self::Single(_) => None,
-            Self::Lean(toolchain) => Some(&toolchain.root),
-        }
-    }
     fn inventory(&self) -> Option<&ToolchainInventory> {
         match self {
             Self::Single(_) => None,
@@ -1893,15 +1887,7 @@ pub fn execute_tool(
         ToolBackend::Lean => ToolExecution::single(
             ProcessPhase::Kernel,
             &obligation.source,
-            run_lean(
-                config,
-                checked.execution.executable(),
-                checked
-                    .execution
-                    .runtime_root()
-                    .ok_or(ToolFailure::ToolchainIncomplete)?,
-                &obligation.source,
-            )?,
+            run_lean(config, checked.execution.executable(), &obligation.source)?,
         ),
     };
     if let CheckedExecution::Lean(toolchain) = &checked.execution {
@@ -2732,27 +2718,18 @@ fn wait_output(
 fn run_lean(
     config: &ToolConfig,
     executable: &Path,
-    runtime_root: &Path,
     source: &[u8],
 ) -> Result<ProcessOutput, ToolFailure> {
     let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     let path =
         std::env::temp_dir().join(format!("zeno-fcis-{}-{sequence}.lean", std::process::id()));
     atomic_write(&path, source)?;
-    let mut arguments = Vec::new();
-    let sysroot = runtime_root
+    let argument = path
         .to_str()
-        .ok_or_else(|| ToolFailure::Io("non-UTF8 private runtime path".into()))?;
-    arguments.push(format!("--sysroot={sysroot}"));
-    arguments.push(
-        path.to_str()
-            .ok_or_else(|| ToolFailure::Io("non-UTF8 temp path".into()))?
-            .to_owned(),
-    );
-    let argument_refs = arguments.iter().map(String::as_str).collect::<Vec<_>>();
+        .ok_or_else(|| ToolFailure::Io("non-UTF8 temp path".into()))?;
     let result = run_fixed(
         executable,
-        &argument_refs,
+        &[argument],
         None,
         config.timeout_ms,
         config.max_output_bytes,
@@ -4753,7 +4730,7 @@ mod tests {
                 .unwrap_or_else(|error| panic!("create bin: {error}"));
             fs::create_dir_all(root.join("lib/lean"))
                 .unwrap_or_else(|error| panic!("create lib: {error}"));
-            let script = b"#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  printf 'Lean (version 4.30.0, fake)\\n'\nelse\n  printf \"'claim' depends on axioms: []\\n\"\nfi\n".to_vec();
+            let script = b"#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  printf 'Lean (version 4.30.0, fake)\\n'\nelif [ \"$#\" -eq 1 ]; then\n  printf \"'claim' depends on axioms: []\\n\"\nelse\n  exit 42\nfi\n".to_vec();
             let executable = root.join("bin/lean");
             fs::write(&executable, &script)
                 .unwrap_or_else(|error| panic!("write fake Lean: {error}"));
@@ -4789,11 +4766,10 @@ mod tests {
             checked.identity.runtime_hash(),
             Some(baseline.tree_sha256())
         );
-        let private_root = checked
-            .execution
-            .runtime_root()
-            .unwrap_or_else(|| unreachable!())
-            .to_path_buf();
+        let private_root = match &checked.execution {
+            CheckedExecution::Lean(toolchain) => toolchain.root.clone(),
+            CheckedExecution::Single(_) => unreachable!(),
+        };
         fs::write(root.join("lib/lean/Init.olean"), b"mutated")
             .unwrap_or_else(|error| panic!("mutate source tree: {error}"));
         assert_eq!(
@@ -4804,7 +4780,6 @@ mod tests {
         let output = run_lean(
             &config,
             checked.execution.executable(),
-            &private_root,
             b"-- exact test source\n",
         )
         .unwrap_or_else(|error| panic!("run private fake Lean: {error:?}"));
