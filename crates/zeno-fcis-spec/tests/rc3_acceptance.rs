@@ -2,10 +2,11 @@
 
 use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_spec::{
-    ClaimMode, DiagnosticCode, EvalLimits, GraphFormat, MiniBudget, MiniDecision, MiniDeterminator,
-    MiniState, Observation, PredicateProvider, ProjectLimits, ProjectionPath, ProjectionRoot,
-    RelExpr, SourceLimits, StableId, TemporalEvaluation, TemporalFormula, TraceStep,
-    WorkerInstruction, WorkerProgram, WorkspaceCell, elaborate_project, evaluate_temporal,
+    ClaimMode, DiagnosticCode, EvalLimits, EvalOutcome, EvaluationContext, GraphFormat,
+    IndeterminateReason, MAX_FORMULA_DEPTH, MiniBudget, MiniDecision, MiniDeterminator, MiniState,
+    Observation, PredicateProvider, ProjectLimits, ProjectionPath, ProjectionRoot, RelExpr,
+    SourceLimits, StableId, TemporalEvaluation, TemporalFormula, TraceStep, WorkerInstruction,
+    WorkerProgram, WorkspaceCell, elaborate_project, evaluate_relational, evaluate_temporal,
     generate_project, parse_project, render_graph,
 };
 
@@ -172,6 +173,84 @@ fn rc3_temporal_modes() {
         ),
         TemporalEvaluation::ProofObligation
     );
+}
+
+fn relational_formula_at_depth(depth: usize) -> RelExpr {
+    let mut formula = RelExpr::Bool(true);
+    for _ in 1..depth {
+        formula = RelExpr::Not(Box::new(formula));
+    }
+    formula
+}
+
+fn temporal_formula_at_depth(depth: usize) -> TemporalFormula {
+    let mut formula = TemporalFormula::Atom(RelExpr::Bool(true));
+    for _ in 2..depth {
+        formula = TemporalFormula::Not(Box::new(formula));
+    }
+    formula
+}
+
+#[test]
+fn direct_relational_depth_is_checked_on_a_small_stack() {
+    let handle = std::thread::Builder::new()
+        .name("relational-depth-boundary".into())
+        .stack_size(512 * 1024)
+        .spawn(|| {
+            let trace = TraceStep::try_new(Vec::new()).unwrap_or_else(|| unreachable!());
+            let evaluate = |formula: &RelExpr| {
+                evaluate_relational(
+                    formula,
+                    EvaluationContext::new(&trace, &NoPredicates, EvalLimits::default()),
+                )
+            };
+            assert_eq!(
+                evaluate(&relational_formula_at_depth(MAX_FORMULA_DEPTH)),
+                EvalOutcome::False
+            );
+            assert_eq!(
+                evaluate(&relational_formula_at_depth(MAX_FORMULA_DEPTH + 1)),
+                EvalOutcome::Indeterminate(IndeterminateReason::ResourceLimit)
+            );
+        })
+        .unwrap_or_else(|error| panic!("failed to start small-stack test thread: {error}"));
+    handle
+        .join()
+        .unwrap_or_else(|_| panic!("small-stack relational evaluation panicked"));
+}
+
+#[test]
+fn direct_temporal_depth_is_checked_on_a_small_stack() {
+    let handle = std::thread::Builder::new()
+        .name("temporal-depth-boundary".into())
+        .stack_size(512 * 1024)
+        .spawn(|| {
+            let trace = TraceStep::try_new(Vec::new()).unwrap_or_else(|| unreachable!());
+            assert_eq!(
+                evaluate_temporal(
+                    &temporal_formula_at_depth(MAX_FORMULA_DEPTH),
+                    ClaimMode::Finite { horizon: 1 },
+                    core::slice::from_ref(&trace),
+                    &NoPredicates,
+                    EvalLimits::default(),
+                ),
+                TemporalEvaluation::Satisfied
+            );
+            assert_eq!(
+                evaluate_temporal(
+                    &temporal_formula_at_depth(MAX_FORMULA_DEPTH + 1),
+                    ClaimMode::Finite { horizon: 1 },
+                    core::slice::from_ref(&trace),
+                    &NoPredicates,
+                    EvalLimits::default(),
+                ),
+                TemporalEvaluation::Indeterminate(IndeterminateReason::ResourceLimit)
+            );
+        })
+        .unwrap_or_else(|error| panic!("failed to start small-stack test thread: {error}"));
+    handle
+        .join()
+        .unwrap_or_else(|_| panic!("small-stack temporal evaluation panicked"));
 }
 
 fn program(worker: u32, slot: u32, operation: WorkerInstruction) -> WorkerProgram {

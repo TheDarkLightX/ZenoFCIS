@@ -17,10 +17,11 @@ unchanged.
   content-addressed retention;
 - `zeno-fcis-cli`: the `zeno-fcis` binary with project templates, checking,
   generation and drift detection, graph/explain views, formal-tool commands,
-  doctor, and backend inspection;
-- umbrella feature `authoring` and RC3 version-1 language, project-AST,
-  temporal, tools-manifest, CLI JSON, and counterexample schemas;
-- sixteen closed BDD/ATDD scenarios with fixed argv bindings and hostile-tag
+  doctor, backend inspection, and Lean runtime inventory;
+- umbrella feature `authoring`, language version 1, project-AST format 1,
+  temporal-spec format 1, tools-manifest format 2, CLI JSON schema 1, and
+  counterexample schema 1;
+- twenty-five closed BDD/ATDD scenarios with fixed argv bindings and hostile-tag
   self-tests;
 - official pinned formal-tool artifacts and recorded SHA-256 checksums;
 - minimal and Mini Determinator `.zeno` examples plus a runnable Rust Mini
@@ -29,6 +30,7 @@ unchanged.
 The public package set grows from 33 to 36 crates and now publishes two
 binaries: `zeno-fcis` and the existing `mount-zenodex-zusd` diagnostic parity
 runner.
+
 ## Readiness polish
 
 The pre-publication developer review added process-level CLI journeys for Mini
@@ -36,15 +38,26 @@ checking, JSON diagnostics, overwrite refusal, generation, and read-only drift
 detection. The isolated downstream consumer now compiles and uses the umbrella
 `authoring` API.
 
+The README and tutorials include real xterm screenshots of CLI help, Mini
+Determinator checking, accumulated diagnostics, and Mermaid graph output. A
+bounded completion handshake prevents partial terminal captures.
+
 Parser nesting, operator chains, finite horizons, and formal export work have
-explicit hard limits. Formal-tool timeouts cover input delivery. Solver names
-use an injective encoding. The version check and requested run execute from the
-same private copy of the admitted binary bytes.
+explicit hard limits, including live Lean render budgets. Formal-tool timeouts
+cover input delivery, and process-group cleanup also runs after successful
+completion. Solver names use an injective encoding. The version check and
+requested run execute from the same private copy of admitted binary bytes.
+Lean uses a private runtime snapshot that is rechecked after execution. Both
+SMT phases are retained, contradictory results block, and complete evidence
+bundles are published atomically by content hash. `KernelChecked` also requires
+the qualified official Lean `4.30.0` Linux x86-64 tree identity.
 
 The release packager now creates one uniquely named archive for each declared
 binary and derives every retained binary command from the same inventory. Its
-self-test opens the archives and checks their executable members.
-
+self-test opens the archives and checks their executable members. It also
+fetches the locked external graph, unpacks all 36 public crate archives into a
+resolver-3 workspace, and compiles all features across every library, test,
+example, benchmark, and binary target offline.
 
 ## Compatibility
 

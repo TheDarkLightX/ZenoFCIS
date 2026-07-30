@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use crate::ast::*;
+use crate::{MAX_FORMULA_DEPTH, MAX_FORMULA_NODES};
 
 /// Contract for one host-owned pure data predicate.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -160,6 +161,7 @@ pub enum IndeterminateReason {
     PredicateLimit,
     EmptyTrace,
     HorizonExceeded,
+    ResourceLimit,
 }
 
 /// Three-way relational evaluation result.
@@ -266,6 +268,10 @@ pub fn evaluate_relational<P: PredicateProvider + ?Sized>(
     formula: &RelExpr,
     context: EvaluationContext<'_, P>,
 ) -> EvalOutcome {
+    let shape = formula_shape_rel(formula);
+    if formula_exceeds_hard_limits(shape) || shape.0 > operation_bound(context.limits) {
+        return EvalOutcome::Indeterminate(IndeterminateReason::ResourceLimit);
+    }
     let mut fuel = Fuel::new(context.limits);
     let mut variables = Vec::new();
     match eval_rel(
@@ -290,8 +296,15 @@ pub fn evaluate_temporal<P: PredicateProvider + ?Sized>(
     predicates: &P,
     limits: EvalLimits,
 ) -> TemporalEvaluation {
+    let shape = formula_shape_temporal(formula);
+    if formula_exceeds_hard_limits(shape) {
+        return TemporalEvaluation::Indeterminate(IndeterminateReason::ResourceLimit);
+    }
     if matches!(mode, ClaimMode::UnboundedProof) {
         return TemporalEvaluation::ProofObligation;
+    }
+    if shape.0 > operation_bound(limits) {
+        return TemporalEvaluation::Indeterminate(IndeterminateReason::ResourceLimit);
     }
     let horizon = match mode {
         ClaimMode::Finite { horizon } => horizon,
@@ -312,6 +325,14 @@ pub fn evaluate_temporal<P: PredicateProvider + ?Sized>(
         },
         Err(reason) => TemporalEvaluation::Indeterminate(reason),
     }
+}
+
+fn formula_exceeds_hard_limits((nodes, depth): (usize, usize)) -> bool {
+    depth > MAX_FORMULA_DEPTH || nodes > MAX_FORMULA_NODES
+}
+
+fn operation_bound(limits: EvalLimits) -> usize {
+    usize::try_from(limits.max_operations()).unwrap_or(usize::MAX)
 }
 
 fn eval_rel<P: PredicateProvider + ?Sized>(
@@ -568,6 +589,7 @@ fn first_failure<P: PredicateProvider + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
     struct NoPredicates;
     impl PredicateProvider for NoPredicates {
         fn evaluate(&self, _: &Identifier, _: &[i128]) -> Option<bool> {
@@ -684,5 +706,70 @@ mod tests {
                 EvalOutcome::Indeterminate(reason)
             );
         }
+    }
+
+    #[test]
+    fn direct_formula_node_count_is_checked_against_operation_budget() {
+        let trace = TraceStep::try_new(Vec::new()).unwrap_or_else(|| unreachable!());
+        let relational = RelExpr::And(Box::new(RelExpr::Bool(true)), Box::new(RelExpr::Bool(true)));
+        let two_operations = EvalLimits::try_new(2, 1, 1).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            evaluate_relational(
+                &relational,
+                EvaluationContext::new(&trace, &NoPredicates, two_operations),
+            ),
+            EvalOutcome::Indeterminate(IndeterminateReason::ResourceLimit)
+        );
+        let three_operations = EvalLimits::try_new(3, 1, 1).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            evaluate_relational(
+                &relational,
+                EvaluationContext::new(&trace, &NoPredicates, three_operations),
+            ),
+            EvalOutcome::True
+        );
+
+        let temporal = TemporalFormula::And(
+            Box::new(TemporalFormula::Atom(RelExpr::Bool(true))),
+            Box::new(TemporalFormula::Atom(RelExpr::Bool(true))),
+        );
+        let four_operations = EvalLimits::try_new(4, 1, 1).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            evaluate_temporal(
+                &temporal,
+                ClaimMode::Finite { horizon: 1 },
+                core::slice::from_ref(&trace),
+                &NoPredicates,
+                four_operations,
+            ),
+            TemporalEvaluation::Indeterminate(IndeterminateReason::ResourceLimit)
+        );
+        let five_operations = EvalLimits::try_new(5, 1, 1).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            evaluate_temporal(
+                &temporal,
+                ClaimMode::Finite { horizon: 1 },
+                core::slice::from_ref(&trace),
+                &NoPredicates,
+                five_operations,
+            ),
+            TemporalEvaluation::Satisfied
+        );
+    }
+
+    #[test]
+    fn unbounded_proof_obligations_ignore_runtime_operation_budget() {
+        let formula = TemporalFormula::Atom(RelExpr::Bool(true));
+        let one_operation = EvalLimits::try_new(1, 1, 1).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            evaluate_temporal(
+                &formula,
+                ClaimMode::UnboundedProof,
+                &[],
+                &NoPredicates,
+                one_operation,
+            ),
+            TemporalEvaluation::ProofObligation
+        );
     }
 }

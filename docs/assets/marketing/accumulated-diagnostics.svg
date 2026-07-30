@@ -56,10 +56,10 @@
     <circle cx="170" cy="317" r="8" fill="#ff6b6b"/>
     <circle cx="198" cy="317" r="8" fill="#f6c85f"/>
     <circle cx="226" cy="317" r="8" fill="#58d68d"/>
-    <text x="800" y="323" text-anchor="middle" class="terminal-title">VERIFIED LOCAL CAPTURE</text>
+    <text x="800" y="323" text-anchor="middle" class="terminal-title">DETERMINISTIC CLI RENDER</text>
   </g>
   <text x="164" y="382" class="prompt">$ zeno-fcis check examples/diagnostics-tour/project.zeno</text>
-  <text x="164" y="413" class="terminal">ZENO-E0205 elaborate:1:1 composition.merge_order expected exact component-ID permutation; got [20, 21]; list</text><text x="164" y="443" class="terminal">  every component exactly once in semantic merge order</text><text x="164" y="473" class="terminal">ZENO-E0201 elaborate:6:1 type.id expected unique stable ID; got 10; allocate a distinct explicit ID</text><text x="164" y="503" class="terminal">ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; declare the referenced type</text>
+  <text x="164" y="413" class="terminal">ZENO-E0205 elaborate:1:1 composition.merge_order expected exact component-ID permutation; got [20, 21]; list</text><text x="164" y="438" class="terminal">  every component exactly once in semantic merge order</text><text x="164" y="463" class="terminal">ZENO-E0201 elaborate:6:1 type.id expected unique stable ID; got 10; allocate a distinct explicit ID</text><text x="164" y="488" class="terminal">ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; declare the referenced type</text>
 
   <rect x="128" y="925" width="151" height="38" rx="19" fill="#0d1728" stroke="#263751"/><text x="143" y="951" class="badge">Accumulated</text><rect x="293" y="925" width="162" height="38" rx="19" fill="#0d1728" stroke="#263751"/><text x="308" y="951" class="badge">Stable codes</text><rect x="469" y="925" width="272" height="38" rx="19" fill="#0d1728" stroke="#263751"/><text x="484" y="951" class="badge">Actionable remediation</text>
   <text x="1472" y="951" text-anchor="end" class="footer">Executable output · deterministic renderer</text>

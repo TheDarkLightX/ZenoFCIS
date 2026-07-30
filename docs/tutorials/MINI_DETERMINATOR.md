@@ -232,7 +232,7 @@ ZENO-E0201 elaborate:6:1 type.id expected unique stable ID; got 10; allocate a d
 ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; declare the referenced type
 ```
 
-![Three authoring problems from one bounded check](../assets/marketing/accumulated-diagnostics.png)
+![Three authoring problems from one bounded check](../assets/marketing/terminal-accumulated-diagnostics.png)
 
 Each message includes a stable code, a location, the expected value, the
 observed value, and a suggested repair. The order stays stable for the same

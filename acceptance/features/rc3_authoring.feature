@@ -46,10 +46,10 @@ Feature: Author and compose bounded ZenoFCIS projects
     Then finite mode returns a counterexample and unbounded mode returns an obligation
 
   @atdd-rc3-formal-tools
-  Scenario: Bind formal output to the exact claim and checked arithmetic
+  Scenario: Bind formal output to the exact claim, runtime, and checked arithmetic
     Given bounded claims with signed division and closed backend identifiers
-    When deterministic source is exported
-    Then claim identity checked arithmetic and finite trace lengths are fixed
+    When deterministic source and a Lean runtime inventory are produced
+    Then claim identity checked arithmetic finite trace lengths and runtime bytes are fixed
 
   @atdd-rc3-formal-fail-closed
   Scenario: Block hostile formal outcomes and replay models before refutation

@@ -12,7 +12,8 @@ use serde_json::{Value, json};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_formal_tools::{
     CVC5_VERSION, LEAN_VERSION, ToolBackend, ToolFailure, ToolRunStatus, Z3_VERSION, doctor,
-    execute_tool, export_lean, export_smt, load_tools_manifest, retain_run, verify_tool,
+    execute_tool, export_lean, export_smt, inspect_lean_toolchain, load_tools_manifest, retain_run,
+    verify_tool,
 };
 use zeno_fcis_spec::{
     ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, ProjectLimits, ProjectSpec,
@@ -160,7 +161,7 @@ enum Command {
         #[arg(long, default_value = "zeno-fcis.tools.json")]
         tools: PathBuf,
     },
-    /// List, inspect, or verify closed formal backend configurations.
+    /// List, inspect, inventory, or verify closed formal backend configurations.
     Backend {
         #[command(subcommand)]
         command: BackendCommand,
@@ -175,6 +176,12 @@ enum BackendCommand {
     Inspect {
         #[arg(long, default_value = "zeno-fcis.tools.json")]
         tools: PathBuf,
+    },
+    /// Compute the portable bounded inventory of a Lean distribution.
+    InventoryLean {
+        root: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+        format: OutputFormat,
     },
     /// Recheck configured executable versions and hashes.
     Verify {
@@ -547,19 +554,35 @@ fn prove(
             let code = match run.status() {
                 ToolRunStatus::ProposedUnsat if counterexample => {
                     println!(
-                        "{} claim {}: no counterexample in requested scope",
+                        "{} claim {}: solver proposed UNSAT for the requested scope; proof output was not independently checked",
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    OK
+                    tool_run_exit(run.status(), counterexample)
                 }
                 ToolRunStatus::ProposedUnsat => {
                     println!(
-                        "{} claim {}: checked proposal retained; production authority unchanged",
+                        "{} claim {}: UNSAT proposal retained; proof output was not independently checked",
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    OK
+                    tool_run_exit(run.status(), counterexample)
+                }
+                ToolRunStatus::KernelChecked if counterexample => {
+                    eprintln!(
+                        "{} claim {}: kernel-checked theorem does not provide a counterexample",
+                        backend_name(tool_backend),
+                        claim.id().get()
+                    );
+                    tool_run_exit(run.status(), counterexample)
+                }
+                ToolRunStatus::KernelChecked => {
+                    println!(
+                        "{} claim {}: generated theorem kernel checked with the qualified RC3 toolchain identity and exact axiom report; production authority unchanged",
+                        backend_name(tool_backend),
+                        claim.id().get()
+                    );
+                    tool_run_exit(run.status(), counterexample)
                 }
                 ToolRunStatus::Refuted => {
                     println!(
@@ -567,7 +590,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    if counterexample { OK } else { INVALID }
+                    tool_run_exit(run.status(), counterexample)
                 }
                 ToolRunStatus::Blocked(error) => {
                     eprintln!(
@@ -575,7 +598,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    BLOCKED
+                    tool_run_exit(run.status(), counterexample)
                 }
                 ToolRunStatus::Failed(error) => {
                     eprintln!(
@@ -583,7 +606,7 @@ fn prove(
                         backend_name(tool_backend),
                         claim.id().get()
                     );
-                    FAILURE
+                    tool_run_exit(run.status(), counterexample)
                 }
             };
             exit = exit.max(code);
@@ -645,6 +668,36 @@ fn backend(command: BackendCommand) -> u8 {
                 BLOCKED
             }
         },
+        BackendCommand::InventoryLean { root, format } => {
+            let inventory = match inspect_lean_toolchain(&root) {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!("Lean toolchain inventory blocked: {error:?}");
+                    return failure_exit(&error);
+                }
+            };
+            match format {
+                OutputFormat::Human => {
+                    println!(
+                        "lean tree_sha256 {}\nfiles {}\ntotal_bytes {}",
+                        inventory.tree_sha256(),
+                        inventory.files().len(),
+                        inventory.total_bytes()
+                    );
+                    OK
+                }
+                OutputFormat::Json => match inventory.canonical_json() {
+                    Ok(bytes) => {
+                        println!("{}", String::from_utf8_lossy(&bytes));
+                        OK
+                    }
+                    Err(error) => {
+                        eprintln!("Lean toolchain inventory encoding failed: {error:?}");
+                        FAILURE
+                    }
+                },
+            }
+        }
         BackendCommand::Verify { tools } => {
             let manifest = match load_tools_manifest(&tools) {
                 Ok(value) => value,
@@ -751,8 +804,22 @@ fn backend_name(backend: ToolBackend) -> &'static str {
 
 fn failure_exit(error: &ToolFailure) -> u8 {
     match error {
-        ToolFailure::Io(_) | ToolFailure::Crash(_) | ToolFailure::OutputLimit => FAILURE,
+        ToolFailure::Io(_)
+        | ToolFailure::Crash(_)
+        | ToolFailure::OutputLimit
+        | ToolFailure::ProcessContainmentFailed => FAILURE,
         _ => BLOCKED,
+    }
+}
+
+fn tool_run_exit(status: &ToolRunStatus, counterexample: bool) -> u8 {
+    match status {
+        ToolRunStatus::ProposedUnsat | ToolRunStatus::Blocked(_) => BLOCKED,
+        ToolRunStatus::KernelChecked if counterexample => BLOCKED,
+        ToolRunStatus::KernelChecked => OK,
+        ToolRunStatus::Refuted if counterexample => OK,
+        ToolRunStatus::Refuted => INVALID,
+        ToolRunStatus::Failed(_) => FAILURE,
     }
 }
 
@@ -826,6 +893,16 @@ mod tests {
     #[test]
     fn exit_classes_are_stable() {
         assert_eq!([OK, INVALID, BLOCKED, FAILURE, USAGE], [0, 1, 2, 3, 64]);
+        assert_eq!(failure_exit(&ToolFailure::Timeout), BLOCKED);
+        assert_eq!(failure_exit(&ToolFailure::HashMismatch), BLOCKED);
+        assert_eq!(
+            failure_exit(&ToolFailure::ProcessContainmentFailed),
+            FAILURE
+        );
+        assert_eq!(tool_run_exit(&ToolRunStatus::ProposedUnsat, false), BLOCKED);
+        assert_eq!(tool_run_exit(&ToolRunStatus::KernelChecked, false), OK);
+        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, false), INVALID);
+        assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, true), OK);
     }
 
     #[test]

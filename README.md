@@ -16,6 +16,12 @@ The semantic kernel treats values, decisions, resource budgets, canonical bytes,
 
 ## See it run
 
+This is the published CLI running inside a virtual terminal. One command reads
+the Mini Determinator project and reports its typed components, claims,
+remaining checks, and content-bound program identity.
+
+[![ZenoFCIS checking the Mini Determinator in a virtual terminal](docs/assets/marketing/terminal-mini-determinator-check.png)](docs/tutorials/MINI_DETERMINATOR.md)
+
 The Mini Determinator links the public semantic core into a freestanding Rust
 kernel, boots through UEFI in QEMU, checks opposite worker completion orders,
 and rejects conflicting private writes without authoritative state change.
@@ -26,11 +32,11 @@ Authoring failures are accumulated in one bounded pass. This deliberately
 invalid example reports a duplicate stable ID, an unknown type reference, and
 an invalid merge order together:
 
-[![Three accumulated diagnostics from one check](docs/assets/marketing/accumulated-diagnostics.png)](docs/tutorials/MINI_DETERMINATOR.md#see-three-authoring-mistakes-at-once)
+[![Three accumulated diagnostics from one check](docs/assets/marketing/terminal-accumulated-diagnostics.png)](docs/tutorials/MINI_DETERMINATOR.md#see-three-authoring-mistakes-at-once)
 
 Start with the worked [Mini Determinator tutorial](docs/tutorials/MINI_DETERMINATOR.md),
 reproduce the [QEMU capture](docs/QEMU_MINI_DETERMINATOR.md), or inspect all
-[marketing-ready executable captures](docs/assets/marketing/README.md).
+[CLI and QEMU captures](docs/assets/marketing/README.md).
 
 ## Canonical bytes and byte-level enforcement
 

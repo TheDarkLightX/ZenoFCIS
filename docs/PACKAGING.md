@@ -14,7 +14,9 @@ This document describes the ZenoFCIS `1.0.0-rc.3` artifact set.
 `tools/rc_package.py check` compares that manifest with Cargo metadata and
 fails on missing packages, hidden public packages, duplicate entries, version
 drift, non-exact internal dependency pins, missing package metadata, or an
-invalid publication order.
+invalid publication order. Publication order includes internal development
+dependencies because crates.io must resolve them while checking a published
+crate.
 
 ## Artifact set
 
@@ -34,10 +36,16 @@ SHA256SUMS
 zeno-fcis-<version>-rc-bundle.zip
 ```
 
-The command requires a clean exact commit. It uses pinned Rust `1.97.1`,
-packages every public crate with `--locked`, builds both declared binaries in
-release mode, generates warning-denied rustdoc, records the Cargo dependency
-graph as CycloneDX 1.6, and content-addresses every retained artifact.
+The command requires a clean exact commit. It uses pinned Rust `1.97.1`, fetches
+the locked external graph, packages every public crate with `--locked`, then
+unpacks the complete crate set into a temporary resolver-3 workspace. It
+generates an offline lock against only the unpacked internal packages, then
+compiles all features across every public library, test, example, benchmark,
+and binary target with `--locked --offline`. This catches source, build, binary,
+or test files that exist in the repository and are absent from a published
+archive. The same run builds both declared binaries in release mode,
+generates warning-denied rustdoc, records the Cargo dependency graph as
+CycloneDX 1.6, and content-addresses every retained artifact.
 
 The source archive also retains `package.json`, `package-lock.json`,
 `.node-version`, and `probity.config.ts` for optional development guardrails.

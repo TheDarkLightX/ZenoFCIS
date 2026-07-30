@@ -194,7 +194,7 @@ def check_markup() -> str:
         'fill="#07131f" stroke="#1e4957"/>'
         '<circle cx="270" cy="773" r="9" fill="#5eead4"/>'
         '<text x="298" y="766" class="metric-label">SEMANTIC PROGRAM ID</text>'
-        '<text x="298" y="792" class="hash">38814d0b0a3a…a464670</text>'
+        '<text x="298" y="792" class="hash">e6a3d0e0c030…bca316bb</text>'
     )
     return "".join(parts)
 
@@ -232,14 +232,14 @@ def render(capture: Capture) -> None:
     lines = terminal_lines(capture.output)
     output_markup = []
     start_y = 413
-    line_height = 30
+    line_height = 25
     for index, line in enumerate(lines):
         output_markup.append(
             f'<text x="164" y="{start_y + index * line_height}" class="terminal">'
             f"{escaped(line)}</text>"
         )
 
-    visual = visual_markup(capture.visual)
+    visual = visual_markup(capture.visual).strip()
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{HEIGHT}"
          viewBox="0 0 {WIDTH} {HEIGHT}" role="img" aria-label="{escaped(capture.title)}">
   <defs>
@@ -298,11 +298,11 @@ def render(capture: Capture) -> None:
     <circle cx="170" cy="317" r="8" fill="#ff6b6b"/>
     <circle cx="198" cy="317" r="8" fill="#f6c85f"/>
     <circle cx="226" cy="317" r="8" fill="#58d68d"/>
-    <text x="800" y="323" text-anchor="middle" class="terminal-title">VERIFIED LOCAL CAPTURE</text>
+    <text x="800" y="323" text-anchor="middle" class="terminal-title">DETERMINISTIC CLI RENDER</text>
   </g>
   <text x="164" y="382" class="prompt">$ {escaped(capture.prompt)}</text>
   {''.join(output_markup)}
-  {visual}
+{visual}
   {badge_markup(capture.badges)}
   <text x="1472" y="951" text-anchor="end" class="footer">Executable output · deterministic renderer</text>
 </svg>

@@ -54,6 +54,8 @@ pub const MAX_SOURCE_TOKENS: usize = 262_144;
 pub const MAX_RETAINED_DIAGNOSTICS: usize = 256;
 /// Maximum recursive expression nesting admitted by the language parser.
 pub const MAX_FORMULA_DEPTH: usize = 256;
+/// Maximum total formula nodes admitted by elaboration and direct evaluation.
+pub const MAX_FORMULA_NODES: usize = 1_000_000;
 /// Maximum finite logical-trace horizon admitted by language version 1.
 pub const MAX_FINITE_HORIZON: u32 = 256;
 
@@ -143,7 +145,7 @@ impl ProjectLimits {
             || max_ports_per_component == 0
             || max_ports_per_component > 256
             || max_formula_nodes == 0
-            || max_formula_nodes > 1_000_000
+            || max_formula_nodes > MAX_FORMULA_NODES
             || max_formula_depth == 0
             || max_formula_depth > MAX_FORMULA_DEPTH
         {
@@ -195,7 +197,7 @@ impl Default for ProjectLimits {
             max_declarations: 65_536,
             max_components: 256,
             max_ports_per_component: 256,
-            max_formula_nodes: 1_000_000,
+            max_formula_nodes: MAX_FORMULA_NODES,
             max_formula_depth: MAX_FORMULA_DEPTH,
         }
     }
