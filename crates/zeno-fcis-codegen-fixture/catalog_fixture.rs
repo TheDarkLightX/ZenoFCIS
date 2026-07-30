@@ -2,7 +2,8 @@
 
 use zeno_fcis_catalog::{
     CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, HashRequirement,
-    ProjectCatalog, ReasonDefinition, ReasonDisposition,
+    OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition, ValueFlow,
+    ValueFlowKind,
 };
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_crypto::RustCryptoSha256;
@@ -30,6 +31,8 @@ pub(crate) fn fixture_catalog(schema: Schema) -> ProjectCatalog {
             TypeId::new(1),
             HashRequirement::Present,
             HashRequirement::Absent,
+            OperationSemantics::non_value(hash(120))
+                .unwrap_or_else(|error| panic!("fixture semantics rejected: {error}")),
             hash(20),
         )
         .unwrap_or_else(|error| panic!("fixture effect rejected: {error}")),
@@ -40,6 +43,14 @@ pub(crate) fn fixture_catalog(schema: Schema) -> ProjectCatalog {
             name("notify"),
             TypeId::new(3),
             TypeId::new(9),
+            OperationSemantics::value(
+                vec![
+                    ValueFlow::standard(ValueFlowKind::ExternalValueDelivery, hash(121))
+                        .unwrap_or_else(|error| panic!("fixture flow rejected: {error}")),
+                ],
+                hash(130),
+            )
+            .unwrap_or_else(|error| panic!("fixture semantics rejected: {error}")),
             hash(30),
         )
         .unwrap_or_else(|error| panic!("fixture channel rejected: {error}")),

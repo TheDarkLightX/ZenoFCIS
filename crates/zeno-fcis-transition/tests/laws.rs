@@ -4,7 +4,7 @@ use std::string::String;
 
 use zeno_fcis_catalog::{
     CatalogError, CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition,
-    HashRequirement, ProjectCatalog, ReasonDefinition, ReasonDisposition,
+    HashRequirement, OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition,
 };
 use zeno_fcis_codec::{CommitmentHasher, Domain, Hash32};
 use zeno_fcis_compose::{AccessPath, PathAtom};
@@ -19,10 +19,10 @@ use zeno_fcis_schema::{
     FieldDef, FieldId, Schema, SchemaLimits, TypeDef, TypeId, TypeKind, ValueValidationError,
 };
 use zeno_fcis_transition::{
-    CataloguedTransitionBuilder, LimitKind, MAX_TRANSITION_MAP_KEY_BYTES,
-    MAX_TRANSITION_OBSERVED_PATHS, MAX_TRANSITION_PATCH_OPERATIONS, MAX_TRANSITION_REASONS,
-    MAX_TRANSITION_STATE_DEPTH, MAX_TRANSITION_STATE_NODES, TransitionError, TransitionLimits,
-    validate_transition_decision,
+    ArtifactField, CataloguedTransitionBuilder, ExpectedInvocationBindings, LimitKind,
+    MAX_TRANSITION_MAP_KEY_BYTES, MAX_TRANSITION_OBSERVED_PATHS, MAX_TRANSITION_PATCH_OPERATIONS,
+    MAX_TRANSITION_REASONS, MAX_TRANSITION_STATE_DEPTH, MAX_TRANSITION_STATE_NODES,
+    TransitionError, TransitionLimits, validate_transition_decision,
 };
 use zeno_fcis_value::{Field, Value};
 
@@ -136,6 +136,8 @@ fn manifest() -> CatalogManifest {
             TypeId::new(4),
             HashRequirement::Present,
             HashRequirement::Absent,
+            OperationSemantics::non_value(hash(121))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(21),
         )
         .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -145,6 +147,8 @@ fn manifest() -> CatalogManifest {
             TypeId::new(4),
             HashRequirement::Present,
             HashRequirement::Absent,
+            OperationSemantics::non_value(hash(120))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(20),
         )
         .unwrap_or_else(|error| panic!("effect: {error}")),
@@ -155,6 +159,8 @@ fn manifest() -> CatalogManifest {
             name("audit-channel"),
             TypeId::new(6),
             TypeId::new(7),
+            OperationSemantics::non_value(hash(131))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(31),
         )
         .unwrap_or_else(|error| panic!("channel: {error}")),
@@ -163,6 +169,8 @@ fn manifest() -> CatalogManifest {
             name("notify"),
             TypeId::new(6),
             TypeId::new(7),
+            OperationSemantics::non_value(hash(130))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
             hash(30),
         )
         .unwrap_or_else(|error| panic!("channel: {error}")),
@@ -263,6 +271,11 @@ fn builder<'a>(
     .unwrap_or_else(|error| panic!("builder: {error}"))
 }
 
+fn expected_invocation() -> ExpectedInvocationBindings {
+    ExpectedInvocationBindings::try_new(hash(80), hash(81))
+        .unwrap_or_else(|error| panic!("expected invocation: {error}"))
+}
+
 fn field_path(raw_id: u16) -> ValuePath {
     ValuePath::new(vec![PathSegment::Field(raw_id)])
 }
@@ -310,8 +323,14 @@ fn accepted_transition_binds_catalog_plans_footprint_budget_and_successor() {
     let decision = transition
         .seal()
         .unwrap_or_else(|error| panic!("seal: {error}"));
-    validate_transition_decision::<TestHasher>(&decision, &catalog, &pre_state, state_domain())
-        .unwrap_or_else(|error| panic!("validate: {error}"));
+    validate_transition_decision::<TestHasher>(
+        &decision,
+        &catalog,
+        expected_invocation(),
+        &pre_state,
+        state_domain(),
+    )
+    .unwrap_or_else(|error| panic!("validate: {error}"));
 
     let Decision::Accept(accepted) = decision else {
         panic!("expected acceptance");
@@ -443,8 +462,14 @@ fn committed_failure_carries_a_complete_catalogued_candidate() {
     let decision = transition
         .seal()
         .unwrap_or_else(|error| panic!("seal: {error}"));
-    validate_transition_decision::<TestHasher>(&decision, &catalog, &pre_state, state_domain())
-        .unwrap_or_else(|error| panic!("validate: {error}"));
+    validate_transition_decision::<TestHasher>(
+        &decision,
+        &catalog,
+        expected_invocation(),
+        &pre_state,
+        state_domain(),
+    )
+    .unwrap_or_else(|error| panic!("validate: {error}"));
     let Decision::CommittedFailure(failed) = decision else {
         panic!("expected committed failure");
     };
@@ -572,10 +597,39 @@ fn invalid_pre_state_stale_replay_and_invalid_context_paths_fail_closed() {
         validate_transition_decision::<TestHasher>(
             &decision,
             &catalog,
+            expected_invocation(),
             &state(9, false),
             state_domain(),
         )
         .is_err()
+    );
+    let substituted_command = ExpectedInvocationBindings::try_new(hash(82), hash(81))
+        .unwrap_or_else(|error| panic!("substituted command: {error}"));
+    assert_eq!(
+        validate_transition_decision::<TestHasher>(
+            &decision,
+            &catalog,
+            substituted_command,
+            &pre_state,
+            state_domain(),
+        ),
+        Err(TransitionError::ArtifactMismatch(
+            ArtifactField::CandidateBindings
+        ))
+    );
+    let substituted_context = ExpectedInvocationBindings::try_new(hash(80), hash(82))
+        .unwrap_or_else(|error| panic!("substituted context: {error}"));
+    assert_eq!(
+        validate_transition_decision::<TestHasher>(
+            &decision,
+            &catalog,
+            substituted_context,
+            &pre_state,
+            state_domain(),
+        ),
+        Err(TransitionError::ArtifactMismatch(
+            ArtifactField::CandidateBindings
+        ))
     );
 
     let mut wrong_namespace = builder(&catalog, &pre_state);

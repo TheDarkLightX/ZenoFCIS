@@ -392,10 +392,13 @@ pub fn decode_canonical_patch(
             actual: operation_count,
         });
     }
-    let capacity =
-        usize::try_from(operation_count).map_err(|_| PatchDecodeError::LengthOverflow)?;
+    // Every operation is carried in a u32-length-prefixed blob.
     let mut state = PatchDecodeState::default();
-    let mut operations = Vec::with_capacity(capacity);
+    let mut operations = Vec::with_capacity(initial_collection_capacity(
+        operation_count,
+        cursor.remaining(),
+        4,
+    )?);
     for _ in 0..operation_count {
         let encoded = cursor.take_blob()?;
         operations.push(decode_patch_operation(encoded, limits, &mut state)?);
@@ -472,8 +475,12 @@ fn decode_value_path(
             actual: segment_count,
         });
     }
-    let capacity = usize::try_from(segment_count).map_err(|_| PatchDecodeError::LengthOverflow)?;
-    let mut segments = Vec::with_capacity(capacity);
+    // Every path segment has at least its one-byte tag.
+    let mut segments = Vec::with_capacity(initial_collection_capacity(
+        segment_count,
+        cursor.remaining(),
+        1,
+    )?);
     for _ in 0..segment_count {
         let segment = match cursor.take_u8()? {
             PATH_TAG_FIELD => PathSegment::Field(cursor.take_u16()?),
@@ -541,6 +548,18 @@ fn decode_patch_value(
 struct PatchDecodeState {
     value_nodes: u64,
     value_payload_bytes: u64,
+}
+
+fn initial_collection_capacity(
+    count: u32,
+    remaining_wire_bytes: usize,
+    minimum_wire_bytes_per_item: usize,
+) -> Result<usize, PatchDecodeError> {
+    let count = usize::try_from(count).map_err(|_| PatchDecodeError::LengthOverflow)?;
+    let wire_bound = remaining_wire_bytes
+        .checked_div(minimum_wire_bytes_per_item)
+        .ok_or(PatchDecodeError::LengthOverflow)?;
+    Ok(count.min(wire_bound))
 }
 
 struct PatchCursor<'a> {
@@ -1403,6 +1422,31 @@ mod tests {
                 actual: 1,
             })
         );
+    }
+
+    #[test]
+    fn collection_reservation_is_bounded_by_remaining_wire_bytes() {
+        assert_eq!(initial_collection_capacity(4_096, 0, 4), Ok(0));
+        assert_eq!(initial_collection_capacity(4_096, 15, 4), Ok(3));
+        assert_eq!(initial_collection_capacity(64, 7, 1), Ok(7));
+        assert_eq!(initial_collection_capacity(2, 100, 4), Ok(2));
+        assert_eq!(
+            initial_collection_capacity(1, 1, 0),
+            Err(PatchDecodeError::LengthOverflow)
+        );
+    }
+
+    #[test]
+    fn truncated_large_operation_declaration_is_rejected() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&1_u32.to_be_bytes());
+        bytes.extend_from_slice(Hash32::ZERO.as_bytes());
+        bytes.extend_from_slice(&4_096_u32.to_be_bytes());
+
+        assert!(matches!(
+            decode_canonical_patch(&bytes, PatchDecodeLimits::default()),
+            Err(PatchDecodeError::UnexpectedEnd { .. })
+        ));
     }
 
     #[test]

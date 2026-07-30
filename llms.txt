@@ -1,0 +1,127 @@
+# ZenoFCIS
+
+ZenoFCIS is a Rust library family for high-assurance functional-core /
+imperative-shell systems.
+
+Current workspace version: 1.0.0-rc.3
+Current status: current public API and packaging candidate; final Cargo V1
+stability and general deployment qualification are not yet claimed
+Rust toolchain: 1.97.1 for repository validation
+
+## Start here
+
+- docs/INSTALLATION.md: exact dependency and source installation
+- docs/QUICKSTART.md: supported project adoption path
+- docs/API_REFERENCE.md: public API entry points and rustdoc
+- docs/CRATE_MAP.md: crate roles and trust boundaries
+- docs/FEATURE_MATRIX.md: umbrella features and environments
+- docs/LLM_USAGE.md: authority rules for model-assisted work
+- docs/V1_PRODUCT_CONTRACT.md: frozen RC3 features and supported adopter journeys
+- docs/RC3_AUTHORING_CONTRACT.md: authoring pipeline, capability boundary, and nonclaims
+- docs/ZENO_LANGUAGE_V1.md: exact grammar, canonicalization, and diagnostics
+- docs/TEMPORAL_LOGIC_V1.md: finite and unbounded temporal semantics
+- docs/FORMAL_TOOLS_RC3.md: exact tool identity and fail-closed process adapters
+- docs/MINI_DETERMINATOR.md: executable shared-nothing semantic model
+- docs/QEMU_MINI_DETERMINATOR.md: freestanding QEMU kernel demo, capture path, and nonclaims
+- docs/CLI_REFERENCE.md: deterministic commands, JSON schema, and exit classes
+- docs/ACCEPTANCE_TESTING.md: BDD scenarios and closed executable ATDD registry
+- docs/DEVELOPER_GUARDRAILS.md: optional deterministic Probity rules and setup
+- docs/ARCHITECTURE.md: dependency rings
+- docs/RC3_RELEASE_NOTES.md: current candidate surface and final-release blockers
+- docs/RC2_RELEASE_NOTES.md: historical second-candidate notes
+- docs/RC1_RELEASE_NOTES.md: historical first-candidate notes
+- docs/V1_RELEASE_CHECKLIST.md: exact-source tag, publication, evidence, and rollback runbook
+- docs/PACKAGING.md: package authority and retained artifacts
+- docs/RELEASE_ASSURANCE.md: repository gates and nonclaims
+
+## Safe golden path
+
+ProjectProfile + ProjectCatalog
+-> generated typed transition or typed DomainMachine implementations
+-> ComposedDomainProgram for multi-domain projects
+-> complete project LawManifest and verified law evidence
+-> CatalogCommitAuthority::execute
+-> private CatalogAuthorizedTransition
+-> AuthorizedShellState or policy-pinned concrete shell
+
+The authority owns the catalog, program, law engine, provider, interpreter,
+deployment, replay policy, and limits. Request callers supply admitted
+invocation values, not prebuilt decisions or bundles.
+
+## Important public APIs
+
+- project: ProjectProfile, RegistryEntry, ProfileEvolution
+- schema/catalog: Schema, ProjectCatalog, CatalogLimits
+- transition: CataloguedTransitionBuilder, TransitionDecision
+- composition: CompositionSpec, ComponentContract, Footprint
+- domain execution: DomainMachine, MachineInterface, ExecutableComposition
+- composed program: ComposedDomainProgram, ProjectionPlan
+- laws: LawManifest, ProjectLawEngine, verify_project_laws
+- authority: CatalogCommitAuthority, InvocationWitness,
+  CatalogAuthorizedTransition
+- formal tools: BackendEngine, BackendVerifier, EvidenceChecker,
+  LawEvidenceVerifier
+- authoring: parse_project, elaborate_project, ProjectSpecBuilder,
+  evaluate_temporal, MiniDeterminator
+- formal process shell: package zeno-fcis-formal-tools
+- authoring CLI: package zeno-fcis-cli, binary zeno-fcis
+- shells: AuthorizedShellState; zeno-fcis-shell-sqlite when enabled
+
+## Production integration rules
+
+- Do not use CommitBundle, TransitionDecision, or NormalizedDecision as commit
+  authority.
+- Do not use apply_reference_bundle as a production commit port.
+- Do not let a caller choose schemas, stable IDs, precedence, laws, providers,
+  verifiers, interpreters, deployments, or promotion status.
+- Keep clocks, randomness, filesystems, networks, databases, threads, async
+  runtimes, mutable globals, and executable effect closures outside the core.
+- Ordinary Reject has no candidate, state change, effect, or outbox obligation.
+- CommittedFailure explicitly binds any intentional authoritative change.
+- Bind evidence to exact source, profile, schema, algorithm, assumptions,
+  artifact, coverage, toolchain, and independent verifier.
+
+## Formal tools
+
+The backend and evidence protocols are tool neutral. Public users may mount
+Lean, SMT/Z3, CVC5, Kani, Flux, or another checker. Private ESSO users may
+implement the same traits in a private crate. Missing tools, timeouts, crashes,
+unknown results, and checker disagreement grant no authority.
+
+## Deterministic parallelism
+
+The library contains proof-carrying composition, footprint/conflict analysis,
+commutativity evidence, and sequential-versus-composed parity surfaces.
+Canonical sequential execution is the normative runtime oracle.
+
+Nonclaim: no concurrent scheduler, threaded shell, or production parallel
+runtime is currently shipped. Production parallel promotion also requires
+complete static footprint witnesses and checked equality with the canonical
+sequential result.
+
+## Project-specific and reference surfaces
+
+- zeno-fcis-profile-zenodex and zeno-fcis-adapter-zenodex are project-specific.
+- zeno-fcis-shell is pure reference semantics.
+- authenticated-state and persistent collection implementations are reference
+  or optimization surfaces unless separately qualified. The
+  `authenticated-authority` feature adds retained-evidence projector
+  qualification, exact candidate binding, strict persisted-plan
+  reauthorization, and a nominal production-facing publication port. It does
+  not turn the bounded reference tree into a production datastore.
+- code generation synchronizes reviewed definitions; it does not prove them.
+
+## Validation commands
+
+python3 tools/check_assurance.py --self-test
+python3 tools/atdd.py self-test
+python3 tools/atdd.py check
+cargo +1.97.1 fmt --all -- --check
+cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo +1.97.1 test --workspace --all-features --locked
+cargo +1.97.1 test --workspace --doc --all-features --locked
+RUSTDOCFLAGS="-D warnings" cargo +1.97.1 doc --workspace --all-features --locked --no-deps
+python3 tools/atdd.py run --all
+
+Do not report exact-head green unless permanent read-only workflows passed at
+that exact commit.

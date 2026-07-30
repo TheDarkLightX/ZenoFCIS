@@ -55,7 +55,7 @@ For ordinary rejection, staged patch/effect/outbox proposals and their proposed 
 
 ## Footprint semantics
 
-State observations and proposed writes are converted from `ValuePath` to `AccessPath` under the profile state-type namespace. Map-key atoms use a domain-separated commitment to the exact encoded map-key bytes. Explicit context paths must use the profile context-type namespace. Each authoritative effect contributes the empty path in the effect operation's namespace. Duplicate observed paths are canonicalized as set membership.
+State observations and proposed writes are converted from `ValuePath` to `AccessPath` under the profile state-type namespace. Map-key atoms use a domain-separated commitment to the exact encoded map-key bytes. Explicit context paths must use the profile context-type namespace. Each non-executable commit-evidence record contributes the empty path in the effect operation's namespace. Duplicate observed paths are canonicalized as set membership.
 
 The returned footprint is execution-observed evidence. It does not establish that all paths reachable for other inputs were declared. It cannot authorize deterministic parallel composition by itself. Parallel promotion still requires a separately reviewed complete static component footprint and equality with the canonical sequential result.
 

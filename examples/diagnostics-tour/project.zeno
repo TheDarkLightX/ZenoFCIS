@@ -1,0 +1,10 @@
+// Deliberately invalid tutorial input. `zeno-fcis check` must report every
+// independent blocker below in deterministic order.
+zeno 1;
+project 1 diagnostics_tour;
+type 10 state SharedState;
+type 10 state DuplicateState;
+component 20 cataloguer {
+  owns 99;
+}
+merge [20, 21];

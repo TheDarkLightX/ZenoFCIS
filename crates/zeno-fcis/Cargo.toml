@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 authors.workspace = true
+readme.workspace = true
 
 [features]
 default = ["std"]
@@ -19,6 +20,8 @@ std = [
     "zeno-fcis-project/std",
     "zeno-fcis-catalog?/std",
     "zeno-fcis-transition?/std",
+    "zeno-fcis-laws?/std",
+    "zeno-fcis-authority?/std",
     "zeno-fcis-security?/std",
     "zeno-fcis-secret?/std",
     "zeno-fcis-patch/std",
@@ -26,12 +29,16 @@ std = [
     "zeno-fcis-receipt/std",
     "zeno-fcis-shell/std",
     "zeno-fcis-compose/std",
+    "zeno-fcis-domain?/std",
+    "zeno-fcis-composed-program?/std",
     "zeno-fcis-refine/std",
     "zeno-fcis-profile-zenodex?/std",
     "zeno-fcis-schema?/std",
     "zeno-fcis-backend?/std",
     "zeno-fcis-collections?/std",
+    "zeno-fcis-spec?/std",
 ]
+authoring = ["dep:zeno-fcis-spec"]
 rustcrypto-sha256 = ["dep:zeno-fcis-crypto", "zeno-fcis-crypto/rustcrypto"]
 verified-sha256 = ["dep:zeno-fcis-crypto", "zeno-fcis-crypto/libcrux"]
 sha256-parity = [
@@ -42,6 +49,20 @@ sha256-parity = [
 schema = ["dep:zeno-fcis-schema"]
 catalog = ["schema", "dep:zeno-fcis-catalog"]
 transition = ["catalog", "dep:zeno-fcis-transition"]
+laws = ["catalog", "dep:zeno-fcis-laws"]
+authority = [
+    "transition",
+    "laws",
+    "rustcrypto-sha256",
+    "dep:zeno-fcis-authority",
+    "zeno-fcis-authority/rustcrypto",
+]
+domain-machines = ["schema", "dep:zeno-fcis-domain"]
+composed-program = [
+    "authority",
+    "domain-machines",
+    "dep:zeno-fcis-composed-program",
+]
 security = ["dep:zeno-fcis-security"]
 secret = ["dep:zeno-fcis-secret"]
 codegen = ["schema", "dep:zeno-fcis-codegen"]
@@ -55,9 +76,15 @@ mounted-zenodex = [
     "dep:zeno-fcis-adapter-zenodex",
 ]
 authenticated-state = ["std", "dep:zeno-fcis-authenticated"]
+authenticated-authority = [
+    "authenticated-state",
+    "authority",
+    "dep:zeno-fcis-authenticated-authority",
+    "zeno-fcis-authenticated-authority/rustcrypto",
+]
 synthesis = ["dep:zeno-fcis-synthesis"]
 backend = ["synthesis", "dep:zeno-fcis-backend"]
-sqlite-shell = ["std", "dep:zeno-fcis-shell-sqlite"]
+sqlite-shell = ["std", "authority", "dep:zeno-fcis-shell-sqlite"]
 collections = ["std", "dep:zeno-fcis-collections"]
 persistent-collections = [
     "collections",
@@ -68,6 +95,10 @@ full = [
     "sha256-parity",
     "catalog",
     "transition",
+    "laws",
+    "authority",
+    "domain-machines",
+    "composed-program",
     "security",
     "secret",
     "codegen",
@@ -75,39 +106,47 @@ full = [
     "evidence",
     "mounted-zenodex",
     "authenticated-state",
+    "authenticated-authority",
     "backend",
     "sqlite-shell",
     "persistent-collections",
+    "authoring",
 ]
 
 [dependencies]
-zeno-fcis-core = { version = "=0.1.0", path = "../zeno-fcis-core", default-features = false }
-zeno-fcis-value = { version = "=0.1.0", path = "../zeno-fcis-value", default-features = false }
-zeno-fcis-codec = { version = "=0.1.0", path = "../zeno-fcis-codec", default-features = false }
-zeno-fcis-crypto = { version = "=0.1.0", path = "../zeno-fcis-crypto", default-features = false, optional = true }
-zeno-fcis-project = { version = "=0.1.0", path = "../zeno-fcis-project", default-features = false }
-zeno-fcis-catalog = { version = "=0.1.0", path = "../zeno-fcis-catalog", default-features = false, optional = true }
-zeno-fcis-transition = { version = "=0.1.0", path = "../zeno-fcis-transition", default-features = false, optional = true }
-zeno-fcis-security = { version = "=0.1.0", path = "../zeno-fcis-security", default-features = false, optional = true }
-zeno-fcis-secret = { version = "=0.1.0", path = "../zeno-fcis-secret", default-features = false, optional = true }
-zeno-fcis-patch = { version = "=0.1.0", path = "../zeno-fcis-patch", default-features = false }
-zeno-fcis-plan = { version = "=0.1.0", path = "../zeno-fcis-plan", default-features = false }
-zeno-fcis-receipt = { version = "=0.1.0", path = "../zeno-fcis-receipt", default-features = false }
-zeno-fcis-shell = { version = "=0.1.0", path = "../zeno-fcis-shell", default-features = false }
-zeno-fcis-compose = { version = "=0.1.0", path = "../zeno-fcis-compose", default-features = false }
-zeno-fcis-refine = { version = "=0.1.0", path = "../zeno-fcis-refine", default-features = false }
-zeno-fcis-profile-zenodex = { version = "=0.1.0", path = "../zeno-fcis-profile-zenodex", default-features = false, optional = true }
-zeno-fcis-schema = { version = "=0.1.0", path = "../zeno-fcis-schema", default-features = false, optional = true }
-zeno-fcis-codegen = { version = "=0.1.0", path = "../zeno-fcis-codegen", optional = true }
-zeno-fcis-bootstrap = { version = "=0.1.0", path = "../zeno-fcis-bootstrap", optional = true }
-zeno-fcis-evidence = { version = "=0.1.0", path = "../zeno-fcis-evidence", default-features = false, optional = true }
-zeno-fcis-adapter = { version = "=0.1.0", path = "../zeno-fcis-adapter", optional = true }
-zeno-fcis-adapter-zenodex = { version = "=0.1.0", path = "../zeno-fcis-adapter-zenodex", optional = true }
-zeno-fcis-authenticated = { version = "=0.1.0", path = "../zeno-fcis-authenticated", optional = true }
-zeno-fcis-synthesis = { version = "=0.1.0", path = "../zeno-fcis-synthesis", default-features = false, optional = true }
-zeno-fcis-backend = { version = "=0.1.0", path = "../zeno-fcis-backend", default-features = false, optional = true }
-zeno-fcis-shell-sqlite = { version = "=0.1.0", path = "../zeno-fcis-shell-sqlite", optional = true }
-zeno-fcis-collections = { version = "=0.1.0", path = "../zeno-fcis-collections", default-features = false, optional = true }
+zeno-fcis-core = { version = "=1.0.0-rc.3", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", default-features = false, optional = true }
+zeno-fcis-project = { version = "=1.0.0-rc.3", path = "../zeno-fcis-project", default-features = false }
+zeno-fcis-catalog = { version = "=1.0.0-rc.3", path = "../zeno-fcis-catalog", default-features = false, optional = true }
+zeno-fcis-transition = { version = "=1.0.0-rc.3", path = "../zeno-fcis-transition", default-features = false, optional = true }
+zeno-fcis-laws = { version = "=1.0.0-rc.3", path = "../zeno-fcis-laws", default-features = false, optional = true }
+zeno-fcis-authority = { version = "=1.0.0-rc.3", path = "../zeno-fcis-authority", default-features = false, optional = true }
+zeno-fcis-security = { version = "=1.0.0-rc.3", path = "../zeno-fcis-security", default-features = false, optional = true }
+zeno-fcis-secret = { version = "=1.0.0-rc.3", path = "../zeno-fcis-secret", default-features = false, optional = true }
+zeno-fcis-patch = { version = "=1.0.0-rc.3", path = "../zeno-fcis-patch", default-features = false }
+zeno-fcis-plan = { version = "=1.0.0-rc.3", path = "../zeno-fcis-plan", default-features = false }
+zeno-fcis-receipt = { version = "=1.0.0-rc.3", path = "../zeno-fcis-receipt", default-features = false }
+zeno-fcis-shell = { version = "=1.0.0-rc.3", path = "../zeno-fcis-shell", default-features = false }
+zeno-fcis-compose = { version = "=1.0.0-rc.3", path = "../zeno-fcis-compose", default-features = false }
+zeno-fcis-domain = { version = "=1.0.0-rc.3", path = "../zeno-fcis-domain", default-features = false, optional = true }
+zeno-fcis-composed-program = { version = "=1.0.0-rc.3", path = "../zeno-fcis-composed-program", default-features = false, optional = true }
+zeno-fcis-refine = { version = "=1.0.0-rc.3", path = "../zeno-fcis-refine", default-features = false }
+zeno-fcis-profile-zenodex = { version = "=1.0.0-rc.3", path = "../zeno-fcis-profile-zenodex", default-features = false, optional = true }
+zeno-fcis-schema = { version = "=1.0.0-rc.3", path = "../zeno-fcis-schema", default-features = false, optional = true }
+zeno-fcis-codegen = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codegen", optional = true }
+zeno-fcis-bootstrap = { version = "=1.0.0-rc.3", path = "../zeno-fcis-bootstrap", optional = true }
+zeno-fcis-evidence = { version = "=1.0.0-rc.3", path = "../zeno-fcis-evidence", default-features = false, optional = true }
+zeno-fcis-adapter = { version = "=1.0.0-rc.3", path = "../zeno-fcis-adapter", optional = true }
+zeno-fcis-adapter-zenodex = { version = "=1.0.0-rc.3", path = "../zeno-fcis-adapter-zenodex", optional = true }
+zeno-fcis-authenticated = { version = "=1.0.0-rc.3", path = "../zeno-fcis-authenticated", optional = true }
+zeno-fcis-authenticated-authority = { version = "=1.0.0-rc.3", path = "../zeno-fcis-authenticated-authority", default-features = false, optional = true }
+zeno-fcis-synthesis = { version = "=1.0.0-rc.3", path = "../zeno-fcis-synthesis", default-features = false, optional = true }
+zeno-fcis-backend = { version = "=1.0.0-rc.3", path = "../zeno-fcis-backend", default-features = false, optional = true }
+zeno-fcis-shell-sqlite = { version = "=1.0.0-rc.3", path = "../zeno-fcis-shell-sqlite", optional = true }
+zeno-fcis-collections = { version = "=1.0.0-rc.3", path = "../zeno-fcis-collections", default-features = false, optional = true }
+zeno-fcis-spec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-spec", default-features = false, optional = true }
 
 [lints]
 workspace = true

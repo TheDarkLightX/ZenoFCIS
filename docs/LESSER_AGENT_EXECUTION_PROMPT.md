@@ -1,5 +1,12 @@
 # ZenoFCIS downstream-agent execution prompt
 
+> **Historical document.** This prompt describes the original PR #1 through
+> PR #5 work-package stack and must not be used as a current branch or package
+> instruction. Current agents should start with [LLM usage](LLM_USAGE.md), the
+> [quickstart](QUICKSTART.md), and the exact source and open PR stack. Stable
+> identifiers, authority, proof, promotion, and release decisions remain owner
+> controlled.
+
 Copy the prompt below into a fresh coding agent. Replace only the selected work-package name. Do not combine packages.
 
 ---
@@ -37,7 +44,7 @@ Do not implement adjacent packages. A small complete draft PR is preferred over 
 - Semantic crates use `#![forbid(unsafe_code)]`.
 - The core has no ambient clock, randomness, filesystem, network, database, thread, async runtime, global mutable state, or interior mutability.
 - All protocol values are transitively owned and immutable.
-- Decisions are exactly `Accept | Reject | CommittedFailure`; ordinary rejection has no candidate or authoritative effect.
+- Decisions are exactly `Accept | Reject | CommittedFailure`; ordinary rejection has no candidate, commit evidence, or outbox obligation.
 - Stable reason precedence is explicit, total, versioned, and content-addressed.
 - ZCVE/1, schema identifiers, domain-separated preimages, roots, candidate IDs, and receipts are protocol meaning.
 - State updates are preconditioned canonical patches with expected pre-root and expected old-value commitments.

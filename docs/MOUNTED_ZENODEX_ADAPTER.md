@@ -25,9 +25,14 @@ bytes remain authoritative.
 ## Authority and trust
 
 The runtime proposes a complete decision. `NormalizedDecision::try_new` checks
-the three-way decision shape and `compare_exact` decides refinement. Serde and
-Serde JSON are trusted only to parse this non-consensus shell format. They do
-not encode protocol values, roots, receipts, or bundles.
+only bounded three-way transport shape, and `compare_exact` reports complete
+byte equality. Both values remain untrusted diagnostic data. Production
+promotion requires strict receipt/bundle reconstruction through
+`ValidatedNormalizedDecision` against an exact invocation, pre-state, state
+domain, and approved provider. An exhaustive claim additionally requires a
+canonical domain manifest and independently verified exact coverage evidence.
+Serde and Serde JSON are trusted only to parse this non-consensus shell format.
+They do not encode protocol values, roots, receipts, or bundles.
 
 ## Bounds and negative cases
 
@@ -45,4 +50,5 @@ revision documented in `MOUNTED_ZENODEX_ZUSD_V1.md`, enforces bounded process
 and transport controls, persists generated replay fixtures, and retains one
 bounded parity report. That report is mounted runtime-refinement evidence only
 for its declared corpus and revisions. Passing generic adapter unit tests is
-not mounted evidence. Neither result grants production authority.
+not mounted evidence. Equality of untrusted normalized decisions is not a
+promotion certificate. Neither result grants production authority.

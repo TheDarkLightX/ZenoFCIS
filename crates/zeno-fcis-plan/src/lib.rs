@@ -1,7 +1,9 @@
-//! Closed data-only plans for authoritative commit and external delivery.
+//! Closed data-only plans for committed evidence and external delivery.
 //!
 //! Plans contain no closures, function pointers, trait objects, endpoints, or
-//! ambient runtime handles. The shell interprets a closed operation registry.
+//! ambient runtime handles. In V1, [`CommitPlan`] is non-executable evidence
+//! published atomically with state, while [`OutboxPlan`] is the only durable
+//! external-work boundary.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
@@ -23,7 +25,7 @@ use zeno_fcis_value::Value;
 pub struct PlanDecodeLimits {
     /// Maximum bytes in one complete encoded plan.
     pub max_input_bytes: u64,
-    /// Maximum authoritative effects in one commit plan.
+    /// Maximum evidence records in one commit plan.
     pub max_effects: u32,
     /// Maximum delivery obligations in one outbox plan.
     pub max_outbox_entries: u32,
@@ -48,7 +50,11 @@ impl Default for PlanDecodeLimits {
     }
 }
 
-/// One authoritative operation planned by the semantic core.
+/// One non-executable evidence record planned by the semantic core.
+///
+/// A shell publishes this record atomically with the candidate but never
+/// executes it. Work that must happen outside semantic state belongs in an
+/// [`OutboxEntry`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Effect {
     ordinal: u32,
@@ -59,7 +65,7 @@ pub struct Effect {
 }
 
 impl Effect {
-    /// Creates a closed authoritative operation.
+    /// Creates one closed non-executable evidence record.
     #[must_use]
     pub const fn new(
         ordinal: u32,
@@ -118,7 +124,7 @@ impl CanonicalEncode for Effect {
     }
 }
 
-/// Canonically ordered authoritative operations.
+/// Canonically ordered non-executable commit evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitPlan {
     effects: Box<[Effect]>,
@@ -291,9 +297,13 @@ pub fn decode_commit_plan(
             actual: effect_count,
         });
     }
-    let capacity = usize::try_from(effect_count).map_err(|_| PlanDecodeError::LengthOverflow)?;
+    // Every effect is carried in a u32-length-prefixed blob.
     let mut state = PlanDecodeState::default();
-    let mut effects = Vec::with_capacity(capacity);
+    let mut effects = Vec::with_capacity(initial_collection_capacity(
+        effect_count,
+        cursor.remaining(),
+        4,
+    )?);
     for _ in 0..effect_count {
         effects.push(decode_effect(cursor.take_blob()?, limits, &mut state)?);
     }
@@ -324,9 +334,13 @@ pub fn decode_outbox_plan(
             actual: entry_count,
         });
     }
-    let capacity = usize::try_from(entry_count).map_err(|_| PlanDecodeError::LengthOverflow)?;
+    // Every outbox entry is carried in a u32-length-prefixed blob.
     let mut state = PlanDecodeState::default();
-    let mut entries = Vec::with_capacity(capacity);
+    let mut entries = Vec::with_capacity(initial_collection_capacity(
+        entry_count,
+        cursor.remaining(),
+        4,
+    )?);
     for _ in 0..entry_count {
         entries.push(decode_outbox_entry(
             cursor.take_blob()?,
@@ -439,6 +453,18 @@ struct PlanDecodeState {
     value_payload_bytes: u64,
 }
 
+fn initial_collection_capacity(
+    count: u32,
+    remaining_wire_bytes: usize,
+    minimum_wire_bytes_per_item: usize,
+) -> Result<usize, PlanDecodeError> {
+    let count = usize::try_from(count).map_err(|_| PlanDecodeError::LengthOverflow)?;
+    let wire_bound = remaining_wire_bytes
+        .checked_div(minimum_wire_bytes_per_item)
+        .ok_or(PlanDecodeError::LengthOverflow)?;
+    Ok(count.min(wire_bound))
+}
+
 struct PlanCursor<'a> {
     bytes: &'a [u8],
     offset: usize,
@@ -511,7 +537,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 /// Closed-plan construction failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlanError {
-    /// Two authoritative effects share one ordinal.
+    /// Two commit-evidence records share one ordinal.
     DuplicateEffectOrdinal(u32),
     /// Two outbox entries share one ordinal.
     DuplicateOutboxOrdinal(u32),
@@ -749,6 +775,30 @@ mod tests {
             decode_outbox_plan(&0_u32.to_be_bytes(), PlanDecodeLimits::default()),
             Ok(OutboxPlan::empty())
         );
+    }
+
+    #[test]
+    fn collection_reservation_is_bounded_by_remaining_wire_bytes() {
+        assert_eq!(initial_collection_capacity(4_096, 0, 4), Ok(0));
+        assert_eq!(initial_collection_capacity(4_096, 15, 4), Ok(3));
+        assert_eq!(initial_collection_capacity(2, 100, 4), Ok(2));
+        assert_eq!(
+            initial_collection_capacity(1, 1, 0),
+            Err(PlanDecodeError::LengthOverflow)
+        );
+    }
+
+    #[test]
+    fn truncated_large_plan_declarations_are_rejected() {
+        let bytes = 4_096_u32.to_be_bytes();
+        assert!(matches!(
+            decode_commit_plan(&bytes, PlanDecodeLimits::default()),
+            Err(PlanDecodeError::UnexpectedEnd { .. })
+        ));
+        assert!(matches!(
+            decode_outbox_plan(&bytes, PlanDecodeLimits::default()),
+            Err(PlanDecodeError::UnexpectedEnd { .. })
+        ));
     }
 
     #[test]

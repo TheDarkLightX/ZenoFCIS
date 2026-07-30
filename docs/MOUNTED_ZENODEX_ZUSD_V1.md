@@ -50,8 +50,11 @@ and the canonical replay fixture when available.
 
 The ZenoDEX engines decide only their native pure transition. The mount adapter
 validates and translates that observation. `CandidateBuilder`,
-`NormalizedDecision::try_new`, and `compare_exact` decide whether the complete
-ZenoFCIS artifact is admissible and equal.
+`NormalizedDecision::try_new`, and `compare_exact` decide whether the bounded
+transport shape is internally present and equal. The result remains untrusted
+mounted evidence. Production promotion must separately reconstruct it through
+`ValidatedNormalizedDecision` and, for exhaustive claims, bind a canonical
+finite-domain manifest and independently checked enumeration artifact.
 
 The runner is an imperative evidence shell. Process spawning, timeout handling,
 filesystem retention, Git revision inspection, and JSON transport are outside
