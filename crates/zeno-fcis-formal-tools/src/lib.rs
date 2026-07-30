@@ -1610,7 +1610,7 @@ def claim_{claim_id}\n\
     (observe : String → Nat → I128)\n\
     (predicate : String → List Int → Prop) : Prop :=\n  {proposition}\n\n\
 theorem claim_{claim_id}_checked : claim_{claim_id} observe predicate := by\n\
-  simp [claim_{claim_id}, floorDiv, ceilDiv, inI128, i128Min, i128Max]\n\n\
+\x20\x20simp [claim_{claim_id}, floorDiv, ceilDiv, inI128, i128Min, i128Max]\n\n\
 #print axioms claim_{claim_id}_checked\n\n\
 end ZenoFCIS\n",
         lean_int(i128::MIN),
@@ -4572,6 +4572,7 @@ mod tests {
         assert!(source.contains("-- claim-id 501\n"));
         assert!(source.contains("(observe \"pre_100\" n).val"));
         assert!(source.contains("∀ n : Nat, n >= 0"));
+        assert!(source.contains(":= by\n  simp [claim_501,"));
         assert!(!source.contains("relational_atom"));
 
         assert_eq!(
