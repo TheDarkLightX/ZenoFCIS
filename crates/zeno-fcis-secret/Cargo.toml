@@ -17,7 +17,7 @@ std = ["zeno-fcis-codec/std", "zeroize/std"]
 [dependencies]
 subtle = { version = "=2.6.1", default-features = false }
 zeroize = { version = "=1.9.0", default-features = false, features = ["alloc"] }
-zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec", default-features = false }
 
 [lints]
 workspace = true

@@ -13,10 +13,10 @@ readme.workspace = true
 [dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.151" }
-zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec" }
-zeno-fcis-core = { version = "=1.0.0-rc.2", path = "../zeno-fcis-core" }
-zeno-fcis-crypto = { version = "=1.0.0-rc.2", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
-zeno-fcis-refine = { version = "=1.0.0-rc.2", path = "../zeno-fcis-refine" }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
+zeno-fcis-core = { version = "=1.0.0-rc.3", path = "../zeno-fcis-core" }
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-refine = { version = "=1.0.0-rc.3", path = "../zeno-fcis-refine" }
 
 [lints]
 workspace = true

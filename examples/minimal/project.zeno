@@ -1,0 +1,19 @@
+zeno 1;
+project 1 minimal;
+namespace 10 core;
+type 100 state State;
+type 101 command Command;
+type 102 context Context;
+type 103 destination Destination;
+type 104 payload Payload;
+reason 200 invalid precedence 0;
+component 300 machine {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 1024;
+}
+merge [300];
+law 400 identity = pre.100 == pre.100;
+claim 500 identity cvc5 relational = pre.100 == pre.100;

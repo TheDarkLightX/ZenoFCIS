@@ -10,14 +10,15 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "=0.4.13"
-zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-codec" }
-zeno-fcis-core = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-core" }
-zeno-fcis-crypto = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
-zeno-fcis-patch = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-patch" }
-zeno-fcis-plan = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-plan" }
-zeno-fcis-receipt = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-receipt" }
-zeno-fcis-shell = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-shell" }
-zeno-fcis-value = { version = "=1.0.0-rc.2", path = "../crates/zeno-fcis-value" }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-codec" }
+zeno-fcis-core = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-core" }
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-patch = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-patch" }
+zeno-fcis-plan = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-plan" }
+zeno-fcis-receipt = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-receipt" }
+zeno-fcis-shell = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-shell" }
+zeno-fcis-spec = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-spec" }
+zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../crates/zeno-fcis-value" }
 
 [[bin]]
 name = "codec_roundtrip"
@@ -29,6 +30,13 @@ bench = false
 [[bin]]
 name = "candidate_bundle"
 path = "fuzz_targets/candidate_bundle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "zeno_parser"
+path = "fuzz_targets/zeno_parser.rs"
 test = false
 doc = false
 bench = false

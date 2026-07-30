@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and execute the closed RC2 acceptance-scenario registry."""
+"""Validate and execute the closed RC3 acceptance-scenario registry."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE_ROOT = ROOT / "acceptance" / "features"
 ATDD_TAG = re.compile(r"@atdd-([a-z0-9]+(?:-[a-z0-9]+)*)")
+ATDD_TAG_LINE = re.compile(r"^@atdd-([a-z0-9]+(?:-[a-z0-9]+)*)$")
 SCENARIO = re.compile(r"^\s*Scenario:\s*(\S.*)$")
 OTHER_GHERKIN_DECLARATION = re.compile(
     r"^\s*(?:Feature|Rule|Background|Scenario Outline|Scenario Template|Examples):"
@@ -37,7 +38,18 @@ class AcceptanceScenario:
 SCENARIOS: dict[str, AcceptanceScenario] = {
     "minimal-core": AcceptanceScenario(
         "Run the immutable functional core example",
-        (("cargo", "+1.97.1", "run", "-p", "zeno-fcis", "--example", "minimal_core", "--locked"),),
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "run",
+                "-p",
+                "zeno-fcis",
+                "--example",
+                "minimal_core",
+                "--locked",
+            ),
+        ),
     ),
     "checked-backend": AcceptanceScenario(
         "Construct a tool-neutral checked backend request",
@@ -86,7 +98,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked"),),
     ),
     "release-contract": AcceptanceScenario(
-        "Validate the complete RC2 release contract",
+        "Run the local RC3 release gate",
         (
             ("python3", "tools/check_assurance.py", "--self-test"),
             ("python3", "tools/check_assurance.py"),
@@ -138,6 +150,256 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
     ),
+    "rc3-project-new": AcceptanceScenario(
+        "Create a bounded project without overwriting files",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-cli",
+                "--locked",
+                "rc3_cli_new_refuses_existing_content",
+            ),
+        ),
+    ),
+    "rc3-mini-os-check": AcceptanceScenario(
+        "Check the Mini Determinator project in one command",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-cli",
+                "--locked",
+                "rc3_cli_mini_determinator_check",
+            ),
+        ),
+    ),
+    "rc3-spec-canonical": AcceptanceScenario(
+        "Produce identical typed AST bytes from equivalent source",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_spec_canonical",
+            ),
+        ),
+    ),
+    "rc3-composition-diagnostics": AcceptanceScenario(
+        "Report composition blockers completely and deterministically",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_composition_diagnostics",
+            ),
+        ),
+    ),
+    "rc3-mini-os-replay": AcceptanceScenario(
+        "Replay shared-nothing coordination independently of completion order",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_mini_os_replay",
+            ),
+        ),
+    ),
+    "rc3-mini-os-conflict": AcceptanceScenario(
+        "Reject conflicting private workspace merges without authority change",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_mini_os_conflict",
+            ),
+        ),
+    ),
+    "rc3-temporal-modes": AcceptanceScenario(
+        "Keep finite execution and unbounded proof obligations distinct",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_temporal_modes",
+            ),
+        ),
+    ),
+    "rc3-formal-tools": AcceptanceScenario(
+        "Bind formal output to the exact claim and checked arithmetic",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-formal-tools",
+                "--locked",
+                "rc3_formal_tools_translation_parity",
+            ),
+        ),
+    ),
+    "rc3-formal-fail-closed": AcceptanceScenario(
+        "Block hostile formal outcomes and replay models before refutation",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-formal-tools",
+                "--locked",
+                "rc3_formal_fail_closed_and_model_replay",
+            ),
+        ),
+    ),
+    "rc3-input-inert": AcceptanceScenario(
+        "Keep shell traversal environment and instruction syntax inert",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_input_inert",
+            ),
+        ),
+    ),
+    "rc3-derived-views": AcceptanceScenario(
+        "Render deterministic diagnostic graphs and explanations only",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_derived_views",
+            ),
+        ),
+    ),
+    "rc3-generated-drift": AcceptanceScenario(
+        "Regenerate source and manifests reproducibly and detect drift",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-cli",
+                "--locked",
+                "rc3_cli_generate_check",
+            ),
+        ),
+    ),
+    "rc3-resource-envelopes": AcceptanceScenario(
+        "Stop deep parsing, huge horizons, and oversized exports within fixed limits",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_parser_",
+            ),
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-spec",
+                "--locked",
+                "rc3_finite_horizon_is_bounded_during_elaboration",
+            ),
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-formal-tools",
+                "--locked",
+                "rc3_formal_export_limits_fail_closed_before_rendering",
+            ),
+        ),
+    ),
+    "rc3-process-boundary": AcceptanceScenario(
+        "Bind timeout, solver names, and execution to exact checked bytes",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-formal-tools",
+                "--locked",
+                "rc3_process_timeout_includes_blocked_stdin_delivery",
+            ),
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-formal-tools",
+                "--locked",
+                "rc3_smt_predicate_symbols_are_injective",
+            ),
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-formal-tools",
+                "--locked",
+                "rc3_private_executable_preserves_the_admitted_bytes",
+            ),
+        ),
+    ),
+    "rc3-cli-json-contract": AcceptanceScenario(
+        "Return versioned deterministic CLI JSON for valid and invalid projects",
+        (
+            (
+                "cargo",
+                "+1.97.1",
+                "test",
+                "-p",
+                "zeno-fcis-cli",
+                "--locked",
+                "rc3_cli_invalid_json_diagnostics",
+            ),
+        ),
+    ),
+    "rc3-package-binary-inventory": AcceptanceScenario(
+        "Package every declared binary in one unique checked archive",
+        (("python3", "tools/rc_package.py", "self-test"),),
+    ),
 }
 
 
@@ -149,7 +411,12 @@ def parse_feature_text(text: str, label: str) -> dict[str, tuple[int, str]]:
     for line_number, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
         if stripped.startswith("@"):
-            pending = ATDD_TAG.findall(stripped)
+            matches = ATDD_TAG.findall(stripped)
+            if matches and ATDD_TAG_LINE.fullmatch(stripped) is None:
+                raise AcceptanceError(
+                    f"{label}:{line_number}: @atdd-* tag line contains hostile or extra syntax"
+                )
+            pending = matches
             continue
         match = SCENARIO.match(line)
         if match is not None:
@@ -215,20 +482,14 @@ def self_test() -> None:
     hostile = {
         "missing tag": "Feature: x\n  Scenario: unbound\n    Then no\n",
         "duplicate tag": (
-            "Feature: x\n"
-            "  @atdd-a\n  Scenario: first\n"
-            "  @atdd-a\n  Scenario: second\n"
+            "Feature: x\n  @atdd-a\n  Scenario: first\n  @atdd-a\n  Scenario: second\n"
         ),
         "multiple tags": "Feature: x\n  @atdd-a @atdd-b\n  Scenario: ambiguous\n",
-        "feature tag inheritance": (
-            "@atdd-a\nFeature: x\n  Scenario: inherited\n"
-        ),
+        "feature tag inheritance": ("@atdd-a\nFeature: x\n  Scenario: inherited\n"),
         "rule tag inheritance": (
-            "Feature: x\n"
-            "  @atdd-a\n"
-            "  Rule: tagged rule\n"
-            "    Scenario: inherited\n"
+            "Feature: x\n  @atdd-a\n  Rule: tagged rule\n    Scenario: inherited\n"
         ),
+        "hostile tag syntax": "Feature: x\n  @atdd-a;touch-owned\n  Scenario: injected\n",
     }
     for label, text in hostile.items():
         try:
@@ -246,6 +507,17 @@ def self_test() -> None:
         parsed = parse_feature_text(path.read_text(encoding="utf-8"), str(path))
         if set(parsed).issubset(SCENARIOS):
             raise AcceptanceError("self-test hidden scenario was not detected")
+
+    commands_before = SCENARIOS["minimal-core"].commands
+    parse_feature_text(
+        "Feature: inert prose\n"
+        "  @atdd-minimal-core\n"
+        "  Scenario: Run the immutable functional core example\n"
+        "    Given cargo publish && touch owned\n",
+        "inert prose",
+    )
+    if SCENARIOS["minimal-core"].commands != commands_before:
+        raise AcceptanceError("feature prose altered a fixed command binding")
 
 
 def run_scenario(scenario_id: str) -> None:
@@ -280,7 +552,7 @@ def main() -> int:
     try:
         if args.command == "self-test":
             self_test()
-            print("atdd: self-test PASS (6 hostile bindings rejected)")
+            print("atdd: self-test PASS (8 hostile or inert-prose mutations checked)")
             return 0
         found = validate_registry()
         if args.command == "check":

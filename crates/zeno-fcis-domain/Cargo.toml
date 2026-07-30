@@ -21,14 +21,14 @@ std = [
 ]
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec", default-features = false }
-zeno-fcis-compose = { version = "=1.0.0-rc.2", path = "../zeno-fcis-compose", default-features = false }
-zeno-fcis-core = { version = "=1.0.0-rc.2", path = "../zeno-fcis-core", default-features = false }
-zeno-fcis-project = { version = "=1.0.0-rc.2", path = "../zeno-fcis-project", default-features = false }
-zeno-fcis-schema = { version = "=1.0.0-rc.2", path = "../zeno-fcis-schema", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-compose = { version = "=1.0.0-rc.3", path = "../zeno-fcis-compose", default-features = false }
+zeno-fcis-core = { version = "=1.0.0-rc.3", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-project = { version = "=1.0.0-rc.3", path = "../zeno-fcis-project", default-features = false }
+zeno-fcis-schema = { version = "=1.0.0-rc.3", path = "../zeno-fcis-schema", default-features = false }
 
 [dev-dependencies]
-zeno-fcis-value = { version = "=1.0.0-rc.2", path = "../zeno-fcis-value" }
+zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value" }
 
 [lints]
 workspace = true

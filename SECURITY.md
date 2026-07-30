@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-ZenoFCIS `1.0.0-rc.2` is a pre-release candidate. Security fixes are applied to
+ZenoFCIS `1.0.0-rc.3` is a pre-release candidate. Security fixes are applied to
 the current release-candidate line until it is superseded. Older development
 branches and unqualified downstream deployments are not supported release
 surfaces. Final support guarantees begin only when they are published with
@@ -10,7 +10,7 @@ surfaces. Final support guarantees begin only when they are published with
 
 | Version | Security-fix status |
 | --- | --- |
-| `1.0.0-rc.2` | Current candidate; fixes are issued through a new RC |
+| `1.0.0-rc.3` | Current candidate; fixes are issued through a new RC |
 | older branches and commits | Unsupported |
 
 ## Private reporting

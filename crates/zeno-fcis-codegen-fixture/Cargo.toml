@@ -16,29 +16,29 @@ default = ["std"]
 std = []
 
 [dependencies]
-zeno-fcis-catalog = { version = "=1.0.0-rc.2", path = "../zeno-fcis-catalog" }
-zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec" }
-zeno-fcis-compose = { version = "=1.0.0-rc.2", path = "../zeno-fcis-compose" }
-zeno-fcis-core = { version = "=1.0.0-rc.2", path = "../zeno-fcis-core" }
-zeno-fcis-patch = { version = "=1.0.0-rc.2", path = "../zeno-fcis-patch" }
-zeno-fcis-plan = { version = "=1.0.0-rc.2", path = "../zeno-fcis-plan" }
-zeno-fcis-project = { version = "=1.0.0-rc.2", path = "../zeno-fcis-project" }
-zeno-fcis-transition = { version = "=1.0.0-rc.2", path = "../zeno-fcis-transition" }
-zeno-fcis-value = { version = "=1.0.0-rc.2", path = "../zeno-fcis-value" }
-zeno-fcis-codegen = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codegen" }
-zeno-fcis-schema = { version = "=1.0.0-rc.2", path = "../zeno-fcis-schema" }
+zeno-fcis-catalog = { version = "=1.0.0-rc.3", path = "../zeno-fcis-catalog" }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
+zeno-fcis-compose = { version = "=1.0.0-rc.3", path = "../zeno-fcis-compose" }
+zeno-fcis-core = { version = "=1.0.0-rc.3", path = "../zeno-fcis-core" }
+zeno-fcis-patch = { version = "=1.0.0-rc.3", path = "../zeno-fcis-patch" }
+zeno-fcis-plan = { version = "=1.0.0-rc.3", path = "../zeno-fcis-plan" }
+zeno-fcis-project = { version = "=1.0.0-rc.3", path = "../zeno-fcis-project" }
+zeno-fcis-transition = { version = "=1.0.0-rc.3", path = "../zeno-fcis-transition" }
+zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value" }
+zeno-fcis-codegen = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codegen" }
+zeno-fcis-schema = { version = "=1.0.0-rc.3", path = "../zeno-fcis-schema" }
 
 [build-dependencies]
-zeno-fcis-bootstrap = { version = "=1.0.0-rc.2", path = "../zeno-fcis-bootstrap" }
-zeno-fcis-catalog = { version = "=1.0.0-rc.2", path = "../zeno-fcis-catalog" }
-zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec" }
-zeno-fcis-codegen = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codegen" }
-zeno-fcis-crypto = { version = "=1.0.0-rc.2", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }
-zeno-fcis-project = { version = "=1.0.0-rc.2", path = "../zeno-fcis-project" }
-zeno-fcis-schema = { version = "=1.0.0-rc.2", path = "../zeno-fcis-schema" }
+zeno-fcis-bootstrap = { version = "=1.0.0-rc.3", path = "../zeno-fcis-bootstrap" }
+zeno-fcis-catalog = { version = "=1.0.0-rc.3", path = "../zeno-fcis-catalog" }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
+zeno-fcis-codegen = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codegen" }
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }
+zeno-fcis-project = { version = "=1.0.0-rc.3", path = "../zeno-fcis-project" }
+zeno-fcis-schema = { version = "=1.0.0-rc.3", path = "../zeno-fcis-schema" }
 
 [dev-dependencies]
-zeno-fcis-crypto = { version = "=1.0.0-rc.2", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
 
 [lints]
 workspace = true

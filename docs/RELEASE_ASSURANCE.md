@@ -68,7 +68,7 @@ RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked
 cargo +1.97.1 deny check
 cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings
 python3 tools/release_manifest.py --require-clean > SOURCE-MANIFEST.json
-python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc3
 python3 tools/atdd.py run --all
 ```
 
@@ -84,7 +84,9 @@ The CI workflows add:
   candidate-bound projection-relation, and nominal publication tests;
 - two independently generated source manifests compared byte-for-byte.
 - exact BDD-to-ATDD registry equality, the complete adopter portfolio, and a
-  hostile/permitted Probity command corpus under Node `22.23.1`.
+  hostile/permitted Probity command corpus under Node `22.23.1`;
+- a freestanding Mini Determinator UEFI boot in single-CPU, network-disabled
+  QEMU, fail-closed serial validation, and framebuffer reproduction.
 
 ## Static policy
 

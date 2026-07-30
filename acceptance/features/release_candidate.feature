@@ -1,10 +1,10 @@
-@rc2 @release
+@rc3 @release
 Feature: Ship one reproducible review candidate
   Maintainers should be able to verify public documentation, package metadata,
   source policy, and release artifacts from one exact clean source revision.
 
   @atdd-release-contract
-  Scenario: Validate the complete RC2 release contract
+  Scenario: Run the local RC3 release gate
     Given the pinned Rust toolchain and locked dependency graph
     When the release contract acceptance stage runs
     Then formatting lint tests doctests rustdoc assurance and package checks pass

@@ -1,6 +1,6 @@
 # Installation
 
-ZenoFCIS `1.0.0-rc.2` is a Rust library release candidate. Rust `1.97.1` is
+ZenoFCIS `1.0.0-rc.3` is a Rust library release candidate. Rust `1.97.1` is
 the minimum supported toolchain for this candidate.
 
 ## Application dependency
@@ -10,7 +10,7 @@ application:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -27,8 +27,8 @@ crate:
 
 ```toml
 [dependencies]
-zeno-fcis-core = { version = "=1.0.0-rc.2", default-features = false }
-zeno-fcis-codec = { version = "=1.0.0-rc.2", default-features = false }
+zeno-fcis-core = { version = "=1.0.0-rc.3", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", default-features = false }
 ```
 
 All ZenoFCIS crates in one dependency graph should use the same exact release
@@ -39,7 +39,7 @@ candidate version.
 ```bash
 git clone https://github.com/TheDarkLightX/ZenoFCIS.git
 cd ZenoFCIS
-git checkout v1.0.0-rc.2
+git checkout v1.0.0-rc.3
 cargo +1.97.1 test --workspace --all-features --locked
 ```
 
@@ -61,14 +61,19 @@ Probity is not a Rust, runtime, protocol, or published-crate dependency. See
 [deterministic developer guardrails](DEVELOPER_GUARDRAILS.md) for opt-in Codex
 hook setup and explicit nonclaims.
 
-## Diagnostic binary
+## Host binaries
 
-The core library does not require a daemon or executable. The RC includes one
-host diagnostic tool:
+The core library does not require a daemon. RC3 includes the authoring CLI and
+the existing host diagnostic parity tool:
+
+```bash
+cargo +1.97.1 install zeno-fcis-cli --version 1.0.0-rc.3 --locked
+zeno-fcis check project.zeno
+```
 
 ```bash
 cargo +1.97.1 install zeno-fcis-adapter-zenodex \
-  --version 1.0.0-rc.2 --locked
+  --version 1.0.0-rc.3 --locked
 ```
 
 `mount-zenodex-zusd` compares the pinned ZenoDEX Python and Rust transitions.

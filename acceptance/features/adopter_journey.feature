@@ -1,4 +1,4 @@
-@rc2 @adoption
+@rc3 @adoption
 Feature: Adopt the ZenoFCIS core library
   A software team should be able to evaluate the release candidate through
   small, deterministic, executable entry points before defining production
@@ -6,7 +6,7 @@ Feature: Adopt the ZenoFCIS core library
 
   @atdd-minimal-core
   Scenario: Run the immutable functional core example
-    Given the exact RC2 source and locked Rust dependencies
+    Given the current RC3 source and locked Rust dependencies
     When an adopter runs the minimal core example
     Then the accepted successor has the expected balance and resource usage
     And the immutable pre-state remains unchanged
@@ -21,7 +21,7 @@ Feature: Adopt the ZenoFCIS core library
   @atdd-external-consumer
   Scenario: Compile an isolated downstream consumer
     Given a consumer outside the ZenoFCIS workspace package graph
-    When the consumer compiles against the RC2 umbrella API and locked graph
+    When the consumer compiles against the RC3 umbrella authoring API and locked graph
     Then the documented public imports and feature selection remain usable
 
   @atdd-project-bootstrap

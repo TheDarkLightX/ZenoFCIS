@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rc2-product-contract:
+  rc3-product-contract:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:

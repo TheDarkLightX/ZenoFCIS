@@ -1,7 +1,7 @@
 # ZenoFCIS feature matrix
 
 This matrix covers features on the `zeno-fcis` umbrella crate. The current
-workspace version is `1.0.0-rc.2`; “core” means the implemented
+workspace version is `1.0.0-rc.3`; “core” means the implemented
 project-neutral RC surface. Final Cargo V1 API stability begins at `1.0.0`.
 
 ## Environment labels
@@ -30,6 +30,7 @@ APIs only.
 
 | Feature | Environment | Class | Enables |
 |---|---|---|---|
+| `authoring` | `no_std + alloc` | Authoring | Bounded `.zeno` compiler, canonical `ProjectSpec`, relational/temporal evaluator, builders, composition derivation, and Mini Determinator |
 | `schema` | `no_std + alloc` | Core | Closed schemas and schema-admitted values |
 | `catalog` | `no_std + alloc` | Core | Schema plus project reasons, effects, channels, authority rules, and limits |
 | `transition` | `no_std + alloc` | Core | Catalog-aware transitions and complete transition validation |
@@ -109,25 +110,28 @@ graph or production authority.
 
 ```toml
 # Project-neutral semantic values and reference semantics
-zeno-fcis = { version = "=1.0.0-rc.2", default-features = false }
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false }
 
 # Single-domain, law-aware authorized transitions
-zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["authority"] }
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["authority"] }
 
 # Multi-domain deterministic composition
-zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["composed-program"] }
 
 # Host-side starter generation
-zeno-fcis = { version = "=1.0.0-rc.2", features = ["bootstrap"] }
+zeno-fcis = { version = "=1.0.0-rc.3", features = ["bootstrap"] }
 
 # Concrete local authorized persistence
-zeno-fcis = { version = "=1.0.0-rc.2", features = ["sqlite-shell"] }
+zeno-fcis = { version = "=1.0.0-rc.3", features = ["sqlite-shell"] }
 
 # Candidate-bound authenticated index publication
-zeno-fcis = { version = "=1.0.0-rc.2", features = ["authenticated-authority"] }
+zeno-fcis = { version = "=1.0.0-rc.3", features = ["authenticated-authority"] }
 
 # Tool-neutral checked backend protocol
-zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["backend"] }
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["backend"] }
+
+# Pure authoring compiler and Mini Determinator
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["authoring"] }
 ```
 
 ## Deterministic-parallel status
