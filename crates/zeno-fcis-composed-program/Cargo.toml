@@ -1,0 +1,50 @@
+[package]
+name = "zeno-fcis-composed-program"
+description = "Authority-owned composed domain programs with explicit root context maps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[features]
+default = ["std"]
+std = [
+    "zeno-fcis-authority/std",
+    "zeno-fcis-catalog/std",
+    "zeno-fcis-codec/std",
+    "zeno-fcis-compose/std",
+    "zeno-fcis-core/std",
+    "zeno-fcis-crypto/std",
+    "zeno-fcis-domain/std",
+    "zeno-fcis-patch/std",
+    "zeno-fcis-plan/std",
+    "zeno-fcis-project/std",
+    "zeno-fcis-schema/std",
+    "zeno-fcis-transition/std",
+    "zeno-fcis-value/std",
+]
+
+[dependencies]
+zeno-fcis-authority = { version = "=1.0.0-rc.3", path = "../zeno-fcis-authority", default-features = false }
+zeno-fcis-catalog = { version = "=1.0.0-rc.3", path = "../zeno-fcis-catalog", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-compose = { version = "=1.0.0-rc.3", path = "../zeno-fcis-compose", default-features = false }
+zeno-fcis-core = { version = "=1.0.0-rc.3", path = "../zeno-fcis-core", default-features = false }
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", default-features = false }
+zeno-fcis-domain = { version = "=1.0.0-rc.3", path = "../zeno-fcis-domain", default-features = false }
+zeno-fcis-patch = { version = "=1.0.0-rc.3", path = "../zeno-fcis-patch", default-features = false }
+zeno-fcis-plan = { version = "=1.0.0-rc.3", path = "../zeno-fcis-plan", default-features = false }
+zeno-fcis-project = { version = "=1.0.0-rc.3", path = "../zeno-fcis-project", default-features = false }
+zeno-fcis-schema = { version = "=1.0.0-rc.3", path = "../zeno-fcis-schema", default-features = false }
+zeno-fcis-transition = { version = "=1.0.0-rc.3", path = "../zeno-fcis-transition", default-features = false }
+zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value", default-features = false }
+
+[dev-dependencies]
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }
+
+[lints]
+workspace = true

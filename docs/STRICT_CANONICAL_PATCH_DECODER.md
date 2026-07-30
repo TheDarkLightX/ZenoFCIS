@@ -27,6 +27,12 @@ The reviewed defaults admit at most 64 MiB of complete input, 4,096 operations,
 value nodes, and 64 MiB of decoded value payload. Callers may supply tighter
 limits for a deployment or profile.
 
+Initial vector reservation is also bounded by wire evidence. The decoder
+reserves no more operation slots than the remaining bytes can contain as
+length-prefixed operation blobs, and no more path segments than the path blob
+can contain as tagged segments. A short count-only input cannot trigger a
+reservation proportional to the declared maximum.
+
 ## Authority boundary
 
 Raw bytes have no patch authority. The decoder first admits every nested value
@@ -67,6 +73,8 @@ declared examples and bounds:
 6. A semantic map key that differs from its encoded path key fails.
 7. Unknown operation tags, unknown path tags, invalid flags, trailing bytes,
    truncation, and nested ZCVE limit violations fail.
+8. Count-only operation declarations are rejected without reserving the
+   declared number of elements.
 
 ## Assumptions
 
@@ -86,3 +94,5 @@ declared examples and bounds:
   Rust and test/tool evidence retained for the exact source.
 - This does not make ZenoFCIS production-authorized or complete the Core V1
   release gate.
+- This does not impose a process-wide allocator quota. A valid large patch can
+  still require memory proportional to its admitted input and logical values.

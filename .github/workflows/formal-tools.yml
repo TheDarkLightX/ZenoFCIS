@@ -1,0 +1,115 @@
+name: formal-tools
+
+on:
+  pull_request:
+    paths:
+      - "crates/zeno-fcis-formal-tools/**"
+      - "crates/zeno-fcis-cli/**"
+      - "crates/zeno-fcis-spec/**"
+      - "release/formal-tools-linux-x86_64.sha256"
+      - "release/lean-4.30.0-tree.sha256"
+      - ".github/workflows/formal-tools.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CVC5_URL: https://github.com/cvc5/cvc5/releases/download/cvc5-1.3.3/cvc5-Linux-x86_64-static.zip
+  Z3_URL: https://github.com/Z3Prover/z3/releases/download/z3-4.16.0/z3-4.16.0-x64-glibc-2.39.zip
+  LEAN_URL: https://github.com/leanprover/lean4/releases/download/v4.30.0/lean-4.30.0-linux.zip
+
+jobs:
+  pinned-linux-x86-64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Record runner storage before tool download
+        run: df -h
+      - name: Download official artifacts
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --location --silent --show-error "$CVC5_URL" --output cvc5-Linux-x86_64-static.zip
+          curl --fail --location --silent --show-error "$Z3_URL" --output z3-4.16.0-x64-glibc-2.39.zip
+          curl --fail --location --silent --show-error "$LEAN_URL" --output lean-4.30.0-linux.zip
+      - name: Verify recorded SHA-256 digests
+        working-directory: ${{ runner.temp }}
+        run: sha256sum --check "$GITHUB_WORKSPACE/release/formal-tools-linux-x86_64.sha256"
+      - name: Extract pinned tools
+        working-directory: ${{ runner.temp }}
+        run: |
+          unzip -q cvc5-Linux-x86_64-static.zip -d cvc5
+          rm -f cvc5-Linux-x86_64-static.zip
+          unzip -q z3-4.16.0-x64-glibc-2.39.zip -d z3
+          rm -f z3-4.16.0-x64-glibc-2.39.zip
+          unzip -q lean-4.30.0-linux.zip -d lean
+          rm -f lean-4.30.0-linux.zip
+      - name: Record extracted tool footprint
+        working-directory: ${{ runner.temp }}
+        run: |
+          du -sh cvc5 z3 lean
+          find lean -type f -print | wc -l
+          df -h
+      - name: Verify exact tool versions
+        working-directory: ${{ runner.temp }}
+        run: |
+          CVC5_BIN="$(find cvc5 -type f -name cvc5 -perm -111 -print -quit)"
+          test -n "$CVC5_BIN"
+          "$CVC5_BIN" --version | grep -F "1.3.3"
+          z3/z3-4.16.0-x64-glibc-2.39/bin/z3 --version | grep -F "4.16.0"
+          lean/lean-4.30.0-linux/bin/lean --version | grep -F "4.30.0"
+      - name: Test deterministic exporters and fail-closed adapters
+        run: cargo +1.97.1 test -p zeno-fcis-formal-tools --locked
+      - name: Match the qualified Lean runtime trust anchor
+        working-directory: ${{ runner.temp }}
+        run: |
+          LEAN_ROOT="$PWD/lean/lean-4.30.0-linux"
+          EXPECTED_TREE="$(tr -d '\n' < "$GITHUB_WORKSPACE/release/lean-4.30.0-tree.sha256")"
+          ACTUAL_TREE="$(cargo +1.97.1 run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+            -p zeno-fcis-cli --locked -- backend inventory-lean "$LEAN_ROOT" | awk '/^lean tree_sha256 / { print $3 }')"
+          test "$ACTUAL_TREE" = "$EXPECTED_TREE"
+      - name: Kernel-check the exact generated Lean obligation
+        working-directory: ${{ runner.temp }}
+        run: |
+          LEAN_BIN="$(find lean -type f -path '*/bin/lean' -perm -111 -print -quit)"
+          test -n "$LEAN_BIN"
+          ZENO_FCIS_LEAN="$PWD/$LEAN_BIN" \
+            ZENO_FCIS_LEAN_ROOT="$PWD/lean/lean-4.30.0-linux" \
+            cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              -p zeno-fcis-formal-tools --locked \
+              tests::pinned_lean_translation_kernel_checks -- --ignored --exact
+      - name: Kernel-check Lean through the published CLI process
+        working-directory: ${{ runner.temp }}
+        run: |
+          LEAN_BIN="$(find lean -type f -path '*/bin/lean' -perm -111 -print -quit)"
+          test -n "$LEAN_BIN"
+          ZENO_FCIS_LEAN="$PWD/$LEAN_BIN" \
+            ZENO_FCIS_LEAN_ROOT="$PWD/lean/lean-4.30.0-linux" \
+            cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              -p zeno-fcis-cli --locked --test cli_adopter_flow \
+              pinned_lean_cli_prove_is_process_level -- --ignored --exact
+      - name: Differential-check exact CVC5 and Z3 translations
+        working-directory: ${{ runner.temp }}
+        run: |
+          CVC5_BIN="$(find cvc5 -type f -name cvc5 -perm -111 -print -quit)"
+          Z3_BIN="z3/z3-4.16.0-x64-glibc-2.39/bin/z3"
+          test -n "$CVC5_BIN"
+          test -x "$Z3_BIN"
+          ZENO_FCIS_CVC5="$PWD/$CVC5_BIN" ZENO_FCIS_Z3="$PWD/$Z3_BIN" \
+            cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              -p zeno-fcis-formal-tools --locked \
+              tests::pinned_smt_translation_differential_check -- --ignored --exact
+      - name: Check pure authoring compiler without std
+        run: cargo +1.97.1 check -p zeno-fcis-spec --no-default-features --locked
+      - name: Run formal-tools ATDD bindings
+        run: |
+          python3 tools/atdd.py run --scenario rc3-formal-tools
+          python3 tools/atdd.py run --scenario rc3-formal-fail-closed

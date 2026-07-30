@@ -18,8 +18,8 @@ use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Ha
 use zeno_fcis_compose::{AccessPath, ContractError, Footprint, PathAtom, PathSet};
 use zeno_fcis_core::{Accepted, BudgetUsed, Decision, DecisionKind, Failed, Rejected, Resource};
 use zeno_fcis_patch::{
-    CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath, hash_precondition_value,
-    hash_value, value_at,
+    AppliedPatch, CanonicalPatch, PatchError, PatchOp, PathSegment, ValuePath,
+    hash_precondition_value, hash_value, value_at,
 };
 use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan, PlanError};
 use zeno_fcis_project::{SemanticId, StableName};
@@ -238,6 +238,53 @@ impl CanonicalEncode for TransitionResourceReport {
     }
 }
 
+/// Externally expected command and authenticated-context commitments.
+///
+/// This value must be derived from the invocation admitted by the caller-facing
+/// boundary. Transition validation never derives either expected field from the
+/// artifact being validated.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExpectedInvocationBindings {
+    command_hash: Hash32,
+    context_hash: Hash32,
+}
+
+impl ExpectedInvocationBindings {
+    /// Creates nonzero expected invocation commitments.
+    pub fn try_new(command_hash: Hash32, context_hash: Hash32) -> Result<Self, TransitionError> {
+        if command_hash == Hash32::ZERO {
+            return Err(TransitionError::ZeroCommandHash);
+        }
+        if context_hash == Hash32::ZERO {
+            return Err(TransitionError::ZeroContextHash);
+        }
+        Ok(Self {
+            command_hash,
+            context_hash,
+        })
+    }
+
+    /// Returns the externally expected command commitment.
+    #[must_use]
+    pub const fn command_hash(self) -> Hash32 {
+        self.command_hash
+    }
+
+    /// Returns the externally expected authenticated-context commitment.
+    #[must_use]
+    pub const fn context_hash(self) -> Hash32 {
+        self.context_hash
+    }
+}
+
+impl CanonicalEncode for ExpectedInvocationBindings {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(self.command_hash.as_bytes());
+        output.extend_from_slice(self.context_hash.as_bytes());
+        Ok(())
+    }
+}
+
 /// Accepted or committed-failure artifacts from one catalogued execution.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransitionArtifacts {
@@ -283,9 +330,22 @@ impl TransitionArtifacts {
     pub fn validate<H: CommitmentHasher>(
         &self,
         catalog: &ProjectCatalog,
+        expected_invocation: ExpectedInvocationBindings,
         pre_state: &Value,
         state_domain: Domain<'_>,
     ) -> Result<(), TransitionError> {
+        self.validate_and_apply::<H>(catalog, expected_invocation, pre_state, state_domain)
+            .map(|_| ())
+    }
+
+    /// Revalidates every relationship and returns the exact pure successor.
+    pub fn validate_and_apply<H: CommitmentHasher>(
+        &self,
+        catalog: &ProjectCatalog,
+        expected_invocation: ExpectedInvocationBindings,
+        pre_state: &Value,
+        state_domain: Domain<'_>,
+    ) -> Result<AppliedPatch, TransitionError> {
         let metrics =
             catalog.validate_plans(self.bundle.commit_plan(), self.bundle.outbox_plan())?;
         if metrics != self.catalog_metrics || self.resources.catalog_metrics != metrics {
@@ -297,8 +357,8 @@ impl TransitionArtifacts {
         let actual = self.bundle.body().bindings();
         let expected = candidate_bindings::<H>(
             catalog,
-            actual.command_hash,
-            actual.context_hash,
+            expected_invocation.command_hash,
+            expected_invocation.context_hash,
             &self.resources,
         )?;
         if actual != expected {
@@ -335,7 +395,7 @@ impl TransitionArtifacts {
             applied.state(),
             self.resources.limits.state_validation_limits(),
         )?;
-        Ok(())
+        Ok(applied)
     }
 }
 
@@ -377,6 +437,7 @@ impl TransitionReject {
     pub fn validate<H: CommitmentHasher>(
         &self,
         catalog: &ProjectCatalog,
+        expected_invocation: ExpectedInvocationBindings,
         pre_state: &Value,
         state_domain: Domain<'_>,
     ) -> Result<(), TransitionError> {
@@ -393,8 +454,8 @@ impl TransitionReject {
         let actual = self.receipt.bindings();
         let expected = candidate_bindings::<H>(
             catalog,
-            actual.command_hash,
-            actual.context_hash,
+            expected_invocation.command_hash,
+            expected_invocation.context_hash,
             &self.resources,
         )?;
         if actual != expected {
@@ -420,6 +481,7 @@ pub type TransitionDecision = Decision<TransitionArtifacts, TransitionReject, Se
 pub fn validate_transition_decision<H: CommitmentHasher>(
     decision: &TransitionDecision,
     catalog: &ProjectCatalog,
+    expected_invocation: ExpectedInvocationBindings,
     pre_state: &Value,
     state_domain: Domain<'_>,
 ) -> Result<(), TransitionError> {
@@ -428,14 +490,17 @@ pub fn validate_transition_decision<H: CommitmentHasher>(
             if accepted.candidate().reason_id().is_some() {
                 return Err(TransitionError::ArtifactMismatch(ArtifactField::Reason));
             }
-            accepted
-                .candidate()
-                .validate::<H>(catalog, pre_state, state_domain)
+            accepted.candidate().validate::<H>(
+                catalog,
+                expected_invocation,
+                pre_state,
+                state_domain,
+            )
         }
         Decision::Reject(rejected) => {
             rejected
                 .reason()
-                .validate::<H>(catalog, pre_state, state_domain)
+                .validate::<H>(catalog, expected_invocation, pre_state, state_domain)
         }
         Decision::CommittedFailure(failed) => {
             if failed.candidate().reason_id() != Some(*failed.reason()) {
@@ -443,7 +508,7 @@ pub fn validate_transition_decision<H: CommitmentHasher>(
             }
             failed
                 .candidate()
-                .validate::<H>(catalog, pre_state, state_domain)
+                .validate::<H>(catalog, expected_invocation, pre_state, state_domain)
         }
     }
 }
@@ -522,7 +587,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
             self.limits.max_observed_paths,
             LimitKind::Reads,
         )?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -535,7 +600,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
     /// Stages one preconditioned update and records its read/write footprint.
     pub fn update(&mut self, path: ValuePath, value: Value) -> Result<&mut Self, TransitionError> {
         self.ensure_patch_and_state_path_capacity()?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -560,7 +625,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
         value: Value,
     ) -> Result<&mut Self, TransitionError> {
         self.ensure_patch_and_state_path_capacity()?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -578,7 +643,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
     /// Stages one preconditioned deletion and records its read/write footprint.
     pub fn delete(&mut self, path: ValuePath) -> Result<&mut Self, TransitionError> {
         self.ensure_patch_and_state_path_capacity()?;
-        let access = state_access_path::<H>(
+        let access = canonical_access_path::<H>(
             self.catalog.profile().state_type().get(),
             &path,
             self.limits.max_map_key_bytes,
@@ -618,7 +683,7 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
         Ok(self)
     }
 
-    /// Stages one authoritative effect and records its operation footprint.
+    /// Stages one non-executable commit-evidence record and its footprint.
     pub fn emit(&mut self, effect: Effect) -> Result<&mut Self, TransitionError> {
         ensure_capacity(
             self.effects.len(),
@@ -787,7 +852,14 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
             footprint,
             resources,
         };
-        reject.validate::<H>(self.catalog, self.pre_state, self.state_domain)?;
+        let expected_invocation =
+            ExpectedInvocationBindings::try_new(self.command_hash, self.context_hash)?;
+        reject.validate::<H>(
+            self.catalog,
+            expected_invocation,
+            self.pre_state,
+            self.state_domain,
+        )?;
         Ok(Decision::Reject(Rejected::new(reject)))
     }
 
@@ -844,7 +916,14 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
             catalog_metrics,
             resources,
         };
-        artifacts.validate::<H>(self.catalog, self.pre_state, self.state_domain)?;
+        let expected_invocation =
+            ExpectedInvocationBindings::try_new(self.command_hash, self.context_hash)?;
+        artifacts.validate::<H>(
+            self.catalog,
+            expected_invocation,
+            self.pre_state,
+            self.state_domain,
+        )?;
         match reason_id {
             None => Ok(Decision::Accept(Accepted::new(artifacts))),
             Some(id) => Ok(Decision::CommittedFailure(Failed::new(artifacts, id))),
@@ -917,7 +996,12 @@ fn validate_resource_report<H: CommitmentHasher>(
     Ok(())
 }
 
-fn state_access_path<H: CommitmentHasher>(
+/// Converts one concrete value path into its canonical hierarchical footprint path.
+///
+/// Map-key segments are replaced by the protocol-defined commitment of their
+/// already-canonical encoded key bytes. Wildcards cannot be introduced through
+/// this conversion.
+pub fn canonical_access_path<H: CommitmentHasher>(
     namespace: u32,
     path: &ValuePath,
     max_map_key_bytes: u32,

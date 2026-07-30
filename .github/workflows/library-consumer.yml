@@ -1,0 +1,58 @@
+name: library-consumer
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: library-consumer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-surface:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Check formatting
+        run: cargo +1.97.1 fmt --all -- --check
+
+      - name: Check public documentation and version markers
+        run: python3 tools/check_library_docs.py
+
+      - name: Compile every umbrella example
+        run: cargo +1.97.1 check -p zeno-fcis --all-features --examples --locked
+
+      - name: Run the minimal core example
+        run: cargo +1.97.1 run -p zeno-fcis --example minimal_core --locked
+
+      - name: Run the checked backend example
+        run: cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
+
+      - name: Compile an isolated external consumer
+        run: cargo +1.97.1 check --manifest-path fixtures/external-consumer/Cargo.toml --locked
+
+      - name: Check no_std prelude
+        run: >-
+          cargo +1.97.1 check -p zeno-fcis --no-default-features --locked
+          --target wasm32-unknown-unknown
+
+      - name: Check warning-free umbrella documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo +1.97.1 doc -p zeno-fcis --all-features --locked --no-deps

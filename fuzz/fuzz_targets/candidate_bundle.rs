@@ -7,7 +7,7 @@ use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_patch::{CanonicalPatch, PatchOp, ValuePath, hash_value};
 use zeno_fcis_plan::{CommitPlan, OutboxEntry, OutboxPlan};
 use zeno_fcis_receipt::{CandidateBindings, CandidateBuilder};
-use zeno_fcis_shell::{CommitStatus, ShellState, commit};
+use zeno_fcis_shell::{CommitStatus, ShellState, apply_reference_bundle};
 use zeno_fcis_value::Value;
 
 fn repeated_hash(seed: u8) -> Hash32 {
@@ -84,11 +84,15 @@ fuzz_target!(|input: &[u8]| {
         panic!("bounded pre-state must initialize a shell");
     };
     let replay_id = repeated_hash(seed.wrapping_add(6));
-    let Ok(first) = commit::<RustCryptoSha256>(&shell, domain, replay_id, &bundle) else {
+    let Ok(first) =
+        apply_reference_bundle::<RustCryptoSha256>(&shell, domain, replay_id, &bundle)
+    else {
         panic!("valid bundle must commit");
     };
     assert_eq!(first.status(), CommitStatus::Committed);
-    let Ok(replay) = commit::<RustCryptoSha256>(first.state(), domain, replay_id, &bundle) else {
+    let Ok(replay) =
+        apply_reference_bundle::<RustCryptoSha256>(first.state(), domain, replay_id, &bundle)
+    else {
         panic!("exact replay must succeed");
     };
     assert_eq!(replay.status(), CommitStatus::IdempotentReplay);

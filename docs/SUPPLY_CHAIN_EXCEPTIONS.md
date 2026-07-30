@@ -4,7 +4,7 @@ Every entry in this file is narrow, version-specific, and release-blocking when 
 
 ## RUSTSEC-2026-0173: `proc-macro-error2` is unmaintained
 
-Status: accepted informational exception for the 0.1 research release.
+Status: accepted informational exception for ZenoFCIS 1.0.0-rc.3.
 
 Exact dependency path:
 
@@ -15,7 +15,7 @@ proc-macro-error2 2.0.1
 -> libcrux-secrets 0.0.6
 -> libcrux-traits 0.0.8
 -> libcrux-sha2 0.0.8
--> zeno-fcis-crypto 0.1.0
+-> zeno-fcis-crypto 1.0.0-rc.3
 ```
 
 Disposition:

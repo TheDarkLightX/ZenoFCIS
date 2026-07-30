@@ -1,0 +1,19 @@
+[package]
+name = "zeno-fcis-external-consumer"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[workspace]
+
+[dependencies]
+zeno-fcis = {
+    version = "=1.0.0-rc.3",
+    path = "../../crates/zeno-fcis",
+    default-features = false,
+    features = ["std", "bootstrap", "composed-program", "backend", "authenticated-authority", "authoring"]
+}
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"
+         viewBox="0 0 1600 1000" role="img" aria-label="Three blockers. One bounded check.">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#050912"/>
+      <stop offset="0.62" stop-color="#08111f"/>
+      <stop offset="1" stop-color="#101827"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.82" cy="0.06" r="0.78">
+      <stop offset="0" stop-color="#fbbf24" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#fbbf24" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M 44 0 L 0 0 0 44" fill="none" stroke="#39506a"
+            stroke-opacity="0.12" stroke-width="1"/>
+    </pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="22" stdDeviation="30" flood-color="#000611"
+                    flood-opacity="0.62"/>
+    </filter>
+  </defs>
+  <style>
+    .brand { font-family: Inter, sans-serif; font-size: 22px; font-weight: 600; letter-spacing: 5px; fill: #dce8f6; }
+    .release { font-family: Inter, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: 2px; fill: #83f5d0; }
+    .eyebrow { font-family: Inter, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: 3px; fill: #fbbf24; }
+    .title { font-family: 'Inter Display', Inter, sans-serif; font-size: 52px; font-weight: 600; fill: #f4f8fd; }
+    .subtitle { font-family: Inter, sans-serif; font-size: 22px; font-weight: 400; fill: #9db0c8; }
+    .terminal { font-family: 'DejaVu Sans Mono', monospace; font-size: 20px; font-weight: 400; fill: #dce7f4; }
+    .prompt { font-family: 'DejaVu Sans Mono', monospace; font-size: 20px; font-weight: 600; fill: #6ee7c7; }
+    .terminal-title { font-family: Inter, sans-serif; font-size: 15px; font-weight: 500; fill: #70849e; letter-spacing: 1px; }
+    .badge { font-family: Inter, sans-serif; font-size: 16px; font-weight: 500; fill: #b9c9dc; }
+    .footer { font-family: Inter, sans-serif; font-size: 15px; font-weight: 400; fill: #64778f; }
+    .node-id { font-family: Inter, sans-serif; font-size: 15px; font-weight: 600; fill: #7de4cb; letter-spacing: 2px; }
+    .node-title { font-family: 'DejaVu Sans Mono', monospace; font-size: 25px; font-weight: 600; fill: #ecf7ff; }
+    .metric-label { font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 2px; fill: #72d9ca; }
+    .metric-value { font-family: 'Inter Display', Inter, sans-serif; font-size: 48px; font-weight: 600; fill: #f2f8ff; }
+    .hash { font-family: 'DejaVu Sans Mono', monospace; font-size: 17px; font-weight: 400; fill: #c5d5e8; }
+    .slot-detail { font-family: Inter, sans-serif; font-size: 14px; font-weight: 400; fill: #8fa5bc; }
+  </style>
+  <rect width="1600" height="1000" fill="url(#background)"/>
+  <rect width="1600" height="1000" fill="url(#glow)"/>
+  <rect width="1600" height="1000" fill="url(#grid)"/>
+  <rect x="0" y="0" width="9" height="1000" fill="#fbbf24"/>
+
+  <text x="128" y="72" class="brand">ZENOFCIS</text>
+  <text x="1457" y="72" text-anchor="end" class="release">1.0.0-RC.3</text>
+  <text x="128" y="132" class="eyebrow">AUTHORING DIAGNOSTICS</text>
+  <text x="128" y="197" class="title">Three blockers. One bounded check.</text>
+  <text x="128" y="238" class="subtitle">Independent specification defects arrive together in stable source order.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="128" y="282" width="1344" height="610" rx="24" fill="#080e18"
+          stroke="#26364c" stroke-width="2"/>
+    <rect x="128" y="282" width="1344" height="70" rx="24" fill="#0d1624"/>
+    <rect x="128" y="328" width="1344" height="24" fill="#0d1624"/>
+    <circle cx="170" cy="317" r="8" fill="#ff6b6b"/>
+    <circle cx="198" cy="317" r="8" fill="#f6c85f"/>
+    <circle cx="226" cy="317" r="8" fill="#58d68d"/>
+    <text x="800" y="323" text-anchor="middle" class="terminal-title">DETERMINISTIC CLI RENDER</text>
+  </g>
+  <text x="164" y="382" class="prompt">$ zeno-fcis check examples/diagnostics-tour/project.zeno</text>
+  <text x="164" y="413" class="terminal">ZENO-E0205 elaborate:1:1 composition.merge_order expected exact component-ID permutation; got [20, 21]; list</text><text x="164" y="438" class="terminal">  every component exactly once in semantic merge order</text><text x="164" y="463" class="terminal">ZENO-E0201 elaborate:6:1 type.id expected unique stable ID; got 10; allocate a distinct explicit ID</text><text x="164" y="488" class="terminal">ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; declare the referenced type</text>
+
+  <rect x="128" y="925" width="151" height="38" rx="19" fill="#0d1728" stroke="#263751"/><text x="143" y="951" class="badge">Accumulated</text><rect x="293" y="925" width="162" height="38" rx="19" fill="#0d1728" stroke="#263751"/><text x="308" y="951" class="badge">Stable codes</text><rect x="469" y="925" width="272" height="38" rx="19" fill="#0d1728" stroke="#263751"/><text x="484" y="951" class="badge">Actionable remediation</text>
+  <text x="1472" y="951" text-anchor="end" class="footer">Executable output · deterministic renderer</text>
+</svg>

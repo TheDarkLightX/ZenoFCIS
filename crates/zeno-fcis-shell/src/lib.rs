@@ -199,8 +199,12 @@ pub enum CommitStatus {
     IdempotentReplay,
 }
 
-/// Atomically validates and publishes one complete candidate in the reference model.
-pub fn commit<H: CommitmentHasher>(
+/// Applies one structurally valid bundle in the executable reference model.
+///
+/// This function does not establish catalog, invocation, provider, interpreter,
+/// deployment, invariant, or conservation authority. Production commit ports
+/// must accept a nominal authorization value from a higher dependency ring.
+pub fn apply_reference_bundle<H: CommitmentHasher>(
     shell: &ShellState,
     state_domain: Domain<'_>,
     replay_id: Hash32,
@@ -519,7 +523,7 @@ mod tests {
         let shell = ShellState::new::<TestHasher>(state, domain())
             .unwrap_or_else(|error| panic!("shell: {error}"));
         let replay = Hash32::new([9; 32]);
-        let first = commit::<TestHasher>(&shell, domain(), replay, &bundle)
+        let first = apply_reference_bundle::<TestHasher>(&shell, domain(), replay, &bundle)
             .unwrap_or_else(|error| panic!("commit: {error}"));
         assert_eq!(first.status(), CommitStatus::Committed);
         assert_eq!(
@@ -530,7 +534,7 @@ mod tests {
                 .unwrap_or_else(|error| panic!("patch: {error}"))
                 .state()
         );
-        let second = commit::<TestHasher>(first.state(), domain(), replay, &bundle)
+        let second = apply_reference_bundle::<TestHasher>(first.state(), domain(), replay, &bundle)
             .unwrap_or_else(|error| panic!("replay: {error}"));
         assert_eq!(second.status(), CommitStatus::IdempotentReplay);
         assert_eq!(first.state(), second.state());
@@ -551,7 +555,8 @@ mod tests {
         let bundle = bundle(&intended_state);
         let shell = ShellState::new::<TestHasher>(Value::U128(99), domain())
             .unwrap_or_else(|error| panic!("shell: {error}"));
-        let result = commit::<TestHasher>(&shell, domain(), Hash32::new([8; 32]), &bundle);
+        let result =
+            apply_reference_bundle::<TestHasher>(&shell, domain(), Hash32::new([8; 32]), &bundle);
         assert!(matches!(result, Err(ShellError::RootConflict { .. })));
         assert_eq!(shell.outbox_records().len(), 0);
         assert_eq!(shell.receipts().len(), 0);
@@ -564,8 +569,9 @@ mod tests {
         let bundle = bundle(&state);
         let shell = ShellState::new::<TestHasher>(state, domain())
             .unwrap_or_else(|error| panic!("shell: {error}"));
-        let committed = commit::<TestHasher>(&shell, domain(), Hash32::new([7; 32]), &bundle)
-            .unwrap_or_else(|error| panic!("commit: {error}"));
+        let committed =
+            apply_reference_bundle::<TestHasher>(&shell, domain(), Hash32::new([7; 32]), &bundle)
+                .unwrap_or_else(|error| panic!("commit: {error}"));
         let pending = committed
             .state()
             .next_pending()

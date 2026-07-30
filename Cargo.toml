@@ -7,9 +7,12 @@ members = [
     "crates/zeno-fcis-codec",
     "crates/zeno-fcis-crypto",
     "crates/zeno-fcis-schema",
+    "crates/zeno-fcis-spec",
     "crates/zeno-fcis-project",
     "crates/zeno-fcis-catalog",
     "crates/zeno-fcis-transition",
+    "crates/zeno-fcis-laws",
+    "crates/zeno-fcis-authority",
     "crates/zeno-fcis-security",
     "crates/zeno-fcis-secret",
     "crates/zeno-fcis-patch",
@@ -17,6 +20,8 @@ members = [
     "crates/zeno-fcis-receipt",
     "crates/zeno-fcis-shell",
     "crates/zeno-fcis-compose",
+    "crates/zeno-fcis-domain",
+    "crates/zeno-fcis-composed-program",
     "crates/zeno-fcis-refine",
     "crates/zeno-fcis-profile-zenodex",
     "crates/zeno-fcis-codegen",
@@ -26,20 +31,24 @@ members = [
     "crates/zeno-fcis-adapter",
     "crates/zeno-fcis-adapter-zenodex",
     "crates/zeno-fcis-authenticated",
+    "crates/zeno-fcis-authenticated-authority",
     "crates/zeno-fcis-synthesis",
     "crates/zeno-fcis-backend",
+    "crates/zeno-fcis-formal-tools",
+    "crates/zeno-fcis-cli",
     "crates/zeno-fcis-shell-sqlite",
     "crates/zeno-fcis-collections",
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0-rc.3"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/TheDarkLightX/ZenoFCIS"
 homepage = "https://github.com/TheDarkLightX/ZenoFCIS"
 authors = ["TheDarkLightX and ZenoFCIS contributors"]
+readme = "README.md"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

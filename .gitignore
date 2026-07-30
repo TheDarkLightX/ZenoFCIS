@@ -1,5 +1,10 @@
 /target/
+node_modules/
+npm-debug.log*
+__pycache__/
+*.pyc
 Cargo.lock
+!demos/mini-determinator-qemu/Cargo.lock
 *.profraw
 *.profdata
 .DS_Store
