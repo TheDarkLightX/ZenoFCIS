@@ -7,6 +7,7 @@ members = [
     "crates/zeno-fcis-codec",
     "crates/zeno-fcis-crypto",
     "crates/zeno-fcis-schema",
+    "crates/zeno-fcis-spec",
     "crates/zeno-fcis-project",
     "crates/zeno-fcis-catalog",
     "crates/zeno-fcis-transition",
@@ -33,12 +34,14 @@ members = [
     "crates/zeno-fcis-authenticated-authority",
     "crates/zeno-fcis-synthesis",
     "crates/zeno-fcis-backend",
+    "crates/zeno-fcis-formal-tools",
+    "crates/zeno-fcis-cli",
     "crates/zeno-fcis-shell-sqlite",
     "crates/zeno-fcis-collections",
 ]
 
 [workspace.package]
-version = "1.0.0-rc.2"
+version = "1.0.0-rc.3"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT OR Apache-2.0"

@@ -8,6 +8,33 @@ embedded in ZenoFCIS values.
 
 No changes yet.
 
+## 1.0.0-rc.3 - release date pending
+
+Authoring and composition usability candidate before stable V1.
+
+### Added
+
+- versioned bounded `.zeno` parsing, canonical typed project ASTs, accumulated
+  diagnostics, builders, relational logic, and explicit finite/unbounded
+  temporal modes in the pure `zeno-fcis-spec` crate;
+- deterministic CVC5 1.3.3, Z3 4.16.0, and Lean 4.30.0 exporters and
+  fail-closed process adapters in `zeno-fcis-formal-tools`;
+- the `zeno-fcis` CLI for templates, checking, generation/drift, graphs,
+  explanations, formal tools, and backend diagnosis;
+- the executable Mini Determinator private-workspace, get/put, return,
+  canonical join, conflict, rollback, budget, and replay reference;
+- sixteen RC3 BDD/ATDD scenarios, tutorials, official formal-tool checksum
+  workflow, and a 36-crate public package inventory.
+
+### Compatibility and limits
+
+- existing protocol IDs and canonical formats are unchanged;
+- `.zeno` is non-authoritative authoring input and only the lowered AST has
+  canonical identity;
+- finite temporal checks, generated views, and tool agreement do not grant
+  production authority;
+- the Mini Determinator is a semantic model. Its isolated QEMU kernel is a demonstration and carries no production OS or hardware claim.
+
 ## 1.0.0-rc.2 - 2026-07-29
 
 Second public release candidate for the reusable ZenoFCIS core library family.

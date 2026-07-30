@@ -1,0 +1,13 @@
+[package]
+name = "kernel"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "kernel"
+path = "src/main.rs"
+
+[dependencies]
+bootloader_api = "=0.11.17"
+zeno-fcis-spec = { path = "../../../crates/zeno-fcis-spec", default-features = false }

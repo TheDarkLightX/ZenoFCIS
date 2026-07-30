@@ -14,6 +14,24 @@ immutable state + command + policy + authenticated context
 
 The semantic kernel treats values, decisions, resource budgets, canonical bytes, and commitments as explicit protocol data. It forbids unsafe Rust and is designed for `no_std + alloc` use without clocks, randomness, networking, filesystems, databases, or executable effect closures.
 
+## See it run
+
+The Mini Determinator links the public semantic core into a freestanding Rust
+kernel, boots through UEFI in QEMU, checks opposite worker completion orders,
+and rejects conflicting private writes without authoritative state change.
+
+[![Mini Determinator kernel running in QEMU](docs/assets/marketing/mini-determinator-qemu-kernel.png)](docs/QEMU_MINI_DETERMINATOR.md)
+
+Authoring failures are accumulated in one bounded pass. This deliberately
+invalid example reports a duplicate stable ID, an unknown type reference, and
+an invalid merge order together:
+
+[![Three accumulated diagnostics from one check](docs/assets/marketing/accumulated-diagnostics.png)](docs/tutorials/MINI_DETERMINATOR.md#see-three-authoring-mistakes-at-once)
+
+Start with the worked [Mini Determinator tutorial](docs/tutorials/MINI_DETERMINATOR.md),
+reproduce the [QEMU capture](docs/QEMU_MINI_DETERMINATOR.md), or inspect all
+[marketing-ready executable captures](docs/assets/marketing/README.md).
+
 ## Canonical bytes and byte-level enforcement
 
 Canonical bytes are the one permitted byte representation of an admitted
@@ -46,7 +64,7 @@ path and import the curated prelude:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -70,12 +88,12 @@ Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
 [crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
 [LLM integration guide](docs/LLM_USAGE.md). The
-[V1 product contract](docs/V1_PRODUCT_CONTRACT.md) defines the RC2 feature
+[V1 product contract](docs/V1_PRODUCT_CONTRACT.md) defines the RC3 feature
 freeze and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md)
 bind those journeys to fixed executable commands, while the optional
 [developer guardrails](docs/DEVELOPER_GUARDRAILS.md) reject selected unsafe
 coding-agent actions before execution. The
-[RC2 release notes](docs/RC2_RELEASE_NOTES.md) describe the exact candidate
+[RC3 release notes](docs/RC3_RELEASE_NOTES.md) describe the exact candidate
 surface and remaining final-release blockers. The owner-facing
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
 repository evidence from signing, publication, and external review actions.
@@ -86,6 +104,45 @@ cargo +1.97.1 run -p zeno-fcis --example minimal_core --locked
 cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
 python3 tools/atdd.py run --all
 ```
+
+## RC3 authoring path
+
+RC3 adds the inert `.zeno` language, canonical typed project AST, accumulated
+diagnostics, bounded relational and temporal logic, deterministic formal-tool
+adapters, and the `zeno-fcis` CLI. Start with the
+[authoring contract](docs/RC3_AUTHORING_CONTRACT.md),
+[language specification](docs/ZENO_LANGUAGE_V1.md),
+[temporal semantics](docs/TEMPORAL_LOGIC_V1.md),
+[formal-tools contract](docs/FORMAL_TOOLS_RC3.md),
+[Mini Determinator reference](docs/MINI_DETERMINATOR.md),
+[Mini Determinator QEMU kernel demo](docs/QEMU_MINI_DETERMINATOR.md), and
+[CLI reference](docs/CLI_REFERENCE.md), and
+[RC3 readiness review](docs/RC3_READINESS_REVIEW.md).
+
+```bash
+cargo +1.97.1 run -p zeno-fcis-cli -- new /tmp/zeno-demo --template minimal
+cargo +1.97.1 run -p zeno-fcis-cli -- check /tmp/zeno-demo/project.zeno
+cargo +1.97.1 run -p zeno-fcis-cli -- generate \
+  /tmp/zeno-demo/project.zeno --out /tmp/zeno-demo/generated
+cargo +1.97.1 run -p zeno-fcis-spec --example mini_determinator --locked
+python3 tools/qemu_demo.py run
+```
+
+The tutorials cover [language authoring](docs/tutorials/LANGUAGE.md),
+[composition](docs/tutorials/COMPOSITION.md),
+[temporal claims](docs/tutorials/TEMPORAL.md),
+[formal tools](docs/tutorials/FORMAL_TOOLS.md),
+[Mini Determinator replay](docs/tutorials/MINI_DETERMINATOR.md), and the
+[CLI workflow](docs/tutorials/CLI.md).
+
+The optional QEMU command builds a freestanding `no_std` kernel, boots it
+through UEFI, and validates its guest serial result. It requires QEMU, OVMF,
+ImageMagick, and the documented pinned nightly toolchain; it is not part of the
+default library build.
+
+`.zeno` source and every derived view are non-authoritative authoring input.
+Only the lowered typed AST has canonical identity, and concrete machines still
+bind through the existing authority-gated constructors.
 
 The `full` feature is intended for workspace integration and exploration.
 Reusable libraries should select only the features needed at their boundary.
@@ -123,7 +180,7 @@ The workspace now includes the complete package ladder:
 - crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
-- a frozen V1 product contract, nine human-readable BDD scenarios, a closed
+- a frozen V1 product contract, 25 human-readable BDD scenarios, a closed
   fail-closed ATDD registry, and optional deterministic Probity guardrails with
   a pinned Node/npm graph and hostile command corpus.
 
@@ -176,7 +233,7 @@ code should enable the smallest explicit feature set, for example:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["composed-program"] }
 ```
 
 The umbrella crate's default and `no_std` feature sets are project-neutral.
@@ -254,17 +311,18 @@ RC packaging is fail closed and reviewable:
 ```bash
 python3 tools/rc_package.py self-test
 python3 tools/rc_package.py check
-python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc3
 ```
 
 The build retains all public `.crate` packages, rustdoc, source and diagnostic
 binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
-[packaging reference](docs/PACKAGING.md) and
+[packaging reference](docs/PACKAGING.md),
+[RC3 readiness review](docs/RC3_READINESS_REVIEW.md), and
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md).
 
 ## Assurance posture
 
-Version `1.0.0-rc.2` is the current public API and packaging candidate for the
+Version `1.0.0-rc.3` is the planned public API and packaging candidate for the
 reusable core library. It is ready for downstream API evaluation and
 integration testing, while remaining a pre-release candidate until the
 independent exact-head review and final release gates pass. The pinned ZenoDEX

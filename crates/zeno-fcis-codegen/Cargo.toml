@@ -11,10 +11,10 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec" }
-zeno-fcis-crypto = { version = "=1.0.0-rc.2", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
-zeno-fcis-schema = { version = "=1.0.0-rc.2", path = "../zeno-fcis-schema" }
-zeno-fcis-value = { version = "=1.0.0-rc.2", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-schema = { version = "=1.0.0-rc.3", path = "../zeno-fcis-schema" }
+zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value", default-features = false }
 
 [lints]
 workspace = true

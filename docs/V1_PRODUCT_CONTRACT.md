@@ -1,8 +1,8 @@
 # ZenoFCIS V1 product contract
 
-This document freezes the reusable core-library scope for `1.0.0-rc.2`. It is
+This document freezes the reusable core-library scope for `1.0.0-rc.3`. It is
 the product-level complement to the protocol and authority documents. A feature
-belongs in RC2 only when it supports one of the adopter journeys below without
+belongs in RC3 only when it supports one of the adopter journeys below without
 silently broadening the production claim.
 
 ## Intended users
@@ -10,14 +10,15 @@ silently broadening the production claim.
 | User | Supported outcome |
 |---|---|
 | Library adopter | Compile a minimal immutable transition through the umbrella crate and select only the required features. |
+| Project author | Create, check, explain, graph, and reproducibly generate a typed composition from one inert `.zeno` file. |
 | Software architect | Define reviewed project meaning, narrow fixed domain machines, explicit global composition, laws, and nominal authority. |
 | Formal-tool integrator | Mount Lean, SMT/Z3, CVC5, Kani, Flux, private ESSO, or another checker behind the common bounded backend and evidence protocols. |
 | Runtime integrator | Compare complete mounted decisions, publish authorized transitions atomically, and deliver exact durable outbox obligations. |
 | Release maintainer | Rebuild the complete crate family, documentation, source, binaries, SBOM, provenance inputs, and checksums from one exact revision. |
 
-## RC2 feature freeze
+## RC3 feature freeze
 
-RC2 contains these product features:
+RC3 contains these product features:
 
 1. Immutable bounded values, deterministic logical budgets, the three-way
    decision algebra, canonical encoding, patches, plans, receipts, and bundles.
@@ -36,8 +37,13 @@ RC2 contains these product features:
 7. A project bootstrap generator, checked examples, isolated-consumer fixture,
    human and LLM documentation, executable acceptance scenarios, and
    reproducible release-candidate packaging.
+8. A bounded `.zeno` compiler, canonical typed project AST, accumulated
+   diagnostics, equivalent authoring builders, derived composition views, and
+   bounded relational/temporal evaluation.
+9. Public deterministic CVC5, Z3, and Lean adapters, a complete `zeno-fcis`
+   CLI, and the executable shared-nothing Mini Determinator semantic model.
 
-No new semantic subsystem should enter RC2 after this freeze. A correction to
+No new semantic subsystem should enter RC3 after this freeze. A correction to
 an authority or protocol defect requires a new exact candidate head and complete
 revalidation. A feature expansion belongs in a later release.
 
@@ -47,6 +53,7 @@ The shortest supported route is:
 
 ```text
 install the umbrella crate with composed-program
+  -> optionally create and check one inert .zeno project
   -> run minimal_core and the isolated consumer
   -> define reviewed schema/profile/catalog
   -> generate and inspect the project starter
@@ -63,7 +70,7 @@ portfolio.
 
 ## UX acceptance criteria
 
-RC2 is usable when:
+RC3 is usable when:
 
 - a new evaluator reaches a successful example with one documented command;
 - feature selection explains the smallest supported dependency surface;
@@ -77,6 +84,11 @@ RC2 is usable when:
 - failures explain the missing authority, evidence, resource, schema, or
   deployment binding rather than suggesting a bypass;
 - humans and coding agents can run the same acceptance and release commands.
+- equivalent source and builder construction produce the same canonical AST;
+- blocked temporal or external-tool outcomes remain visibly blocked;
+- the Mini Determinator demonstrates private work, canonical join, conflict,
+  and rollback, with an optional freestanding QEMU kernel integration that does
+  not claim production operating-system qualification.
 
 ## Explicit nonclaims
 

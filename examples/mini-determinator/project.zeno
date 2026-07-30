@@ -1,0 +1,30 @@
+zeno 1;
+project 2 mini_determinator;
+namespace 10 mini_os;
+type 100 state CoordinatorState;
+type 101 state WorkerState;
+type 102 command Execute;
+type 103 context WorkerResults;
+type 104 destination ReturnDestination;
+type 105 payload ReturnPayload;
+reason 200 merge_conflict precedence 0;
+reason 201 missing_footprint precedence 1;
+component 300 coordinator {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.103;
+  budget steps 4096;
+  budget nodes 256;
+}
+component 301 worker_space {
+  owns 101;
+  reads pre.101;
+  writes post.101;
+  budget steps 4096;
+  budget nodes 256;
+}
+merge [300, 301];
+law 400 worker_isolation = pre.100 == pre.100;
+claim 500 finite_state_reflexivity all finite 4 = always atom(pre.100 == pre.100);
+claim 501 unbounded_state_reflexivity lean unbounded = always atom(pre.100 == pre.100);

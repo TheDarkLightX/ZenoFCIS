@@ -36,7 +36,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "1217dc0185cea2f120c80942f139f3bb9265ef06a1c0a141bb4995966b0249e6"
+    "7fb558604786562325fab8ab8d57228c511abfc4218a6e21fc273ec0f6b38c8d"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -332,13 +332,26 @@ def validate_package_documents(
     binaries = configured.get("binaries")
     if not isinstance(binaries, list) or not binaries:
         raise RcError("package set must declare at least one binary")
+    binary_targets: set[str] = set()
     for binary in binaries:
         if not isinstance(binary, dict):
             raise RcError("binary declaration is malformed")
         package_name = binary.get("package")
         target_name = binary.get("target")
-        if package_name not in by_name or not isinstance(target_name, str):
+        if (
+            package_name not in by_name
+            or not isinstance(target_name, str)
+            or not target_name
+            or not target_name.isascii()
+            or any(
+                not character.isalnum() and character not in "-_"
+                for character in target_name
+            )
+        ):
             raise RcError("binary package or target is invalid")
+        if target_name in binary_targets:
+            raise RcError(f"duplicate binary target {target_name}")
+        binary_targets.add(target_name)
         targets = by_name[str(package_name)].get("targets")
         if not isinstance(targets, list) or not any(
             isinstance(target, dict)
@@ -505,6 +518,17 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
         raise RcError("self-test binary declaration is unavailable")
     binaries[0]["target"] = "missing-binary"
     expect_failure(wrong_binary_configured, copy.deepcopy(metadata), "binary target")
+
+    duplicate_binary_configured = copy.deepcopy(configured)
+    duplicate_binaries = duplicate_binary_configured.get("binaries")
+    if not isinstance(duplicate_binaries, list) or not duplicate_binaries:
+        raise RcError("self-test binary declaration is unavailable")
+    duplicate_binaries.append(copy.deepcopy(duplicate_binaries[0]))
+    expect_failure(
+        duplicate_binary_configured,
+        copy.deepcopy(metadata),
+        "duplicate binary target",
+    )
 
 
 def run_rustdoc_normalization_self_test() -> None:
@@ -680,6 +704,70 @@ def deterministic_binary_archive(binary: Path, destination: Path, prefix: str) -
             info.mode = mode
             normalized_tar_info(info)
             archive.addfile(info, io.BytesIO(content))
+
+
+def binary_artifact_inventory(
+    configured: dict[str, object], version: str, host: str
+) -> list[dict[str, str]]:
+    binaries = configured.get("binaries")
+    if not isinstance(binaries, list):
+        raise RcError("binary metadata is malformed")
+    inventory: list[dict[str, str]] = []
+    archive_names: set[str] = set()
+    prefixes: set[str] = set()
+    for binary in binaries:
+        if not isinstance(binary, dict):
+            raise RcError("binary metadata is malformed")
+        package_name = binary.get("package")
+        target_name = binary.get("target")
+        if not isinstance(package_name, str) or not isinstance(target_name, str):
+            raise RcError("binary metadata is malformed")
+        stem = f"{target_name}-{version}-{host}"
+        archive_name = f"{stem}.tar.gz"
+        if archive_name in archive_names or stem in prefixes:
+            raise RcError(f"duplicate binary artifact path for {target_name}")
+        archive_names.add(archive_name)
+        prefixes.add(stem)
+        inventory.append(
+            {
+                "package": package_name,
+                "target": target_name,
+                "archive": archive_name,
+                "prefix": stem,
+                "command": (
+                    "cargo +1.97.1 build --release --locked "
+                    f"-p {package_name} --bin {target_name}"
+                ),
+            }
+        )
+    return inventory
+
+
+def run_binary_inventory_self_test(configured: dict[str, object]) -> None:
+    version = require_string(configured, "version")
+    inventory = binary_artifact_inventory(
+        configured, version, "self-test-unknown-linux"
+    )
+    binaries = configured.get("binaries")
+    if not isinstance(binaries, list) or len(inventory) != len(binaries):
+        raise RcError("binary inventory omitted a declared target")
+    if len({item["archive"] for item in inventory}) != len(inventory):
+        raise RcError("binary inventory archive names are not unique")
+    if len({item["command"] for item in inventory}) != len(inventory):
+        raise RcError("binary inventory provenance commands are not unique")
+
+    with tempfile.TemporaryDirectory(prefix="zeno-fcis-binary-self-test-") as raw:
+        root = Path(raw)
+        for item in inventory:
+            executable = root / item["target"]
+            executable.write_bytes(item["target"].encode("ascii"))
+            archive_path = root / item["archive"]
+            deterministic_binary_archive(executable, archive_path, item["prefix"])
+            with tarfile.open(archive_path, mode="r:gz") as archive:
+                members = {member.name for member in archive.getmembers()}
+            expected_executable = str(Path(item["prefix"]) / item["target"])
+            if expected_executable not in members:
+                raise RcError(f"binary archive omitted {item['target']}")
 
 
 def source_archive(destination: Path, prefix: str) -> None:
@@ -914,15 +1002,22 @@ def build(output: Path) -> None:
         f"zeno-fcis-rustdoc-{version}",
     )
 
-    binaries = configured["binaries"]
-    if not isinstance(binaries, list):
-        raise RcError("binary metadata changed during assembly")
-    host_targets: set[str] = set()
-    for binary in binaries:
-        if not isinstance(binary, dict):
-            raise RcError("binary metadata is malformed")
-        package_name = str(binary["package"])
-        target_name = str(binary["target"])
+    verbose_version = run(["rustc", "+1.97.1", "-vV"], capture=True)
+    if not isinstance(verbose_version, str):
+        raise RcError("rustc version output is binary")
+    host_lines = [
+        line.removeprefix("host: ")
+        for line in verbose_version.splitlines()
+        if line.startswith("host: ")
+    ]
+    if len(host_lines) != 1:
+        raise RcError("rustc host target is unavailable")
+    host = host_lines[0]
+    host_targets = {host}
+    binary_inventory = binary_artifact_inventory(configured, version, host)
+    for item in binary_inventory:
+        package_name = item["package"]
+        target_name = item["target"]
         run(
             [
                 "cargo",
@@ -941,23 +1036,16 @@ def build(output: Path) -> None:
         executable = build_target / "release" / executable_name
         if not executable.is_file():
             raise RcError(f"release binary {executable_name} is missing")
-        verbose_version = run(["rustc", "+1.97.1", "-vV"], capture=True)
-        if not isinstance(verbose_version, str):
-            raise RcError("rustc version output is binary")
-        host_lines = [
-            line.removeprefix("host: ")
-            for line in verbose_version.splitlines()
-            if line.startswith("host: ")
-        ]
-        if len(host_lines) != 1:
-            raise RcError("rustc host target is unavailable")
-        host = host_lines[0]
-        host_targets.add(host)
-        archive_name = f"zeno-fcis-tools-{version}-{host}.tar.gz"
         deterministic_binary_archive(
             executable,
-            binaries_dir / archive_name,
-            f"zeno-fcis-tools-{version}-{host}",
+            binaries_dir / item["archive"],
+            item["prefix"],
+        )
+    actual_binary_archives = sorted(path.name for path in binaries_dir.iterdir())
+    expected_binary_archives = sorted(item["archive"] for item in binary_inventory)
+    if actual_binary_archives != expected_binary_archives:
+        raise RcError(
+            "assembled binary archive set differs from the declared inventory"
         )
     shutil.rmtree(build_target)
 
@@ -979,9 +1067,13 @@ def build(output: Path) -> None:
         "source_manifest_sha256": sha256(source_manifest),
         "sbom_sha256": sha256(sbom_path),
         "commands": [
-            "cargo +1.97.1 package --workspace --locked --no-verify --exclude zeno-fcis-codegen-fixture",
-            "cargo +1.97.1 build --release --locked -p zeno-fcis-adapter-zenodex --bin mount-zenodex-zusd",
-            "RUSTFLAGS=--remap-path-prefix=<target>=/zeno-fcis-target RUSTDOCFLAGS='-D warnings --remap-path-prefix=<target>=/zeno-fcis-target' cargo +1.97.1 doc --workspace --all-features --locked --no-deps --jobs 1 --exclude zeno-fcis-codegen-fixture",
+            " ".join(package_arguments),
+            *[item["command"] for item in binary_inventory],
+            (
+                "RUSTFLAGS=--remap-path-prefix=<target>=/zeno-fcis-target "
+                "RUSTDOCFLAGS=-D-warnings,--remap-path-prefix=<target>=/zeno-fcis-target "
+                + " ".join(rustdoc_arguments)
+            ),
         ],
         "nonclaim": "inputs for a future signed attestation; not a signature or SLSA provenance",
     }
@@ -1040,9 +1132,10 @@ def main() -> int:
             run_self_test(configured, cargo_metadata(complete=False))
             run_rustdoc_normalization_self_test()
             run_tree_archive_mode_self_test()
+            run_binary_inventory_self_test(configured)
             print(
                 "rc-package: self-test PASS "
-                "(9 hostile mutations rejected; rustdoc and archive modes verified)"
+                "(10 hostile mutations rejected; rustdoc, archive modes, and binary inventory verified)"
             )
         else:
             build(args.output.resolve())

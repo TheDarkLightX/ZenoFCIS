@@ -2,7 +2,7 @@
 
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
-All workspace crates are version `1.0.0-rc.2`; the project has not published a
+All workspace crates are version `1.0.0-rc.3`; the project has not published a
 stable V1 API.
 
 ## Dependency direction
@@ -33,6 +33,7 @@ surface.
 | `zeno-fcis-core` | Three-way decisions, stable reasons, immutable logical budgets, transition trait |
 | `zeno-fcis-value` | Transitively owned closed values and bounded admission |
 | `zeno-fcis-codec` | ZCVE/1 canonical encoding, domain separation, commitments, strict value decoding |
+| `zeno-fcis-spec` | Pure bounded `.zeno` compiler, canonical project AST, relational/temporal evaluator, authoring builders, composition derivation, and Mini Determinator |
 | `zeno-fcis-patch` | Expected-root, preconditioned, canonical nonoverlapping state patches |
 | `zeno-fcis-plan` | Closed non-executable commit evidence and durable outbox obligations |
 | `zeno-fcis-receipt` | Candidate sealing, receipts, reject receipts, and complete bundles |
@@ -70,6 +71,7 @@ authoritative without an independent checker and release policy.
 | `zeno-fcis-evidence` | Source/tool/query/assumption/coverage-bound evidence envelopes and importers |
 | `zeno-fcis-synthesis` | Canonical bounded candidate enumeration and honest incomplete-search results |
 | `zeno-fcis-backend` | Checked engine/verifier protocol for Lean, SMT/Z3, CVC5, Kani, private ESSO, compilers, and other tools |
+| `zeno-fcis-formal-tools` | Deterministic CVC5, Z3, and Lean exporters, checked process execution, model replay, and content-addressed diagnostic retention |
 
 Concrete tool clients normally live in a separate `std` shell crate. ESSO is
 private and optional; it is not a public dependency or universal requirement.
@@ -109,6 +111,7 @@ publication uses the nominal authorization boundary instead.
 | `zeno-fcis-adapter` | Callable and strict JSON-line mounted-runtime comparison |
 | `zeno-fcis-codegen` | Deterministic Rust/Python schema and vector generation |
 | `zeno-fcis-bootstrap` | Deterministic project starter generation from a reviewed catalog |
+| `zeno-fcis-cli` | Published `zeno-fcis` authoring, generation, graph, explanation, proof, counterexample, doctor, and backend-inspection binary |
 
 These crates may use `std` because they access a host runtime, database, files,
 or generated source. They must preserve the decisions produced by the semantic

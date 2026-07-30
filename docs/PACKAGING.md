@@ -1,14 +1,14 @@
 # Release-candidate packaging
 
-This document describes the ZenoFCIS `1.0.0-rc.2` artifact set.
+This document describes the ZenoFCIS `1.0.0-rc.3` artifact set.
 
 ## Package set
 
 `release/package-set.toml` is the reviewed package authority. It contains:
 
-- 33 public crates in dependency-first publication order;
+- 36 public crates in dependency-first publication order;
 - one private compiled code-generation fixture;
-- one supported diagnostic binary target;
+- the `zeno-fcis` authoring CLI and `mount-zenodex-zusd` diagnostic target;
 - the exact Cargo version and Rust toolchain.
 
 `tools/rc_package.py check` compares that manifest with Cargo metadata and
@@ -22,7 +22,8 @@ invalid publication order.
 
 ```text
 packages/*.crate
-binaries/zeno-fcis-tools-<version>-<target>.tar.gz
+binaries/zeno-fcis-<version>-<target>.tar.gz
+binaries/mount-zenodex-zusd-<version>-<target>.tar.gz
 docs/zeno-fcis-rustdoc-<version>.tar.gz
 source/zeno-fcis-<version>-source.tar.gz
 SOURCE-MANIFEST.json
@@ -34,12 +35,17 @@ zeno-fcis-<version>-rc-bundle.zip
 ```
 
 The command requires a clean exact commit. It uses pinned Rust `1.97.1`,
-packages every public crate with `--locked`, builds the diagnostic binary in
+packages every public crate with `--locked`, builds both declared binaries in
 release mode, generates warning-denied rustdoc, records the Cargo dependency
 graph as CycloneDX 1.6, and content-addresses every retained artifact.
 
 The source archive also retains `package.json`, `package-lock.json`,
 `.node-version`, and `probity.config.ts` for optional development guardrails.
+It retains the isolated Mini Determinator QEMU kernel source, its locked nested
+workspace, the fixed-argument capture runner, and the validated marketing
+capture, serial transcript, and metadata. These demo artifacts are source and
+integration evidence; they are not additional publishable crates or binaries
+in the 36-package release set.
 The release packager validates their exact Node/Probity identities and binds
 the complete canonical npm lock graph, including every transitive package
 entry. `SBOM.cdx.json` describes the shipped Rust crate graph; the
@@ -54,8 +60,7 @@ The generated help and settings pages are normalized to the `zeno_fcis`
 umbrella crate because Rustdoc otherwise records the crate that finishes last.
 Use docs.rs or locally generated documentation when global search is required.
 
-The generated binary archive is host-target-specific. The read-only release
-candidate workflow currently qualifies the Linux x86-64 archive. Additional
+Each generated binary archive is host-target-specific. The archive name, top-level directory, executable member, and provenance command are derived from the declared target. The read-only release candidate workflow currently qualifies the Linux x86-64 archive. Additional
 targets require their own exact-head workflow evidence before attachment to a
 release.
 

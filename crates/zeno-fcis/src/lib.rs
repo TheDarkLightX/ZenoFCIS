@@ -83,6 +83,11 @@ pub mod prelude {
         VerificationDecision, VerifiedBackendRun, execute_verified,
     };
 
+    #[cfg(feature = "authoring")]
+    pub use zeno_fcis_spec::{
+        ProjectLimits, ProjectSpec, SourceLimits, elaborate_project, parse_project,
+    };
+
     #[cfg(feature = "bootstrap")]
     pub use crate::{BootstrapLimits, BootstrapSpec, generate_project};
 }
@@ -108,6 +113,10 @@ pub use zeno_fcis_backend as backend;
 #[cfg(feature = "bootstrap")]
 /// Deterministic project starter generation from reviewed catalogs.
 pub use zeno_fcis_bootstrap as bootstrap;
+#[cfg(feature = "authoring")]
+/// Bounded `.zeno` parser, typed project AST, builders, logic, and derived views.
+pub use zeno_fcis_spec as spec;
+
 #[cfg(feature = "catalog")]
 /// Schema-bound reason, effect, channel, and plan-validation catalogs.
 pub use zeno_fcis_catalog as catalog;

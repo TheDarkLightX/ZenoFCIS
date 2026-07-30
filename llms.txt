@@ -3,7 +3,7 @@
 ZenoFCIS is a Rust library family for high-assurance functional-core /
 imperative-shell systems.
 
-Current workspace version: 1.0.0-rc.2
+Current workspace version: 1.0.0-rc.3
 Current status: current public API and packaging candidate; final Cargo V1
 stability and general deployment qualification are not yet claimed
 Rust toolchain: 1.97.1 for repository validation
@@ -16,11 +16,19 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/CRATE_MAP.md: crate roles and trust boundaries
 - docs/FEATURE_MATRIX.md: umbrella features and environments
 - docs/LLM_USAGE.md: authority rules for model-assisted work
-- docs/V1_PRODUCT_CONTRACT.md: frozen RC2 features and supported adopter journeys
+- docs/V1_PRODUCT_CONTRACT.md: frozen RC3 features and supported adopter journeys
+- docs/RC3_AUTHORING_CONTRACT.md: authoring pipeline, capability boundary, and nonclaims
+- docs/ZENO_LANGUAGE_V1.md: exact grammar, canonicalization, and diagnostics
+- docs/TEMPORAL_LOGIC_V1.md: finite and unbounded temporal semantics
+- docs/FORMAL_TOOLS_RC3.md: exact tool identity and fail-closed process adapters
+- docs/MINI_DETERMINATOR.md: executable shared-nothing semantic model
+- docs/QEMU_MINI_DETERMINATOR.md: freestanding QEMU kernel demo, capture path, and nonclaims
+- docs/CLI_REFERENCE.md: deterministic commands, JSON schema, and exit classes
 - docs/ACCEPTANCE_TESTING.md: BDD scenarios and closed executable ATDD registry
 - docs/DEVELOPER_GUARDRAILS.md: optional deterministic Probity rules and setup
 - docs/ARCHITECTURE.md: dependency rings
-- docs/RC2_RELEASE_NOTES.md: current candidate surface and final-release blockers
+- docs/RC3_RELEASE_NOTES.md: current candidate surface and final-release blockers
+- docs/RC2_RELEASE_NOTES.md: historical second-candidate notes
 - docs/RC1_RELEASE_NOTES.md: historical first-candidate notes
 - docs/V1_RELEASE_CHECKLIST.md: exact-source tag, publication, evidence, and rollback runbook
 - docs/PACKAGING.md: package authority and retained artifacts
@@ -53,6 +61,10 @@ invocation values, not prebuilt decisions or bundles.
   CatalogAuthorizedTransition
 - formal tools: BackendEngine, BackendVerifier, EvidenceChecker,
   LawEvidenceVerifier
+- authoring: parse_project, elaborate_project, ProjectSpecBuilder,
+  evaluate_temporal, MiniDeterminator
+- formal process shell: package zeno-fcis-formal-tools
+- authoring CLI: package zeno-fcis-cli, binary zeno-fcis
 - shells: AuthorizedShellState; zeno-fcis-shell-sqlite when enabled
 
 ## Production integration rules

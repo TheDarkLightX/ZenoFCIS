@@ -12,14 +12,27 @@
 8. [V1 product contract](V1_PRODUCT_CONTRACT.md)
 9. [BDD and acceptance testing](ACCEPTANCE_TESTING.md)
 10. [Deterministic developer guardrails](DEVELOPER_GUARDRAILS.md)
-11. [RC2 release notes](RC2_RELEASE_NOTES.md)
-12. [Historical RC1 release notes](RC1_RELEASE_NOTES.md)
-13. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
-14. [Packaging](PACKAGING.md)
-15. [Release assurance](RELEASE_ASSURANCE.md)
+11. [RC3 release notes](RC3_RELEASE_NOTES.md)
+12. [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md)
+13. [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
+14. [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
+15. [Formal tools](FORMAL_TOOLS_RC3.md)
+16. [Mini Determinator](MINI_DETERMINATOR.md)
+17. [Mini Determinator QEMU kernel demo](QEMU_MINI_DETERMINATOR.md)
+18. [CLI reference](CLI_REFERENCE.md)
+19. [CLI and QEMU marketing captures](assets/marketing/README.md)
+20. [Historical RC2 release notes](RC2_RELEASE_NOTES.md)
+21. [Historical RC1 release notes](RC1_RELEASE_NOTES.md)
+22. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
+23. [Packaging](PACKAGING.md)
+24. [Release assurance](RELEASE_ASSURANCE.md)
+25. [RC3 readiness review](RC3_READINESS_REVIEW.md)
 
 ## Project definition and typed construction
 
+- [Language tutorial](tutorials/LANGUAGE.md)
+- [Composition tutorial](tutorials/COMPOSITION.md)
+- [CLI tutorial](tutorials/CLI.md)
 - [Universal project profiles](UNIVERSAL_PROJECT_PROFILES.md)
 - [Schema and code-generation boundary](SCHEMA_CODEGEN_BOUNDARY.md)
 - [Schema-bound catalog](SCHEMA_BOUND_CATALOG.md)
@@ -46,6 +59,9 @@
 
 ## Formal tools and runtime refinement
 
+- [Temporal tutorial](tutorials/TEMPORAL.md)
+- [Formal-tools tutorial](tutorials/FORMAL_TOOLS.md)
+- [Mini Determinator tutorial](tutorials/MINI_DETERMINATOR.md)
 - [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md)
 - [Deterministic synthesis](DETERMINISTIC_SYNTHESIS.md)
 - [Evidence importers](EVIDENCE_IMPORTERS.md)
@@ -81,7 +97,7 @@ and other tools can use the same public boundaries.
 
 ## Status
 
-The workspace is version `1.0.0-rc.2`, the current public API and packaging
+The workspace is version `1.0.0-rc.3`, the current public API and packaging
 candidate. The documentation describes implemented APIs and explicit
 boundaries. Final Cargo V1 stability begins only at `1.0.0`. The RC does not
 claim general deployment qualification, a bundled concurrent runtime, or an

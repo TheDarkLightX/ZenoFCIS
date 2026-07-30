@@ -1,5 +1,5 @@
 format = "zeno-fcis/package-set/1"
-version = "1.0.0-rc.2"
+version = "1.0.0-rc.3"
 rust_toolchain = "1.97.1"
 
 # Dependency-first order for crates.io publication. The checker rejects a
@@ -8,6 +8,7 @@ publish_order = [
     "zeno-fcis-value",
     "zeno-fcis-core",
     "zeno-fcis-codec",
+    "zeno-fcis-spec",
     "zeno-fcis-project",
     "zeno-fcis-schema",
     "zeno-fcis-patch",
@@ -34,6 +35,8 @@ publish_order = [
     "zeno-fcis-authenticated",
     "zeno-fcis-authenticated-authority",
     "zeno-fcis-backend",
+    "zeno-fcis-formal-tools",
+    "zeno-fcis-cli",
     "zeno-fcis-adapter",
     "zeno-fcis-shell-sqlite",
     "zeno-fcis-adapter-zenodex",
@@ -41,6 +44,11 @@ publish_order = [
 ]
 
 private_packages = ["zeno-fcis-codegen-fixture"]
+
+[[binaries]]
+package = "zeno-fcis-cli"
+target = "zeno-fcis"
+purpose = "bounded deterministic project authoring and formal-tool interface"
 
 [[binaries]]
 package = "zeno-fcis-adapter-zenodex"

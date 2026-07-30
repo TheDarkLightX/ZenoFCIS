@@ -67,6 +67,7 @@ jobs:
             zeno-fcis-schema \
             zeno-fcis-synthesis \
             zeno-fcis-backend \
+            zeno-fcis-spec \
             zeno-fcis
           do
             cargo +1.97.1 check -p "${crate}" --no-default-features --locked --target wasm32-unknown-unknown
