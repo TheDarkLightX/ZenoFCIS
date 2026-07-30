@@ -9,10 +9,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::thread::{self, JoinHandle};
+use std::sync::mpsc::{self, SyncSender, TryRecvError};
+use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -26,17 +27,28 @@ use zeno_fcis_spec::{
 };
 
 /// Formal-tools manifest format.
-pub const TOOLS_MANIFEST_FORMAT: &str = "zeno-fcis/tools/1";
+pub const TOOLS_MANIFEST_FORMAT: &str = "zeno-fcis/tools/2";
 /// CVC5 release qualified by RC3.
 pub const CVC5_VERSION: &str = "1.3.3";
 /// Z3 release qualified by RC3.
 pub const Z3_VERSION: &str = "4.16.0";
 /// Lean release qualified by RC3.
 pub const LEAN_VERSION: &str = "4.30.0";
+/// Canonical Lean 4.30.0 Linux x86-64 runtime-tree identity qualified by RC3.
+pub const LEAN_LINUX_X86_64_TREE_SHA256: &str =
+    "5dc9cab14b1a15fc8d6cfc3f1c1b627c0c74facb23465fb9463c42554a807f5b";
 /// Maximum tools-manifest size.
 pub const MAX_TOOLS_MANIFEST_BYTES: usize = 1024 * 1024;
 /// Maximum admitted executable size for hashing.
 pub const MAX_TOOL_BINARY_BYTES: u64 = 512 * 1024 * 1024;
+/// Maximum regular files admitted into one Lean runtime closure.
+pub const MAX_LEAN_TOOLCHAIN_FILES: usize = 25_000;
+/// Maximum directory nesting admitted into one Lean runtime closure.
+pub const MAX_LEAN_TOOLCHAIN_DEPTH: usize = 64;
+/// Maximum total regular-file bytes admitted into one Lean runtime closure.
+pub const MAX_LEAN_TOOLCHAIN_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+/// Maximum UTF-8 relative-path bytes admitted into one Lean runtime closure.
+pub const MAX_LEAN_TOOLCHAIN_PATH_BYTES: usize = 4_096;
 /// Maximum formula nodes rendered into one formal obligation.
 pub const MAX_EXPORT_FORMULA_NODES: usize = 4_096;
 /// Maximum conservative render operations for one formal obligation.
@@ -123,6 +135,17 @@ impl Default for ExportLimits {
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+fn open_untrusted_read(path: &Path) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.custom_flags(nix::libc::O_NOFOLLOW | nix::libc::O_NONBLOCK);
+    }
+    options.open(path)
+}
+
 /// Closed process backend family.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -160,6 +183,26 @@ impl ToolBackend {
     }
 }
 
+/// Exact runtime closure required for Lean kernel execution.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ToolRuntimeConfig {
+    root: PathBuf,
+    tree_sha256: String,
+}
+impl ToolRuntimeConfig {
+    /// Returns the source runtime root copied into the checked private snapshot.
+    #[must_use]
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+    /// Returns the lowercase SHA-256 commitment to the canonical runtime inventory.
+    #[must_use]
+    pub fn tree_sha256(&self) -> &str {
+        &self.tree_sha256
+    }
+}
+
 /// One untrusted manifest entry rechecked before every process run.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -168,6 +211,8 @@ pub struct ToolConfig {
     path: PathBuf,
     version: String,
     sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    runtime: Option<ToolRuntimeConfig>,
     timeout_ms: u64,
     max_output_bytes: usize,
     #[serde(default)]
@@ -193,6 +238,11 @@ impl ToolConfig {
     #[must_use]
     pub fn sha256(&self) -> &str {
         &self.sha256
+    }
+    /// Returns the exact runtime closure configuration, when required.
+    #[must_use]
+    pub const fn runtime(&self) -> Option<&ToolRuntimeConfig> {
+        self.runtime.as_ref()
     }
     /// Returns the process timeout.
     #[must_use]
@@ -243,30 +293,52 @@ impl ToolsManifest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ManifestError {
     Io(String),
+    NotFile,
     TooLarge,
     Json(String),
-    WrongFormat,
+    WrongFormat {
+        expected: &'static str,
+        actual: String,
+    },
     DuplicateBackend,
     WrongVersion {
         backend: ToolBackend,
         actual: String,
     },
     InvalidHash,
+    InvalidRuntime,
     InvalidLimit,
     InvalidAxiom,
 }
 
 /// Reads and validates one untrusted manifest without following any `.zeno` data.
 pub fn load_tools_manifest(path: &Path) -> Result<ToolsManifest, ManifestError> {
-    let metadata = fs::metadata(path).map_err(|error| ManifestError::Io(error.to_string()))?;
-    if metadata.len() > MAX_TOOLS_MANIFEST_BYTES as u64 {
+    let file = open_untrusted_read(path).map_err(|error| ManifestError::Io(error.to_string()))?;
+    if !file
+        .metadata()
+        .map_err(|error| ManifestError::Io(error.to_string()))?
+        .is_file()
+    {
+        return Err(ManifestError::NotFile);
+    }
+    let mut bytes = Vec::new();
+    file.take(
+        u64::try_from(MAX_TOOLS_MANIFEST_BYTES)
+            .unwrap_or(u64::MAX)
+            .saturating_add(1),
+    )
+    .read_to_end(&mut bytes)
+    .map_err(|error| ManifestError::Io(error.to_string()))?;
+    if bytes.len() > MAX_TOOLS_MANIFEST_BYTES {
         return Err(ManifestError::TooLarge);
     }
-    let bytes = fs::read(path).map_err(|error| ManifestError::Io(error.to_string()))?;
     let mut manifest: ToolsManifest =
         serde_json::from_slice(&bytes).map_err(|error| ManifestError::Json(error.to_string()))?;
     if manifest.format != TOOLS_MANIFEST_FORMAT {
-        return Err(ManifestError::WrongFormat);
+        return Err(ManifestError::WrongFormat {
+            expected: TOOLS_MANIFEST_FORMAT,
+            actual: manifest.format,
+        });
     }
     manifest.tools.sort_by_key(ToolConfig::backend);
     if manifest
@@ -286,6 +358,14 @@ pub fn load_tools_manifest(path: &Path) -> Result<ToolsManifest, ManifestError> 
         if !is_hash(&tool.sha256) {
             return Err(ManifestError::InvalidHash);
         }
+        match (tool.backend, &tool.runtime) {
+            (ToolBackend::Lean, Some(runtime))
+                if runtime.root.is_absolute()
+                    && is_hash(&runtime.tree_sha256)
+                    && lean_executable_relative(tool, runtime).is_some() => {}
+            (ToolBackend::Lean, _) | (_, Some(_)) => return Err(ManifestError::InvalidRuntime),
+            (_, None) => {}
+        }
         if tool.timeout_ms == 0
             || tool.timeout_ms > 600_000
             || tool.max_output_bytes == 0
@@ -302,6 +382,9 @@ pub fn load_tools_manifest(path: &Path) -> Result<ToolsManifest, ManifestError> 
         {
             return Err(ManifestError::InvalidAxiom);
         }
+        if tool.backend != ToolBackend::Lean && !tool.allowed_axioms.is_empty() {
+            return Err(ManifestError::InvalidAxiom);
+        }
     }
     Ok(manifest)
 }
@@ -313,6 +396,7 @@ pub struct ToolIdentity {
     path: PathBuf,
     version: String,
     binary_hash: Hash32,
+    runtime_hash: Option<Hash32>,
 }
 impl ToolIdentity {
     /// Returns the backend.
@@ -335,6 +419,11 @@ impl ToolIdentity {
     pub const fn binary_hash(&self) -> Hash32 {
         self.binary_hash
     }
+    /// Returns the checked Lean runtime-closure hash, when one is required.
+    #[must_use]
+    pub const fn runtime_hash(&self) -> Option<Hash32> {
+        self.runtime_hash
+    }
 }
 
 /// Fail-closed process or admission failure.
@@ -344,16 +433,388 @@ pub enum ToolFailure {
     Missing,
     NotFile,
     BinaryTooLarge,
+    ToolchainTooLarge,
+    ToolchainUnsupported,
+    ToolchainIncomplete,
+    ToolchainHashMismatch,
     HashMismatch,
     VersionMismatch,
     Timeout,
     Crash(Option<i32>),
     OutputLimit,
+    ProcessContainmentUnavailable,
+    ProcessContainmentFailed,
+    InconsistentResult,
+    RetentionConflict,
     Unknown,
     UnsupportedEvidence,
     ModelReplayFailed,
     LeanAxiomReport,
     Io(String),
+}
+
+/// One regular file bound into a canonical Lean runtime inventory.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ToolchainFileIdentity {
+    relative_path: String,
+    length: u64,
+    executable: bool,
+    sha256: Hash32,
+}
+impl ToolchainFileIdentity {
+    /// Returns the portable slash-separated path relative to the runtime root.
+    #[must_use]
+    pub fn relative_path(&self) -> &str {
+        &self.relative_path
+    }
+    /// Returns the exact file length.
+    #[must_use]
+    pub const fn length(&self) -> u64 {
+        self.length
+    }
+    /// Returns whether any executable bit was set in the admitted source tree.
+    #[must_use]
+    pub const fn executable(&self) -> bool {
+        self.executable
+    }
+    /// Returns the exact file-content SHA-256.
+    #[must_use]
+    pub const fn sha256(&self) -> Hash32 {
+        self.sha256
+    }
+}
+
+/// Portable bounded identity of one complete Lean distribution closure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ToolchainInventory {
+    files: Vec<ToolchainFileIdentity>,
+    total_bytes: u64,
+    tree_sha256: Hash32,
+}
+impl ToolchainInventory {
+    /// Returns files in canonical relative-path order.
+    #[must_use]
+    pub fn files(&self) -> &[ToolchainFileIdentity] {
+        &self.files
+    }
+    /// Returns the exact total regular-file bytes.
+    #[must_use]
+    pub const fn total_bytes(&self) -> u64 {
+        self.total_bytes
+    }
+    /// Returns the portable tree SHA-256.
+    #[must_use]
+    pub const fn tree_sha256(&self) -> Hash32 {
+        self.tree_sha256
+    }
+    /// Serializes the canonical retained inventory.
+    pub fn canonical_json(&self) -> Result<Vec<u8>, ToolFailure> {
+        #[derive(Serialize)]
+        struct FileRecord<'a> {
+            path: &'a str,
+            length: u64,
+            executable: bool,
+            sha256: String,
+        }
+        #[derive(Serialize)]
+        struct InventoryRecord<'a> {
+            format: &'static str,
+            tree_sha256: String,
+            total_bytes: u64,
+            files: Vec<FileRecord<'a>>,
+        }
+        let files = self
+            .files
+            .iter()
+            .map(|file| FileRecord {
+                path: &file.relative_path,
+                length: file.length,
+                executable: file.executable,
+                sha256: hash_hex(file.sha256),
+            })
+            .collect();
+        serde_json::to_vec(&InventoryRecord {
+            format: "zeno-fcis/toolchain-inventory/1",
+            tree_sha256: hash_hex(self.tree_sha256),
+            total_bytes: self.total_bytes,
+            files,
+        })
+        .map_err(|error| ToolFailure::Io(error.to_string()))
+    }
+}
+
+#[derive(Clone)]
+struct ToolchainSourceFile {
+    #[cfg(not(unix))]
+    source_path: PathBuf,
+    relative_path: String,
+    executable: bool,
+}
+
+/// Inspects a bounded Lean distribution without executing it.
+///
+/// Execution repeats this work while copying every admitted byte into a private
+/// snapshot. This function is intended for preparing the separate tools
+/// manifest and release checksum record.
+pub fn inspect_lean_toolchain(root: &Path) -> Result<ToolchainInventory, ToolFailure> {
+    snapshot_toolchain(root, None)
+}
+
+fn snapshot_toolchain(
+    source_root: &Path,
+    destination_root: Option<&Path>,
+) -> Result<ToolchainInventory, ToolFailure> {
+    let source_files = enumerate_toolchain(source_root)?;
+    snapshot_toolchain_files(source_root, source_files, destination_root)
+}
+
+fn snapshot_toolchain_files(
+    source_root: &Path,
+    source_files: Vec<ToolchainSourceFile>,
+    destination_root: Option<&Path>,
+) -> Result<ToolchainInventory, ToolFailure> {
+    #[cfg(unix)]
+    let source_root = open_toolchain_root(source_root)?;
+    let mut files = Vec::with_capacity(source_files.len());
+    let mut total_bytes = 0_u64;
+    for source in source_files {
+        #[cfg(unix)]
+        let file = open_rooted_toolchain_file(&source_root, &source.relative_path)
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        #[cfg(not(unix))]
+        let file = open_untrusted_read(&source.source_path)
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        let metadata = file
+            .metadata()
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        if !metadata.is_file() {
+            return Err(ToolFailure::ToolchainUnsupported);
+        }
+        let mut bytes = Vec::new();
+        file.take(MAX_TOOL_BINARY_BYTES.saturating_add(1))
+            .read_to_end(&mut bytes)
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        let length = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if length > MAX_TOOL_BINARY_BYTES {
+            return Err(ToolFailure::BinaryTooLarge);
+        }
+        total_bytes = total_bytes
+            .checked_add(length)
+            .ok_or(ToolFailure::ToolchainTooLarge)?;
+        if total_bytes > MAX_LEAN_TOOLCHAIN_BYTES {
+            return Err(ToolFailure::ToolchainTooLarge);
+        }
+        let sha256 = RustCryptoSha256::hash(&bytes);
+        if let Some(destination_root) = destination_root {
+            let destination = destination_root.join(&source.relative_path);
+            let parent = destination
+                .parent()
+                .ok_or(ToolFailure::ToolchainUnsupported)?;
+            fs::create_dir_all(parent).map_err(|error| ToolFailure::Io(error.to_string()))?;
+            let mut output = OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&destination)
+                .map_err(|error| ToolFailure::Io(error.to_string()))?;
+            output
+                .write_all(&bytes)
+                .map_err(|error| ToolFailure::Io(error.to_string()))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = if source.executable { 0o700 } else { 0o600 };
+                output
+                    .set_permissions(fs::Permissions::from_mode(mode))
+                    .map_err(|error| ToolFailure::Io(error.to_string()))?;
+            }
+        }
+        files.push(ToolchainFileIdentity {
+            relative_path: source.relative_path,
+            length,
+            executable: source.executable,
+            sha256,
+        });
+    }
+    let tree_sha256 = hash_toolchain_inventory(&files, total_bytes);
+    Ok(ToolchainInventory {
+        files,
+        total_bytes,
+        tree_sha256,
+    })
+}
+
+#[cfg(unix)]
+fn nix_io_error(error: nix::errno::Errno) -> std::io::Error {
+    std::io::Error::from_raw_os_error(error as i32)
+}
+
+#[cfg(unix)]
+fn open_toolchain_root(root: &Path) -> Result<std::os::fd::OwnedFd, ToolFailure> {
+    use nix::fcntl::{OFlag, open};
+    use nix::sys::stat::Mode;
+
+    open(
+        root,
+        OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW | OFlag::O_CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(|error| ToolFailure::Io(nix_io_error(error).to_string()))
+}
+
+#[cfg(unix)]
+fn open_rooted_toolchain_file(
+    root: &std::os::fd::OwnedFd,
+    relative_path: &str,
+) -> std::io::Result<File> {
+    use nix::fcntl::{OFlag, openat};
+    use nix::sys::stat::Mode;
+
+    let mut current = root.try_clone()?;
+    let mut components = relative_path.split('/').peekable();
+    while let Some(component) = components.next() {
+        if component.is_empty() || matches!(component, "." | "..") {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "non-normal toolchain path component",
+            ));
+        }
+        let flags = if components.peek().is_some() {
+            OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW | OFlag::O_CLOEXEC
+        } else {
+            OFlag::O_RDONLY | OFlag::O_NOFOLLOW | OFlag::O_NONBLOCK | OFlag::O_CLOEXEC
+        };
+        current = openat(&current, component, flags, Mode::empty()).map_err(nix_io_error)?;
+    }
+    Ok(File::from(current))
+}
+
+fn enumerate_toolchain(root: &Path) -> Result<Vec<ToolchainSourceFile>, ToolFailure> {
+    let root_metadata = fs::symlink_metadata(root).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            ToolFailure::Missing
+        } else {
+            ToolFailure::Io(error.to_string())
+        }
+    })?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(ToolFailure::ToolchainUnsupported);
+    }
+    let mut directories = vec![(root.to_path_buf(), String::new(), 0_usize)];
+    let mut files = Vec::new();
+    let mut declared_bytes = 0_u64;
+    while let Some((directory, prefix, depth)) = directories.pop() {
+        if depth > MAX_LEAN_TOOLCHAIN_DEPTH {
+            return Err(ToolFailure::ToolchainTooLarge);
+        }
+        let entries = fs::read_dir(directory)
+            .map_err(|error| ToolFailure::Io(error.to_string()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        let mut entries = entries
+            .into_iter()
+            .map(|entry| {
+                let name = entry
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| ToolFailure::ToolchainUnsupported)?;
+                Ok((name, entry.path()))
+            })
+            .collect::<Result<Vec<_>, ToolFailure>>()?;
+        entries.sort_by(|left, right| left.0.cmp(&right.0));
+        for (name, path) in entries.into_iter().rev() {
+            let relative_path = if prefix.is_empty() {
+                name
+            } else {
+                format!("{prefix}/{name}")
+            };
+            if relative_path.len() > MAX_LEAN_TOOLCHAIN_PATH_BYTES {
+                return Err(ToolFailure::ToolchainTooLarge);
+            }
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|error| ToolFailure::Io(error.to_string()))?;
+            let file_type = metadata.file_type();
+            if file_type.is_symlink() {
+                return Err(ToolFailure::ToolchainUnsupported);
+            }
+            if file_type.is_dir() {
+                directories.push((path, relative_path, depth.saturating_add(1)));
+                continue;
+            }
+            if !file_type.is_file() {
+                return Err(ToolFailure::ToolchainUnsupported);
+            }
+            if files.len() >= MAX_LEAN_TOOLCHAIN_FILES {
+                return Err(ToolFailure::ToolchainTooLarge);
+            }
+            declared_bytes = declared_bytes
+                .checked_add(metadata.len())
+                .ok_or(ToolFailure::ToolchainTooLarge)?;
+            if metadata.len() > MAX_TOOL_BINARY_BYTES || declared_bytes > MAX_LEAN_TOOLCHAIN_BYTES {
+                return Err(ToolFailure::ToolchainTooLarge);
+            }
+            #[cfg(unix)]
+            let executable = {
+                use std::os::unix::fs::PermissionsExt;
+                metadata.permissions().mode() & 0o111 != 0
+            };
+            #[cfg(not(unix))]
+            let executable = false;
+            files.push(ToolchainSourceFile {
+                #[cfg(not(unix))]
+                source_path: path,
+                relative_path,
+                executable,
+            });
+        }
+    }
+    files.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
+    if files.is_empty() {
+        return Err(ToolFailure::ToolchainIncomplete);
+    }
+    Ok(files)
+}
+
+fn hash_toolchain_inventory(files: &[ToolchainFileIdentity], total_bytes: u64) -> Hash32 {
+    let mut bytes = b"zeno-fcis/toolchain-tree/1\0".to_vec();
+    bytes.extend_from_slice(&u64::try_from(files.len()).unwrap_or(u64::MAX).to_be_bytes());
+    bytes.extend_from_slice(&total_bytes.to_be_bytes());
+    for file in files {
+        bytes.extend_from_slice(
+            &u32::try_from(file.relative_path.len())
+                .unwrap_or(u32::MAX)
+                .to_be_bytes(),
+        );
+        bytes.extend_from_slice(file.relative_path.as_bytes());
+        bytes.extend_from_slice(&file.length.to_be_bytes());
+        bytes.push(u8::from(file.executable));
+        bytes.extend_from_slice(file.sha256.as_bytes());
+    }
+    RustCryptoSha256::hash(&bytes)
+}
+
+fn is_normal_absolute(path: &Path) -> bool {
+    path.is_absolute()
+        && path.components().all(|component| {
+            matches!(
+                component,
+                Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+            )
+        })
+}
+
+fn lean_executable_relative(config: &ToolConfig, runtime: &ToolRuntimeConfig) -> Option<PathBuf> {
+    if !is_normal_absolute(&runtime.root) || !is_normal_absolute(&config.path) {
+        return None;
+    }
+    let relative = config.path.strip_prefix(&runtime.root).ok()?;
+    if relative.as_os_str().is_empty()
+        || !relative
+            .components()
+            .all(|component| matches!(component, Component::Normal(_)))
+    {
+        return None;
+    }
+    Some(relative.to_path_buf())
 }
 
 struct PrivateExecutable {
@@ -399,9 +860,186 @@ impl Drop for PrivateExecutable {
     }
 }
 
+struct PrivateToolchain {
+    root: PathBuf,
+    executable: PathBuf,
+    inventory: ToolchainInventory,
+}
+impl PrivateToolchain {
+    fn create(config: &ToolConfig) -> Result<Self, ToolFailure> {
+        let runtime = config
+            .runtime
+            .as_ref()
+            .ok_or(ToolFailure::ToolchainIncomplete)?;
+        let relative_executable =
+            lean_executable_relative(config, runtime).ok_or(ToolFailure::ToolchainUnsupported)?;
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-checked-Lean-{}-{sequence}",
+            std::process::id()
+        ));
+        fs::create_dir(&root).map_err(|error| ToolFailure::Io(error.to_string()))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            fs::set_permissions(&root, fs::Permissions::from_mode(0o700))
+                .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        }
+        let result = (|| {
+            let inventory = snapshot_toolchain(&runtime.root, Some(&root))?;
+            if hash_hex(inventory.tree_sha256) != runtime.tree_sha256 {
+                return Err(ToolFailure::ToolchainHashMismatch);
+            }
+            let portable_executable = relative_executable
+                .to_str()
+                .ok_or(ToolFailure::ToolchainUnsupported)?
+                .replace(std::path::MAIN_SEPARATOR, "/");
+            let executable_identity = inventory
+                .files
+                .iter()
+                .find(|file| file.relative_path == portable_executable)
+                .ok_or(ToolFailure::ToolchainIncomplete)?;
+            if !executable_identity.executable {
+                return Err(ToolFailure::ToolchainIncomplete);
+            }
+            if hash_hex(executable_identity.sha256) != config.sha256 {
+                return Err(ToolFailure::HashMismatch);
+            }
+            if !inventory
+                .files
+                .iter()
+                .any(|file| file.relative_path == "lib/lean/Init.olean")
+            {
+                return Err(ToolFailure::ToolchainIncomplete);
+            }
+            freeze_private_toolchain(&root, &inventory)?;
+            Ok(Self {
+                executable: root.join(relative_executable),
+                root: root.clone(),
+                inventory,
+            })
+        })();
+        if result.is_err() {
+            make_private_tree_writable(&root);
+            let _ = fs::remove_dir_all(&root);
+        }
+        result
+    }
+
+    fn verify_unchanged(&self) -> Result<(), ToolFailure> {
+        if snapshot_toolchain(&self.root, None)? == self.inventory {
+            Ok(())
+        } else {
+            Err(ToolFailure::ToolchainHashMismatch)
+        }
+    }
+
+    fn refreeze(&self) -> Result<(), ToolFailure> {
+        freeze_private_toolchain(&self.root, &self.inventory)
+    }
+}
+impl Drop for PrivateToolchain {
+    fn drop(&mut self) {
+        make_private_tree_writable(&self.root);
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+#[cfg(unix)]
+fn private_tree_directories(root: &Path) -> Result<Vec<PathBuf>, ToolFailure> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut directories = Vec::new();
+    while let Some(directory) = pending.pop() {
+        directories.push(directory.clone());
+        for entry in fs::read_dir(&directory).map_err(|error| ToolFailure::Io(error.to_string()))? {
+            let path = entry
+                .map_err(|error| ToolFailure::Io(error.to_string()))?
+                .path();
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|error| ToolFailure::Io(error.to_string()))?;
+            if metadata.file_type().is_symlink() {
+                return Err(ToolFailure::ToolchainUnsupported);
+            }
+            if metadata.is_dir() {
+                pending.push(path);
+            }
+        }
+    }
+    Ok(directories)
+}
+
+#[cfg(unix)]
+fn freeze_private_toolchain(
+    root: &Path,
+    inventory: &ToolchainInventory,
+) -> Result<(), ToolFailure> {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    for file in &inventory.files {
+        let mode = if file.executable { 0o500 } else { 0o400 };
+        fs::set_permissions(
+            root.join(&file.relative_path),
+            fs::Permissions::from_mode(mode),
+        )
+        .map_err(|error| ToolFailure::Io(error.to_string()))?;
+    }
+    let mut directories = private_tree_directories(root)?;
+    directories.sort_by_key(|path| core::cmp::Reverse(path.components().count()));
+    for directory in directories {
+        fs::set_permissions(directory, fs::Permissions::from_mode(0o500))
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn freeze_private_toolchain(_: &Path, _: &ToolchainInventory) -> Result<(), ToolFailure> {
+    Err(ToolFailure::ProcessContainmentUnavailable)
+}
+
+#[cfg(unix)]
+fn make_private_tree_writable(root: &Path) {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let _ = fs::set_permissions(root, fs::Permissions::from_mode(0o700));
+    if let Ok(directories) = private_tree_directories(root) {
+        for directory in directories {
+            let _ = fs::set_permissions(directory, fs::Permissions::from_mode(0o700));
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn make_private_tree_writable(_: &Path) {}
+
+enum CheckedExecution {
+    Single(PrivateExecutable),
+    Lean(PrivateToolchain),
+}
+impl CheckedExecution {
+    fn executable(&self) -> &Path {
+        match self {
+            Self::Single(executable) => executable.path(),
+            Self::Lean(toolchain) => &toolchain.executable,
+        }
+    }
+    fn runtime_root(&self) -> Option<&Path> {
+        match self {
+            Self::Single(_) => None,
+            Self::Lean(toolchain) => Some(&toolchain.root),
+        }
+    }
+    fn inventory(&self) -> Option<&ToolchainInventory> {
+        match self {
+            Self::Single(_) => None,
+            Self::Lean(toolchain) => Some(&toolchain.inventory),
+        }
+    }
+}
+
 struct CheckedTool {
     identity: ToolIdentity,
-    executable: PrivateExecutable,
+    execution: CheckedExecution,
 }
 
 fn check_tool(config: &ToolConfig) -> Result<CheckedTool, ToolFailure> {
@@ -412,7 +1050,10 @@ fn check_tool_with_max_binary_bytes(
     config: &ToolConfig,
     max_binary_bytes: u64,
 ) -> Result<CheckedTool, ToolFailure> {
-    let file = File::open(&config.path).map_err(|error| {
+    if config.backend == ToolBackend::Lean {
+        return check_lean_tool(config);
+    }
+    let file = open_untrusted_read(&config.path).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             ToolFailure::Missing
         } else {
@@ -451,7 +1092,7 @@ fn check_tool_with_max_binary_bytes(
         return Err(ToolFailure::Crash(output.status.code()));
     }
     let version_text = String::from_utf8_lossy(&output.stdout);
-    if !version_text.contains(&config.version) {
+    if !version_output_matches(config.backend, &version_text, &config.version) {
         return Err(ToolFailure::VersionMismatch);
     }
     Ok(CheckedTool {
@@ -460,9 +1101,64 @@ fn check_tool_with_max_binary_bytes(
             path: config.path.clone(),
             version: config.version.clone(),
             binary_hash,
+            runtime_hash: None,
         },
-        executable,
+        execution: CheckedExecution::Single(executable),
     })
+}
+
+fn check_lean_tool(config: &ToolConfig) -> Result<CheckedTool, ToolFailure> {
+    let toolchain = PrivateToolchain::create(config)?;
+    let executable_identity = toolchain
+        .inventory
+        .files
+        .iter()
+        .find(|file| toolchain.root.join(&file.relative_path) == toolchain.executable)
+        .ok_or(ToolFailure::ToolchainIncomplete)?;
+    let binary_hash = executable_identity.sha256;
+    let runtime_hash = toolchain.inventory.tree_sha256;
+    let output = run_fixed(
+        &toolchain.executable,
+        &["--version"],
+        None,
+        config.timeout_ms,
+        config.max_output_bytes,
+    )?;
+    if !output.status.success() {
+        return Err(ToolFailure::Crash(output.status.code()));
+    }
+    let version_text = String::from_utf8_lossy(&output.stdout);
+    if !version_output_matches(config.backend, &version_text, &config.version) {
+        return Err(ToolFailure::VersionMismatch);
+    }
+    toolchain.verify_unchanged()?;
+    toolchain.refreeze()?;
+    Ok(CheckedTool {
+        identity: ToolIdentity {
+            backend: config.backend,
+            path: config.path.clone(),
+            version: config.version.clone(),
+            binary_hash,
+            runtime_hash: Some(runtime_hash),
+        },
+        execution: CheckedExecution::Lean(toolchain),
+    })
+}
+
+fn version_output_matches(backend: ToolBackend, output: &str, expected: &str) -> bool {
+    let first = output.lines().next().unwrap_or("").trim();
+    let actual = match backend {
+        ToolBackend::Cvc5 => first
+            .strip_prefix("This is cvc5 version ")
+            .and_then(|rest| rest.split_whitespace().next()),
+        ToolBackend::Z3 => first
+            .strip_prefix("Z3 version ")
+            .and_then(|rest| rest.split_whitespace().next()),
+        ToolBackend::Lean => first
+            .strip_prefix("Lean (version ")
+            .and_then(|rest| rest.split([',', ')']).next()),
+    };
+    actual == Some(expected)
 }
 
 /// Rechecks file type, exact admitted bytes, hash, and version through fixed argv.
@@ -569,9 +1265,9 @@ fn preflight_export(
     kind: ExportKind,
     limits: ExportLimits,
 ) -> Result<(), ExportError> {
-    let (root, multiplier) = match (kind, claim.mode(), claim.formula()) {
+    let (root, multiplier, temporal_width) = match (kind, claim.mode(), claim.formula()) {
         (ExportKind::Smt, ClaimMode::Relational, ClaimFormula::Relational(value)) => {
-            (ExportNode::Rel(value), 1)
+            (ExportNode::Rel(value), 1, 1)
         }
         (ExportKind::Smt, ClaimMode::Finite { horizon }, ClaimFormula::Temporal(value))
             if horizon > 0 =>
@@ -579,16 +1275,14 @@ fn preflight_export(
             if horizon > limits.max_horizon() {
                 return Err(ExportError::ResourceLimit);
             }
-            let multiplier = u64::from(horizon)
-                .checked_mul(u64::from(horizon))
-                .ok_or(ExportError::ResourceLimit)?;
-            (ExportNode::Temporal(value), multiplier)
+            let width = u64::from(horizon);
+            (ExportNode::Temporal(value), width, width)
         }
         (ExportKind::Smt, ClaimMode::UnboundedProof, _) => {
             return Err(ExportError::UnsupportedMode);
         }
         (ExportKind::Lean, ClaimMode::UnboundedProof, ClaimFormula::Temporal(value)) => {
-            (ExportNode::Temporal(value), 1)
+            (ExportNode::Temporal(value), 1, 1)
         }
         (ExportKind::Lean, _, _) => return Err(ExportError::UnsupportedMode),
         _ => return Err(ExportError::InvalidFormula),
@@ -723,19 +1417,29 @@ fn preflight_export(
                     render_multiplier,
                     limits,
                 )?,
-                TemporalFormula::Not(value)
-                | TemporalFormula::Next(value)
-                | TemporalFormula::Always(value)
-                | TemporalFormula::Eventually(value) => push_export_node(
+                TemporalFormula::Not(value) | TemporalFormula::Next(value) => push_export_node(
                     &mut stack,
                     ExportNode::Temporal(value),
                     next_depth,
                     render_multiplier,
                     limits,
                 )?,
-                TemporalFormula::And(left, right)
-                | TemporalFormula::Or(left, right)
-                | TemporalFormula::Until(left, right) => {
+                TemporalFormula::Always(value) | TemporalFormula::Eventually(value) => {
+                    let expanded = render_multiplier
+                        .checked_mul(temporal_width)
+                        .ok_or(ExportError::ResourceLimit)?;
+                    if expanded > limits.max_operations() {
+                        return Err(ExportError::ResourceLimit);
+                    }
+                    push_export_node(
+                        &mut stack,
+                        ExportNode::Temporal(value),
+                        next_depth,
+                        expanded,
+                        limits,
+                    )?;
+                }
+                TemporalFormula::And(left, right) | TemporalFormula::Or(left, right) => {
                     push_export_node(
                         &mut stack,
                         ExportNode::Temporal(left),
@@ -748,6 +1452,28 @@ fn preflight_export(
                         ExportNode::Temporal(right),
                         next_depth,
                         render_multiplier,
+                        limits,
+                    )?;
+                }
+                TemporalFormula::Until(left, right) => {
+                    let expanded = render_multiplier
+                        .checked_mul(temporal_width)
+                        .ok_or(ExportError::ResourceLimit)?;
+                    if expanded > limits.max_operations() {
+                        return Err(ExportError::ResourceLimit);
+                    }
+                    push_export_node(
+                        &mut stack,
+                        ExportNode::Temporal(left),
+                        next_depth,
+                        expanded,
+                        limits,
+                    )?;
+                    push_export_node(
+                        &mut stack,
+                        ExportNode::Temporal(right),
+                        next_depth,
+                        expanded,
                         limits,
                     )?;
                 }
@@ -778,15 +1504,25 @@ pub fn export_smt_with_limits(
     }
     preflight_export(claim, ExportKind::Smt, limits)?;
     let empty_environment = BTreeMap::new();
+    let mut budget = SmtRenderBudget::new(limits);
     let (horizon, finite, formula) = match (claim.mode(), claim.formula()) {
-        (ClaimMode::Relational, ClaimFormula::Relational(value)) => {
-            (1, false, render_rel_smt(value, 0, &empty_environment)?)
-        }
+        (ClaimMode::Relational, ClaimFormula::Relational(value)) => (
+            1,
+            false,
+            render_rel_smt(value, 0, &empty_environment, &mut budget)?,
+        ),
         (ClaimMode::Finite { horizon }, ClaimFormula::Temporal(value)) if horizon > 0 => {
-            let formulas = (1..=horizon)
-                .map(|length| render_temporal_smt(value, 0, length, &empty_environment))
-                .collect::<Result<Vec<_>, _>>()?;
-            (horizon, true, select_trace_length(formulas)?)
+            let mut formulas = Vec::new();
+            for length in 1..=horizon {
+                formulas.push(render_temporal_smt(
+                    value,
+                    0,
+                    length,
+                    &empty_environment,
+                    &mut budget,
+                )?);
+            }
+            (horizon, true, select_trace_length(formulas, &mut budget)?)
         }
         (ClaimMode::UnboundedProof, _) => return Err(ExportError::UnsupportedMode),
         _ => return Err(ExportError::InvalidFormula),
@@ -851,8 +1587,11 @@ pub fn export_lean_with_limits(
     }
     preflight_export(claim, ExportKind::Lean, limits)?;
     let empty_environment = BTreeMap::new();
+    let mut budget = LeanRenderBudget::new(limits);
     let formula = match claim.formula() {
-        ClaimFormula::Temporal(value) => render_temporal_lean(value, "0", &empty_environment)?,
+        ClaimFormula::Temporal(value) => {
+            render_temporal_lean(value, "0", &empty_environment, &mut budget)?
+        }
         ClaimFormula::Relational(_) => return Err(ExportError::InvalidFormula),
     };
     let proposition = lean_and(vec![formula.defined, formula.term]);
@@ -904,9 +1643,51 @@ fn exported(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ToolRunStatus {
     ProposedUnsat,
+    KernelChecked,
     Refuted,
     Blocked(ToolFailure),
     Failed(ToolFailure),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
+enum ProcessPhase {
+    Decision = 1,
+    Evidence = 2,
+    Kernel = 3,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ProcessTranscript {
+    phase: ProcessPhase,
+    input: Vec<u8>,
+    output: ProcessOutput,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ToolExecution {
+    transcripts: Vec<ProcessTranscript>,
+    inconsistent: bool,
+}
+impl ToolExecution {
+    fn single(phase: ProcessPhase, input: &[u8], output: ProcessOutput) -> Self {
+        Self {
+            transcripts: vec![ProcessTranscript {
+                phase,
+                input: input.to_vec(),
+                output,
+            }],
+            inconsistent: false,
+        }
+    }
+
+    fn final_output(&self) -> &ProcessOutput {
+        &self
+            .transcripts
+            .last()
+            .unwrap_or_else(|| unreachable!("tool execution always has a transcript"))
+            .output
+    }
 }
 
 /// Complete bounded process record.
@@ -915,8 +1696,8 @@ pub struct ToolRun {
     identity: ToolIdentity,
     obligation: ExportedObligation,
     status: ToolRunStatus,
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
+    transcripts: Vec<ProcessTranscript>,
+    toolchain_inventory: Option<ToolchainInventory>,
     record_hash: Hash32,
 }
 impl ToolRun {
@@ -938,18 +1719,162 @@ impl ToolRun {
     /// Returns bounded standard output.
     #[must_use]
     pub fn stdout(&self) -> &[u8] {
-        &self.stdout
+        &self
+            .transcripts
+            .last()
+            .unwrap_or_else(|| unreachable!("tool run always has a transcript"))
+            .output
+            .stdout
     }
     /// Returns bounded standard error.
     #[must_use]
     pub fn stderr(&self) -> &[u8] {
-        &self.stderr
+        &self
+            .transcripts
+            .last()
+            .unwrap_or_else(|| unreachable!("tool run always has a transcript"))
+            .output
+            .stderr
+    }
+    /// Returns the retained Lean runtime inventory, when present.
+    #[must_use]
+    pub const fn toolchain_inventory(&self) -> Option<&ToolchainInventory> {
+        self.toolchain_inventory.as_ref()
     }
     /// Returns the content-addressed record ID.
     #[must_use]
     pub const fn record_hash(&self) -> Hash32 {
         self.record_hash
     }
+}
+
+fn append_record_field(output: &mut Vec<u8>, tag: u8, value: &[u8]) -> Result<(), ToolFailure> {
+    let length = u64::try_from(value.len())
+        .map_err(|_| ToolFailure::Io("formal-run record field exceeds u64".into()))?;
+    output.push(tag);
+    output.extend_from_slice(&length.to_be_bytes());
+    output.extend_from_slice(value);
+    Ok(())
+}
+
+const fn backend_record_tag(backend: ToolBackend) -> u8 {
+    match backend {
+        ToolBackend::Cvc5 => 1,
+        ToolBackend::Z3 => 2,
+        ToolBackend::Lean => 3,
+    }
+}
+
+fn exit_status_record(status: &ExitStatus) -> Vec<u8> {
+    if let Some(code) = status.code() {
+        let mut bytes = vec![1];
+        bytes.extend_from_slice(&code.to_be_bytes());
+        return bytes;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt as _;
+        if let Some(signal) = status.signal() {
+            let mut bytes = vec![2];
+            bytes.extend_from_slice(&signal.to_be_bytes());
+            return bytes;
+        }
+    }
+    vec![0]
+}
+
+fn failure_record(failure: &ToolFailure) -> Result<Vec<u8>, ToolFailure> {
+    let (tag, detail): (u8, Option<Vec<u8>>) = match failure {
+        ToolFailure::Missing => (1, None),
+        ToolFailure::NotFile => (2, None),
+        ToolFailure::BinaryTooLarge => (3, None),
+        ToolFailure::ToolchainTooLarge => (4, None),
+        ToolFailure::ToolchainUnsupported => (5, None),
+        ToolFailure::ToolchainIncomplete => (6, None),
+        ToolFailure::ToolchainHashMismatch => (7, None),
+        ToolFailure::HashMismatch => (8, None),
+        ToolFailure::VersionMismatch => (9, None),
+        ToolFailure::Timeout => (10, None),
+        ToolFailure::Crash(code) => {
+            let mut bytes = vec![u8::from(code.is_some())];
+            if let Some(code) = code {
+                bytes.extend_from_slice(&code.to_be_bytes());
+            }
+            (11, Some(bytes))
+        }
+        ToolFailure::OutputLimit => (12, None),
+        ToolFailure::ProcessContainmentUnavailable => (13, None),
+        ToolFailure::ProcessContainmentFailed => (14, None),
+        ToolFailure::InconsistentResult => (15, None),
+        ToolFailure::RetentionConflict => (16, None),
+        ToolFailure::Unknown => (17, None),
+        ToolFailure::UnsupportedEvidence => (18, None),
+        ToolFailure::ModelReplayFailed => (19, None),
+        ToolFailure::LeanAxiomReport => (20, None),
+        ToolFailure::Io(message) => (21, Some(message.as_bytes().to_vec())),
+    };
+    let mut bytes = vec![tag];
+    if let Some(detail) = detail {
+        append_record_field(&mut bytes, 1, &detail)?;
+    }
+    Ok(bytes)
+}
+
+fn status_record(status: &ToolRunStatus) -> Result<Vec<u8>, ToolFailure> {
+    let (tag, failure) = match status {
+        ToolRunStatus::ProposedUnsat => (1, None),
+        ToolRunStatus::KernelChecked => (2, None),
+        ToolRunStatus::Refuted => (3, None),
+        ToolRunStatus::Blocked(failure) => (4, Some(failure)),
+        ToolRunStatus::Failed(failure) => (5, Some(failure)),
+    };
+    let mut bytes = vec![tag];
+    if let Some(failure) = failure {
+        append_record_field(&mut bytes, 1, &failure_record(failure)?)?;
+    }
+    Ok(bytes)
+}
+
+fn formal_run_record(
+    identity: &ToolIdentity,
+    obligation: &ExportedObligation,
+    status: &ToolRunStatus,
+    transcripts: &[ProcessTranscript],
+) -> Result<Vec<u8>, ToolFailure> {
+    let mut record = b"zeno-fcis/formal-run-record/3\0".to_vec();
+    append_record_field(&mut record, 1, &[backend_record_tag(identity.backend)])?;
+    append_record_field(&mut record, 2, identity.version.as_bytes())?;
+    append_record_field(&mut record, 3, identity.binary_hash.as_bytes())?;
+    let mut runtime = vec![u8::from(identity.runtime_hash.is_some())];
+    if let Some(runtime_hash) = identity.runtime_hash {
+        runtime.extend_from_slice(runtime_hash.as_bytes());
+    }
+    append_record_field(&mut record, 4, &runtime)?;
+    append_record_field(&mut record, 5, &obligation.claim_id.get().to_be_bytes())?;
+    append_record_field(&mut record, 6, obligation.source_hash.as_bytes())?;
+    append_record_field(&mut record, 7, obligation.source())?;
+    append_record_field(
+        &mut record,
+        8,
+        &u64::try_from(transcripts.len())
+            .map_err(|_| ToolFailure::Io("too many formal-run transcripts".into()))?
+            .to_be_bytes(),
+    )?;
+    for transcript in transcripts {
+        let mut phase = Vec::new();
+        append_record_field(&mut phase, 1, &[transcript.phase as u8])?;
+        append_record_field(&mut phase, 2, &transcript.input)?;
+        append_record_field(
+            &mut phase,
+            3,
+            &exit_status_record(&transcript.output.status),
+        )?;
+        append_record_field(&mut phase, 4, &transcript.output.stdout)?;
+        append_record_field(&mut phase, 5, &transcript.output.stderr)?;
+        append_record_field(&mut record, 9, &phase)?;
+    }
+    append_record_field(&mut record, 10, &status_record(status)?)?;
+    Ok(record)
 }
 
 /// Executes exact generated source using only backend-fixed argv arrays.
@@ -961,22 +1886,38 @@ pub fn execute_tool(
         return Err(ToolFailure::UnsupportedEvidence);
     }
     let checked = check_tool(config)?;
-    let output = match config.backend {
-        ToolBackend::Cvc5 => run_smt(config, checked.executable.path(), &obligation.source)?,
-        ToolBackend::Z3 => run_smt(config, checked.executable.path(), &obligation.source)?,
-        ToolBackend::Lean => run_lean(config, checked.executable.path(), &obligation.source)?,
+    let execution = match config.backend {
+        ToolBackend::Cvc5 | ToolBackend::Z3 => {
+            run_smt(config, checked.execution.executable(), &obligation.source)?
+        }
+        ToolBackend::Lean => ToolExecution::single(
+            ProcessPhase::Kernel,
+            &obligation.source,
+            run_lean(
+                config,
+                checked.execution.executable(),
+                checked
+                    .execution
+                    .runtime_root()
+                    .ok_or(ToolFailure::ToolchainIncomplete)?,
+                &obligation.source,
+            )?,
+        ),
     };
+    if let CheckedExecution::Lean(toolchain) = &checked.execution {
+        toolchain.verify_unchanged()?;
+        toolchain.refreeze()?;
+    }
+    let toolchain_inventory = checked.execution.inventory().cloned();
     let identity = checked.identity;
-    let status = classify(config, &output, &obligation);
-    let mut record = Vec::new();
-    record.extend_from_slice(identity.binary_hash.as_bytes());
-    record.extend_from_slice(&obligation.claim_id.get().to_be_bytes());
-    record.extend_from_slice(obligation.source_hash.as_bytes());
-    record.extend_from_slice(&output.stdout);
-    record.extend_from_slice(&output.stderr);
-    record.extend_from_slice(format!("{status:?}").as_bytes());
+    let status = if execution.inconsistent {
+        ToolRunStatus::Blocked(ToolFailure::InconsistentResult)
+    } else {
+        classify(config, execution.final_output(), &obligation)
+    };
+    let record = formal_run_record(&identity, &obligation, &status, &execution.transcripts)?;
     let record_hash = commitment::<RustCryptoSha256>(
-        Domain::new("zeno-fcis/formal-run", 1)
+        Domain::new("zeno-fcis/formal-run", 3)
             .map_err(|error| ToolFailure::Io(error.to_string()))?,
         &record,
     )
@@ -985,24 +1926,34 @@ pub fn execute_tool(
         identity,
         obligation,
         status,
-        stdout: output.stdout,
-        stderr: output.stderr,
+        transcripts: execution.transcripts,
+        toolchain_inventory,
         record_hash,
     })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SolverResult {
+    Sat,
+    Unsat,
+}
+
+fn solver_result(output: &ProcessOutput) -> Option<SolverResult> {
+    let text = String::from_utf8_lossy(&output.stdout);
+    match text.lines().find(|line| !line.trim().is_empty())?.trim() {
+        "sat" => Some(SolverResult::Sat),
+        "unsat" => Some(SolverResult::Unsat),
+        _ => None,
+    }
 }
 
 fn run_smt(
     config: &ToolConfig,
     executable: &Path,
     source: &[u8],
-) -> Result<ProcessOutput, ToolFailure> {
+) -> Result<ToolExecution, ToolFailure> {
     let args: &[&str] = match config.backend {
-        ToolBackend::Cvc5 => &[
-            "--safe-mode=safe",
-            "--lang=smt2",
-            "--produce-proofs",
-            "--proof-format-mode=alethe",
-        ],
+        ToolBackend::Cvc5 => &["--safe-mode=safe", "--lang=smt2", "--produce-proofs"],
         ToolBackend::Z3 => &["-in", "-smt2"],
         ToolBackend::Lean => return Err(ToolFailure::UnsupportedEvidence),
     };
@@ -1013,29 +1964,56 @@ fn run_smt(
         config.timeout_ms,
         config.max_output_bytes,
     )?;
-    if !first.status.success() {
-        return Ok(first);
+    let first_result = solver_result(&first);
+    let first = ProcessTranscript {
+        phase: ProcessPhase::Decision,
+        input: source.to_vec(),
+        output: first,
+    };
+    if !first.output.status.success() {
+        return Ok(ToolExecution {
+            transcripts: vec![first],
+            inconsistent: false,
+        });
     }
-    let result = String::from_utf8_lossy(&first.stdout)
-        .lines()
-        .find(|line| !line.trim().is_empty())
-        .unwrap_or("")
-        .trim()
-        .to_owned();
-    let request = match (config.backend, result.as_str()) {
-        (ToolBackend::Cvc5, "unsat") => b"(get-proof)\n".as_slice(),
-        (ToolBackend::Cvc5 | ToolBackend::Z3, "sat") => b"(get-model)\n".as_slice(),
-        _ => return Ok(first),
+    let request = match (config.backend, first_result) {
+        (ToolBackend::Cvc5, Some(SolverResult::Unsat)) => b"(get-proof)\n".as_slice(),
+        (ToolBackend::Cvc5 | ToolBackend::Z3, Some(SolverResult::Sat)) => {
+            b"(get-model)\n".as_slice()
+        }
+        _ => {
+            return Ok(ToolExecution {
+                transcripts: vec![first],
+                inconsistent: false,
+            });
+        }
     };
     let mut followup = source.to_vec();
     followup.extend_from_slice(request);
-    run_fixed(
+    let second = run_fixed(
         executable,
         args,
         Some(&followup),
         config.timeout_ms,
         config.max_output_bytes,
-    )
+    )?;
+    let second_result = solver_result(&second);
+    let inconsistent = matches!(
+        (first_result, second_result),
+        (Some(SolverResult::Sat), Some(SolverResult::Unsat))
+            | (Some(SolverResult::Unsat), Some(SolverResult::Sat))
+    );
+    Ok(ToolExecution {
+        transcripts: vec![
+            first,
+            ProcessTranscript {
+                phase: ProcessPhase::Evidence,
+                input: followup,
+                output: second,
+            },
+        ],
+        inconsistent,
+    })
 }
 
 struct MissingPredicates;
@@ -1173,33 +2151,131 @@ fn classify(
                 _ => ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence),
             }
         }
+        ToolBackend::Lean
+            if config
+                .runtime
+                .as_ref()
+                .is_none_or(|runtime| runtime.tree_sha256 != LEAN_LINUX_X86_64_TREE_SHA256) =>
+        {
+            ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
+        }
         ToolBackend::Lean => match parse_lean_axioms(&text) {
-            Some(axioms) if axioms == config.allowed_axioms => ToolRunStatus::ProposedUnsat,
+            Some(axioms) if axioms == config.allowed_axioms => ToolRunStatus::KernelChecked,
             _ => ToolRunStatus::Blocked(ToolFailure::LeanAxiomReport),
         },
     }
 }
 
-/// Atomically retains exact source, outputs, and a normalized metadata record by content hash.
-pub fn retain_run(root: &Path, run: &ToolRun) -> Result<PathBuf, ToolFailure> {
-    let directory = root.join(hash_hex(run.record_hash));
-    fs::create_dir_all(&directory).map_err(|error| ToolFailure::Io(error.to_string()))?;
-    atomic_write(&directory.join("source"), run.obligation.source())?;
-    atomic_write(&directory.join("stdout"), &run.stdout)?;
-    atomic_write(&directory.join("stderr"), &run.stderr)?;
-    let metadata = format!(
-        "{{\"backend\":\"{}\",\"claim_id\":{},\"record_hash\":\"{}\",\"source_hash\":\"{}\",\"status\":\"{:?}\",\"tool_hash\":\"{}\",\"tool_version\":\"{}\"}}\n",
-        run.identity.backend.name(),
-        run.obligation.claim_id.get(),
-        run.record_hash,
-        run.obligation.source_hash,
-        run.status,
-        run.identity.binary_hash,
-        run.identity.version
+fn run_status_name(status: &ToolRunStatus) -> &'static str {
+    match status {
+        ToolRunStatus::ProposedUnsat => "proposed_unsat",
+        ToolRunStatus::KernelChecked => "kernel_checked",
+        ToolRunStatus::Refuted => "refuted",
+        ToolRunStatus::Blocked(_) => "blocked",
+        ToolRunStatus::Failed(_) => "failed",
+    }
+}
+
+fn failure_name(failure: &ToolFailure) -> &'static str {
+    match failure {
+        ToolFailure::Missing => "missing",
+        ToolFailure::NotFile => "not_file",
+        ToolFailure::BinaryTooLarge => "binary_too_large",
+        ToolFailure::ToolchainTooLarge => "toolchain_too_large",
+        ToolFailure::ToolchainUnsupported => "toolchain_unsupported",
+        ToolFailure::ToolchainIncomplete => "toolchain_incomplete",
+        ToolFailure::ToolchainHashMismatch => "toolchain_hash_mismatch",
+        ToolFailure::HashMismatch => "hash_mismatch",
+        ToolFailure::VersionMismatch => "version_mismatch",
+        ToolFailure::Timeout => "timeout",
+        ToolFailure::Crash(_) => "crash",
+        ToolFailure::OutputLimit => "output_limit",
+        ToolFailure::ProcessContainmentUnavailable => "process_containment_unavailable",
+        ToolFailure::ProcessContainmentFailed => "process_containment_failed",
+        ToolFailure::InconsistentResult => "inconsistent_result",
+        ToolFailure::RetentionConflict => "retention_conflict",
+        ToolFailure::Unknown => "unknown",
+        ToolFailure::UnsupportedEvidence => "unsupported_evidence",
+        ToolFailure::ModelReplayFailed => "model_replay_failed",
+        ToolFailure::LeanAxiomReport => "lean_axiom_report",
+        ToolFailure::Io(_) => "io",
+    }
+}
+
+fn process_phase_name(phase: ProcessPhase) -> &'static str {
+    match phase {
+        ProcessPhase::Decision => "decision",
+        ProcessPhase::Evidence => "evidence",
+        ProcessPhase::Kernel => "kernel",
+    }
+}
+
+fn retained_run_files(run: &ToolRun) -> Result<BTreeMap<String, Vec<u8>>, ToolFailure> {
+    #[derive(Serialize)]
+    struct Metadata<'a> {
+        backend: &'a str,
+        claim_id: u32,
+        format: &'static str,
+        record_hash: String,
+        source_hash: String,
+        status: &'static str,
+        status_detail: Option<&'static str>,
+        tool_hash: String,
+        tool_version: &'a str,
+        toolchain_hash: Option<String>,
+        transcript_count: usize,
+    }
+
+    let mut files = BTreeMap::new();
+    files.insert(
+        "formal-run-record.bin".to_owned(),
+        formal_run_record(
+            &run.identity,
+            &run.obligation,
+            &run.status,
+            &run.transcripts,
+        )?,
     );
-    atomic_write(&directory.join("record.json"), metadata.as_bytes())?;
+    files.insert("source".to_owned(), run.obligation.source().to_vec());
+    files.insert("stdout".to_owned(), run.stdout().to_vec());
+    files.insert("stderr".to_owned(), run.stderr().to_vec());
+    for (index, transcript) in run.transcripts.iter().enumerate() {
+        let prefix = format!(
+            "transcript-{:02}-{}",
+            index.saturating_add(1),
+            process_phase_name(transcript.phase)
+        );
+        files.insert(format!("{prefix}-input"), transcript.input.clone());
+        files.insert(format!("{prefix}-stdout"), transcript.output.stdout.clone());
+        files.insert(format!("{prefix}-stderr"), transcript.output.stderr.clone());
+    }
+    if let Some(inventory) = &run.toolchain_inventory {
+        files.insert("toolchain.json".to_owned(), inventory.canonical_json()?);
+    }
+    let status_detail = match &run.status {
+        ToolRunStatus::Blocked(failure) | ToolRunStatus::Failed(failure) => {
+            Some(failure_name(failure))
+        }
+        _ => None,
+    };
+    let mut metadata = serde_json::to_vec(&Metadata {
+        backend: run.identity.backend.name(),
+        claim_id: run.obligation.claim_id.get(),
+        format: "zeno-fcis/formal-run-record/3",
+        record_hash: hash_hex(run.record_hash),
+        source_hash: hash_hex(run.obligation.source_hash),
+        status: run_status_name(&run.status),
+        status_detail,
+        tool_hash: hash_hex(run.identity.binary_hash),
+        tool_version: &run.identity.version,
+        toolchain_hash: run.identity.runtime_hash.map(hash_hex),
+        transcript_count: run.transcripts.len(),
+    })
+    .map_err(|error| ToolFailure::Io(error.to_string()))?;
+    metadata.push(b'\n');
+    files.insert("record.json".to_owned(), metadata);
     if matches!(run.status, ToolRunStatus::Refuted) {
-        let values: Vec<_> = parse_model_values(&String::from_utf8_lossy(&run.stdout))
+        let values: Vec<_> = parse_model_values(&String::from_utf8_lossy(run.stdout()))
             .into_iter()
             .map(|(projection, value)| {
                 serde_json::json!({
@@ -1214,9 +2290,115 @@ pub fn retain_run(root: &Path, run: &ToolRun) -> Result<PathBuf, ToolFailure> {
             "values": values,
         }))
         .map_err(|error| ToolFailure::Io(error.to_string()))?;
-        atomic_write(&directory.join("counterexample.json"), &counterexample)?;
+        files.insert("counterexample.json".to_owned(), counterexample);
     }
-    Ok(directory)
+    Ok(files)
+}
+
+fn write_retained_bundle(
+    path: &Path,
+    files: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), ToolFailure> {
+    for (name, bytes) in files {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(path.join(name))
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        file.write_all(bytes)
+            .and_then(|()| file.sync_all())
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn verify_retained_bundle(
+    path: &Path,
+    expected: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), ToolFailure> {
+    let metadata = fs::symlink_metadata(path).map_err(|_| ToolFailure::RetentionConflict)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(ToolFailure::RetentionConflict);
+    }
+    let mut actual_names = Vec::new();
+    for entry in fs::read_dir(path).map_err(|_| ToolFailure::RetentionConflict)? {
+        let entry = entry.map_err(|_| ToolFailure::RetentionConflict)?;
+        let name = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| ToolFailure::RetentionConflict)?;
+        actual_names.push(name);
+    }
+    actual_names.sort();
+    if actual_names != expected.keys().cloned().collect::<Vec<_>>() {
+        return Err(ToolFailure::RetentionConflict);
+    }
+    for (name, expected_bytes) in expected {
+        let file =
+            open_untrusted_read(&path.join(name)).map_err(|_| ToolFailure::RetentionConflict)?;
+        if !file
+            .metadata()
+            .map_err(|_| ToolFailure::RetentionConflict)?
+            .is_file()
+        {
+            return Err(ToolFailure::RetentionConflict);
+        }
+        let mut actual = Vec::new();
+        file.take(
+            u64::try_from(expected_bytes.len())
+                .unwrap_or(u64::MAX)
+                .saturating_add(1),
+        )
+        .read_to_end(&mut actual)
+        .map_err(|_| ToolFailure::RetentionConflict)?;
+        if actual != *expected_bytes {
+            return Err(ToolFailure::RetentionConflict);
+        }
+    }
+    Ok(())
+}
+
+struct RetentionStage {
+    path: PathBuf,
+    armed: bool,
+}
+impl Drop for RetentionStage {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+}
+
+/// Atomically retains a complete process bundle by content hash.
+pub fn retain_run(root: &Path, run: &ToolRun) -> Result<PathBuf, ToolFailure> {
+    fs::create_dir_all(root).map_err(|error| ToolFailure::Io(error.to_string()))?;
+    let name = hash_hex(run.record_hash);
+    let directory = root.join(&name);
+    let files = retained_run_files(run)?;
+    if directory.exists() {
+        verify_retained_bundle(&directory, &files)?;
+        return Ok(directory);
+    }
+    let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    let stage_path = root.join(format!(".{name}.tmp-{}-{sequence}", std::process::id()));
+    fs::create_dir(&stage_path).map_err(|error| ToolFailure::Io(error.to_string()))?;
+    let mut stage = RetentionStage {
+        path: stage_path,
+        armed: true,
+    };
+    write_retained_bundle(&stage.path, &files)?;
+    match fs::rename(&stage.path, &directory) {
+        Ok(()) => {
+            stage.armed = false;
+            Ok(directory)
+        }
+        Err(_) if directory.exists() => {
+            verify_retained_bundle(&directory, &files)?;
+            Ok(directory)
+        }
+        Err(error) => Err(ToolFailure::Io(error.to_string())),
+    }
 }
 
 /// Deterministic summary of configured and checked tools.
@@ -1250,6 +2432,7 @@ pub fn doctor(manifest: &ToolsManifest) -> Vec<DoctorEntry> {
         .collect()
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct ProcessOutput {
     status: ExitStatus,
     stdout: Vec<u8>,
@@ -1262,11 +2445,34 @@ fn run_fixed(
     timeout_ms: u64,
     max_output: usize,
 ) -> Result<ProcessOutput, ToolFailure> {
+    #[cfg(not(unix))]
+    {
+        let _ = (path, args, input, timeout_ms, max_output);
+        Err(ToolFailure::ProcessContainmentUnavailable)
+    }
+    #[cfg(unix)]
+    {
+        run_fixed_unix(path, args, input, timeout_ms, max_output)
+    }
+}
+
+#[cfg(unix)]
+fn run_fixed_unix(
+    path: &Path,
+    args: &[&str],
+    input: Option<&[u8]>,
+    timeout_ms: u64,
+    max_output: usize,
+) -> Result<ProcessOutput, ToolFailure> {
+    use std::os::unix::process::CommandExt as _;
+
     let start = Instant::now();
+    let working_directory = PrivateWorkingDirectory::create()?;
     let mut command = Command::new(path);
     command
         .args(args)
         .env_clear()
+        .current_dir(working_directory.path())
         .stdin(if input.is_some() {
             Stdio::piped()
         } else {
@@ -1274,124 +2480,259 @@ fn run_fixed(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    let mut child = command
+    command.process_group(0);
+    let child = command
         .spawn()
         .map_err(|error| ToolFailure::Io(error.to_string()))?;
+    let mut child = ContainedChild::new(child)?;
     let stdout = child
+        .child
         .stdout
         .take()
         .ok_or_else(|| ToolFailure::Io("missing child stdout".into()))?;
     let stderr = child
+        .child
         .stderr
         .take()
         .ok_or_else(|| ToolFailure::Io("missing child stderr".into()))?;
-    let stdout_reader = bounded_reader(stdout, max_output);
-    let stderr_reader = bounded_reader(stderr, max_output);
-    let stdin_writer = if let Some(bytes) = input {
-        let Some(stdin) = child.stdin.take() else {
+    let (events, receiver) = mpsc::sync_channel(3);
+    bounded_reader(stdout, max_output, events.clone(), IoStream::Stdout);
+    bounded_reader(stderr, max_output, events.clone(), IoStream::Stderr);
+    let stdin_pending = if let Some(bytes) = input {
+        let Some(stdin) = child.child.stdin.take() else {
             return Err(ToolFailure::Io("missing child stdin".into()));
         };
-        Some(bounded_writer(stdin, bytes.to_vec()))
+        bounded_writer(stdin, bytes.to_vec(), events.clone());
+        true
     } else {
-        None
+        false
     };
+    drop(events);
     wait_output(
         child,
         timeout_ms,
         max_output,
-        stdout_reader,
-        stderr_reader,
-        stdin_writer,
+        receiver,
+        stdin_pending,
         start,
     )
+}
+
+#[cfg(unix)]
+struct PrivateWorkingDirectory {
+    path: PathBuf,
+}
+#[cfg(unix)]
+impl PrivateWorkingDirectory {
+    fn create() -> Result<Self, ToolFailure> {
+        let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let path =
+            std::env::temp_dir().join(format!("zeno-fcis-work-{}-{sequence}", std::process::id()));
+        fs::create_dir(&path).map_err(|error| ToolFailure::Io(error.to_string()))?;
+        use std::os::unix::fs::PermissionsExt as _;
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+            .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        Ok(Self { path })
+    }
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+#[cfg(unix)]
+impl Drop for PrivateWorkingDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir(&self.path);
+    }
+}
+
+#[cfg(unix)]
+struct ContainedChild {
+    child: Child,
+    process_group: nix::unistd::Pid,
+    armed: bool,
+}
+#[cfg(unix)]
+impl ContainedChild {
+    fn new(mut child: Child) -> Result<Self, ToolFailure> {
+        let raw = i32::try_from(child.id()).map_err(|_| {
+            let _ = child.kill();
+            let _ = child.wait();
+            ToolFailure::ProcessContainmentFailed
+        })?;
+        Ok(Self {
+            child,
+            process_group: nix::unistd::Pid::from_raw(raw),
+            armed: true,
+        })
+    }
+
+    fn terminate(&mut self, observed_exit: bool) -> Result<(), ToolFailure> {
+        use nix::errno::Errno;
+        use nix::sys::signal::{Signal, killpg};
+
+        let group_result = killpg(self.process_group, Signal::SIGKILL);
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        self.armed = false;
+        match group_result {
+            Ok(()) => Ok(()),
+            Err(Errno::ESRCH) if observed_exit => Ok(()),
+            Err(_) => Err(ToolFailure::ProcessContainmentFailed),
+        }
+    }
+}
+#[cfg(unix)]
+impl Drop for ContainedChild {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = nix::sys::signal::killpg(self.process_group, nix::sys::signal::Signal::SIGKILL);
+            let _ = self.child.kill();
+            let _ = self.child.wait();
+        }
+    }
+}
+
+enum IoStream {
+    Stdout,
+    Stderr,
+}
+enum IoEvent {
+    Stdin(Result<(), ToolFailure>),
+    Stdout(Result<Vec<u8>, ToolFailure>),
+    Stderr(Result<Vec<u8>, ToolFailure>),
 }
 
 fn bounded_writer<W: Write + Send + 'static>(
     mut stream: W,
     bytes: Vec<u8>,
-) -> JoinHandle<Result<(), ToolFailure>> {
+    events: SyncSender<IoEvent>,
+) {
     thread::spawn(move || {
-        stream
+        let result = stream
             .write_all(&bytes)
-            .map_err(|error| ToolFailure::Io(error.to_string()))
-    })
+            .map_err(|error| ToolFailure::Io(error.to_string()));
+        let _ = events.send(IoEvent::Stdin(result));
+    });
 }
 
 fn bounded_reader<R: Read + Send + 'static>(
     stream: R,
     max_output: usize,
-) -> JoinHandle<Result<Vec<u8>, ToolFailure>> {
+    events: SyncSender<IoEvent>,
+    stream_name: IoStream,
+) {
     thread::spawn(move || {
         let mut bytes = Vec::new();
-        stream
+        let result = stream
             .take(
                 u64::try_from(max_output)
                     .unwrap_or(u64::MAX)
                     .saturating_add(1),
             )
             .read_to_end(&mut bytes)
-            .map_err(|error| ToolFailure::Io(error.to_string()))?;
-        Ok(bytes)
-    })
+            .map(|_| bytes)
+            .map_err(|error| ToolFailure::Io(error.to_string()));
+        let event = match stream_name {
+            IoStream::Stdout => IoEvent::Stdout(result),
+            IoStream::Stderr => IoEvent::Stderr(result),
+        };
+        let _ = events.send(event);
+    });
 }
 
-fn join_writer(writer: JoinHandle<Result<(), ToolFailure>>) -> Result<(), ToolFailure> {
-    writer
-        .join()
-        .map_err(|_| ToolFailure::Io("process input writer panicked".into()))?
-}
-
-fn join_reader(reader: JoinHandle<Result<Vec<u8>, ToolFailure>>) -> Result<Vec<u8>, ToolFailure> {
-    reader
-        .join()
-        .map_err(|_| ToolFailure::Io("process output reader panicked".into()))?
-}
-
+#[cfg(unix)]
 fn wait_output(
-    mut child: Child,
+    mut child: ContainedChild,
     timeout_ms: u64,
     max_output: usize,
-    stdout_reader: JoinHandle<Result<Vec<u8>, ToolFailure>>,
-    stderr_reader: JoinHandle<Result<Vec<u8>, ToolFailure>>,
-    stdin_writer: Option<JoinHandle<Result<(), ToolFailure>>>,
+    receiver: mpsc::Receiver<IoEvent>,
+    stdin_pending: bool,
     start: Instant,
 ) -> Result<ProcessOutput, ToolFailure> {
-    let status = loop {
-        match child
-            .try_wait()
-            .map_err(|error| ToolFailure::Io(error.to_string()))?
-        {
-            Some(status) => break status,
-            None if start.elapsed() >= Duration::from_millis(timeout_ms) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                let _ = join_reader(stdout_reader);
-                let _ = join_reader(stderr_reader);
-                if let Some(writer) = stdin_writer {
-                    let _ = join_writer(writer);
+    let mut status = None;
+    let mut stdin_done = !stdin_pending;
+    let mut stdout = None;
+    let mut stderr = None;
+    loop {
+        loop {
+            match receiver.try_recv() {
+                Ok(IoEvent::Stdin(result)) => {
+                    if let Err(error) = result {
+                        child.terminate(status.is_some())?;
+                        return Err(error);
+                    }
+                    stdin_done = true;
                 }
-                return Err(ToolFailure::Timeout);
+                Ok(IoEvent::Stdout(result)) => {
+                    let bytes = match result {
+                        Ok(bytes) => bytes,
+                        Err(error) => {
+                            child.terminate(status.is_some())?;
+                            return Err(error);
+                        }
+                    };
+                    if bytes.len() > max_output {
+                        child.terminate(status.is_some())?;
+                        return Err(ToolFailure::OutputLimit);
+                    }
+                    stdout = Some(bytes);
+                }
+                Ok(IoEvent::Stderr(result)) => {
+                    let bytes = match result {
+                        Ok(bytes) => bytes,
+                        Err(error) => {
+                            child.terminate(status.is_some())?;
+                            return Err(error);
+                        }
+                    };
+                    if bytes.len() > max_output {
+                        child.terminate(status.is_some())?;
+                        return Err(ToolFailure::OutputLimit);
+                    }
+                    stderr = Some(bytes);
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    if !(stdin_done && stdout.is_some() && stderr.is_some()) {
+                        child.terminate(status.is_some())?;
+                        return Err(ToolFailure::ProcessContainmentFailed);
+                    }
+                    break;
+                }
             }
-            None => thread::sleep(Duration::from_millis(5)),
         }
-    };
-    if let Some(writer) = stdin_writer {
-        join_writer(writer)?;
+        if status.is_none() {
+            status = child
+                .child
+                .try_wait()
+                .map_err(|error| ToolFailure::Io(error.to_string()))?;
+        }
+        if status.is_some() && stdin_done && stdout.is_some() && stderr.is_some() {
+            let status = status.unwrap_or_else(|| unreachable!());
+            let stdout = stdout.take().unwrap_or_else(|| unreachable!());
+            let stderr = stderr.take().unwrap_or_else(|| unreachable!());
+            if stdout.len().saturating_add(stderr.len()) > max_output {
+                child.terminate(true)?;
+                return Err(ToolFailure::OutputLimit);
+            }
+            child.terminate(true)?;
+            return Ok(ProcessOutput {
+                status,
+                stdout,
+                stderr,
+            });
+        }
+        if start.elapsed() >= Duration::from_millis(timeout_ms) {
+            child.terminate(status.is_some())?;
+            return Err(ToolFailure::Timeout);
+        }
+        thread::sleep(Duration::from_millis(5));
     }
-    let stdout = join_reader(stdout_reader)?;
-    let stderr = join_reader(stderr_reader)?;
-    if stdout.len().saturating_add(stderr.len()) > max_output {
-        return Err(ToolFailure::OutputLimit);
-    }
-    Ok(ProcessOutput {
-        status,
-        stdout,
-        stderr,
-    })
 }
 fn run_lean(
     config: &ToolConfig,
     executable: &Path,
+    runtime_root: &Path,
     source: &[u8],
 ) -> Result<ProcessOutput, ToolFailure> {
     let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
@@ -1399,14 +2740,10 @@ fn run_lean(
         std::env::temp_dir().join(format!("zeno-fcis-{}-{sequence}.lean", std::process::id()));
     atomic_write(&path, source)?;
     let mut arguments = Vec::new();
-    if let Some(sysroot) = config
-        .path
-        .parent()
-        .and_then(Path::parent)
-        .and_then(Path::to_str)
-    {
-        arguments.push(format!("--sysroot={sysroot}"));
-    }
+    let sysroot = runtime_root
+        .to_str()
+        .ok_or_else(|| ToolFailure::Io("non-UTF8 private runtime path".into()))?;
+    arguments.push(format!("--sysroot={sysroot}"));
     arguments.push(
         path.to_str()
             .ok_or_else(|| ToolFailure::Io("non-UTF8 temp path".into()))?
@@ -1492,6 +2829,65 @@ struct SmtBool {
     defined: String,
 }
 
+struct SmtRenderBudget {
+    operations: u64,
+    bytes: usize,
+    limits: ExportLimits,
+}
+impl SmtRenderBudget {
+    const fn new(limits: ExportLimits) -> Self {
+        Self {
+            operations: 0,
+            bytes: 0,
+            limits,
+        }
+    }
+
+    fn operation(&mut self) -> Result<(), ExportError> {
+        self.operations = self
+            .operations
+            .checked_add(1)
+            .ok_or(ExportError::ResourceLimit)?;
+        if self.operations > self.limits.max_operations() {
+            return Err(ExportError::ResourceLimit);
+        }
+        Ok(())
+    }
+
+    fn bytes(&mut self, bytes: usize) -> Result<(), ExportError> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or(ExportError::ResourceLimit)?;
+        if self.bytes > self.limits.max_source_bytes() {
+            return Err(ExportError::ResourceLimit);
+        }
+        Ok(())
+    }
+
+    fn value(&mut self, value: SmtValue) -> Result<SmtValue, ExportError> {
+        self.bytes(
+            value
+                .term
+                .len()
+                .checked_add(value.defined.len())
+                .ok_or(ExportError::ResourceLimit)?,
+        )?;
+        Ok(value)
+    }
+
+    fn boolean(&mut self, value: SmtBool) -> Result<SmtBool, ExportError> {
+        self.bytes(
+            value
+                .term
+                .len()
+                .checked_add(value.defined.len())
+                .ok_or(ExportError::ResourceLimit)?,
+        )?;
+        Ok(value)
+    }
+}
+
 fn smt_int(value: i128) -> String {
     if value < 0 {
         format!("(- {})", value.unsigned_abs())
@@ -1528,10 +2924,16 @@ fn smt_i128_range(term: &str) -> String {
     )
 }
 
-fn checked_binary_smt(operator: &str, left: SmtValue, right: SmtValue) -> SmtValue {
+fn checked_binary_smt(
+    operator: &str,
+    left: SmtValue,
+    right: SmtValue,
+    budget: &mut SmtRenderBudget,
+) -> Result<SmtValue, ExportError> {
+    budget.operation()?;
     let term = format!("({operator} {} {})", left.term, right.term);
     let defined = smt_and(vec![left.defined, right.defined, smt_i128_range(&term)]);
-    SmtValue { term, defined }
+    budget.value(SmtValue { term, defined })
 }
 
 fn floor_div_smt(left: &str, right: &str) -> String {
@@ -1546,8 +2948,10 @@ fn render_value_smt(
     value: &ValueExpr,
     step: u32,
     environment: &BTreeMap<String, i128>,
+    budget: &mut SmtRenderBudget,
 ) -> Result<SmtValue, ExportError> {
-    Ok(match value {
+    budget.operation()?;
+    let rendered = match value {
         ValueExpr::Int(value) => SmtValue {
             term: smt_int(*value),
             defined: "true".to_owned(),
@@ -1567,22 +2971,25 @@ fn render_value_smt(
         },
         ValueExpr::Add(left, right) => checked_binary_smt(
             "+",
-            render_value_smt(left, step, environment)?,
-            render_value_smt(right, step, environment)?,
-        ),
+            render_value_smt(left, step, environment, budget)?,
+            render_value_smt(right, step, environment, budget)?,
+            budget,
+        )?,
         ValueExpr::Sub(left, right) => checked_binary_smt(
             "-",
-            render_value_smt(left, step, environment)?,
-            render_value_smt(right, step, environment)?,
-        ),
+            render_value_smt(left, step, environment, budget)?,
+            render_value_smt(right, step, environment, budget)?,
+            budget,
+        )?,
         ValueExpr::Mul(left, right) => checked_binary_smt(
             "*",
-            render_value_smt(left, step, environment)?,
-            render_value_smt(right, step, environment)?,
-        ),
+            render_value_smt(left, step, environment, budget)?,
+            render_value_smt(right, step, environment, budget)?,
+            budget,
+        )?,
         ValueExpr::Div(mode, left, right) => {
-            let left = render_value_smt(left, step, environment)?;
-            let right = render_value_smt(right, step, environment)?;
+            let left = render_value_smt(left, step, environment, budget)?;
+            let right = render_value_smt(right, step, environment, budget)?;
             let term = match mode {
                 zeno_fcis_spec::DivisionMode::Exact | zeno_fcis_spec::DivisionMode::Floor => {
                     floor_div_smt(&left.term, &right.term)
@@ -1623,55 +3030,65 @@ fn render_value_smt(
             for current in *start..*end {
                 let mut nested = environment.clone();
                 nested.insert(variable.as_str().into(), current);
-                total = checked_binary_smt("+", total, render_value_smt(body, step, &nested)?);
+                let value = render_value_smt(body, step, &nested, budget)?;
+                total = checked_binary_smt("+", total, value, budget)?;
             }
             total
         }
-    })
+    };
+    budget.value(rendered)
 }
 
-fn strict_bool_smt(operator: &str, left: SmtBool, right: SmtBool) -> SmtBool {
-    SmtBool {
+fn strict_bool_smt(
+    operator: &str,
+    left: SmtBool,
+    right: SmtBool,
+    budget: &mut SmtRenderBudget,
+) -> Result<SmtBool, ExportError> {
+    budget.operation()?;
+    budget.boolean(SmtBool {
         term: format!("({operator} {} {})", left.term, right.term),
         defined: smt_and(vec![left.defined, right.defined]),
-    }
+    })
 }
 
 fn render_rel_smt(
     value: &RelExpr,
     step: u32,
     environment: &BTreeMap<String, i128>,
+    budget: &mut SmtRenderBudget,
 ) -> Result<SmtBool, ExportError> {
-    Ok(match value {
+    budget.operation()?;
+    let rendered = match value {
         RelExpr::Bool(value) => SmtBool {
             term: value.to_string(),
             defined: "true".to_owned(),
         },
         RelExpr::Not(value) => {
-            let value = render_rel_smt(value, step, environment)?;
+            let value = render_rel_smt(value, step, environment, budget)?;
             SmtBool {
                 term: smt_not(&value.term),
                 defined: value.defined,
             }
         }
-        RelExpr::And(left, right) => strict_bool_smt(
-            "and",
-            render_rel_smt(left, step, environment)?,
-            render_rel_smt(right, step, environment)?,
-        ),
-        RelExpr::Or(left, right) => strict_bool_smt(
-            "or",
-            render_rel_smt(left, step, environment)?,
-            render_rel_smt(right, step, environment)?,
-        ),
-        RelExpr::Implies(left, right) => strict_bool_smt(
-            "=>",
-            render_rel_smt(left, step, environment)?,
-            render_rel_smt(right, step, environment)?,
-        ),
+        RelExpr::And(left, right) => {
+            let left = render_rel_smt(left, step, environment, budget)?;
+            let right = render_rel_smt(right, step, environment, budget)?;
+            strict_bool_smt("and", left, right, budget)?
+        }
+        RelExpr::Or(left, right) => {
+            let left = render_rel_smt(left, step, environment, budget)?;
+            let right = render_rel_smt(right, step, environment, budget)?;
+            strict_bool_smt("or", left, right, budget)?
+        }
+        RelExpr::Implies(left, right) => {
+            let left = render_rel_smt(left, step, environment, budget)?;
+            let right = render_rel_smt(right, step, environment, budget)?;
+            strict_bool_smt("=>", left, right, budget)?
+        }
         RelExpr::Compare(operation, left, right) => {
-            let left = render_value_smt(left, step, environment)?;
-            let right = render_value_smt(right, step, environment)?;
+            let left = render_value_smt(left, step, environment, budget)?;
+            let right = render_value_smt(right, step, environment, budget)?;
             SmtBool {
                 term: format!(
                     "({} {} {})",
@@ -1692,7 +3109,7 @@ fn render_rel_smt(
         RelExpr::Predicate { name, arguments } => {
             let arguments = arguments
                 .iter()
-                .map(|value| render_value_smt(value, step, environment))
+                .map(|value| render_value_smt(value, step, environment, budget))
                 .collect::<Result<Vec<_>, _>>()?;
             let defined = smt_and(
                 arguments
@@ -1719,71 +3136,96 @@ fn render_rel_smt(
             start,
             end,
             body,
-        } => render_bounded_bool(true, variable, *start, *end, body, step, environment)?,
+        } => render_bounded_bool(
+            true,
+            variable,
+            *start..*end,
+            body,
+            step,
+            environment,
+            budget,
+        )?,
         RelExpr::Exists {
             variable,
             start,
             end,
             body,
-        } => render_bounded_bool(false, variable, *start, *end, body, step, environment)?,
-    })
+        } => render_bounded_bool(
+            false,
+            variable,
+            *start..*end,
+            body,
+            step,
+            environment,
+            budget,
+        )?,
+    };
+    budget.boolean(rendered)
 }
 
-fn fold_all_smt(values: Vec<SmtBool>) -> SmtBool {
-    let mut result = SmtBool {
+fn fold_all_smt(
+    values: Vec<SmtBool>,
+    budget: &mut SmtRenderBudget,
+) -> Result<SmtBool, ExportError> {
+    let mut result = budget.boolean(SmtBool {
         term: "true".to_owned(),
         defined: "true".to_owned(),
-    };
+    })?;
     for value in values {
+        budget.operation()?;
         let defined = smt_and(vec![
             result.defined,
             smt_or(vec![smt_not(&result.term), value.defined]),
         ]);
         let term = smt_and(vec![result.term, value.term]);
-        result = SmtBool { term, defined };
+        result = budget.boolean(SmtBool { term, defined })?;
     }
-    result
+    Ok(result)
 }
 
-fn fold_exists_smt(values: Vec<SmtBool>) -> SmtBool {
-    let mut result = SmtBool {
+fn fold_exists_smt(
+    values: Vec<SmtBool>,
+    budget: &mut SmtRenderBudget,
+) -> Result<SmtBool, ExportError> {
+    let mut result = budget.boolean(SmtBool {
         term: "false".to_owned(),
         defined: "true".to_owned(),
-    };
+    })?;
     for value in values {
+        budget.operation()?;
         let defined = smt_and(vec![
             result.defined,
             smt_or(vec![result.term.clone(), value.defined]),
         ]);
         let term = smt_or(vec![result.term, value.term]);
-        result = SmtBool { term, defined };
+        result = budget.boolean(SmtBool { term, defined })?;
     }
-    result
+    Ok(result)
 }
 
 fn render_bounded_bool(
     all: bool,
     variable: &Identifier,
-    start: i128,
-    end: i128,
+    range: core::ops::Range<i128>,
     body: &RelExpr,
     step: u32,
     environment: &BTreeMap<String, i128>,
+    budget: &mut SmtRenderBudget,
 ) -> Result<SmtBool, ExportError> {
-    if end < start || end.saturating_sub(start) > 4096 {
+    if range.end < range.start || range.end.saturating_sub(range.start) > 4096 {
         return Err(ExportError::InvalidFormula);
     }
     let mut values = Vec::new();
-    for current in start..end {
+    for current in range {
         let mut nested = environment.clone();
         nested.insert(variable.as_str().into(), current);
-        values.push(render_rel_smt(body, step, &nested)?);
+        values.push(render_rel_smt(body, step, &nested, budget)?);
     }
-    Ok(if all {
-        fold_all_smt(values)
+    if all {
+        fold_all_smt(values, budget)
     } else {
-        fold_exists_smt(values)
-    })
+        fold_exists_smt(values, budget)
+    }
 }
 
 fn render_temporal_smt(
@@ -1791,29 +3233,31 @@ fn render_temporal_smt(
     step: u32,
     horizon: u32,
     environment: &BTreeMap<String, i128>,
+    budget: &mut SmtRenderBudget,
 ) -> Result<SmtBool, ExportError> {
-    Ok(match value {
-        TemporalFormula::Atom(value) => render_rel_smt(value, step, environment)?,
+    budget.operation()?;
+    let rendered = match value {
+        TemporalFormula::Atom(value) => render_rel_smt(value, step, environment, budget)?,
         TemporalFormula::Not(value) => {
-            let value = render_temporal_smt(value, step, horizon, environment)?;
+            let value = render_temporal_smt(value, step, horizon, environment, budget)?;
             SmtBool {
                 term: smt_not(&value.term),
                 defined: value.defined,
             }
         }
-        TemporalFormula::And(left, right) => strict_bool_smt(
-            "and",
-            render_temporal_smt(left, step, horizon, environment)?,
-            render_temporal_smt(right, step, horizon, environment)?,
-        ),
-        TemporalFormula::Or(left, right) => strict_bool_smt(
-            "or",
-            render_temporal_smt(left, step, horizon, environment)?,
-            render_temporal_smt(right, step, horizon, environment)?,
-        ),
+        TemporalFormula::And(left, right) => {
+            let left = render_temporal_smt(left, step, horizon, environment, budget)?;
+            let right = render_temporal_smt(right, step, horizon, environment, budget)?;
+            strict_bool_smt("and", left, right, budget)?
+        }
+        TemporalFormula::Or(left, right) => {
+            let left = render_temporal_smt(left, step, horizon, environment, budget)?;
+            let right = render_temporal_smt(right, step, horizon, environment, budget)?;
+            strict_bool_smt("or", left, right, budget)?
+        }
         TemporalFormula::Next(value) => {
             if step + 1 < horizon {
-                render_temporal_smt(value, step + 1, horizon, environment)?
+                render_temporal_smt(value, step + 1, horizon, environment, budget)?
             } else {
                 SmtBool {
                     term: "false".to_owned(),
@@ -1823,22 +3267,25 @@ fn render_temporal_smt(
         }
         TemporalFormula::Always(value) => fold_all_smt(
             (step..horizon)
-                .map(|current| render_temporal_smt(value, current, horizon, environment))
+                .map(|current| render_temporal_smt(value, current, horizon, environment, budget))
                 .collect::<Result<Vec<_>, _>>()?,
-        ),
+            budget,
+        )?,
         TemporalFormula::Eventually(value) => fold_exists_smt(
             (step..horizon)
-                .map(|current| render_temporal_smt(value, current, horizon, environment))
+                .map(|current| render_temporal_smt(value, current, horizon, environment, budget))
                 .collect::<Result<Vec<_>, _>>()?,
-        ),
+            budget,
+        )?,
         TemporalFormula::Until(left, right) => {
-            let mut continuation = SmtBool {
+            let mut continuation = budget.boolean(SmtBool {
                 term: "false".to_owned(),
                 defined: "true".to_owned(),
-            };
+            })?;
             for current in (step..horizon).rev() {
-                let right = render_temporal_smt(right, current, horizon, environment)?;
-                let left = render_temporal_smt(left, current, horizon, environment)?;
+                budget.operation()?;
+                let right = render_temporal_smt(right, current, horizon, environment, budget)?;
+                let left = render_temporal_smt(left, current, horizon, environment, budget)?;
                 let defined = smt_and(vec![
                     right.defined,
                     smt_or(vec![
@@ -1853,20 +3300,25 @@ fn render_temporal_smt(
                     right.term,
                     smt_and(vec![left.term, continuation.term]),
                 ]);
-                continuation = SmtBool { term, defined };
+                continuation = budget.boolean(SmtBool { term, defined })?;
             }
             continuation
         }
-    })
+    };
+    budget.boolean(rendered)
 }
 
-fn select_trace_length(mut formulas: Vec<SmtBool>) -> Result<SmtBool, ExportError> {
+fn select_trace_length(
+    mut formulas: Vec<SmtBool>,
+    budget: &mut SmtRenderBudget,
+) -> Result<SmtBool, ExportError> {
     let Some(mut selected) = formulas.pop() else {
         return Err(ExportError::InvalidFormula);
     };
     for (index, formula) in formulas.into_iter().enumerate().rev() {
+        budget.operation()?;
         let length = index + 1;
-        selected = SmtBool {
+        selected = budget.boolean(SmtBool {
             term: format!(
                 "(ite (= zeno_trace_len {length}) {} {})",
                 formula.term, selected.term
@@ -1875,7 +3327,7 @@ fn select_trace_length(mut formulas: Vec<SmtBool>) -> Result<SmtBool, ExportErro
                 "(ite (= zeno_trace_len {length}) {} {})",
                 formula.defined, selected.defined
             ),
-        };
+        })?;
     }
     Ok(selected)
 }
@@ -1995,6 +3447,65 @@ struct LeanBool {
     defined: String,
 }
 
+struct LeanRenderBudget {
+    operations: u64,
+    bytes: usize,
+    limits: ExportLimits,
+}
+impl LeanRenderBudget {
+    const fn new(limits: ExportLimits) -> Self {
+        Self {
+            operations: 0,
+            bytes: 0,
+            limits,
+        }
+    }
+
+    fn operation(&mut self) -> Result<(), ExportError> {
+        self.operations = self
+            .operations
+            .checked_add(1)
+            .ok_or(ExportError::ResourceLimit)?;
+        if self.operations > self.limits.max_operations() {
+            return Err(ExportError::ResourceLimit);
+        }
+        Ok(())
+    }
+
+    fn bytes(&mut self, bytes: usize) -> Result<(), ExportError> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes)
+            .ok_or(ExportError::ResourceLimit)?;
+        if self.bytes > self.limits.max_source_bytes() {
+            return Err(ExportError::ResourceLimit);
+        }
+        Ok(())
+    }
+
+    fn value(&mut self, value: LeanValue) -> Result<LeanValue, ExportError> {
+        self.bytes(
+            value
+                .term
+                .len()
+                .checked_add(value.defined.len())
+                .ok_or(ExportError::ResourceLimit)?,
+        )?;
+        Ok(value)
+    }
+
+    fn boolean(&mut self, value: LeanBool) -> Result<LeanBool, ExportError> {
+        self.bytes(
+            value
+                .term
+                .len()
+                .checked_add(value.defined.len())
+                .ok_or(ExportError::ResourceLimit)?,
+        )?;
+        Ok(value)
+    }
+}
+
 fn lean_int(value: i128) -> String {
     if value < 0 {
         format!("(-{} : Int)", value.unsigned_abs())
@@ -2042,18 +3553,26 @@ fn lean_path(path: &ProjectionPath, step: &str) -> String {
     format!("(observe \"{root}_{suffix}\" {step}).val")
 }
 
-fn lean_checked_binary(operator: &str, left: LeanValue, right: LeanValue) -> LeanValue {
+fn lean_checked_binary(
+    operator: &str,
+    left: LeanValue,
+    right: LeanValue,
+    budget: &mut LeanRenderBudget,
+) -> Result<LeanValue, ExportError> {
+    budget.operation()?;
     let term = format!("({} {operator} {})", left.term, right.term);
     let defined = lean_and(vec![left.defined, right.defined, format!("inI128 {term}")]);
-    LeanValue { term, defined }
+    budget.value(LeanValue { term, defined })
 }
 
 fn render_value_lean(
     value: &ValueExpr,
     step: &str,
     environment: &BTreeMap<String, i128>,
+    budget: &mut LeanRenderBudget,
 ) -> Result<LeanValue, ExportError> {
-    Ok(match value {
+    budget.operation()?;
+    let rendered = match value {
         ValueExpr::Int(value) => LeanValue {
             term: lean_int(*value),
             defined: "True".to_owned(),
@@ -2071,24 +3590,20 @@ fn render_value_lean(
             term: lean_path(path, step),
             defined: "True".to_owned(),
         },
-        ValueExpr::Add(left, right) => lean_checked_binary(
-            "+",
-            render_value_lean(left, step, environment)?,
-            render_value_lean(right, step, environment)?,
-        ),
-        ValueExpr::Sub(left, right) => lean_checked_binary(
-            "-",
-            render_value_lean(left, step, environment)?,
-            render_value_lean(right, step, environment)?,
-        ),
-        ValueExpr::Mul(left, right) => lean_checked_binary(
-            "*",
-            render_value_lean(left, step, environment)?,
-            render_value_lean(right, step, environment)?,
-        ),
+        ValueExpr::Add(left, right) | ValueExpr::Sub(left, right) | ValueExpr::Mul(left, right) => {
+            let operator = match value {
+                ValueExpr::Add(_, _) => "+",
+                ValueExpr::Sub(_, _) => "-",
+                ValueExpr::Mul(_, _) => "*",
+                _ => unreachable!(),
+            };
+            let left = render_value_lean(left, step, environment, budget)?;
+            let right = render_value_lean(right, step, environment, budget)?;
+            lean_checked_binary(operator, left, right, budget)?
+        }
         ValueExpr::Div(mode, left, right) => {
-            let left = render_value_lean(left, step, environment)?;
-            let right = render_value_lean(right, step, environment)?;
+            let left = render_value_lean(left, step, environment, budget)?;
+            let right = render_value_lean(right, step, environment, budget)?;
             let term = match mode {
                 zeno_fcis_spec::DivisionMode::Exact | zeno_fcis_spec::DivisionMode::Floor => {
                     format!("floorDiv {} {}", left.term, right.term)
@@ -2127,55 +3642,61 @@ fn render_value_lean(
             for current in *start..*end {
                 let mut nested = environment.clone();
                 nested.insert(variable.as_str().into(), current);
-                total = lean_checked_binary("+", total, render_value_lean(body, step, &nested)?);
+                let next = render_value_lean(body, step, &nested, budget)?;
+                total = lean_checked_binary("+", total, next, budget)?;
             }
             total
         }
-    })
+    };
+    budget.value(rendered)
 }
 
-fn strict_bool_lean(operator: &str, left: LeanBool, right: LeanBool) -> LeanBool {
-    LeanBool {
+fn strict_bool_lean(
+    operator: &str,
+    left: LeanBool,
+    right: LeanBool,
+    budget: &mut LeanRenderBudget,
+) -> Result<LeanBool, ExportError> {
+    budget.operation()?;
+    budget.boolean(LeanBool {
         term: format!("({} {operator} {})", left.term, right.term),
         defined: lean_and(vec![left.defined, right.defined]),
-    }
+    })
 }
 
 fn render_rel_lean(
     value: &RelExpr,
     step: &str,
     environment: &BTreeMap<String, i128>,
+    budget: &mut LeanRenderBudget,
 ) -> Result<LeanBool, ExportError> {
-    Ok(match value {
+    budget.operation()?;
+    let rendered = match value {
         RelExpr::Bool(value) => LeanBool {
             term: if *value { "True" } else { "False" }.to_owned(),
             defined: "True".to_owned(),
         },
         RelExpr::Not(value) => {
-            let value = render_rel_lean(value, step, environment)?;
+            let value = render_rel_lean(value, step, environment, budget)?;
             LeanBool {
                 term: lean_not(&value.term),
                 defined: value.defined,
             }
         }
-        RelExpr::And(left, right) => strict_bool_lean(
-            "∧",
-            render_rel_lean(left, step, environment)?,
-            render_rel_lean(right, step, environment)?,
-        ),
-        RelExpr::Or(left, right) => strict_bool_lean(
-            "∨",
-            render_rel_lean(left, step, environment)?,
-            render_rel_lean(right, step, environment)?,
-        ),
-        RelExpr::Implies(left, right) => strict_bool_lean(
-            "→",
-            render_rel_lean(left, step, environment)?,
-            render_rel_lean(right, step, environment)?,
-        ),
+        RelExpr::And(left, right) | RelExpr::Or(left, right) | RelExpr::Implies(left, right) => {
+            let operator = match value {
+                RelExpr::And(_, _) => "∧",
+                RelExpr::Or(_, _) => "∨",
+                RelExpr::Implies(_, _) => "→",
+                _ => unreachable!(),
+            };
+            let left = render_rel_lean(left, step, environment, budget)?;
+            let right = render_rel_lean(right, step, environment, budget)?;
+            strict_bool_lean(operator, left, right, budget)?
+        }
         RelExpr::Compare(operation, left, right) => {
-            let left = render_value_lean(left, step, environment)?;
-            let right = render_value_lean(right, step, environment)?;
+            let left = render_value_lean(left, step, environment, budget)?;
+            let right = render_value_lean(right, step, environment, budget)?;
             LeanBool {
                 term: format!(
                     "({} {} {})",
@@ -2196,7 +3717,7 @@ fn render_rel_lean(
         RelExpr::Predicate { name, arguments } => {
             let arguments = arguments
                 .iter()
-                .map(|value| render_value_lean(value, step, environment))
+                .map(|value| render_value_lean(value, step, environment, budget))
                 .collect::<Result<Vec<_>, _>>()?;
             let defined = lean_and(
                 arguments
@@ -2219,117 +3740,144 @@ fn render_rel_lean(
             start,
             end,
             body,
-        } => render_bounded_bool_lean(true, variable, *start, *end, body, step, environment)?,
+        } => render_bounded_bool_lean(
+            true,
+            variable,
+            *start..*end,
+            body,
+            step,
+            environment,
+            budget,
+        )?,
         RelExpr::Exists {
             variable,
             start,
             end,
             body,
-        } => render_bounded_bool_lean(false, variable, *start, *end, body, step, environment)?,
-    })
+        } => render_bounded_bool_lean(
+            false,
+            variable,
+            *start..*end,
+            body,
+            step,
+            environment,
+            budget,
+        )?,
+    };
+    budget.boolean(rendered)
 }
 
-fn fold_all_lean(values: Vec<LeanBool>) -> LeanBool {
-    let mut result = LeanBool {
+fn fold_all_lean(
+    values: Vec<LeanBool>,
+    budget: &mut LeanRenderBudget,
+) -> Result<LeanBool, ExportError> {
+    let mut result = budget.boolean(LeanBool {
         term: "True".to_owned(),
         defined: "True".to_owned(),
-    };
+    })?;
     for value in values {
+        budget.operation()?;
         let defined = lean_and(vec![
             result.defined,
             lean_or(vec![lean_not(&result.term), value.defined]),
         ]);
         let term = lean_and(vec![result.term, value.term]);
-        result = LeanBool { term, defined };
+        result = budget.boolean(LeanBool { term, defined })?;
     }
-    result
+    Ok(result)
 }
 
-fn fold_exists_lean(values: Vec<LeanBool>) -> LeanBool {
-    let mut result = LeanBool {
+fn fold_exists_lean(
+    values: Vec<LeanBool>,
+    budget: &mut LeanRenderBudget,
+) -> Result<LeanBool, ExportError> {
+    let mut result = budget.boolean(LeanBool {
         term: "False".to_owned(),
         defined: "True".to_owned(),
-    };
+    })?;
     for value in values {
+        budget.operation()?;
         let defined = lean_and(vec![
             result.defined,
             lean_or(vec![result.term.clone(), value.defined]),
         ]);
         let term = lean_or(vec![result.term, value.term]);
-        result = LeanBool { term, defined };
+        result = budget.boolean(LeanBool { term, defined })?;
     }
-    result
+    Ok(result)
 }
 
 fn render_bounded_bool_lean(
     all: bool,
     variable: &Identifier,
-    start: i128,
-    end: i128,
+    range: core::ops::Range<i128>,
     body: &RelExpr,
     step: &str,
     environment: &BTreeMap<String, i128>,
+    budget: &mut LeanRenderBudget,
 ) -> Result<LeanBool, ExportError> {
-    if end < start || end.saturating_sub(start) > 4096 {
+    if range.end < range.start || range.end.saturating_sub(range.start) > 4096 {
         return Err(ExportError::InvalidFormula);
     }
     let mut values = Vec::new();
-    for current in start..end {
+    for current in range {
         let mut nested = environment.clone();
         nested.insert(variable.as_str().into(), current);
-        values.push(render_rel_lean(body, step, &nested)?);
+        values.push(render_rel_lean(body, step, &nested, budget)?);
     }
-    Ok(if all {
-        fold_all_lean(values)
+    if all {
+        fold_all_lean(values, budget)
     } else {
-        fold_exists_lean(values)
-    })
+        fold_exists_lean(values, budget)
+    }
 }
 
 fn render_temporal_lean(
     value: &TemporalFormula,
     step: &str,
     environment: &BTreeMap<String, i128>,
+    budget: &mut LeanRenderBudget,
 ) -> Result<LeanBool, ExportError> {
-    Ok(match value {
-        TemporalFormula::Atom(value) => render_rel_lean(value, step, environment)?,
+    budget.operation()?;
+    let rendered = match value {
+        TemporalFormula::Atom(value) => render_rel_lean(value, step, environment, budget)?,
         TemporalFormula::Not(value) => {
-            let value = render_temporal_lean(value, step, environment)?;
+            let value = render_temporal_lean(value, step, environment, budget)?;
             LeanBool {
                 term: lean_not(&value.term),
                 defined: value.defined,
             }
         }
-        TemporalFormula::And(left, right) => strict_bool_lean(
-            "∧",
-            render_temporal_lean(left, step, environment)?,
-            render_temporal_lean(right, step, environment)?,
-        ),
-        TemporalFormula::Or(left, right) => strict_bool_lean(
-            "∨",
-            render_temporal_lean(left, step, environment)?,
-            render_temporal_lean(right, step, environment)?,
-        ),
+        TemporalFormula::And(left, right) | TemporalFormula::Or(left, right) => {
+            let operator = if matches!(value, TemporalFormula::And(_, _)) {
+                "∧"
+            } else {
+                "∨"
+            };
+            let left = render_temporal_lean(left, step, environment, budget)?;
+            let right = render_temporal_lean(right, step, environment, budget)?;
+            strict_bool_lean(operator, left, right, budget)?
+        }
         TemporalFormula::Next(value) => {
-            render_temporal_lean(value, &format!("({step} + 1)"), environment)?
+            render_temporal_lean(value, &format!("({step} + 1)"), environment, budget)?
         }
         TemporalFormula::Always(value) => {
-            let value = render_temporal_lean(value, "n", environment)?;
+            let value = render_temporal_lean(value, "n", environment, budget)?;
             LeanBool {
                 term: format!("∀ n : Nat, n >= {step} → ({})", value.term),
                 defined: format!("∀ n : Nat, n >= {step} → ({})", value.defined),
             }
         }
         TemporalFormula::Eventually(value) => {
-            let value = render_temporal_lean(value, "n", environment)?;
+            let value = render_temporal_lean(value, "n", environment, budget)?;
             LeanBool {
                 term: format!("∃ n : Nat, n >= {step} ∧ ({})", value.term),
                 defined: format!("∀ n : Nat, n >= {step} → ({})", value.defined),
             }
         }
         TemporalFormula::Until(left, right) => {
-            let left_at_m = render_temporal_lean(left, "m", environment)?;
-            let right_at_n = render_temporal_lean(right, "n", environment)?;
+            let left_at_m = render_temporal_lean(left, "m", environment, budget)?;
+            let right_at_n = render_temporal_lean(right, "n", environment, budget)?;
             LeanBool {
                 term: format!(
                     "∃ n : Nat, n >= {step} ∧ ({}) ∧ \
@@ -2343,7 +3891,8 @@ fn render_temporal_lean(
                 ),
             }
         }
-    })
+    };
+    budget.boolean(rendered)
 }
 
 #[cfg(test)]
@@ -2355,6 +3904,313 @@ mod tests {
     }
     fn name(value: &str) -> Identifier {
         Identifier::try_new(value).unwrap_or_else(|| unreachable!())
+    }
+
+    fn test_obligation(claim_id: u32) -> ExportedObligation {
+        let claim = ClaimDecl::new(
+            id(claim_id),
+            name("record_identity"),
+            vec![BackendId::Z3],
+            ClaimMode::Relational,
+            ClaimFormula::Relational(RelExpr::Bool(true)),
+        );
+        export_smt(&claim, ToolBackend::Z3).unwrap_or_else(|_| unreachable!())
+    }
+
+    fn test_identity() -> ToolIdentity {
+        ToolIdentity {
+            backend: ToolBackend::Z3,
+            path: PathBuf::from("/untrusted/tool/path"),
+            version: Z3_VERSION.to_owned(),
+            binary_hash: RustCryptoSha256::hash(b"tool"),
+            runtime_hash: None,
+        }
+    }
+
+    fn test_transcript(stdout: &[u8], stderr: &[u8]) -> ProcessTranscript {
+        ProcessTranscript {
+            phase: ProcessPhase::Decision,
+            input: b"input".to_vec(),
+            output: ProcessOutput {
+                status: success_status(),
+                stdout: stdout.to_vec(),
+                stderr: stderr.to_vec(),
+            },
+        }
+    }
+
+    #[test]
+    fn rc3_run_record_encoding_is_injective_and_complete() {
+        let identity = test_identity();
+        let obligation = test_obligation(700);
+        let status = ToolRunStatus::Blocked(ToolFailure::Unknown);
+        let left = formal_run_record(
+            &identity,
+            &obligation,
+            &status,
+            &[test_transcript(b"a", b"bc")],
+        )
+        .unwrap_or_else(|_| unreachable!());
+        let right = formal_run_record(
+            &identity,
+            &obligation,
+            &status,
+            &[test_transcript(b"ab", b"c")],
+        )
+        .unwrap_or_else(|_| unreachable!());
+        assert_ne!(left, right);
+        assert!(
+            left.windows(obligation.source().len())
+                .any(|window| window == obligation.source())
+        );
+
+        let mut variants = Vec::new();
+        let mut changed_backend = identity.clone();
+        changed_backend.backend = ToolBackend::Cvc5;
+        variants.push(formal_run_record(
+            &changed_backend,
+            &obligation,
+            &status,
+            &[test_transcript(b"a", b"bc")],
+        ));
+        let mut changed_version = identity.clone();
+        changed_version.version = "4.16.0-qualified".to_owned();
+        variants.push(formal_run_record(
+            &changed_version,
+            &obligation,
+            &status,
+            &[test_transcript(b"a", b"bc")],
+        ));
+        let mut changed_runtime = identity.clone();
+        changed_runtime.runtime_hash = Some(RustCryptoSha256::hash(b"runtime"));
+        variants.push(formal_run_record(
+            &changed_runtime,
+            &obligation,
+            &status,
+            &[test_transcript(b"a", b"bc")],
+        ));
+        variants.push(formal_run_record(
+            &identity,
+            &test_obligation(701),
+            &status,
+            &[test_transcript(b"a", b"bc")],
+        ));
+        variants.push(formal_run_record(
+            &identity,
+            &obligation,
+            &ToolRunStatus::Failed(ToolFailure::Unknown),
+            &[test_transcript(b"a", b"bc")],
+        ));
+        for variant in variants {
+            assert_ne!(left, variant.unwrap_or_else(|_| unreachable!()));
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn rc3_smt_followup_cannot_contradict_the_decision() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-smt-consistency-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap_or_else(|error| panic!("create test root: {error}"));
+        let state = root.join("called");
+        let script_path = root.join("solver");
+        let script = format!(
+            "#!/bin/sh\nwhile IFS= read -r line; do :; done\nif [ -e '{}' ]; then\n  printf 'unsat\\n'\nelse\n  : > '{}'\n  printf 'sat\\n'\nfi\n",
+            state.display(),
+            state.display()
+        );
+        fs::write(&script_path, script.as_bytes())
+            .unwrap_or_else(|error| panic!("write fake solver: {error}"));
+        fs::set_permissions(&script_path, fs::Permissions::from_mode(0o700))
+            .unwrap_or_else(|error| panic!("make fake solver executable: {error}"));
+        let config = ToolConfig {
+            backend: ToolBackend::Z3,
+            path: script_path.clone(),
+            version: Z3_VERSION.to_owned(),
+            sha256: hash_hex(RustCryptoSha256::hash(script.as_bytes())),
+            runtime: None,
+            timeout_ms: 1_000,
+            max_output_bytes: 4096,
+            allowed_axioms: Vec::new(),
+        };
+        let execution = run_smt(&config, &script_path, b"(check-sat)\n")
+            .unwrap_or_else(|error| panic!("run fake solver: {error:?}"));
+        assert!(execution.inconsistent);
+        assert_eq!(execution.transcripts.len(), 2);
+        assert_eq!(
+            solver_result(&execution.transcripts[0].output),
+            Some(SolverResult::Sat)
+        );
+        assert_eq!(
+            solver_result(&execution.transcripts[1].output),
+            Some(SolverResult::Unsat)
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn rc3_lean_render_budget_is_live() {
+        let variable = name("n");
+        let claim = ClaimDecl::new(
+            id(702),
+            name("lean_live_budget"),
+            vec![BackendId::Lean],
+            ClaimMode::UnboundedProof,
+            ClaimFormula::Temporal(TemporalFormula::Atom(RelExpr::ForAll {
+                variable,
+                start: 0,
+                end: 4096,
+                body: Box::new(RelExpr::Bool(true)),
+            })),
+        );
+        let limits = ExportLimits::try_new(1, 16, 16, MAX_EXPORT_OPERATIONS, 1024)
+            .unwrap_or_else(|| unreachable!());
+        let started = Instant::now();
+        assert_eq!(
+            export_lean_with_limits(&claim, limits),
+            Err(ExportError::ResourceLimit)
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn rc3_untrusted_special_files_and_post_enumeration_swaps_are_blocked() {
+        use nix::sys::stat::Mode;
+        use nix::unistd::mkfifo;
+        use std::os::unix::fs::symlink;
+
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-untrusted-files-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap_or_else(|error| panic!("create test root: {error}"));
+        let fifo = root.join("manifest.fifo");
+        mkfifo(&fifo, Mode::S_IRUSR | Mode::S_IWUSR)
+            .unwrap_or_else(|error| panic!("create fifo: {error}"));
+        let started = Instant::now();
+        assert_eq!(load_tools_manifest(&fifo), Err(ManifestError::NotFile));
+        assert!(started.elapsed() < Duration::from_secs(1));
+        fs::remove_file(&fifo).unwrap_or_else(|error| panic!("remove fifo: {error}"));
+
+        let admitted = root.join("admitted");
+        let replacement = root.join("replacement");
+        fs::write(&admitted, b"admitted").unwrap_or_else(|error| panic!("write file: {error}"));
+        fs::write(&replacement, b"replacement")
+            .unwrap_or_else(|error| panic!("write replacement: {error}"));
+        let enumerated = enumerate_toolchain(&root)
+            .unwrap_or_else(|error| panic!("enumerate toolchain: {error:?}"));
+        fs::remove_file(&admitted).unwrap_or_else(|error| panic!("remove admitted: {error}"));
+        symlink(&replacement, &admitted)
+            .unwrap_or_else(|error| panic!("replace with symlink: {error}"));
+        assert!(matches!(
+            snapshot_toolchain_files(&root, enumerated, None),
+            Err(ToolFailure::Io(_))
+        ));
+
+        fs::remove_file(&admitted).unwrap_or_else(|error| panic!("remove symlink: {error}"));
+        fs::remove_file(&replacement).unwrap_or_else(|error| panic!("remove replacement: {error}"));
+        let admitted_directory = root.join("admitted-directory");
+        let moved_directory = root.join("moved-directory");
+        let outside = root.with_extension("outside");
+        fs::create_dir(&admitted_directory)
+            .unwrap_or_else(|error| panic!("create admitted directory: {error}"));
+        fs::write(admitted_directory.join("file"), b"inside")
+            .unwrap_or_else(|error| panic!("write admitted nested file: {error}"));
+        fs::create_dir(&outside)
+            .unwrap_or_else(|error| panic!("create outside directory: {error}"));
+        fs::write(outside.join("file"), b"outside")
+            .unwrap_or_else(|error| panic!("write outside file: {error}"));
+        let enumerated = enumerate_toolchain(&root)
+            .unwrap_or_else(|error| panic!("enumerate nested toolchain: {error:?}"));
+        fs::rename(&admitted_directory, &moved_directory)
+            .unwrap_or_else(|error| panic!("move admitted directory: {error}"));
+        symlink(&outside, &admitted_directory)
+            .unwrap_or_else(|error| panic!("replace directory with symlink: {error}"));
+        assert!(matches!(
+            snapshot_toolchain_files(&root, enumerated, None),
+            Err(ToolFailure::Io(_))
+        ));
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(outside);
+    }
+
+    #[test]
+    fn rc3_retention_publishes_only_complete_bundles() {
+        let obligation = test_obligation(703);
+        let identity = test_identity();
+        let status = ToolRunStatus::Blocked(ToolFailure::Unknown);
+        let transcripts = vec![test_transcript(b"answer", b"warning")];
+        let record = formal_run_record(&identity, &obligation, &status, &transcripts)
+            .unwrap_or_else(|_| unreachable!());
+        let record_hash = commitment::<RustCryptoSha256>(
+            Domain::new("zeno-fcis/formal-run", 3).unwrap_or_else(|_| unreachable!()),
+            &record,
+        )
+        .unwrap_or_else(|_| unreachable!());
+        let run = std::sync::Arc::new(ToolRun {
+            identity,
+            obligation,
+            status,
+            transcripts,
+            toolchain_inventory: None,
+            record_hash,
+        });
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-retention-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut workers = Vec::new();
+        for _ in 0..4 {
+            let root = root.clone();
+            let run = std::sync::Arc::clone(&run);
+            workers.push(thread::spawn(move || retain_run(&root, &run)));
+        }
+        let directories = workers
+            .into_iter()
+            .map(|worker| {
+                worker
+                    .join()
+                    .unwrap_or_else(|_| panic!("retention worker panicked"))
+                    .unwrap_or_else(|error| panic!("retain run: {error:?}"))
+            })
+            .collect::<Vec<_>>();
+        assert!(directories.windows(2).all(|pair| pair[0] == pair[1]));
+        let expected = retained_run_files(&run).unwrap_or_else(|_| unreachable!());
+        verify_retained_bundle(&directories[0], &expected)
+            .unwrap_or_else(|error| panic!("verify retained bundle: {error:?}"));
+        let retained_record = fs::read(directories[0].join("formal-run-record.bin"))
+            .unwrap_or_else(|error| panic!("read canonical run record: {error}"));
+        let retained_hash = commitment::<RustCryptoSha256>(
+            Domain::new("zeno-fcis/formal-run", 3).unwrap_or_else(|_| unreachable!()),
+            &retained_record,
+        )
+        .unwrap_or_else(|_| unreachable!());
+        assert_eq!(retained_hash, run.record_hash());
+        let metadata = fs::read(directories[0].join("record.json"))
+            .unwrap_or_else(|error| panic!("read record metadata: {error}"));
+        assert!(
+            !metadata
+                .windows(b"/untrusted/tool/path".len())
+                .any(|window| { window == b"/untrusted/tool/path" })
+        );
+        assert!(
+            !fs::read_dir(&root)
+                .unwrap_or_else(|error| panic!("read retention root: {error}"))
+                .filter_map(Result::ok)
+                .any(|entry| entry.file_name().to_string_lossy().contains(".tmp-"))
+        );
+        fs::write(directories[0].join("stdout"), b"tampered")
+            .unwrap_or_else(|error| panic!("tamper retained bundle: {error}"));
+        assert_eq!(retain_run(&root, &run), Err(ToolFailure::RetentionConflict));
+        let _ = fs::remove_dir_all(root);
     }
     #[test]
     fn rc3_formal_tools_bind_exact_claim_and_strong_next() {
@@ -2379,6 +4235,7 @@ mod tests {
             path: "z3".into(),
             version: Z3_VERSION.into(),
             sha256: "0".repeat(64),
+            runtime: None,
             timeout_ms: 1,
             max_output_bytes: 100,
             allowed_axioms: Vec::new(),
@@ -2413,12 +4270,56 @@ mod tests {
     }
 
     #[test]
+    fn rc3_custom_lean_identity_cannot_receive_kernel_checked() {
+        let claim = ClaimDecl::new(
+            id(704),
+            name("qualified_lean_only"),
+            vec![BackendId::Lean],
+            ClaimMode::UnboundedProof,
+            ClaimFormula::Temporal(TemporalFormula::Atom(RelExpr::Bool(true))),
+        );
+        let obligation = export_lean(&claim).unwrap_or_else(|_| unreachable!());
+        let output = ProcessOutput {
+            status: success_status(),
+            stdout: b"'claim' depends on axioms: []\n".to_vec(),
+            stderr: Vec::new(),
+        };
+        let mut config = ToolConfig {
+            backend: ToolBackend::Lean,
+            path: PathBuf::from("/custom/lean/bin/lean"),
+            version: LEAN_VERSION.to_owned(),
+            sha256: "1".repeat(64),
+            runtime: Some(ToolRuntimeConfig {
+                root: PathBuf::from("/custom/lean"),
+                tree_sha256: "2".repeat(64),
+            }),
+            timeout_ms: 1_000,
+            max_output_bytes: 4096,
+            allowed_axioms: Vec::new(),
+        };
+        assert_eq!(
+            classify(&config, &output, &obligation),
+            ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
+        );
+        config
+            .runtime
+            .as_mut()
+            .unwrap_or_else(|| unreachable!())
+            .tree_sha256 = LEAN_LINUX_X86_64_TREE_SHA256.to_owned();
+        assert_eq!(
+            classify(&config, &output, &obligation),
+            ToolRunStatus::KernelChecked
+        );
+    }
+
+    #[test]
     fn rc3_formal_fail_closed_and_model_replay() {
         let config = ToolConfig {
             backend: ToolBackend::Z3,
             path: "z3".into(),
             version: Z3_VERSION.into(),
             sha256: "0".repeat(64),
+            runtime: None,
             timeout_ms: 1,
             max_output_bytes: 100,
             allowed_axioms: Vec::new(),
@@ -2485,6 +4386,7 @@ mod tests {
                 .join(format!("zeno-fcis-missing-tool-{}", std::process::id())),
             version: Z3_VERSION.into(),
             sha256: "0".repeat(64),
+            runtime: None,
             timeout_ms: 100,
             max_output_bytes: 4096,
             allowed_axioms: Vec::new(),
@@ -2497,6 +4399,7 @@ mod tests {
             path: executable.clone(),
             version: Z3_VERSION.into(),
             sha256: "0".repeat(64),
+            runtime: None,
             timeout_ms: 100,
             max_output_bytes: 4096,
             allowed_axioms: Vec::new(),
@@ -2508,6 +4411,7 @@ mod tests {
             path: executable.clone(),
             version: CVC5_VERSION.into(),
             sha256: "0".repeat(64),
+            runtime: None,
             timeout_ms: 100,
             max_output_bytes: 4096,
             allowed_axioms: Vec::new(),
@@ -2760,6 +4664,26 @@ mod tests {
             export_smt_with_limits(&nested, ToolBackend::Z3, limits),
             Err(ExportError::ResourceLimit)
         );
+
+        let nested_temporal = ClaimDecl::new(
+            id(83),
+            name("nested_temporal_envelope"),
+            vec![BackendId::Z3],
+            ClaimMode::Finite {
+                horizon: MAX_FINITE_HORIZON,
+            },
+            ClaimFormula::Temporal(TemporalFormula::Always(Box::new(TemporalFormula::Always(
+                Box::new(TemporalFormula::Always(Box::new(TemporalFormula::Atom(
+                    RelExpr::Bool(true),
+                )))),
+            )))),
+        );
+        let started = Instant::now();
+        assert_eq!(
+            export_smt(&nested_temporal, ToolBackend::Z3),
+            Err(ExportError::ResourceLimit)
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
     }
 
     #[test]
@@ -2778,6 +4702,7 @@ mod tests {
             path,
             version: version.into(),
             sha256,
+            runtime: None,
             timeout_ms: 1_000,
             max_output_bytes: 4096,
             allowed_axioms: Vec::new(),
@@ -2796,7 +4721,7 @@ mod tests {
         fs::remove_file(&oversized_path).unwrap_or_else(|_| unreachable!());
 
         let script_path = small_path.with_extension("tool");
-        let script = b"#!/bin/sh\nprintf tool-1.2.3\n";
+        let script = b"#!/bin/sh\nprintf 'Z3 version 1.2.3 - 64 bit\\n'\n";
         fs::write(&script_path, script).unwrap_or_else(|_| unreachable!());
         let expected_hash = RustCryptoSha256::hash(script);
         let expected_hash_hex = hash_hex(expected_hash);
@@ -2810,6 +4735,213 @@ mod tests {
             Err(ToolFailure::VersionMismatch)
         ));
         fs::remove_file(script_path).unwrap_or_else(|_| unreachable!());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn rc3_lean_runtime_closure_is_portable_private_and_fail_closed() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        fn make_tree(label: &str) -> (PathBuf, Vec<u8>) {
+            let root = std::env::temp_dir().join(format!(
+                "zeno-fcis-lean-tree-{label}-{}-{}",
+                std::process::id(),
+                TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir_all(root.join("bin"))
+                .unwrap_or_else(|error| panic!("create bin: {error}"));
+            fs::create_dir_all(root.join("lib/lean"))
+                .unwrap_or_else(|error| panic!("create lib: {error}"));
+            let script = b"#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  printf 'Lean (version 4.30.0, fake)\\n'\nelse\n  printf \"'claim' depends on axioms: []\\n\"\nfi\n".to_vec();
+            let executable = root.join("bin/lean");
+            fs::write(&executable, &script)
+                .unwrap_or_else(|error| panic!("write fake Lean: {error}"));
+            fs::set_permissions(&executable, fs::Permissions::from_mode(0o700))
+                .unwrap_or_else(|error| panic!("make fake Lean executable: {error}"));
+            fs::write(root.join("lib/lean/Init.olean"), b"checked-init")
+                .unwrap_or_else(|error| panic!("write fake Init.olean: {error}"));
+            (root, script)
+        }
+
+        let (root, script) = make_tree("primary");
+        let (same_root, _) = make_tree("same");
+        let baseline = inspect_lean_toolchain(&root).unwrap_or_else(|error| panic!("{error:?}"));
+        let same = inspect_lean_toolchain(&same_root).unwrap_or_else(|error| panic!("{error:?}"));
+        assert_eq!(baseline.tree_sha256(), same.tree_sha256());
+        assert_eq!(baseline.canonical_json(), same.canonical_json());
+
+        let config = ToolConfig {
+            backend: ToolBackend::Lean,
+            path: root.join("bin/lean"),
+            version: LEAN_VERSION.into(),
+            sha256: hash_hex(RustCryptoSha256::hash(&script)),
+            runtime: Some(ToolRuntimeConfig {
+                root: root.clone(),
+                tree_sha256: hash_hex(baseline.tree_sha256()),
+            }),
+            timeout_ms: 1_000,
+            max_output_bytes: 4096,
+            allowed_axioms: Vec::new(),
+        };
+        let checked = check_tool(&config).unwrap_or_else(|error| panic!("{error:?}"));
+        assert_eq!(
+            checked.identity.runtime_hash(),
+            Some(baseline.tree_sha256())
+        );
+        let private_root = checked
+            .execution
+            .runtime_root()
+            .unwrap_or_else(|| unreachable!())
+            .to_path_buf();
+        fs::write(root.join("lib/lean/Init.olean"), b"mutated")
+            .unwrap_or_else(|error| panic!("mutate source tree: {error}"));
+        assert_eq!(
+            fs::read(private_root.join("lib/lean/Init.olean"))
+                .unwrap_or_else(|error| panic!("read private Init.olean: {error}")),
+            b"checked-init"
+        );
+        let output = run_lean(
+            &config,
+            checked.execution.executable(),
+            &private_root,
+            b"-- exact test source\n",
+        )
+        .unwrap_or_else(|error| panic!("run private fake Lean: {error:?}"));
+        assert!(output.status.success());
+        assert_eq!(
+            parse_lean_axioms(&String::from_utf8_lossy(&output.stdout)),
+            Some(Vec::new())
+        );
+        drop(checked);
+        assert!(!private_root.exists());
+        assert_eq!(
+            check_tool(&config).err(),
+            Some(ToolFailure::ToolchainHashMismatch)
+        );
+
+        fs::write(root.join("lib/lean/Init.olean"), b"checked-init")
+            .unwrap_or_else(|error| panic!("restore Init.olean: {error}"));
+        fs::write(root.join("added.olean"), b"added")
+            .unwrap_or_else(|error| panic!("add runtime file: {error}"));
+        assert_ne!(
+            inspect_lean_toolchain(&root)
+                .unwrap_or_else(|error| panic!("{error:?}"))
+                .tree_sha256(),
+            baseline.tree_sha256()
+        );
+        fs::remove_file(root.join("added.olean"))
+            .unwrap_or_else(|error| panic!("remove added runtime file: {error}"));
+        symlink("Init.olean", root.join("lib/lean/linked.olean"))
+            .unwrap_or_else(|error| panic!("create runtime symlink: {error}"));
+        assert_eq!(
+            inspect_lean_toolchain(&root),
+            Err(ToolFailure::ToolchainUnsupported)
+        );
+
+        assert!(version_output_matches(
+            ToolBackend::Lean,
+            "Lean (version 4.30.0, fake)",
+            LEAN_VERSION
+        ));
+        assert!(!version_output_matches(
+            ToolBackend::Lean,
+            "Lean (version 4.30.0-modified, fake)",
+            LEAN_VERSION
+        ));
+        assert!(!version_output_matches(
+            ToolBackend::Z3,
+            "Z3 version 14.16.00 - 64 bit",
+            Z3_VERSION
+        ));
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(same_root);
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn rc3_tools_manifest_requires_only_lean_to_bind_a_runtime_closure() {
+        let path = std::env::temp_dir().join(format!(
+            "zeno-fcis-tools-manifest-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        let lean = serde_json::json!({
+            "format": TOOLS_MANIFEST_FORMAT,
+            "tools": [{
+                "backend": "lean",
+                "path": "/opt/lean-4.30.0/bin/lean",
+                "version": LEAN_VERSION,
+                "sha256": "1".repeat(64),
+                "runtime": {
+                    "root": "/opt/lean-4.30.0",
+                    "tree_sha256": "2".repeat(64)
+                },
+                "timeout_ms": 30_000,
+                "max_output_bytes": 1_048_576,
+                "allowed_axioms": []
+            }]
+        });
+        fs::write(
+            &path,
+            serde_json::to_vec(&lean).unwrap_or_else(|_| unreachable!()),
+        )
+        .unwrap_or_else(|error| panic!("write valid manifest: {error}"));
+        let loaded = load_tools_manifest(&path).unwrap_or_else(|error| panic!("{error:?}"));
+        assert!(loaded.tool(ToolBackend::Lean).is_some());
+        assert_eq!(
+            String::from_utf8(loaded.canonical_json().unwrap_or_else(|_| unreachable!()))
+                .unwrap_or_else(|_| unreachable!()),
+            "{\"format\":\"zeno-fcis/tools/2\",\"tools\":[{\"backend\":\"lean\",\"path\":\"/opt/lean-4.30.0/bin/lean\",\"version\":\"4.30.0\",\"sha256\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"runtime\":{\"root\":\"/opt/lean-4.30.0\",\"tree_sha256\":\"2222222222222222222222222222222222222222222222222222222222222222\"},\"timeout_ms\":30000,\"max_output_bytes\":1048576,\"allowed_axioms\":[]}]}"
+        );
+
+        let mut old_format = lean.clone();
+        old_format["format"] = serde_json::json!("zeno-fcis/tools/1");
+        fs::write(
+            &path,
+            serde_json::to_vec(&old_format).unwrap_or_else(|_| unreachable!()),
+        )
+        .unwrap_or_else(|error| panic!("write old-format manifest: {error}"));
+        assert_eq!(
+            load_tools_manifest(&path),
+            Err(ManifestError::WrongFormat {
+                expected: TOOLS_MANIFEST_FORMAT,
+                actual: "zeno-fcis/tools/1".to_owned(),
+            })
+        );
+
+        let mut missing_runtime = lean.clone();
+        missing_runtime["tools"][0]
+            .as_object_mut()
+            .unwrap_or_else(|| unreachable!())
+            .remove("runtime");
+        fs::write(
+            &path,
+            serde_json::to_vec(&missing_runtime).unwrap_or_else(|_| unreachable!()),
+        )
+        .unwrap_or_else(|error| panic!("write missing-runtime manifest: {error}"));
+        assert_eq!(
+            load_tools_manifest(&path),
+            Err(ManifestError::InvalidRuntime)
+        );
+
+        let mut unexpected_runtime = lean;
+        unexpected_runtime["tools"][0]["backend"] = serde_json::json!("z3");
+        unexpected_runtime["tools"][0]["version"] = serde_json::json!(Z3_VERSION);
+        fs::write(
+            &path,
+            serde_json::to_vec(&unexpected_runtime).unwrap_or_else(|_| unreachable!()),
+        )
+        .unwrap_or_else(|error| panic!("write unexpected-runtime manifest: {error}"));
+        assert_eq!(
+            load_tools_manifest(&path),
+            Err(ManifestError::InvalidRuntime)
+        );
+
+        fs::write(&path, vec![b' '; MAX_TOOLS_MANIFEST_BYTES + 1])
+            .unwrap_or_else(|error| panic!("write oversized manifest: {error}"));
+        assert_eq!(load_tools_manifest(&path), Err(ManifestError::TooLarge));
+        let _ = fs::remove_file(path);
     }
 
     #[test]
@@ -2893,7 +5025,7 @@ mod tests {
             Err(ExportError::ResourceLimit)
         );
         let exact_operations =
-            ExportLimits::try_new(2, 2, 2, 8, 4096).unwrap_or_else(|| unreachable!());
+            ExportLimits::try_new(2, 2, 2, 4, 4096).unwrap_or_else(|| unreachable!());
         assert_eq!(
             preflight_export(&finite(2), ExportKind::Smt, exact_operations),
             Ok(())
@@ -2973,6 +5105,178 @@ mod tests {
         assert!(start.elapsed() < Duration::from_secs(2));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn rc3_process_timeout_kills_descendant_holding_solver_pipes() {
+        use nix::errno::Errno;
+        use nix::sys::signal::{Signal, kill};
+        use nix::unistd::Pid;
+
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-pipe-holder-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap_or_else(|error| panic!("create helper root: {error}"));
+        let executable = std::env::current_exe().unwrap_or_else(|_| unreachable!());
+        let root_bytes = root
+            .to_str()
+            .unwrap_or_else(|| unreachable!())
+            .as_bytes()
+            .to_vec();
+        let start = Instant::now();
+        assert_eq!(
+            run_fixed(
+                &executable,
+                &[
+                    "--ignored",
+                    "--exact",
+                    "tests::process_helper_spawns_pipe_holder",
+                    "--nocapture",
+                ],
+                Some(&root_bytes),
+                2_000,
+                4096,
+            )
+            .err(),
+            Some(ToolFailure::Timeout)
+        );
+        assert!(start.elapsed() < Duration::from_secs(5));
+
+        let parent = fs::read_to_string(root.join("parent"))
+            .unwrap_or_else(|error| panic!("read parent identity: {error}"));
+        let descendant = fs::read_to_string(root.join("descendant"))
+            .unwrap_or_else(|error| panic!("read descendant identity: {error}"));
+        let parse_identity = |value: &str| {
+            let mut fields = value.split_whitespace();
+            let pid = fields
+                .next()
+                .and_then(|field| field.parse::<i32>().ok())
+                .unwrap_or_else(|| panic!("missing helper pid"));
+            let group = fields
+                .next()
+                .and_then(|field| field.parse::<i32>().ok())
+                .unwrap_or_else(|| panic!("missing helper process group"));
+            assert!(fields.next().is_none());
+            (pid, group)
+        };
+        let (_, parent_group) = parse_identity(&parent);
+        let (descendant_pid, descendant_group) = parse_identity(&descendant);
+        assert_eq!(descendant_group, parent_group);
+
+        let descendant_pid = Pid::from_raw(descendant_pid);
+        let reaped = (0..200).any(|_| match kill(descendant_pid, None) {
+            Err(Errno::ESRCH) => true,
+            Ok(()) => {
+                thread::sleep(Duration::from_millis(10));
+                false
+            }
+            Err(error) => panic!("check descendant process: {error}"),
+        });
+        if !reaped {
+            let _ = kill(descendant_pid, Signal::SIGKILL);
+        }
+        let _ = fs::remove_dir_all(&root);
+        assert!(reaped, "descendant process survived process-group timeout");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rc3_process_success_kills_descendants_after_collecting_output() {
+        use nix::errno::Errno;
+        use nix::sys::signal::{Signal, kill};
+        use nix::unistd::Pid;
+
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-success-descendant-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap_or_else(|error| panic!("create helper root: {error}"));
+        let executable = std::env::current_exe().unwrap_or_else(|_| unreachable!());
+        let root_bytes = root
+            .to_str()
+            .unwrap_or_else(|| unreachable!())
+            .as_bytes()
+            .to_vec();
+        let output = run_fixed(
+            &executable,
+            &[
+                "--ignored",
+                "--exact",
+                "tests::process_helper_spawns_detached_pipe_child",
+                "--nocapture",
+            ],
+            Some(&root_bytes),
+            2_000,
+            4096,
+        )
+        .unwrap_or_else(|error| panic!("run success helper: {error:?}"));
+        assert!(output.status.success());
+        let descendant_pid = fs::read_to_string(root.join("descendant"))
+            .unwrap_or_else(|error| panic!("read descendant pid: {error}"))
+            .trim()
+            .parse::<i32>()
+            .unwrap_or_else(|error| panic!("parse descendant pid: {error}"));
+        let descendant_pid = Pid::from_raw(descendant_pid);
+        let reaped = (0..200).any(|_| match kill(descendant_pid, None) {
+            Err(Errno::ESRCH) => true,
+            Ok(()) => {
+                thread::sleep(Duration::from_millis(10));
+                false
+            }
+            Err(error) => panic!("check descendant process: {error}"),
+        });
+        if !reaped {
+            let _ = kill(descendant_pid, Signal::SIGKILL);
+        }
+        let _ = fs::remove_dir_all(root);
+        assert!(reaped, "descendant process survived successful tool run");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rc3_lean_runtime_mutation_during_version_probe_is_blocked() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-mutating-lean-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir_all(root.join("bin"))
+            .unwrap_or_else(|error| panic!("create fake Lean bin: {error}"));
+        fs::create_dir_all(root.join("lib/lean"))
+            .unwrap_or_else(|error| panic!("create fake Lean lib: {error}"));
+        let script = b"#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n  root=${0%/bin/lean}\n  /bin/chmod 600 \"$root/lib/lean/Init.olean\"\n  printf 'mutated' > \"$root/lib/lean/Init.olean\"\n  printf 'Lean (version 4.30.0, fake)\\n'\nelse\n  printf \"'claim' depends on axioms: []\\n\"\nfi\n";
+        let executable = root.join("bin/lean");
+        fs::write(&executable, script).unwrap_or_else(|error| panic!("write fake Lean: {error}"));
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o700))
+            .unwrap_or_else(|error| panic!("make fake Lean executable: {error}"));
+        fs::write(root.join("lib/lean/Init.olean"), b"checked-init")
+            .unwrap_or_else(|error| panic!("write fake Lean runtime: {error}"));
+        let inventory = inspect_lean_toolchain(&root)
+            .unwrap_or_else(|error| panic!("inventory fake Lean: {error:?}"));
+        let config = ToolConfig {
+            backend: ToolBackend::Lean,
+            path: executable,
+            version: LEAN_VERSION.to_owned(),
+            sha256: hash_hex(RustCryptoSha256::hash(script)),
+            runtime: Some(ToolRuntimeConfig {
+                root: root.clone(),
+                tree_sha256: hash_hex(inventory.tree_sha256()),
+            }),
+            timeout_ms: 1_000,
+            max_output_bytes: 4096,
+            allowed_axioms: Vec::new(),
+        };
+        assert_eq!(
+            check_tool(&config).err(),
+            Some(ToolFailure::ToolchainHashMismatch)
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
     #[test]
     fn rc3_private_executable_preserves_the_admitted_bytes() {
         let executable = std::env::current_exe().unwrap_or_else(|_| unreachable!());
@@ -3000,10 +5304,29 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires the workflow-pinned Lean executable"]
+    #[ignore = "requires the workflow-pinned Lean distribution"]
     fn pinned_lean_translation_kernel_checks() {
         let executable =
             PathBuf::from(std::env::var_os("ZENO_FCIS_LEAN").unwrap_or_else(|| unreachable!()));
+        let runtime_root = PathBuf::from(
+            std::env::var_os("ZENO_FCIS_LEAN_ROOT").unwrap_or_else(|| unreachable!()),
+        );
+        let expected_runtime_hash = LEAN_LINUX_X86_64_TREE_SHA256;
+        let executable_bytes =
+            fs::read(&executable).unwrap_or_else(|error| panic!("read pinned Lean: {error}"));
+        let config = ToolConfig {
+            backend: ToolBackend::Lean,
+            path: executable,
+            version: LEAN_VERSION.to_owned(),
+            sha256: hash_hex(RustCryptoSha256::hash(&executable_bytes)),
+            runtime: Some(ToolRuntimeConfig {
+                root: runtime_root,
+                tree_sha256: expected_runtime_hash.to_owned(),
+            }),
+            timeout_ms: 30_000,
+            max_output_bytes: 1024 * 1024,
+            allowed_axioms: vec!["Quot.sound".to_owned(), "propext".to_owned()],
+        };
         let path = ProjectionPath::try_new(ProjectionRoot::Pre, vec![id(100)])
             .unwrap_or_else(|| unreachable!());
         let claim = ClaimDecl::new(
@@ -3020,22 +5343,17 @@ mod tests {
             )))),
         );
         let obligation = export_lean(&claim).unwrap_or_else(|_| unreachable!());
-        let source_path =
-            std::env::temp_dir().join(format!("zeno-fcis-pinned-lean-{}.lean", std::process::id()));
-        atomic_write(&source_path, obligation.source()).unwrap_or_else(|_| unreachable!());
-        let output = run_fixed(
-            &executable,
-            &[source_path.to_str().unwrap_or_else(|| unreachable!())],
-            None,
-            30_000,
-            1024 * 1024,
-        )
-        .unwrap_or_else(|_| unreachable!());
-        let _ = fs::remove_file(source_path);
-        assert!(output.status.success());
+        let run = execute_tool(&config, obligation).unwrap_or_else(|error| panic!("{error:?}"));
+        assert_eq!(run.status(), &ToolRunStatus::KernelChecked);
         assert_eq!(
-            parse_lean_axioms(&String::from_utf8_lossy(&output.stdout)),
-            Some(vec!["Quot.sound".to_owned(), "propext".to_owned()])
+            run.identity().runtime_hash().map(hash_hex),
+            Some(expected_runtime_hash.to_owned())
+        );
+        assert_eq!(
+            run.toolchain_inventory()
+                .map(ToolchainInventory::tree_sha256)
+                .map(hash_hex),
+            Some(expected_runtime_hash.to_owned())
         );
     }
 
@@ -3059,6 +5377,7 @@ mod tests {
             path: cvc5,
             version: CVC5_VERSION.to_owned(),
             sha256: "0".repeat(64),
+            runtime: None,
             timeout_ms: 30_000,
             max_output_bytes: 8 * 1024 * 1024,
             allowed_axioms: Vec::new(),
@@ -3066,8 +5385,11 @@ mod tests {
         let cvc5_output = run_smt(&cvc5_config, &cvc5_config.path, true_obligation.source())
             .unwrap_or_else(|_| unreachable!());
         assert_eq!(
-            classify(&cvc5_config, &cvc5_output, &true_obligation),
-            ToolRunStatus::ProposedUnsat
+            classify(&cvc5_config, cvc5_output.final_output(), &true_obligation),
+            ToolRunStatus::ProposedUnsat,
+            "CVC5 stdout:\n{}\nCVC5 stderr:\n{}",
+            String::from_utf8_lossy(&cvc5_output.final_output().stdout),
+            String::from_utf8_lossy(&cvc5_output.final_output().stderr)
         );
 
         let false_claim = ClaimDecl::new(
@@ -3084,6 +5406,7 @@ mod tests {
             path: z3,
             version: Z3_VERSION.to_owned(),
             sha256: "0".repeat(64),
+            runtime: None,
             timeout_ms: 30_000,
             max_output_bytes: 8 * 1024 * 1024,
             allowed_axioms: Vec::new(),
@@ -3091,7 +5414,7 @@ mod tests {
         let z3_output = run_smt(&z3_config, &z3_config.path, false_obligation.source())
             .unwrap_or_else(|_| unreachable!());
         assert_eq!(
-            classify(&z3_config, &z3_output, &false_obligation),
+            classify(&z3_config, z3_output.final_output(), &false_obligation),
             ToolRunStatus::Refuted
         );
 
@@ -3150,7 +5473,7 @@ mod tests {
                 let output = run_smt(config, &config.path, obligation.source())
                     .unwrap_or_else(|_| unreachable!());
                 assert_eq!(
-                    String::from_utf8_lossy(&output.stdout)
+                    String::from_utf8_lossy(&output.final_output().stdout)
                         .lines()
                         .next()
                         .unwrap_or(""),
@@ -3161,7 +5484,10 @@ mod tests {
                 } else {
                     ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
                 };
-                assert_eq!(classify(config, &output, &obligation), expected);
+                assert_eq!(
+                    classify(config, output.final_output(), &obligation),
+                    expected
+                );
             }
         }
     }
@@ -3188,6 +5514,103 @@ mod tests {
     #[ignore = "spawned by the fail-closed process-adapter test"]
     fn process_helper_output_limit() {
         println!("{}", "x".repeat(4096));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "spawned by the process-tree containment regression test"]
+    fn process_helper_spawns_pipe_holder() {
+        let mut root = String::new();
+        std::io::stdin()
+            .read_to_string(&mut root)
+            .unwrap_or_else(|error| panic!("read helper root: {error}"));
+        let root = PathBuf::from(root.trim());
+        fs::write(
+            root.join("parent"),
+            format!("{} {}\n", std::process::id(), nix::unistd::getpgrp()),
+        )
+        .unwrap_or_else(|error| panic!("write parent identity: {error}"));
+        let descendant = Command::new(std::env::current_exe().unwrap_or_else(|_| unreachable!()))
+            .args([
+                "--ignored",
+                "--exact",
+                "tests::process_helper_holds_inherited_pipes",
+                "--nocapture",
+            ])
+            .env("ZENO_FCIS_PIPE_HOLDER_ROOT", &root)
+            .spawn()
+            .unwrap_or_else(|error| panic!("spawn descendant helper: {error}"));
+        std::mem::forget(descendant);
+        let marker = root.join("descendant");
+        for _ in 0..200 {
+            if marker.exists() {
+                return;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        panic!("descendant helper did not start");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "spawned by the process-tree containment regression test"]
+    fn process_helper_holds_inherited_pipes() {
+        let root = PathBuf::from(
+            std::env::var_os("ZENO_FCIS_PIPE_HOLDER_ROOT")
+                .unwrap_or_else(|| panic!("missing helper root")),
+        );
+        fs::write(
+            root.join("descendant"),
+            format!("{} {}\n", std::process::id(), nix::unistd::getpgrp()),
+        )
+        .unwrap_or_else(|error| panic!("write descendant identity: {error}"));
+        thread::sleep(Duration::from_secs(30));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "spawned by the successful process-tree containment regression test"]
+    fn process_helper_spawns_detached_pipe_child() {
+        let mut root = String::new();
+        std::io::stdin()
+            .read_to_string(&mut root)
+            .unwrap_or_else(|error| panic!("read helper root: {error}"));
+        let root = PathBuf::from(root.trim());
+        let descendant = Command::new(std::env::current_exe().unwrap_or_else(|_| unreachable!()))
+            .args([
+                "--ignored",
+                "--exact",
+                "tests::process_helper_sleeps_without_solver_pipes",
+                "--nocapture",
+            ])
+            .env("ZENO_FCIS_SUCCESS_DESCENDANT_ROOT", &root)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap_or_else(|error| panic!("spawn descendant helper: {error}"));
+        std::mem::forget(descendant);
+        let marker = root.join("descendant");
+        for _ in 0..200 {
+            if marker.exists() {
+                return;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        panic!("descendant helper did not start");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    #[ignore = "spawned by the successful process-tree containment regression test"]
+    fn process_helper_sleeps_without_solver_pipes() {
+        let root = PathBuf::from(
+            std::env::var_os("ZENO_FCIS_SUCCESS_DESCENDANT_ROOT")
+                .unwrap_or_else(|| panic!("missing helper root")),
+        );
+        fs::write(root.join("descendant"), std::process::id().to_string())
+            .unwrap_or_else(|error| panic!("write descendant pid: {error}"));
+        thread::sleep(Duration::from_secs(30));
     }
 
     #[cfg(unix)]

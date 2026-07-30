@@ -25,19 +25,43 @@ parses and elaborates a complete project, and checks the public typed project
 identity. This exercises the public adoption path outside the workspace package
 graph.
 
+The final adopter pass also requested real terminal images. The README and
+tutorials now use window-only screenshots from the published CLI running in an
+xterm pseudo-terminal. The checked-in images show the entered command, actual
+wrapping, output, semantic identity, and exit status. Styled cards remain
+available for social posts, and the QEMU image remains a direct guest
+framebuffer capture. The formal tutorial now opens with the successful Lean
+path and marks tree inventory examples as placeholders.
+
 ### Formal methods and process-security reviewer
 
-The reviewer found five boundary risks: deeply nested formulas reached the
-Rust call stack, very large finite horizons could request huge translations,
-input delivery happened outside the effective timeout, two source names could
-map to one solver name, and the configured executable could change after its
-hash check.
+The reviewer found additional boundary risks around deeply nested formulas,
+large finite horizons, live Lean rendering, process timeouts and descendants,
+solver-name identity, changing executable or runtime files, contradictory
+solver phases, ambiguous run records, and partially published retained
+evidence.
 
 RC3 now stops formula nesting at depth 256, stops finite horizons above 256,
-and preflights formal exports before recursive rendering. The process timeout
-covers input delivery. Solver names use injective length-prefixed hexadecimal
-encoding. Tool admission copies the exact hashed bytes to a private executable
-and uses that copy for the version check and requested run.
+preflights formal exports, and checks Lean render budgets while producing each
+term. Process timeouts cover input delivery, and successful runs clean up the
+remaining process group. Solver names use injective length-prefixed hexadecimal
+encoding. Tool admission copies exact hashed bytes and the Lean runtime into
+private snapshots, then rechecks the runtime after execution. Both SMT phases
+enter an unambiguous run identity, contradictory phases block, and retained
+evidence appears only as a complete byte-verified directory.
+
+A later pass found that a self-consistent custom Lean tree could receive the
+same positive status as the qualified distribution. RC3 now reserves
+`KernelChecked` for the recorded official Lean tree. Runtime traversal rejects
+links at every path component, execution uses a checked private copy, retained
+evidence includes the canonical run bytes, and the CLI acceptance path covers
+formal exit classes and retained transcripts. The official workflow compares
+the computed Lean tree with the checked-in trust anchor and checks claim 501
+through both the library and the published CLI.
+
+The exact-tool kernel corpus currently covers the representative Mini
+Determinator claim. Operator-complete Lean kernel acceptance remains a stable
+V1 gate and is stated as a nonclaim in the formal reference.
 
 ### Systems release engineer
 
@@ -50,6 +74,14 @@ member, and provenance command from every declared binary target. Validation
 rejects duplicate target names. A self-test opens each generated archive and
 checks that it contains the intended executable.
 
+The final package review also found that publication order ignored development
+dependencies and that only one unpacked archive was compiled. The corrected
+order places `zeno-fcis-crypto` before `zeno-fcis-spec`. The release builder now
+fetches the locked external graph, extracts all 36 public archives into one
+resolver-3 workspace, patches internal dependencies to those extracted bytes,
+and compiles all targets with all features offline. The release self-test checks
+11 hostile package mutations.
+
 ## User stories and executable acceptance
 
 | Developer story | ATDD scenario | Executable evidence |
@@ -59,7 +91,7 @@ checks that it contains the intended executable.
 | As an adopter, I can detect generated drift without changing my files. | `rc3-generated-drift` | Generates artifacts, edits one, runs `--check`, and verifies the edit remains. |
 | As a tool author, I receive stable versioned JSON for valid and invalid input. | `rc3-cli-json-contract` | Checks schema, status, diagnostics, and canonical key order. |
 | As a reviewer, hostile nesting and horizons stop inside a documented envelope. | `rc3-resource-envelopes` | Runs parser-depth, horizon, and export-preflight boundary tests. |
-| As a security reviewer, timeout and executable identity cover the complete run. | `rc3-process-boundary` | Runs blocked-input timeout, injective-name, and admitted-byte tests. |
+| As a security reviewer, process and evidence identity cover the complete run. | `rc3-process-boundary` | Runs blocked-input timeout, special-file and swap rejection, admitted-byte and Lean-tree checks, descendant cleanup, and atomic retention tests. |
 | As a release engineer, each declared binary reaches one distinct archive. | `rc3-package-binary-inventory` | Runs the hostile package mutations and archive-member self-test. |
 
 A focused local mutation audit used `cargo-mutants 26.0.0` against the exact
@@ -119,12 +151,12 @@ The following work can follow RC3 without changing the current public semantic
 formats:
 
 - grow the pinned solver corpus with more quantified, arithmetic, and temporal
-  boundary claims;
+  boundary claims, including operator-complete Lean kernel acceptance;
 - add declared predicate signatures to the project language;
 - provide a smoother generated Lean theorem handoff;
 - retain richer normalized counterexample traces;
 - collect first-time adopter completion time and error-recovery feedback.
 
-CVC5 Alethe output remains proposal evidence subject to independent checking.
+CVC5 step proof output remains proposal evidence subject to independent checking.
 Z3 UNSAT remains blocked. Finite temporal results keep their declared horizon.
 These boundaries are part of the release contract.

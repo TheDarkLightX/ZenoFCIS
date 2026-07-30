@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "crates/zeno-fcis-formal-tools/**"
+      - "crates/zeno-fcis-cli/**"
       - "crates/zeno-fcis-spec/**"
       - "release/formal-tools-linux-x86_64.sha256"
+      - "release/lean-4.30.0-tree.sha256"
       - ".github/workflows/formal-tools.yml"
   push:
     branches: [main]
@@ -22,7 +24,7 @@ env:
 jobs:
   pinned-linux-x86-64:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -30,6 +32,8 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Record runner storage before tool download
+        run: df -h
       - name: Download official artifacts
         working-directory: ${{ runner.temp }}
         run: |
@@ -43,8 +47,17 @@ jobs:
         working-directory: ${{ runner.temp }}
         run: |
           unzip -q cvc5-Linux-x86_64-static.zip -d cvc5
+          rm -f cvc5-Linux-x86_64-static.zip
           unzip -q z3-4.16.0-x64-glibc-2.39.zip -d z3
+          rm -f z3-4.16.0-x64-glibc-2.39.zip
           unzip -q lean-4.30.0-linux.zip -d lean
+          rm -f lean-4.30.0-linux.zip
+      - name: Record extracted tool footprint
+        working-directory: ${{ runner.temp }}
+        run: |
+          du -sh cvc5 z3 lean
+          find lean -type f -print | wc -l
+          df -h
       - name: Verify exact tool versions
         working-directory: ${{ runner.temp }}
         run: |
@@ -55,15 +68,34 @@ jobs:
           lean/lean-4.30.0-linux/bin/lean --version | grep -F "4.30.0"
       - name: Test deterministic exporters and fail-closed adapters
         run: cargo +1.97.1 test -p zeno-fcis-formal-tools --locked
+      - name: Match the qualified Lean runtime trust anchor
+        working-directory: ${{ runner.temp }}
+        run: |
+          LEAN_ROOT="$PWD/lean/lean-4.30.0-linux"
+          EXPECTED_TREE="$(tr -d '\n' < "$GITHUB_WORKSPACE/release/lean-4.30.0-tree.sha256")"
+          ACTUAL_TREE="$(cargo +1.97.1 run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+            -p zeno-fcis-cli --locked -- backend inventory-lean "$LEAN_ROOT" | awk '/^lean tree_sha256 / { print $3 }')"
+          test "$ACTUAL_TREE" = "$EXPECTED_TREE"
       - name: Kernel-check the exact generated Lean obligation
         working-directory: ${{ runner.temp }}
         run: |
           LEAN_BIN="$(find lean -type f -path '*/bin/lean' -perm -111 -print -quit)"
           test -n "$LEAN_BIN"
           ZENO_FCIS_LEAN="$PWD/$LEAN_BIN" \
+            ZENO_FCIS_LEAN_ROOT="$PWD/lean/lean-4.30.0-linux" \
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
               -p zeno-fcis-formal-tools --locked \
               tests::pinned_lean_translation_kernel_checks -- --ignored --exact
+      - name: Kernel-check Lean through the published CLI process
+        working-directory: ${{ runner.temp }}
+        run: |
+          LEAN_BIN="$(find lean -type f -path '*/bin/lean' -perm -111 -print -quit)"
+          test -n "$LEAN_BIN"
+          ZENO_FCIS_LEAN="$PWD/$LEAN_BIN" \
+            ZENO_FCIS_LEAN_ROOT="$PWD/lean/lean-4.30.0-linux" \
+            cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              -p zeno-fcis-cli --locked --test cli_adopter_flow \
+              pinned_lean_cli_prove_is_process_level -- --ignored --exact
       - name: Differential-check exact CVC5 and Z3 translations
         working-directory: ${{ runner.temp }}
         run: |

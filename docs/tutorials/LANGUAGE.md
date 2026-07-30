@@ -60,7 +60,7 @@ ZENO-E0201 elaborate:6:1 type.id expected unique stable ID; got 10; allocate a d
 ZENO-E0203 elaborate:7:1 component.20.owns expected declared type ID; got 99; declare the referenced type
 ```
 
-![One bounded check reports three authoring problems](../assets/marketing/accumulated-diagnostics.png)
+![One bounded check reports three authoring problems](../assets/marketing/terminal-accumulated-diagnostics.png)
 
 The compiler keeps checking after the first independent problem. Each message
 contains a stable code, source location, observed value, expected value, and a

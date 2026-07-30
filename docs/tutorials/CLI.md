@@ -1,5 +1,7 @@
 # Tutorial: use the CLI as a checked workflow
 
+![ZenoFCIS CLI help in a virtual terminal](../assets/marketing/terminal-cli-overview.png)
+
 Start with one command:
 
 ```bash
@@ -66,9 +68,8 @@ renames them into place. `generate --check` only reads and reports drift.
 | `3` | A tool, file, or bounded execution failed. |
 | `64` | The command line is invalid. |
 
-Treat code `2` as blocked. A build system should stop a release or deployment and
-  preserve
-the reason for review.
+Treat code `2` as blocked. A build system should stop a release or deployment
+and preserve the reason for review.
 
 The CLI can check source, generate code, draw graphs, explain messages, invoke
 approved formal tools, and retain their output. These commands cannot create

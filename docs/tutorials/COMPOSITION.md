@@ -38,6 +38,8 @@ the reviewed sequential meaning.
 
 ## See the connection graph
 
+![Mermaid composition output in a virtual terminal](../assets/marketing/terminal-composition-graph.png)
+
 ```bash
 cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
   graph examples/minimal/project.zeno --format mermaid

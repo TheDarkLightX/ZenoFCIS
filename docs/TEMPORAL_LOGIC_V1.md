@@ -58,12 +58,14 @@ fragment allows it. Z3 is used for differential checking and replayable
 models; unsupported Z3 UNSAT evidence remains blocked. SAT models must replay
 against the exact typed claim in the built-in evaluator.
 
-Lean receives unbounded temporal proof obligations. The generated source
-preserves every projection path, relational atom, bounded sum and quantifier,
-checked arithmetic condition, and temporal operator. Evidence binds the exact
-claim ID, generated source, Lean toolchain identity, successful kernel check,
-and exact allowed-axiom set. A process exit code or parsed word alone is never
-a certificate.
+Lean receives unbounded temporal proof obligations. The source generator has
+translation branches for projection paths, relational atoms, bounded sums and
+quantifiers, checked arithmetic conditions, and temporal operators. RC3's
+exact-tool acceptance evidence covers claim 501, which uses projection,
+equality, and `always`. Operator-complete source and kernel checks remain a
+stable V1 gate. Evidence binds the exact claim ID, generated source, Lean
+toolchain identity, successful kernel check, and exact allowed-axiom set. A
+process exit code or parsed word alone is never a certificate.
 
 ## Nonclaims
 

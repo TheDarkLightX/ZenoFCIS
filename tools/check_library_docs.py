@@ -25,6 +25,7 @@ REQUIRED_FILES = (
     Path(".github/workflows/formal-tools.yml"),
     Path(".github/workflows/qemu-demo.yml"),
     Path("release/formal-tools-linux-x86_64.sha256"),
+    Path("release/lean-4.30.0-tree.sha256"),
     Path("docs/INDEX.md"),
     Path("docs/INSTALLATION.md"),
     Path("docs/QUICKSTART.md"),

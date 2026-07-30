@@ -18,5 +18,8 @@ zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
 zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }
 zeno-fcis-spec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-spec" }
 
+[target.'cfg(unix)'.dependencies]
+nix = { version = "=0.30.1", default-features = false, features = ["fs", "process", "signal"] }
+
 [lints]
 workspace = true

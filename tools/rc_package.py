@@ -17,7 +17,7 @@ import tarfile
 import tempfile
 import uuid
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 import tomllib
@@ -74,10 +74,11 @@ def run(
     capture: bool = False,
     binary: bool = False,
     environment: dict[str, str] | None = None,
+    cwd: Path = ROOT,
 ) -> str | bytes:
     result = subprocess.run(
         arguments,
-        cwd=ROOT,
+        cwd=cwd,
         check=True,
         stdout=subprocess.PIPE if capture else None,
         stderr=None,
@@ -320,7 +321,6 @@ def validate_package_documents(
                 )
             if (
                 name in order_index
-                and dependency.get("kind") != "dev"
                 and dependency_name in order_index
                 and order_index[str(dependency_name)] >= order_index[name]
             ):
@@ -396,6 +396,21 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
     )
     expect_failure(
         reversed_configured, copy.deepcopy(metadata), "invalid publish order"
+    )
+
+    dev_order_configured = copy.deepcopy(configured)
+    dev_order = require_string_list(dev_order_configured, "publish_order")
+    crypto_index = dev_order.index("zeno-fcis-crypto")
+    spec_index = dev_order.index("zeno-fcis-spec")
+    dev_order[crypto_index], dev_order[spec_index] = (
+        dev_order[spec_index],
+        dev_order[crypto_index],
+    )
+    dev_order_configured["publish_order"] = dev_order
+    expect_failure(
+        dev_order_configured,
+        copy.deepcopy(metadata),
+        "dev dependency publish order",
     )
 
     wrong_version_metadata = copy.deepcopy(metadata)
@@ -931,6 +946,94 @@ def deterministic_bundle(output: Path, destination: Path) -> None:
             archive.writestr(info, path.read_bytes())
 
 
+def extract_checked_crate(archive_path: Path, destination: Path) -> None:
+    with tarfile.open(archive_path, mode="r:gz") as archive:
+        members = archive.getmembers()
+        for member in members:
+            relative = PurePosixPath(member.name)
+            if (
+                relative.is_absolute()
+                or ".." in relative.parts
+                or member.issym()
+                or member.islnk()
+                or not (member.isdir() or member.isfile())
+            ):
+                raise RcError(
+                    f"crate archive contains an unsafe member: {archive_path.name}:{member.name}"
+                )
+        archive.extractall(destination, members=members, filter="data")
+
+
+def verify_packaged_workspace(
+    packages_dir: Path,
+    version: str,
+    build_target: Path,
+    environment: dict[str, str],
+) -> None:
+    verification_root = build_target / "packaged-workspace"
+    sources = verification_root / "sources"
+    sources.mkdir(parents=True)
+    package_roots: dict[str, Path] = {}
+    for archive_path in sorted(packages_dir.glob("*.crate")):
+        extract_checked_crate(archive_path, sources)
+        suffix = f"-{version}"
+        if not archive_path.stem.endswith(suffix):
+            raise RcError(f"crate archive has an unexpected versioned name: {archive_path.name}")
+        name = archive_path.stem.removesuffix(suffix)
+        package_root = sources / f"{name}-{version}"
+        if not (package_root / "Cargo.toml").is_file():
+            raise RcError(f"unpacked crate is missing Cargo.toml: {archive_path.name}")
+        package_roots[name] = package_root
+
+    workspace_manifest = verification_root / "Cargo.toml"
+    workspace_lines = ["[workspace]", 'resolver = "3"', "members = ["]
+    for package_root in sorted(package_roots.values()):
+        workspace_lines.append(
+            f"  {json.dumps(package_root.relative_to(verification_root).as_posix())},"
+        )
+    workspace_lines.extend(["]", "", "[patch.crates-io]"])
+    for name, package_root in sorted(package_roots.items()):
+        workspace_lines.append(
+            f"{json.dumps(name)} = {{ path = {json.dumps(str(package_root))} }}"
+        )
+    workspace_manifest.write_text("\n".join(workspace_lines) + "\n", encoding="utf-8")
+
+    check_environment = dict(environment)
+    check_environment["CARGO_TARGET_DIR"] = str(verification_root / "target")
+    run(
+        [
+            "cargo",
+            "+1.97.1",
+            "generate-lockfile",
+            "--manifest-path",
+            str(workspace_manifest),
+            "--offline",
+        ],
+        environment=check_environment,
+        cwd=verification_root,
+    )
+    run(
+        [
+            "cargo",
+            "+1.97.1",
+            "test",
+            "--manifest-path",
+            str(workspace_manifest),
+            "--workspace",
+            "--all-targets",
+            "--all-features",
+            "--locked",
+            "--offline",
+            "--no-run",
+            "--jobs",
+            "1",
+        ],
+        environment=check_environment,
+        cwd=verification_root,
+    )
+    shutil.rmtree(verification_root)
+
+
 def build(output: Path) -> None:
     configured, _ = validate_package_set()
     version = require_string(configured, "version")
@@ -949,6 +1052,11 @@ def build(output: Path) -> None:
     for variable in ("CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS", "RUSTDOCFLAGS"):
         build_environment.pop(variable, None)
     build_environment["CARGO_TARGET_DIR"] = str(build_target)
+
+    run(
+        ["cargo", "+1.97.1", "fetch", "--locked"],
+        environment=build_environment,
+    )
 
     source_manifest_text = run(
         ["python3", "tools/release_manifest.py", "--require-clean"], capture=True
@@ -974,6 +1082,7 @@ def build(output: Path) -> None:
         if not archive.is_file():
             raise RcError(f"cargo did not create {archive.name}")
         shutil.copyfile(archive, packages_dir / archive.name)
+    verify_packaged_workspace(packages_dir, version, build_target, build_environment)
 
     rustdoc_environment = dict(build_environment)
     remap_flag = f"--remap-path-prefix={build_target}=/zeno-fcis-target"
@@ -1067,7 +1176,10 @@ def build(output: Path) -> None:
         "source_manifest_sha256": sha256(source_manifest),
         "sbom_sha256": sha256(sbom_path),
         "commands": [
+            "cargo +1.97.1 fetch --locked",
             " ".join(package_arguments),
+            "cargo +1.97.1 generate-lockfile --manifest-path <unpacked-workspace>/Cargo.toml --offline",
+            "cargo +1.97.1 test --manifest-path <unpacked-workspace>/Cargo.toml --workspace --all-targets --all-features --locked --offline --no-run --jobs 1",
             *[item["command"] for item in binary_inventory],
             (
                 "RUSTFLAGS=--remap-path-prefix=<target>=/zeno-fcis-target "
@@ -1135,7 +1247,7 @@ def main() -> int:
             run_binary_inventory_self_test(configured)
             print(
                 "rc-package: self-test PASS "
-                "(10 hostile mutations rejected; rustdoc, archive modes, and binary inventory verified)"
+                "(11 hostile mutations rejected; rustdoc, archive modes, and binary inventory verified)"
             )
         else:
             build(args.output.resolve())
