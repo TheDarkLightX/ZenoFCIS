@@ -1,6 +1,6 @@
 # ZenoStructures 0.5.0 research catalogue
 
-This directory records the exact review boundary for the ZenoStructures 0.5.0 deterministic-data-structure research release. It is stacked on the deterministic-witness-structures work in PR #95 and is deliberately **research-only and non-authoritative**.
+This directory records the public review boundary for the ZenoStructures 0.5.0 deterministic-data-structure research release. It is stacked on the deterministic-witness-structures work in PR #95 and is deliberately **research-only and non-authoritative**.
 
 ## Catalogue
 
@@ -33,19 +33,23 @@ The formal-design queue is `PFPL`, `ICRWT`, and `PCFL`. Seven additional executa
 CWCRM grouping-phase benchmark, 6,144 keys: 12.537x versus retained quadratic oracle
 ```
 
-The sealed ZIP delivered with this checkpoint has SHA-256:
+The sealed release identities are retained for reproducibility:
 
 ```text
+ZIP SHA-256
 c58fecb910fdfecc3e3433338664eb70002716c63ef0d3f3353177cb1d7a8daf
-```
 
-The independent source TAR has SHA-256:
-
-```text
+source TAR SHA-256
 d947d572fef84a181d87d28982cedc485835666dbf97c6d0508a2c775b3108fb
 ```
 
-The full source, tests, results, prior-art matrix, Research Kernel graph, LEAP packets, Morph cards, ESSO models, ZAG/Zenith archive, Lean source, Julia oracle, ZenoFCIS adapter specification, and 76-task implementation graph are inside the sealed archive.
+## Public/private boundary
+
+The public ZenoFCIS repository contains only candidate contracts, public evidence summaries, prior-art pressure, implementation handoff material, and explicit nonclaims.
+
+The invention machinery is private. This includes abductive generators, search grammars and operators, scoring and selection policies, internal proposal archives, private counterexample-mining procedures, private research-backend adapters, and detailed private-tool replay traces. Those materials are maintained separately from ZenoFCIS, like the private Morph, ESSO, and LEAP systems.
+
+A public evidence receipt may state that a bounded private campaign ran and may bind its output digest. It must not reveal the private implementation, prompts, internal search state, operator catalogue, proposal frontier, or tool-specific trace unless the owner explicitly approves publication.
 
 ## Claim boundary
 
