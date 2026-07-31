@@ -123,7 +123,7 @@ pub use zeno_fcis_catalog as catalog;
 /// Canonical encoding and commitment-provider interfaces.
 pub use zeno_fcis_codec as codec;
 #[cfg(feature = "codegen")]
-/// Deterministic, inspectable source generation from closed schemas.
+/// Deterministic source generation from closed schemas and bounded on-chain FCIS machines.
 pub use zeno_fcis_codegen as codegen;
 #[cfg(feature = "collections")]
 /// Backend-independent persistent collection interfaces and implementations.
@@ -250,7 +250,18 @@ pub use zeno_fcis_codec::{
 };
 #[cfg(feature = "codegen")]
 pub use zeno_fcis_codegen::{
-    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GenerationSpec, generate,
+    CodegenError, GENERATOR_ID, GeneratedBundle, GeneratedFile, GeneratedOnchainBundle,
+    GeneratedOnchainFile, GeneratedSolidity, GenerationSpec, MAX_ONCHAIN_CAPABILITIES,
+    MAX_ONCHAIN_EVENT_FIELDS, MAX_ONCHAIN_EVENTS, MAX_ONCHAIN_FIELDS, MAX_ONCHAIN_PLAN_SLOTS,
+    MAX_ONCHAIN_REASONS, MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
+    ONCHAIN_MACHINE_FORMAT_VERSION, OPENZEPPELIN_CONTRACTS_VERSION, ObservationPolicy,
+    OnchainCapability, OnchainCapabilityKind, OnchainEvent, OnchainField, OnchainListKind,
+    OnchainMachineSpec, OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
+    SOLIDITY_ADVANCED_GENERATOR_ID, SOLIDITY_GENERATOR_ID, SOLIDITY_PINNED_VERSION,
+    SOLIDITY_PRAGMA, SolidityAdvancedSpec, SolidityContractSpec, SolidityField,
+    SolidityFungibleBinding, SolidityGenerationError, SolidityListKind, SoliditySafetyFinding,
+    SoliditySafetyFindingKind, SoliditySafetyReport, SolidityScalar, generate,
+    generate_advanced_solidity, generate_solidity, inspect_solidity_source,
 };
 pub use zeno_fcis_compose::{
     AccessPath, Assumption, AssumptionDischarge, ClaimEvidence, ComponentContract, ComponentId,
