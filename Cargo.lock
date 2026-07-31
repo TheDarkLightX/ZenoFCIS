@@ -1214,6 +1214,7 @@ dependencies = [
  "zeno-fcis-composed-program",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
+ "zeno-fcis-diagnostics",
  "zeno-fcis-domain",
  "zeno-fcis-evidence",
  "zeno-fcis-laws",
@@ -1437,6 +1438,14 @@ dependencies = [
  "libcrux-sha2",
  "sha2",
  "zeno-fcis-codec",
+]
+
+[[package]]
+name = "zeno-fcis-diagnostics"
+version = "1.0.0-rc.3"
+dependencies = [
+ "zeno-fcis-codec",
+ "zeno-fcis-value",
 ]
 
 [[package]]
