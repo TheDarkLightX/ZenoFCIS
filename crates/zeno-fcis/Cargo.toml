@@ -16,6 +16,7 @@ std = [
     "zeno-fcis-core/std",
     "zeno-fcis-value/std",
     "zeno-fcis-codec/std",
+    "zeno-fcis-diagnostics?/std",
     "zeno-fcis-crypto?/std",
     "zeno-fcis-project/std",
     "zeno-fcis-catalog?/std",
@@ -68,6 +69,7 @@ secret = ["dep:zeno-fcis-secret"]
 codegen = ["schema", "dep:zeno-fcis-codegen"]
 bootstrap = ["std", "catalog", "codegen", "dep:zeno-fcis-bootstrap"]
 evidence = ["std", "dep:zeno-fcis-evidence"]
+diagnostics = ["dep:zeno-fcis-diagnostics"]
 mounted-runtime = ["std", "dep:zeno-fcis-adapter"]
 zenodex-profile = ["dep:zeno-fcis-profile-zenodex"]
 mounted-zenodex = [
@@ -104,6 +106,7 @@ full = [
     "codegen",
     "bootstrap",
     "evidence",
+    "diagnostics",
     "mounted-zenodex",
     "authenticated-state",
     "authenticated-authority",
@@ -117,6 +120,7 @@ full = [
 zeno-fcis-core = { version = "=1.0.0-rc.3", path = "../zeno-fcis-core", default-features = false }
 zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value", default-features = false }
 zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-diagnostics = { version = "=1.0.0-rc.3", path = "../zeno-fcis-diagnostics", default-features = false, optional = true }
 zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", default-features = false, optional = true }
 zeno-fcis-project = { version = "=1.0.0-rc.3", path = "../zeno-fcis-project", default-features = false }
 zeno-fcis-catalog = { version = "=1.0.0-rc.3", path = "../zeno-fcis-catalog", default-features = false, optional = true }

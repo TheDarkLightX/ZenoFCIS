@@ -90,6 +90,11 @@ pub mod prelude {
 
     #[cfg(feature = "bootstrap")]
     pub use crate::{BootstrapLimits, BootstrapSpec, generate_project};
+
+    #[cfg(feature = "diagnostics")]
+    pub use zeno_fcis_diagnostics::{
+        DivergenceError, DivergenceForest, DivergenceWitness, ImplementationTrace,
+    };
 }
 
 #[cfg(feature = "mounted-runtime")]
@@ -142,6 +147,9 @@ pub use zeno_fcis_core as core;
 ))]
 /// Vetted SHA-256 providers and independent provider-parity evidence.
 pub use zeno_fcis_crypto as crypto;
+#[cfg(feature = "diagnostics")]
+/// Deterministic trace partitions and globally minimal divergence witnesses.
+pub use zeno_fcis_diagnostics as diagnostics;
 #[cfg(feature = "evidence")]
 /// Canonical evidence envelopes and independent checker adapters.
 pub use zeno_fcis_evidence as evidence;

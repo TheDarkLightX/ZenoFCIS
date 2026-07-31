@@ -27,6 +27,9 @@ const PATH_TAG_MAP_KEY: u8 = 4;
 const PATCH_TAG_INSERT: u8 = 0;
 const PATCH_TAG_UPDATE: u8 = 1;
 const PATCH_TAG_DELETE: u8 = 2;
+const PATCH_MERGE_TAG_STATE_TYPE: u8 = 0;
+const PATCH_MERGE_TAG_PRE_ROOT: u8 = 1;
+const PATCH_MERGE_TAG_OPERATION: u8 = 2;
 
 /// Explicit resource bounds for strict canonical patch decoding.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -225,6 +228,126 @@ impl CanonicalEncode for PatchOp {
     }
 }
 
+/// Exact reason that two canonical patch operations cannot coexist.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum PatchOperationConflictKind {
+    /// Two different operations target the same exact path.
+    SamePathDifferentOperation,
+    /// One operation targets an ancestor of the other operation's path.
+    AncestorDescendantOverlap,
+}
+
+impl PatchOperationConflictKind {
+    const fn tag(self) -> u8 {
+        match self {
+            Self::SamePathDifferentOperation => 0,
+            Self::AncestorDescendantOverlap => 1,
+        }
+    }
+}
+
+/// Canonical, operand-order-independent witness for an incompatible patch merge.
+///
+/// Operation witnesses retain both exact operations in canonical byte order.
+/// A verifier can therefore replay the paths, operation identity, and overlap
+/// relation without trusting the merge caller.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PatchMergeConflict {
+    /// Patches describe different state schemas.
+    StateTypeMismatch {
+        /// Canonically smaller state type.
+        first: u32,
+        /// Canonically larger state type.
+        second: u32,
+    },
+    /// Patches are bound to different immutable pre-states.
+    ExpectedPreRootMismatch {
+        /// Canonically smaller pre-root.
+        first: Hash32,
+        /// Canonically larger pre-root.
+        second: Hash32,
+    },
+    /// Exact path-level incompatibility.
+    Operation {
+        /// Conflict relation between the two paths.
+        kind: PatchOperationConflictKind,
+        /// Longest common path prefix.
+        common_prefix: ValuePath,
+        /// Canonically first operation.
+        first: PatchOp,
+        /// Canonically second operation.
+        second: PatchOp,
+    },
+}
+
+impl CanonicalEncode for PatchMergeConflict {
+    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        match self {
+            Self::StateTypeMismatch { first, second } => {
+                output.push(PATCH_MERGE_TAG_STATE_TYPE);
+                output.extend_from_slice(&first.to_be_bytes());
+                output.extend_from_slice(&second.to_be_bytes());
+            }
+            Self::ExpectedPreRootMismatch { first, second } => {
+                output.push(PATCH_MERGE_TAG_PRE_ROOT);
+                output.extend_from_slice(first.as_bytes());
+                output.extend_from_slice(second.as_bytes());
+            }
+            Self::Operation {
+                kind,
+                common_prefix,
+                first,
+                second,
+            } => {
+                output.push(PATCH_MERGE_TAG_OPERATION);
+                output.push(kind.tag());
+                put_blob(output, &common_prefix.canonical_bytes()?)?;
+                put_blob(output, &first.canonical_bytes()?)?;
+                put_blob(output, &second.canonical_bytes()?)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Patch merge failure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PatchMergeError {
+    /// A canonical witness could not be encoded within the wire format.
+    Encode(EncodeError),
+    /// Reconstructing the merged canonical patch failed.
+    Patch(PatchError),
+    /// The two patches are semantically incompatible.
+    Conflict(Box<PatchMergeConflict>),
+}
+
+impl fmt::Display for PatchMergeError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Encode(error) => error.fmt(formatter),
+            Self::Patch(error) => error.fmt(formatter),
+            Self::Conflict(conflict) => match conflict.as_ref() {
+                PatchMergeConflict::StateTypeMismatch { .. } => {
+                    formatter.write_str("patch state types differ")
+                }
+                PatchMergeConflict::ExpectedPreRootMismatch { .. } => {
+                    formatter.write_str("patch pre-roots differ")
+                }
+                PatchMergeConflict::Operation { kind, .. } => match kind {
+                    PatchOperationConflictKind::SamePathDifferentOperation => {
+                        formatter.write_str("different patch operations target the same path")
+                    }
+                    PatchOperationConflictKind::AncestorDescendantOverlap => {
+                        formatter.write_str("patch operation paths overlap")
+                    }
+                },
+            },
+        }
+    }
+}
+
+impl core::error::Error for PatchMergeError {}
+
 /// A canonical, pre-root-bound, non-overlapping patch.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CanonicalPatch {
@@ -285,6 +408,66 @@ impl CanonicalPatch {
     #[must_use]
     pub fn operations(&self) -> &[PatchOp] {
         &self.operations
+    }
+
+    /// Merges compatible operations under one unchanged pre-state.
+    ///
+    /// Compatible merge is commutative, idempotent, and associative. A
+    /// conflict produces the same canonical witness when operands are
+    /// reversed. This function creates data only; it grants no commit or
+    /// publication authority.
+    pub fn merge(&self, other: &Self) -> Result<Self, PatchMergeError> {
+        if self.state_type != other.state_type {
+            let (first, second) = ordered_pair(self.state_type, other.state_type);
+            return Err(PatchMergeError::Conflict(Box::new(
+                PatchMergeConflict::StateTypeMismatch { first, second },
+            )));
+        }
+        if self.expected_pre_root != other.expected_pre_root {
+            let (first, second) = ordered_pair(self.expected_pre_root, other.expected_pre_root);
+            return Err(PatchMergeError::Conflict(Box::new(
+                PatchMergeConflict::ExpectedPreRootMismatch { first, second },
+            )));
+        }
+
+        let mut conflicts = Vec::new();
+        for left in self.operations() {
+            for right in other.operations() {
+                if left.path() == right.path() {
+                    if left != right {
+                        conflicts.push(operation_conflict(
+                            PatchOperationConflictKind::SamePathDifferentOperation,
+                            left,
+                            right,
+                        )?);
+                    }
+                } else if left.path().is_prefix_of(right.path())
+                    || right.path().is_prefix_of(left.path())
+                {
+                    conflicts.push(operation_conflict(
+                        PatchOperationConflictKind::AncestorDescendantOverlap,
+                        left,
+                        right,
+                    )?);
+                }
+            }
+        }
+        if !conflicts.is_empty() {
+            conflicts.sort_by(|left, right| left.0.cmp(&right.0));
+            let Some((_, conflict)) = conflicts.into_iter().next() else {
+                return Err(PatchMergeError::Encode(EncodeError::LengthOverflow));
+            };
+            return Err(PatchMergeError::Conflict(Box::new(conflict)));
+        }
+
+        let mut operations = self.operations.to_vec();
+        for operation in other.operations() {
+            if !operations.iter().any(|existing| existing == operation) {
+                operations.push(operation.clone());
+            }
+        }
+        Self::try_new(self.state_type, self.expected_pre_root, operations)
+            .map_err(PatchMergeError::Patch)
     }
 
     /// Purely applies the complete patch or returns without a successor.
@@ -349,6 +532,55 @@ impl CanonicalPatch {
             post_root,
         })
     }
+}
+
+fn ordered_pair<T: Ord>(left: T, right: T) -> (T, T) {
+    if left <= right {
+        (left, right)
+    } else {
+        (right, left)
+    }
+}
+
+fn operation_conflict(
+    kind: PatchOperationConflictKind,
+    left: &PatchOp,
+    right: &PatchOp,
+) -> Result<(Vec<u8>, PatchMergeConflict), PatchMergeError> {
+    let left_bytes = left.canonical_bytes().map_err(PatchMergeError::Encode)?;
+    let right_bytes = right.canonical_bytes().map_err(PatchMergeError::Encode)?;
+    let (first, second, first_bytes, second_bytes) = if left_bytes <= right_bytes {
+        (left.clone(), right.clone(), left_bytes, right_bytes)
+    } else {
+        (right.clone(), left.clone(), right_bytes, left_bytes)
+    };
+    let common_prefix = common_path_prefix(first.path(), second.path());
+    let mut key = common_prefix
+        .canonical_bytes()
+        .map_err(PatchMergeError::Encode)?;
+    key.push(kind.tag());
+    put_blob(&mut key, &first_bytes).map_err(PatchMergeError::Encode)?;
+    put_blob(&mut key, &second_bytes).map_err(PatchMergeError::Encode)?;
+    Ok((
+        key,
+        PatchMergeConflict::Operation {
+            kind,
+            common_prefix,
+            first,
+            second,
+        },
+    ))
+}
+
+fn common_path_prefix(left: &ValuePath, right: &ValuePath) -> ValuePath {
+    let segments = left
+        .segments()
+        .iter()
+        .zip(right.segments())
+        .take_while(|(left_segment, right_segment)| left_segment == right_segment)
+        .map(|(segment, _)| segment.clone())
+        .collect();
+    ValuePath::new(segments)
 }
 
 impl CanonicalEncode for CanonicalPatch {
@@ -1331,6 +1563,185 @@ mod tests {
             ],
         );
         assert_eq!(patch, Err(PatchError::OverlappingPaths));
+    }
+
+    #[test]
+    fn compatible_merge_is_commutative_idempotent_and_associative() {
+        let patch = |field, value| {
+            CanonicalPatch::try_new(
+                1,
+                Hash32::ZERO,
+                vec![field_update(field, Value::U128(value))],
+            )
+            .unwrap_or_else(|error| panic!("patch construction failed: {error}"))
+        };
+        let first = patch(1, 11);
+        let second = patch(2, 22);
+        let third = patch(3, 33);
+
+        let first_second = first
+            .merge(&second)
+            .unwrap_or_else(|error| panic!("compatible merge failed: {error}"));
+        let second_first = second
+            .merge(&first)
+            .unwrap_or_else(|error| panic!("compatible merge failed: {error}"));
+        assert_eq!(first_second, second_first);
+        assert_eq!(
+            first
+                .merge(&first)
+                .unwrap_or_else(|error| panic!("idempotent merge failed: {error}")),
+            first
+        );
+
+        let left = first_second
+            .merge(&third)
+            .unwrap_or_else(|error| panic!("compatible merge failed: {error}"));
+        let second_third = second
+            .merge(&third)
+            .unwrap_or_else(|error| panic!("compatible merge failed: {error}"));
+        let right = first
+            .merge(&second_third)
+            .unwrap_or_else(|error| panic!("compatible merge failed: {error}"));
+        assert_eq!(left, right);
+    }
+
+    #[test]
+    fn merged_patch_checks_one_prestate_and_applies_both_operations() {
+        let state = Value::record_canonical(vec![
+            Field::new(1, Value::U128(10)),
+            Field::new(2, Value::U128(20)),
+        ])
+        .unwrap_or_else(|error| panic!("invalid state: {error}"));
+        let original = state.clone();
+        let pre_root = hash_value::<TestHasher>(state_domain(), &state)
+            .unwrap_or_else(|error| panic!("state hash failed: {error}"));
+        let first_old = hash_precondition_value::<TestHasher>(&Value::U128(10))
+            .unwrap_or_else(|error| panic!("value hash failed: {error}"));
+        let second_old = hash_precondition_value::<TestHasher>(&Value::U128(20))
+            .unwrap_or_else(|error| panic!("value hash failed: {error}"));
+        let first = CanonicalPatch::try_new(
+            1,
+            pre_root,
+            vec![PatchOp::Update {
+                path: ValuePath::new(vec![PathSegment::Field(1)]),
+                expected_old_hash: first_old,
+                value: Value::U128(11),
+            }],
+        )
+        .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+        let second = CanonicalPatch::try_new(
+            1,
+            pre_root,
+            vec![PatchOp::Update {
+                path: ValuePath::new(vec![PathSegment::Field(2)]),
+                expected_old_hash: second_old,
+                value: Value::U128(22),
+            }],
+        )
+        .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+
+        let merged = first
+            .merge(&second)
+            .unwrap_or_else(|error| panic!("compatible merge failed: {error}"));
+        let applied = merged
+            .apply::<TestHasher>(&state, state_domain())
+            .unwrap_or_else(|error| panic!("merged application failed: {error}"));
+        let expected = Value::record_canonical(vec![
+            Field::new(1, Value::U128(11)),
+            Field::new(2, Value::U128(22)),
+        ])
+        .unwrap_or_else(|error| panic!("invalid expected state: {error}"));
+        assert_eq!(applied.state(), &expected);
+        assert_eq!(state, original);
+    }
+
+    #[test]
+    fn same_path_conflict_witness_is_operand_order_independent() {
+        let first = CanonicalPatch::try_new(1, Hash32::ZERO, vec![field_update(1, Value::U128(1))])
+            .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+        let second =
+            CanonicalPatch::try_new(1, Hash32::ZERO, vec![field_update(1, Value::U128(2))])
+                .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+
+        let left = first.merge(&second);
+        let right = second.merge(&first);
+        assert_eq!(left, right);
+        let Err(PatchMergeError::Conflict(conflict)) = left else {
+            panic!("expected a same-path conflict");
+        };
+        assert!(matches!(
+            conflict.as_ref(),
+            PatchMergeConflict::Operation {
+                kind: PatchOperationConflictKind::SamePathDifferentOperation,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn ancestor_conflict_witness_retains_exact_common_prefix() {
+        let ancestor =
+            CanonicalPatch::try_new(1, Hash32::ZERO, vec![field_update(1, Value::U128(1))])
+                .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+        let descendant = CanonicalPatch::try_new(
+            1,
+            Hash32::ZERO,
+            vec![PatchOp::Update {
+                path: ValuePath::new(vec![PathSegment::Field(1), PathSegment::Field(2)]),
+                expected_old_hash: Hash32::ZERO,
+                value: Value::U128(2),
+            }],
+        )
+        .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+
+        let left = ancestor.merge(&descendant);
+        let right = descendant.merge(&ancestor);
+        assert_eq!(left, right);
+        let Err(PatchMergeError::Conflict(conflict)) = left else {
+            panic!("expected an ancestor/descendant conflict");
+        };
+        let PatchMergeConflict::Operation {
+            kind,
+            common_prefix,
+            ..
+        } = conflict.as_ref()
+        else {
+            panic!("expected an operation conflict");
+        };
+        assert_eq!(*kind, PatchOperationConflictKind::AncestorDescendantOverlap);
+        assert_eq!(*common_prefix, ValuePath::new(vec![PathSegment::Field(1)]));
+    }
+
+    #[test]
+    fn metadata_conflicts_are_canonical_under_operand_reversal() {
+        let operation = vec![field_update(1, Value::U128(1))];
+        let first = CanonicalPatch::try_new(3, Hash32::new([2; 32]), operation.clone())
+            .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+        let different_type = CanonicalPatch::try_new(1, Hash32::new([2; 32]), operation.clone())
+            .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+        let different_root = CanonicalPatch::try_new(3, Hash32::new([1; 32]), operation)
+            .unwrap_or_else(|error| panic!("patch construction failed: {error}"));
+
+        assert_eq!(first.merge(&different_type), different_type.merge(&first));
+        assert_eq!(first.merge(&different_root), different_root.merge(&first));
+        assert_eq!(
+            first.merge(&different_type),
+            Err(PatchMergeError::Conflict(Box::new(
+                PatchMergeConflict::StateTypeMismatch {
+                    first: 1,
+                    second: 3,
+                }
+            )))
+        );
+        assert_eq!(
+            first.merge(&different_root),
+            Err(PatchMergeError::Conflict(Box::new(
+                PatchMergeConflict::ExpectedPreRootMismatch {
+                    first: Hash32::new([1; 32]),
+                    second: Hash32::new([2; 32]),
+                }
+            )))
+        );
     }
 
     #[test]
