@@ -24,3 +24,10 @@ Feature: Build deterministic composed applications without bypassing authority
     When the SQLite shell runs publication replay reopening corruption and delivery tests
     Then the authoritative rows reconstruct the exact committed candidate
     And external work remains a replay-safe outbox delivery obligation
+
+  @atdd-security-hotspots
+  Scenario: Rank security hotspots without interpreting source as instructions
+    Given the owner reviewed EPI model and exact source inventory
+    When the deterministic hotspot scanner runs its hostile fixtures and baseline check
+    Then every score decomposes into bounded review-priority components
+    And repository text remains inert data rather than reviewer instructions

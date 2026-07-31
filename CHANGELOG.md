@@ -6,7 +6,26 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
-No changes yet.
+### Added
+
+- a deterministic, prompt-minimized Exploitability-Potential Index scanner with
+  decomposable hotspot scores, category-specific reviewer cards, candidate
+  multi-stage review routes, hostile self-tests, exact baseline drift
+  detection, and a read-only CI gate;
+- an evidence-first LLM security playbook, dated primary-source standards
+  snapshot, exploit-chain proof obligations, Chain Feasibility Index, and a
+  machine-readable review-report schema;
+- a closed ATDD scenario proving that repository text remains inert while
+  hotspot ranking and the exact source inventory stay reproducible.
+
+### Changed
+
+- the LLM cybersecurity prompt now guides bounded models from threat modeling
+  through hotspot triage, isolated scanners, current advisory/tactic lookup,
+  finding proof, zero-day chain analysis, mitigation, and adversarial re-review;
+- release assurance now retains hotspot model/inventory identities, review
+  scope, chains, and residual-risk decisions without treating a low score or
+  clean scan as a security certificate.
 
 ## 1.0.0-rc.3 - release date pending
 
@@ -23,7 +42,7 @@ Authoring and composition usability candidate before stable V1.
   explanations, formal tools, and backend diagnosis;
 - the executable Mini Determinator private-workspace, get/put, return,
   canonical join, conflict, rollback, budget, and replay reference;
-- sixteen RC3 BDD/ATDD scenarios, tutorials, official formal-tool checksum
+- twenty-six RC3 BDD/ATDD scenarios, tutorials, official formal-tool checksum
   workflow, and a 36-crate public package inventory.
 
 ### Compatibility and limits
