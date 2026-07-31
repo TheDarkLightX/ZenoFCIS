@@ -1,12 +1,12 @@
-# ZenoStructures 0.5.0 research packet
+# ZenoStructures 0.5.0 public research packet
 
 **Date:** 2026-07-31  
 **Status:** `TESTED_ONLY / PROVISIONAL COMPOUND-CONTRACT HYPOTHESES`  
 **Mount status:** `UNMOUNTED / NO_RUNTIME_AUTHORITY`
 
-## Research method
+## Public research method
 
-The programme treats a data structure as an observable contract rather than a name or storage backend:
+The public programme treats a data structure as an observable contract rather than a name or storage backend:
 
 ```text
 admitted immutable values
@@ -20,122 +20,84 @@ admitted immutable values
 + deterministic resource bounds
 ```
 
-For each candidate the process was:
+The public lifecycle is:
 
 ```text
-problem discovery
+problem statement
   -> nearest-family and prior-art attack
   -> semantic fingerprint
-  -> smallest executable reference
-  -> bounded counterexample search
-  -> mutation and complexity pressure
-  -> formal obligations
+  -> executable reference or formal design
+  -> bounded counterexample and mutation evidence
   -> retain, revise, demote, or reject
 ```
 
-A candidate remains provisional until independent review of citation graphs, patents, standards, dissertations, non-English sources, and implementation equivalence is complete.
+The private invention machinery that proposes, mutates, scores, ranks, or explores candidates is intentionally outside this public repository. Public evidence may bind private-campaign outputs by digest, but does not expose private search operators, prompts, proposal frontiers, scoring policies, internal traces, or backend implementations.
 
 ## Active executable hypotheses
 
 ### SIDF — Stutter-Invariant Divergence Forest
 
-**Problem:** Different runtimes may insert retries, reopens, or no-op delivery attempts before the same real transition. Raw trace comparison therefore reports false divergence, while ordinary stutter erasure destroys exact replay positions.
-
-**Contract:** Erase only events with fresh certificates that before and after observations are equal. Retain a semantic progress trace and an exact half-open source-span fiber. Select the globally earliest semantic divergence and then the lexicographically first implementation pair. Keep semantic-witness and lineage-witness roots distinct.
-
-**First falsifier:** Inserting a certified stutter changes the semantic witness, or removing an uncertified event does not.
+Erases only freshly certified observational stutters, retains exact source spans, and selects the globally earliest semantic divergence with separate semantic and lineage roots.
 
 ### RSPT — Retraction-Sealed Patch Trie
 
-**Problem:** A logically correct patch does not prove that every durable row, authority record, receipt, and provenance item exists exactly once.
-
-**Contract:** Admit durable layouts only when `encode(reopen(d)) = d`. Check every patch precondition against one unchanged logical pre-state, apply atomically, encode the complete successor layout, reopen it, and emit one seal over all pre/post logical and durable roots.
-
-**First falsifier:** A missing or surplus durable row is accepted because the selected logical root remains equal.
+Applies an atomic preconditioned patch only between complete durable layouts satisfying the fixed-point law `encode(reopen(d)) = d`.
 
 ### CRQG — Certified Retraction Quotient Graph
 
-**Problem:** Runtime graphs contain retry/reopen/idempotent-delivery cycles that should be observational stutters, but arbitrary cycle deletion can erase state-changing authority edges.
-
-**Contract:** Generate quotient equivalence only from proof-relevant observational-identity edges. Keep progress edges visible, retain exact event lineage separately, and emit one canonical minimal progress-cycle witness.
-
-**First falsifier:** An observation-changing edge is collapsed or a certified stutter changes the quotient progress graph.
+Collapses retry, reopen, and idempotent-delivery cycles only when backed by observational-identity certificates, while retaining real progress and authority edges.
 
 ### CWET — Closed-World Evidence Trie
 
-**Problem:** An authenticated dictionary can prove a key is absent from the current tree without proving that the key belonged to the reviewed evidence universe or that absence was explicitly declared.
-
-**Contract:** Commit separately to a finite reviewed key universe and to a total assignment over that universe. Queries distinguish present, declared absent, and outside universe. Authority and provenance slots remain explicit.
-
-**First falsifier:** An omitted in-universe key and an out-of-universe key produce the same accepted answer.
+Commits separately to a finite reviewed key universe and a total present/declared-absent assignment over that universe.
 
 ### CWCRM — Canonical Witness-Carrying Reconciliation Map
 
-**Problem:** Last-writer-wins and ordinary materialized maps erase disagreement and exact contributor history. A resolution policy can also silently rewrite the replicated base.
+Merges exact contributions by ACI union over a closed key manifest, derives canonical semantic value classes with exact contributor fibers, emits a canonical conflict basis, and keeps manifest, semantic, lineage, and conflict roots separate. Resolution is projection-only and cannot rewrite base history.
 
-**Contract:** Merge exact contributions by ACI set union over a closed key manifest. For each key derive canonical semantic value classes with exact contributor fibers. Return a canonical minimal conflict basis. Maintain separate manifest, semantic, lineage, and conflict roots. Resolution is projection-only and must be bound to the exact current conflict root; it never mutates base history.
-
-**First falsifier:** Merge order changes the map, a same-ID/different-content contribution is accepted, or a stale resolution plan succeeds.
-
-**Complexity repair:** The first reference rescanned all contributions for every manifest key. A retained quadratic oracle now checks a single-pass grouping implementation. At 6,144 keys and 12,288 contributions, the measured grouping phase was 12.537× faster in the retained CPython run. This is a phase-specific prototype measurement, not a production performance claim.
+The retained single-pass grouping implementation is checked against the original quadratic semantic oracle. At 6,144 keys and 12,288 contributions, the grouping phase measured 12.537× faster in the retained CPython run. This is not a whole-build or production-performance claim.
 
 ### FQAT — Frontier-Qualified Absence Trie
 
-**Problem:** A non-membership proof does not distinguish explicit authoritative absence from an unobserved key, an outside-universe key, or a query made against a stale caller-selected causal frontier.
-
-**Contract:** Combine a closed universe, exact causal events, and a separately sealed frontier. Query included maximal events and return exactly one of `PRESENT`, `DECLARED_ABSENT`, `CONFLICT`, `UNOBSERVED`, `OUTSIDE_UNIVERSE`, or `UNSEALED_FRONTIER`.
-
-**First falsifier:** A caller-selected stale frontier manufactures `DECLARED_ABSENT` for a key with an unseen present event.
+Combines a closed universe, exact causal events, and a separately sealed frontier to distinguish present, declared absent, conflict, unobserved, outside-universe, and unsealed-frontier results.
 
 ### PFCT — Projection-Fiber Collision Trie
 
-**Problem:** Materialized-view or projection roots are often used as if they uniquely identify exact base records even when the projection is non-injective.
-
-**Contract:** Retain exact records and a closed manifest of deterministic projections. Freshly recompute every projection. Comparison returns exactly `IDENTICAL`, `DISTINCT`, or `COLLISION`. A collision binds both exact roots, the equal projection value, and the canonical first exact-record difference.
-
-**First falsifier:** Different exact records with equal projections are reported as identical or have no replay-checkable witness.
+Retains exact records and deterministic projections, returning exactly `IDENTICAL`, `DISTINCT`, or `COLLISION` with a canonical exact-record witness.
 
 ### CSIM — Cut-Sealed Invalidation Map
 
-**Problem:** Dependency invalidation can be sound yet invalidate too much, silently rewrite unaffected derivation steps, or claim incremental parity without complete recomputation.
-
-**Contract:** For changed base claims, compute the least forward invalidation closure in a closed acyclic single-writer derivation manifest. Preserve every unaffected claim and derivation step byte-for-byte. Emit the survivor-to-affected cut and cause basis. Merge compare-and-replace update plans by ACI union or return a symmetric conflict. Seal the result against transparent full recomputation.
-
-**First falsifier:** An unaffected derivation step changes, the affected set is not least, or the incremental successor differs from full recomputation.
+Computes the least forward invalidation closure in a closed acyclic single-writer manifest, preserves unaffected claims and derivation steps exactly, and seals the incremental successor against transparent full recomputation.
 
 ### AIRB — Authority-Indexed Refinement Braid
 
-**Problem:** Schema and implementation migrations need to preserve one semantic history while representations, permitted writers, and authority phases change.
-
-**Contract:** Store an immutable position-indexed braid of legacy/successor representation cells and lifecycle edges over the exact sequence `LEGACY -> SHADOW_REPLAY -> DUAL_CHECK -> QUIESCED -> AUTHORITY_SWITCH -> POST_SWITCH_VALIDATION -> LEGACY_DISABLED`. Dual representation cells must commute to the same semantic before/after pair. Semantic, authority, and exact lineage roots are distinct. Rollbacks crossing the switch require a certified cut and explicit override.
-
-**First falsifier:** An old writer commits after the authority switch, a phase is skipped, representations disagree semantically, or rollback restores balances while erasing configuration or lineage.
+Retains legacy and successor representations across the exact migration lifecycle while keeping semantic, authority, and exact-lineage roots distinct and making rollback across the authority switch explicitly permitted and cut-bound.
 
 ## Formal-design queue
 
-- `PFPL` — Potential-Fibered Persistence Ledger: a formal hypothesis relating persistent version DAGs, resource potential, and exact spend authority.
-- `ICRWT` — Intervention-Closed Recovery Word Tree: a formal recovery-language structure whose leaves classify every bounded crash/intervention word as PRE, POST, or a minimal bad prefix.
-- `PCFL` — Proof-Context Fiber Lattice: a formal product-lattice structure in which only the maximal complete proof context authorizes use and the least differing dimension witnesses substitution.
+- `PFPL` — Potential-Fibered Persistence Ledger
+- `ICRWT` — Intervention-Closed Recovery Word Tree
+- `PCFL` — Proof-Context Fiber Lattice
 
-These designs are not counted as executable candidates and have no proof receipt.
+These are not counted as executable candidates and have no proof receipt in this public packet.
 
 ## Component-only structures
 
-`WPT`, `MDF`, `CPSQ`, `CDRT`, `SCR`, `DRFI`, and `CCAL` remain useful executable components but were demoted because their central operations have stronger overlap with established patch, divergence, stutter quotient, canonical reconstruction, trace-monoid, retry/idempotency, or counterexample-antichain families.
+`WPT`, `MDF`, `CPSQ`, `CDRT`, `SCR`, `DRFI`, and `CCAL` remain useful executable components but are not promoted novelty hypotheses. `FSF`, `OL`, `MCDM`, and `CBF` remain baselines.
 
 ## Prior-art pressure
 
-The current search materially narrowed the claims:
+The search materially narrowed the claims:
 
-- StateFuse and CRDT reconstruction work strongly pressure broad CWCRM novelty; the residual hypothesis is the exact closed-manifest, four-root, conflict-basis, projection-only-resolution contract.
-- Vector clocks, causal contexts, OR-sets, authenticated dictionaries, and non-membership proofs pressure FQAT; the residual hypothesis is its sealed-frontier six-way epistemic result algebra.
-- Materialized views and provenance pressure PFCT; the residual hypothesis is the total exact/projection trichotomy with a canonical collision fiber witness.
-- Self-adjusting computation, view maintenance, build DAGs, and dynamic slicing pressure CSIM; the residual hypothesis is least closure plus exact survivor-step retention, explicit cut, compare-replace algebra, and full recomputation seal.
-- Schema-change and refinement literature pressure AIRB; its claim is narrowed to the immutable position-indexed authority braid with three distinct roots and rollback-cut semantics.
+- replicated-state and deterministic-reconstruction work pressure broad CWCRM claims;
+- causal-context and authenticated-nonmembership work pressure FQAT;
+- materialized-view and provenance work pressure PFCT;
+- self-adjusting computation and incremental view maintenance pressure CSIM;
+- online schema-change and refinement work pressure AIRB.
 
-No reviewed source matched the complete observable contract of an active candidate. Most ingredients are anticipated, so absolute novelty is not claimed.
+No reviewed source matched an active candidate's complete observable contract. Most ingredients are anticipated, so absolute novelty is not claimed.
 
-## Executed evidence
+## Executed public evidence
 
 ```text
 209 unit/adversarial tests passed
@@ -144,28 +106,29 @@ No reviewed source matched the complete observable contract of an active candida
 19 named bounded laws
 19/19 named semantic mutants killed
 0 bounded survivors
-11,264 contract-lattice configurations
+11,264 contract configurations
 4 independent Python hash seeds
 1 campaign digest
 novelty metadata gate: PASS
-clean ZIP extraction and checksum replay: PASS
+clean release checksum and replay validation: PASS
 ```
 
-## Tool artifacts
-
-The sealed release contains:
-
-- a Research Kernel claim/evidence/contradiction graph;
-- seven LEAP surprise packets;
-- nine Morph source/target relation cards;
-- eight ESSO state-machine models;
-- a ZAG/Zenith rejected-neighbor archive and run manifest;
-- theorem-oriented Lean source without `sorry`, not compiled here;
-- an independent Julia oracle, not executed here;
-- a ZenoFCIS adapter specification and 76-task dependency graph.
-
-Prepared inputs are not represented as successful tool executions. Consensus was attempted, but its connected monthly quota was exhausted; public primary sources supplied the retained search record.
+Private research systems and their internal artifacts are not public evidence surfaces. A public receipt records only the scoped claim, declared inputs and bounds, output digest, replay status, and explicit nonclaims.
 
 ## ZenoFCIS integration boundary
 
-The research values create no command, state, candidate, receipt, bundle, database, migration, or effect authority. Any Rust port must remain isolated behind a non-default research feature and preserve exact bytes, typed failures, root separation, and Python/Rust/Julia vectors. Production promotion requires independent prior-art review, concrete Lean or equivalent proofs where claimed, strict decoders, no-std and Miri evidence, mutation coverage, authenticated-source integration, no-bypass audit, and exact-head review.
+The research values create no command, state, candidate, receipt, bundle, database, migration, or effect authority. Any Rust port must remain isolated behind a non-default research feature and preserve exact bytes, typed failures, root separation, and cross-runtime vectors.
+
+The mandatory production chain remains:
+
+```text
+authenticated command and current state/context
+  -> deterministic evaluation
+  -> nominal authorization
+  -> exact receipt and bundle lineage
+  -> atomic publication and recovery
+  -> committed outbox effects only
+  -> no alternate acceptance path
+```
+
+Production promotion additionally requires independent prior-art review, exact-source tests and proofs appropriate to each claim, strict decoding, no-std and Miri evidence, mutation coverage, authenticated-source integration, no-bypass review, and exact-head approval.
