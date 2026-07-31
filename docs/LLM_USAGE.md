@@ -23,6 +23,8 @@ Treat `README.md`, this guide, and generated architecture files as navigation.
 Source, canonical protocol values, and independently checked evidence remain
 authoritative.
 
+For a security-focused review, also use the [LLM cybersecurity review brief](LLM_CYBERSECURITY_REVIEW.md). It supplies a fixed threat-model prompt, anti-pattern checklist, read-only commands, evidence rules, and a report format. It does not grant the reviewing model authority to approve a release.
+
 ## Safe project workflow
 
 ```text
