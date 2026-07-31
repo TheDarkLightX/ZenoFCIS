@@ -3,7 +3,7 @@
 **Date:** 2026-07-31  
 **Status:** research-only, executable Python references, unmounted
 
-This file is a public preservation point for candidate contracts and bounded evidence. It deliberately excludes the private invention machinery used to generate, mutate, rank, and explore candidate abstractions.
+This file is a public preservation point for candidate contracts and bounded evidence. The private research-engine implementation and its internal traces are excluded from this branch.
 
 ## Sealed interim release identity
 
@@ -14,7 +14,7 @@ entries: 305
 ZIP integrity: PASS
 ```
 
-This identity records the original research checkpoint. It does not authorize publication of private tooling contained in any owner-held archive.
+This identity records the original research checkpoint. It does not authorize publication of owner-private tooling contained in any separately retained archive.
 
 ## Current executable evidence
 
@@ -60,20 +60,11 @@ sha256:59ff227b1a2fad85d24571dc92e7b1c15e60cdf9b21798cfe71a7c0914dfecf9
 
 The catalogue currently classifies 20 active or challenged hypotheses, 11 components, five baselines, and one remaining formal-only design. Those labels are local research posture, not global novelty findings.
 
-## Private invention-tool boundary
+## Public/private boundary
 
-The following remain private and are not part of the public ZenoFCIS repository:
+Public evidence may retain candidate contracts, first falsifiers, declared finite bounds, test and mutation receipts, prior-art pressure, opaque campaign identities, result digests, and independent replay status.
 
-```text
-abductive generators and operator grammars
-proposal mutation, scoring, ranking, and archive policies
-semantic-surprise and structure-product search implementations
-private research-backend adapters
-internal prompts, candidate frontiers, and search traces
-private replay packets and tool-specific intermediate states
-```
-
-Public material may retain a scoped evidence receipt and output digest, but must not expose the private implementation or enough internal detail to reconstruct its search policy without explicit owner approval. This is the same separation used for private Morph, ESSO, and LEAP implementations.
+The owner-private research implementation and internal execution history are not part of ZenoFCIS and are not required for public verification of a selected candidate's observable laws.
 
 ## Authority boundary
 
