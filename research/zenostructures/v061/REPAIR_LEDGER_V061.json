@@ -1,0 +1,105 @@
+{
+  "schema": "zenostructures/repair-ledger/v1",
+  "release": "0.6.1",
+  "authority_class": "RESEARCH_ONLY_UNMOUNTED",
+  "base": "agent/zenostructures-catalogue-v060-20260731",
+  "repairs": [
+    {
+      "id": "FQAT-CAUSAL-CLOSURE",
+      "construction": "derive and validate one causally downward-closed frontier",
+      "point_of_use": "reverify the exact frontier seal before an absence classification",
+      "falsifier": "downward-open frontier or public-constructor bypass",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "PFCT-SOURCE-DERIVATION",
+      "construction": "derive every projection cell from the retained exact record",
+      "point_of_use": "freshly recompute the projection before comparison",
+      "falsifier": "amount-1 projection attached to amount-999 exact record",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "CWCRM-SOURCE-DERIVATION",
+      "construction": "derive semantic cells from exact contribution occurrences",
+      "point_of_use": "freshly recompute classes, contributor fibers, and roots",
+      "falsifier": "semantic cell 7 attached to exact contribution 99",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "SIDF-DERIVED-PROGRESS",
+      "construction": "derive semantic progress indexes internally",
+      "point_of_use": "compare complete progress cells including effects, outbox, durable layout, and context",
+      "falsifier": "caller-selected progress index or effect identity omission",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "EFFECT-CLOSED-STUTTER",
+      "construction": "mint an opaque verifier receipt for exact before/after evidence",
+      "point_of_use": "reverify current context, empty effects/outbox, and byte-exact durable equality",
+      "falsifier": "locally recomputable checksum, Boolean certificate, or effect-bearing stutter",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "PFPL-UNIQUE-CREDIT-OWNERSHIP",
+      "construction": "reject one credit token owned by two open versions",
+      "point_of_use": "revalidate unique ownership before every spend",
+      "falsifier": "double-owned token followed by double spend",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "PCFP-PARTIAL-ORDER",
+      "construction": "compatible partial-assignment poset with meet and partial join",
+      "point_of_use": "return a canonical incompatibility witness instead of inventing a join",
+      "falsifier": "calling an incompatible assignment pair a lattice join",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "PCFP-CURRENT-CONTEXT-QUALIFICATION",
+      "construction": "opaque verifier-produced current-context qualification",
+      "point_of_use": "reverify against store-current context and verifier",
+      "falsifier": "public receipt with arbitrary digest values",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "ICRWT-STUTTER-VERIFICATION",
+      "construction": "effect-closed verifier receipt for claimed stutters",
+      "point_of_use": "reverify before prefix erasure or crash classification",
+      "falsifier": "unchecked Boolean and digest erase a nonempty effect",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "PSHF-PROSPECTIVE-PUBLICATION",
+      "construction": "candidate commitment followed by append-only publication receipt",
+      "point_of_use": "observation verifier checks publication predates observation and both receipts remain current",
+      "falsifier": "self-asserted prior commitment or arbitrary evidence root",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "CHA-SINGLETON-IDENTITY",
+      "construction": "total identity transport for one node and zero edges",
+      "point_of_use": "flat-atlas operations remain total on the singleton case",
+      "falsifier": "one-node zero-edge atlas crash",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "LFRL-DISCHARGE-AUTHORITY",
+      "construction": "closed loss/creation manifests plus verifier-minted context-bound receipts",
+      "point_of_use": "reverify receipt MAC, verifier, migration, exact atom, and store-current context",
+      "falsifier": "caller-supplied evidence or verifier digest closes a debt",
+      "status": "CLOSED_IN_REFERENCE"
+    },
+    {
+      "id": "LFRL-ROLLBACK-PERMIT",
+      "construction": "one-use permit bound to the exact closed-debt ledger state",
+      "point_of_use": "reverify current context and consume a separate permit state",
+      "falsifier": "crossed-state permit or permit reuse",
+      "status": "CLOSED_IN_REFERENCE"
+    }
+  ],
+  "nonclaims": [
+    "qualifications and receipts are evidence, not ZenoFCIS runtime authority",
+    "reference Python MACs must become private nominal Rust values or authenticated signatures",
+    "no production datastore, crash, migration, no-bypass, or ZenoDEX refinement theorem is claimed",
+    "novelty metadata consistency is not a novelty or patent determination"
+  ]
+}
