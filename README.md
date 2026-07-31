@@ -99,7 +99,14 @@ freeze and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md
 bind those journeys to fixed executable commands, while the optional
 [developer guardrails](docs/DEVELOPER_GUARDRAILS.md) reject selected unsafe
 coding-agent actions before execution. The
-[LLM cybersecurity review brief](docs/LLM_CYBERSECURITY_REVIEW.md) provides a repeatable threat-model prompt, anti-pattern checklist, evidence rules, and report format for security review. The
+[LLM cybersecurity review orchestrator](docs/LLM_CYBERSECURITY_REVIEW.md),
+[evidence-first playbook](docs/SECURITY_REVIEW_PLAYBOOK.md),
+[EPI hotspot model](docs/SECURITY_HOTSPOT_MODEL.md), and
+[dated standards snapshot](docs/SECURITY_STANDARDS_SNAPSHOT.md) provide a
+deterministic review queue, constrained prompts for less-capable models,
+exploit-chain proof obligations, scanner guidance, and a machine-readable
+report contract. Run `python3 tools/security_hotspots.py check` to reject
+unreviewed ranking or model drift. The
 [RC3 release notes](docs/RC3_RELEASE_NOTES.md) describe the exact candidate
 surface and remaining final-release blockers. The owner-facing
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
@@ -187,7 +194,7 @@ The workspace now includes the complete package ladder:
 - crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
-- a frozen V1 product contract, 25 human-readable BDD scenarios, a closed
+- a frozen V1 product contract, 26 human-readable BDD scenarios, a closed
   fail-closed ATDD registry, and optional deterministic Probity guardrails with
   a pinned Node/npm graph and hostile command corpus.
 

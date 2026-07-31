@@ -48,6 +48,8 @@ tag target, package source manifest, and release notes must identify one commit.
 Run from a clean checkout of the recorded commit:
 
 ```bash
+python3 tools/security_hotspots.py self-test
+python3 tools/security_hotspots.py check
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
 python3 tools/check_library_docs.py

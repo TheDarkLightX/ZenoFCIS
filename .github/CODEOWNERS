@@ -10,7 +10,9 @@
 /tools/rc_package.py @TheDarkLightX
 /tools/atdd.py @TheDarkLightX
 /tools/check_probity.py @TheDarkLightX
+/tools/security_hotspots.py @TheDarkLightX
 /acceptance/ @TheDarkLightX
+/security/ @TheDarkLightX
 /probity.config.ts @TheDarkLightX
 /package.json @TheDarkLightX
 /package-lock.json @TheDarkLightX
