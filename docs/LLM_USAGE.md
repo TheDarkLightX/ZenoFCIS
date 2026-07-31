@@ -23,7 +23,14 @@ Treat `README.md`, this guide, and generated architecture files as navigation.
 Source, canonical protocol values, and independently checked evidence remain
 authoritative.
 
-For a security-focused review, also use the [LLM cybersecurity review brief](LLM_CYBERSECURITY_REVIEW.md). It supplies a fixed threat-model prompt, anti-pattern checklist, read-only commands, evidence rules, and a report format. It does not grant the reviewing model authority to approve a release.
+For a security-focused review, start with the
+[LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md), then use
+the [evidence-first playbook](SECURITY_REVIEW_PLAYBOOK.md), the
+[EPI hotspot model](SECURITY_HOTSPOT_MODEL.md), and the
+[dated standards snapshot](SECURITY_STANDARDS_SNAPSHOT.md). Together they
+supply a deterministic review queue, constrained prompts, scanner isolation
+rules, exploit-chain proof obligations, and a machine-readable report format.
+Neither an LLM nor a hotspot score has authority to approve a release.
 
 ## Safe project workflow
 

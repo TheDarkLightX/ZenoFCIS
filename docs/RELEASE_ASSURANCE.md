@@ -51,6 +51,8 @@ stability begins at `1.0.0`.
 Run from a clean checkout of the exact release commit:
 
 ```bash
+python3 tools/security_hotspots.py self-test
+python3 tools/security_hotspots.py check
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
 python3 tools/rc_package.py self-test
@@ -74,6 +76,8 @@ python3 tools/atdd.py run --all
 
 The CI workflows add:
 
+- deterministic EPI hotspot-model self-tests, exact baseline drift rejection,
+  prompt-minimized review-card rendering, and public-link validation;
 - `wasm32-unknown-unknown` checks for every `no_std + alloc` crate;
 - independent SHA-256 provider and provider-parity checks;
 - Miri interpretation of the semantic boundary tests;
@@ -130,6 +134,8 @@ For a release candidate, retain:
 7. all public `.crate` files, rustdoc, source and diagnostic binary archives,
    CycloneDX SBOM, provenance inputs, RC manifest, and checksums;
 8. a signed audit or review report when the deployment policy requires one.
+9. the exact hotspot model and inventory digests, baseline, selected/deferred
+   review queue, findings, chain graph, and residual-risk decision.
 
 The retained rustdoc archive includes every public API and source page but
 excludes Rustdoc `1.97.1`'s nondeterministic merged cross-crate search index.

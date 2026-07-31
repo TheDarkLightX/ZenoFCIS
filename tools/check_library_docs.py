@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -21,6 +22,7 @@ REQUIRED_FILES = (
     Path(".github/CODEOWNERS"),
     Path(".github/workflows/adopter-acceptance.yml"),
     Path(".github/workflows/developer-guardrails.yml"),
+    Path(".github/workflows/security-hotspots.yml"),
     Path(".github/workflows/release-candidate.yml"),
     Path(".github/workflows/formal-tools.yml"),
     Path(".github/workflows/qemu-demo.yml"),
@@ -36,6 +38,10 @@ REQUIRED_FILES = (
     Path("docs/CRATE_MAP.md"),
     Path("docs/FEATURE_MATRIX.md"),
     Path("docs/LLM_USAGE.md"),
+    Path("docs/LLM_CYBERSECURITY_REVIEW.md"),
+    Path("docs/SECURITY_HOTSPOT_MODEL.md"),
+    Path("docs/SECURITY_REVIEW_PLAYBOOK.md"),
+    Path("docs/SECURITY_STANDARDS_SNAPSHOT.md"),
     Path("docs/RC1_RELEASE_NOTES.md"),
     Path("docs/RC2_RELEASE_NOTES.md"),
     Path("docs/RC3_RELEASE_NOTES.md"),
@@ -80,6 +86,9 @@ REQUIRED_FILES = (
     Path("examples/diagnostics-tour/project.zeno"),
     Path("tools/atdd.py"),
     Path("tools/check_probity.py"),
+    Path("tools/security_hotspots.py"),
+    Path("security/hotspots-baseline.json"),
+    Path("security/review-report.schema.json"),
     Path("fixtures/external-consumer/Cargo.toml"),
     Path("fixtures/external-consumer/Cargo.lock"),
     Path("fixtures/external-consumer/src/main.rs"),
@@ -116,6 +125,10 @@ REQUIRED_README_MARKERS = (
     "docs/CRATE_MAP.md",
     "docs/FEATURE_MATRIX.md",
     "docs/LLM_USAGE.md",
+    "docs/LLM_CYBERSECURITY_REVIEW.md",
+    "docs/SECURITY_HOTSPOT_MODEL.md",
+    "docs/SECURITY_REVIEW_PLAYBOOK.md",
+    "docs/SECURITY_STANDARDS_SNAPSHOT.md",
     "docs/RC3_RELEASE_NOTES.md",
     "docs/RC3_READINESS_REVIEW.md",
     "docs/RC3_AUTHORING_CONTRACT.md",
@@ -130,18 +143,26 @@ REQUIRED_README_MARKERS = (
     "--example minimal_core",
     "--example checked_backend",
     "python3 tools/atdd.py run --all",
+    "python3 tools/security_hotspots.py check",
 )
 REQUIRED_CODEOWNER_MARKERS = (
     "* @TheDarkLightX",
     "/release/ @TheDarkLightX",
     "/crates/ @TheDarkLightX",
     "/docs/ @TheDarkLightX",
+    "/security/ @TheDarkLightX",
 )
 REQUIRED_RELEASE_WORKFLOW_MARKERS = (
     '"v1.0.0-rc.*"',
     "contents: read",
     "python3 tools/rc_package.py build",
     "retention-days: 30",
+)
+REQUIRED_SECURITY_WORKFLOW_MARKERS = (
+    "contents: read",
+    "persist-credentials: false",
+    "python3 tools/security_hotspots.py self-test",
+    "python3 tools/security_hotspots.py check",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 
@@ -190,6 +211,35 @@ def check_release_markers(failures: list[str]) -> None:
                 f"missing release marker {marker!r}"
             )
 
+    security_workflow = (
+        ROOT / ".github/workflows/security-hotspots.yml"
+    ).read_text(encoding="utf-8")
+    for marker in REQUIRED_SECURITY_WORKFLOW_MARKERS:
+        if marker not in security_workflow:
+            failures.append(
+                ".github/workflows/security-hotspots.yml: "
+                f"missing security marker {marker!r}"
+            )
+
+
+def check_security_json(failures: list[str]) -> None:
+    """Reject malformed or substituted public security contracts."""
+
+    baseline_path = ROOT / "security/hotspots-baseline.json"
+    schema_path = ROOT / "security/review-report.schema.json"
+    try:
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        failures.append(f"security contract JSON is invalid: {error}")
+        return
+    if baseline.get("format") != "zeno-fcis/security-hotspots/1":
+        failures.append("security/hotspots-baseline.json: unsupported format")
+    if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        failures.append("security/review-report.schema.json: unsupported schema draft")
+    if schema.get("title") != "ZenoFCIS security review report":
+        failures.append("security/review-report.schema.json: unexpected title")
+
 
 def check_markdown_links(failures: list[str]) -> None:
     files = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
@@ -210,6 +260,7 @@ def main() -> int:
     check_version_markers(version, failures)
     check_readme_markers(failures)
     check_release_markers(failures)
+    check_security_json(failures)
     check_markdown_links(failures)
     if failures:
         for failure in failures:

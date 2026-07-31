@@ -30,6 +30,11 @@ Include, when available:
 - whether the report depends on a downstream profile or deployment choice;
 - a proposed test or invariant that would prevent recurrence.
 
+The deterministic [hotspot model](docs/SECURITY_HOTSPOT_MODEL.md) and
+[review playbook](docs/SECURITY_REVIEW_PLAYBOOK.md) may help identify and
+describe the affected boundary. An EPI score or scanner match alone is not a
+vulnerability report; include reachability, impact, and evidence.
+
 Maintainers aim to acknowledge a complete report within three business days,
 then coordinate validation, remediation, release, and disclosure timing with
 the reporter. This target is not a guarantee of a particular fix date. Please
@@ -48,6 +53,10 @@ Reports are especially relevant when they demonstrate:
 - forged promotion, proof, provider, projector, interpreter, or deployment
   evidence;
 - secret exposure or a concrete side/covert-channel claim violation.
+- an LLM, scanner, generated artifact, workflow, dependency, or compromised
+  evidence producer obtaining authority or composing with another weakness;
+- a reproducible multi-stage chain from untrusted input or supply-chain control
+  to publication, persistence, release, secret access, or external effects.
 
 The semantic kernel forbids unsafe Rust and is designed to remain independent
 of clocks, randomness, networking, filesystems, databases, threads, async

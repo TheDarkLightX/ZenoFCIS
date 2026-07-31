@@ -27,6 +27,10 @@
 23. [Packaging](PACKAGING.md)
 24. [Release assurance](RELEASE_ASSURANCE.md)
 25. [RC3 readiness review](RC3_READINESS_REVIEW.md)
+26. [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
+27. [Security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
+28. [Security hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
+29. [Security standards snapshot](SECURITY_STANDARDS_SNAPSHOT.md)
 
 ## Project definition and typed construction
 
@@ -83,6 +87,10 @@ and other tools can use the same public boundaries.
 - [SHA-256 provider policy](SHA256_PROVIDER_POLICY.md)
 - [Secret handling and constant time](SECRET_HANDLING_AND_CONSTANT_TIME.md)
 - [Side/covert-channel security](SIDE_CHANNEL_COVERT_CHANNEL_SECURITY.md)
+- [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
+- [Evidence-first security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
+- [EPI hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
+- [Security standards and threat-intelligence snapshot](SECURITY_STANDARDS_SNAPSHOT.md)
 
 ## Canonical admission and decoding
 

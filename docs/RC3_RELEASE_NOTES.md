@@ -21,7 +21,7 @@ unchanged.
 - umbrella feature `authoring`, language version 1, project-AST format 1,
   temporal-spec format 1, tools-manifest format 2, CLI JSON schema 1, and
   counterexample schema 1;
-- twenty-five closed BDD/ATDD scenarios with fixed argv bindings and hostile-tag
+- twenty-six closed BDD/ATDD scenarios with fixed argv bindings and hostile-tag
   self-tests;
 - official pinned formal-tool artifacts and recorded SHA-256 checksums;
 - minimal and Mini Determinator `.zeno` examples plus a runnable Rust Mini

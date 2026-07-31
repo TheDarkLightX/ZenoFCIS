@@ -150,6 +150,13 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
     ),
+    "security-hotspots": AcceptanceScenario(
+        "Rank security hotspots without interpreting source as instructions",
+        (
+            ("python3", "tools/security_hotspots.py", "self-test"),
+            ("python3", "tools/security_hotspots.py", "check"),
+        ),
+    ),
     "rc3-project-new": AcceptanceScenario(
         "Create a bounded project without overwriting files",
         (
