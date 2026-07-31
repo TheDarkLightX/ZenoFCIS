@@ -41,10 +41,14 @@ bounded campaign
 sha256:1bd9f7d0e2d27dc0d3bac2ed60c823dcd6e89161db92cc38b6e9af1502737cc6
 
 hash-seed matrix
-sha256:b16440ec9facf84cc2e8b91a1895076678a8b91a1895076678a8b91a189507667
-```
+sha256:33537a6aa413b964902b3451c8cf7c4624af29f1cd0c8b8e79e98679da6d61bc
 
-The final hash-seed matrix identity in the sealed archive is authoritative; the shortened transcription above must not be used as a substitute for archive verification.
+design-space campaign
+sha256:fa0b9fc7d1c98c6db90ba315625da343ce88daa8edaeffeb5ec23ebe7935b930
+
+novelty metadata gate
+sha256:35995f114854a4e7b3cc5a166ba5bc9f44d9056182792f5709f58cedc72d931c
+```
 
 ## Prepared but not executed
 
