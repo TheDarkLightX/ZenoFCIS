@@ -1,11 +1,11 @@
-# ZenoStructures 0.6.0 interim checkpoint
+# ZenoStructures 0.6.0 public interim checkpoint
 
 **Date:** 2026-07-31  
-**Status:** research-only, executable Python reference, unmounted
+**Status:** research-only, executable Python references, unmounted
 
-This file is an early preservation point created before the complete 0.6.0 review packet. It prevents the current higher-risk research state from existing only in a transient workspace.
+This file is a public preservation point for candidate contracts and bounded evidence. It deliberately excludes the private invention machinery used to generate, mutate, rank, and explore candidate abstractions.
 
-## Sealed interim archive
+## Sealed interim release identity
 
 ```text
 zenostructures-v0.6.0-interim-checkpoint.zip
@@ -14,7 +14,7 @@ entries: 305
 ZIP integrity: PASS
 ```
 
-The sealed archive is retained as the conversation artifact accompanying this research run. A final archive will supersede it after documentation, formal companions, and clean-extraction replay.
+This identity records the original research checkpoint. It does not authorize publication of private tooling contained in any owner-held archive.
 
 ## Current executable evidence
 
@@ -59,6 +59,21 @@ sha256:59ff227b1a2fad85d24571dc92e7b1c15e60cdf9b21798cfe71a7c0914dfecf9
 - ADFL — Abstraction Debt Fiber Ledger
 
 The catalogue currently classifies 20 active or challenged hypotheses, 11 components, five baselines, and one remaining formal-only design. Those labels are local research posture, not global novelty findings.
+
+## Private invention-tool boundary
+
+The following remain private and are not part of the public ZenoFCIS repository:
+
+```text
+abductive generators and operator grammars
+proposal mutation, scoring, ranking, and archive policies
+semantic-surprise and structure-product search implementations
+private research-backend adapters
+internal prompts, candidate frontiers, and search traces
+private replay packets and tool-specific intermediate states
+```
+
+Public material may retain a scoped evidence receipt and output digest, but must not expose the private implementation or enough internal detail to reconstruct its search policy without explicit owner approval. This is the same separation used for private Morph, ESSO, and LEAP implementations.
 
 ## Authority boundary
 
