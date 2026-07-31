@@ -99,6 +99,7 @@ freeze and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md
 bind those journeys to fixed executable commands, while the optional
 [developer guardrails](docs/DEVELOPER_GUARDRAILS.md) reject selected unsafe
 coding-agent actions before execution. The
+[LLM cybersecurity review brief](docs/LLM_CYBERSECURITY_REVIEW.md) provides a repeatable threat-model prompt, anti-pattern checklist, evidence rules, and report format for security review. The
 [RC3 release notes](docs/RC3_RELEASE_NOTES.md) describe the exact candidate
 surface and remaining final-release blockers. The owner-facing
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
