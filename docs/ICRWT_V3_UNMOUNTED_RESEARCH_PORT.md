@@ -97,7 +97,8 @@ The builder returns either one canonical tree or one canonical earliest defect.
 - structural duplicate/collision defects and per-word defects compete under
   the same canonical global witness ordering;
 - node identity includes the initial snapshot commitment and exact event prefix;
-- input order cannot change the selected shortest defect witness;
+- input order cannot change the selected shortest defect witness, including
+  ties on the primary prefix, precedence, word, and event key;
 - canonical encoding retains the exact word lineage.
 
 ## Explicit non-guarantees

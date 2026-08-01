@@ -899,6 +899,22 @@ fn compare_witness(left: &RecoveryBadPrefixWitness, right: &RecoveryBadPrefixWit
             &right.word_id,
             &right.event_id,
         ))
+        .then_with(|| {
+            (
+                left.kind,
+                left.expected,
+                left.actual,
+                left.expected_snapshot,
+                left.actual_snapshot,
+            )
+                .cmp(&(
+                    right.kind,
+                    right.expected,
+                    right.actual,
+                    right.expected_snapshot,
+                    right.actual_snapshot,
+                ))
+        })
 }
 
 fn select_earlier_witness(
@@ -1276,5 +1292,26 @@ mod tests {
         assert_eq!(witness.kind(), RecoveryDefectKind::MixedPrefix);
         assert_eq!(witness.prefix_length(), 0);
         assert_eq!(witness.word_id(), "z-mixed");
+    }
+
+    #[test]
+    fn equal_primary_witness_keys_use_complete_canonical_tiebreaker() {
+        let lower = snapshot(RecoveryObservation::Indeterminate, 1);
+        let higher = snapshot(RecoveryObservation::Indeterminate, 2);
+        let lower_word = word("collision", lower, Vec::new());
+        let higher_word = word("collision", higher, Vec::new());
+
+        let Err(forward) = build_recovery_word_tree(vec![lower_word.clone(), higher_word.clone()])
+        else {
+            panic!("colliding open words were accepted");
+        };
+        let Err(reverse) = build_recovery_word_tree(vec![higher_word, lower_word]) else {
+            panic!("reversed colliding open words were accepted");
+        };
+
+        assert_eq!(forward, reverse);
+        assert_eq!(forward.canonical_bytes(), reverse.canonical_bytes());
+        assert_eq!(forward.kind(), RecoveryDefectKind::TerminalNotClosed);
+        assert_eq!(forward.actual_snapshot(), Some(lower));
     }
 }
