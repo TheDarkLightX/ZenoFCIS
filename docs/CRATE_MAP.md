@@ -69,7 +69,7 @@ authoritative without an independent checker and release policy.
 |---|---|
 | `zeno-fcis-refine` | Exact normalized-decision comparison and promotion reports |
 | `zeno-fcis-evidence` | Source/tool/query/assumption/coverage-bound evidence envelopes and importers |
-| `zeno-fcis-diagnostics` | Canonical trace-prefix partitions and globally minimal replay divergence witnesses |
+| `zeno-fcis-diagnostics` | Canonical trace partitions, exact recovery-word tries, and globally minimal replay or bad-prefix witnesses |
 | `zeno-fcis-synthesis` | Canonical bounded candidate enumeration and honest incomplete-search results |
 | `zeno-fcis-backend` | Checked engine/verifier protocol for Lean, SMT/Z3, CVC5, Kani, private ESSO, compilers, and other tools |
 | `zeno-fcis-formal-tools` | Deterministic CVC5, Z3, and Lean exporters, checked process execution, model replay, and content-addressed diagnostic retention |

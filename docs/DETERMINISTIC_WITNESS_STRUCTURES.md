@@ -1,11 +1,13 @@
 # Deterministic witness structures
 
-This checkpoint adopts two narrow contracts from the experimental
+This checkpoint adopts three narrow contracts from the experimental
 ZenoStructures work:
 
 1. compatible merge and canonical conflict evidence for existing
    `CanonicalPatch` values;
 2. globally minimal divergence evidence over committed implementation traces.
+3. exact recovery words with effect-closed stutters and canonical earliest
+   bad-prefix evidence.
 
 The implementation is Rust-native and uses existing ZenoFCIS values,
 commitments, canonical encoding, and no-std boundaries. It does not import the
@@ -17,6 +19,7 @@ Python package or its authority model.
 |---|---|---|---|
 | Patch merge | Immutable aggregate plus witness | `zeno-fcis-patch` | None |
 | Divergence forest | Immutable derived index plus verifier | `zeno-fcis-diagnostics` | None |
+| Recovery word tree | Exact prefix trie plus witness | `zeno-fcis-diagnostics` | None |
 
 The patch crate already checks all operation preconditions against one
 unchanged pre-state and applies a successor atomically. The added merge
@@ -48,9 +51,26 @@ The witness verifier recomputes the globally canonical answer from the owned
 traces. Later equal outputs cannot merge implementations whose earlier
 prefixes differ.
 
+The recovery-word tree receives exact commitments for the semantic state,
+complete durable layout, and authority state. It preserves exact intervention
+order and admits a structural stutter only when the complete snapshot tuple is
+unchanged and the effect set is empty. Its chain relation is:
+
+```text
+word.initial_snapshot = word.events[0].before_snapshot
+event[i].after_snapshot = event[i + 1].before_snapshot
+```
+
+Equality of the coarse PRE or POST class cannot substitute for exact snapshot
+equality. Prefix identity includes the initial snapshot and complete event
+prefix. Equal-length defects are selected by fixed defect precedence, then
+word identity and event identity. The diagnostic repeats event-identity,
+effect-order, stutter, chain, prefix, and terminal checks during construction;
+derived queries rebuild the complete tree.
+
 ## Failure and commit semantics
 
-Both surfaces are pure:
+All three surfaces are pure:
 
 - construction returns an immutable value or a closed error;
 - failure produces no successor or external effect;
@@ -75,7 +95,13 @@ observation under the relevant ZenoDEX profile. The forest then identifies the
 globally earliest disagreement and retains enough committed prefix data for
 replay.
 
-Neither structure should be mounted directly into settlement. A ZenoDEX
+The recovery-word tree is suitable for finite crash and retry campaigns. It
+can preserve the first mixed durable prefix, an exact snapshot splice, or a
+POST-to-PRE regression even if a later event reaches a plausible terminal
+state. The supplied commitments remain claims until a concrete datastore
+adapter proves complete-row reconstruction and PRE/POST refinement.
+
+None of these structures should be mounted directly into settlement. A ZenoDEX
 adapter must bind:
 
 ```text
@@ -109,5 +135,11 @@ The focused test surface includes:
 - earliest-step and canonical-pair selection;
 - no historical remerge after later convergence;
 - equal-trace, duplicate-ID, length, text-profile, and prefix-bound cases.
+- exact snapshot-chain continuity across equal coarse classes;
+- initial-snapshot-bound prefix identity;
+- fixed defect precedence before word identity;
+- point-of-use duplicate event identity rejection;
+- effect-closed stutter, mixed-prefix, POST-to-PRE, terminal, duplicate-word,
+  and word-ID-collision cases.
 
 The complete workspace ATDD command remains the final pre-commit gate.

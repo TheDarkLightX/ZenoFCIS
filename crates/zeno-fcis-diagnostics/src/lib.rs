@@ -14,6 +14,16 @@
 
 extern crate alloc;
 
+mod recovery;
+
+pub use recovery::{
+    ICRWT_VERSION, MAX_RECOVERY_ACTION_BYTES, MAX_RECOVERY_EVENT_ID_BYTES,
+    MAX_RECOVERY_WORD_ID_BYTES, RecoveryAction, RecoveryBadPrefixWitness, RecoveryDefectKind,
+    RecoveryError, RecoveryEvent, RecoveryEventId, RecoveryEventKind, RecoveryObservation,
+    RecoveryPrefixKey, RecoverySnapshotCommitment, RecoveryTrieNode, RecoveryWord, RecoveryWordId,
+    RecoveryWordTree, build_recovery_word_tree,
+};
+
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
