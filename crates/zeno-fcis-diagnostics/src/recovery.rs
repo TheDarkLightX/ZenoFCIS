@@ -661,6 +661,7 @@ pub fn build_recovery_word_tree(
     mut words: Vec<RecoveryWord>,
 ) -> Result<RecoveryWordTree, Box<RecoveryBadPrefixWitness>> {
     words.sort_by(|left, right| left.word_id.cmp(&right.word_id));
+    let mut selected: Option<RecoveryBadPrefixWitness> = None;
     let mut group_start = 0;
     while group_start < words.len() {
         let mut group_end = group_start + 1;
@@ -672,27 +673,24 @@ pub fn build_recovery_word_tree(
             let duplicate = words[group_start + 1..group_end]
                 .iter()
                 .all(|word| word == first);
-            return Err(Box::new(structural_witness(
-                if duplicate {
-                    RecoveryDefectKind::DuplicateWord
-                } else {
-                    RecoveryDefectKind::WordIdCollision
-                },
-                first,
-            )));
+            select_earlier_witness(
+                &mut selected,
+                structural_witness(
+                    if duplicate {
+                        RecoveryDefectKind::DuplicateWord
+                    } else {
+                        RecoveryDefectKind::WordIdCollision
+                    },
+                    first,
+                ),
+            );
         }
         group_start = group_end;
     }
 
-    let mut selected: Option<RecoveryBadPrefixWitness> = None;
     for word in &words {
         for defect in validate_word(word) {
-            if selected
-                .as_ref()
-                .is_none_or(|current| compare_witness(&defect, current) == Ordering::Less)
-            {
-                selected = Some(defect);
-            }
+            select_earlier_witness(&mut selected, defect);
         }
     }
     if let Some(defect) = selected {
@@ -904,6 +902,18 @@ fn compare_witness(left: &RecoveryBadPrefixWitness, right: &RecoveryBadPrefixWit
             &right.word_id,
             &right.event_id,
         ))
+}
+
+fn select_earlier_witness(
+    selected: &mut Option<RecoveryBadPrefixWitness>,
+    candidate: RecoveryBadPrefixWitness,
+) {
+    if selected
+        .as_ref()
+        .is_none_or(|current| compare_witness(&candidate, current) == Ordering::Less)
+    {
+        *selected = Some(candidate);
+    }
 }
 
 fn structural_witness(kind: RecoveryDefectKind, word: &RecoveryWord) -> RecoveryBadPrefixWitness {
@@ -1208,5 +1218,41 @@ mod tests {
             panic!("word identity collision was accepted");
         };
         assert_eq!(collision.kind(), RecoveryDefectKind::WordIdCollision);
+    }
+
+    #[test]
+    fn duplicate_word_does_not_hide_higher_priority_prefix_defect() {
+        let mixed = word(
+            "same-mixed",
+            snapshot(RecoveryObservation::Mixed, 1),
+            Vec::new(),
+        );
+        let Err(witness) = build_recovery_word_tree(vec![mixed.clone(), mixed]) else {
+            panic!("invalid duplicate words were accepted");
+        };
+        assert_eq!(witness.kind(), RecoveryDefectKind::MixedPrefix);
+        assert_eq!(witness.prefix_length(), 0);
+        assert_eq!(witness.word_id(), "same-mixed");
+    }
+
+    #[test]
+    fn duplicate_group_does_not_hide_another_words_prefix_defect() {
+        let duplicate = word(
+            "a-duplicate",
+            snapshot(RecoveryObservation::Pre, 1),
+            Vec::new(),
+        );
+        let mixed = word(
+            "z-mixed",
+            snapshot(RecoveryObservation::Mixed, 2),
+            Vec::new(),
+        );
+        let Err(witness) = build_recovery_word_tree(vec![duplicate.clone(), duplicate, mixed])
+        else {
+            panic!("invalid words were accepted");
+        };
+        assert_eq!(witness.kind(), RecoveryDefectKind::MixedPrefix);
+        assert_eq!(witness.prefix_length(), 0);
+        assert_eq!(witness.word_id(), "z-mixed");
     }
 }
