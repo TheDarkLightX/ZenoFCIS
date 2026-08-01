@@ -94,6 +94,8 @@ The builder returns either one canonical tree or one canonical earliest defect.
 - any `MIXED` prefix remains a defect after later events;
 - `POST -> PRE` is rejected;
 - duplicate word identity and word-identity collision are distinct defects;
+- structural duplicate/collision defects and per-word defects compete under
+  the same canonical global witness ordering;
 - node identity includes the initial snapshot commitment and exact event prefix;
 - input order cannot change the selected shortest defect witness;
 - canonical encoding retains the exact word lineage.
