@@ -165,7 +165,7 @@ The workspace now includes the complete package ladder:
   strict approved-provider reconstruction into nominal validated decisions,
   canonical finite-domain manifests, independently verified exhaustive
   coverage, content-addressed promotion reports, canonical evidence envelopes,
-  and the first ZenoDEX profile;
+  deterministic minimal divergence witnesses, and the first ZenoDEX profile;
 - fixed-size executable domain machines with schema-admitted state, command,
   context, and port matrices; narrow per-machine interfaces; routes derived
   exactly from global composition wiring; deterministic merge-order execution;

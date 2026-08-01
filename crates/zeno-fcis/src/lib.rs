@@ -90,6 +90,14 @@ pub mod prelude {
 
     #[cfg(feature = "bootstrap")]
     pub use crate::{BootstrapLimits, BootstrapSpec, generate_project};
+
+    #[cfg(feature = "diagnostics")]
+    pub use zeno_fcis_diagnostics::{
+        DivergenceError, DivergenceForest, DivergenceWitness, ImplementationTrace,
+        RecoveryBadPrefixWitness, RecoveryDefectKind, RecoveryError, RecoveryEvent,
+        RecoveryEventKind, RecoveryObservation, RecoverySnapshotCommitment, RecoveryWord,
+        RecoveryWordTree, build_recovery_word_tree,
+    };
 }
 
 #[cfg(feature = "mounted-runtime")]
@@ -142,6 +150,9 @@ pub use zeno_fcis_core as core;
 ))]
 /// Vetted SHA-256 providers and independent provider-parity evidence.
 pub use zeno_fcis_crypto as crypto;
+#[cfg(feature = "diagnostics")]
+/// Deterministic trace partitions, recovery words, and globally minimal witnesses.
+pub use zeno_fcis_diagnostics as diagnostics;
 #[cfg(feature = "evidence")]
 /// Canonical evidence envelopes and independent checker adapters.
 pub use zeno_fcis_evidence as evidence;

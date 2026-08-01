@@ -8,6 +8,7 @@ publish_order = [
     "zeno-fcis-value",
     "zeno-fcis-core",
     "zeno-fcis-codec",
+    "zeno-fcis-diagnostics",
     "zeno-fcis-crypto",
     "zeno-fcis-spec",
     "zeno-fcis-project",
