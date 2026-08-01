@@ -242,12 +242,9 @@ impl RecoveryEvent {
         &self.effects
     }
 
-    fn is_structurally_valid(&self) -> bool {
-        !self.event_id().is_empty()
-            && !self.action().is_empty()
-            && self.effects.windows(2).all(|pair| pair[0] < pair[1])
-            && (self.kind != RecoveryEventKind::Stutter
-                || (self.before_snapshot == self.after_snapshot && self.effects.is_empty()))
+    fn has_valid_stutter_closure(&self) -> bool {
+        self.kind != RecoveryEventKind::Stutter
+            || (self.before_snapshot == self.after_snapshot && self.effects.is_empty())
     }
 }
 
@@ -763,7 +760,7 @@ fn validate_word(word: &RecoveryWord) -> Vec<RecoveryBadPrefixWitness> {
                 None,
             ));
         }
-        if !event.is_structurally_valid() {
+        if !event.has_valid_stutter_closure() {
             defects.push(witness(
                 RecoveryDefectKind::InvalidStutter,
                 word,
@@ -1120,6 +1117,31 @@ mod tests {
             panic!("invalid stutter was accepted");
         };
         assert_eq!(witness.kind(), RecoveryDefectKind::InvalidStutter);
+    }
+
+    #[test]
+    fn malformed_progress_effects_are_not_classified_as_invalid_stutter() {
+        let pre = snapshot(RecoveryObservation::Pre, 1);
+        let post = snapshot(RecoveryObservation::Post, 2);
+        for effects in [vec![hash(2), hash(1)], vec![hash(1), hash(1)]] {
+            let malformed = RecoveryEvent {
+                event_id: parse_event_id("progress")
+                    .unwrap_or_else(|error| panic!("id failed: {error}")),
+                action: parse_action("commit")
+                    .unwrap_or_else(|error| panic!("action failed: {error}")),
+                kind: RecoveryEventKind::Progress,
+                before_snapshot: pre,
+                after_snapshot: post,
+                payload_root: hash(3),
+                effects: effects.into_boxed_slice(),
+            };
+            let Err(witness) =
+                build_recovery_word_tree(vec![word("malformed", pre, vec![malformed])])
+            else {
+                panic!("noncanonical progress effects were accepted");
+            };
+            assert_eq!(witness.kind(), RecoveryDefectKind::NonCanonicalEffectSet);
+        }
     }
 
     #[test]
