@@ -1,6 +1,6 @@
 [package]
 name = "zeno-fcis-diagnostics"
-description = "Deterministic replay diagnostics and canonical minimal divergence witnesses"
+description = "Deterministic replay, divergence, and recovery-prefix diagnostics"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
