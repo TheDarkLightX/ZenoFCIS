@@ -1,0 +1,71 @@
+{
+  "active_candidates": [
+    "SIDF",
+    "RSPT",
+    "CRQG",
+    "CWET",
+    "CWCRM",
+    "FQAT",
+    "PFCT",
+    "CSIM",
+    "AIRB"
+  ],
+  "archive": {
+    "bytes": 392179,
+    "name": "zenostructures-research-bundle-0.5.0.zip",
+    "sha256": "c58fecb910fdfecc3e3433338664eb70002716c63ef0d3f3353177cb1d7a8daf"
+  },
+  "authority_class": "RESEARCH_ONLY_NONAUTHORITATIVE",
+  "baselines": [
+    "FSF",
+    "OL",
+    "MCDM",
+    "CBF"
+  ],
+  "components": [
+    "WPT",
+    "MDF",
+    "CPSQ",
+    "CDRT",
+    "SCR",
+    "DRFI",
+    "CCAL"
+  ],
+  "evidence": {
+    "bounded_cases": 2815,
+    "bounded_laws": 19,
+    "contract_configurations": 11264,
+    "coverage_percent": "86",
+    "hash_seed_equal": true,
+    "mutants_killed": 19,
+    "mutants_survived": 0,
+    "novelty_metadata_gate": true,
+    "unit_tests": 209
+  },
+  "formal_designs": [
+    "PFPL",
+    "ICRWT",
+    "PCFL"
+  ],
+  "manifest_root": "sha256:eef66aca5120f509857cde31a71b1773879fd59e80b320be4db97410d0acf994",
+  "nonclaims": [
+    "the archive is research evidence, not a production crate",
+    "Python objects and roots cannot enter a ZenoFCIS production commit port",
+    "bounded search does not prove worldwide novelty or patentability"
+  ],
+  "release": "zenostructures-0.5.0",
+  "release_evidence": "sha256:a7ce67f2639ce048046f070a68fbf8b30e638d1582cb260413d354c0d237ca2e",
+  "schema": "zenofcis/research-import-manifest/v2",
+  "source_archive": {
+    "bytes": 330655,
+    "name": "zenostructures-source-0.5.0.tar.gz",
+    "sha256": "d947d572fef84a181d87d28982cedc485835666dbf97c6d0508a2c775b3108fb"
+  },
+  "source_manifest": "sha256:554f6a9b1e7c097030bfb580bba5fea14b28773b4d8cd1e00473ff075e3f8d52",
+  "transport": {
+    "decoded_name": "zenostructures-research-bundle-0.5.0.zip",
+    "decoded_sha256": "c58fecb910fdfecc3e3433338664eb70002716c63ef0d3f3353177cb1d7a8daf",
+    "encoding": "conversation_attachment_or_review_artifact",
+    "file": "zenostructures-research-bundle-0.5.0.zip"
+  }
+}
