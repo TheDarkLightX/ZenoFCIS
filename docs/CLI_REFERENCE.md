@@ -4,7 +4,7 @@ The `zeno-fcis-cli` package in `1.0.0-rc.3` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
-zeno-fcis new <dir> --template minimal|mini-determinator
+zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter
 zeno-fcis check [project.zeno] [--format human|json]
 zeno-fcis generate [project.zeno] --out <dir> [--check]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
@@ -25,6 +25,14 @@ tools manifest and retain process records below `.zeno-fcis/evidence`.
 
 Machine output uses schema `zeno-fcis/cli/1`, deterministic field ordering,
 and no terminal color. Human output is deterministic for the same input.
+
+The development `durable-counter` template includes authored shapes, reviewed
+runtime laws, generated typed transitions, and a SQLite lifecycle. It uses the
+current checkout's schema-lowering and complete-invocation APIs. Run
+`python3 tools/check_generated_application.py` from the repository to compile
+and exercise it as an isolated consumer of this exact source. See the
+[template README](../crates/zeno-fcis-cli/templates/durable-counter/README.md)
+for its bounded semantics and local demonstration limits.
 
 ## Tools manifest
 

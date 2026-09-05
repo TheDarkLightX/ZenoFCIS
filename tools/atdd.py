@@ -85,6 +85,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Generate a reviewable project starter",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-bootstrap", "--locked"),),
     ),
+    "generated-application": AcceptanceScenario(
+        "Run an authored application through durable authorization",
+        (("python3", "tools/check_generated_application.py"),),
+    ),
     "composed-program": AcceptanceScenario(
         "Execute fixed domain machines through one global composition",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-composed-program", "--locked"),),

@@ -3427,6 +3427,7 @@ struct LeanBool {
 struct LeanRenderBudget {
     operations: u64,
     bytes: usize,
+    next_time_binding: u64,
     limits: ExportLimits,
 }
 impl LeanRenderBudget {
@@ -3434,8 +3435,17 @@ impl LeanRenderBudget {
         Self {
             operations: 0,
             bytes: 0,
+            next_time_binding: 0,
             limits,
         }
+    }
+
+    // A child temporal formula must never shadow the time expression passed
+    // by its parent. One supply also separates the two binders of `until`.
+    fn time_binding(&mut self) -> Result<String, ExportError> {
+        let binding = self.next_time_binding;
+        self.next_time_binding = binding.checked_add(1).ok_or(ExportError::ResourceLimit)?;
+        Ok(format!("time_{binding}"))
     }
 
     fn operation(&mut self) -> Result<(), ExportError> {
@@ -3839,38 +3849,45 @@ fn render_temporal_lean(
             render_temporal_lean(value, &format!("({step} + 1)"), environment, budget)?
         }
         TemporalFormula::Always(value) => {
-            let value = render_temporal_lean(value, "n", environment, budget)?;
+            let time = budget.time_binding()?;
+            let value = render_temporal_lean(value, &time, environment, budget)?;
             LeanBool {
-                term: format!("∀ n : Nat, n >= {step} → ({})", value.term),
-                defined: format!("∀ n : Nat, n >= {step} → ({})", value.defined),
+                term: format!("∀ {time} : Nat, {time} >= {step} → ({})", value.term),
+                defined: format!("∀ {time} : Nat, {time} >= {step} → ({})", value.defined),
             }
         }
         TemporalFormula::Eventually(value) => {
-            let value = render_temporal_lean(value, "n", environment, budget)?;
+            let time = budget.time_binding()?;
+            let value = render_temporal_lean(value, &time, environment, budget)?;
             LeanBool {
-                term: format!("∃ n : Nat, n >= {step} ∧ ({})", value.term),
-                defined: format!("∀ n : Nat, n >= {step} → ({})", value.defined),
+                term: format!("∃ {time} : Nat, {time} >= {step} ∧ ({})", value.term),
+                defined: format!("∀ {time} : Nat, {time} >= {step} → ({})", value.defined),
             }
         }
         TemporalFormula::Until(left, right) => {
-            let left_at_m = render_temporal_lean(left, "m", environment, budget)?;
-            let right_at_n = render_temporal_lean(right, "n", environment, budget)?;
+            let witness = budget.time_binding()?;
+            let prefix = budget.time_binding()?;
+            let left_at_prefix = render_temporal_lean(left, &prefix, environment, budget)?;
+            let right_at_witness = render_temporal_lean(right, &witness, environment, budget)?;
             LeanBool {
                 term: format!(
-                    "∃ n : Nat, n >= {step} ∧ ({}) ∧ \
-                     ∀ m : Nat, {step} <= m → m < n → ({})",
-                    right_at_n.term, left_at_m.term
+                    "∃ {witness} : Nat, {witness} >= {step} ∧ ({}) ∧ \
+                     ∀ {prefix} : Nat, {step} <= {prefix} → {prefix} < {witness} → ({})",
+                    right_at_witness.term, left_at_prefix.term
                 ),
                 defined: format!(
-                    "(∀ n : Nat, n >= {step} → ({})) ∧ \
-                     (∀ m : Nat, m >= {step} → ({}))",
-                    right_at_n.defined, left_at_m.defined
+                    "(∀ {witness} : Nat, {witness} >= {step} → ({})) ∧ \
+                     (∀ {prefix} : Nat, {prefix} >= {step} → ({}))",
+                    right_at_witness.defined, left_at_prefix.defined
                 ),
             }
         }
     };
     budget.boolean(rendered)
 }
+
+#[cfg(test)]
+mod translation_tests;
 
 #[cfg(test)]
 mod tests {
@@ -4547,8 +4564,8 @@ mod tests {
         let export = export_lean(&claim).unwrap_or_else(|_| unreachable!());
         let source = String::from_utf8_lossy(export.source());
         assert!(source.contains("-- claim-id 501\n"));
-        assert!(source.contains("(observe \"pre_100\" n).val"));
-        assert!(source.contains("∀ n : Nat, n >= 0"));
+        assert!(source.contains("(observe \"pre_100\" time_0).val"));
+        assert!(source.contains("∀ time_0 : Nat, time_0 >= 0"));
         assert!(source.contains(":= by\n  simp [claim_501,"));
         assert!(!source.contains("relational_atom"));
 

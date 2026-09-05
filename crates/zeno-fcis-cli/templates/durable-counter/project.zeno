@@ -1,0 +1,31 @@
+zeno 1;
+project 1 durable_counter;
+namespace 2 core;
+type 100 state CounterState;
+type 101 command CounterCommand;
+type 102 context CounterContext;
+type 103 destination NotificationDestination;
+type 104 payload Notification;
+type 105 int CounterValue;
+field 110 100 count 105;
+field 111 100 failures 105;
+field 112 104 notified_count 105;
+field 113 104 notified_failures 105;
+variant 120 101 Increment none;
+variant 121 101 RecordFailure none;
+reason 200 denied precedence 0;
+reason 201 capacity precedence 1;
+reason 202 recorded_failure precedence 2;
+channel 300 notify destination 103 payload 104;
+component 400 counter {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 32;
+}
+merge [400];
+law 500 bounded_state = post.100.110 >= 0 && post.100.110 <= 3 && post.100.111 >= 0 && post.100.111 <= 3;
+law 501 accepted_increment = context.102 == 1 && command.101 == 120 && post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111;
+law 502 committed_failure = context.102 == 1 && command.101 == 121 && post.100.110 == pre.100.110 && post.100.111 == pre.100.111 + 1;
+law 503 reject_no_authority = true;

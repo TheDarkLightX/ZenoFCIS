@@ -30,3 +30,11 @@ Feature: Adopt the ZenoFCIS core library
     When the bootstrap generator emits the starter package and negative vectors
     Then deterministic regeneration and generated consumer checks pass
     And the generator grants no schema or release authority
+
+  @atdd-generated-application
+  Scenario: Run an authored application through durable authorization
+    Given authored record and command shapes with explicit scalar bounds and runtime laws
+    When an adopter creates and builds the durable counter as an isolated package
+    Then all bounded input cases obey the reviewed decision table
+    And rejection publishes no state, replay or delivery rows
+    And committed failure, exact replay, database reopen and delivery retry preserve the expected state

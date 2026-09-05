@@ -1,6 +1,8 @@
 //! `zeno-fcis` authoring CLI.
 #![forbid(unsafe_code)]
 
+mod durable_counter;
+
 use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -194,6 +196,7 @@ enum BackendCommand {
 enum Template {
     Minimal,
     MiniDeterminator,
+    DurableCounter,
 }
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
@@ -289,6 +292,21 @@ fn new_project(dir: &Path, template: Template) -> u8 {
     } else if let Err(error) = fs::create_dir(dir) {
         return io_error("create target", error);
     }
+    if matches!(template, Template::DurableCounter) {
+        for (relative, content) in durable_counter::FILES {
+            let path = dir.join(relative);
+            if let Some(parent) = path.parent()
+                && let Err(error) = fs::create_dir_all(parent)
+            {
+                return io_error("create template directory", error);
+            }
+            if let Err(error) = atomic_create(&path, content.as_bytes()) {
+                return io_error("write template file", error);
+            }
+        }
+        println!("created {}", dir.display());
+        return OK;
+    }
     let (source, readme) = match template {
         Template::Minimal => (
             MINIMAL,
@@ -298,6 +316,7 @@ fn new_project(dir: &Path, template: Template) -> u8 {
             MINI,
             "# Mini Determinator\n\nA pure shared-nothing semantic example. Run `zeno-fcis check`.\n",
         ),
+        Template::DurableCounter => unreachable!("handled above"),
     };
     if let Err(error) = atomic_create(&dir.join("project.zeno"), source.as_bytes()) {
         return io_error("write project", error);

@@ -132,6 +132,73 @@ mod tests {
     }
 
     #[test]
+    fn generated_transition_preserves_complete_invocation_bindings() {
+        let project = generated_project();
+        let state = project
+            .admit_root::<RustCryptoSha256>(&minimal_state(), ValidationLimits::default())
+            .unwrap_or_else(|error| panic!("generated binding regression: {error:?}"));
+        let command = admitted_command(&project);
+        let context = admitted_context(&project);
+        let expected = ExpectedInvocationBindings::try_new(
+            command.commitment(),
+            RustCryptoSha256::hash(b"complete authenticated invocation"),
+        )
+        .unwrap_or_else(|error| panic!("generated binding regression: {error:?}"));
+        let decision = project
+            .begin_bound_transition::<RustCryptoSha256>(
+                &state,
+                state_domain(),
+                &command,
+                &context,
+                expected,
+                BudgetUsed::default(),
+                TransitionLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("generated binding regression: {error:?}"))
+            .seal()
+            .unwrap_or_else(|error| panic!("generated binding regression: {error:?}"));
+        assert!(
+            validate_transition_decision::<RustCryptoSha256>(
+                &decision,
+                project.catalog(),
+                expected,
+                state.value().value(),
+                state_domain(),
+            )
+            .is_ok()
+        );
+        let wrong_command = ExpectedInvocationBindings::try_new(
+            RustCryptoSha256::hash(b"another command"),
+            expected.context_hash(),
+        )
+        .unwrap_or_else(|error| panic!("generated binding regression: {error:?}"));
+        assert!(
+            validate_transition_decision::<RustCryptoSha256>(
+                &decision,
+                project.catalog(),
+                expected_invocation(&command, &context),
+                state.value().value(),
+                state_domain(),
+            )
+            .is_err(),
+            "the context value alone cannot replace the complete invocation binding"
+        );
+        assert!(
+            project
+                .begin_bound_transition::<RustCryptoSha256>(
+                    &state,
+                    state_domain(),
+                    &command,
+                    &context,
+                    wrong_command,
+                    BudgetUsed::default(),
+                    TransitionLimits::default(),
+                )
+                .is_err()
+        );
+    }
+
+    #[test]
     fn positive_vector_round_trips_through_codec() {
         for case in VECTORS {
             if !matches!(case.kind, VectorKind::Positive | VectorKind::Boundary) {

@@ -1,0 +1,52 @@
+//! Closed, package-local file set for the runnable development example.
+
+pub(crate) const FILES: &[(&str, &str)] = &[
+    (
+        "project.zeno",
+        include_str!("../templates/durable-counter/project.zeno"),
+    ),
+    (
+        "README.md",
+        include_str!("../templates/durable-counter/README.md"),
+    ),
+    (
+        "Cargo.toml",
+        include_str!("../templates/durable-counter/Cargo.toml.in"),
+    ),
+    (
+        "build.rs",
+        include_str!("../templates/durable-counter/build.rs"),
+    ),
+    (
+        "profile.rs",
+        include_str!("../templates/durable-counter/profile.rs"),
+    ),
+    (
+        "src/lib.rs",
+        include_str!("../templates/durable-counter/src/lib.rs"),
+    ),
+    (
+        "src/main.rs",
+        include_str!("../templates/durable-counter/src/main.rs"),
+    ),
+    (
+        "src/program.rs",
+        include_str!("../templates/durable-counter/src/program.rs"),
+    ),
+    (
+        "src/laws.rs",
+        include_str!("../templates/durable-counter/src/laws.rs"),
+    ),
+    (
+        "src/delivery.rs",
+        include_str!("../templates/durable-counter/src/delivery.rs"),
+    ),
+    (
+        "tests/lifecycle.rs",
+        include_str!("../templates/durable-counter/tests/lifecycle.rs"),
+    ),
+    (
+        "tests/laws.rs",
+        include_str!("../templates/durable-counter/tests/laws.rs"),
+    ),
+];
