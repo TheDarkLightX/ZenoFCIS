@@ -1435,6 +1435,7 @@ version = "1.0.0-rc.3"
 name = "zeno-fcis-crypto"
 version = "1.0.0-rc.3"
 dependencies = [
+ "criterion",
  "libcrux-sha2",
  "sha2",
  "zeno-fcis-codec",

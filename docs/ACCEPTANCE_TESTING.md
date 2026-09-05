@@ -58,7 +58,7 @@ feature file. This keeps Gherkin prose outside execution authority.
 | `composed-program` | Fixed domain-machine and global composition portfolio. |
 | `production-authority` | Catalog, invocation, law, genesis, and nominal commit authority. |
 | `sqlite-authority` | Crash-atomic authorized history and durable outbox. |
-| `release-contract` | Local formatting, lint, tests, docs, assurance, and packaging gate. |
+| `release-contract` | Local formatting, lint, tests, docs, assurance, packaging, and benchmark-fixture smoke gate. |
 | `probity-guardrails` | Hostile and permitted coding-agent workflow commands. |
 | `rc3-project-new` | Create a bounded project without overwriting files. |
 | `rc3-mini-os-check` | Check the Mini Determinator project in one command. |
@@ -79,3 +79,8 @@ feature file. This keeps Gherkin prose outside execution authority.
 
 The permanent adopter-acceptance workflow runs the checker and complete
 portfolio from the exact source revision.
+
+The benchmark smoke gate uses the development profile and Criterion's `--test`
+mode. It checks commitment parity and persistent-map fixtures across enabled
+backends; it does not qualify performance. See the
+[commitment optimization record](COMMITMENT_OPTIMIZATION.md) for timed runs.
