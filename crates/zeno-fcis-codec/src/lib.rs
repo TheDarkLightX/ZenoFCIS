@@ -70,6 +70,16 @@ pub trait CommitmentHasher {
 
     /// Hashes exact bytes to 32 bytes.
     fn hash(bytes: &[u8]) -> Hash32;
+
+    /// Hashes the concatenation of ordered byte slices.
+    ///
+    /// This must equal `Self::hash(&parts.concat())`: slice boundaries and
+    /// empty slices have no meaning. Providers may override this with an
+    /// incremental implementation to avoid allocating the concatenation.
+    /// The default preserves existing one-shot provider implementations.
+    fn hash_parts(parts: &[&[u8]]) -> Hash32 {
+        Self::hash(&parts.concat())
+    }
 }
 
 /// A versioned domain-separation tag.
@@ -122,8 +132,35 @@ pub fn commitment<H: CommitmentHasher>(
     domain: Domain<'_>,
     payload: &[u8],
 ) -> Result<Hash32, EncodeError> {
-    let preimage = domain_preimage(domain, payload)?;
-    Ok(H::hash(&preimage))
+    let domain_length =
+        u16::try_from(domain.name.len()).map_err(|_| EncodeError::LengthOverflow)?;
+    let payload_length = u64::try_from(payload.len()).map_err(|_| EncodeError::LengthOverflow)?;
+    let parts: [&[u8]; 6] = [
+        HASH_MAGIC,
+        &domain.version.to_be_bytes(),
+        &domain_length.to_be_bytes(),
+        domain.name.as_bytes(),
+        &payload_length.to_be_bytes(),
+        payload,
+    ];
+    // Small commitments need only one primitive call. The bounded local
+    // buffer avoids both a heap allocation and multiple incremental updates.
+    const SMALL_PREIMAGE_BYTES: usize = 128;
+    let header_length = HASH_MAGIC.len() + 2 + 2 + domain.name.len() + 8;
+    if let Some(length) = header_length
+        .checked_add(payload.len())
+        .filter(|length| *length <= SMALL_PREIMAGE_BYTES)
+    {
+        let mut preimage = [0_u8; SMALL_PREIMAGE_BYTES];
+        let mut offset = 0;
+        for part in parts {
+            let end = offset + part.len();
+            preimage[offset..end].copy_from_slice(part);
+            offset = end;
+        }
+        return Ok(H::hash(&preimage[..length]));
+    }
+    Ok(H::hash_parts(&parts))
 }
 
 /// Canonical encoding interface.
@@ -1041,6 +1078,69 @@ mod tests {
             commitment::<XorTestHasher>(Domain::new("zeno/test", 2).unwrap_or(domain), b"payload");
         assert!(left.is_ok() && right.is_ok());
         assert_ne!(left, right);
+    }
+
+    #[test]
+    fn legacy_hasher_parts_preserve_concatenation_and_empty_parts() {
+        for parts in [
+            vec![],
+            vec![&b""[..]],
+            vec![&b"a"[..], &b""[..], &b"bc"[..]],
+            vec![&b"abc"[..]],
+        ] {
+            assert_eq!(
+                XorTestHasher::hash_parts(&parts),
+                XorTestHasher::hash(&parts.concat())
+            );
+        }
+    }
+
+    #[test]
+    fn commitment_preserves_exact_framing_for_legacy_and_segmented_hashers() {
+        // Independent literal: magic, big-endian version, domain length/name,
+        // big-endian payload length, payload. Empty parts add no framing.
+        const EXPECTED: &[u8] =
+            b"ZENOFCIS-HASH\0\x12\x34\x00\x01x\x00\x00\x00\x00\x00\x00\x00\x03abc";
+        struct CheckFraming;
+        impl CommitmentHasher for CheckFraming {
+            const ALGORITHM_ID: &'static str = "test/framing-only";
+
+            fn hash(bytes: &[u8]) -> Hash32 {
+                assert_eq!(bytes, EXPECTED);
+                Hash32::ZERO
+            }
+        }
+        struct CheckParts;
+        impl CommitmentHasher for CheckParts {
+            const ALGORITHM_ID: &'static str = "test/segmented-framing-only";
+
+            fn hash(bytes: &[u8]) -> Hash32 {
+                CheckFraming::hash(bytes)
+            }
+
+            fn hash_parts(parts: &[&[u8]]) -> Hash32 {
+                let mut observed = parts.iter().flat_map(|part| part.iter());
+                for expected in EXPECTED {
+                    assert_eq!(observed.next(), Some(expected));
+                }
+                assert_eq!(observed.next(), None);
+                Hash32::ZERO
+            }
+        }
+        let domain =
+            Domain::new("x", 0x1234).unwrap_or_else(|error| panic!("test domain: {error}"));
+        assert_eq!(domain_preimage(domain, b"abc"), Ok(EXPECTED.to_vec()));
+        assert_eq!(commitment::<CheckFraming>(domain, b"abc"), Ok(Hash32::ZERO));
+        assert_eq!(commitment::<CheckParts>(domain, b"abc"), Ok(Hash32::ZERO));
+    }
+
+    #[test]
+    fn domain_name_admission_boundaries_are_unchanged() {
+        let maximum = "x".repeat(usize::from(u16::MAX));
+        assert!(Domain::new(&maximum, u16::MAX).is_ok());
+        for name in ["", "é", &(maximum + "x")] {
+            assert_eq!(Domain::new(name, 1), Err(EncodeError::InvalidDomain));
+        }
     }
 
     #[test]

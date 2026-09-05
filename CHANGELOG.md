@@ -6,6 +6,12 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Stream exact commitment preimages through the existing approved SHA-256
+  providers, removing the framing buffer while preserving canonical hashes
+  and a default allocating path for existing custom hashers.
+- Repair overflowing persistent-map benchmark fixtures, compare all existing
+  backends, and add allocating-versus-streaming commitment benchmarks with
+  permanent fixture smoke checks.
 - Add checked `.zeno` record/sum lowering with explicit scalar bounds and
   precise rejection of incompatible schema bindings.
 - Add the development `durable-counter` CLI template and an isolated consumer

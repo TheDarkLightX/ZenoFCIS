@@ -57,6 +57,7 @@
 - [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md)
 - [Policy-bound genesis authorization](GENESIS_AUTHORIZATION.md)
 - [Candidate and commit boundary](CANDIDATE_COMMIT_BOUNDARY.md)
+- [Commitment allocation optimization](COMMITMENT_OPTIMIZATION.md)
 
 ## Formal tools and runtime refinement
 

@@ -22,5 +22,13 @@ zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec", defaul
 sha2 = { version = "=0.11.0", default-features = false, optional = true }
 libcrux-sha2 = { version = "=0.0.8", default-features = false, optional = true }
 
+[dev-dependencies]
+criterion = "=0.5.1"
+
+[[bench]]
+name = "commitment"
+harness = false
+required-features = ["parity"]
+
 [lints]
 workspace = true

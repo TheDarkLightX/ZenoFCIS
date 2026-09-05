@@ -38,6 +38,12 @@ jobs:
       - name: Test
         run: cargo +1.97.1 test --workspace --all-features --locked
 
+      - name: Validate commitment and persistent-map benchmark fixtures
+        run: >-
+          cargo +1.97.1 bench --profile dev
+          -p zeno-fcis-crypto -p zeno-fcis-collections
+          --all-features --locked -- --test
+
       - name: Documentation tests
         run: cargo +1.97.1 test --workspace --doc --all-features --locked
 

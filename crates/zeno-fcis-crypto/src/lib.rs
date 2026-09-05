@@ -43,6 +43,17 @@ impl CommitmentHasher for RustCryptoSha256 {
         output.copy_from_slice(&digest);
         Hash32::new(output)
     }
+
+    fn hash_parts(parts: &[&[u8]]) -> Hash32 {
+        let mut engine = RustCryptoEngine::new();
+        for part in parts {
+            engine.update(part);
+        }
+        let digest = engine.finalize();
+        let mut output = [0_u8; 32];
+        output.copy_from_slice(&digest);
+        Hash32::new(output)
+    }
 }
 
 /// SHA-256 backed by the libcrux HACL* implementation.
@@ -58,11 +69,17 @@ impl CommitmentHasher for LibcruxSha256 {
     const ALGORITHM_ID: &'static str = "sha2-256/libcrux-0.0.8-hacl";
 
     fn hash(bytes: &[u8]) -> Hash32 {
+        Self::hash_parts(&[bytes])
+    }
+
+    fn hash_parts(parts: &[&[u8]]) -> Hash32 {
         const MAXIMUM_CHUNK: usize = u32::MAX as usize;
 
         let mut engine = LibcruxEngine::new();
-        for chunk in bytes.chunks(MAXIMUM_CHUNK) {
-            engine.update(chunk);
+        for part in parts {
+            for chunk in part.chunks(MAXIMUM_CHUNK) {
+                engine.update(chunk);
+            }
         }
         let mut output = [0_u8; 32];
         engine.finish(&mut output);
@@ -292,7 +309,8 @@ const DOMAIN_DIGEST: Hash32 = Hash32::new([
 const MULTIBLOCK_MESSAGE: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
 
 /// Verifies one provider against published SHA-256 vectors and one ZenoFCIS
-/// domain-separation vector.
+/// domain-separation vector. Raw vectors exercise both one-shot and segmented
+/// hashing; the report counts distinct vectors, not calls to the primitive.
 pub fn verify_known_answers<H: CommitmentHasher>()
 -> Result<KnownAnswerReport, ProviderVerificationError> {
     let vectors = [
@@ -301,15 +319,22 @@ pub fn verify_known_answers<H: CommitmentHasher>()
         (MULTIBLOCK_MESSAGE, MULTIBLOCK_DIGEST),
     ];
     for (ordinal, (message, expected)) in vectors.into_iter().enumerate() {
-        let observed = H::hash(message);
-        if observed != expected {
-            let vector =
-                u16::try_from(ordinal).map_err(|_| ProviderVerificationError::LengthOverflow)?;
-            return Err(ProviderVerificationError::KnownAnswerMismatch {
-                vector,
-                expected,
-                observed,
-            });
+        for segmented in [false, true] {
+            let observed = if segmented {
+                let midpoint = message.len() / 2;
+                H::hash_parts(&[&message[..midpoint], b"", &message[midpoint..]])
+            } else {
+                H::hash(message)
+            };
+            if observed != expected {
+                let vector = u16::try_from(ordinal)
+                    .map_err(|_| ProviderVerificationError::LengthOverflow)?;
+                return Err(ProviderVerificationError::KnownAnswerMismatch {
+                    vector,
+                    expected,
+                    observed,
+                });
+            }
         }
     }
 
@@ -345,9 +370,18 @@ pub fn verify_provider_parity(
         .map_err(|_| ProviderVerificationError::SemanticEncoding)?;
     let preimage =
         domain_preimage(domain, bytes).map_err(|_| ProviderVerificationError::SemanticEncoding)?;
+    let reference_left = RustCryptoSha256::hash(&preimage);
+    let reference_right = LibcruxSha256::hash(&preimage);
+    compare_hashes(reference_left, reference_right)?;
     compare_hashes(
-        RustCryptoSha256::hash(&preimage),
-        LibcruxSha256::hash(&preimage),
+        commitment::<RustCryptoSha256>(domain, bytes)
+            .map_err(|_| ProviderVerificationError::SemanticEncoding)?,
+        reference_left,
+    )?;
+    compare_hashes(
+        commitment::<LibcruxSha256>(domain, bytes)
+            .map_err(|_| ProviderVerificationError::SemanticEncoding)?,
+        reference_right,
     )?;
 
     let bytes_checked =
@@ -370,7 +404,104 @@ fn compare_hashes(left: Hash32, right: Hash32) -> Result<(), ProviderVerificatio
 
 #[cfg(test)]
 mod tests {
+    extern crate alloc;
+
     use super::*;
+    #[cfg(any(feature = "rustcrypto", feature = "libcrux"))]
+    use alloc::vec::Vec;
+
+    #[cfg(any(feature = "rustcrypto", feature = "libcrux"))]
+    fn check_segmented_hashes<H: CommitmentHasher>() {
+        assert_eq!(H::hash_parts(&[]), EMPTY_DIGEST);
+        assert_eq!(H::hash_parts(&[b"", b"a", b"", b"bc", b""]), ABC_DIGEST);
+        // Exhaust all two-part splits through two SHA-256 blocks, including
+        // both padding boundaries. Distinct bytes expose dropped/reordered data.
+        for length in 0..=130 {
+            let bytes: Vec<u8> = (0_u8..=255).cycle().take(length).collect();
+            let expected = H::hash(&bytes);
+            for split in 0..=length {
+                assert_eq!(
+                    H::hash_parts(&[&bytes[..split], b"", &bytes[split..]]),
+                    expected,
+                    "length {length}, split {split}"
+                );
+            }
+            let single_bytes: Vec<&[u8]> = bytes.chunks(1).collect();
+            assert_eq!(H::hash_parts(&single_bytes), expected);
+        }
+        for length in [255, 256, 257, 1024, 65_536] {
+            let bytes: Vec<u8> = (0_u8..=255).cycle().take(length).collect();
+            let expected = H::hash(&bytes);
+            for chunk_size in [1, 55, 56, 63, 64, 65, 257] {
+                let parts: Vec<&[u8]> = bytes.chunks(chunk_size).collect();
+                assert_eq!(H::hash_parts(&parts), expected);
+            }
+        }
+    }
+
+    #[cfg(any(feature = "rustcrypto", feature = "libcrux"))]
+    fn check_domain_commitments<H: CommitmentHasher>() {
+        use zeno_fcis_codec::domain_preimage;
+
+        let maximum_name = "x".repeat(usize::from(u16::MAX));
+        for name in ["x", "zeno-fcis/test", maximum_name.as_str()] {
+            for version in [0, 1, u16::MAX] {
+                let domain = Domain::new(name, version)
+                    .unwrap_or_else(|error| panic!("test domain: {error}"));
+                // Cover every possible header alignment around block/padding
+                // boundaries, as well as larger payloads.
+                for length in (0..=130).chain([255, 256, 257, 1024, 65_536]) {
+                    let payload: Vec<u8> = (0_u8..=255).cycle().take(length).collect();
+                    let reference = domain_preimage(domain, &payload)
+                        .unwrap_or_else(|error| panic!("reference preimage: {error}"));
+                    assert_eq!(commitment::<H>(domain, &payload), Ok(H::hash(&reference)));
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "rustcrypto")]
+    #[test]
+    fn rustcrypto_segmented_hashes_equal_one_shot() {
+        check_segmented_hashes::<RustCryptoSha256>();
+        check_domain_commitments::<RustCryptoSha256>();
+    }
+
+    #[cfg(feature = "libcrux")]
+    #[test]
+    fn libcrux_segmented_hashes_equal_one_shot() {
+        check_segmented_hashes::<LibcruxSha256>();
+        check_domain_commitments::<LibcruxSha256>();
+    }
+
+    #[cfg(feature = "rustcrypto")]
+    #[test]
+    fn known_answers_reject_a_broken_segmented_path() {
+        struct BrokenParts;
+        impl CommitmentHasher for BrokenParts {
+            const ALGORITHM_ID: &'static str = "test/broken-parts";
+
+            fn hash(bytes: &[u8]) -> Hash32 {
+                RustCryptoSha256::hash(bytes)
+            }
+
+            fn hash_parts(_: &[&[u8]]) -> Hash32 {
+                Hash32::ZERO
+            }
+        }
+        assert!(matches!(
+            verify_known_answers::<BrokenParts>(),
+            Err(ProviderVerificationError::KnownAnswerMismatch { vector: 0, .. })
+        ));
+        // The nominal provider identity and fixed-vector report stay intact.
+        let verified = verify_approved_provider::<RustCryptoSha256>()
+            .unwrap_or_else(|error| panic!("approved provider: {error}"));
+        assert_eq!(
+            verified.provider_id(),
+            ApprovedProviderId::RustCryptoSha256_0_11_0
+        );
+        assert_eq!(verified.report().vectors_checked(), 4);
+    }
 
     #[cfg(feature = "rustcrypto")]
     #[test]
