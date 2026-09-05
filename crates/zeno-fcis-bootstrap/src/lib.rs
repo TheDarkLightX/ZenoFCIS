@@ -8,6 +8,7 @@
 
 mod model;
 mod render;
+mod schema_lowering;
 mod templates;
 
 pub use model::{
@@ -16,3 +17,4 @@ pub use model::{
     MAX_BOOTSTRAP_TOTAL_BYTES,
 };
 pub use render::generate_project;
+pub use schema_lowering::{SchemaLoweringError, lower_schema};

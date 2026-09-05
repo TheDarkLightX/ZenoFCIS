@@ -86,6 +86,10 @@ jobs:
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
               -p zeno-fcis-formal-tools --locked \
               tests::pinned_lean_translation_kernel_checks -- --ignored --exact
+          ZENO_FCIS_TRANSLATION_LEAN="$PWD/$LEAN_BIN" \
+            cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              -p zeno-fcis-formal-tools --locked \
+              translation_tests::operator_corpus_checks_with_existing_lean -- --ignored --exact --nocapture
       - name: Kernel-check Lean through the published CLI process
         working-directory: ${{ runner.temp }}
         run: |

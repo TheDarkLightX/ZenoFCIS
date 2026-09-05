@@ -6,7 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
-No changes yet.
+- Add checked `.zeno` record/sum lowering with explicit scalar bounds and
+  precise rejection of incompatible schema bindings.
+- Add the development `durable-counter` CLI template and an isolated consumer
+  gate covering runtime laws, nominal authorization, SQLite restart, exact
+  replay, and idempotent notification delivery.
+- Add generated `begin_bound_transition` for complete shell-owned invocation
+  bindings and support empty generated reason, effect, and channel enums.
+- Fix nested Lean temporal variable capture and add a relational/temporal
+  translation corpus. Lean remains pinned at 4.30.0; the corpus can reuse an
+  existing executable without installing or copying its runtime.
 
 ## 1.0.0-rc.3 - release date pending
 

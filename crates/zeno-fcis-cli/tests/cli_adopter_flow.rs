@@ -38,6 +38,51 @@ fn cli() -> &'static str {
     env!("CARGO_BIN_EXE_zeno-fcis")
 }
 
+#[test]
+fn cli_durable_counter_emits_a_complete_project_without_overwriting() {
+    let temp = TempRoot::new("durable-counter");
+    let target = temp.path().join("app");
+    let first = run(Command::new(cli())
+        .arg("new")
+        .arg(&target)
+        .args(["--template", "durable-counter"]));
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    for name in [
+        "Cargo.toml",
+        "README.md",
+        "project.zeno",
+        "profile.rs",
+        "build.rs",
+        "src/lib.rs",
+        "src/main.rs",
+        "src/program.rs",
+        "src/laws.rs",
+        "src/delivery.rs",
+        "tests/lifecycle.rs",
+    ] {
+        assert!(target.join(name).is_file(), "missing {name}");
+    }
+    let checked = run(Command::new(cli())
+        .arg("check")
+        .arg(target.join("project.zeno")));
+    assert!(
+        checked.status.success(),
+        "{}",
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    let source = read(target.join("src/program.rs"));
+    let repeated = run(Command::new(cli())
+        .arg("new")
+        .arg(&target)
+        .args(["--template", "durable-counter"]));
+    assert!(!repeated.status.success());
+    assert_eq!(read(target.join("src/program.rs")), source);
+}
+
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()

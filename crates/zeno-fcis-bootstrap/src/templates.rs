@@ -169,9 +169,24 @@ pub(crate) fn render_rust_project(
     Ok(output)
 }
 
+fn render_id_attributes(output: &mut String, empty: bool) {
+    output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    if !empty {
+        output.push_str("#[repr(u32)]\n");
+    }
+}
+
+fn render_id_get(output: &mut String, empty: bool) {
+    output.push_str(if empty {
+        "    pub const fn get(self) -> u32 { match self {} }\n"
+    } else {
+        "    pub const fn get(self) -> u32 { self as u32 }\n"
+    });
+}
+
 fn render_reason_enum(output: &mut String, catalog: &ProjectCatalog) -> Result<(), BootstrapError> {
     output.push_str("/// Stable catalogued reason identifiers.\n");
-    output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n#[repr(u32)]\n");
+    render_id_attributes(output, catalog.manifest().reasons().is_empty());
     output.push_str("pub enum ReasonId {\n");
     for reason in catalog.manifest().reasons() {
         writeln!(
@@ -185,7 +200,7 @@ fn render_reason_enum(output: &mut String, catalog: &ProjectCatalog) -> Result<(
         .map_err(|_| BootstrapError::Render)?;
     }
     output.push_str("}\n\nimpl ReasonId {\n");
-    output.push_str("    pub const fn get(self) -> u32 { self as u32 }\n");
+    render_id_get(output, catalog.manifest().reasons().is_empty());
     output.push_str("    pub fn try_semantic_id(self) -> Result<SemanticId, ProfileError> {\n");
     output.push_str("        SemanticId::try_new(self.get())\n    }\n");
     output.push_str("    pub const fn class(self) -> ReasonClass {\n        match self {\n");
@@ -268,7 +283,7 @@ fn render_typed_reason_enum(
 
 fn render_effect_enum(output: &mut String, catalog: &ProjectCatalog) -> Result<(), BootstrapError> {
     output.push_str("/// Stable authoritative-effect identifiers.\n");
-    output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n#[repr(u32)]\n");
+    render_id_attributes(output, catalog.manifest().effects().is_empty());
     output.push_str("pub enum EffectKind {\n");
     for effect in catalog.manifest().effects() {
         writeln!(
@@ -281,7 +296,8 @@ fn render_effect_enum(output: &mut String, catalog: &ProjectCatalog) -> Result<(
         .map_err(|_| BootstrapError::Render)?;
     }
     output.push_str("}\n\nimpl EffectKind {\n");
-    output.push_str("    pub const fn get(self) -> u32 { self as u32 }\n}\n\n");
+    render_id_get(output, catalog.manifest().effects().is_empty());
+    output.push_str("}\n\n");
     Ok(())
 }
 
@@ -290,7 +306,7 @@ fn render_channel_enum(
     catalog: &ProjectCatalog,
 ) -> Result<(), BootstrapError> {
     output.push_str("/// Stable external-delivery channel identifiers.\n");
-    output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n#[repr(u32)]\n");
+    render_id_attributes(output, catalog.manifest().channels().is_empty());
     output.push_str("pub enum ChannelKind {\n");
     for channel in catalog.manifest().channels() {
         writeln!(
@@ -303,7 +319,8 @@ fn render_channel_enum(
         .map_err(|_| BootstrapError::Render)?;
     }
     output.push_str("}\n\nimpl ChannelKind {\n");
-    output.push_str("    pub const fn get(self) -> u32 { self as u32 }\n}\n\n");
+    render_id_get(output, catalog.manifest().channels().is_empty());
+    output.push_str("}\n\n");
     Ok(())
 }
 
@@ -766,6 +783,29 @@ fn render_generated_project(
     output.push_str("        budget_used: BudgetUsed,\n");
     output.push_str("        limits: TransitionLimits,\n");
     output.push_str("    ) -> Result<GeneratedTransition<'a, H>, GeneratedProjectError> {\n");
+    output.push_str("        let expected = zeno_fcis_transition::ExpectedInvocationBindings::try_new(command.commitment(), context.commitment())?;\n");
+    output.push_str("        self.begin_bound_transition::<H>(pre_state, state_domain, command, context, expected, budget_used, limits)\n");
+    output.push_str("    }\n\n");
+    output.push_str(
+        "    /// Starts a transition using the shell-owned complete invocation bindings.\n",
+    );
+    output.push_str("    ///\n");
+    output.push_str("    /// Pass `ReviewedTransitionInput::expected_bindings()` inside the reviewed program.\n");
+    output.push_str("    /// The command must match its admitted value. The complete context binding includes\n");
+    output.push_str("    /// authentication and replay data; only the authority can validate that relationship.\n");
+    output.push_str(
+        "    /// This constructor creates a candidate builder and grants no commit authority.\n",
+    );
+    output.push_str("    pub fn begin_bound_transition<'a, H: CommitmentHasher>(\n");
+    output.push_str("        &'a self,\n");
+    output.push_str("        pre_state: &'a SchemaAdmittedEnvelope,\n");
+    output.push_str("        state_domain: Domain<'a>,\n");
+    output.push_str("        command: &GeneratedCommandEnvelope,\n");
+    output.push_str("        context: &GeneratedContextEnvelope,\n");
+    output.push_str("        expected: zeno_fcis_transition::ExpectedInvocationBindings,\n");
+    output.push_str("        budget_used: BudgetUsed,\n");
+    output.push_str("        limits: TransitionLimits,\n");
+    output.push_str("    ) -> Result<GeneratedTransition<'a, H>, GeneratedProjectError> {\n");
     output.push_str("        self.validate_catalog::<H>()?;\n");
     output.push_str("        if pre_state.schema_hash() != SCHEMA_HASH {\n");
     output.push_str("            return Err(GeneratedProjectError::SchemaHashMismatch { expected: SCHEMA_HASH, actual: pre_state.schema_hash() });\n");
@@ -775,11 +815,14 @@ fn render_generated_project(
     output.push_str("        }\n");
     output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Command, command.admitted(), command.commitment())?;\n");
     output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Context, context.admitted(), context.commitment())?;\n");
+    output.push_str("        if expected.command_hash() != command.commitment() {\n");
+    output.push_str("            return Err(GeneratedProjectError::InputCommitmentMismatch { kind: GeneratedInputKind::Command, expected: expected.command_hash(), actual: command.commitment() });\n");
+    output.push_str("        }\n");
     output.push_str("        let inner = CataloguedTransitionBuilder::try_new(\n");
     output.push_str(
         "            &self.catalog, pre_state.value().value(), state_domain, command.commitment(),\n",
     );
-    output.push_str("            context.commitment(), budget_used, limits,\n");
+    output.push_str("            expected.context_hash(), budget_used, limits,\n");
     output.push_str("        )?;\n");
     output.push_str("        Ok(GeneratedTransition { inner })\n");
     output.push_str("    }\n\n");

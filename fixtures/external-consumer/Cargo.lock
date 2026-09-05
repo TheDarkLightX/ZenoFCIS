@@ -179,6 +179,7 @@ dependencies = [
  "zeno-fcis-codegen",
  "zeno-fcis-project",
  "zeno-fcis-schema",
+ "zeno-fcis-spec",
 ]
 
 [[package]]

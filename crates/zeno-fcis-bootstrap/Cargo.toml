@@ -16,6 +16,7 @@ zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
 zeno-fcis-codegen = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codegen" }
 zeno-fcis-project = { version = "=1.0.0-rc.3", path = "../zeno-fcis-project" }
 zeno-fcis-schema = { version = "=1.0.0-rc.3", path = "../zeno-fcis-schema" }
+zeno-fcis-spec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-spec" }
 
 [lints]
 workspace = true

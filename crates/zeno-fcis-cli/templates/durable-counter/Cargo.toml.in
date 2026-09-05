@@ -1,0 +1,42 @@
+[package]
+name = "durable-counter"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+# The emitted application is independent of any enclosing workspace.
+[workspace]
+
+[dependencies]
+zeno-fcis-authority = "=1.0.0-rc.3"
+zeno-fcis-catalog = "=1.0.0-rc.3"
+zeno-fcis-codec = "=1.0.0-rc.3"
+zeno-fcis-compose = "=1.0.0-rc.3"
+zeno-fcis-core = "=1.0.0-rc.3"
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", features = ["rustcrypto"] }
+zeno-fcis-evidence = "=1.0.0-rc.3"
+zeno-fcis-laws = "=1.0.0-rc.3"
+zeno-fcis-patch = "=1.0.0-rc.3"
+zeno-fcis-plan = "=1.0.0-rc.3"
+zeno-fcis-project = "=1.0.0-rc.3"
+zeno-fcis-schema = "=1.0.0-rc.3"
+zeno-fcis-shell = "=1.0.0-rc.3"
+zeno-fcis-shell-sqlite = "=1.0.0-rc.3"
+zeno-fcis-spec = "=1.0.0-rc.3"
+zeno-fcis-transition = "=1.0.0-rc.3"
+zeno-fcis-value = "=1.0.0-rc.3"
+
+[build-dependencies]
+zeno-fcis-bootstrap = "=1.0.0-rc.3"
+zeno-fcis-catalog = "=1.0.0-rc.3"
+zeno-fcis-codec = "=1.0.0-rc.3"
+zeno-fcis-crypto = { version = "=1.0.0-rc.3", features = ["rustcrypto"] }
+zeno-fcis-laws = "=1.0.0-rc.3"
+zeno-fcis-project = "=1.0.0-rc.3"
+zeno-fcis-schema = "=1.0.0-rc.3"
+zeno-fcis-spec = "=1.0.0-rc.3"
+
+[profile.dev]
+debug = 0
+incremental = false
