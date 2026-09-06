@@ -58,6 +58,7 @@
 - [Policy-bound genesis authorization](GENESIS_AUTHORIZATION.md)
 - [Candidate and commit boundary](CANDIDATE_COMMIT_BOUNDARY.md)
 - [Commitment allocation optimization](COMMITMENT_OPTIMIZATION.md)
+- [Owned footprint sealing](OWNED_FOOTPRINT_SEALING.md)
 
 ## Formal tools and runtime refinement
 
