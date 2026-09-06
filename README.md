@@ -93,7 +93,9 @@ ProjectProfile + ProjectCatalog
 Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
 [crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
-[LLM integration guide](docs/LLM_USAGE.md). The
+[LLM integration guide](docs/LLM_USAGE.md). Agents can discover this development
+CLI with `zeno-fcis describe` and inspect generation drift with
+`zeno-fcis generate --out generated --check --format json`. The
 [V1 product contract](docs/V1_PRODUCT_CONTRACT.md) defines the RC3 feature
 freeze and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md)
 bind those journeys to fixed executable commands, while the optional
@@ -187,7 +189,7 @@ The workspace now includes the complete package ladder:
 - crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
-- a frozen V1 product contract, 25 human-readable BDD scenarios, a closed
+- a frozen V1 product contract, 26 human-readable BDD scenarios, a closed
   fail-closed ATDD registry, and optional deterministic Probity guardrails with
   a pinned Node/npm graph and hostile command corpus.
 

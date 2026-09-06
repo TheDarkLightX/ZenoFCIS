@@ -6,6 +6,21 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add parser-derived `describe [COMMAND...]` JSON for agents, including command
+  effects, argument defaults/choices, and bounded failure recovery guidance.
+- Add optional JSON generation and drift results, bounded artifact comparisons,
+  and explicit artifact-read errors while preserving read-only checks.
+- Implement the standard `core::error::Error` trait for eight foundational
+  errors, enabling normal downstream `?` propagation without requiring `std`.
+- Align workspace, generated application, external consumer, and fuzz metadata
+  with the documented minimum Rust version, 1.97.1; retain existing dependencies.
+- Return versioned JSON for CLI project-read failures when requested, including
+  JSON graph input errors, and classify tool timeouts as execution failure (3).
+- Bound CLI project-file reads before UTF-8 interpretation or parsing. Oversized
+  files now return input-acquisition failure (3); in-memory parser diagnostics
+  and accepted source programs are unchanged.
+- Refresh quickstart commands and the complete generated-application journey,
+  and report the actual error when the admitted-executable regression fails.
 - Move owned footprint buffers into sealed transitions, avoiding deep clones
   while preserving normalization, reason precedence, resource bindings, and
   rejection behavior.

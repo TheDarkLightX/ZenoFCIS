@@ -1169,6 +1169,8 @@ pub enum PatchError {
     },
 }
 
+impl core::error::Error for PatchError {}
+
 impl fmt::Display for PatchError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

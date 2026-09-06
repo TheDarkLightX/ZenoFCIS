@@ -74,7 +74,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
             (
                 "cargo",
                 "+1.97.1",
-                "check",
+                "run",
                 "--manifest-path",
                 "fixtures/external-consumer/Cargo.toml",
                 "--locked",
@@ -329,6 +329,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
                 "--locked",
                 "rc3_cli_formal_outcomes_and_retention_are_process_level",
             ),
+            (
+                "cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked",
+                "cli_tool_timeout_is_execution_failure",
+            ),
         ),
     ),
     "rc3-input-inert": AcceptanceScenario(
@@ -493,6 +497,14 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
                 "zeno-fcis-cli",
                 "--locked",
                 "rc3_cli_invalid_json_diagnostics",
+            ),
+            (
+                "cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked",
+                "cli_project_",
+            ),
+            (
+                "cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--locked",
+                "--test", "cli_adopter_flow", "agent_",
             ),
         ),
     ),

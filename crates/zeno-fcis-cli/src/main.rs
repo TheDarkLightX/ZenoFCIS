@@ -4,12 +4,12 @@
 mod durable_counter;
 
 use std::fs::{self, OpenOptions};
-use std::io::Write as _;
+use std::io::{Read, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use serde_json::{Value, json};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_formal_tools::{
@@ -24,6 +24,7 @@ use zeno_fcis_spec::{
 };
 
 const JSON_SCHEMA: &str = "zeno-fcis/cli/1";
+const DESCRIPTION_SCHEMA: &str = "zeno-fcis/cli-description/1";
 const OK: u8 = 0;
 const INVALID: u8 = 1;
 const BLOCKED: u8 = 2;
@@ -98,6 +99,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Describe commands, arguments, defaults, and effects as JSON without reading projects.
+    Describe {
+        /// Optional command path, for example: backend verify.
+        #[arg(value_name = "COMMAND")]
+        command: Vec<String>,
+    },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
         dir: PathBuf,
@@ -119,6 +126,8 @@ enum Command {
         out: PathBuf,
         #[arg(long)]
         check: bool,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+        format: OutputFormat,
     },
     /// Render a deterministic composition graph as DOT, Mermaid, or JSON.
     Graph {
@@ -239,13 +248,15 @@ fn clap_error_exit(error: &clap::Error) -> u8 {
 
 fn run(command: Command) -> u8 {
     match command {
+        Command::Describe { command } => describe(&command),
         Command::New { dir, template } => new_project(&dir, template),
         Command::Check { project, format } => check(&project, format),
         Command::Generate {
             project,
             out,
             check,
-        } => generate(&project, &out, check),
+            format,
+        } => generate(&project, &out, check, format),
         Command::Graph { project, format } => graph(&project, format),
         Command::Explain {
             project,
@@ -276,6 +287,108 @@ fn run(command: Command) -> u8 {
         Command::Doctor { tools } => run_doctor(&tools),
         Command::Backend { command } => backend(command),
     }
+}
+
+fn describe(path: &[String]) -> u8 {
+    let mut root = Cli::command();
+    root.build();
+    let mut selected = &root;
+    for name in path {
+        let Some(command) = selected
+            .get_subcommands()
+            .find(|command| command.get_name() == name)
+        else {
+            print_json(&json!({
+                "schema": DESCRIPTION_SCHEMA, "status": "error",
+                "error": {"code": "unknown-command", "command": path}
+            }));
+            return USAGE;
+        };
+        selected = command;
+    }
+    let limits = SourceLimits::default();
+    print_json(&json!({
+        "schema": DESCRIPTION_SCHEMA,
+        "cli_version": env!("CARGO_PKG_VERSION"),
+        "authority": "diagnostic-only",
+        "limits": {"max_source_bytes": limits.max_bytes(), "max_source_tokens": limits.max_tokens(), "max_diagnostics": limits.max_diagnostics()},
+        "exit_codes": [
+            {"code": OK, "meaning": "requested result completed"},
+            {"code": INVALID, "meaning": "invalid input, refuted claim, or generated drift"},
+            {"code": BLOCKED, "meaning": "blocked prerequisite or indeterminate evidence"},
+            {"code": FAILURE, "meaning": "filesystem, tool, or bounded execution failure"},
+            {"code": USAGE, "meaning": "invalid command-line arguments"}
+        ],
+        "command": describe_tree(selected, path)
+    }));
+    OK
+}
+
+fn describe_tree(command: &clap::Command, path: &[String]) -> Value {
+    let mut arguments: Vec<_> = command
+        .get_arguments()
+        .filter(|arg| !arg.is_hide_set())
+        .collect();
+    arguments.sort_by_key(|arg| arg.get_id().as_str());
+    let arguments: Vec<Value> = arguments.into_iter().map(|arg| {
+        let range = arg.get_num_args().unwrap_or_default();
+        json!({
+            "id": arg.get_id().as_str(), "long": arg.get_long(), "short": arg.get_short(),
+            "position": arg.get_index(), "required": arg.is_required_set(),
+            "help": arg.get_help().map(ToString::to_string),
+            "arity": {"min": range.min_values(), "max": (range.max_values() != usize::MAX).then_some(range.max_values())},
+            "defaults": arg.get_default_values().iter().map(|value| value.to_string_lossy()).collect::<Vec<_>>(),
+            "choices": arg.get_possible_values().iter().map(|value| value.get_name()).collect::<Vec<_>>()
+        })
+    }).collect();
+    let mut commands: Vec<_> = command.get_subcommands().collect();
+    commands.sort_by_key(|command| command.get_name());
+    let commands: Vec<Value> = commands
+        .into_iter()
+        .map(|command| {
+            let mut child_path = path.to_vec();
+            child_path.push(command.get_name().to_owned());
+            describe_tree(command, &child_path)
+        })
+        .collect();
+    json!({
+        "name": command.get_name(), "path": path, "about": command.get_about().map(ToString::to_string),
+        "subcommand_required": command.is_subcommand_required_set(),
+        "arguments": arguments, "subcommands": commands, "effects": describe_effects(path)
+    })
+}
+
+fn describe_effects(path: &[String]) -> Value {
+    let path: Vec<_> = path.iter().map(String::as_str).collect();
+    let (reads, writes, executes_tools, read_only_flag): (&[&str], &[&str], bool, Option<&str>) =
+        match path.as_slice() {
+            [] | ["backend"] => return json!({"classification": "command-group"}),
+            ["describe"] | ["backend", "list"] => (&[], &[], false, None),
+            ["new"] => (&["target-directory"], &["project-files"], false, None),
+            ["check" | "graph" | "explain"] => (&["project"], &[], false, None),
+            ["generate"] => (
+                &["project", "generated-artifacts"],
+                &["generated-artifacts"],
+                false,
+                Some("--check"),
+            ),
+            ["backend", "inspect"] => (&["tools-manifest"], &[], false, None),
+            ["backend", "inventory-lean"] => (&["toolchain-files"], &[], false, None),
+            ["doctor"] | ["backend", "verify"] => (
+                &["tools-manifest", "toolchain-files"],
+                &["temporary-files"],
+                true,
+                None,
+            ),
+            ["prove" | "counterexample"] => (
+                &["project", "tools-manifest", "toolchain-files"],
+                &["temporary-files", "retained-evidence"],
+                true,
+                None,
+            ),
+            _ => return json!({"classification": "unclassified"}),
+        };
+    json!({"classification": "declared", "reads": reads, "writes": writes, "executes_tools": executes_tools, "read_only_flag": read_only_flag})
 }
 
 fn new_project(dir: &Path, template: Template) -> u8 {
@@ -360,15 +473,20 @@ fn check(path: &Path, format: OutputFormat) -> u8 {
     OK
 }
 
-fn generate(path: &Path, out: &Path, check_only: bool) -> u8 {
-    let spec = match project_or_report(path, OutputFormat::Human) {
+fn generate(path: &Path, out: &Path, check_only: bool, format: OutputFormat) -> u8 {
+    let spec = match project_or_report(path, format) {
         Ok(value) => value,
         Err(code) => return code,
     };
     let generated = match generate_project::<RustCryptoSha256>(&spec) {
         Ok(value) => value,
         Err(error) => {
-            eprintln!("generation failed: {error:?}");
+            print_command_error(
+                path,
+                "generation-failed",
+                &format!("generation failed: {error:?}"),
+                format,
+            );
             return FAILURE;
         }
     };
@@ -376,37 +494,89 @@ fn generate(path: &Path, out: &Path, check_only: bool) -> u8 {
         ("generated.rs", generated.rust().as_bytes()),
         ("PROJECT_MANIFEST.zfcis", generated.manifest()),
     ];
+    let mut drift = Vec::new();
     if check_only {
-        let drift: Vec<&str> = files
-            .iter()
-            .filter_map(|(name, expected)| match fs::read(out.join(name)) {
-                Ok(actual) if actual == *expected => None,
-                _ => Some(*name),
-            })
-            .collect();
-        if drift.is_empty() {
-            println!("generated artifacts are current");
-            OK
-        } else {
-            eprintln!("generated drift: {}", drift.join(", "));
-            INVALID
+        for (name, expected) in files {
+            match artifact_is_current(&out.join(name), expected) {
+                Ok(true) => {}
+                Ok(false) => drift.push(name),
+                Err(error) => {
+                    print_command_error(
+                        &out.join(name),
+                        "artifact-read-failed",
+                        &format!("read generated artifact: {error}"),
+                        format,
+                    );
+                    return FAILURE;
+                }
+            }
         }
     } else {
         if let Err(error) = fs::create_dir_all(out) {
-            return io_error("create output directory", error);
+            print_command_error(
+                out,
+                "artifact-write-failed",
+                &format!("create output directory: {error}"),
+                format,
+            );
+            return FAILURE;
         }
         for (name, bytes) in files {
             if let Err(error) = atomic_replace(&out.join(name), bytes) {
-                return io_error("write generated artifact", error);
+                print_command_error(
+                    &out.join(name),
+                    "artifact-write-failed",
+                    &format!("write generated artifact: {error}"),
+                    format,
+                );
+                return FAILURE;
             }
         }
-        println!("generated {}", out.display());
-        OK
     }
+    let status = if !check_only {
+        "generated"
+    } else if drift.is_empty() {
+        "current"
+    } else {
+        "drift"
+    };
+    match format {
+        OutputFormat::Json => print_json(&json!({
+            "schema": JSON_SCHEMA, "status": status, "path": path.display().to_string(),
+            "output": out.display().to_string(), "artifacts": files.map(|(name, _)| name), "drift": drift
+        })),
+        OutputFormat::Human if !check_only => println!("generated {}", out.display()),
+        OutputFormat::Human if drift.is_empty() => println!("generated artifacts are current"),
+        OutputFormat::Human => eprintln!("generated drift: {}", drift.join(", ")),
+    }
+    if drift.is_empty() { OK } else { INVALID }
+}
+
+fn artifact_is_current(path: &Path, expected: &[u8]) -> std::io::Result<bool> {
+    let file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error),
+    };
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "generated artifact is not a regular file",
+        ));
+    }
+    let read_limit =
+        u64::try_from(expected.len().saturating_add(1)).map_err(std::io::Error::other)?;
+    let mut actual = Vec::new();
+    file.take(read_limit).read_to_end(&mut actual)?;
+    Ok(actual == expected)
 }
 
 fn graph(path: &Path, format: GraphOutput) -> u8 {
-    let spec = match project_or_report(path, OutputFormat::Human) {
+    let diagnostics = match format {
+        GraphOutput::Json => OutputFormat::Json,
+        GraphOutput::Dot | GraphOutput::Mermaid => OutputFormat::Human,
+    };
+    let spec = match project_or_report(path, diagnostics) {
         Ok(value) => value,
         Err(code) => return code,
     };
@@ -470,7 +640,7 @@ fn explain(path: &Path, code: Option<&str>, format: OutputFormat) -> u8 {
             INVALID
         }
         Err(ProjectLoad::System(message)) => {
-            eprintln!("{message}");
+            print_command_error(path, "project-read-failed", &message, format);
             FAILURE
         }
     }
@@ -750,10 +920,30 @@ enum ProjectLoad {
 }
 
 fn load_project(path: &Path) -> Result<ProjectSpec, ProjectLoad> {
-    let source = fs::read_to_string(path)
+    let limits = SourceLimits::default();
+    let source = fs::File::open(path)
+        .and_then(|file| read_project_source(file, limits))
         .map_err(|error| ProjectLoad::System(format!("read {}: {error}", path.display())))?;
-    let parsed = parse_project(&source, SourceLimits::default()).map_err(ProjectLoad::Invalid)?;
+    let parsed = parse_project(&source, limits).map_err(ProjectLoad::Invalid)?;
     elaborate_project(parsed, ProjectLimits::default()).map_err(ProjectLoad::Invalid)
+}
+
+fn read_project_source(reader: impl Read, limits: SourceLimits) -> std::io::Result<String> {
+    let read_limit =
+        u64::try_from(limits.max_bytes().saturating_add(1)).map_err(std::io::Error::other)?;
+    let mut bytes = Vec::new();
+    reader.take(read_limit).read_to_end(&mut bytes)?;
+    if bytes.len() > limits.max_bytes() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "source byte limit exceeded (maximum {} bytes)",
+                limits.max_bytes()
+            ),
+        ));
+    }
+    String::from_utf8(bytes)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
 }
 
 fn project_or_report(path: &Path, format: OutputFormat) -> Result<ProjectSpec, u8> {
@@ -764,9 +954,21 @@ fn project_or_report(path: &Path, format: OutputFormat) -> Result<ProjectSpec, u
             Err(INVALID)
         }
         Err(ProjectLoad::System(message)) => {
-            eprintln!("{message}");
+            print_command_error(path, "project-read-failed", &message, format);
             Err(FAILURE)
         }
+    }
+}
+
+fn print_command_error(path: &Path, code: &str, message: &str, format: OutputFormat) {
+    match format {
+        OutputFormat::Human => eprintln!("{message}"),
+        OutputFormat::Json => print_json(&json!({
+            "error": {"code": code, "message": message},
+            "path": path.display().to_string(),
+            "schema": JSON_SCHEMA,
+            "status": "error"
+        })),
     }
 }
 
@@ -825,6 +1027,7 @@ fn failure_exit(error: &ToolFailure) -> u8 {
     match error {
         ToolFailure::Io(_)
         | ToolFailure::Crash(_)
+        | ToolFailure::Timeout
         | ToolFailure::OutputLimit
         | ToolFailure::ProcessContainmentFailed => FAILURE,
         _ => BLOCKED,
@@ -849,7 +1052,7 @@ fn atomic_create(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    if path.exists() && fs::read(path)? == bytes {
+    if artifact_is_current(path, bytes)? {
         return Ok(());
     }
     let name = path
@@ -885,6 +1088,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn every_described_command_has_explicit_effect_metadata() {
+        fn visit(command: &Value) {
+            assert_ne!(
+                command["effects"]["classification"], "unclassified",
+                "{}",
+                command["path"]
+            );
+            for child in command["subcommands"]
+                .as_array()
+                .unwrap_or_else(|| panic!("command children"))
+            {
+                visit(child);
+            }
+        }
+        let mut root = Cli::command();
+        root.build();
+        visit(&describe_tree(&root, &[]));
+        for arguments in [
+            vec!["zeno-fcis", "describe", "backend", "verify"],
+            vec![
+                "zeno-fcis",
+                "generate",
+                "--out",
+                "generated",
+                "--check",
+                "--format",
+                "json",
+            ],
+            vec!["zeno-fcis", "check", "--format", "json"],
+        ] {
+            assert!(Cli::try_parse_from(arguments).is_ok());
+        }
+    }
+
+    #[test]
+    fn project_reader_stops_before_consuming_the_full_input() {
+        let limits =
+            SourceLimits::try_new(4, 8, 4).unwrap_or_else(|| panic!("valid source limits"));
+        let mut source = std::io::Cursor::new(b"zeno trailing bytes");
+        assert!(read_project_source(&mut source, limits).is_err());
+        assert_eq!(source.position(), 5);
+        assert_eq!(
+            read_project_source(&b"zeno"[..], limits).ok().as_deref(),
+            Some("zeno")
+        );
+        assert!(read_project_source(&[0xff][..], limits).is_err());
+    }
+
+    #[test]
     fn rc3_mini_os_check() {
         for source in [MINIMAL, MINI] {
             let Ok(parsed) = parse_project(source, SourceLimits::default()) else {
@@ -912,7 +1164,7 @@ mod tests {
     #[test]
     fn exit_classes_are_stable() {
         assert_eq!([OK, INVALID, BLOCKED, FAILURE, USAGE], [0, 1, 2, 3, 64]);
-        assert_eq!(failure_exit(&ToolFailure::Timeout), BLOCKED);
+        assert_eq!(failure_exit(&ToolFailure::Timeout), FAILURE);
         assert_eq!(failure_exit(&ToolFailure::HashMismatch), BLOCKED);
         assert_eq!(
             failure_exit(&ToolFailure::ProcessContainmentFailed),

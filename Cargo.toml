@@ -43,7 +43,7 @@ members = [
 [workspace.package]
 version = "1.0.0-rc.3"
 edition = "2024"
-rust-version = "1.97"
+rust-version = "1.97.1"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/TheDarkLightX/ZenoFCIS"
 homepage = "https://github.com/TheDarkLightX/ZenoFCIS"

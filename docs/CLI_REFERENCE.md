@@ -4,9 +4,10 @@ The `zeno-fcis-cli` package in `1.0.0-rc.3` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
+zeno-fcis describe [COMMAND...]
 zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter
 zeno-fcis check [project.zeno] [--format human|json]
-zeno-fcis generate [project.zeno] --out <dir> [--check]
+zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
 zeno-fcis explain [project.zeno] [--code CODE] [--format human|json]
 zeno-fcis prove [project.zeno] --claim ID|all --backend cvc5|z3|lean|all [--tools FILE]
@@ -18,13 +19,26 @@ zeno-fcis backend inventory-lean ROOT [--format human|json]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
-`generate` atomically writes deterministic Rust and `PROJECT_MANIFEST.zfcis`;
+`generate` replaces each deterministic Rust/manifest file atomically;
 `--check` writes nothing and reports drift. `graph` and `explain` are derived
 diagnostic views. `prove` and `counterexample` use only the separate checked
 tools manifest and retain process records below `.zeno-fcis/evidence`.
 
-Machine output uses schema `zeno-fcis/cli/1`, deterministic field ordering,
-and no terminal color. Human output is deterministic for the same input.
+Project check, explanation, and generation results use schema
+`zeno-fcis/cli/1`, deterministic field ordering, and no terminal color. Successful
+JSON graphs use `zeno-fcis/graph/1`; backend manifests and inventories use their
+own documented formats. Human output is deterministic for the same input.
+
+`check`, `explain`, and `graph --format json` also report project-read failures
+as JSON on stdout, with `status: "error"`, `error.code: "project-read-failed"`,
+the input path, and a diagnostic message. These failures return exit code `3`;
+the message can include operating-system-specific details. Human mode retains
+stderr diagnostics.
+
+CLI source acquisition reads at most the one-MiB source budget plus one byte.
+An oversized file fails with exit `3` before UTF-8 interpretation or parsing;
+an exact-limit file proceeds to normal parser validation. The in-memory parser
+continues to return its existing source-limit diagnostic for oversized strings.
 
 The development `durable-counter` template includes authored shapes, reviewed
 runtime laws, generated typed transitions, and a SQLite lifecycle. It uses the
@@ -33,6 +47,32 @@ current checkout's schema-lowering and complete-invocation APIs. Run
 and exercise it as an isolated consumer of this exact source. See the
 [template README](../crates/zeno-fcis-cli/templates/durable-counter/README.md)
 for its bounded semantics and local demonstration limits.
+
+## Agent discovery and generation results
+
+`describe` emits `zeno-fcis/cli-description/1` for the command tree, or a selected
+path such as `describe backend verify`. The parser supplies argument names,
+requiredness, positions, arity, choices, and defaults. Command effects identify
+reads, writes, tool execution, and the `generate --check` read-only condition.
+An argument position is one-based; `null` denotes an option. An arity maximum
+of `null` means an unbounded value count. An empty `choices` array means no
+closed list is exposed by the parser, so command-specific semantic validation
+may still reject a value. Descriptive help text is not an executable instruction.
+`subcommand_required` distinguishes groups that require a child command from
+commands that can be invoked on their own.
+Unknown command paths return versioned JSON and exit `64`. Discovery reads no
+project or tool input and grants no authority. These interfaces are development
+additions after the original RC3 package; use a binary built from this source.
+
+`generate --format json` returns `status: "generated"`; with `--check` it
+returns `current` (exit `0`) or `drift` (exit `1`). Results include `path`,
+`output`, `artifacts`, and `drift` arrays. Missing or changed files are drift.
+Other artifact-read failures return `error.code: "artifact-read-failed"` and
+exit `3`, while write failures use `artifact-write-failed`. Comparisons read at
+most the expected artifact length plus one byte, and checks create no files.
+Source diagnostics retain `status: "invalid"` and exit `1` in JSON mode.
+Generation failures use `generation-failed` and exit `3`. The default human
+output remains available. See the [agent recovery loop](LLM_USAGE.md).
 
 ## Tools manifest
 

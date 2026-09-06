@@ -23,6 +23,10 @@ release commit.
 
 ## Recommended entry points
 
+For machine discovery of the development CLI, use `zeno-fcis describe` or
+`zeno-fcis describe generate`. The [agent guide](LLM_USAGE.md) describes the
+versioned JSON workflow and recovery by exit class.
+
 | Goal | Entry point |
 |---|---|
 | Basic decision and budget algebra | `zeno_fcis::core` |
@@ -50,6 +54,11 @@ release commit.
 
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
 the [crate map](CRATE_MAP.md) and generated rustdoc for exact signatures.
+Foundational budget, value, codec, plan, and patch errors implement
+`core::error::Error`, including when their crates build without `std`. A hosted
+application can propagate them with `?` into a standard boxed error while
+retaining the concrete error type for downcasting. Error variants and display
+messages are unchanged.
 The [canonical-bytes guide](CANONICAL_BYTES.md) explains ZCVE/1 admission,
 decode/re-encode enforcement, commitments, and the boundary between byte
 identity and semantic authority.

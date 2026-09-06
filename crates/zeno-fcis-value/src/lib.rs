@@ -75,6 +75,8 @@ impl LengthError {
     }
 }
 
+impl core::error::Error for LengthError {}
+
 impl fmt::Display for LengthError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -207,6 +209,8 @@ pub enum TextError {
     /// The encoded text exceeds its bound.
     TooLong(LengthError),
 }
+
+impl core::error::Error for TextError {}
 
 impl fmt::Display for TextError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -864,6 +868,8 @@ pub enum ValueError {
     /// Metric arithmetic overflowed.
     ArithmeticOverflow,
 }
+
+impl core::error::Error for ValueError {}
 
 impl fmt::Display for ValueError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

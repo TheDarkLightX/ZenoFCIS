@@ -395,6 +395,8 @@ impl BudgetExceeded {
     }
 }
 
+impl core::error::Error for BudgetExceeded {}
+
 impl fmt::Display for BudgetExceeded {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

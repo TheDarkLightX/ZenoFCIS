@@ -27,6 +27,7 @@
 23. [Packaging](PACKAGING.md)
 24. [Release assurance](RELEASE_ASSURANCE.md)
 25. [RC3 readiness review](RC3_READINESS_REVIEW.md)
+26. [V1 polish review and remaining gates](V1_POLISH_REVIEW.md)
 
 ## Project definition and typed construction
 

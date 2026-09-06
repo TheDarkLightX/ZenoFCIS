@@ -5272,11 +5272,13 @@ mod tests {
 
     #[test]
     fn rc3_private_executable_preserves_the_admitted_bytes() {
-        let executable = std::env::current_exe().unwrap_or_else(|_| unreachable!());
-        let bytes = fs::read(executable).unwrap_or_else(|_| unreachable!());
+        let executable = std::env::current_exe()
+            .unwrap_or_else(|error| panic!("locate test executable: {error}"));
+        let bytes =
+            fs::read(executable).unwrap_or_else(|error| panic!("read test executable: {error}"));
         let expected_hash = RustCryptoSha256::hash(&bytes);
-        let admitted =
-            PrivateExecutable::create(ToolBackend::Z3, &bytes).unwrap_or_else(|_| unreachable!());
+        let admitted = PrivateExecutable::create(ToolBackend::Z3, &bytes)
+            .unwrap_or_else(|error| panic!("admit test executable: {error:?}"));
         let output = run_fixed(
             admitted.path(),
             &[
@@ -5289,10 +5291,11 @@ mod tests {
             1_000,
             4096,
         )
-        .unwrap_or_else(|_| unreachable!());
+        .unwrap_or_else(|error| panic!("run admitted test executable: {error:?}"));
         assert!(output.status.success());
         assert!(String::from_utf8_lossy(&output.stdout).contains("checked-copy"));
-        let retained_bytes = fs::read(admitted.path()).unwrap_or_else(|_| unreachable!());
+        let retained_bytes = fs::read(admitted.path())
+            .unwrap_or_else(|error| panic!("read admitted test executable: {error}"));
         assert_eq!(RustCryptoSha256::hash(&retained_bytes), expected_hash);
     }
 
