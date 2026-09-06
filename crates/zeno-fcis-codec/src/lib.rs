@@ -773,6 +773,8 @@ pub enum EncodeError {
     InvalidValue(ValueError),
 }
 
+impl core::error::Error for EncodeError {}
+
 impl fmt::Display for EncodeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -873,6 +875,8 @@ pub enum DecodeError {
     /// Re-encoding failed.
     Encode(EncodeError),
 }
+
+impl core::error::Error for DecodeError {}
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {

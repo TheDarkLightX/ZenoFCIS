@@ -605,6 +605,8 @@ pub enum PlanDecodeError {
     NonCanonical,
 }
 
+impl core::error::Error for PlanError {}
+
 impl fmt::Display for PlanError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

@@ -37,11 +37,17 @@ use zeno_fcis::prelude::*;
 To start from `.zeno`, create and check a project in one command sequence:
 
 ```bash
-cargo +1.97.1 run -p zeno-fcis-cli -- new /tmp/zeno-quickstart --template minimal
-cargo +1.97.1 run -p zeno-fcis-cli -- check /tmp/zeno-quickstart/project.zeno
-cargo +1.97.1 run -p zeno-fcis-cli -- generate \
+cargo +1.97.1 run -p zeno-fcis-cli --locked -- new /tmp/zeno-quickstart --template minimal
+cargo +1.97.1 run -p zeno-fcis-cli --locked -- check /tmp/zeno-quickstart/project.zeno
+cargo +1.97.1 run -p zeno-fcis-cli --locked -- generate \
   /tmp/zeno-quickstart/project.zeno --out /tmp/zeno-quickstart/generated
 ```
+
+For a complete development application with typed transitions, reviewed laws,
+SQLite restart/replay, and outbox delivery, follow the
+[generated durable-counter journey](GENERATED_APPLICATION_MILESTONE.md). Its
+local acceptance command validates an isolated consumer against this checkout;
+release-package qualification is a separate v1 gate.
 
 Use umbrella feature `authoring` for the pure parser, typed AST, builders,
 logic evaluator, derived composition, and Mini Determinator APIs.

@@ -3,7 +3,6 @@
 use core::mem::size_of;
 use zeno_fcis::prelude::*;
 
-
 const AUTHORING_PROJECT: &str = r#"zeno 1;
 project 7 consumer_authoring;
 namespace 10 core;
@@ -25,6 +24,7 @@ law 400 identity = pre.100 == pre.100;
 claim 500 identity cvc5 relational = pre.100 == pre.100;
 "#;
 fn main() -> Result<(), &'static str> {
+    foundational_errors_interoperate()?;
     let limits = BudgetLimits::zero().with_limit(Resource::Read, 1);
     let mut budget = Budget::new(limits);
     budget
@@ -60,4 +60,30 @@ fn main() -> Result<(), &'static str> {
     let _ = size_of::<Option<ProjectSpec>>();
 
     Ok(())
+}
+
+fn foundational_errors_interoperate() -> Result<(), &'static str> {
+    fn standard_error<E: core::error::Error + Send + Sync + 'static>() {}
+    standard_error::<zeno_fcis::BudgetExceeded>();
+    standard_error::<zeno_fcis::EncodeError>();
+    standard_error::<zeno_fcis::DecodeError>();
+    standard_error::<zeno_fcis::LengthError>();
+    standard_error::<zeno_fcis::TextError>();
+    standard_error::<zeno_fcis::ValueError>();
+    standard_error::<zeno_fcis::PlanError>();
+    standard_error::<zeno_fcis::PatchError>();
+
+    fn domain_error() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        Domain::new("", 1)?;
+        Ok(())
+    }
+    match domain_error() {
+        Err(error)
+            if error.downcast_ref::<zeno_fcis::EncodeError>()
+                == Some(&zeno_fcis::EncodeError::InvalidDomain) =>
+        {
+            Ok(())
+        }
+        _ => Err("standard error propagation changed the typed codec error"),
+    }
 }

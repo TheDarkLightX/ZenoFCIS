@@ -292,8 +292,8 @@ def validate_package_documents(
     for name, package in by_name.items():
         if package.get("version") != version:
             raise RcError(f"{name}: package version is not {version}")
-        if package.get("rust_version") != "1.97":
-            raise RcError(f"{name}: rust-version is not 1.97")
+        if package.get("rust_version") != toolchain:
+            raise RcError(f"{name}: rust-version is not {toolchain}")
         for field in ("description", "license", "repository", "readme"):
             value = package.get(field)
             if not isinstance(value, str) or not value:
@@ -422,6 +422,11 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
         raise RcError("self-test package is malformed")
     first_package["version"] = "9.9.9"
     expect_failure(copy.deepcopy(configured), wrong_version_metadata, "package version")
+
+    wrong_rust_metadata = copy.deepcopy(metadata)
+    rust_packages = workspace_packages(wrong_rust_metadata)
+    rust_packages[0]["rust_version"] = "1.97"
+    expect_failure(copy.deepcopy(configured), wrong_rust_metadata, "minimum Rust version")
 
     missing_readme_metadata = copy.deepcopy(metadata)
     missing_readme_packages = missing_readme_metadata.get("packages")
@@ -1247,7 +1252,7 @@ def main() -> int:
             run_binary_inventory_self_test(configured)
             print(
                 "rc-package: self-test PASS "
-                "(11 hostile mutations rejected; rustdoc, archive modes, and binary inventory verified)"
+                "(12 hostile mutations rejected; rustdoc, archive modes, and binary inventory verified)"
             )
         else:
             build(args.output.resolve())
