@@ -6,9 +6,9 @@ use zeno_fcis_catalog::{
     CatalogError, CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition,
     HashRequirement, OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition,
 };
-use zeno_fcis_codec::{CommitmentHasher, Domain, Hash32};
-use zeno_fcis_compose::{AccessPath, PathAtom};
-use zeno_fcis_core::{Budget, BudgetLimits, Decision, Resource};
+use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, Hash32};
+use zeno_fcis_compose::{AccessPath, PathAtom, PathSet};
+use zeno_fcis_core::{Budget, BudgetLimits, Decision, DecisionKind, Resource};
 use zeno_fcis_patch::{PatchError, PathSegment, ValuePath, value_at};
 use zeno_fcis_plan::{Effect, OutboxEntry, PlanError};
 use zeno_fcis_project::{
@@ -22,7 +22,7 @@ use zeno_fcis_transition::{
     ArtifactField, CataloguedTransitionBuilder, ExpectedInvocationBindings, LimitKind,
     MAX_TRANSITION_MAP_KEY_BYTES, MAX_TRANSITION_OBSERVED_PATHS, MAX_TRANSITION_PATCH_OPERATIONS,
     MAX_TRANSITION_REASONS, MAX_TRANSITION_STATE_DEPTH, MAX_TRANSITION_STATE_NODES,
-    TransitionError, TransitionLimits, validate_transition_decision,
+    TransitionDecision, TransitionError, TransitionLimits, validate_transition_decision,
 };
 use zeno_fcis_value::{Field, Value};
 
@@ -730,4 +730,254 @@ fn repeated_applicable_reason_is_idempotent_at_the_exact_reason_bound() {
         .seal()
         .unwrap_or_else(|error| panic!("seal: {error}"));
     assert!(matches!(decision, Decision::Reject(_)));
+}
+
+fn boundary_footprint_decision(
+    catalog: &ProjectCatalog,
+    pre_state: &Value,
+    kind: DecisionKind,
+    reverse: bool,
+    context_depth: usize,
+) -> TransitionDecision {
+    let limits = TransitionLimits::try_new(4, 4, 4, 1_024, 16, 64)
+        .unwrap_or_else(|error| panic!("limits: {error}"));
+    let mut transition = CataloguedTransitionBuilder::<TestHasher>::try_new(
+        catalog,
+        pre_state,
+        state_domain(),
+        hash(80),
+        hash(81),
+        budget_used(),
+        limits,
+    )
+    .unwrap_or_else(|error| panic!("builder: {error}"));
+    let initial_bytes = pre_state
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("pre-state encoding: {error}"));
+    let retained_amount = transition
+        .read(field_path(1))
+        .unwrap_or_else(|error| panic!("retained read: {error}"));
+    transition
+        .read(field_path(2))
+        .unwrap_or_else(|error| panic!("read: {error}"));
+
+    let context = AccessPath::try_new(3, vec![PathAtom::Field(1); context_depth])
+        .unwrap_or_else(|error| panic!("context path: {error}"));
+    let mut ordinals = [1, 2, 3, 4];
+    if reverse {
+        ordinals.reverse();
+    }
+    for ordinal in ordinals {
+        transition
+            .observe_context(context.clone())
+            .unwrap_or_else(|error| panic!("context: {error}"));
+        transition
+            .emit(effect(ordinal, 20 + ordinal % 2, u128::from(ordinal)))
+            .unwrap_or_else(|error| panic!("effect: {error}"));
+        if ordinal <= 2 {
+            let (field, value) = if ordinal == 1 {
+                (1, Value::U128(8))
+            } else {
+                (2, Value::Bool(true))
+            };
+            transition
+                .update(field_path(field), value)
+                .unwrap_or_else(|error| panic!("update: {error}"));
+            transition
+                .enqueue(outbox(ordinal, 30, "destination", true))
+                .unwrap_or_else(|error| panic!("outbox: {error}"));
+        }
+    }
+    // Resource checks still precede path resolution, and failed staging must
+    // leave the subsequent sealed decision intact. Duplicates consume the raw
+    // observation budget even though the final sets contain fewer paths.
+    assert_eq!(
+        transition.read(field_path(999)),
+        Err(TransitionError::LimitExceeded {
+            kind: LimitKind::Reads,
+            limit: 4,
+            attempted: 5
+        })
+    );
+    assert!(matches!(
+        transition.observe_context(context.clone()),
+        Err(TransitionError::LimitExceeded {
+            kind: LimitKind::Contexts,
+            limit: 4,
+            attempted: 5
+        })
+    ));
+    assert!(matches!(
+        transition.emit(effect(5, 20, 5)),
+        Err(TransitionError::LimitExceeded {
+            kind: LimitKind::EffectPaths,
+            limit: 4,
+            attempted: 5
+        })
+    ));
+
+    let mut reasons = [11, 12, 10];
+    if reverse {
+        reasons.reverse();
+    }
+    for reason in reasons {
+        if kind == DecisionKind::Accept || (kind == DecisionKind::CommittedFailure && reason == 10)
+        {
+            continue;
+        }
+        if reason == 12 {
+            transition.fail_if(true, id(reason))
+        } else {
+            transition.require(false, id(reason))
+        }
+        .unwrap_or_else(|error| panic!("reason: {error}"));
+    }
+    let decision = transition
+        .seal()
+        .unwrap_or_else(|error| panic!("seal: {error}"));
+    assert_eq!(decision.kind(), kind);
+    assert_eq!(retained_amount, &Value::U128(7));
+    assert_eq!(pre_state.canonical_bytes(), Ok(initial_bytes));
+    validate_transition_decision::<TestHasher>(
+        &decision,
+        catalog,
+        expected_invocation(),
+        pre_state,
+        state_domain(),
+    )
+    .unwrap_or_else(|error| panic!("validate: {error}"));
+
+    let (footprint, resources) = match &decision {
+        Decision::Reject(rejected) => {
+            assert_eq!(rejected.reason().reason_id(), id(10));
+            assert_eq!(
+                rejected.reason().receipt().pre_root(),
+                rejected.reason().receipt().post_root()
+            );
+            assert!(rejected.reason().footprint().writes().is_empty());
+            assert!(rejected.reason().footprint().effects().is_empty());
+            (rejected.reason().footprint(), rejected.reason().resources())
+        }
+        Decision::Accept(accepted) => (
+            accepted.candidate().footprint(),
+            accepted.candidate().resources(),
+        ),
+        Decision::CommittedFailure(failed) => {
+            assert_eq!(*failed.reason(), id(12));
+            (
+                failed.candidate().footprint(),
+                failed.candidate().resources(),
+            )
+        }
+    };
+    let expected_state_paths = PathSet::try_new(vec![
+        AccessPath::try_new(1, vec![PathAtom::Field(1)])
+            .unwrap_or_else(|error| panic!("expected read: {error}")),
+        AccessPath::try_new(1, vec![PathAtom::Field(2)])
+            .unwrap_or_else(|error| panic!("expected read: {error}")),
+    ])
+    .unwrap_or_else(|error| panic!("expected state paths: {error}"));
+    assert_eq!(footprint.reads(), &expected_state_paths);
+    assert_eq!(footprint.contexts().paths(), &[context]);
+    assert_eq!(resources.budget_used(), budget_used());
+    assert_eq!(resources.limits(), limits);
+    let artifacts = match &decision {
+        Decision::Accept(accepted) => Some(accepted.candidate()),
+        Decision::CommittedFailure(failed) => Some(failed.candidate()),
+        Decision::Reject(_) => None,
+    };
+    if let Some(artifacts) = artifacts {
+        assert_eq!(footprint.writes(), &expected_state_paths);
+        assert_eq!(
+            footprint
+                .effects()
+                .paths()
+                .iter()
+                .map(AccessPath::namespace)
+                .collect::<Vec<_>>(),
+            vec![20, 21]
+        );
+        assert_eq!(artifacts.catalog_metrics().effects(), 4);
+        assert_eq!(artifacts.catalog_metrics().outbox_entries(), 2);
+        let applied = artifacts
+            .bundle()
+            .validate_and_apply::<TestHasher>(pre_state, state_domain())
+            .unwrap_or_else(|error| panic!("apply: {error}"));
+        assert_eq!(applied.state(), &state(8, true));
+    }
+    decision
+}
+
+#[test]
+fn sealing_preserves_complete_footprints_at_exact_observation_limits() {
+    let catalog = catalog();
+    let pre_state = state(7, false);
+    for kind in [
+        DecisionKind::Accept,
+        DecisionKind::Reject,
+        DecisionKind::CommittedFailure,
+    ] {
+        for depth in [0, 1, 64] {
+            let forward = boundary_footprint_decision(&catalog, &pre_state, kind, false, depth);
+            let reverse = boundary_footprint_decision(&catalog, &pre_state, kind, true, depth);
+            assert_eq!(forward, reverse);
+        }
+    }
+}
+
+#[test]
+#[ignore = "manual canonical-vector export for comparison between source revisions"]
+fn export_footprint_sealing_vectors() {
+    let catalog = catalog();
+    let pre_state = state(7, false);
+    for kind in [
+        DecisionKind::Accept,
+        DecisionKind::Reject,
+        DecisionKind::CommittedFailure,
+    ] {
+        for depth in [0, 1, 64] {
+            for reverse in [false, true] {
+                let decision =
+                    boundary_footprint_decision(&catalog, &pre_state, kind, reverse, depth);
+                let (reason, footprint, resources, body) = match &decision {
+                    Decision::Accept(accepted) => {
+                        let a = accepted.candidate();
+                        (
+                            a.reason_id(),
+                            a.footprint(),
+                            a.resources(),
+                            a.bundle().canonical_bytes(),
+                        )
+                    }
+                    Decision::Reject(rejected) => {
+                        let r = rejected.reason();
+                        (
+                            Some(r.reason_id()),
+                            r.footprint(),
+                            r.resources(),
+                            r.receipt().canonical_bytes(),
+                        )
+                    }
+                    Decision::CommittedFailure(failed) => {
+                        let a = failed.candidate();
+                        (
+                            Some(*failed.reason()),
+                            a.footprint(),
+                            a.resources(),
+                            a.bundle().canonical_bytes(),
+                        )
+                    }
+                };
+                let bytes = [
+                    footprint.canonical_bytes(),
+                    resources.canonical_bytes(),
+                    body,
+                ]
+                .map(|result| result.unwrap_or_else(|error| panic!("canonical vector: {error}")));
+                // Diagnostic framing only: kind/reason plus complete canonical
+                // fields. This is not a new protocol encoding or proof object.
+                println!("FOOTPRINT_VECTOR {kind:?} {depth} {reverse} {reason:?} {bytes:?}");
+            }
+        }
+    }
 }

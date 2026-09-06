@@ -6,6 +6,9 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Move owned footprint buffers into sealed transitions, avoiding deep clones
+  while preserving normalization, reason precedence, resource bindings, and
+  rejection behavior.
 - Stream exact commitment preimages through the existing approved SHA-256
   providers, removing the framing buffer while preserving canonical hashes
   and a default allocating path for existing custom hashers.

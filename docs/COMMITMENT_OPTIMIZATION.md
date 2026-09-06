@@ -126,12 +126,13 @@ already locked and is added only as a crypto development dependency.
 ## Additional optimization methods
 
 The follow-up audit identified five further candidates at the base revision.
-Their performance remains unmeasured; these are subsequent bounded changes.
+Their performance remains unmeasured. Ownership transfer is now implemented
+as a subsequent bounded change; the remaining items are future candidates.
 
-1. **Transfer ownership during sealing.** The consuming transition builder
-   clones its four footprint vectors before normalization. Move those owned
-   vectors instead, preserving reason order, limits, and exact decision bytes.
-   See [transition sealing](../crates/zeno-fcis-transition/src/lib.rs).
+1. **Transfer ownership during sealing.** Implemented by moving the consuming
+   builder's footprint buffers into normalization, preserving reason order,
+   limits, and exact decision bytes. See the
+   [ownership-transfer record](OWNED_FOOTPRINT_SEALING.md).
 2. **Bulk-build persistent maps.** Repeated reference insertion clones every
    intermediate map. A private builder could consume bounded input once and
    publish one immutable result. Preserve duplicate replacement order and

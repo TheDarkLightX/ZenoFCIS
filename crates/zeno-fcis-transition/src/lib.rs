@@ -12,6 +12,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
+use core::mem;
 
 use zeno_fcis_catalog::{CatalogError, CatalogMetrics, ProjectCatalog, ReasonDisposition};
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
@@ -741,15 +742,15 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
     }
 
     /// Canonicalizes, validates, resource-binds, and seals one three-way decision.
-    pub fn seal(self) -> Result<TransitionDecision, TransitionError> {
+    pub fn seal(mut self) -> Result<TransitionDecision, TransitionError> {
         let selected = self.selected_reason()?;
         match selected {
             Some(reason) if reason.disposition == ReasonDisposition::Reject => {
-                let footprint = self.rejection_footprint()?;
+                let footprint = self.take_rejection_footprint()?;
                 self.seal_reject(footprint, reason)
             }
             reason => {
-                let footprint = self.observed_footprint()?;
+                let footprint = self.take_observed_footprint()?;
                 self.seal_candidate(footprint, reason)
             }
         }
@@ -786,20 +787,22 @@ impl<'a, H: CommitmentHasher> CataloguedTransitionBuilder<'a, H> {
         Ok(())
     }
 
-    fn observed_footprint(&self) -> Result<Footprint, TransitionError> {
+    // Sealing consumes the builder. Subsequent resource and candidate checks
+    // use this completed footprint, so the original buffers can move into it.
+    fn take_observed_footprint(&mut self) -> Result<Footprint, TransitionError> {
         Ok(Footprint::new(
-            normalize_paths(self.reads.clone())?,
-            normalize_paths(self.writes.clone())?,
-            normalize_paths(self.contexts.clone())?,
-            normalize_paths(self.effect_paths.clone())?,
+            normalize_paths(mem::take(&mut self.reads))?,
+            normalize_paths(mem::take(&mut self.writes))?,
+            normalize_paths(mem::take(&mut self.contexts))?,
+            normalize_paths(mem::take(&mut self.effect_paths))?,
         ))
     }
 
-    fn rejection_footprint(&self) -> Result<Footprint, TransitionError> {
+    fn take_rejection_footprint(&mut self) -> Result<Footprint, TransitionError> {
         Ok(Footprint::new(
-            normalize_paths(self.reads.clone())?,
+            normalize_paths(mem::take(&mut self.reads))?,
             PathSet::empty(),
-            normalize_paths(self.contexts.clone())?,
+            normalize_paths(mem::take(&mut self.contexts))?,
             PathSet::empty(),
         ))
     }
