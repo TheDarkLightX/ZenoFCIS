@@ -28,10 +28,12 @@ jobs:
 
       - name: Install pinned Rust
         run: |
-          rustup toolchain install 1.97.1 --profile minimal
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
 
       - name: Check hostile package mutations
-        run: python3 tools/rc_package.py self-test
+        run: |
+          python3 tools/rc_package.py self-test
+          python3 tools/test_generated_application.py
 
       - name: Check package authority and documentation
         run: |

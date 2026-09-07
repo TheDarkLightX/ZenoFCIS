@@ -39,6 +39,7 @@
 - [Schema-bound catalog](SCHEMA_BOUND_CATALOG.md)
 - [Project bootstrap generator](PROJECT_BOOTSTRAP_GENERATOR.md)
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
+- [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Catalogued transition builder](CATALOGUED_TRANSITION_BUILDER.md)
 - [Generated catalog transition](GENERATED_CATALOG_TRANSITION.md)
 - [Generated typed reasons](GENERATED_TYPED_REASONS.md)

@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Qualify the generated durable application using a CLI built from actual crate
+  archives and internal dependencies resolved only from those archives; retain
+  `PACKAGED-APPLICATION.json` in release evidence.
+- Admit both packaged and generated-consumer dependency graphs against the
+  reviewed external lock and exact local manifest/version allowlists, rejecting
+  cached dependency drift and fallback to checkout sources.
+
 - Add parser-derived `describe [COMMAND...]` JSON for agents, including command
   effects, argument defaults/choices, and bounded failure recovery guidance.
 - Add optional JSON generation and drift results, bounded artifact comparisons,
