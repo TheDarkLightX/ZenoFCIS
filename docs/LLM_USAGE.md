@@ -55,8 +55,16 @@ zeno-fcis generate project.zeno --out generated --check --format json
 A `generated` result describes derived files, not accepted laws or production
 authority. Review the diff and run the relevant crate tests and full acceptance
 gate. The [durable-counter journey](GENERATED_APPLICATION_MILESTONE.md) exercises
-a complete development application against this checkout; release-package
-qualification remains separate.
+a complete development application against this checkout. The release packager
+separately produces a [packaged-application receipt](PACKAGED_APPLICATION_QUALIFICATION.md)
+for the generator and application built from `.crate` contents.
+
+For packaging work, inspect `PACKAGED-APPLICATION.json`: require `status` to be
+`passed`, bind `source_commit` and archive hashes to the selected candidate, and
+inspect `checker_source_clean` and every archive's `source_clean` before using
+it as clean-source evidence. `application.generated_files` hashes the emitted application
+before the temporary resolver overlay is added. The receipt records a bounded
+application check; it does not authorize publication or a protocol decision.
 
 | Exit | Agent recovery |
 | ---: | --- |

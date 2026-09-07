@@ -22,6 +22,8 @@ from urllib.parse import quote
 
 import tomllib
 
+import check_generated_application as generated_application
+
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_SET_PATH = ROOT / "release" / "package-set.toml"
 LOCK_PATH = ROOT / "Cargo.lock"
@@ -65,6 +67,9 @@ def parse_args() -> argparse.Namespace:
     subcommands.add_parser("self-test")
     build = subcommands.add_parser("build")
     build.add_argument("--output", type=Path, required=True)
+    verify = subcommands.add_parser("verify-packaged", help="exercise an existing crate set and its generated application")
+    verify.add_argument("--packages", type=Path, required=True)
+    verify.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
 
@@ -954,10 +959,14 @@ def deterministic_bundle(output: Path, destination: Path) -> None:
 def extract_checked_crate(archive_path: Path, destination: Path) -> None:
     with tarfile.open(archive_path, mode="r:gz") as archive:
         members = archive.getmembers()
+        seen: set[PurePosixPath] = set()
         for member in members:
             relative = PurePosixPath(member.name)
             if (
                 relative.is_absolute()
+                or not relative.parts
+                or relative.parts[0] != archive_path.stem
+                or relative in seen
                 or ".." in relative.parts
                 or member.issym()
                 or member.islnk()
@@ -966,7 +975,15 @@ def extract_checked_crate(archive_path: Path, destination: Path) -> None:
                 raise RcError(
                     f"crate archive contains an unsafe member: {archive_path.name}:{member.name}"
                 )
+            seen.add(relative)
         archive.extractall(destination, members=members, filter="data")
+
+
+def packaged_checker_inputs() -> list[dict[str, str]]:
+    return [{"path": name, "sha256": sha256(ROOT / name)} for name in (
+        "tools/rc_package.py", "tools/check_generated_application.py",
+        "Cargo.lock", "release/package-set.toml",
+    )]
 
 
 def verify_packaged_workspace(
@@ -974,20 +991,45 @@ def verify_packaged_workspace(
     version: str,
     build_target: Path,
     environment: dict[str, str],
-) -> None:
-    verification_root = build_target / "packaged-workspace"
+) -> dict[str, object]:
+    build_target.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="packaged-workspace-", dir=build_target) as directory:
+        return check_packaged_workspace(packages_dir, version, Path(directory), environment)
+
+
+def check_packaged_workspace(
+    packages_dir: Path, version: str, verification_root: Path, environment: dict[str, str],
+) -> dict[str, object]:
     sources = verification_root / "sources"
     sources.mkdir(parents=True)
+    commit = git_text("rev-parse", "HEAD")
+    inputs = packaged_checker_inputs()
+    clean = not git_text("status", "--porcelain", "--untracked-files=all")
+    expected = {f"{name}-{version}.crate" for name in require_string_list(package_set(), "publish_order")}
+    archives = sorted(packages_dir.glob("*.crate"))
+    if {path.name for path in archives} != expected:
+        raise RcError("packaged verification requires the exact declared crate set")
     package_roots: dict[str, Path] = {}
-    for archive_path in sorted(packages_dir.glob("*.crate")):
+    package_evidence = []
+    for archive_path in archives:
         extract_checked_crate(archive_path, sources)
-        suffix = f"-{version}"
-        if not archive_path.stem.endswith(suffix):
-            raise RcError(f"crate archive has an unexpected versioned name: {archive_path.name}")
-        name = archive_path.stem.removesuffix(suffix)
+        name = archive_path.stem.removesuffix(f"-{version}")
         package_root = sources / f"{name}-{version}"
         if not (package_root / "Cargo.toml").is_file():
             raise RcError(f"unpacked crate is missing Cargo.toml: {archive_path.name}")
+        manifest = load_toml(package_root / "Cargo.toml")
+        package = manifest.get("package", {})
+        if not isinstance(package, dict) or (package.get("name"), package.get("version")) != (name, version):
+            raise RcError(f"unpacked crate identity differs from its archive: {archive_path.name}")
+        vcs = load_json_object(package_root / ".cargo_vcs_info.json")
+        git_info = vcs.get("git")
+        if not isinstance(git_info, dict) or git_info.get("sha1") != commit:
+            raise RcError(f"crate source commit differs from this checkout: {archive_path.name}")
+        dirty = git_info.get("dirty", False)
+        if not isinstance(dirty, bool):
+            raise RcError(f"crate source status is malformed: {archive_path.name}")
+        package_evidence.append({"archive": archive_path.name, "sha256": sha256(archive_path),
+                                 "source_clean": not dirty})
         package_roots[name] = package_root
 
     workspace_manifest = verification_root / "Cargo.toml"
@@ -1005,17 +1047,14 @@ def verify_packaged_workspace(
 
     check_environment = dict(environment)
     check_environment["CARGO_TARGET_DIR"] = str(verification_root / "target")
-    run(
-        [
-            "cargo",
-            "+1.97.1",
-            "generate-lockfile",
-            "--manifest-path",
-            str(workspace_manifest),
-            "--offline",
-        ],
-        environment=check_environment,
-        cwd=verification_root,
+    check_environment.update(CARGO_BUILD_JOBS="1", CARGO_INCREMENTAL="0",
+                             CARGO_PROFILE_DEV_DEBUG="0", CARGO_PROFILE_TEST_DEBUG="0")
+    check_environment.pop("CARGO_ENCODED_RUSTFLAGS", None)
+    check_environment["RUSTFLAGS"] = f"--remap-path-prefix={verification_root}=/zeno-fcis-package-check"
+    graph = generated_application.resolve_reviewed_graph(
+        verification_root,
+        {(name, version): root / "Cargo.toml" for name, root in package_roots.items()},
+        check_environment,
     )
     run(
         [
@@ -1036,7 +1075,45 @@ def verify_packaged_workspace(
         environment=check_environment,
         cwd=verification_root,
     )
-    shutil.rmtree(verification_root)
+    run(["cargo", "+1.97.1", "build", "--locked", "--offline", "-p", "zeno-fcis-cli",
+         "--bin", "zeno-fcis"], environment=check_environment, cwd=verification_root)
+    executable = verification_root / "target" / "debug" / ("zeno-fcis.exe" if os.name == "nt" else "zeno-fcis")
+    application_root = verification_root / "generated-application"
+    application_root.mkdir()
+    app = application_root / "counter"
+    run([str(executable), "new", str(app), "--template", "durable-counter"],
+        environment=check_environment, cwd=application_root)
+    application = generated_application.exercise_application(
+        app, application_root, package_roots, version, check_environment,
+    )
+    compiler = run(["rustc", "+1.97.1", "-vV"], capture=True)
+    if (packaged_checker_inputs() != inputs or git_text("rev-parse", "HEAD") != commit
+            or (not git_text("status", "--porcelain", "--untracked-files=all")) != clean):
+        raise RcError("checker inputs or source status changed during packaged verification")
+    result = {
+        "format": "zeno-fcis/packaged-application/1", "status": "passed",
+        "source_commit": commit, "checker_source_clean": clean, "checker_inputs": inputs,
+        "version": version, "compiler": compiler,
+        "archives": package_evidence, "packaged_workspace_graph": graph,
+        "generator": {"package": "zeno-fcis-cli", "target": "zeno-fcis", "sha256": sha256(executable),
+                      "command": ["<packaged-cli>", "new", "<new-application>", "--template", "durable-counter"]},
+        "internal_manifests": [{"name": name, "version": version,
+                                "path": (root / "Cargo.toml").relative_to(verification_root).as_posix()}
+                               for name, root in sorted(package_roots.items())],
+        "application": application,
+        "nonclaims": ["not a registry-only installation check", "not an independent review",
+                      "not production deployment qualification", "not release authorization"],
+    }
+    return result
+
+
+def verify_packaged(packages: Path, output: Path, version: str) -> None:
+    output.mkdir(parents=True)
+    target = output / ".cargo-target"
+    result = verify_packaged_workspace(packages, version, target, dict(os.environ))
+    write_json(output / "PACKAGED-APPLICATION.json", result)
+    target.rmdir()
+    print(f"rc-package: packaged application PASS; receipt: {output / 'PACKAGED-APPLICATION.json'}")
 
 
 def build(output: Path) -> None:
@@ -1087,7 +1164,8 @@ def build(output: Path) -> None:
         if not archive.is_file():
             raise RcError(f"cargo did not create {archive.name}")
         shutil.copyfile(archive, packages_dir / archive.name)
-    verify_packaged_workspace(packages_dir, version, build_target, build_environment)
+    packaged_application = verify_packaged_workspace(packages_dir, version, build_target, build_environment)
+    write_json(output / "PACKAGED-APPLICATION.json", packaged_application)
 
     rustdoc_environment = dict(build_environment)
     remap_flag = f"--remap-path-prefix={build_target}=/zeno-fcis-target"
@@ -1183,8 +1261,11 @@ def build(output: Path) -> None:
         "commands": [
             "cargo +1.97.1 fetch --locked",
             " ".join(package_arguments),
-            "cargo +1.97.1 generate-lockfile --manifest-path <unpacked-workspace>/Cargo.toml --offline",
+            "cargo +1.97.1 metadata --manifest-path <unpacked-workspace>/Cargo.toml --offline --format-version 1 (seeded and checked against the reviewed lock)",
             "cargo +1.97.1 test --manifest-path <unpacked-workspace>/Cargo.toml --workspace --all-targets --all-features --locked --offline --no-run --jobs 1",
+            "cargo +1.97.1 build --manifest-path <unpacked-workspace>/Cargo.toml --locked --offline -p zeno-fcis-cli --bin zeno-fcis",
+            "<packaged-cli> new <new-application> --template durable-counter",
+            "generated application: archive-only internal sources, reviewed external lock, formatting, Clippy, tests and durable demonstration; see PACKAGED-APPLICATION.json",
             *[item["command"] for item in binary_inventory],
             (
                 "RUSTFLAGS=--remap-path-prefix=<target>=/zeno-fcis-target "
@@ -1254,14 +1335,19 @@ def main() -> int:
                 "rc-package: self-test PASS "
                 "(12 hostile mutations rejected; rustdoc, archive modes, and binary inventory verified)"
             )
+        elif args.command == "verify-packaged":
+            verify_packaged(args.packages.resolve(), args.output.resolve(), require_string(configured, "version"))
         else:
             build(args.output.resolve())
         return 0
     except (
         RcError,
+        RuntimeError,
         OSError,
         subprocess.CalledProcessError,
         json.JSONDecodeError,
+        tomllib.TOMLDecodeError,
+        tarfile.TarError,
     ) as error:
         print(f"rc-package: FAIL: {error}", file=sys.stderr)
         return 2

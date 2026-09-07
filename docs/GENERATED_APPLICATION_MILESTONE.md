@@ -83,6 +83,11 @@ durable demonstration. See the
 [template README](../crates/zeno-fcis-cli/templates/durable-counter/README.md)
 for the exact example contract and deployment limits.
 
+The release packager now also checks a CLI built from actual `.crate` contents
+and runs its generated application against those same archive sources. This
+[package-source qualification](PACKAGED_APPLICATION_QUALIFICATION.md) extends
+the development journey without changing the example's laws or authority.
+
 The integration exposed and repaired three gaps:
 
 - Generated transitions previously bound only the context value. The new

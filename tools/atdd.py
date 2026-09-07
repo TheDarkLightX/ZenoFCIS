@@ -87,7 +87,8 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "generated-application": AcceptanceScenario(
         "Run an authored application through durable authorization",
-        (("python3", "tools/check_generated_application.py"),),
+        (("python3", "tools/test_generated_application.py"),
+         ("python3", "tools/check_generated_application.py")),
     ),
     "composed-program": AcceptanceScenario(
         "Execute fixed domain machines through one global composition",

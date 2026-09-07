@@ -81,7 +81,9 @@ Stable `1.0.0` promotion still requires the
    supply-chain, formal-tool, and QEMU workflows at that source revision.
 3. Produce matching retained checksums from two clean builders. Qualify the
    generated durable application against actual release `.crate` artifacts and
-   the packaged CLI; its current source-override development gate is narrower.
+   the packaged CLI. The subsequent
+   [packaged-application gate](PACKAGED_APPLICATION_QUALIFICATION.md) implements
+   that check; exact final-release evidence is still required.
 4. Prepare the reviewed `1.0.0` version, documentation, consumer pins, lockfile,
    and package evidence, then repeat the checklist for the final version.
 5. Complete the owner-controlled signed tag, publication, and independent

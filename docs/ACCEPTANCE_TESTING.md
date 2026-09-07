@@ -54,7 +54,7 @@ feature file. This keeps Gherkin prose outside execution authority.
 | `checked-backend` | Bounded tool-neutral backend request example. |
 | `external-consumer` | Isolated downstream compile against the public authoring API. |
 | `project-bootstrap` | Deterministic generated starter and negative vectors. |
-| `generated-application` | Authored schema lowering, complete invocation binding, runtime laws, and isolated durable lifecycle. |
+| `generated-application` | Authored schema lowering, complete invocation binding, runtime laws, dependency admission, and isolated durable lifecycle. |
 | `composed-program` | Fixed domain-machine and global composition portfolio. |
 | `production-authority` | Catalog, invocation, law, genesis, and nominal commit authority. |
 | `sqlite-authority` | Crash-atomic authorized history and durable outbox. |

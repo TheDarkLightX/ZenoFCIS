@@ -31,6 +31,7 @@ source/zeno-fcis-<version>-source.tar.gz
 SOURCE-MANIFEST.json
 SBOM.cdx.json
 PROVENANCE-INPUTS.json
+PACKAGED-APPLICATION.json
 RC-MANIFEST.json
 SHA256SUMS
 zeno-fcis-<version>-rc-bundle.zip
@@ -39,13 +40,45 @@ zeno-fcis-<version>-rc-bundle.zip
 The command requires a clean exact commit. It uses pinned Rust `1.97.1`, fetches
 the locked external graph, packages every public crate with `--locked`, then
 unpacks the complete crate set into a temporary resolver-3 workspace. It
-generates an offline lock against only the unpacked internal packages, then
+reconciles a copy of the reviewed lock against only the unpacked internal
+packages, rejects external identity/checksum drift and internal source fallback, then
 compiles all features across every public library, test, example, benchmark,
 and binary target with `--locked --offline`. This catches source, build, binary,
 or test files that exist in the repository and are absent from a published
 archive. The same run builds both declared binaries in release mode,
 generates warning-denied rustdoc, records the Cargo dependency graph as
 CycloneDX 1.6, and content-addresses every retained artifact.
+
+Before deleting the unpacked workspace, the packager also builds its CLI and
+uses that executable to emit a fresh durable-counter application. The separate
+consumer resolves internal dependencies only from the extracted archives and
+external dependencies from the reviewed lock. Formatting, Clippy, tests, and
+the durable demonstration must all pass. `PACKAGED-APPLICATION.json` retains
+archive and generator hashes, the original emitted-file hashes, admitted
+dependency identities, compiler identity, commands, and outcomes. It is included
+in the release manifest, checksums, and bundle. See
+[packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md).
+
+To replay this check on the exact checkout that produced an existing crate set:
+
+```bash
+python3 tools/rc_package.py verify-packaged \
+  --packages /tmp/zeno-fcis-rc/packages \
+  --output /tmp/zeno-fcis-packaged-check
+```
+
+The output directory must be new. This command reuses downloaded dependencies,
+creates one temporary compilation target, retains a JSON receipt on success, and
+removes its owned staging directory on success or failure. Development archives
+are permitted by this standalone check and are explicitly marked through their source status; the
+normal release build still requires a clean exact commit. The resolver overlay
+points to archive contents. A registry-only smoke test remains a separate
+post-publication check.
+
+Archive VCS fields describe the packaging source; they are not an attestation.
+Match archive hashes against the selected release manifest and its independent
+source evidence. Receipts also hash the checker scripts, reviewed lockfile, and
+package-set configuration, and reject changes to those inputs during a run.
 
 The source archive also retains `package.json`, `package-lock.json`,
 `.node-version`, and `probity.config.ts` for optional development guardrails.
@@ -89,9 +122,10 @@ is packaged through the same read-only gate used during review.
 
 ## Nonclaims
 
-Successful packaging proves that the declared artifacts are reproducibly
-assembled from an exact source revision and that Cargo package metadata is
-coherent. It does not claim byte reproducibility for Rustdoc's excluded global
+Successful packaging records artifact identities, checks Cargo package metadata,
+compiles the package contents, and executes the bounded generated application.
+Reproducibility requires matching retained checksums from independent clean
+builders. It does not claim byte reproducibility for Rustdoc's excluded global
 search index, and it does not constitute an independent audit, proof of
 downstream project laws, deployment qualification, signature, or SLSA
 attestation.
