@@ -144,8 +144,9 @@ evidence types remain separate steps.
 
 ## Finite synthesis
 
-`zeno-fcis synth discover` describes the shared finite profile and current Rust
-and Python adapters. `synth run PROBLEM --target LANGUAGE --out DIR` performs
+`zeno-fcis synth discover` describes the shared finite profile, current Rust,
+Python and JavaScript adapters, and their callable interfaces.
+`synth run PROBLEM --target LANGUAGE --out DIR` performs
 complete bounded semantic checking and emission; add `--check` for read-only
 regeneration comparison. `synth verify PROBLEM --target LANGUAGE --out DIR`
 rechecks the artifacts and executes the complete finite corpus. Optional

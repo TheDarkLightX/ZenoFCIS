@@ -317,9 +317,17 @@ original relation. `unrealizable`, `no-solution`, `incomplete`, and
 emission leaves runtime conformance `not-run`. Store verification receipts
 outside the immutable artifact directory.
 
-Rust and Python use the same closed representation. Additional languages need
-an emitter and runner through the shared conformance gate. The first profile
+Rust, Python and JavaScript use the same closed representation. Additional
+languages need an emitter and runner through the shared conformance gate. The first profile
 is finite, acyclic, and based on explicit current inputs. See the
 [workflow and wire format](LANGUAGE_NEUTRAL_SYNTHESIS.md) for examples and exact
 claim boundaries. Synthesized data still passes through the existing catalog
 laws and nominal authority before it can commit.
+
+The JavaScript target emits an ES module with `transition(input)`. Pass a
+primitive string of canonical decimal integers separated by single spaces;
+the result is another primitive string, or `null` for rejection. This preserves
+all signed 64-bit values without JavaScript `Number` rounding or object
+conversion hooks. `synth verify --target javascript` uses an existing Node.js
+installation. Consult discovery for the supported runtime and exact ABI;
+problem and vector JSON also require lossless integer handling in your client.

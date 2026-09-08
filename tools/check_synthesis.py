@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise shared synthesis, real Rust/Python replay, and hostile artifact cases."""
+"""Exercise shared synthesis, real language replay, and hostile artifact cases."""
 from __future__ import annotations
 
 import argparse
@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+TARGETS = {"rust": "rs", "python": "py", "javascript": "mjs"}
 
 
 def invoke(cli: list[str], arguments: list[str], cwd: Path, environment: dict[str, str],
@@ -68,15 +69,76 @@ def exercise_counter(cli: list[str], app: Path, directory: Path,
         raise RuntimeError("mounted Rust artifact drifted")
     check_vectors(rust, "counter")
     records = [invoke(cli, ["synth", "verify", spec, "--out", str(rust)], directory, environment)]
-    python = directory / "counter-python"
-    invoke(cli, ["synth", "run", spec, "--target", "python", "--out", str(python)], directory, environment)
-    check_vectors(python, "counter")
-    records.append(invoke(cli, ["synth", "verify", spec, "--target", "python", "--out", str(python)], directory, environment))
+    for language in TARGETS:
+        if language == "rust":
+            continue
+        out = directory / f"counter-{language}"
+        invoke(cli, ["synth", "run", spec, "--target", language, "--out", str(out)], directory, environment)
+        check_vectors(out, "counter")
+        records.append(invoke(cli, ["synth", "verify", spec, "--target", language, "--out", str(out)], directory, environment))
     if any(record["status"] != "passed" or record["inputs_checked"] != 64 for record in records):
         raise RuntimeError("target did not pass complete finite conformance")
-    if records[0]["certificate"] != records[1]["certificate"] or records[0]["stdout_sha256"] != records[1]["stdout_sha256"]:
+    if len({record["certificate"] for record in records}) != 1 or len({record["stdout_sha256"] for record in records}) != 1:
         raise RuntimeError("language targets disagree on semantics or output")
     return {"status": "passed", "targets": records, "claim": "finite pure-step conformance; application authority is checked separately"}
+
+
+def check_integer_boundaries(cli: list[str], directory: Path, environment: dict[str, str]) -> list[dict]:
+    """The expected relation is an independent exact-integer identity/constant."""
+    records = []
+    for name, low, high, constant in [
+        ("above-number-precision", 2**53 - 1, 2**53 + 1, False),
+        ("i64-min", -(2**63), -(2**63) + 2, False),
+        ("i64-max", 2**63 - 3, 2**63 - 1, False),
+        ("zero-input", -(2**63), -(2**63), True),
+    ]:
+        field = {"name": "value", "type": {"kind": "int", "min": low, "max": high}}
+        problem = {"schema": "zeno-fcis/synthesis-problem/1", "profile": "zeno-fcis/finite-i64/1",
+                   "inputs": [] if constant else [field], "outputs": [field],
+                   "contract": {"nodes": [["input", 0], ["int", low] if constant else ["input", 1], ["eq", 0, 1]], "roots": [2]},
+                   "sketch": {"nodes": [{"hole": 1, "alternatives": [["int", 0 if constant else low],
+                                                                                 ["int", low] if constant else ["input", 0]]}], "roots": [0]}}
+        spec = directory / f"{name}.json"
+        spec.write_text(json.dumps(problem) + "\n")
+        expected = [{"input": [] if constant else [value], "output": [value]} for value in range(low, high + 1)]
+        current = []
+        for language in TARGETS:
+            out = directory / f"{name}-{language}"
+            arguments = [str(spec), "--target", language, "--out", str(out)]
+            invoke(cli, ["synth", "run"] + arguments, directory, environment)
+            cases = json.loads((out / "vectors.json").read_text())["cases"]
+            if cases != expected:
+                raise RuntimeError(f"{language} {name} lost integer precision or corpus coverage")
+            record = invoke(cli, ["synth", "verify"] + arguments, directory, environment)
+            if record["status"] != "passed" or record["inputs_checked"] != len(expected):
+                raise RuntimeError(f"{language} {name} conformance failed")
+            current.append(record)
+        if len({record["certificate"] for record in current}) != 1 or len({record["stdout_sha256"] for record in current}) != 1:
+            raise RuntimeError(f"{name} target results disagree")
+        records.append({"case": name, "targets": current})
+    return records
+
+
+def check_node_environment(cli: list[str], app: Path, directory: Path, environment: dict[str, str]) -> None:
+    marker = directory / "node-preload-executed"
+    preload = directory / "node-preload.cjs"
+    preload.write_text(f"require('node:fs').writeFileSync({json.dumps(str(marker))}, 'executed'); process.exit(94);\n")
+    injected = {**environment, "NODE_OPTIONS": "--require=" + json.dumps(str(preload)),
+                "NODE_PATH": str(directory / "untrusted-node-modules"),
+                "NODE_V8_COVERAGE": str(directory / "unwanted-node-coverage"),
+                "NODE_COMPILE_CACHE": str(directory / "unwanted-node-cache")}
+    report = invoke(cli, ["synth", "verify", str(app / "synthesis.json"), "--target", "javascript",
+                          "--out", str(directory / "counter-javascript")], directory, injected)
+    if report["status"] != "passed" or any(path.exists() for path in [marker, directory / "unwanted-node-coverage", directory / "unwanted-node-cache"]):
+        raise RuntimeError("inherited Node environment changed target execution or wrote external artifacts")
+    # Prove the payload actually reaches Node without the runner's mediation.
+    control = {key: value for key, value in environment.items() if not key.startswith("NODE_")}
+    control["NODE_OPTIONS"] = injected["NODE_OPTIONS"]
+    probe = subprocess.run([report["tool"]["path"], "--eval", "process.exit(95)"],
+                           cwd=directory, env=control, capture_output=True, timeout=30)
+    if probe.returncode != 94 or not marker.is_file() or marker.read_text() != "executed":
+        raise RuntimeError("Node preload control did not exercise the intended failure")
+    marker.unlink()
 
 
 def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
@@ -86,14 +148,14 @@ def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
                    env=environment, check=True, stdout=subprocess.PIPE, timeout=120)
     counter = exercise_counter(cli, app, directory, environment)
     generic = []
-    for language in ("rust", "python"):
+    for language, extension in TARGETS.items():
         out = directory / f"generic-{language}"
         spec = str(ROOT / "fixtures/synthesis/saturating-add.json")
         invoke(cli, ["synth", "run", spec, "--target", language, "--out", str(out)], directory, environment)
         check_vectors(out, "generic")
         generic.append(invoke(cli, ["synth", "verify", spec, "--target", language, "--out", str(out)], directory, environment))
         # A changed source cannot be blessed by editing its public hash record.
-        source = out / ("transition.rs" if language == "rust" else "transition.py")
+        source = out / f"transition.{extension}"
         source.write_bytes(source.read_bytes() + b"\n")
         manifest = json.loads((out / "manifest.json").read_text())
         for entry in manifest["files"]:
@@ -104,8 +166,10 @@ def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
         rejected = invoke(cli, ["synth", "verify", spec, "--target", language, "--out", str(out)], directory, environment, expected=1)
         if rejected["status"] != "artifact-drift":
             raise RuntimeError("hostile source mutation escaped regeneration binding")
-    if generic[0]["certificate"] != generic[1]["certificate"] or generic[0]["inputs_checked"] != 16:
+    if len({record["certificate"] for record in generic}) != 1 or len({record["stdout_sha256"] for record in generic}) != 1 or any(record["status"] != "passed" or record["inputs_checked"] != 16 for record in generic):
         raise RuntimeError("generic target evidence is inconsistent")
+    integer_boundaries = check_integer_boundaries(cli, directory, environment)
+    check_node_environment(cli, app, directory, environment)
     spec = str(app / "synthesis.json")
     for args, status, code in [
         (["--max-assignments", "1"], "incomplete", 2),
@@ -127,8 +191,8 @@ def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
     if missing["status"] != "conformance-unknown":
         raise RuntimeError("missing compiler did not remain unknown")
     return {"schema": "zeno-fcis/synthesis-validation/1", "status": "passed",
-            "counter": counter, "generic": generic,
-            "negative_cases": ["source-and-manifest-tampering", "assignment-budget", "work-budget", "unsupported-target", "missing-tool", "receipt-location", "missing-problem"]}
+            "counter": counter, "generic": generic, "integer_boundaries": integer_boundaries,
+            "negative_cases": ["source-and-manifest-tampering", "assignment-budget", "work-budget", "unsupported-target", "missing-tool", "receipt-location", "missing-problem", "inherited-node-environment"]}
 
 
 def main() -> None:
@@ -148,7 +212,7 @@ def main() -> None:
         with args.receipt.open("x") as output:
             json.dump(receipt, output, indent=2)
             output.write("\n")
-    print("finite synthesis: Rust and Python passed 64 counter and 16 generic inputs; hostile cases rejected")
+    print("finite synthesis: Rust, Python and JavaScript passed counter, generic and exact-integer boundary cases; hostile cases rejected")
 
 
 if __name__ == "__main__":

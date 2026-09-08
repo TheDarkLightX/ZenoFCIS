@@ -71,10 +71,15 @@ zeno-fcis synth run synthesis.json --out synthesized --check
 zeno-fcis synth verify synthesis.json --out synthesized --receipt rust-conformance.json
 zeno-fcis synth run synthesis.json --target python --out python-step
 zeno-fcis synth verify synthesis.json --target python --out python-step --receipt python-conformance.json
+zeno-fcis synth run synthesis.json --target javascript --out javascript-step
+zeno-fcis synth verify synthesis.json --target javascript --out javascript-step --receipt javascript-conformance.json
 ```
 
 Emission and runtime conformance have separate results. Keep receipts outside
-artifact directories. Rust and Python satisfy the same finite relation; these
-checks do not establish completeness of arbitrary requirements or properties
-outside the declared bounds. Automatic replay currently uses Linux and the
-existing Rust 1.97.1 or Python 3 installation.
+artifact directories. Rust, Python and JavaScript satisfy the same finite
+relation; these checks do not establish completeness of arbitrary requirements
+or properties outside the declared bounds. Automatic replay uses Linux and the
+existing Rust 1.97.1, Python 3 or Node.js 22 installation. The JavaScript module
+accepts and returns primitive strings of canonical decimal integers separated
+by single spaces, using exact `BigInt` arithmetic internally. It returns `null`
+on invalid input or an arithmetic trap. Discovery describes each target's ABI.

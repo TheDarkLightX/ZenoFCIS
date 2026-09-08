@@ -42,7 +42,8 @@ Feature: Adopt the ZenoFCIS core library
   @atdd-finite-synthesis
   Scenario: Synthesize and replay one contract across languages
     Given a closed finite relational contract and typed implementation grammar
-    When the synthesizer emits Rust and Python through separate target adapters
-    Then both targets satisfy the complete independent decision table
+    When the synthesizer emits Rust, Python and JavaScript through separate target adapters
+    Then all targets satisfy the complete independent decision table
+    And signed integer boundaries and inert JavaScript inputs preserve exact semantics
     And contradictory contracts, inadequate grammars and incomplete budgets stay distinct
     And modified artifacts and missing target tools cannot produce conformance evidence

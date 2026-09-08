@@ -113,6 +113,12 @@ digest for the complete canonical lock graph. CI installs that graph with
 lifecycle scripts disabled and runs `npm audit`. It is excluded from Rust
 runtime and protocol authority.
 
+Packaged-application qualification also requires the existing Rust compiler,
+Python 3, and Node.js 22 to execute the same finite synthesis contract through
+all three adapters. The release-candidate workflow selects Node `22.23.1` from
+`.node-version` before assembly. Target receipts bind the observed runtime
+version and executable hash; these checks do not certify dynamic dependencies.
+
 The source manifest binds the full commit, clean-tree status, pinned Rust toolchain file, every tracked path, file kind, byte length, and SHA-256 digest. It is deterministic and contains no timestamps or host-specific paths.
 
 Every advisory exception requires a repository-local disposition. See [supply-chain exceptions](SUPPLY_CHAIN_EXCEPTIONS.md). An exception suppresses only its named advisory; all other vulnerabilities, yanks, unsound notices, and unmaintained warnings remain blockers.

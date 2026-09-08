@@ -12,7 +12,9 @@ use std::{
 };
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Hash32};
 use zeno_fcis_crypto::RustCryptoSha256;
-use zeno_fcis_synthesis::finite::emit::{PythonEmitter, RustEmitter, TargetEmitter};
+use zeno_fcis_synthesis::finite::emit::{
+    JavaScriptEmitter, PythonEmitter, RustEmitter, TargetEmitter,
+};
 use zeno_fcis_synthesis::finite::{
     Budget, Case, Contract, Error, Outcome, PROFILE, Program, Witness, synthesize,
 };
@@ -33,7 +35,8 @@ pub(super) enum Command {
     Verify {
         #[command(flatten)]
         selection: Selection,
-        /// Explicit compiler/interpreter path; Rust must be the qualified pin.
+        /// Explicit compiler/interpreter path; Rust and Node must still report
+        /// their qualified versions.
         #[arg(long)]
         tool: Option<PathBuf>,
         /// Create a separate conformance receipt without overwriting a file.
@@ -45,6 +48,7 @@ pub(super) enum Command {
 pub(super) struct Selection {
     #[arg(default_value = "synthesis.json")]
     problem: PathBuf,
+    /// Registered target language; `synth discover` lists each ABI and runner.
     #[arg(long, default_value = "rust")]
     target: String,
     #[arg(long)]
@@ -59,7 +63,9 @@ struct Target {
     emitter: &'static dyn TargetEmitter,
     runner: &'static dyn runner::TargetRunner,
 }
-fn targets() -> [Target; 2] {
+/// Trusted registration. Each entry pairs a reviewed pure emitter with the
+/// runner that executes it; both stay outside the semantic kernel.
+fn targets() -> [Target; 3] {
     [
         Target {
             emitter: &RustEmitter,
@@ -68,6 +74,10 @@ fn targets() -> [Target; 2] {
         Target {
             emitter: &PythonEmitter,
             runner: &runner::PythonRunner,
+        },
+        Target {
+            emitter: &JavaScriptEmitter,
+            runner: &runner::JavaScriptRunner,
         },
     ]
 }
@@ -142,7 +152,7 @@ fn semantic(error: Error) -> Failure {
 pub(super) fn run(command: Command) -> u8 {
     let result = match command {
         Command::Discover => Ok(
-            json!({"schema":"zeno-fcis/synthesis-discovery/1","authority":"none","profiles":[PROFILE],"problem_schema":problem::SCHEMA,"targets":targets().iter().map(|target|json!({"language":target.emitter.target().language,"revision":target.emitter.target().revision,"compiler":target.runner.tool_requirement(),"pure_module":true})).collect::<Vec<_>>(),"instructions":problem::OPERATIONS.iter().map(|(name,arity)|json!({"opcode":name,"wire_items":arity})).collect::<Vec<_>>(),"contract_environment":"input fields followed by output fields","example_command":"zeno-fcis new counter --template durable-counter","limits":{"source_bytes":problem::MAX_BYTES,"fields_per_side":16,"nodes_per_graph":256,"input_tuples":65536,"output_tuples":4096,"graph_steps":100000000},"runtime_platform":"linux", "stages":["realizability","canonical-search","emission","target-conformance"],"semantics":{"evaluation":"eager","arithmetic":"checked-i64","boolean_wire":[0,1],"temporal":"unsupported","effects":"output-data-only"}}),
+            json!({"schema":"zeno-fcis/synthesis-discovery/1","authority":"none","profiles":[PROFILE],"problem_schema":problem::SCHEMA,"targets":targets().iter().map(|target|json!({"language":target.emitter.target().language,"revision":target.emitter.target().revision,"extension":target.emitter.target().extension,"compiler":target.runner.tool_requirement(),"abi":target.emitter.abi(),"conformance_invocation":target.runner.invocation(),"pure_module":true})).collect::<Vec<_>>(),"instructions":problem::OPERATIONS.iter().map(|(name,arity)|json!({"opcode":name,"wire_items":arity})).collect::<Vec<_>>(),"contract_environment":"input fields followed by output fields","example_command":"zeno-fcis new counter --template durable-counter","limits":{"source_bytes":problem::MAX_BYTES,"fields_per_side":16,"nodes_per_graph":256,"input_tuples":65536,"output_tuples":4096,"graph_steps":100000000},"runtime_platform":"linux", "stages":["realizability","canonical-search","emission","target-conformance"],"semantics":{"evaluation":"eager","arithmetic":"checked-i64","boolean_wire":[0,1],"temporal":"unsupported","effects":"output-data-only"}}),
         ),
         Command::Run { selection, check } => author(&selection, check),
         Command::Verify {

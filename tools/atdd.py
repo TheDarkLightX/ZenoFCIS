@@ -88,6 +88,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "finite-synthesis": AcceptanceScenario(
         "Synthesize and replay one contract across languages",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "-p", "zeno-fcis-cli", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "synthesis_javascript", "--locked", "--", "--ignored"),
          ("python3", "tools/check_synthesis.py")),
     ),
     "generated-application": AcceptanceScenario(
