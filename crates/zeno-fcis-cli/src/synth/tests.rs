@@ -104,13 +104,52 @@ fn discovery_has_distinct_language_adapters_and_missing_tools_stay_unknown() {
     assert_eq!(target("rust").unwrap().emitter.target().language, "rust");
     let python = target("python").unwrap();
     assert_eq!(python.emitter.target().language, "python");
+    let javascript = target("javascript").unwrap();
+    assert_eq!(javascript.emitter.target().extension, "mjs");
+    // Discovery must state the exact call and harness, never a bare language.
+    assert!(javascript.emitter.abi().contains("primitive string"));
+    assert!(javascript.runner.tool_requirement().contains("Node.js 22"));
+    assert!(javascript.runner.invocation().contains("node fixture.mjs"));
     assert!(target("unsupported").is_none());
-    let Err(failure) =
-        python
-            .runner
-            .run("", &[], Some(Path::new("/zeno-fcis-missing-interpreter")))
+    assert!(target("js").is_none());
+    // A registered adapter that kept the uninformative default ABI, or whose
+    // published invocation disagreed with its own artifact, would force an
+    // agent to guess the harness from the language name.
+    for registered in targets() {
+        let id = registered.emitter.target();
+        let harness = format!("fixture.{}", id.extension);
+        let stated = !registered.emitter.abi().starts_with("unspecified")
+            && registered.runner.invocation().contains(&harness);
+        assert!(stated, "{} publishes no usable harness", id.language);
+    }
+    for adapter in [python, javascript] {
+        let language = adapter.emitter.target().language;
+        let Err(failure) =
+            adapter
+                .runner
+                .run("", &[], Some(Path::new("/zeno-fcis-missing-interpreter")))
+        else {
+            panic!("{language} admitted a missing tool")
+        };
+        assert_eq!(failure.code, "tool-missing");
+    }
+}
+#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[test]
+fn javascript_runner_refuses_an_unqualified_runtime_version() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = runner::Temp::new().unwrap_or_else(|error| panic!("{}", error.message));
+    let stand_in = temp.path().join("node");
+    fs::write(&stand_in, "#!/bin/sh\necho v18.20.8\n").unwrap();
+    fs::set_permissions(&stand_in, fs::Permissions::from_mode(0o700)).unwrap();
+    // An interpreter that exits successfully while reporting an unqualified
+    // version cannot produce evidence, and never reaches the emitted source.
+    let Err(failure) = target("javascript")
+        .unwrap()
+        .runner
+        .run("", &[], Some(&stand_in))
     else {
-        panic!("missing tool succeeded")
+        panic!("unqualified runtime was admitted")
     };
-    assert_eq!(failure.code, "tool-missing");
+    assert_eq!(failure.code, "tool-version");
 }

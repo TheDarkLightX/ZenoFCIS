@@ -1,6 +1,9 @@
 //! Negative and generic-domain evidence for finite synthesis.
 #![allow(clippy::unwrap_used)]
 
+use zeno_fcis_synthesis::finite::emit::{
+    JavaScriptEmitter, PythonEmitter, RustEmitter, TargetEmitter,
+};
 use zeno_fcis_synthesis::finite::{
     Budget, Contract, Domain, Error, Op, Outcome, Program, Sketch, Slot, synthesize,
 };
@@ -224,6 +227,29 @@ fn budget_includes_selected_replay_and_contract_identity_includes_partition() {
         Contract::try_new(vec![Domain::Bool], vec![Domain::Bool; 2], relation.clone()).unwrap();
     let two = Contract::try_new(vec![Domain::Bool; 2], vec![Domain::Bool], relation).unwrap();
     assert_ne!(one.commitment().unwrap(), two.commitment().unwrap());
+}
+
+#[test]
+fn language_adapters_keep_distinct_identities_extensions_and_stated_abis() {
+    let javascript = JavaScriptEmitter.target();
+    assert_eq!(javascript.language, "javascript");
+    assert_eq!(javascript.extension, "mjs");
+    assert_eq!(javascript.revision, 1);
+    assert!(JavaScriptEmitter.abi().contains("primitive string"));
+    // A copied adapter that kept another emitter's identity, extension, or ABI
+    // would let one target's conformance evidence stand in for another's.
+    let adapters: [&dyn TargetEmitter; 3] = [&RustEmitter, &PythonEmitter, &JavaScriptEmitter];
+    for (position, left) in adapters.iter().enumerate() {
+        let identity = left.identity();
+        assert_eq!(identity, left.identity(), "identity must be stable");
+        assert!(!left.abi().is_empty());
+        for right in &adapters[position + 1..] {
+            assert_ne!(left.identity(), right.identity());
+            assert_ne!(left.target().language, right.target().language);
+            assert_ne!(left.target().extension, right.target().extension);
+            assert_ne!(left.abi(), right.abi());
+        }
+    }
 }
 
 #[test]

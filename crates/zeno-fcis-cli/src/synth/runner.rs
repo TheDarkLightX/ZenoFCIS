@@ -12,6 +12,7 @@ use zeno_fcis_synthesis::finite::{Case, Contract};
 
 #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
 use std::{
+    ffi::OsStr,
     fs::OpenOptions,
     io::Write,
     process::{Command, Stdio},
@@ -44,6 +45,10 @@ pub(super) struct Observation {
 }
 pub(super) trait TargetRunner {
     fn tool_requirement(&self) -> &'static str;
+    /// Exact command line, wire protocol, and per-case call this runner runs,
+    /// in an owned temporary working directory with the scrubbed environment of
+    /// `execute`. Discovery publishes it so an agent never guesses the harness.
+    fn invocation(&self) -> &'static str;
     fn run(
         &self,
         source: &str,
@@ -53,6 +58,7 @@ pub(super) trait TargetRunner {
 }
 pub(super) struct RustRunner;
 pub(super) struct PythonRunner;
+pub(super) struct JavaScriptRunner;
 
 const RUST_FIXTURE: &str = r#"mod target { include!("transition.rs"); }
 fn main() {
@@ -75,10 +81,32 @@ if __name__ == "__main__":
         result = transition(tuple(int(v) for v in line.split()))
         print("trap" if result is None else " ".join(str(v) for v in result))
 "#;
+// The harness transports bytes and never decides acceptance. It calls the
+// declared string ABI with the exact input line, so the module performs its own
+// admission instead of receiving a re-normalized or coerced argument.
+const JAVASCRIPT_FIXTURE: &str = r#"import { readFileSync, writeFileSync } from "node:fs";
+import { transition } from "./transition.mjs";
+const lines = readFileSync(0, "utf8").split("\n");
+if (lines.length > 0 && lines[lines.length - 1] === "") { lines.pop(); }
+let out = "";
+for (const line of lines) {
+  const result = transition(line);
+  if (result === null) { out += "trap\n"; continue; }
+  if (typeof result !== "string") { throw new TypeError("non-string transition result"); }
+  out += result + "\n";
+}
+writeFileSync(1, out);
+"#;
 
 impl TargetRunner for RustRunner {
     fn tool_requirement(&self) -> &'static str {
         "rustc 1.97.1"
+    }
+    fn invocation(&self) -> &'static str {
+        "rustc --edition=2024 --crate-name zeno_synthesis_fixture -Dwarnings -Cdebuginfo=0 \
+         fixture.rs -o fixture, then ./fixture with one whitespace-separated input tuple per \
+         stdin line; fixture.rs includes transition.rs and prints the output tuple or `trap` \
+         per line"
     }
     fn run(
         &self,
@@ -150,6 +178,11 @@ impl TargetRunner for PythonRunner {
     fn tool_requirement(&self) -> &'static str {
         "Python 3"
     }
+    fn invocation(&self) -> &'static str {
+        "python3 -I -B fixture.py with one whitespace-separated input tuple per stdin line; \
+         fixture.py is transition.py plus a reader that calls transition(tuple(int, ...)) and \
+         prints the output tuple or `trap` per line"
+    }
     fn run(
         &self,
         source: &str,
@@ -176,6 +209,60 @@ impl TargetRunner for PythonRunner {
             tool: identity,
             fixture_sha256: sha(fixture.as_bytes()),
             execution_artifact_sha256: sha(fixture.as_bytes()),
+        })
+    }
+}
+impl TargetRunner for JavaScriptRunner {
+    fn tool_requirement(&self) -> &'static str {
+        "Node.js 22"
+    }
+    fn invocation(&self) -> &'static str {
+        "node fixture.mjs, with every inherited NODE_* variable removed, and one canonical input \
+         tuple per stdin line; fixture.mjs imports ./transition.mjs and calls transition(line) \
+         with the exact line as a primitive string, printing the returned string or `trap` for \
+         null, one line per input"
+    }
+    fn run(
+        &self,
+        source: &str,
+        cases: &[Case],
+        tool: Option<&Path>,
+    ) -> Result<Observation, RunError> {
+        let temp = Temp::new()?;
+        let node = match tool {
+            Some(path) => fs::canonicalize(path).map_err(|e| error("tool-missing", e))?,
+            None => find("node")?,
+        };
+        // Identification and execution both run through `execute`, which drops
+        // every inherited NODE_* switch, so a preload cannot forge either one.
+        let identity = identify(&node, &temp.0, "v22.")?;
+        let module = temp.0.join("transition.mjs");
+        let fixture = temp.0.join("fixture.mjs");
+        fs::write(&module, source).map_err(io)?;
+        fs::write(&fixture, JAVASCRIPT_FIXTURE).map_err(io)?;
+        let fixture_sha256 = sha(JAVASCRIPT_FIXTURE.as_bytes());
+        let module_sha256 = sha(source.as_bytes());
+        let stdout = execute(&node, &["fixture.mjs".into()], &inputs(cases), &temp.0)?;
+        // The executed artifact is a two-file module graph, so its identity is
+        // the digest of both exact file digests, not of a single entry point.
+        if binary_hash(&fixture)? != fixture_sha256 || binary_hash(&module)? != module_sha256 {
+            return Err(error(
+                "execution-artifact-drift",
+                "executed module graph changed",
+            ));
+        }
+        recheck(&node, &identity)?;
+        let graph = sha(
+            format!(
+                "zeno-fcis/synthesis-module-graph/1\nfixture.mjs {fixture_sha256}\ntransition.mjs {module_sha256}\n"
+            )
+            .as_bytes(),
+        );
+        Ok(Observation {
+            stdout,
+            tool: identity,
+            fixture_sha256,
+            execution_artifact_sha256: graph,
         })
     }
 }
@@ -282,9 +369,34 @@ fn recheck(path: &Path, identity: &Value) -> Result<(), RunError> {
     Ok(())
 }
 
-struct Temp(PathBuf);
+/// Inherited variables that could change tool identification or target
+/// execution. The `NODE_` prefix covers `NODE_OPTIONS` preloads, `NODE_PATH`
+/// resolution, and every analogous Node switch, including later additions.
+/// Dynamic linker and library premises remain outside this scope.
+#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+const SCRUBBED: [&str; 7] = [
+    "RUSTC_BOOTSTRAP",
+    "RUSTFLAGS",
+    "CARGO_ENCODED_RUSTFLAGS",
+    "RUSTC_WRAPPER",
+    "RUSTC_WORKSPACE_WRAPPER",
+    "PYTHONPATH",
+    "PYTHONHOME",
+];
+#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+fn scrubbed(key: &OsStr) -> bool {
+    let key = key.as_encoded_bytes();
+    key.starts_with(b"NODE_") || SCRUBBED.iter().any(|name| name.as_bytes() == key)
+}
+
+pub(super) struct Temp(PathBuf);
 impl Temp {
-    fn new() -> Result<Self, RunError> {
+    /// Owned 0700 directory for tests that need a disposable executable.
+    #[cfg(all(test, target_os = "linux", not(target_env = "uclibc")))]
+    pub(super) fn path(&self) -> &Path {
+        &self.0
+    }
+    pub(super) fn new() -> Result<Self, RunError> {
         let root = std::env::temp_dir().join(format!(
             "zeno-fcis-synth-{}-{}",
             std::process::id(),
@@ -351,16 +463,10 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
             .stdout(Stdio::from(out))
             .stderr(Stdio::from(err))
             .process_group(0);
-        for key in [
-            "RUSTC_BOOTSTRAP",
-            "RUSTFLAGS",
-            "CARGO_ENCODED_RUSTFLAGS",
-            "RUSTC_WRAPPER",
-            "RUSTC_WORKSPACE_WRAPPER",
-            "PYTHONPATH",
-            "PYTHONHOME",
-        ] {
-            command.env_remove(key);
+        for (key, _) in std::env::vars_os() {
+            if scrubbed(&key) {
+                command.env_remove(&key);
+            }
         }
         command.env("LC_ALL", "C");
         let mut child = command.spawn().map_err(|e| error("tool-start", e))?;
@@ -437,6 +543,32 @@ fn read_output(path: &Path, limit: u64) -> Result<Vec<u8>, RunError> {
 mod process_tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
+    #[test]
+    fn inherited_node_switches_and_toolchain_overrides_cannot_reach_a_child() {
+        // A NODE_OPTIONS preload would otherwise change both `node --version`
+        // identification and fixture execution; RUSTUP_HOME must survive,
+        // because Rust tool discovery still has to find the pinned toolchain.
+        for hostile in [
+            "NODE_OPTIONS",
+            "NODE_PATH",
+            "NODE_V8_COVERAGE",
+            "NODE_COMPILE_CACHE",
+            "NODE_ICU_DATA",
+            "RUSTC_BOOTSTRAP",
+            "PYTHONPATH",
+        ] {
+            assert!(scrubbed(OsStr::new(hostile)), "{hostile} must be removed");
+        }
+        for inherited in [
+            "PATH",
+            "HOME",
+            "RUSTUP_HOME",
+            "NODEJS_OPTIONS",
+            "node_options",
+        ] {
+            assert!(!scrubbed(OsStr::new(inherited)), "{inherited} was removed");
+        }
+    }
     #[test]
     fn final_capture_is_bounded_and_exited_parents_do_not_leave_running_children() {
         let temp = Temp::new().unwrap_or_else(|e| panic!("{}", e.message));
