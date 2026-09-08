@@ -16,6 +16,8 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+
+import check_synthesis
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -124,7 +126,8 @@ def bind_generated_dependencies(manifest: Path, package_roots: dict[str, Path], 
 
 
 def exercise_application(app: Path, directory: Path, package_roots: dict[str, Path],
-                         version: str, environment: dict[str, str]) -> dict:
+                         version: str, environment: dict[str, str], cli: list[str]) -> dict:
+    synthesis = check_synthesis.exercise_counter(cli, app, directory, environment)
     generated = generated_file_manifest(app)
     manifest = app / "Cargo.toml"
     consumer = tomllib.loads(manifest.read_text())["package"]
@@ -142,7 +145,7 @@ def exercise_application(app: Path, directory: Path, package_roots: dict[str, Pa
     demonstration = run(["cargo", "+1.97.1", "run", "--locked", "--offline", "--",
                          str(directory / "counter.sqlite")], app, capture=True, environment=environment)
     print(demonstration, end="")
-    return {"generated_files": generated, "resolved_graph": graph,
+    return {"generated_files": generated, "resolved_graph": graph, "synthesis": synthesis,
             "commands": commands + [["cargo", "+1.97.1", "run", "--locked", "--offline", "--", "<new-database>"]],
             "demonstration": demonstration.strip(), "status": "passed"}
 
@@ -161,7 +164,8 @@ def check(directory: Path) -> None:
     packages = {tomllib.loads(manifest.read_text())["package"]["name"]: manifest.parent
                 for manifest in sorted((ROOT / "crates").glob("*/Cargo.toml"))}
     version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
-    exercise_application(app, directory, packages, version, dict(os.environ))
+    exercise_application(app, directory, packages, version, dict(os.environ),
+                         [str((ROOT / Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/zeno-fcis").resolve())])
     print("generated application: isolated consumer, locked dependencies, lifecycle and decision table passed")
 
 

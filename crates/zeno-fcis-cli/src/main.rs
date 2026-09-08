@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 mod durable_counter;
+mod synth;
 
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write as _};
@@ -104,6 +105,11 @@ enum Command {
         /// Optional command path, for example: backend verify.
         #[arg(value_name = "COMMAND")]
         command: Vec<String>,
+    },
+    /// Synthesize language-neutral finite contracts and check target conformance.
+    Synth {
+        #[command(subcommand)]
+        command: synth::Command,
     },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
@@ -249,6 +255,7 @@ fn clap_error_exit(error: &clap::Error) -> u8 {
 fn run(command: Command) -> u8 {
     match command {
         Command::Describe { command } => describe(&command),
+        Command::Synth { command } => synth::run(command),
         Command::New { dir, template } => new_project(&dir, template),
         Command::Check { project, format } => check(&project, format),
         Command::Generate {
@@ -362,8 +369,24 @@ fn describe_effects(path: &[String]) -> Value {
     let path: Vec<_> = path.iter().map(String::as_str).collect();
     let (reads, writes, executes_tools, read_only_flag): (&[&str], &[&str], bool, Option<&str>) =
         match path.as_slice() {
-            [] | ["backend"] => return json!({"classification": "command-group"}),
-            ["describe"] | ["backend", "list"] => (&[], &[], false, None),
+            [] | ["backend"] | ["synth"] => return json!({"classification": "command-group"}),
+            ["describe"] | ["backend", "list"] | ["synth", "discover"] => (&[], &[], false, None),
+            ["synth", "run"] => (
+                &["synthesis-problem", "synthesis-artifacts"],
+                &["synthesis-artifacts"],
+                false,
+                Some("--check"),
+            ),
+            ["synth", "verify"] => (
+                &[
+                    "synthesis-problem",
+                    "synthesis-artifacts",
+                    "compiler-or-interpreter",
+                ],
+                &["temporary-files", "optional-conformance-receipt"],
+                true,
+                None,
+            ),
             ["new"] => (&["target-directory"], &["project-files"], false, None),
             ["check" | "graph" | "explain"] => (&["project"], &[], false, None),
             ["generate"] => (
@@ -413,7 +436,7 @@ fn new_project(dir: &Path, template: Template) -> u8 {
             {
                 return io_error("create template directory", error);
             }
-            if let Err(error) = atomic_create(&path, content.as_bytes()) {
+            if let Err(error) = atomic_create(&path, content) {
                 return io_error("write template file", error);
             }
         }

@@ -63,6 +63,12 @@ fn cli_durable_counter_emits_a_complete_project_without_overwriting() {
         "src/laws.rs",
         "src/delivery.rs",
         "tests/lifecycle.rs",
+        "synthesis.json",
+        "synthesized/transition.rs",
+        "synthesized/manifest.json",
+        "synthesized/problem.json",
+        "synthesized/program.zcve",
+        "synthesized/vectors.json",
     ] {
         assert!(target.join(name).is_file(), "missing {name}");
     }

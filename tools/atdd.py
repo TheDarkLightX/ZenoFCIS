@@ -85,6 +85,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Generate a reviewable project starter",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-bootstrap", "--locked"),),
     ),
+    "finite-synthesis": AcceptanceScenario(
+        "Synthesize and replay one contract across languages",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "-p", "zeno-fcis-cli", "--locked"),
+         ("python3", "tools/check_synthesis.py")),
+    ),
     "generated-application": AcceptanceScenario(
         "Run an authored application through durable authorization",
         (("python3", "tools/test_generated_application.py"),

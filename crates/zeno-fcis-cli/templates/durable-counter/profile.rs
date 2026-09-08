@@ -30,7 +30,7 @@ pub fn project() -> ProjectSpec {
 }
 
 pub fn source_hash() -> Hash32 {
-    digest(
+    let source = digest(
         "example/durable-counter/source",
         concat!(
             include_str!("project.zeno"),
@@ -47,9 +47,27 @@ pub fn source_hash() -> Hash32 {
             "\0",
             include_str!("src/laws.rs"),
             "\0",
-            include_str!("src/delivery.rs")
+            include_str!("src/delivery.rs"),
+            "\0",
+            include_str!("synthesis.json"),
+            "\0",
+            include_str!("synthesized/problem.json"),
+            "\0",
+            include_str!("synthesized/manifest.json"),
+            "\0",
+            include_str!("synthesized/vectors.json"),
+            "\0",
+            include_str!("synthesized/transition.rs")
         )
         .as_bytes(),
+    );
+    let program = digest(
+        "example/durable-counter/closed-ir",
+        include_bytes!("synthesized/program.zcve"),
+    );
+    digest(
+        "example/durable-counter/source-complete",
+        &[source.as_bytes().as_slice(), program.as_bytes().as_slice()].concat(),
     )
 }
 

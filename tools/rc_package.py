@@ -1010,7 +1010,7 @@ def compiler_flag_evidence(environment: dict[str, str], source: Path, label: str
 
 def packaged_checker_inputs() -> list[dict[str, str]]:
     return [{"path": name, "sha256": sha256(ROOT / name)} for name in (
-        "tools/rc_package.py", "tools/check_generated_application.py",
+        "tools/rc_package.py", "tools/check_generated_application.py", "tools/check_synthesis.py",
         "Cargo.lock", "release/package-set.toml",
     )]
 
@@ -1113,7 +1113,7 @@ def check_packaged_workspace(
     run([str(executable), "new", str(app), "--template", "durable-counter"],
         environment=check_environment, cwd=application_root)
     application = generated_application.exercise_application(
-        app, application_root, package_roots, version, check_environment,
+        app, application_root, package_roots, version, check_environment, [str(executable)],
     )
     compiler = run(["rustc", "+1.97.1", "-vV"], capture=True)
     if (packaged_checker_inputs() != inputs or git_text("rev-parse", "HEAD") != commit

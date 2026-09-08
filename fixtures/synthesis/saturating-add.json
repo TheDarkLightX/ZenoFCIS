@@ -1,0 +1,150 @@
+{
+  "schema": "zeno-fcis/synthesis-problem/1",
+  "profile": "zeno-fcis/finite-i64/1",
+  "inputs": [
+    {
+      "name": "a",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 3
+      }
+    },
+    {
+      "name": "b",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 3
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "sum",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 3
+      }
+    }
+  ],
+  "contract": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "input",
+        1
+      ],
+      [
+        "input",
+        2
+      ],
+      [
+        "int",
+        3
+      ],
+      [
+        "int",
+        4
+      ],
+      [
+        "add",
+        0,
+        1
+      ],
+      [
+        "lt",
+        5,
+        4
+      ],
+      [
+        "eq",
+        2,
+        5
+      ],
+      [
+        "eq",
+        2,
+        3
+      ],
+      [
+        "select",
+        6,
+        7,
+        8
+      ]
+    ],
+    "roots": [
+      9
+    ]
+  },
+  "sketch": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "input",
+        1
+      ],
+      [
+        "add",
+        0,
+        1
+      ],
+      {
+        "hole": 1,
+        "alternatives": [
+          [
+            "int",
+            2
+          ],
+          [
+            "int",
+            3
+          ],
+          [
+            "int",
+            4
+          ],
+          [
+            "int",
+            5
+          ]
+        ]
+      },
+      {
+        "hole": 2,
+        "alternatives": [
+          [
+            "int",
+            0
+          ],
+          [
+            "int",
+            3
+          ]
+        ]
+      },
+      [
+        "lt",
+        2,
+        3
+      ],
+      [
+        "select",
+        5,
+        2,
+        4
+      ]
+    ],
+    "roots": [
+      6
+    ]
+  }
+}

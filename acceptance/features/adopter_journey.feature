@@ -38,3 +38,11 @@ Feature: Adopt the ZenoFCIS core library
     Then all bounded input cases obey the reviewed decision table
     And rejection publishes no state, replay or delivery rows
     And committed failure, exact replay, database reopen and delivery retry preserve the expected state
+
+  @atdd-finite-synthesis
+  Scenario: Synthesize and replay one contract across languages
+    Given a closed finite relational contract and typed implementation grammar
+    When the synthesizer emits Rust and Python through separate target adapters
+    Then both targets satisfy the complete independent decision table
+    And contradictory contracts, inadequate grammars and incomplete budgets stay distinct
+    And modified artifacts and missing target tools cannot produce conformance evidence

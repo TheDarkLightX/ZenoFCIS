@@ -8,6 +8,9 @@
 
 extern crate alloc;
 
+/// Closed finite relational synthesis and language-neutral execution.
+pub mod finite;
+
 use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;

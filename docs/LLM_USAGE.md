@@ -305,3 +305,21 @@ Nonclaims:
   context, post-state, effects, and outbox together?
 - Does the shell publish the exact authorized tuple atomically?
 - Are proof scope, test bounds, and nonclaims explicit?
+
+## Synthesis for agents
+
+Use `zeno-fcis synth discover` and `zeno-fcis describe synth verify` for the
+implemented profile, limits, arguments, effects, and result stages. Review the
+contract before running search. `synth run` selects and emits a pure function;
+`synth verify` independently captures every target output and rechecks the
+original relation. `unrealizable`, `no-solution`, `incomplete`, and
+`conformance-unknown` require different recovery actions. A zero exit from
+emission leaves runtime conformance `not-run`. Store verification receipts
+outside the immutable artifact directory.
+
+Rust and Python use the same closed representation. Additional languages need
+an emitter and runner through the shared conformance gate. The first profile
+is finite, acyclic, and based on explicit current inputs. See the
+[workflow and wire format](LANGUAGE_NEUTRAL_SYNTHESIS.md) for examples and exact
+claim boundaries. Synthesized data still passes through the existing catalog
+laws and nominal authority before it can commit.

@@ -1347,11 +1347,14 @@ name = "zeno-fcis-cli"
 version = "1.0.0-rc.3"
 dependencies = [
  "clap",
+ "nix",
+ "serde",
  "serde_json",
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
  "zeno-fcis-formal-tools",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
 ]
 
 [[package]]

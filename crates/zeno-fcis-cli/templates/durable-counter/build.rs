@@ -178,6 +178,12 @@ fn main() {
         "src/program.rs",
         "src/laws.rs",
         "src/delivery.rs",
+        "synthesis.json",
+        "synthesized/problem.json",
+        "synthesized/manifest.json",
+        "synthesized/program.zcve",
+        "synthesized/vectors.json",
+        "synthesized/transition.rs",
     ] {
         println!("cargo::rerun-if-changed={path}");
     }

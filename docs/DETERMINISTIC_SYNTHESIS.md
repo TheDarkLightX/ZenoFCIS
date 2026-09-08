@@ -1,5 +1,9 @@
 # Deterministic synthesis integration
 
+The library also provides a [language-neutral finite synthesis workflow](LANGUAGE_NEUTRAL_SYNTHESIS.md)
+with a relational checker, Rust/Python emitters, and CLI runtime conformance.
+The original search-kernel contract below remains unchanged.
+
 ## Boundary
 
 `zeno-fcis-synthesis` is a bounded search kernel for reviewed ZenoFCIS schemas,
@@ -45,6 +49,7 @@ existing ZenoFCIS value encoder.
 
 This crate does not embed ESSO, an SMT solver, a compiler, or an LLM. It is the
 deterministic authority boundary into which a mounted ESSO proposer and
-independent checkers plug. Unit tests establish bounded enumeration and binding
-laws; they do not prove a synthesis grammar complete, a candidate economically
-correct, or a generated runtime refined.
+independent checkers plug. The kernel tests establish bounded enumeration and binding laws. The finite
+profile separately checks its entire declared input domain and can replay an
+emitted target through the CLI. Neither layer proves an arbitrary grammar
+complete, an economic specification adequate, or an arbitrary runtime correct.
