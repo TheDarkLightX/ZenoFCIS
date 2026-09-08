@@ -979,6 +979,35 @@ def extract_checked_crate(archive_path: Path, destination: Path) -> None:
         archive.extractall(destination, members=members, filter="data")
 
 
+def compiler_environment(environment: dict[str, str]) -> dict[str, str]:
+    """Exclude inherited flag, compiler, wrapper, and target overrides."""
+    overrides = {
+        "RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS",
+        "RUSTC", "RUSTDOC", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER",
+        "CARGO_BUILD_RUSTC", "CARGO_BUILD_RUSTDOC", "CARGO_BUILD_RUSTC_WRAPPER",
+        "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_TARGET",
+    }
+    return {name: value for name, value in environment.items() if name not in overrides}
+
+
+def remapped_compiler_environment(
+    environment: dict[str, str], source: Path, destination: str,
+) -> dict[str, str]:
+    """Preserve paths as single Cargo arguments and deny documentation warnings."""
+    result = compiler_environment(environment)
+    remap = f"--remap-path-prefix={source}={destination}"
+    if "\x1f" in remap or "\0" in remap:
+        raise RcError("staging path cannot be encoded as one compiler argument")
+    result["CARGO_ENCODED_RUSTFLAGS"] = remap
+    result["CARGO_ENCODED_RUSTDOCFLAGS"] = "\x1f".join(["-D", "warnings", remap])
+    return result
+
+
+def compiler_flag_evidence(environment: dict[str, str], source: Path, label: str) -> dict[str, list[str]]:
+    return {key: [flag.replace(str(source), label) for flag in environment[key].split("\x1f")]
+            for key in ("CARGO_ENCODED_RUSTFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS")}
+
+
 def packaged_checker_inputs() -> list[dict[str, str]]:
     return [{"path": name, "sha256": sha256(ROOT / name)} for name in (
         "tools/rc_package.py", "tools/check_generated_application.py",
@@ -1045,12 +1074,12 @@ def check_packaged_workspace(
         )
     workspace_manifest.write_text("\n".join(workspace_lines) + "\n", encoding="utf-8")
 
-    check_environment = dict(environment)
+    check_environment = remapped_compiler_environment(
+        environment, verification_root, "/zeno-fcis-package-check",
+    )
     check_environment["CARGO_TARGET_DIR"] = str(verification_root / "target")
     check_environment.update(CARGO_BUILD_JOBS="1", CARGO_INCREMENTAL="0",
                              CARGO_PROFILE_DEV_DEBUG="0", CARGO_PROFILE_TEST_DEBUG="0")
-    check_environment.pop("CARGO_ENCODED_RUSTFLAGS", None)
-    check_environment["RUSTFLAGS"] = f"--remap-path-prefix={verification_root}=/zeno-fcis-package-check"
     graph = generated_application.resolve_reviewed_graph(
         verification_root,
         {(name, version): root / "Cargo.toml" for name, root in package_roots.items()},
@@ -1094,6 +1123,7 @@ def check_packaged_workspace(
         "format": "zeno-fcis/packaged-application/1", "status": "passed",
         "source_commit": commit, "checker_source_clean": clean, "checker_inputs": inputs,
         "version": version, "compiler": compiler,
+        "compiler_flags": compiler_flag_evidence(check_environment, verification_root, "<verification-root>"),
         "archives": package_evidence, "packaged_workspace_graph": graph,
         "generator": {"package": "zeno-fcis-cli", "target": "zeno-fcis", "sha256": sha256(executable),
                       "command": ["<packaged-cli>", "new", "<new-application>", "--template", "durable-counter"]},
@@ -1101,7 +1131,8 @@ def check_packaged_workspace(
                                 "path": (root / "Cargo.toml").relative_to(verification_root).as_posix()}
                                for name, root in sorted(package_roots.items())],
         "application": application,
-        "nonclaims": ["not a registry-only installation check", "not an independent review",
+        "nonclaims": ["not a registry-only installation check", "not fresh external dependency resolution",
+                      "not an independent review",
                       "not production deployment qualification", "not release authorization"],
     }
     return result
@@ -1130,9 +1161,7 @@ def build(output: Path) -> None:
     for directory in (packages_dir, binaries_dir, docs_dir, source_dir):
         directory.mkdir()
     build_target = output / ".cargo-target"
-    build_environment = dict(os.environ)
-    for variable in ("CARGO_ENCODED_RUSTFLAGS", "RUSTFLAGS", "RUSTDOCFLAGS"):
-        build_environment.pop(variable, None)
+    build_environment = compiler_environment(dict(os.environ))
     build_environment["CARGO_TARGET_DIR"] = str(build_target)
 
     run(
@@ -1167,10 +1196,9 @@ def build(output: Path) -> None:
     packaged_application = verify_packaged_workspace(packages_dir, version, build_target, build_environment)
     write_json(output / "PACKAGED-APPLICATION.json", packaged_application)
 
-    rustdoc_environment = dict(build_environment)
-    remap_flag = f"--remap-path-prefix={build_target}=/zeno-fcis-target"
-    rustdoc_environment["RUSTFLAGS"] = remap_flag
-    rustdoc_environment["RUSTDOCFLAGS"] = f"-D warnings {remap_flag}"
+    rustdoc_environment = remapped_compiler_environment(
+        build_environment, build_target, "/zeno-fcis-target",
+    )
     rustdoc_arguments = [
         "cargo",
         "+1.97.1",
@@ -1249,6 +1277,8 @@ def build(output: Path) -> None:
     complete_metadata = cargo_metadata(complete=True)
     sbom_path = output / "SBOM.cdx.json"
     write_json(sbom_path, build_sbom(complete_metadata, commit, version))
+    if require_clean_commit() != commit:
+        raise RcError("source commit changed during release assembly")
 
     provenance_inputs = {
         "format": "zeno-fcis/provenance-inputs/1",
@@ -1258,6 +1288,10 @@ def build(output: Path) -> None:
         "host_targets": sorted(host_targets),
         "source_manifest_sha256": sha256(source_manifest),
         "sbom_sha256": sha256(sbom_path),
+        "compiler_flags": {
+            "packaged_application": packaged_application["compiler_flags"],
+            "rustdoc": compiler_flag_evidence(rustdoc_environment, build_target, "<target>"),
+        },
         "commands": [
             "cargo +1.97.1 fetch --locked",
             " ".join(package_arguments),
@@ -1267,11 +1301,7 @@ def build(output: Path) -> None:
             "<packaged-cli> new <new-application> --template durable-counter",
             "generated application: archive-only internal sources, reviewed external lock, formatting, Clippy, tests and durable demonstration; see PACKAGED-APPLICATION.json",
             *[item["command"] for item in binary_inventory],
-            (
-                "RUSTFLAGS=--remap-path-prefix=<target>=/zeno-fcis-target "
-                "RUSTDOCFLAGS=-D-warnings,--remap-path-prefix=<target>=/zeno-fcis-target "
-                + " ".join(rustdoc_arguments)
-            ),
+            " ".join(rustdoc_arguments),
         ],
         "nonclaim": "inputs for a future signed attestation; not a signature or SLSA provenance",
     }

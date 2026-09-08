@@ -2,7 +2,9 @@
 
 import copy
 import io
+import os
 from pathlib import Path
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -70,8 +72,10 @@ class DependencyAdmissionTests(unittest.TestCase):
 
     def test_emitted_dependencies_reject_stale_pins_and_source_overrides_before_editing(self):
         declarations = [
-            '"=1.0.0-rc.2"',
-            '{ version = "=1.0.0-rc.3", path = "/checkout/crates/zeno-fcis-core" }',
+            ("zeno-fcis-core", '"=1.0.0-rc.2"'),
+            ("zeno-fcis-core", '{ version = "=1.0.0-rc.3", path = "/checkout/crates/zeno-fcis-core" }'),
+            ("core-alias", '{ package = "zeno-fcis-core", version = "=1.0.0-rc.2" }'),
+            ("core-alias", '{ package = "zeno-fcis-core", version = "=1.0.0-rc.3", path = "/checkout/core" }'),
         ]
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-emitted-pins-") as directory:
             root = Path(directory)
@@ -79,13 +83,31 @@ class DependencyAdmissionTests(unittest.TestCase):
             package.mkdir()
             (package / "Cargo.toml").write_text('[package]\nname = "zeno-fcis-core"\nversion = "1.0.0-rc.3"\n')
             manifest = root / "Cargo.toml"
-            for declaration in declarations:
+            for name, declaration in declarations:
                 with self.subTest(declaration=declaration):
-                    original = f'[dependencies]\nzeno-fcis-core = {declaration}\n'
+                    original = f'[dependencies]\n{name} = {declaration}\n'
                     manifest.write_text(original)
                     with self.assertRaisesRegex(RuntimeError, "generated.*dependency"):
                         application.bind_generated_dependencies(manifest, {"zeno-fcis-core": package}, "1.0.0-rc.3")
                     self.assertEqual(manifest.read_text(), original)
+
+    def test_renamed_internal_dependencies_bind_the_actual_package_closure(self):
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-renamed-dependencies-") as directory:
+            root = Path(directory)
+            packages = {}
+            for name in ("zeno-fcis-core", "zeno-fcis-value"):
+                packages[name] = root / name
+                packages[name].mkdir()
+                (packages[name] / "Cargo.toml").write_text(
+                    f'[package]\nname = "{name}"\nversion = "1.0.0-rc.3"\n',
+                )
+            with (packages["zeno-fcis-core"] / "Cargo.toml").open("a") as manifest:
+                manifest.write('[dependencies]\nvalues = { package = "zeno-fcis-value", version = "=1.0.0-rc.3" }\n')
+            manifest = root / "Cargo.toml"
+            manifest.write_text('[dependencies]\ncore = { package = "zeno-fcis-core", version = "=1.0.0-rc.3" }\n')
+            application.bind_generated_dependencies(manifest, packages, "1.0.0-rc.3")
+            patched = rc_package.load_toml(manifest)["patch"]["crates-io"]
+            self.assertEqual(patched, {name: {"path": str(path)} for name, path in packages.items()})
 
 
 class PackagedStagingTests(unittest.TestCase):
@@ -130,6 +152,69 @@ class PackagedStagingTests(unittest.TestCase):
                     rc_package.verify_packaged_workspace(root / "packages", "1.0.0", root, {})
             self.assertEqual(list(root.iterdir()), [marker])
             self.assertEqual(marker.read_bytes(), b"existing output")
+
+
+class CompilerFlagTests(unittest.TestCase):
+    def test_spaced_paths_compile_and_documentation_warnings_remain_errors(self):
+        with tempfile.TemporaryDirectory(prefix="zeno fcis compiler flags ") as directory:
+            staging = Path(directory).resolve()
+            root = staging / "probe app"
+            root.mkdir()
+            (root / "Cargo.toml").write_text(
+                '[package]\nname = "compiler_flag_probe"\nversion = "0.0.0"\n'
+                'edition = "2024"\n[workspace]\n[dependencies]\n'
+                'probe-dep = { path = "../probe dep" }\n', encoding="utf-8",
+            )
+            dependency = staging / "probe dep"
+            (dependency / "src").mkdir(parents=True)
+            (dependency / "Cargo.toml").write_text(
+                '[package]\nname = "probe-dep"\nversion = "0.0.0"\nedition = "2024"\n[workspace]\n',
+                encoding="utf-8",
+            )
+            (dependency / "src/lib.rs").write_text(
+                "pub fn origin() -> &'static str { file!() }\n", encoding="utf-8",
+            )
+            (root / "src").mkdir()
+            (root / "src/main.rs").write_text(
+                'fn main() { println!("{}", probe_dep::origin()); }\n', encoding="utf-8",
+            )
+            source = root / "src/lib.rs"
+            source.write_text('/// A documented probe.\npub fn probe() {}\n', encoding="utf-8")
+            inherited = {**os.environ, "CARGO_TARGET_DIR": str(root / "build target"),
+                         "RUSTFLAGS": "--invalid-inherited-flag",
+                         "RUSTDOCFLAGS": "--invalid-inherited-flag",
+                         "CARGO_ENCODED_RUSTFLAGS": "--invalid-inherited-flag",
+                         "CARGO_ENCODED_RUSTDOCFLAGS": "-A\x1fwarnings"}
+            for name in ("RUSTC", "RUSTDOC", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER",
+                         "CARGO_BUILD_RUSTC", "CARGO_BUILD_RUSTDOC", "CARGO_BUILD_RUSTC_WRAPPER",
+                         "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_TARGET"):
+                inherited[name] = str(staging / "missing-tool")
+            environment = rc_package.remapped_compiler_environment(
+                inherited, staging, "/zeno-fcis-compiler-probe",
+            )
+
+            def cargo(*arguments):
+                return subprocess.run(
+                    ["cargo", "+1.97.1", *arguments], cwd=root, env=environment,
+                    text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    timeout=60,
+                )
+
+            for arguments in [("generate-lockfile", "--offline"),
+                              ("check", "--locked", "--offline"),
+                              ("doc", "--locked", "--offline", "--no-deps")]:
+                result = cargo(*arguments)
+                self.assertEqual(result.returncode, 0, result.stdout)
+            result = cargo("run", "--quiet", "--locked", "--offline")
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(result.stdout.strip().replace("\\", "/"),
+                             "/zeno-fcis-compiler-probe/probe dep/src/lib.rs")
+            self.assertTrue((root / "build target/doc/compiler_flag_probe/fn.probe.html").is_file())
+            source.write_text('/// See [MissingProbeType].\npub fn probe() {}\n', encoding="utf-8")
+            result = cargo("doc", "--locked", "--offline", "--no-deps")
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("unresolved link", result.stdout)
+            self.assertIn("MissingProbeType", result.stdout)
 
 
 if __name__ == "__main__":
