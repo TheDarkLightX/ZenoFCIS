@@ -51,7 +51,7 @@ directory; existing worktrees, toolchains, and caches remain intact.
 `tools/rc_package.py build` runs the package journey and includes
 `PACKAGED-APPLICATION.json` in its manifest, checksums, and bundle. The
 `verify-packaged --packages <directory> --output <new-directory>` subcommand
-replays the check independently on the checkout identified by the archives.
+replays the same checker on the checkout identified by the archives.
 The release workflow installs the existing Rust pin's Clippy and rustfmt
 components for the shared consumer checks. No Lean tooling is needed.
 
@@ -63,10 +63,10 @@ and require those inputs and source status to remain unchanged during the run.
 Archive VCS metadata is descriptive; archive hashes still need comparison with
 independently retained source and release evidence.
 
-Focused evidence includes ten dependency, emitted-pin, archive-layout, and
-cleanup tests. Two separate draft staging directories produced the same
-packaged generator hash, admitted graph, and application evidence. The complete
-36-package target compilation and generated application's two law tests and
+Focused evidence includes twelve dependency, emitted-pin, archive-layout,
+cleanup, and compiler-flag tests. Two separate draft staging directories on one
+host produced the same packaged generator hash, admitted graph, and application
+evidence. The complete 36-package target compilation and generated application's two law tests and
 three lifecycle/decision-table tests passed. A required template was then
 omitted from the extracted CLI during a real rebuild: compilation failed. After
 restoring its bytes, the generator rebuilt to the original hash.
@@ -76,3 +76,23 @@ clean-commit packaging, and retained checksum results belong in the stage's
 validation receipt. This local work does not substitute for the final version's
 independent review, required platform/formal-tool workflows, two clean release
 builders, registry smoke test, or owner release procedure.
+
+## Compiler flag follow-up
+
+A real pinned-Cargo probe found that a staging path containing spaces is split
+when the remapping argument is passed through `RUSTFLAGS`. Use Cargo's encoded
+Rust and Rustdoc argument variables in both package checks and documentation
+assembly. Replace inherited compiler flags so documentation warnings remain
+errors. A tiny dependency-free crate under a spaced path checks successful
+compilation/documentation and rejection of a real documentation warning. It uses
+the installed Rust toolchain and removes only its own temporary directory.
+
+Fable 5.1's supplied-source review also identified inherited compiler/wrapper
+overrides, renamed dependency keys missing the early pin checks, and the need
+to recheck the clean commit at the end of assembly. The follow-up removes those
+environment overrides, resolves aliases to their actual package names for pin
+validation and dependency closure, records compiler argument vectors, and
+rechecks the source commit before retaining the final manifest. The regression
+executes a sibling path dependency and checks its remapped `file!()` output,
+then verifies that a real documentation warning still fails. The model review
+is advisory; local checks determine whether the proposed changes pass.

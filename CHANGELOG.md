@@ -12,7 +12,11 @@ embedded in ZenoFCIS values.
 - Admit both packaged and generated-consumer dependency graphs against the
   reviewed external lock and exact local manifest/version allowlists, rejecting
   cached dependency drift and fallback to checkout sources.
-
+- Preserve release staging paths containing spaces through encoded Cargo
+  compiler arguments, remove inherited compiler overrides, and retain explicit
+  argument evidence without allowing documentation warnings to be suppressed.
+- Check renamed internal dependencies by actual package identity and recheck
+  the clean source commit before retaining release manifests.
 - Add parser-derived `describe [COMMAND...]` JSON for agents, including command
   effects, argument defaults/choices, and bounded failure recovery guidance.
 - Add optional JSON generation and drift results, bounded artifact comparisons,

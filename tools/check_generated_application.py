@@ -81,11 +81,14 @@ def bind_generated_dependencies(manifest: Path, package_roots: dict[str, Path], 
     if emitted.get("patch") or emitted.get("replace"):
         raise RuntimeError("generated manifest already contains a resolver override")
 
+    def package_name(name: str, declaration: str | dict) -> str:
+        return declaration.get("package", name) if isinstance(declaration, dict) else name
+
     def dependencies(document: dict) -> set[str]:
         names = set()
         for key, value in document.items():
             if key in ("dependencies", "dev-dependencies", "build-dependencies"):
-                names.update(set(value) & packages.keys())
+                names.update({package_name(name, declaration) for name, declaration in value.items()} & packages.keys())
             elif isinstance(value, dict):
                 names.update(dependencies(value))
         return names
@@ -94,6 +97,7 @@ def bind_generated_dependencies(manifest: Path, package_roots: dict[str, Path], 
         for key, value in document.items():
             if key in ("dependencies", "dev-dependencies", "build-dependencies"):
                 for name, declaration in value.items():
+                    name = package_name(name, declaration)
                     if name.startswith("zeno-fcis"):
                         requirement = declaration if isinstance(declaration, str) else declaration.get("version")
                         if name not in packages or requirement != f"={version}":
