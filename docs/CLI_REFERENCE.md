@@ -141,3 +141,16 @@ Exit code `0` from a Lean `prove` command covers the generated theorem, the
 qualified Lean `4.30.0` Linux x86-64 distribution, and the configured exact
 axiom report. Translation review and any promotion into existing ZenoFCIS
 evidence types remain separate steps.
+
+## Finite synthesis
+
+`zeno-fcis synth discover` describes the shared finite profile and current Rust
+and Python adapters. `synth run PROBLEM --target LANGUAGE --out DIR` performs
+complete bounded semantic checking and emission; add `--check` for read-only
+regeneration comparison. `synth verify PROBLEM --target LANGUAGE --out DIR`
+rechecks the artifacts and executes the complete finite corpus. Optional
+`--tool PATH` selects the compiler/interpreter and `--receipt PATH` creates a
+separate new receipt file outside DIR. Both commands accept
+`--max-assignments` and `--max-steps`. See
+[language-neutral synthesis](LANGUAGE_NEUTRAL_SYNTHESIS.md) for the JSON
+contract, distinct failure outcomes, and target-conformance boundary.

@@ -1,6 +1,6 @@
 //! Pure reviewed transition. All state access and staging use generated typed methods.
 
-use crate::{bindings::*, generated::*, profile};
+use crate::{bindings::*, generated::*, profile, synthesized};
 use zeno_fcis_authority::{CatalogTransitionProgram, ReviewedTransitionInput};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_core::BudgetUsed;
@@ -10,8 +10,24 @@ use zeno_fcis_transition::TransitionDecision;
 
 pub struct CounterProgram;
 
+#[derive(Debug)]
+pub enum CounterProgramError {
+    Project(Box<GeneratedProjectError>),
+    SynthesisDomain,
+}
+impl From<GeneratedProjectError> for CounterProgramError {
+    fn from(error: GeneratedProjectError) -> Self {
+        Self::Project(Box::new(error))
+    }
+}
+impl From<AdapterError> for CounterProgramError {
+    fn from(error: AdapterError) -> Self {
+        GeneratedProjectError::from(error).into()
+    }
+}
+
 impl CatalogTransitionProgram<RustCryptoSha256> for CounterProgram {
-    type Error = GeneratedProjectError;
+    type Error = CounterProgramError;
 
     fn transition_build_hash(&self) -> Hash32 {
         profile::program_hash()
@@ -38,39 +54,46 @@ impl CatalogTransitionProgram<RustCryptoSha256> for CounterProgram {
             input.limits(),
         )?;
         transition.observe_context_root()?;
-        transition.require(context.0, RejectReasonId::Reason200)?;
         let count = transition.read_count()?;
         let failures = transition.read_failures()?;
-        let selected = match command {
-            CounterCommand::Increment => count.0,
-            CounterCommand::RecordFailure => failures.0,
-        };
-        transition.require(selected < 3, RejectReasonId::Reason201)?;
-        // Rejection seals without staging out-of-range values or delivery obligations.
-        if !context.0 || selected >= 3 {
-            return transition.seal();
-        }
-        let (count, failures) = match command {
-            CounterCommand::Increment => {
-                let count = CounterValue(count.0 + 1);
-                transition.update_count(&count)?;
-                (count, failures)
+        let command_bit = i64::from(matches!(command, CounterCommand::RecordFailure));
+        let output = synthesized::transition(&[
+            i64::try_from(count.0).map_err(|_| CounterProgramError::SynthesisDomain)?,
+            i64::try_from(failures.0).map_err(|_| CounterProgramError::SynthesisDomain)?,
+            command_bit,
+            i64::from(context.0),
+        ])
+        .ok_or(CounterProgramError::SynthesisDomain)?;
+        // The generated function returns data. This reviewed adapter maps the
+        // complete finite decision into existing typed staging operations.
+        match output[0] {
+            0 => {
+                transition.require(false, RejectReasonId::Reason200)?;
+                return Ok(transition.seal()?);
             }
-            CounterCommand::RecordFailure => {
-                let failures = CounterValue(failures.0 + 1);
-                transition.update_failures(&failures)?;
+            1 => {
+                transition.require(false, RejectReasonId::Reason201)?;
+                return Ok(transition.seal()?);
+            }
+            2 => {
+                transition.update_count(&CounterValue(i128::from(output[1])))?;
+            }
+            3 => {
+                transition.update_failures(&CounterValue(i128::from(output[2])))?;
                 transition.fail_if(true, CommittedFailureReasonId::Reason202)?;
-                (count, failures)
             }
-        };
-        transition.enqueue_channel_300(
-            0,
-            &NotificationDestination("local-observer".into()),
-            &Notification {
-                notified_count: count,
-                notified_failures: failures,
-            },
-        )?;
-        transition.seal()
+            _ => return Err(CounterProgramError::SynthesisDomain),
+        }
+        if output[3] == 1 {
+            transition.enqueue_channel_300(
+                0,
+                &NotificationDestination("local-observer".into()),
+                &Notification {
+                    notified_count: CounterValue(i128::from(output[4])),
+                    notified_failures: CounterValue(i128::from(output[5])),
+                },
+            )?;
+        }
+        Ok(transition.seal()?)
     }
 }

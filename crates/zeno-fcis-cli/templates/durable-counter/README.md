@@ -1,7 +1,7 @@
 # Generated durable counter
 
 This local, non-value-moving application connects authored shapes, generated
-Rust types, a reviewed transition, runtime law checks, nominal authorization,
+Rust types, a synthesized pure step with a reviewed adapter, runtime law checks, nominal authorization,
 SQLite publication, and an idempotent demonstration destination.
 
 `project.zeno` owns record fields, command variants, reason order, channel
@@ -56,3 +56,25 @@ principal are trusted tutorial inputs, not remote authentication. Source hashes
 identify reviewed example policy, not certified binaries or release evidence.
 Changing the source changes policy identity and requires a new database unless
 a separately reviewed migration is implemented. No Lean installation is used.
+
+## Inspect and replay synthesis
+
+`synthesis.json` independently specifies all 64 combinations of current state,
+command, and context. The grammar selects a field, guard limit, and update step.
+The checked-in `synthesized/transition.rs` is the actual function used by
+`src/program.rs`. The adapter maps its complete decision and notification plan
+through typed staging; the existing law checker still validates every actual
+decision. Source bindings include the specification and emitted artifacts.
+
+```sh
+zeno-fcis synth run synthesis.json --out synthesized --check
+zeno-fcis synth verify synthesis.json --out synthesized --receipt rust-conformance.json
+zeno-fcis synth run synthesis.json --target python --out python-step
+zeno-fcis synth verify synthesis.json --target python --out python-step --receipt python-conformance.json
+```
+
+Emission and runtime conformance have separate results. Keep receipts outside
+artifact directories. Rust and Python satisfy the same finite relation; these
+checks do not establish completeness of arbitrary requirements or properties
+outside the declared bounds. Automatic replay currently uses Linux and the
+existing Rust 1.97.1 or Python 3 installation.
