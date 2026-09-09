@@ -1499,17 +1499,15 @@ fn insert_outbox(
     Ok(())
 }
 
+/// Decodes one stored value under the reviewed default limits.
+///
+/// `decode_value` already rejects trailing bytes and returns
+/// `DecodeError::NonCanonical` unless the decoded value re-encodes to exactly
+/// the stored bytes, so repeating that comparison here could never reject a
+/// value it accepted. Every other stored-state guard, including the semantic
+/// root comparison in `snapshot`, is unaffected.
 fn decode_canonical_value(bytes: &[u8]) -> Result<Value, SqliteShellError> {
-    let value = decode_value(bytes, DecodeLimits::default()).map_err(SqliteShellError::Decode)?;
-    if value
-        .canonical_bytes()
-        .map_err(SqliteShellError::Encode)?
-        .as_slice()
-        != bytes
-    {
-        return Err(SqliteShellError::CorruptState);
-    }
-    Ok(value)
+    decode_value(bytes, DecodeLimits::default()).map_err(SqliteShellError::Decode)
 }
 
 fn hash_outbox_entry(entry: &OutboxEntry) -> Result<Hash32, SqliteShellError> {
@@ -2621,6 +2619,57 @@ mod tests {
         assert!(matches!(
             database.snapshot(),
             Err(SqliteShellError::CorruptHistory)
+        ));
+    }
+
+    #[test]
+    fn snapshot_rejects_trailing_bytes_after_the_stored_state_value() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let database = shell(&authority, &catalog);
+        let mut state_bytes: Vec<u8> = database
+            .connection
+            .query_row(
+                "SELECT state_bytes FROM semantic_state WHERE singleton = 1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or_else(|error| panic!("stored state: {error}"));
+        state_bytes.push(0);
+        database
+            .connection
+            .execute(
+                "UPDATE semantic_state SET state_bytes = ?1 WHERE singleton = 1",
+                params![state_bytes],
+            )
+            .unwrap_or_else(|error| panic!("append trailing byte: {error}"));
+
+        assert!(matches!(
+            database.snapshot(),
+            Err(SqliteShellError::Decode(DecodeError::TrailingBytes { .. }))
+        ));
+    }
+
+    #[test]
+    fn snapshot_rejects_a_stored_root_that_does_not_commit_to_the_stored_state() {
+        let catalog = catalog();
+        let authority = authority(&catalog, 53);
+        let database = shell(&authority, &catalog);
+        let replacement = Value::U128(4321);
+        let replacement_bytes = replacement
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("replacement bytes: {error}"));
+        database
+            .connection
+            .execute(
+                "UPDATE semantic_state SET state_bytes = ?1 WHERE singleton = 1",
+                params![replacement_bytes],
+            )
+            .unwrap_or_else(|error| panic!("substitute state only: {error}"));
+
+        assert!(matches!(
+            database.snapshot(),
+            Err(SqliteShellError::CorruptState)
         ));
     }
 

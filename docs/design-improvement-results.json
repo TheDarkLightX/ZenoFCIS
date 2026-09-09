@@ -1,0 +1,436 @@
+{
+  "schema": "zeno-fcis/design-improvement-results/1",
+  "date": "2026-09-09",
+  "baseline_commit": "132dc15d8333d0514e38bbed4786d127057b5770",
+  "source_sha256": {
+    "crates/zeno-fcis-codec/src/lib.rs": "8b53a21580cc6e8434ccdc3e038831cf72a4d987de8dd437f123041724c74a33",
+    "crates/zeno-fcis-compose/src/lib.rs": "5eca5c18313592c68a1c3da2939db7349594fcc048f10958bc8aba86891ba1e2",
+    "crates/zeno-fcis-compose/tests/composition_identity.rs": "c902b68d2c96b36296eca5179f6dc29da9d4281e1fc782c9482bb6bd4549efff",
+    "crates/zeno-fcis-shell-sqlite/src/lib.rs": "c20e3ff7bfb15d252179ddfb15f49998a127b9fababa2d99e4052f368fb9d6d8",
+    "crates/zeno-fcis-synthesis/src/finite/ir.rs": "0589f8b8cde123524200ef8bc0e25469d3e79f1570ff8f7746471e97e4b7eae1",
+    "crates/zeno-fcis-synthesis/src/finite/mod.rs": "42294c31ddb420550aa4105dd127bbc7cb87f65df413642010fee9cea261446b",
+    "crates/zeno-fcis-synthesis/src/finite/evaluation_tests.rs": "f9af18b32d1e00928ca9574f4ec302ce8c8eb94b494b93d4a6b948393ef5cfbd",
+    "crates/zeno-fcis-synthesis/tests/finite.rs": "fcecab9e7e1425f8b7e76f6b9f3e55d0d8c29a1d18c64460aa1ae9eec3b3374c",
+    "crates/zeno-fcis-cli/templates/durable-counter/synthesized/manifest.json": "cc21e20219abd863c78e35bb2fffabe49cfe65a379bb555357fab23f33543277"
+  },
+  "environment": {
+    "rust": "1.97.1",
+    "node": "22.23.1",
+    "lean": "4.30.0; unchanged and not part of the focused checks",
+    "dependencies_changed": false,
+    "new_toolchain_installed": false,
+    "benchmark_profile": "release"
+  },
+  "model_reviews": [
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "fable",
+      "requested_model": "claude-fable-5-1[1m]",
+      "assistant_models": [
+        "claude-fable-5-1"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 900.694011,
+      "events_sha256": "3500fc34c126ede09374b5b7b348e647e478fa6610792f33baef791995d1bb30",
+      "prompt_sha256": "d9c176befa314dc2e6aa295f75864679b907e623496c7dc51d8d31c0715c6e76",
+      "authority": "ADVISORY; independent root validation required",
+      "receipt_sha256": "0489833b70b0bd44e217398b7a82a787df109821f8a36ba3bb95c14273a53a20"
+    },
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "opus",
+      "requested_model": "claude-opus-5",
+      "assistant_models": [
+        "claude-opus-5"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read",
+        "Write"
+      ],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 1788.548579,
+      "events_sha256": "ac3a0192ec280dbc41aa57238e420deb57cc74719e124bc73ea83d7f8a885bc0",
+      "prompt_sha256": "803d1c3af77aa893be4962cd750caff16e92ca02b595f1ac113fe09275358aa9",
+      "authority": "ADVISORY; independent root validation required",
+      "receipt_sha256": "adec9fdc167ab4eeb939a97e6b846b8a723b4973f52c08331ee83e9045eabf92"
+    }
+  ],
+  "validation_owner": "Astra; model suggestions and edits remain advisory",
+  "behavior_comparisons": {
+    "check_behavior": {
+      "identical": true,
+      "observations_sha256": "4bd03fdf73ab1e63db4de5d07a79850211bb8589c61f36ed20819e102db60553",
+      "lines": 405365,
+      "binary_sha256": "78e1c686f7ca19d52b4a1277fbd59a7e064bb14b6bff4e8dc0b7454afd27ca64"
+    },
+    "check_finite": {
+      "identical": true,
+      "observations_sha256": "8168e8517921b3200e2a900d873ece62379216ac669074caed0e71c0e827aec4",
+      "lines": 145,
+      "binary_sha256": "617d6a8dcdc4c89f12a4a7aa9a36230a4201e7f4d78b0025f7f72863baf29673"
+    },
+    "check_composition": {
+      "identical": true,
+      "observations_sha256": "bac92f38ab414b832c4c362c66cae06110606697abcc473ca8d2e8397a455d46",
+      "lines": 6144,
+      "binary_sha256": "28566f83462307a32c94f6e9e7861196ef40d73ef5fa7b209543368b52836ed4"
+    },
+    "certificate": {
+      "source_identity_refreshed": true,
+      "trace_and_assignment_unchanged": true,
+      "before": [
+        "certificate=Hash32([84, 187, 198, 232, 23, 47, 51, 171, 15, 16, 224, 171, 5, 128, 99, 109, 185, 130, 108, 43, 5, 248, 251, 208, 63, 228, 19, 223, 222, 235, 106, 139])",
+        "trace=Hash32([149, 228, 163, 2, 135, 230, 40, 228, 233, 12, 176, 34, 150, 99, 174, 228, 197, 43, 220, 165, 78, 89, 250, 176, 170, 112, 150, 158, 231, 147, 48, 141])",
+        "assignment=Some(Hash32([238, 180, 123, 222, 49, 8, 200, 189, 42, 213, 215, 186, 147, 88, 124, 130, 102, 60, 127, 202, 164, 6, 97, 230, 23, 204, 93, 100, 44, 78, 20, 185]))"
+      ],
+      "after": [
+        "certificate=Hash32([54, 163, 75, 182, 61, 220, 13, 44, 12, 46, 43, 4, 17, 192, 75, 80, 233, 247, 126, 84, 45, 240, 49, 40, 117, 98, 134, 115, 219, 18, 165, 109])",
+        "trace=Hash32([149, 228, 163, 2, 135, 230, 40, 228, 233, 12, 176, 34, 150, 99, 174, 228, 197, 43, 220, 165, 78, 89, 250, 176, 170, 112, 150, 158, 231, 147, 48, 141])",
+        "assignment=Some(Hash32([238, 180, 123, 222, 49, 8, 200, 189, 42, 213, 215, 186, 147, 88, 124, 130, 102, 60, 127, 202, 164, 6, 97, 230, 23, 204, 93, 100, 44, 78, 20, 185]))"
+      ]
+    }
+  },
+  "case_counts": {
+    "decoder_observations": 405364,
+    "finite_spaces": 85,
+    "finite_synthesis_outcomes": 60,
+    "composition_scenarios": 3072,
+    "composition_reports_with_verifier_calls": 6144
+  },
+  "complexity": {
+    "tool": "Lizard 1.24.0",
+    "scope": "Changed production modules; tests excluded",
+    "branch_points": "sum(CCN - 1)",
+    "modules": [
+      {
+        "path": "crates/zeno-fcis-codec/src/lib.rs",
+        "before": {
+          "functions": 52,
+          "decisions": 106,
+          "nloc": 561,
+          "max_ccn": 51
+        },
+        "after": {
+          "functions": 53,
+          "decisions": 98,
+          "nloc": 541,
+          "max_ccn": 45
+        }
+      },
+      {
+        "path": "crates/zeno-fcis-compose/src/lib.rs",
+        "before": {
+          "functions": 191,
+          "decisions": 275,
+          "nloc": 1876,
+          "max_ccn": 18
+        },
+        "after": {
+          "functions": 194,
+          "decisions": 273,
+          "nloc": 1897,
+          "max_ccn": 18
+        }
+      },
+      {
+        "path": "crates/zeno-fcis-shell-sqlite/src/lib.rs",
+        "before": {
+          "functions": 55,
+          "decisions": 360,
+          "nloc": 1308,
+          "max_ccn": 53
+        },
+        "after": {
+          "functions": 55,
+          "decisions": 357,
+          "nloc": 1299,
+          "max_ccn": 53
+        }
+      },
+      {
+        "path": "crates/zeno-fcis-synthesis/src/finite/mod.rs",
+        "before": {
+          "functions": 19,
+          "decisions": 76,
+          "nloc": 410,
+          "max_ccn": 29
+        },
+        "after": {
+          "functions": 23,
+          "decisions": 80,
+          "nloc": 496,
+          "max_ccn": 29
+        }
+      },
+      {
+        "path": "crates/zeno-fcis-synthesis/src/finite/ir.rs",
+        "before": {
+          "functions": 19,
+          "decisions": 45,
+          "nloc": 216,
+          "max_ccn": 21
+        },
+        "after": {
+          "functions": 21,
+          "decisions": 48,
+          "nloc": 241,
+          "max_ccn": 21
+        }
+      }
+    ],
+    "totals_before": {
+      "functions": 336,
+      "branch_points": 862,
+      "nloc": 4371,
+      "sum_ccn": 1198
+    },
+    "totals_after": {
+      "functions": 346,
+      "branch_points": 856,
+      "nloc": 4474,
+      "sum_ccn": 1202
+    }
+  },
+  "benchmarks": {
+    "method": "Seven alternating paired rounds; median ns per call; same logical CPU, Rust 1.97.1 release build and harness",
+    "cpu": "AMD Ryzen Threadripper 1950X 16-Core Processor",
+    "cpu_affinity": [
+      31
+    ],
+    "summary": [
+      {
+        "name": "decode_envelope_1",
+        "before_ns_per_call": 1134.96349,
+        "after_ns_per_call": 645.08551,
+        "speedup": 1.7594000677522583,
+        "time_change_percent": -43.16244393024484
+      },
+      {
+        "name": "decode_envelope_32",
+        "before_ns_per_call": 21548.33,
+        "after_ns_per_call": 16538.475,
+        "speedup": 1.3029212185524968,
+        "time_change_percent": -23.249388699727557
+      },
+      {
+        "name": "decode_envelope_512",
+        "before_ns_per_call": 304047.195,
+        "after_ns_per_call": 241854.6275,
+        "speedup": 1.2571485530083562,
+        "time_change_percent": -20.45490585762516
+      },
+      {
+        "name": "decode_map_1",
+        "before_ns_per_call": 668.19699,
+        "after_ns_per_call": 620.39524,
+        "speedup": 1.0770504783370034,
+        "time_change_percent": -7.153840965371616
+      },
+      {
+        "name": "decode_map_32",
+        "before_ns_per_call": 18380.7992,
+        "after_ns_per_call": 16942.9164,
+        "speedup": 1.0848663102652152,
+        "time_change_percent": -7.822743637828344
+      },
+      {
+        "name": "decode_map_512",
+        "before_ns_per_call": 257989.6125,
+        "after_ns_per_call": 244168.4375,
+        "speedup": 1.0566050843487909,
+        "time_change_percent": -5.357260265662822
+      },
+      {
+        "name": "parallel_verification_1_guarantees",
+        "before_ns_per_call": 2208.38795,
+        "after_ns_per_call": 1240.48956,
+        "speedup": 1.7802551679677174,
+        "time_change_percent": -43.82827709234692
+      },
+      {
+        "name": "parallel_verification_32_guarantees",
+        "before_ns_per_call": 12705.2517,
+        "after_ns_per_call": 7659.4413,
+        "speedup": 1.6587700332660034,
+        "time_change_percent": -39.71436787828454
+      },
+      {
+        "name": "parallel_verification_512_guarantees",
+        "before_ns_per_call": 184009.469,
+        "after_ns_per_call": 117430.312,
+        "speedup": 1.5669673857291633,
+        "time_change_percent": -36.182462436213
+      },
+      {
+        "name": "path_overlap_256_namespaces",
+        "before_ns_per_call": 27919.885,
+        "after_ns_per_call": 51079.295,
+        "speedup": 0.5465988714213851,
+        "time_change_percent": 82.94951787946118
+      },
+      {
+        "name": "path_overlap_256_one_namespace",
+        "before_ns_per_call": 137952.87,
+        "after_ns_per_call": 133390.76,
+        "speedup": 1.0342010945885607,
+        "time_change_percent": -3.3070062261118527
+      },
+      {
+        "name": "path_overlap_4096_namespaces",
+        "before_ns_per_call": 6594433.0,
+        "after_ns_per_call": 11635359.5,
+        "speedup": 0.5667579931672933,
+        "time_change_percent": 76.4421520394551
+      },
+      {
+        "name": "path_overlap_4096_one_namespace",
+        "before_ns_per_call": 37382868.0,
+        "after_ns_per_call": 34732908.0,
+        "speedup": 1.0762953680699583,
+        "time_change_percent": -7.088701701538791
+      },
+      {
+        "name": "path_overlap_4_namespaces",
+        "before_ns_per_call": 22.7,
+        "after_ns_per_call": 26.97,
+        "speedup": 0.8416759362254357,
+        "time_change_percent": 18.810572687224656
+      },
+      {
+        "name": "path_overlap_4_one_namespace",
+        "before_ns_per_call": 50.60407,
+        "after_ns_per_call": 49.87517,
+        "speedup": 1.0146144865270634,
+        "time_change_percent": -1.4403979758940366
+      },
+      {
+        "name": "synthesis_256x64",
+        "before_ns_per_call": 2348333.775,
+        "after_ns_per_call": 711830.925,
+        "speedup": 3.299004991950862,
+        "time_change_percent": -69.68783004451741
+      },
+      {
+        "name": "synthesis_2x2",
+        "before_ns_per_call": 38975.674,
+        "after_ns_per_call": 40615.14,
+        "speedup": 0.9596341167357788,
+        "time_change_percent": 4.206382678590748
+      }
+    ],
+    "claim": "Local measurements for these fixed workloads, not portable performance guarantees",
+    "full_measurements_sha256": "b8c39cbd5141970a8ef37f279f550d7e030d989647220a58d8d6745d30078cba",
+    "path_control_interpretation": {
+      "routine": "PathSet::overlaps",
+      "instruction_bytes": 320,
+      "different_byte_offsets": [
+        61,
+        62
+      ],
+      "only_difference": "RIP-relative jump-table address displacement in the LEA instruction",
+      "baseline_address": "0x42a30",
+      "candidate_address": "0x443d0",
+      "interpretation": "same instruction sequence at different binary addresses; measured timing differences are not evidence of a changed path algorithm"
+    },
+    "composition_evidence_verifier": "Accepting test verifier; real RustCryptoSha256 commitments; external proof verification cost excluded"
+  },
+  "benchmark_harness_source_sha256": {
+    "Cargo.lock": "549fa6071d7e1ad7df366a87eaa56710165d58b1f9f6821b9a3cdc7b7c4460b2",
+    "Cargo.toml": "ffb2cd685e4b9dbfd52aa958bfb21a2db1fb974bd7670835b5aca510c3025e14",
+    "src/main.rs": "008fab50f25353434a6f749c782ecc1b3238080aa0ad0fa1280345b881a1c4a6",
+    "src/bin/benchmark_composition.rs": "51de3b6134e62cff8cd8b203ea20b0a49cfebc82fefa3ef421817cc2fcea5682",
+    "src/bin/check_composition.rs": "fefe47b66ae61cb631c54cc4373e81ca07f37a7052a236af4c046cfcf74aaa87",
+    "src/bin/check_behavior.rs": "32b80116c384e15a2fa724a35ff9f10a2152e53598dc37adc00bbdc242e62443",
+    "src/bin/compare_path_algorithms.rs": "51f22a9c699eee6b57fb37c5cb5867099b741e031d7d84ceab3b8a6f2a2d261a",
+    "src/bin/check_finite.rs": "36b125f73da793baa73d131b6ed2e35c01af85b7326081bab70fddfdc0a5b378",
+    "src/bin/check_paths.rs": "2e3745ee7715d3d216491b749b2f1fa1045f93e4ac23635423053796f1442652"
+  },
+  "additional_certificate_check_sha256": "08e979b6ff8cc83e0d7ab07ea5e230c15b20c4979c856a5671936924c4666218",
+  "test_results": {
+    "focused_tests_including_doctests": {
+      "passed": 92,
+      "failed": 0
+    },
+    "clippy_all_targets_warnings_denied": "passed for codec, compose, shell-sqlite, synthesis",
+    "no_default_features": "passed for codec, compose, synthesis libraries",
+    "static_assurance": {
+      "status": "passed",
+      "crates": 37,
+      "semantic_boundaries": 27,
+      "effect_rules": 16
+    },
+    "controlled_mutations": [
+      {
+        "name": "reset-nested-decoding-budgets",
+        "test": "nested_map_blobs_share_the_parent_depth_node_and_payload_budgets",
+        "exit_code": 101,
+        "source_sha256": "8b53a21580cc6e8434ccdc3e038831cf72a4d987de8dd437f123041724c74a33",
+        "test_rejected_mutation": true
+      },
+      {
+        "name": "skip-later-relation-checks",
+        "test": "realizability_reports_a_trap_after_an_earlier_satisfying_output",
+        "exit_code": 101,
+        "source_sha256": "42294c31ddb420550aa4105dd127bbc7cb87f65df413642010fee9cea261446b",
+        "test_rejected_mutation": true
+      },
+      {
+        "name": "retain-partial-evaluation-on-error",
+        "test": "arithmetic_traps_clear_partial_nodes_before_the_next_input",
+        "exit_code": 101,
+        "source_sha256": "0589f8b8cde123524200ef8bc0e25469d3e79f1570ff8f7746471e97e4b7eae1",
+        "test_rejected_mutation": true
+      }
+    ],
+    "one_commitment_test_on_baseline": "failed as expected: two commitments instead of one",
+    "mutation_restoration": "exact source bytes restored; codec and synthesis tests passed again",
+    "required_precommit_gate": "python3 tools/atdd.py run --all",
+    "precommit_gate_result": "Recorded separately after documentation is finalized"
+  },
+  "evidence_sha256": {
+    "baseline-final.json": "841747dbab25084d9df5d4848581dea589a6bdb281a485cd718cb00389207924",
+    "behavior-comparison.json": "39180bfc77f4e452c76c657712a807d0fde596d86cd4e72b6c314908fe8e6823",
+    "complexity-comparison.json": "5ac634d6cf0065ac9517bfa715b52f23cb80bd65cb2446ba4252ed18eee7cecc",
+    "benchmark-comparison.json": "b8c39cbd5141970a8ef37f279f550d7e030d989647220a58d8d6745d30078cba",
+    "path-assembly-comparison.json": "f82b76b9a134687dc1fc60a6ee682b8cb3754d23be9f045086757ea80112d5da",
+    "mutation-results.json": "febee0536d0bae833975249b109e6d13864595e015946bc8a5119ba12272c83d",
+    "focused-tests.log": "e2638658cd8138d3b34423195f88de892fb0edab660501c1058082d1b64bfef0",
+    "clippy.log": "828ee0136ac48c8a792ef5871d53ccabcfa3f417e415028cad302d90ce3b4618",
+    "no-std.log": "f11493bc88a3b7b59f749dd5d41a504e0770155ceecd0995ea45e3af7dd65154",
+    "restored-tests.log": "6d5036614c54e8f49d9728b5a077386ca057389ad49b1a5f6f6c046f4218f706",
+    "atdd-stale-template.log": "acc63967b96c13cefd49df536e6e3646e3d7ab27fcb189c16fad999ff3c3bf7b",
+    "starter-certificate-refresh.json": "4cc93579b766dc296e6ea2003ccf1100b1636a229edd5d9a3cee63c756278305"
+  },
+  "local_evidence_directory": "/tmp/zenofcis-design-review-20260909",
+  "limits": [
+    "Bounded behavioral comparisons; no general equivalence or global optimality proof.",
+    "Benchmarks are local fixed workloads; tiny synthesis and unchanged path controls include regressions.",
+    "Certificate identity changes with source; assignment and trace identity are preserved in comparison cases.",
+    "Model reviews are not independent release approval.",
+    "Local acceptance does not establish remote CI completion or stable V1 readiness."
+  ],
+  "starter_certificate_refresh": {
+    "changed_fields": [
+      "certificate"
+    ],
+    "before_certificate": "659baa7a8bef1a6e348f5a77f17facbd146f28a097d0e32da30d748302106e0f",
+    "after_certificate": "85a5720338505e48a3403a6b2461044901b409c0d8536da78023d2b8d733fa7b",
+    "other_files_identical": true,
+    "program_contract_trace_unchanged": true,
+    "cause": "Checker source identity changed; embedded starter manifest retained the old certificate",
+    "test": "tools/check_synthesis.py exercise_counter --check rejected the old manifest",
+    "first_atdd_exit_code": 1
+  }
+}

@@ -205,10 +205,41 @@ impl Program {
     }
     /// Evaluates explicit inputs without any ambient state or effects.
     pub fn evaluate(&self, input: &[i64]) -> Result<Vec<i64>, Error> {
+        let mut values = Vec::new();
+        let mut output = Vec::new();
+        self.evaluate_into(input, &mut values, &mut output)?;
+        Ok(output)
+    }
+    /// Evaluates into caller-owned buffers, reusing their existing capacity.
+    ///
+    /// Both buffers are cleared before use and again on every failure, so a
+    /// rejected input, a trapped operation, or a rejected output tuple cannot
+    /// leave a partial row visible to the next evaluation.
+    pub(super) fn evaluate_into(
+        &self,
+        input: &[i64],
+        values: &mut Vec<i64>,
+        output: &mut Vec<i64>,
+    ) -> Result<(), Error> {
+        let result = self.evaluate_nodes(input, values, output);
+        if result.is_err() {
+            values.clear();
+            output.clear();
+        }
+        result
+    }
+    fn evaluate_nodes(
+        &self,
+        input: &[i64],
+        values: &mut Vec<i64>,
+        output: &mut Vec<i64>,
+    ) -> Result<(), Error> {
+        values.clear();
+        output.clear();
         if !admitted(&self.inputs, input) {
             return Err(Error::Invalid("input-domain"));
         }
-        let mut values: Vec<i64> = Vec::with_capacity(self.nodes.len());
+        values.reserve_exact(self.nodes.len());
         for op in &self.nodes {
             let at = |id: u16| values[usize::from(id)];
             let value = match *op {
@@ -231,15 +262,14 @@ impl Program {
             };
             values.push(value);
         }
-        let output: Vec<_> = self
-            .roots
-            .iter()
-            .map(|id| values[usize::from(*id)])
-            .collect();
-        if !admitted(&self.outputs, &output) {
+        output.reserve_exact(self.roots.len());
+        for id in &self.roots {
+            output.push(values[usize::from(*id)]);
+        }
+        if !admitted(&self.outputs, output) {
             return Err(Error::Invalid("output-domain"));
         }
-        Ok(output)
+        Ok(())
     }
     /// Canonical, language-neutral program data, including the semantic profile.
     #[must_use]
@@ -300,3 +330,7 @@ pub(super) fn schema_value(inputs: &[Domain], outputs: &[Domain]) -> Value {
 pub(super) fn tuple(values: Vec<Value>) -> Value {
     Value::Tuple(values.into_boxed_slice())
 }
+
+#[cfg(test)]
+#[path = "evaluation_tests.rs"]
+mod evaluation_tests;

@@ -285,6 +285,9 @@ Persistent backends are sealed behind a pure logical-map interface. Updates retu
 
 Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; pure validators decide whether that data is admissible. A structurally valid `CommitBundle` remains reference data and cannot enter the production SQLite commit port directly.
 
+The [design and algorithm review](docs/DESIGN_IMPROVEMENTS.md) explains recent
+performance changes, preserved acceptance rules, measurements and tradeoffs.
+
 The `zeno-fcis-domain` layer makes global composition executable without
 introducing hidden shared state. Every component receives only its fixed state
 row, one command, one context, and fixed typed input ports. The complete route

@@ -2427,11 +2427,33 @@ pub fn verify_assume_guarantee<H: CommitmentHasher, V: EvidenceVerifier>(
     verifier: &V,
 ) -> CompositionReport {
     let Ok(spec_hash) = spec.commitment::<H>() else {
-        return CompositionReport {
-            blockers: Vec::from([CompositionBlocker::CompositionIdentityFailure])
-                .into_boxed_slice(),
-        };
+        return composition_identity_failure();
     };
+    CompositionReport {
+        blockers: assume_guarantee_blockers(spec, evidence, verifier, spec_hash).into_boxed_slice(),
+    }
+}
+
+/// The single report returned whenever the specification cannot be committed.
+fn composition_identity_failure() -> CompositionReport {
+    CompositionReport {
+        blockers: Vec::from([CompositionBlocker::CompositionIdentityFailure]).into_boxed_slice(),
+    }
+}
+
+/// Collects assume-guarantee blockers under an already computed specification
+/// identity.
+///
+/// `spec_hash` is the commitment of the immutable `spec` under the caller's
+/// hasher. Recomputing it here could only reproduce the same 32 bytes, so each
+/// public entry commits the specification exactly once and passes the result
+/// down. The order in which blockers are appended is part of the report.
+fn assume_guarantee_blockers<V: EvidenceVerifier>(
+    spec: &CompositionSpec,
+    evidence: &CompositionEvidence,
+    verifier: &V,
+    spec_hash: Hash32,
+) -> Vec<CompositionBlocker> {
     let mut blockers = Vec::new();
     for component in spec.components() {
         for guarantee in component.guarantees() {
@@ -2471,13 +2493,15 @@ pub fn verify_assume_guarantee<H: CommitmentHasher, V: EvidenceVerifier>(
             };
             let mut providers_valid = true;
             for provider in discharge.providers() {
+                // Component guarantees are sorted by claim and duplicate claims
+                // are rejected by `ComponentContract::try_new_with_outbox`.
                 let exists = spec
                     .component(provider.component())
                     .is_some_and(|candidate| {
                         candidate
                             .guarantees()
-                            .iter()
-                            .any(|guarantee| guarantee.claim() == provider.guarantee())
+                            .binary_search_by_key(&provider.guarantee(), Guarantee::claim)
+                            .is_ok()
                     });
                 if !exists {
                     providers_valid = false;
@@ -2541,9 +2565,7 @@ pub fn verify_assume_guarantee<H: CommitmentHasher, V: EvidenceVerifier>(
             blockers.push(CompositionBlocker::MissingCouplingEvidence { claim: *claim_hash });
         }
     }
-    CompositionReport {
-        blockers: blockers.into_boxed_slice(),
-    }
+    blockers
 }
 
 /// Checks assume-guarantee obligations, conservative effect/outbox conflicts,
@@ -2555,20 +2577,31 @@ pub fn verify_deterministic_parallel<H: CommitmentHasher, V: EvidenceVerifier>(
     expected_context: &ParallelVerificationContext,
     verifier: &V,
 ) -> CompositionReport {
-    let mut blockers = verify_assume_guarantee::<H, V>(spec, evidence, verifier)
-        .blockers
-        .into_vec();
     let Ok(spec_hash) = spec.commitment::<H>() else {
-        if !blockers
-            .iter()
-            .any(|item| matches!(item, CompositionBlocker::CompositionIdentityFailure))
-        {
-            blockers.push(CompositionBlocker::CompositionIdentityFailure);
-        }
-        return CompositionReport {
-            blockers: blockers.into_boxed_slice(),
-        };
+        return composition_identity_failure();
     };
+    CompositionReport {
+        blockers: deterministic_parallel_blockers(
+            spec,
+            evidence,
+            expected_context,
+            verifier,
+            spec_hash,
+        )
+        .into_boxed_slice(),
+    }
+}
+
+/// Collects deterministic-parallel blockers under an already computed
+/// specification identity, starting from the assume-guarantee blockers.
+fn deterministic_parallel_blockers<V: EvidenceVerifier>(
+    spec: &CompositionSpec,
+    evidence: &CompositionEvidence,
+    expected_context: &ParallelVerificationContext,
+    verifier: &V,
+    spec_hash: Hash32,
+) -> Vec<CompositionBlocker> {
+    let mut blockers = assume_guarantee_blockers(spec, evidence, verifier, spec_hash);
     if expected_context.composition_spec_hash() != spec_hash
         || expected_context.merge_order() != spec.merge_order()
     {
@@ -2622,9 +2655,7 @@ pub fn verify_deterministic_parallel<H: CommitmentHasher, V: EvidenceVerifier>(
         }
     }
 
-    CompositionReport {
-        blockers: blockers.into_boxed_slice(),
-    }
+    blockers
 }
 
 /// Authorizes deterministic-parallel use only with exact complete footprints.
@@ -2701,13 +2732,21 @@ pub fn authorize_deterministic_parallel<
         footprint_witnesses.push(witness);
     }
 
-    let report = verify_deterministic_parallel::<H, V>(spec, evidence, expected_context, verifier);
-    if !report.is_verified() {
-        return Err(ParallelAuthorizationError::Composition(report));
+    // The specification identity is committed here, after every footprint
+    // binding and evidence check, exactly where parallel verification used to
+    // compute it. The same value authorizes the composition below.
+    let Ok(spec_hash) = spec.commitment::<H>() else {
+        return Err(ParallelAuthorizationError::Composition(
+            composition_identity_failure(),
+        ));
+    };
+    let blockers =
+        deterministic_parallel_blockers(spec, evidence, expected_context, verifier, spec_hash);
+    if !blockers.is_empty() {
+        return Err(ParallelAuthorizationError::Composition(CompositionReport {
+            blockers: blockers.into_boxed_slice(),
+        }));
     }
-    let spec_hash = spec
-        .commitment::<H>()
-        .map_err(ParallelAuthorizationError::Contract)?;
     Ok(DeterministicParallelAuthorization {
         spec_hash,
         context: expected_context.clone(),
@@ -2857,6 +2896,10 @@ pub enum ParallelAuthorizationError {
     /// Ordinary composition, conflict, or parity obligations failed.
     Composition(CompositionReport),
     /// Canonical composition identity construction failed.
+    ///
+    /// Retained for compatibility. A specification that cannot be committed is
+    /// reported as [`Self::Composition`] carrying
+    /// [`CompositionBlocker::CompositionIdentityFailure`].
     Contract(ContractError),
 }
 
