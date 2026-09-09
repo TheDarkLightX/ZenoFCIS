@@ -17,7 +17,7 @@ canonical bytes for the same logical entries, regardless of insertion history.
 PersistentMap trait
 ├── BTreeMapBackend (reference, always available)
 ├── RpdsBackend (optional, behind "rpds-backend" feature)
-└── ImblBackend (optional, behind "imbl-backend" feature)
+└── OrderedMap (optional, behind "ordered-map" feature)
 ```
 
 ### Authority Boundary
@@ -34,8 +34,7 @@ PersistentMap trait
 
 - `zeno-fcis-codec` for `CanonicalEncode` (existing workspace crate).
 - `zeno-fcis-value` for `Value`, `MapEntry` (existing workspace crate).
-- `rpds = "=1.1.0"` (optional): MIT/Apache-2.0, no unsafe, no advisory.
-- `imbl = "=3.0.0"` (optional): MPL-2.0+, no advisory.
+- `rpds = "=1.1.0"` (optional): MIT/Apache-2.0; implements both shared maps.
 - `criterion = "=0.5.1"` (dev-only): MIT/Apache-2.0.
 
 All dependency versions are pinned exactly per ZenoFCIS dependency policy.
@@ -45,8 +44,12 @@ All dependency versions are pinned exactly per ZenoFCIS dependency policy.
 - No explicit size limits in the adapter layer; bounds are inherited from
   `zeno-fcis-value`'s `Value::Map` validation.
 - `BTreeMapBackend`: O(n) clone per insert/remove (no structural sharing).
-- `RpdsBackend`: O(n) filter + push per insert/remove (vector-based).
-- `ImblBackend`: O(log n) insert/remove (tree-based structural sharing).
+- `RpdsBackend`: shared hash-trie nodes; hash collisions can increase lookup
+  and update work. Materializing canonical order requires sorting the entries.
+- `OrderedMap`: O(log n) ordered tree operations per lookup/insert/remove and
+  O(n) ordered iteration. Atomic reference counting preserves `Send + Sync`.
+
+These costs exclude key comparison, value copying, and serialization costs.
 
 ### Laws
 
@@ -73,33 +76,38 @@ All dependency versions are pinned exactly per ZenoFCIS dependency policy.
   removing every other entry, asserting equality at every step.
 - **Rpds vs BTreeMap** (with `rpds-backend`): insert 20 entries, remove every
   3rd, assert entry and canonical byte equality.
-- **Imbl vs BTreeMap** (with `imbl-backend`): same differential sequence.
+- **OrderedMap vs BTreeMap** (with `ordered-map`): the same differential
+  sequence, plus mixed-key updates branching from retained snapshots. Every
+  step checks current results and the canonical bytes of all saved versions.
 
 ### Benchmarks
 
-- `insert_dense`: insert 10, 50, 100, 200 entries in dense order.
+- `insert_dense`: insert 10, 50, 100, 200, 1024 entries in dense order.
 - `insert_sparse`: insert entries with stride 5 (sparse set).
-- `lookup`: get by encoded key in maps of size 10, 50, 100, 200.
+- `lookup`: get by encoded key in maps of size 10, 50, 100, 200, 1024.
 - `canonical_iteration`: materialize entries in canonical order.
-- `root_generation`: compute canonical bytes.
+- `canonical_encoding`: compute canonical bytes.
 - `snapshot_retention`: retain all intermediate snapshots during insert.
 
-### Dependency Assessment
+### Dependency change and compatibility
 
-| Dependency | Version | License | Advisory | Unsafe |
-|------------|---------|---------|----------|--------|
-| rpds | =1.1.0 | MIT/Apache-2.0 | None | No |
-| imbl | =3.0.0 | MPL-2.0+ | None | Yes (internal) |
-| criterion | =0.5.1 | MIT/Apache-2.0 | None | No |
+The previous `imbl` dependency pulled in `bitmaps` 3.2.1, affected by
+[RUSTSEC-2025-0167](https://rustsec.org/advisories/RUSTSEC-2025-0167.html).
+It has been removed. The ordered map now uses the existing pinned `rpds` crate,
+without adding an advisory exception or changing canonical map encoding.
 
-The `imbl` crate contains internal `unsafe` code for its persistent vector
-implementation. This `unsafe` code is never exposed through the adapter API.
-The `rpds` crate is `no_std` and contains no `unsafe` code.
+New callers should enable `ordered-map` and use `OrderedMap`. The
+`imbl-backend` feature enables `ordered-map`, and `ImblBackend` remains a
+compatibility alias. Both names use the same implementation. The umbrella
+`persistent-collections` feature preserves access through either name.
+
+Run the pinned dependency checks against current advisory data; a historical
+scan cannot establish the current advisory status of any dependency.
 
 ### Recommendation
 
 **No default backend is selected.** The `BTreeMapBackend` is the reference
-backend and is always available. The `rpds-backend` and `imbl-backend`
+backend and is always available. The `rpds-backend` and `ordered-map`
 features are opt-in. A default backend should only be selected after
 benchmark results demonstrate a clear performance advantage and the
 assurance criteria (no `unsafe` in the adapter layer, no advisory
@@ -111,9 +119,8 @@ vulnerabilities, license compatibility) are met.
   canonical commitments, authenticated proofs, or economic correctness.
 - The `BTreeMapBackend` has no structural sharing; it clones the entire map
   on every modification.
-- The `RpdsBackend` uses a vector internally and filters on every insert,
-  which is O(n) per operation.
-- The `ImblBackend` provides true O(log n) structural sharing but depends on
-  a crate with internal `unsafe` code.
+- `RpdsBackend` shares hash-trie nodes and sorts when materializing entries.
+- `OrderedMap` shares ordered-tree nodes. Algorithmic bounds alone do not
+  establish a latency or memory improvement over another implementation.
 - No backend is claimed to be production-ready until benchmark evidence and
   assurance criteria are met.

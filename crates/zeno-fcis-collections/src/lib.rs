@@ -267,11 +267,18 @@ mod rpds_backend;
 #[cfg(feature = "rpds-backend")]
 pub use rpds_backend::RpdsBackend;
 
-#[cfg(feature = "imbl-backend")]
-mod imbl_backend;
+#[cfg(feature = "ordered-map")]
+mod ordered_map;
 
+#[cfg(feature = "ordered-map")]
+pub use ordered_map::OrderedMap;
+
+/// Compatibility name for [`OrderedMap`], which now uses `rpds` internally.
+///
+/// New callers should enable `ordered-map` and use [`OrderedMap`] directly.
 #[cfg(feature = "imbl-backend")]
-pub use imbl_backend::ImblBackend;
+#[doc(hidden)]
+pub type ImblBackend = OrderedMap;
 
 // ---------------------------------------------------------------------------
 // Tests

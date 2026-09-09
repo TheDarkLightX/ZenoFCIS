@@ -121,7 +121,7 @@ pub fn compare_case(
     let replay = if report.is_exact() {
         None
     } else {
-        Some(ReplayFixture::new(
+        Some(DecisionMismatchRecord::new(
             case_id, input_hash, model, runtime, &report,
         )?)
     };
@@ -132,7 +132,7 @@ pub fn compare_case(
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MountedCase {
     report: RefinementReport,
-    replay: Option<ReplayFixture>,
+    replay: Option<DecisionMismatchRecord>,
 }
 
 impl MountedCase {
@@ -144,14 +144,14 @@ impl MountedCase {
 
     /// Returns the canonical counterexample when the comparison differs.
     #[must_use]
-    pub const fn replay(&self) -> Option<&ReplayFixture> {
+    pub const fn replay(&self) -> Option<&DecisionMismatchRecord> {
         self.replay.as_ref()
     }
 }
 
-/// Canonical replay identity for one complete mounted disagreement.
+/// Saved hashes and differing fields for a model/runtime decision mismatch.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ReplayFixture {
+pub struct DecisionMismatchRecord {
     case_id: Hash32,
     input_hash: Hash32,
     model_hash: Hash32,
@@ -159,7 +159,11 @@ pub struct ReplayFixture {
     mismatches: Box<[Mismatch]>,
 }
 
-impl ReplayFixture {
+/// Compatibility name for [`DecisionMismatchRecord`].
+#[doc(hidden)]
+pub type ReplayFixture = DecisionMismatchRecord;
+
+impl DecisionMismatchRecord {
     fn new(
         case_id: Hash32,
         input_hash: Hash32,
@@ -215,7 +219,7 @@ impl ReplayFixture {
     }
 }
 
-impl CanonicalEncode for ReplayFixture {
+impl CanonicalEncode for DecisionMismatchRecord {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.case_id.as_bytes());
         output.extend_from_slice(self.input_hash.as_bytes());
@@ -549,7 +553,7 @@ mod tests {
         let mounted = compare_case(hash(20), b"canonical-input", &model, &runtime)
             .unwrap_or_else(|error| panic!("compare: {error}"));
         assert!(!mounted.report().is_exact());
-        let replay = mounted.replay().unwrap_or_else(|| panic!("missing replay"));
+        let replay: &ReplayFixture = mounted.replay().unwrap_or_else(|| panic!("missing replay"));
         assert_eq!(replay.mismatches(), &[Mismatch::ReasonCode]);
         assert_ne!(
             replay

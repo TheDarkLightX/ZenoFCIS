@@ -517,18 +517,18 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
     hidden_packages = hidden_public_metadata.get("packages")
     if not isinstance(hidden_packages, list):
         raise RcError("self-test package set is unavailable")
-    fixture = next(
+    private_test_package = next(
         (
             package
             for package in hidden_packages
             if isinstance(package, dict)
-            and package.get("name") == "zeno-fcis-codegen-fixture"
+            and package.get("name") == "zeno-fcis-generated-code-tests"
         ),
         None,
     )
-    if fixture is None:
-        raise RcError("self-test fixture package is unavailable")
-    fixture["publish"] = None
+    if private_test_package is None:
+        raise RcError("self-test generated-code test package is unavailable")
+    private_test_package["publish"] = None
     expect_failure(
         copy.deepcopy(configured), hidden_public_metadata, "hidden public package"
     )
@@ -1213,8 +1213,8 @@ def build(output: Path) -> None:
     for private_name in require_string_list(configured, "private_packages"):
         rustdoc_arguments.extend(["--exclude", private_name])
     run(rustdoc_arguments, environment=rustdoc_environment)
-    if (build_target / "doc" / "zeno_fcis_codegen_fixture").exists():
-        raise RcError("private fixture leaked into public rustdoc")
+    if (build_target / "doc" / "zeno_fcis_generated_code_tests").exists():
+        raise RcError("private generated-code test crate leaked into public rustdoc")
     normalize_rustdoc_tree(build_target / "doc")
     deterministic_tree_archive(
         build_target / "doc",

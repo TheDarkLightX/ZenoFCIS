@@ -1,6 +1,6 @@
-//! imbl persistent map backend.
+//! Ordered map with immutable, shareable snapshots.
 //!
-//! Uses `imbl::OrdMap` for structural sharing with ordered keys. Entries
+//! Uses `rpds::RedBlackTreeMapSync` for structural sharing with ordered keys. Entries
 //! are stored by encoded key and materialized in canonical order.
 
 use alloc::boxed::Box;
@@ -9,49 +9,50 @@ use alloc::vec::Vec;
 use super::{LogicalEntry, PersistentMap};
 use crate::private::Sealed;
 
-/// A persistent map backed by `imbl::OrdMap`.
+/// An ordered map whose immutable snapshots can be shared across threads.
 ///
-/// Entries are keyed by encoded key bytes and stored as `(key, value)` pairs.
-/// This backend provides structural sharing with O(log n) operations.
+/// Uses the pinned `rpds::RedBlackTreeMapSync` internally. Entries are keyed by
+/// encoded key bytes and stored as `(key, value)` pairs. Updates share unchanged
+/// tree nodes and take O(log n) tree operations.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ImblBackend {
-    entries: imbl::OrdMap<Box<[u8]>, (crate::Value, crate::Value)>,
+pub struct OrderedMap {
+    entries: rpds::RedBlackTreeMapSync<Box<[u8]>, (crate::Value, crate::Value)>,
 }
 
-impl Sealed for ImblBackend {}
+impl Sealed for OrderedMap {}
 
-impl ImblBackend {
+impl OrderedMap {
     #[must_use]
     /// Creates an empty persistent map.
     pub fn new() -> Self {
         Self {
-            entries: imbl::OrdMap::new(),
+            entries: rpds::RedBlackTreeMap::new_sync(),
         }
     }
 }
 
-impl Default for ImblBackend {
+impl Default for OrderedMap {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl PersistentMap for ImblBackend {
+impl PersistentMap for OrderedMap {
     fn empty() -> Self {
         Self::new()
     }
 
     fn insert(&self, entry: LogicalEntry) -> Self {
-        let mut next = self.clone();
         let (encoded_key, key, value) = entry.into_parts();
-        next.entries.insert(encoded_key, (key, value));
-        next
+        Self {
+            entries: self.entries.insert(encoded_key, (key, value)),
+        }
     }
 
     fn remove(&self, encoded_key: &[u8]) -> Self {
-        let mut next = self.clone();
-        next.entries.remove(encoded_key);
-        next
+        Self {
+            entries: self.entries.remove(encoded_key),
+        }
     }
 
     fn get(&self, encoded_key: &[u8]) -> Option<&crate::Value> {
@@ -59,7 +60,7 @@ impl PersistentMap for ImblBackend {
     }
 
     fn len(&self) -> usize {
-        self.entries.len()
+        self.entries.size()
     }
 
     fn is_empty(&self) -> bool {

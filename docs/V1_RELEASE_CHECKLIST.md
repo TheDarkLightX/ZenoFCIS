@@ -136,7 +136,7 @@ local path override and lockfile:
 
 ```bash
 rc_smoke_dir="$(mktemp -d)"
-cp -R fixtures/external-consumer/. "$rc_smoke_dir/"
+cp -R test-projects/external-consumer/. "$rc_smoke_dir/"
 sed -i '/^[[:space:]]*path = /d' "$rc_smoke_dir/Cargo.toml"
 rm "$rc_smoke_dir/Cargo.lock"
 cargo +1.97.1 check --manifest-path "$rc_smoke_dir/Cargo.toml"

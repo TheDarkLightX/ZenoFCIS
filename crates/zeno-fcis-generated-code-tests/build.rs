@@ -1,4 +1,4 @@
-//! Builds the compiled generated Rust and Python fixtures from the canonical
+//! Builds the generated Rust and Python test code from the canonical
 //! codegen schema.
 //!
 //! Runs the deterministic generator at build time and writes the generated Rust
@@ -11,13 +11,13 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-mod catalog_fixture;
+mod test_catalog;
 
 use zeno_fcis_bootstrap::{BootstrapLimits, BootstrapSpec, generate_project};
 use zeno_fcis_codegen::{fixture_schema, fixture_spec, generate};
 use zeno_fcis_crypto::RustCryptoSha256;
 
-use catalog_fixture::fixture_catalog;
+use test_catalog::test_catalog;
 
 fn main() {
     let schema = match fixture_schema() {
@@ -45,7 +45,7 @@ fn main() {
     fs::write(&rust_path, rust_file.bytes())
         .unwrap_or_else(|_| panic!("write generated rust fixture"));
 
-    let catalog = fixture_catalog(schema);
+    let catalog = test_catalog(schema);
     let bootstrap_spec = BootstrapSpec::try_new(
         "codegen-bootstrap-fixture",
         "codegen_fixture",
@@ -84,7 +84,7 @@ fn main() {
     }
 
     println!("cargo::rerun-if-changed=build.rs");
-    println!("cargo::rerun-if-changed=catalog_fixture.rs");
+    println!("cargo::rerun-if-changed=test_catalog.rs");
 }
 
 fn write_bootstrap_file(

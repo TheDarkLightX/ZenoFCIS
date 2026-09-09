@@ -1,5 +1,5 @@
 [package]
-name = "zeno-fcis-codegen-fixture"
+name = "zeno-fcis-generated-code-tests"
 description = "Compiled generated Rust fixture and replay evidence for zeno-fcis-codegen"
 publish = false
 version.workspace = true

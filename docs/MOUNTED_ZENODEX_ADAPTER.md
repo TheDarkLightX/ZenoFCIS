@@ -19,7 +19,7 @@ bytes remain authoritative.
 
 - input: one caller-defined canonical request plus one complete runtime result;
 - output: a normalized decision or a typed fail-closed adapter error;
-- comparison output: an exact report and a content-addressed replay fixture for
+- comparison output: an exact report and a saved mismatch record identified by its hash for
   every mismatch.
 
 ## Authority and trust
@@ -47,7 +47,7 @@ are supplied by the mounted `JsonLineRuntime` implementation as runtime errors.
 The generic adapter does not certify arbitrary project binaries or Python
 modules. Its concrete single-vault zUSD runner mounts the exact external
 revision documented in `MOUNTED_ZENODEX_ZUSD_V1.md`, enforces bounded process
-and transport controls, persists generated replay fixtures, and retains one
+and transport controls, persists generated mismatch records, and retains one
 bounded parity report. That report is mounted runtime-refinement evidence only
 for its declared corpus and revisions. Passing generic adapter unit tests is
 not mounted evidence. Equality of untrusted normalized decisions is not a

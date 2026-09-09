@@ -36,7 +36,7 @@ jobs:
         run: |
           cargo +1.97.1 clippy \
             -p zeno-fcis-bootstrap \
-            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-generated-code-tests \
             -p zeno-fcis-transition \
             --all-targets --all-features --locked -- -D warnings
 
@@ -44,19 +44,19 @@ jobs:
         run: |
           cargo +1.97.1 test \
             -p zeno-fcis-bootstrap \
-            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-generated-code-tests \
             -p zeno-fcis-transition \
             --all-features --locked
           cargo +1.97.1 test \
             -p zeno-fcis-bootstrap \
-            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-generated-code-tests \
             -p zeno-fcis-transition \
             --doc --all-features --locked
 
       - name: Generated no_std check
         run: |
           cargo +1.97.1 check \
-            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-generated-code-tests \
             --no-default-features --locked \
             --target wasm32-unknown-unknown
 
@@ -66,7 +66,7 @@ jobs:
         run: |
           cargo +1.97.1 doc \
             -p zeno-fcis-bootstrap \
-            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-generated-code-tests \
             -p zeno-fcis-transition \
             --all-features --locked --no-deps
 

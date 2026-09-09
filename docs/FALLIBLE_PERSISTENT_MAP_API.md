@@ -32,7 +32,7 @@ are outside the library API and grant no protocol or release authority.
 
 No dependency is added or changed. The package trusts the existing checked
 `LogicalEntry`, `MapEntry`, `Value::map_canonical`, and `CanonicalEncode`
-boundaries, plus the sealed reference, `rpds`, and `imbl` adapters.
+boundaries, plus the sealed reference, `rpds`, and `OrderedMap` adapters.
 
 ## Deterministic resource bounds
 

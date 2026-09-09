@@ -280,12 +280,12 @@ fn catalog(schema: &Schema, manifest: CatalogManifest, algorithm_hash: Hash32) -
 }
 
 #[derive(Clone)]
-struct FixtureMachine {
+struct FixedOutputMachine {
     output: SchemaAdmittedTypeEnvelope,
 }
 
-fn fixture_machine(schema: &Schema) -> FixtureMachine {
-    FixtureMachine {
+fn fixed_output_machine(schema: &Schema) -> FixedOutputMachine {
+    FixedOutputMachine {
         output: must(SchemaAdmittedTypeEnvelope::try_new::<RustCryptoSha256>(
             schema,
             PAYLOAD_TYPE,
@@ -295,7 +295,7 @@ fn fixture_machine(schema: &Schema) -> FixtureMachine {
     }
 }
 
-impl DomainMachine<1, 1> for FixtureMachine {
+impl DomainMachine<1, 1> for FixedOutputMachine {
     fn component_id(&self) -> ComponentId {
         COMPONENT
     }
@@ -345,7 +345,7 @@ fn assert_state_projection_path_mismatch(interface_path: AccessPath, projection_
         ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
             &catalog,
             executable,
-            [fixture_machine(&schema)],
+            [fixed_output_machine(&schema)],
             projection,
             machine_hashes,
             machine_limits(),
@@ -377,7 +377,7 @@ fn exact_semantic_program_identity_is_constructible() {
         ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
             &catalog,
             executable,
-            [fixture_machine(&schema)],
+            [fixed_output_machine(&schema)],
             projection,
             machine_hashes,
             machine_limits(),
@@ -417,7 +417,7 @@ fn matching_schema_reachable_nonroot_state_projection_path_is_constructible() {
         ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
             &catalog,
             executable,
-            [fixture_machine(&schema)],
+            [fixed_output_machine(&schema)],
             projection,
             machine_hashes,
             machine_limits(),
@@ -462,7 +462,7 @@ fn machine_identity_substitution_changes_the_required_program_hash() {
         ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
             &catalog,
             executable,
-            [fixture_machine(&schema)],
+            [fixed_output_machine(&schema)],
             projection,
             [hash(71)],
             machine_limits(),
@@ -490,7 +490,7 @@ fn routed_or_inactive_output_roles_cannot_replace_an_external_effect() {
         ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
             &catalog,
             executable,
-            [fixture_machine(&schema)],
+            [fixed_output_machine(&schema)],
             projection,
             [hash(70)],
             machine_limits(),
@@ -521,7 +521,7 @@ fn fixed_effect_authority_must_satisfy_the_catalog() {
         ComposedDomainProgram::<RustCryptoSha256, _, 1, 1, 1>::try_new(
             &catalog,
             executable,
-            [fixture_machine(&schema)],
+            [fixed_output_machine(&schema)],
             projection,
             [hash(70)],
             machine_limits(),

@@ -181,13 +181,13 @@ The workspace now includes the complete package ladder:
 - tool-neutral, profile-bound relational-law manifests for state invariants, conservation, mint/burn authority, debit/credit-to-effect equality, fees and rounding, authority/subject/recipient relations, rejection purity, and committed-failure effects, with retained proof evidence and fresh bounded per-invocation evaluation;
 - nominal catalog authorization that owns the reviewed transition program and exact project-law engine, binds the reviewed initial root/source/configuration/evidence/deployment instance, creates a private-construction `CatalogAuthorizedGenesis` only after every genesis-applicable law is satisfied, admits external command/context/principal/replay invocations, pins a sealed known-answer-verified provider plus exact outbox-delivery-interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only after every applicable transition law is satisfied;
 - a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
-- strict JSON-line mounted-runtime adapters that compare complete normalized decisions and retain mismatch fixtures;
+- strict JSON-line runtime adapters that compare complete normalized decisions and retain mismatch records;
 - a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
 - an explicit dual-root sparse authenticated-state reference with strict bounded proof/plan decoding, projector-bound profiles, context-verified membership/absence witnesses, expected-version publication, and full-rebuild equality checks;
 - a candidate-bound authenticated authority that verifies exact retained projector evidence at setup, requires a project-specific per-transition projection law, reconstructs persisted plans locally, and exposes a production-facing port that accepts only nominal `CatalogAuthorizedAuthenticatedCommit` values;
 - [language-neutral finite synthesis](docs/LANGUAGE_NEUTRAL_SYNTHESIS.md) with relational realizability checks, canonical hole search, Rust/Python/JavaScript emission, and separate exhaustive target conformance;
 - crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
-- backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
+- persistent collections with reference, shared hash-map, and shared ordered-map implementations, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
 - a frozen V1 product contract, 26 human-readable BDD scenarios, a closed
   fail-closed ATDD registry, and optional deterministic Probity guardrails with
@@ -217,7 +217,7 @@ decision kind and reason
 The permanent `mounted-zenodex` workflow checks out the exact pinned ZenoDEX
 revision, builds its Rust runtime, runs both implementations, and byte-compares
 the new report with the retained
-[`fixtures/mounted-zenodex/zusd-v1/report.json`](fixtures/mounted-zenodex/zusd-v1/report.json).
+[`test-data/zenodex/zusd-v1/report.json`](test-data/zenodex/zusd-v1/report.json).
 The runner can also be invoked directly:
 
 ```bash
