@@ -274,10 +274,33 @@ impl Contract {
     }
     /// Rechecks a target's actual complete output tuple against the relation.
     pub fn holds(&self, input: &[i64], output: &[i64]) -> Result<bool, Error> {
+        let mut environment = Vec::new();
+        let mut values = Vec::new();
+        let mut result = Vec::new();
+        self.holds_into(input, output, &mut environment, &mut values, &mut result)
+    }
+    /// Rechecks one admitted pair using caller-owned buffers.
+    ///
+    /// The environment is the input tuple followed by the output tuple, exactly
+    /// as the relation declares its own inputs. Every buffer is rewritten from
+    /// the start before evaluation, so an earlier rejected pair cannot influence
+    /// an admitted pair.
+    fn holds_into(
+        &self,
+        input: &[i64],
+        output: &[i64],
+        environment: &mut Vec<i64>,
+        values: &mut Vec<i64>,
+        result: &mut Vec<i64>,
+    ) -> Result<bool, Error> {
         if !ir::admitted(&self.inputs, input) || !ir::admitted(&self.outputs, output) {
             return Err(Error::Invalid("contract-domain"));
         }
-        Ok(self.relation.evaluate(&[input, output].concat())? == [1])
+        environment.clear();
+        environment.extend_from_slice(input);
+        environment.extend_from_slice(output);
+        self.relation.evaluate_into(environment, values, result)?;
+        Ok(matches!(result.as_slice(), [1]))
     }
     /// Enumerates every admitted input, independently of any candidate or target.
     pub fn input_space(&self) -> Result<Space, Error> {
@@ -328,22 +351,57 @@ impl Space {
     pub const fn cardinality(&self) -> u64 {
         self.count
     }
+    /// Copies the current tuple into `tuple` and advances the space.
+    ///
+    /// Returns false once the space is exhausted. Zero fields yield exactly one
+    /// empty tuple, matching the public iterator.
+    fn next_into(&mut self, tuple: &mut Vec<i64>) -> bool {
+        let Some(current) = self.current.as_mut() else {
+            return false;
+        };
+        tuple.clear();
+        tuple.extend_from_slice(current);
+        if !advance(&self.domains, current) {
+            self.current = None;
+        }
+        true
+    }
+    /// Returns the space to its first tuple, recreating it after exhaustion.
+    fn restart(&mut self) {
+        match &mut self.current {
+            Some(tuple) => {
+                tuple.clear();
+                tuple.extend(self.domains.iter().map(|d| d.bounds().0));
+            }
+            None => self.current = Some(self.domains.iter().map(|d| d.bounds().0).collect()),
+        }
+    }
+}
+/// Steps one tuple to its lexicographic successor in place.
+///
+/// Returns false when the last field wrapped, which is also the answer for a
+/// zero-field tuple: the singleton space is exhausted by its one visit. A field
+/// is incremented only while it is strictly below its maximum, so the odometer
+/// never overflows at an `i64` endpoint.
+fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
+    for index in (0..tuple.len()).rev() {
+        let (min, max) = domains[index].bounds();
+        if tuple[index] < max {
+            tuple[index] += 1;
+            return true;
+        }
+        tuple[index] = min;
+    }
+    false
 }
 impl Iterator for Space {
     type Item = Vec<i64>;
     fn next(&mut self) -> Option<Self::Item> {
-        let result = self.current.clone()?;
-        let mut next = result.clone();
-        for i in (0..next.len()).rev() {
-            let (min, max) = self.domains[i].bounds();
-            if next[i] < max {
-                next[i] += 1;
-                self.current = Some(next);
-                return Some(result);
-            }
-            next[i] = min;
+        let current = self.current.as_mut()?;
+        let result = current.clone();
+        if !advance(&self.domains, current) {
+            self.current = None;
         }
-        self.current = None;
         Some(result)
     }
 }
@@ -433,11 +491,28 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
         budget.max_steps,
         MAX_STEPS,
     )?;
-    for input in input_space.clone() {
+    let mut inputs = input_space.clone();
+    let mut outputs = output_space;
+    let mut input = Vec::new();
+    let mut output = Vec::new();
+    let mut environment = Vec::new();
+    let mut relation_nodes = Vec::new();
+    let mut relation_output = Vec::new();
+    while inputs.next_into(&mut input) {
         let mut found = false;
-        for output in output_space.clone() {
+        outputs.restart();
+        // Every output in the row is visited even after one satisfies the
+        // relation, so a later trap still wins over the row's success, and an
+        // earlier unrealizable row still wins over any later trap.
+        while outputs.next_into(&mut output) {
             found |= contract
-                .holds(&input, &output)
+                .holds_into(
+                    &input,
+                    &output,
+                    &mut environment,
+                    &mut relation_nodes,
+                    &mut relation_output,
+                )
                 .map_err(|_| Error::ContractTrap {
                     input: input.clone(),
                     output: output.clone(),
@@ -493,6 +568,13 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
         checker_hash,
         first: None,
         accepted: None,
+        inputs: input_space.clone(),
+        input: Vec::new(),
+        program_nodes: Vec::new(),
+        program_output: Vec::new(),
+        environment: Vec::new(),
+        relation_nodes: Vec::new(),
+        relation_output: Vec::new(),
     };
     match search(&problem, &mut checker)? {
         SearchResult::NoSolution { certificate } => Ok(Outcome::NoSolution {
@@ -503,14 +585,18 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
             let program = checker
                 .accepted
                 .ok_or(Error::Invalid("missing-accepted-program"))?;
-            let cases = input_space
-                .map(|input| {
-                    Ok(Case {
-                        output: program.evaluate(&input)?,
-                        input,
-                    })
-                })
-                .collect::<Result<Vec<_>, Error>>()?;
+            let mut cases = Vec::new();
+            let mut replay = input_space;
+            let mut replay_input = Vec::new();
+            let mut replay_nodes = Vec::new();
+            let mut replay_output = Vec::new();
+            while replay.next_into(&mut replay_input) {
+                program.evaluate_into(&replay_input, &mut replay_nodes, &mut replay_output)?;
+                cases.push(Case {
+                    input: replay_input.clone(),
+                    output: replay_output.clone(),
+                });
+            }
             Ok(Outcome::Selected {
                 program,
                 certificate,
@@ -538,12 +624,21 @@ fn check_budget(
     }
     Ok(())
 }
+/// Candidate checking state, including the admitted input space and the
+/// evaluation buffers reused across candidates and inputs.
 struct Checker<'a> {
     contract: &'a Contract,
     sketch: &'a Sketch,
     checker_hash: Hash32,
     first: Option<Witness>,
     accepted: Option<Program>,
+    inputs: Space,
+    input: Vec<i64>,
+    program_nodes: Vec<i64>,
+    program_output: Vec<i64>,
+    environment: Vec<i64>,
+    relation_nodes: Vec<i64>,
+    relation_output: Vec<i64>,
 }
 impl CandidateChecker for Checker<'_> {
     fn checker_hash(&self) -> Hash32 {
@@ -553,28 +648,50 @@ impl CandidateChecker for Checker<'_> {
         let Ok(program) = self.sketch.close(assignment) else {
             return CheckResult::Indeterminate;
         };
-        let Ok(space) = self.contract.input_space() else {
-            return CheckResult::Indeterminate;
-        };
-        let count = space.cardinality();
-        for input in space {
-            let output = program.evaluate(&input).ok();
-            let holds = match &output {
-                Some(output) => match self.contract.holds(&input, output) {
+        // The input space was admitted before the search started. Every
+        // candidate replays that same space from its first tuple.
+        let count = self.inputs.cardinality();
+        self.inputs.restart();
+        while self.inputs.next_into(&mut self.input) {
+            let evaluated = program
+                .evaluate_into(
+                    &self.input,
+                    &mut self.program_nodes,
+                    &mut self.program_output,
+                )
+                .is_ok();
+            let holds = if evaluated {
+                match self.contract.holds_into(
+                    &self.input,
+                    &self.program_output,
+                    &mut self.environment,
+                    &mut self.relation_nodes,
+                    &mut self.relation_output,
+                ) {
                     Ok(holds) => holds,
                     Err(_) => return CheckResult::Indeterminate,
-                },
-                None => false,
+                }
+            } else {
+                false
             };
             if !holds {
+                let output = evaluated.then(|| self.program_output.clone());
                 let counterexample = tuple(vec![
-                    tuple(input.iter().map(|v| Value::I128((*v).into())).collect()),
+                    tuple(
+                        self.input
+                            .iter()
+                            .map(|v| Value::I128((*v).into()))
+                            .collect(),
+                    ),
                     output.as_ref().map_or(Value::Unit, |out| {
                         tuple(out.iter().map(|v| Value::I128((*v).into())).collect())
                     }),
                 ]);
                 if self.first.is_none() {
-                    self.first = Some(Witness { input, output });
+                    self.first = Some(Witness {
+                        input: self.input.clone(),
+                        output,
+                    });
                 }
                 return CheckResult::Rejected { counterexample };
             }

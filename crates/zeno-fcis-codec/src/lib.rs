@@ -418,22 +418,20 @@ impl DecodeLimits {
 /// Decodes one value and rejects trailing bytes and noncanonical aliases.
 pub fn decode_value(bytes: &[u8], limits: DecodeLimits) -> Result<Value, DecodeError> {
     enforce_input_limit(bytes, limits)?;
-    let mut cursor = Cursor::new(bytes);
     let mut state = DecodeState::new(limits.value);
-    let value = decode_value_inner(&mut cursor, &mut state, 0)?;
-    if cursor.remaining() != 0 {
-        return Err(DecodeError::TrailingBytes {
-            offset: cursor.offset,
-        });
-    }
-    let encoded = value.canonical_bytes().map_err(DecodeError::Encode)?;
-    if encoded.as_slice() != bytes {
-        return Err(DecodeError::NonCanonical);
-    }
-    Ok(value)
+    decode_complete_value(bytes, &mut state, 0)
 }
 
 /// Decodes one canonical envelope.
+///
+/// The envelope frame is reconstructed byte for byte from checks already made
+/// here: the magic was compared exactly, the type identifier and schema hash
+/// are copied through unchanged, the payload length was read as a `u32` and
+/// exactly that many bytes were taken, [`decode_value`] accepted the payload
+/// only after it re-encoded to those same bytes, and trailing bytes were
+/// rejected before the payload was decoded. Re-encoding the assembled envelope
+/// and comparing it with the input can therefore only ever succeed, so this
+/// function does not repeat that work.
 pub fn decode_envelope(bytes: &[u8], limits: DecodeLimits) -> Result<Envelope, DecodeError> {
     enforce_input_limit(bytes, limits)?;
     let mut cursor = Cursor::new(bytes);
@@ -451,12 +449,34 @@ pub fn decode_envelope(bytes: &[u8], limits: DecodeLimits) -> Result<Envelope, D
         });
     }
     let value = decode_value(payload, limits)?;
-    let envelope = Envelope::new(type_id, Hash32::new(schema_hash), value);
-    let encoded = envelope.canonical_bytes().map_err(DecodeError::Encode)?;
-    if encoded.as_slice() != bytes {
+    Ok(Envelope::new(type_id, Hash32::new(schema_hash), value))
+}
+
+/// Decodes one complete framed value from exactly `bytes`.
+///
+/// Top-level and nested framed values are decided identically: the whole slice
+/// must be consumed and the decoded value must re-encode to it. The caller owns
+/// the structural budget. [`decode_value`] enforces the input size and starts a
+/// fresh [`DecodeState`] at depth zero; a nested map key or value shares its
+/// parent's state and enters at `depth + 1`, so nesting inside a blob is
+/// charged against the same depth, node, and payload budgets as nesting on the
+/// wire. Reported trailing-byte offsets are relative to `bytes`.
+fn decode_complete_value(
+    bytes: &[u8],
+    state: &mut DecodeState,
+    depth: u32,
+) -> Result<Value, DecodeError> {
+    let mut cursor = Cursor::new(bytes);
+    let value = decode_value_inner(&mut cursor, state, depth)?;
+    if cursor.remaining() != 0 {
+        return Err(DecodeError::TrailingBytes {
+            offset: cursor.offset,
+        });
+    }
+    if value.canonical_bytes().map_err(DecodeError::Encode)? != bytes {
         return Err(DecodeError::NonCanonical);
     }
-    Ok(envelope)
+    Ok(value)
 }
 
 fn enforce_input_limit(bytes: &[u8], limits: DecodeLimits) -> Result<(), DecodeError> {
@@ -625,43 +645,23 @@ fn decode_value_inner(
             // tag in each encoded key and value.
             let mut entries =
                 Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 10)?);
-            let mut previous: Option<Vec<u8>> = None;
+            // Encoded keys are compared as they are borrowed from the input, so
+            // canonical key order is decided on the exact wire bytes.
+            let mut previous: Option<&[u8]> = None;
             for _ in 0..count {
-                let encoded_key = cursor.take_blob(state.limits.max_payload_bytes)?.to_vec();
+                let encoded_key = cursor.take_blob(state.limits.max_payload_bytes)?;
                 state.payload(encoded_key.len())?;
-                if previous
-                    .as_ref()
-                    .is_some_and(|value| value.as_slice() >= encoded_key.as_slice())
-                {
+                if previous.is_some_and(|value| value >= encoded_key) {
                     return Err(DecodeError::NonCanonicalMap);
                 }
                 let encoded_value = cursor.take_blob(state.limits.max_payload_bytes)?;
                 state.payload(encoded_value.len())?;
 
-                let mut key_cursor = Cursor::new(&encoded_key);
-                let key = decode_value_inner(&mut key_cursor, state, depth + 1)?;
-                if key_cursor.remaining() != 0 {
-                    return Err(DecodeError::TrailingBytes {
-                        offset: key_cursor.offset,
-                    });
-                }
-                if key.canonical_bytes().map_err(DecodeError::Encode)? != encoded_key {
-                    return Err(DecodeError::NonCanonical);
-                }
-
-                let mut value_cursor = Cursor::new(encoded_value);
-                let value = decode_value_inner(&mut value_cursor, state, depth + 1)?;
-                if value_cursor.remaining() != 0 {
-                    return Err(DecodeError::TrailingBytes {
-                        offset: value_cursor.offset,
-                    });
-                }
-                if value.canonical_bytes().map_err(DecodeError::Encode)? != encoded_value {
-                    return Err(DecodeError::NonCanonical);
-                }
+                let key = decode_complete_value(encoded_key, state, depth + 1)?;
+                let value = decode_complete_value(encoded_value, state, depth + 1)?;
 
                 let entry = MapEntry::try_new(key, value).map_err(DecodeError::InvalidValue)?;
-                if entry.encoded_key() != encoded_key.as_slice() {
+                if entry.encoded_key() != encoded_key {
                     return Err(DecodeError::NonCanonical);
                 }
                 previous = Some(encoded_key);
@@ -941,6 +941,403 @@ mod tests {
             }
             Hash32::new(output)
         }
+    }
+
+    /// One value per wire tag, including both sum payload flags and a map with
+    /// more than one entry.
+    fn tag_corpus() -> Vec<Value> {
+        let entry = |key: Value, value: Value| {
+            MapEntry::try_new(key, value).unwrap_or_else(|error| panic!("map entry: {error}"))
+        };
+        vec![
+            Value::Unit,
+            Value::Bool(false),
+            Value::Bool(true),
+            Value::U128(0),
+            Value::U128(u128::MAX),
+            Value::I128(i128::MIN),
+            Value::bytes(vec![1, 2]).unwrap_or_else(|error| panic!("bytes: {error}")),
+            Value::Text(String::from("abc").into_boxed_str()),
+            Value::Enum {
+                type_id: 4,
+                variant: 5,
+            },
+            Value::tuple(vec![Value::Unit, Value::Bool(true)]),
+            Value::vector(vec![Value::U128(1), Value::U128(2)]),
+            Value::record_canonical(vec![
+                Field::new(1, Value::Unit),
+                Field::new(2, Value::I128(-1)),
+            ])
+            .unwrap_or_else(|error| panic!("record: {error}")),
+            Value::Sum {
+                type_id: 6,
+                variant: 7,
+                payload: None,
+            },
+            Value::Sum {
+                type_id: 6,
+                variant: 7,
+                payload: Some(Box::new(Value::Bool(false))),
+            },
+            Value::map_canonical(vec![
+                entry(Value::U128(1), Value::Bool(true)),
+                entry(Value::U128(2), Value::tuple(vec![Value::Unit])),
+            ])
+            .unwrap_or_else(|error| panic!("map: {error}")),
+        ]
+    }
+
+    fn envelope_bytes(value: Value) -> Vec<u8> {
+        Envelope::new(7, Hash32::new([3; 32]), value)
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("envelope bytes: {error}"))
+    }
+
+    /// Frames an arbitrary, possibly malformed, payload as an envelope.
+    fn framed_payload(payload: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(ENVELOPE_MAGIC);
+        bytes.extend_from_slice(&7_u32.to_be_bytes());
+        bytes.extend_from_slice(&[3_u8; 32]);
+        bytes.extend_from_slice(
+            &u32::try_from(payload.len())
+                .unwrap_or(u32::MAX)
+                .to_be_bytes(),
+        );
+        bytes.extend_from_slice(payload);
+        bytes
+    }
+
+    fn blob(bytes: &[u8]) -> Vec<u8> {
+        let mut output = Vec::new();
+        output.extend_from_slice(&u32::try_from(bytes.len()).unwrap_or(u32::MAX).to_be_bytes());
+        output.extend_from_slice(bytes);
+        output
+    }
+
+    fn map_payload(entries: &[(&[u8], &[u8])]) -> Vec<u8> {
+        let mut output = vec![TAG_MAP];
+        output.extend_from_slice(
+            &u32::try_from(entries.len())
+                .unwrap_or(u32::MAX)
+                .to_be_bytes(),
+        );
+        for (key, value) in entries {
+            output.extend_from_slice(&blob(key));
+            output.extend_from_slice(&blob(value));
+        }
+        output
+    }
+
+    fn unsigned_key(value: u128) -> Vec<u8> {
+        let mut output = vec![TAG_U128];
+        output.extend_from_slice(&value.to_be_bytes());
+        output
+    }
+
+    fn structural_limits(value: ValueLimits) -> DecodeLimits {
+        DecodeLimits {
+            value,
+            ..DecodeLimits::default()
+        }
+    }
+
+    #[test]
+    fn every_value_tag_round_trips_in_a_value_and_an_envelope() {
+        for value in tag_corpus() {
+            let bytes = value
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("value bytes: {error}"));
+            assert_eq!(
+                decode_value(&bytes, DecodeLimits::default()),
+                Ok(value.clone())
+            );
+            let envelope = Envelope::new(7, Hash32::new([3; 32]), value);
+            let bytes = envelope
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("envelope bytes: {error}"));
+            assert_eq!(
+                decode_envelope(&bytes, DecodeLimits::default()),
+                Ok(envelope)
+            );
+        }
+    }
+
+    #[test]
+    fn decoded_values_and_envelopes_always_re_encode_to_their_input() {
+        // Dropping the envelope's second re-encode is behavior preserving only
+        // because every accepted decode reproduces its input exactly. Byte
+        // mutations drive the parse, limit, and canonical-order guards that
+        // remain, and no accepted result may differ from its input.
+        let originals: Vec<Vec<u8>> = tag_corpus().into_iter().map(envelope_bytes).collect();
+        let mut inputs = originals.clone();
+        for original in &originals {
+            for index in 0..original.len() {
+                for delta in [1_u8, 0x7f, 0xff] {
+                    let mut mutated = original.clone();
+                    mutated[index] = mutated[index].wrapping_add(delta);
+                    inputs.push(mutated);
+                }
+                let mut truncated = original.clone();
+                truncated.truncate(index);
+                inputs.push(truncated);
+                let mut extended = original.clone();
+                extended.insert(index, 0);
+                inputs.push(extended);
+            }
+        }
+        let mut accepted_envelopes = 0_u32;
+        for input in inputs {
+            if let Ok(envelope) = decode_envelope(&input, DecodeLimits::default()) {
+                accepted_envelopes += 1;
+                assert_eq!(envelope.canonical_bytes(), Ok(input.clone()));
+            }
+            if let Ok(value) = decode_value(&input, DecodeLimits::default()) {
+                assert_eq!(value.canonical_bytes(), Ok(input));
+            }
+        }
+        // Mutation alone must not silence the corpus.
+        assert!(accepted_envelopes >= 15);
+    }
+
+    #[test]
+    fn envelope_byte_mutations_report_exact_errors() {
+        let limits = DecodeLimits::default();
+        let base = envelope_bytes(Value::U128(9));
+        let length_offset = ENVELOPE_MAGIC.len() + 4 + 32;
+        let payload_length = base.len() - length_offset - 4;
+
+        let mut wrong_magic = base.clone();
+        wrong_magic[0] ^= 0xff;
+        assert_eq!(
+            decode_envelope(&wrong_magic, limits),
+            Err(DecodeError::EnvelopeMagic)
+        );
+
+        let mut extra_byte = base.clone();
+        extra_byte.push(0);
+        assert_eq!(
+            decode_envelope(&extra_byte, limits),
+            Err(DecodeError::TrailingBytes { offset: base.len() })
+        );
+
+        let mut long_payload = base.clone();
+        long_payload[length_offset..length_offset + 4].copy_from_slice(
+            &u32::try_from(payload_length + 1)
+                .unwrap_or(u32::MAX)
+                .to_be_bytes(),
+        );
+        assert_eq!(
+            decode_envelope(&long_payload, limits),
+            Err(DecodeError::UnexpectedEnd {
+                offset: length_offset + 4,
+                requested: payload_length + 1,
+            })
+        );
+
+        let mut short_payload = base.clone();
+        short_payload[length_offset..length_offset + 4].copy_from_slice(
+            &u32::try_from(payload_length - 1)
+                .unwrap_or(u32::MAX)
+                .to_be_bytes(),
+        );
+        assert_eq!(
+            decode_envelope(&short_payload, limits),
+            Err(DecodeError::TrailingBytes {
+                offset: base.len() - 1,
+            })
+        );
+
+        let mut swapped_fields = vec![TAG_RECORD];
+        swapped_fields.extend_from_slice(&2_u32.to_be_bytes());
+        swapped_fields.extend_from_slice(&2_u16.to_be_bytes());
+        swapped_fields.push(TAG_UNIT);
+        swapped_fields.extend_from_slice(&1_u16.to_be_bytes());
+        swapped_fields.push(TAG_UNIT);
+        assert_eq!(
+            decode_envelope(&framed_payload(&swapped_fields), limits),
+            Err(DecodeError::NonCanonicalRecord)
+        );
+
+        let high_key = unsigned_key(2);
+        let low_key = unsigned_key(1);
+        let swapped_keys = map_payload(&[
+            (&high_key[..], &[TAG_BOOL_TRUE][..]),
+            (&low_key[..], &[TAG_BOOL_TRUE][..]),
+        ]);
+        assert_eq!(
+            decode_envelope(&framed_payload(&swapped_keys), limits),
+            Err(DecodeError::NonCanonicalMap)
+        );
+
+        let mut sum_flag = vec![TAG_SUM];
+        sum_flag.extend_from_slice(&6_u32.to_be_bytes());
+        sum_flag.extend_from_slice(&7_u16.to_be_bytes());
+        sum_flag.push(2);
+        assert_eq!(
+            decode_envelope(&framed_payload(&sum_flag), limits),
+            Err(DecodeError::InvalidSumFlag)
+        );
+
+        let mut wide_text = vec![TAG_TEXT];
+        wide_text.extend_from_slice(&1_u32.to_be_bytes());
+        wide_text.push(0xff);
+        assert_eq!(
+            decode_envelope(&framed_payload(&wide_text), limits),
+            Err(DecodeError::NonAsciiText)
+        );
+
+        assert_eq!(
+            decode_envelope(&framed_payload(&[0xd0_u8]), limits),
+            Err(DecodeError::UnknownTag(0xd0))
+        );
+    }
+
+    #[test]
+    fn nested_map_blobs_share_the_parent_depth_node_and_payload_budgets() {
+        let entry = MapEntry::try_new(Value::U128(1), Value::tuple(vec![Value::Unit]))
+            .unwrap_or_else(|error| panic!("map entry: {error}"));
+        let nested =
+            Value::map_canonical(vec![entry]).unwrap_or_else(|error| panic!("nested map: {error}"));
+        let bytes = nested
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("nested map bytes: {error}"));
+
+        // The map is depth zero, its key and value blobs decode at depth one,
+        // and the value's own child reaches depth two on the parent's budget.
+        assert_eq!(
+            decode_value(
+                &bytes,
+                structural_limits(ValueLimits {
+                    max_depth: 1,
+                    ..ValueLimits::default()
+                })
+            ),
+            Err(DecodeError::DepthLimit {
+                limit: 1,
+                attempted: 2,
+            })
+        );
+        assert_eq!(
+            decode_value(
+                &bytes,
+                structural_limits(ValueLimits {
+                    max_depth: 2,
+                    ..ValueLimits::default()
+                })
+            ),
+            Ok(nested.clone())
+        );
+
+        // Map, key, value, and the value's child are four nodes on one counter.
+        assert_eq!(
+            decode_value(
+                &bytes,
+                structural_limits(ValueLimits {
+                    max_nodes: 3,
+                    ..ValueLimits::default()
+                })
+            ),
+            Err(DecodeError::NodeLimit {
+                limit: 3,
+                attempted: 4,
+            })
+        );
+        assert_eq!(
+            decode_value(
+                &bytes,
+                structural_limits(ValueLimits {
+                    max_nodes: 4,
+                    ..ValueLimits::default()
+                })
+            ),
+            Ok(nested)
+        );
+
+        // Both raw entry blobs are charged, and the byte payload inside each is
+        // charged again: seven plus seven raw bytes plus two plus two owned.
+        let leaves = MapEntry::try_new(
+            Value::bytes(vec![b'a', b'b']).unwrap_or_else(|error| panic!("key bytes: {error}")),
+            Value::bytes(vec![b'c', b'd']).unwrap_or_else(|error| panic!("value bytes: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("leaf entry: {error}"));
+        let leaves =
+            Value::map_canonical(vec![leaves]).unwrap_or_else(|error| panic!("leaf map: {error}"));
+        let bytes = leaves
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("leaf map bytes: {error}"));
+        assert_eq!(
+            decode_value(
+                &bytes,
+                structural_limits(ValueLimits {
+                    max_payload_bytes: 17,
+                    ..ValueLimits::default()
+                })
+            ),
+            Err(DecodeError::PayloadLimit {
+                limit: 17,
+                attempted: 18,
+            })
+        );
+        assert_eq!(
+            decode_value(
+                &bytes,
+                structural_limits(ValueLimits {
+                    max_payload_bytes: 18,
+                    ..ValueLimits::default()
+                })
+            ),
+            Ok(leaves)
+        );
+    }
+
+    #[test]
+    fn map_entry_checks_keep_their_order_from_raw_blob_to_value() {
+        let limits = DecodeLimits::default();
+        let key = unsigned_key(1);
+        let trailing_value = [TAG_BOOL_TRUE, 0];
+        // A nested blob is decoded with its own cursor, so its trailing-byte
+        // offset stays relative to that blob.
+        assert_eq!(
+            decode_value(&map_payload(&[(&key[..], &trailing_value[..])]), limits),
+            Err(DecodeError::TrailingBytes { offset: 1 })
+        );
+
+        let mut trailing_key = unsigned_key(1);
+        trailing_key.push(0);
+        assert_eq!(
+            decode_value(
+                &map_payload(&[(&trailing_key[..], &[TAG_BOOL_TRUE][..])]),
+                limits
+            ),
+            Err(DecodeError::TrailingBytes { offset: 17 })
+        );
+
+        // A malformed key is decided before a malformed value.
+        assert_eq!(
+            decode_value(&map_payload(&[(&trailing_key[..], &[0xd0_u8][..])]), limits),
+            Err(DecodeError::TrailingBytes { offset: 17 })
+        );
+        assert_eq!(
+            decode_value(&map_payload(&[(&key[..], &[0xd0_u8][..])]), limits),
+            Err(DecodeError::UnknownTag(0xd0))
+        );
+
+        // Both raw blobs are charged before either is decoded, so an exhausted
+        // payload budget is reported ahead of the malformed value.
+        assert_eq!(
+            decode_value(
+                &map_payload(&[(&key[..], &trailing_value[..])]),
+                structural_limits(ValueLimits {
+                    max_payload_bytes: 18,
+                    ..ValueLimits::default()
+                })
+            ),
+            Err(DecodeError::PayloadLimit {
+                limit: 18,
+                attempted: 19,
+            })
+        );
     }
 
     #[test]
