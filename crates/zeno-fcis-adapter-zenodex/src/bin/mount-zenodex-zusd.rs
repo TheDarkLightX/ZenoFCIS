@@ -369,7 +369,7 @@ fn persist_divergence(
     request: &[u8],
     python: &[u8],
     rust: &[u8],
-    replay: Option<&zeno_fcis_adapter_zenodex::ReplayFixture>,
+    replay: Option<&zeno_fcis_adapter_zenodex::DecisionMismatchRecord>,
 ) -> Result<(), String> {
     let replay = replay
         .map(CanonicalEncode::canonical_bytes)

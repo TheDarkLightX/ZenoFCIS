@@ -32,18 +32,18 @@ jobs:
 
       - name: Compile generated starter and deny warnings
         run: |
-          cargo +1.97.1 clippy -p zeno-fcis-bootstrap -p zeno-fcis-codegen-fixture --all-targets --all-features --locked -- -D warnings
+          cargo +1.97.1 clippy -p zeno-fcis-bootstrap -p zeno-fcis-generated-code-tests --all-targets --all-features --locked -- -D warnings
           cargo +1.97.1 check -p zeno-fcis --features bootstrap --locked
 
       - name: Generator laws and compiled fixtures
         run: |
           cargo +1.97.1 test -p zeno-fcis-bootstrap --locked
-          cargo +1.97.1 test -p zeno-fcis-codegen-fixture --locked
+          cargo +1.97.1 test -p zeno-fcis-generated-code-tests --locked
 
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
-        run: cargo +1.97.1 doc -p zeno-fcis-bootstrap -p zeno-fcis-codegen-fixture --locked --no-deps
+        run: cargo +1.97.1 doc -p zeno-fcis-bootstrap -p zeno-fcis-generated-code-tests --locked --no-deps
 
       - name: Static authority-boundary checks
         run: python3 tools/check_assurance.py

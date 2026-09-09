@@ -183,8 +183,8 @@ fn bench_maps(c: &mut Criterion) {
     bench_backend::<BTreeMapBackend>(c, "btreemap");
     #[cfg(feature = "rpds-backend")]
     bench_backend::<zeno_fcis_collections::RpdsBackend>(c, "rpds");
-    #[cfg(feature = "imbl-backend")]
-    bench_backend::<zeno_fcis_collections::ImblBackend>(c, "imbl");
+    #[cfg(feature = "ordered-map")]
+    bench_backend::<zeno_fcis_collections::OrderedMap>(c, "ordered_map");
 }
 
 criterion_group!(benches, bench_maps);

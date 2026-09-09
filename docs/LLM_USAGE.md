@@ -133,7 +133,7 @@ a workflow guardrail and supplies no proof or production authority.
 ## What a model may propose
 
 - schema drafts and bounded example values;
-- `.zeno` drafts, builder calls, diagnostic fixtures, and generated views;
+- `.zeno` drafts, builder calls, diagnostic test inputs, and generated views;
 - domain decomposition and narrow machine interfaces;
 - candidate stable names and identifiers for owner review;
 - transition code inside already reviewed types and registries;

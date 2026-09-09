@@ -150,7 +150,7 @@ def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
     generic = []
     for language, extension in TARGETS.items():
         out = directory / f"generic-{language}"
-        spec = str(ROOT / "fixtures/synthesis/saturating-add.json")
+        spec = str(ROOT / "test-data/synthesis/saturating-add.json")
         invoke(cli, ["synth", "run", spec, "--target", language, "--out", str(out)], directory, environment)
         check_vectors(out, "generic")
         generic.append(invoke(cli, ["synth", "verify", spec, "--target", language, "--out", str(out)], directory, environment))

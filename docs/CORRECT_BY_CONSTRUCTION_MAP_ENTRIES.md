@@ -70,7 +70,7 @@ Compile-fail doctests prevent reintroduction of the former public
 `MapEntry::new(encoded_key, key, value)` and
 `LogicalEntry::new(encoded_key, key, value)` APIs. Existing differential tests
 cover insertion-history independence, snapshot retention, removal, and parity
-between the reference, `rpds`, and `imbl` backends.
+between the reference, `rpds`, and `OrderedMap` backends.
 
 ## Negative cases
 

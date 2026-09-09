@@ -45,7 +45,7 @@ jobs:
         run: cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
 
       - name: Compile and run an isolated external consumer
-        run: cargo +1.97.1 run --manifest-path fixtures/external-consumer/Cargo.toml --locked
+        run: cargo +1.97.1 run --manifest-path test-projects/external-consumer/Cargo.toml --locked
 
       - name: Check no_std prelude
         run: >-

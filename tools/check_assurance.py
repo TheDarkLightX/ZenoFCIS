@@ -75,7 +75,7 @@ DEPENDENCY_RING = {
     "zeno-fcis": 6,
     "zeno-fcis-profile-zenodex": 3,
     "zeno-fcis-codegen": 3,
-    "zeno-fcis-codegen-fixture": 3,
+    "zeno-fcis-generated-code-tests": 3,
     "zeno-fcis-bootstrap": 3,
     "zeno-fcis-adapter": 3,
     "zeno-fcis-adapter-zenodex": 3,

@@ -80,9 +80,9 @@ REQUIRED_FILES = (
     Path("examples/diagnostics-tour/project.zeno"),
     Path("tools/atdd.py"),
     Path("tools/check_probity.py"),
-    Path("fixtures/external-consumer/Cargo.toml"),
-    Path("fixtures/external-consumer/Cargo.lock"),
-    Path("fixtures/external-consumer/src/main.rs"),
+    Path("test-projects/external-consumer/Cargo.toml"),
+    Path("test-projects/external-consumer/Cargo.lock"),
+    Path("test-projects/external-consumer/src/main.rs"),
 )
 VERSIONED_DOCS = (
     Path("README.md"),

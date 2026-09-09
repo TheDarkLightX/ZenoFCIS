@@ -2560,9 +2560,9 @@ mod tests {
         Violate,
     }
 
-    struct FixtureEngine(EngineMode);
+    struct TestLawChecker(EngineMode);
 
-    impl ProjectLawEngine for FixtureEngine {
+    impl ProjectLawEngine for TestLawChecker {
         fn evaluate(
             &self,
             input: &LawCheckInput<'_>,
@@ -2619,7 +2619,7 @@ mod tests {
         }
     }
 
-    fn verified(mode: EngineMode) -> VerifiedProjectLaws<TestHasher, FixtureEngine> {
+    fn verified(mode: EngineMode) -> VerifiedProjectLaws<TestHasher, TestLawChecker> {
         let manifest = manifest();
         let catalog = catalog(&manifest);
         verify_project_laws::<TestHasher, _, _>(
@@ -2629,7 +2629,7 @@ mod tests {
             vec![proof_input(&catalog, b"checked-proof")],
             LawLimits::default(),
             hash(b"engine-build"),
-            FixtureEngine(mode),
+            TestLawChecker(mode),
             &AttestingVerifier,
         )
         .unwrap_or_else(|error| panic!("verified laws: {error}"))
@@ -2834,7 +2834,7 @@ mod tests {
             vec![input],
             LawLimits::default(),
             hash(b"engine-build"),
-            FixtureEngine(EngineMode::Pass),
+            TestLawChecker(EngineMode::Pass),
             &AttestingVerifier,
         );
         assert!(matches!(
@@ -2882,7 +2882,7 @@ mod tests {
             vec![LawEvidenceInput::new(id(101), envelope, artifact.to_vec())],
             LawLimits::default(),
             hash(b"engine-build"),
-            FixtureEngine(EngineMode::Pass),
+            TestLawChecker(EngineMode::Pass),
             &AttestingVerifier,
         );
         assert!(matches!(result, Err(LawError::NonCanonicalAssumptions)));

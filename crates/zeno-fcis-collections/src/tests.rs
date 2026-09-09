@@ -8,6 +8,7 @@
 
 use super::*;
 use alloc::string::String;
+use alloc::vec;
 
 fn encoded_key_for(byte: u8) -> Vec<u8> {
     Value::U128(u128::from(byte))
@@ -300,33 +301,40 @@ mod rpds_tests {
 }
 
 // ---------------------------------------------------------------------------
-// Optional imbl backend differential tests
+// Optional ordered map differential tests
 // ---------------------------------------------------------------------------
 
-#[cfg(all(test, feature = "imbl-backend"))]
-mod imbl_tests {
+#[cfg(all(test, feature = "ordered-map"))]
+mod ordered_map_tests {
     use super::*;
 
+    #[cfg(feature = "imbl-backend")]
     #[test]
-    fn imbl_empty_is_empty() {
-        let map = ImblBackend::empty();
+    fn previous_type_name_accepts_the_ordered_map() {
+        let previous_name: ImblBackend = OrderedMap::new();
+        assert!(previous_name.is_empty());
+    }
+
+    #[test]
+    fn ordered_empty_is_empty() {
+        let map = OrderedMap::empty();
         assert!(map.is_empty());
     }
 
     #[test]
-    fn imbl_insert_and_get() {
-        let map = ImblBackend::empty().insert(make_entry(1, 10));
+    fn ordered_insert_and_get() {
+        let map = OrderedMap::empty().insert(make_entry(1, 10));
         assert_eq!(map.len(), 1);
         assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::U128(10)));
     }
 
     #[test]
-    fn imbl_insertion_history_independence() {
-        let order_a = ImblBackend::empty()
+    fn ordered_insertion_history_independence() {
+        let order_a = OrderedMap::empty()
             .insert(make_entry(3, 30))
             .insert(make_entry(1, 10))
             .insert(make_entry(2, 20));
-        let order_b = ImblBackend::empty()
+        let order_b = OrderedMap::empty()
             .insert(make_entry(1, 10))
             .insert(make_entry(2, 20))
             .insert(make_entry(3, 30));
@@ -335,8 +343,8 @@ mod imbl_tests {
     }
 
     #[test]
-    fn imbl_snapshot_retention() {
-        let v1 = ImblBackend::empty()
+    fn ordered_snapshot_retention() {
+        let v1 = OrderedMap::empty()
             .insert(make_entry(1, 10))
             .insert(make_entry(2, 20));
         let v2 = v1.insert(make_entry(3, 30));
@@ -346,22 +354,65 @@ mod imbl_tests {
     }
 
     #[test]
-    fn imbl_differential_vs_btreemap() {
+    fn ordered_differential_vs_btreemap() {
         let mut btree = BTreeMapBackend::empty();
-        let mut imbl = ImblBackend::empty();
+        let mut ordered = OrderedMap::empty();
         for i in 1..=20u8 {
             let entry = make_entry(i, i * 3);
             btree = btree.insert(entry.clone());
-            imbl = imbl.insert(entry);
+            ordered = ordered.insert(entry);
         }
-        assert_eq!(btree.to_entries(), imbl.to_entries());
-        assert_eq!(materialized_bytes(&btree), materialized_bytes(&imbl));
+        assert_eq!(btree.to_entries(), ordered.to_entries());
+        assert_eq!(materialized_bytes(&btree), materialized_bytes(&ordered));
         for i in (1..=20u8).filter(|i| i % 3 == 0) {
             btree = btree.remove(&encoded_key_for(i));
-            imbl = imbl.remove(&encoded_key_for(i));
+            ordered = ordered.remove(&encoded_key_for(i));
         }
-        assert_eq!(btree.to_entries(), imbl.to_entries());
-        assert_eq!(materialized_bytes(&btree), materialized_bytes(&imbl));
+        assert_eq!(btree.to_entries(), ordered.to_entries());
+        assert_eq!(materialized_bytes(&btree), materialized_bytes(&ordered));
+    }
+
+    #[test]
+    fn ordered_map_preserves_branching_snapshots_and_thread_safety() {
+        fn requires_send_sync<T: Send + Sync>() {}
+        requires_send_sync::<OrderedMap>();
+
+        let mut candidate = OrderedMap::empty();
+        let mut reference = BTreeMapBackend::empty();
+        let mut retained = vec![(candidate.clone(), reference.clone())];
+        for step in 0..192_u16 {
+            if step % 13 == 0 {
+                let index = usize::from(step) % retained.len();
+                (candidate, reference) = retained[index].clone();
+            }
+            let key = u8::try_from((step * 37) % 64)
+                .unwrap_or_else(|error| panic!("bounded key: {error}"));
+            let entry = if step % 2 == 0 {
+                make_entry(key, key ^ 0x5a)
+            } else {
+                make_entry_text(&alloc::format!("key-{key}"), key ^ 0xa5)
+            };
+            let encoded_key = entry.encoded_key().to_vec();
+            if step % 3 == 0 {
+                candidate = candidate.remove(&encoded_key);
+                reference = reference.remove(&encoded_key);
+            } else {
+                candidate = candidate.insert(entry.clone());
+                reference = reference.insert(entry);
+            }
+            assert_eq!(candidate.get(&encoded_key), reference.get(&encoded_key));
+            assert_eq!(candidate.len(), reference.len());
+            assert_eq!(
+                materialized_bytes(&candidate),
+                materialized_bytes(&reference)
+            );
+            for (snapshot, expected) in &retained {
+                assert_eq!(materialized_bytes(snapshot), materialized_bytes(expected));
+            }
+            if step % 8 == 0 {
+                retained.push((candidate.clone(), reference.clone()));
+            }
+        }
     }
 }
 

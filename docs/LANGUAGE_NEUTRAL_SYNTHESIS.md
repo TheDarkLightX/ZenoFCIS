@@ -207,7 +207,7 @@ a fixed-size stack array through `Option`. JavaScript uses an immutable string
 of canonical tokens and returns a string or `null`.
 
 See [the counter problem](../crates/zeno-fcis-cli/templates/durable-counter/synthesis.json)
-and [the saturating-add problem](../fixtures/synthesis/saturating-add.json).
+and [the saturating-add problem](../test-data/synthesis/saturating-add.json).
 The counter's six outputs are a decision tag (0 denied, 1 capacity, 2 accept,
 3 committed failure), post-count, post-failures, notification presence, and both
 notification payload fields. The fixed reviewed adapter supplies the channel,

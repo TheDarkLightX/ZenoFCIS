@@ -1,6 +1,6 @@
 //! Python replay integration test.
 //!
-//! Runs the generated Python fixture's `replay()` function via `python3` and
+//! Runs the generated Python test module's `replay()` function via `python3` and
 //! asserts that all vectors replay with the expected decode outcomes. The
 //! Python files are generated at build time by `build.rs` into the `python/`
 //! directory next to this crate's `Cargo.toml`.

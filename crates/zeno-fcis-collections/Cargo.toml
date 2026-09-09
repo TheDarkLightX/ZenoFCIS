@@ -13,10 +13,12 @@ readme.workspace = true
 [features]
 default = ["std"]
 std = []
-# Enable the rpds persistent vector backend.
+# Enable the rpds persistent hash map.
 rpds-backend = ["dep:rpds"]
-# Enable the imbl persistent map backend.
-imbl-backend = ["dep:imbl"]
+# Enable the ordered map with thread-safe, shared snapshots.
+ordered-map = ["dep:rpds"]
+# Compatibility feature; the implementation now uses the pinned rpds crate.
+imbl-backend = ["ordered-map"]
 
 [dependencies]
 zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
@@ -24,10 +26,8 @@ zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value" }
 
 # Optional persistent collection backends.
 # Pinned exactly per ZenoFCIS dependency policy.
-# rpds 1.1.0: MIT/Apache-2.0, no unsafe, no advisory.
+# rpds 1.1.0: MIT/Apache-2.0; used for both optional map implementations.
 rpds = { version = "=1.1.0", optional = true }
-# imbl 3.0.0: MPL-2.0+, no advisory.
-imbl = { version = "=3.0.0", optional = true }
 
 [dev-dependencies]
 criterion = "=0.5.1"

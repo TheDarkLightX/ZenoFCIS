@@ -76,7 +76,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
                 "+1.97.1",
                 "run",
                 "--manifest-path",
-                "fixtures/external-consumer/Cargo.toml",
+                "test-projects/external-consumer/Cargo.toml",
                 "--locked",
             ),
         ),

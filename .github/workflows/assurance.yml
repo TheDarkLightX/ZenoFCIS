@@ -39,14 +39,34 @@ jobs:
         run: cargo +1.97.1 metadata --locked --format-version 1 > /tmp/zeno-fcis-cargo-metadata.json
 
       - name: Install pinned supply-chain tools
+        id: supply-chain-tools
         run: |
           cargo +1.97.1 install cargo-deny --version 0.20.2 --locked
           cargo +1.97.1 install cargo-audit --version 0.22.2 --locked
 
-      - name: License, source, and advisory policy
+      - name: Check licenses, sources, and dependency advisories
+        shell: bash
         run: |
-          cargo +1.97.1 deny check > /tmp/zeno-fcis-cargo-deny.txt 2>&1
-          cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings > /tmp/zeno-fcis-cargo-audit.txt 2>&1
+          set -o pipefail
+          cargo +1.97.1 deny check 2>&1 | tee /tmp/zeno-fcis-cargo-deny.txt
+
+      - name: Audit the locked dependency graph
+        if: ${{ !cancelled() && steps.supply-chain-tools.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings 2>&1 | tee /tmp/zeno-fcis-cargo-audit.txt
+
+      - name: Retain dependency check logs, including failures
+        if: ${{ !cancelled() && steps.supply-chain-tools.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zeno-fcis-dependency-checks-${{ github.sha }}
+          path: |
+            /tmp/zeno-fcis-cargo-deny.txt
+            /tmp/zeno-fcis-cargo-audit.txt
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Build reproducible evidence bundle
         run: |
@@ -81,7 +101,9 @@ jobs:
           cargo +1.97.1 test --locked -p zeno-fcis-authenticated
           cargo +1.97.1 test --locked -p zeno-fcis-synthesis
           cargo +1.97.1 test --locked -p zeno-fcis-bootstrap
-          cargo +1.97.1 test --locked -p zeno-fcis-codegen-fixture
+          cargo +1.97.1 test --locked -p zeno-fcis-generated-code-tests
           cargo +1.97.1 test --locked -p zeno-fcis-authority
           cargo +1.97.1 test --locked -p zeno-fcis-shell-sqlite
           cargo +1.97.1 test --locked -p zeno-fcis-collections --all-features
+          cargo +1.97.1 test --locked -p zeno-fcis-collections --no-default-features --features ordered-map
+          cargo +1.97.1 test --locked -p zeno-fcis-collections --no-default-features --features imbl-backend

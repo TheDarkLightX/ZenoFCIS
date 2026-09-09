@@ -55,7 +55,7 @@ jobs:
             mounted-zenodex/rust-runtime/target/debug/zenodex-runtime \
             /tmp/zenodex-zusd-mount
           cmp \
-            fixtures/mounted-zenodex/zusd-v1/report.json \
+            test-data/zenodex/zusd-v1/report.json \
             /tmp/zenodex-zusd-mount/report.json
 
       - name: Bind exact-head evidence

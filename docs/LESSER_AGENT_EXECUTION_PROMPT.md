@@ -54,7 +54,7 @@ Do not implement adjacent packages. A small complete draft PR is preferred over 
 - Parallelism requires complete read/write/context/effect footprints and equality with the canonical sequential result.
 - Full runtime refinement compares the complete normalized decision artifact, not only roots or success/failure.
 - Bounded testing is not an unbounded proof. Evidence claims must name the exact artifact, tool version, source hash, assumptions, and coverage mode.
-- Do not hand-roll cryptography. Do not make Serde, Postcard, a database, JMT, `rpds`, `imbl`, or any collection's internal shape define consensus bytes.
+- Do not hand-roll cryptography. Do not make Serde, Postcard, a database, JMT, `rpds`, `OrderedMap`, or any collection's internal shape define consensus bytes.
 - An LLM may propose bounded values or examples; it may not choose schemas, synthesis grammars, wiring, proof claims, or release status.
 
 ## Required implementation process
@@ -177,7 +177,7 @@ Goal: evaluate structural sharing without changing protocol meaning.
 
 Acceptance criteria:
 
-- implement adapters for standard `BTreeMap` builder, `rpds`, and `imbl` candidates;
+- implement adapters for standard `BTreeMap` builder, `rpds`, and `OrderedMap` candidates;
 - keep equality, ordering, canonical encoding, and roots defined over logical entries;
 - benchmark small/dense and large/sparse workloads, retained snapshots, allocations, lookup, update, freeze, and root generation;
 - differential-test every backend against the reference owned map;

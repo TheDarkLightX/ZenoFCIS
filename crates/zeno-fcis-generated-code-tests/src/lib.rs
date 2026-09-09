@@ -1,7 +1,7 @@
-//! Compiled generated Rust fixture for `zeno-fcis-codegen`.
+//! Compiled generated Rust test code for `zeno-fcis-codegen`.
 //!
 //! The `generated` module is produced at build time by `build.rs` from the
-//! canonical fixture schema and is included verbatim. It exposes typed domain
+//! shared test schema and is included verbatim. It exposes typed domain
 //! adapters, strict `to_value`/`try_from_value` conversions, typed patch-path
 //! constructors, and the codec vector evidence table.
 
@@ -29,8 +29,8 @@ pub mod bootstrap_runtime {
 pub use zeno_fcis_codegen::{fixture_schema, fixture_spec};
 
 #[cfg(test)]
-#[path = "../catalog_fixture.rs"]
-mod catalog_fixture;
+#[path = "../test_catalog.rs"]
+mod test_catalog;
 
 #[cfg(test)]
 mod tests {
@@ -56,7 +56,7 @@ mod tests {
         GeneratedCommandEnvelope, GeneratedContextEnvelope, GeneratedProject,
         GeneratedProjectError, ReasonClass, ReasonId, RejectReasonId,
     };
-    use crate::catalog_fixture::fixture_catalog;
+    use crate::test_catalog::test_catalog;
 
     struct WrongHash;
 
@@ -744,7 +744,7 @@ mod tests {
     #[test]
     fn generated_project_reconstructs_exact_catalog_profile_and_schema() {
         let project = generated_project();
-        let expected = fixture_catalog(schema());
+        let expected = test_catalog(schema());
         assert_eq!(project.catalog(), &expected);
         assert_eq!(
             project

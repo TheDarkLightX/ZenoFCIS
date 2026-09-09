@@ -6,6 +6,15 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Use `test-projects` and `test-data` folders and a private
+  `zeno-fcis-generated-code-tests` crate. Rename `ReplayFixture` to
+  `DecisionMismatchRecord`, with the previous public name retained as an alias.
+- Replace the optional `imbl` ordered map with `OrderedMap` using the existing
+  pinned `rpds` dependency, removing the unsound `bitmaps` dependency. Preserve
+  thread-safe shared snapshots, canonical output, and the old type/feature names
+  as compatibility aliases. Add branching-snapshot differential checks.
+- Show dependency-check failures in CI output and retain both checker logs on
+  failure, while keeping the existing advisory policy.
 - Qualify the generated durable application using a CLI built from actual crate
   archives and internal dependencies resolved only from those archives; retain
   `PACKAGED-APPLICATION.json` in release evidence.

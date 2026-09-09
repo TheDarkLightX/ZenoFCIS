@@ -13,7 +13,7 @@ use zeno_fcis_project::{
 };
 use zeno_fcis_schema::{Schema, TypeId};
 
-pub(crate) fn fixture_catalog(schema: Schema) -> ProjectCatalog {
+pub(crate) fn test_catalog(schema: Schema) -> ProjectCatalog {
     let reasons = vec![
         ReasonDefinition::try_new(
             id(10),

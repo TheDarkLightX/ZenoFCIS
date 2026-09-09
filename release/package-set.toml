@@ -43,7 +43,7 @@ publish_order = [
     "zeno-fcis",
 ]
 
-private_packages = ["zeno-fcis-codegen-fixture"]
+private_packages = ["zeno-fcis-generated-code-tests"]
 
 [[binaries]]
 package = "zeno-fcis-cli"

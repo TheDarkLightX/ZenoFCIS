@@ -39,7 +39,7 @@ jobs:
             -p zeno-fcis-codec \
             -p zeno-fcis-patch \
             -p zeno-fcis-codegen \
-            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-generated-code-tests \
             -p zeno-fcis-collections \
             --all-targets --all-features --locked -- -D warnings
 
@@ -50,7 +50,7 @@ jobs:
             -p zeno-fcis-codec \
             -p zeno-fcis-patch \
             -p zeno-fcis-codegen \
-            -p zeno-fcis-codegen-fixture \
+            -p zeno-fcis-generated-code-tests \
             -p zeno-fcis-collections \
             --all-features --locked
           cargo +1.97.1 test -p zeno-fcis-value -p zeno-fcis-collections --doc --locked

@@ -98,7 +98,7 @@ production backends.
 |---|---|
 | `zeno-fcis-shell` | Pure atomic commit, replay, and acknowledgement reference semantics |
 | `zeno-fcis-authenticated` | Configured projector-bound authenticated-state reference, strict proof/plan decoding, and context-verified sparse-proof witnesses |
-| `zeno-fcis-collections` | Logical persistent-map interface plus reference, `rpds`, and `imbl` implementations |
+| `zeno-fcis-collections` | Logical persistent-map interface plus reference, `rpds`, and `OrderedMap` implementations |
 
 `apply_reference_bundle` intentionally accepts raw structural data. Production
 publication uses the nominal authorization boundary instead.
@@ -117,13 +117,13 @@ These crates may use `std` because they access a host runtime, database, files,
 or generated source. They must preserve the decisions produced by the semantic
 core.
 
-## Project-specific and fixture crates
+## Project-specific crates and generated-code tests
 
 | Crate | Responsibility |
 |---|---|
 | `zeno-fcis-profile-zenodex` | Initial ZenoDEX single-vault zUSD profile values and stable identifiers |
-| `zeno-fcis-adapter-zenodex` | Mounted ZenoDEX Python/Rust runtime parity fixtures |
-| `zeno-fcis-codegen-fixture` | Compiled fixture for generated-source assurance |
+| `zeno-fcis-adapter-zenodex` | ZenoDEX Python/Rust runtime comparison tests |
+| `zeno-fcis-generated-code-tests` | Compiles and tests generated Rust and Python code |
 
 Applications should define their own profile, catalog, laws, machines, mounted
 runtime, and interpreter. ZenoDEX behavior is not part of the generic
