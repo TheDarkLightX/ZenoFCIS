@@ -158,7 +158,7 @@
         "CWE-367",
         "CWE-345"
       ],
-      "entry": "AuthorizedSqliteShell next_pending and deliver_next",
+      "entry": "SqliteShell next_pending and deliver_next",
       "epi_at_discovery": 98,
       "epss": null,
       "evidence_refs": [
@@ -170,9 +170,9 @@
       "kev": "not-applicable",
       "locations": [
         {
-          "end_line": 810,
+          "end_line": 822,
           "path": "crates/zeno-fcis-shell-sqlite/src/lib.rs",
-          "start_line": 810
+          "start_line": 812
         }
       ],
       "mitigation": "Fixed: compare the selected entry and authorization directly with the immutable approved bundle before returning PendingDelivery. Scheduled public-API regression rejects substitution and accepts restored legitimate delivery.",
@@ -183,7 +183,7 @@
         "next_pending can return an entry absent from the approved bundle; deliver_next can then invoke the destination interpreter with it"
       ],
       "reachable_path": [
-        "AuthorizedSqliteShell next_pending and deliver_next",
+        "SqliteShell next_pending and deliver_next",
         "next_pending can return an entry absent from the approved bundle; deliver_next can then invoke the destination interpreter with it"
       ],
       "reliability": "schedule-dependent",

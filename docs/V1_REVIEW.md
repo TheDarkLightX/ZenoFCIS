@@ -37,6 +37,12 @@ transition, proves a theorem, or replaces the release gates.
   for GHSA-gqvv-2mrq-wpjv, GHSA-g6gw-c38x-mqfc and GHSA-crvj-82cr-hjcx. The fresh
   npm audit returned no advisories. Probity remains 1.10.0; no external Rust
   dependency version or Lean pin was upgraded for stable release preparation.
+- **Standalone package verification cleanup:** PR #100 identified that a failed
+  verification left its new output directory behind and blocked a retry. The
+  wrapper now removes only the directory it created when verification, receipt
+  writing or interruption fails. Before-and-after regressions cover retry after
+  an incomplete archive set, partial receipt cleanup, interruption, successful receipt
+  retention and rejection of pre-existing output without overwriting it.
 
 ## Earlier issue acceptance criteria
 

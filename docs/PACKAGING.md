@@ -71,9 +71,12 @@ The current HEAD must equal the commit recorded in every archive. This replays
 the same checker; it is not an independent review. The output directory must be
 new. This command reuses downloaded dependencies,
 creates one temporary compilation target, retains a JSON receipt on success, and
-removes its owned staging directory on success or failure. Development archives
-are permitted by this standalone check and are explicitly marked through their source status; the
-normal release build still requires a clean exact commit. The resolver overlay
+removes its owned staging directory on success or failure. If verification or
+receipt writing fails, it also removes the new output directory so the same
+path can be retried. Pre-existing output directories are rejected and preserved.
+Development archives are permitted by this standalone check and are explicitly
+marked through their source status; the normal release build still requires a
+clean exact commit. The resolver overlay
 points to archive contents. A registry-only smoke test remains a separate
 post-publication check.
 

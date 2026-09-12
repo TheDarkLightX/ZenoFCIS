@@ -1,0 +1,51 @@
+{
+  "baseline_commit": "4bb3ef5fd8830a7adb900065be697d19dd2bf2cc",
+  "review_thread": "https://github.com/TheDarkLightX/ZenoFCIS/pull/100#discussion_r3997493964",
+  "finding": "Failed standalone package verification retained its output and blocked retries.",
+  "change": "Preserve the exclusive output creation and existing verification order; on failure, remove only that invocation-owned output and re-raise. Successful receipts and pre-existing-output rejection remain unchanged.",
+  "checker_semantics": "Package validation and admission checks are unchanged. The checker script content identity changes and release package evidence must be rebuilt.",
+  "before": {
+    "command": [
+      "python3",
+      "tools/test_generated_application.py",
+      "PackagedStagingTests"
+    ],
+    "exit_code": 1,
+    "started_at": "2026-09-12T21:50:41.285634+00:00",
+    "elapsed_seconds": 0.168051,
+    "log_sha256": "a9b52bcd5e92dd3db12ab468146fc6a6cb21ebbbffe452b6d62a321dfd7f4daa"
+  },
+  "after": {
+    "command": [
+      "python3",
+      "tools/test_generated_application.py"
+    ],
+    "exit_code": 0,
+    "started_at": "2026-09-12T21:51:47.333136+00:00",
+    "elapsed_seconds": 1.817035,
+    "log_sha256": "02d74aef04272051cc6f0776b80dffc8fab8b5ee462bf016386e7297b6230f2f"
+  },
+  "coverage": [
+    "Actual incomplete archive set rejects and permits retry using the same output path",
+    "Injected receipt-write failure removes a partial receipt",
+    "Injected interruption removes temporary build files and owned output",
+    "Successful wrapper call retains exactly its receipt",
+    "Existing output is rejected before verification and retains its bytes",
+    "Existing parent marker remains unchanged"
+  ],
+  "qualification": "Receipt-success, receipt-write and interruption tests replace the expensive inner checker with controlled outcomes. Full packaged-application execution remains a separate exact-commit CI gate. The before run had three assertion failures and one retry error; all 16 after tests passed.",
+  "hotspot_refresh": {
+    "model_unchanged": true,
+    "rank_score_and_path_order_unchanged": true,
+    "changed_reported_paths": [
+      "tools/rc_package.py"
+    ],
+    "admitted_files": 151,
+    "before_inventory": "f1201aa1dd44348b34107d049632591b05266a15a012f17946b7baf8f2984eb5",
+    "after_inventory": "698654ac551468feefd3efd2bc1c6055cadc9bc581b5f8a6e1883551d6b21300"
+  },
+  "changed_source_sha256": {
+    "tools/rc_package.py": "302d1c2454b4bd90524c2aac9557fc3b0a8ea996db99e6bc8807064c199db07c",
+    "tools/test_generated_application.py": "08216c430a127f412d09984d034bf73044a4c8d4afe738de73f565b45c318d5b"
+  }
+}
