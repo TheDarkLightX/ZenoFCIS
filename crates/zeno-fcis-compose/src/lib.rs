@@ -2679,8 +2679,11 @@ pub fn authorize_deterministic_parallel<
     if expected_bindings.len() != spec.components().len() {
         return Err(ParallelAuthorizationError::AuthorityBindingSetCardinality);
     }
-    let mut canonical_bindings = expected_bindings.to_vec();
-    canonical_bindings.sort_by_key(FootprintAuthorityBinding::component);
+    // The authority bindings are only read here, so canonical component order is
+    // taken over borrows of the caller's immutable bindings. The returned
+    // witnesses own their data through the supplied evidence instead.
+    let mut canonical_bindings = expected_bindings.iter().collect::<Vec<_>>();
+    canonical_bindings.sort_by_key(|binding| binding.component());
     if canonical_bindings
         .windows(2)
         .any(|pair| pair[0].component() == pair[1].component())
@@ -2701,7 +2704,7 @@ pub fn authorize_deterministic_parallel<
     for (((component, expected), supplied), index) in spec
         .components()
         .iter()
-        .zip(&canonical_bindings)
+        .zip(canonical_bindings)
         .zip(footprint_evidence)
         .zip(0_u32..)
     {

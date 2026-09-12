@@ -1,0 +1,705 @@
+{
+  "schema": "zeno-fcis/parallel-authorization-sorting-results/1",
+  "baseline_commit": "dfdcc04c5f6d944f9c4395b6ec119ee3a5765e49",
+  "selected_change": "sort references to immutable expected bindings instead of deep cloning their nested data",
+  "files": {
+    "crates/zeno-fcis-compose/src/lib.rs": "723f5aa90329e868eae767c70c22d2c53e6ffdfebdb6f15e93102a970265d44f",
+    "crates/zeno-fcis-compose/tests/complete_footprint.rs": "88b2b48b5dc11ecc93a9f78d89f472d20bb7385bf4c751c91179aebb7bba09c0"
+  },
+  "behavior": {
+    "cases": 2376,
+    "identical_in_both_profiles": true,
+    "observations_sha256": "d65ae0cce5dd68e735b5b41911f68385f9b237145900b17091ffa9d896a022a2",
+    "coverage": "72 independent three-component order pairs across empty and nonempty footprints plus 2304 combinations of eight defects and input reorderings; complete canonical bytes, exact errors, hash-provider inputs, verifier callbacks and input snapshots",
+    "limits": "bounded source-to-source observations; no formal equivalence proof"
+  },
+  "probes": {
+    "baseline": {
+      "source_sha256": "5eca5c18313592c68a1c3da2939db7349594fcc048f10958bc8aba86891ba1e2",
+      "probe_sha256": "0d782ace97312a3bfa910dde931c7a2a90dfffc75d58b24c1541082dcc18b072",
+      "binary_sha256": "550fc8e6ea13f328f1f46904f81c6bae58eb47860d83fe6ec7ce7f329a3eaa21",
+      "observations_sha256": "d65ae0cce5dd68e735b5b41911f68385f9b237145900b17091ffa9d896a022a2",
+      "golden": "CASES 2376\n",
+      "allocations": "ALLOC count=1 width=0 reject=false calls=50 bytes=5710\nALLOC count=1 width=0 reject=true calls=1 bytes=344\nALLOC count=1 width=16 reject=false calls=362 bytes=59598\nALLOC count=1 width=16 reject=true calls=35 bytes=5720\nALLOC count=4 width=0 reject=false calls=150 bytes=17291\nALLOC count=4 width=0 reject=true calls=1 bytes=1376\nALLOC count=4 width=16 reject=false calls=1398 bytes=224523\nALLOC count=4 width=16 reject=true calls=137 bytes=22880\nALLOC count=16 width=16 reject=false calls=5541 bytes=899063\nALLOC count=16 width=16 reject=true calls=545 bytes=91520\nALLOC count=64 width=16 reject=false calls=22105 bytes=3650983\nALLOC count=64 width=16 reject=true calls=2178 bytes=388096\n",
+      "build_command": [
+        "cargo",
+        "+1.97.1",
+        "build",
+        "--locked",
+        "-p",
+        "zeno-fcis-compose",
+        "-p",
+        "zeno-fcis-crypto",
+        "--message-format=json"
+      ],
+      "probe_compiler": [
+        "rustc",
+        "+1.97.1",
+        "--edition=2024",
+        "-C",
+        "opt-level=2",
+        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "--extern",
+        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_compose.rlib",
+        "--extern",
+        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/debug/deps/libzeno_fcis_codec-40d8c657a2e8d5cf.rlib",
+        "--extern",
+        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_crypto.rlib",
+        "-L",
+        "dependency=/tmp/zenofcis-milestone-target/debug/deps",
+        "-o",
+        "/tmp/zenofcis-binding-order-20260912/baseline-binding-probe"
+      ],
+      "profile": "dev libraries opt-level0 debug0; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
+    },
+    "candidate": {
+      "source_sha256": "723f5aa90329e868eae767c70c22d2c53e6ffdfebdb6f15e93102a970265d44f",
+      "probe_sha256": "0d782ace97312a3bfa910dde931c7a2a90dfffc75d58b24c1541082dcc18b072",
+      "binary_sha256": "27bafd519b24701bc8a3202b532ee5a7bfda131568966b094f91171de1b1ff6d",
+      "observations_sha256": "d65ae0cce5dd68e735b5b41911f68385f9b237145900b17091ffa9d896a022a2",
+      "golden": "CASES 2376\n",
+      "allocations": "ALLOC count=1 width=0 reject=false calls=50 bytes=5374\nALLOC count=1 width=0 reject=true calls=1 bytes=8\nALLOC count=1 width=16 reject=false calls=328 bytes=53886\nALLOC count=1 width=16 reject=true calls=1 bytes=8\nALLOC count=4 width=0 reject=false calls=150 bytes=15947\nALLOC count=4 width=0 reject=true calls=1 bytes=32\nALLOC count=4 width=16 reject=false calls=1262 bytes=201675\nALLOC count=4 width=16 reject=true calls=1 bytes=32\nALLOC count=16 width=16 reject=false calls=4997 bytes=807671\nALLOC count=16 width=16 reject=true calls=1 bytes=128\nALLOC count=64 width=16 reject=false calls=19928 bytes=3263399\nALLOC count=64 width=16 reject=true calls=1 bytes=512\n",
+      "build_command": [
+        "cargo",
+        "+1.97.1",
+        "build",
+        "--locked",
+        "-p",
+        "zeno-fcis-compose",
+        "-p",
+        "zeno-fcis-crypto",
+        "--message-format=json"
+      ],
+      "probe_compiler": [
+        "rustc",
+        "+1.97.1",
+        "--edition=2024",
+        "-C",
+        "opt-level=2",
+        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "--extern",
+        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_compose.rlib",
+        "--extern",
+        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/debug/deps/libzeno_fcis_codec-40d8c657a2e8d5cf.rlib",
+        "--extern",
+        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_crypto.rlib",
+        "-L",
+        "dependency=/tmp/zenofcis-milestone-target/debug/deps",
+        "-o",
+        "/tmp/zenofcis-binding-order-20260912/candidate-binding-probe"
+      ],
+      "profile": "dev libraries opt-level0 debug0; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
+    },
+    "release-baseline": {
+      "source_sha256": "5eca5c18313592c68a1c3da2939db7349594fcc048f10958bc8aba86891ba1e2",
+      "probe_sha256": "0d782ace97312a3bfa910dde931c7a2a90dfffc75d58b24c1541082dcc18b072",
+      "binary_sha256": "c4bc4d16192f51e8da5f8414075a5e25cbea954c57f838b9fed0afec0d370a43",
+      "observations_sha256": "d65ae0cce5dd68e735b5b41911f68385f9b237145900b17091ffa9d896a022a2",
+      "golden": "CASES 2376\n",
+      "allocations": "ALLOC count=1 width=0 reject=false calls=50 bytes=5710\nALLOC count=1 width=0 reject=true calls=1 bytes=344\nALLOC count=1 width=16 reject=false calls=362 bytes=59598\nALLOC count=1 width=16 reject=true calls=35 bytes=5720\nALLOC count=4 width=0 reject=false calls=150 bytes=17291\nALLOC count=4 width=0 reject=true calls=1 bytes=1376\nALLOC count=4 width=16 reject=false calls=1398 bytes=224523\nALLOC count=4 width=16 reject=true calls=137 bytes=22880\nALLOC count=16 width=16 reject=false calls=5541 bytes=899063\nALLOC count=16 width=16 reject=true calls=545 bytes=91520\nALLOC count=64 width=16 reject=false calls=22105 bytes=3650983\nALLOC count=64 width=16 reject=true calls=2178 bytes=388096\n",
+      "build_command": [
+        "cargo",
+        "+1.97.1",
+        "build",
+        "--locked",
+        "--release",
+        "-p",
+        "zeno-fcis-compose",
+        "-p",
+        "zeno-fcis-crypto",
+        "--message-format=json"
+      ],
+      "probe_compiler": [
+        "rustc",
+        "+1.97.1",
+        "--edition=2024",
+        "-C",
+        "opt-level=2",
+        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "--extern",
+        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/release/libzeno_fcis_compose.rlib",
+        "--extern",
+        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/release/deps/libzeno_fcis_codec-8ab4f87418899eee.rlib",
+        "--extern",
+        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/release/libzeno_fcis_crypto.rlib",
+        "-L",
+        "dependency=/tmp/zenofcis-milestone-target/release/deps",
+        "-o",
+        "/tmp/zenofcis-binding-order-20260912/release-baseline-binding-probe"
+      ],
+      "profile": "release libraries; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
+    },
+    "release-candidate": {
+      "source_sha256": "723f5aa90329e868eae767c70c22d2c53e6ffdfebdb6f15e93102a970265d44f",
+      "probe_sha256": "0d782ace97312a3bfa910dde931c7a2a90dfffc75d58b24c1541082dcc18b072",
+      "binary_sha256": "3350d9355ba294a69a95a78376ec45c07823ae2dd59770ebf6b92416803e86ef",
+      "observations_sha256": "d65ae0cce5dd68e735b5b41911f68385f9b237145900b17091ffa9d896a022a2",
+      "golden": "CASES 2376\n",
+      "allocations": "ALLOC count=1 width=0 reject=false calls=50 bytes=5374\nALLOC count=1 width=0 reject=true calls=1 bytes=8\nALLOC count=1 width=16 reject=false calls=328 bytes=53886\nALLOC count=1 width=16 reject=true calls=1 bytes=8\nALLOC count=4 width=0 reject=false calls=150 bytes=15947\nALLOC count=4 width=0 reject=true calls=1 bytes=32\nALLOC count=4 width=16 reject=false calls=1262 bytes=201675\nALLOC count=4 width=16 reject=true calls=1 bytes=32\nALLOC count=16 width=16 reject=false calls=4997 bytes=807671\nALLOC count=16 width=16 reject=true calls=1 bytes=128\nALLOC count=64 width=16 reject=false calls=19928 bytes=3263399\nALLOC count=64 width=16 reject=true calls=1 bytes=512\n",
+      "build_command": [
+        "cargo",
+        "+1.97.1",
+        "build",
+        "--locked",
+        "--release",
+        "-p",
+        "zeno-fcis-compose",
+        "-p",
+        "zeno-fcis-crypto",
+        "--message-format=json"
+      ],
+      "probe_compiler": [
+        "rustc",
+        "+1.97.1",
+        "--edition=2024",
+        "-C",
+        "opt-level=2",
+        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "--extern",
+        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/release/libzeno_fcis_compose.rlib",
+        "--extern",
+        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/release/deps/libzeno_fcis_codec-8ab4f87418899eee.rlib",
+        "--extern",
+        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/release/libzeno_fcis_crypto.rlib",
+        "-L",
+        "dependency=/tmp/zenofcis-milestone-target/release/deps",
+        "-o",
+        "/tmp/zenofcis-binding-order-20260912/release-candidate-binding-probe"
+      ],
+      "profile": "release libraries; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
+    }
+  },
+  "structure": {
+    "baseline": {
+      "production_functions": 194,
+      "production_function_nloc": 1897,
+      "production_branch_points": 273,
+      "target": {
+        "name": "authorize_deterministic_parallel",
+        "nloc": 86,
+        "ccn": 13
+      },
+      "tool": "lizard 1.24.0; source observations only"
+    },
+    "candidate": {
+      "production_functions": 194,
+      "production_function_nloc": 1897,
+      "production_branch_points": 273,
+      "target": {
+        "name": "authorize_deterministic_parallel",
+        "nloc": 86,
+        "ccn": 13
+      },
+      "tool": "lizard 1.24.0; source observations only"
+    }
+  },
+  "development_timing_summary": [
+    {
+      "count": 1,
+      "width": 0,
+      "reject": false,
+      "median_ns": {
+        "baseline": 73015.57,
+        "candidate": 116028.42
+      },
+      "change_percent": 58.90914773383265
+    },
+    {
+      "count": 1,
+      "width": 0,
+      "reject": true,
+      "median_ns": {
+        "baseline": 77.65,
+        "candidate": 78.3
+      },
+      "change_percent": 0.8370895041854398
+    },
+    {
+      "count": 1,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 254526.925,
+        "candidate": 261844.405
+      },
+      "change_percent": 2.874933565476434
+    },
+    {
+      "count": 1,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 1715.155,
+        "candidate": 40.45
+      },
+      "change_percent": -97.64161256562818
+    },
+    {
+      "count": 4,
+      "width": 0,
+      "reject": false,
+      "median_ns": {
+        "baseline": 187112.18,
+        "candidate": 181835.66499999998
+      },
+      "change_percent": -2.8199740925470507
+    },
+    {
+      "count": 4,
+      "width": 0,
+      "reject": true,
+      "median_ns": {
+        "baseline": 386.6,
+        "candidate": 104.4
+      },
+      "change_percent": -72.99534402483187
+    },
+    {
+      "count": 4,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 913192.7250000001,
+        "candidate": 904133.89
+      },
+      "change_percent": -0.9919959666783495
+    },
+    {
+      "count": 4,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 10409.09,
+        "candidate": 3902.86
+      },
+      "change_percent": -62.50527183452156
+    },
+    {
+      "count": 16,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 3477744.6500000004,
+        "candidate": 3593196.05
+      },
+      "change_percent": 3.319720440084617
+    },
+    {
+      "count": 16,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 36323.149999999994,
+        "candidate": 18403.1
+      },
+      "change_percent": -49.33506592902873
+    },
+    {
+      "count": 64,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 14478648.15,
+        "candidate": 14327894.649999999
+      },
+      "change_percent": -1.0412125388930216
+    },
+    {
+      "count": 64,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 238735.4,
+        "candidate": 125863.95
+      },
+      "change_percent": -47.27889119083303
+    }
+  ],
+  "release_timing_summary": [
+    {
+      "count": 1,
+      "width": 0,
+      "reject": false,
+      "median_ns": {
+        "baseline": 3855.5150000000003,
+        "candidate": 3623.915
+      },
+      "change_percent": -6.006979612321583
+    },
+    {
+      "count": 1,
+      "width": 0,
+      "reject": true,
+      "median_ns": {
+        "baseline": 98.2,
+        "candidate": 41.5
+      },
+      "change_percent": -57.73930753564155
+    },
+    {
+      "count": 1,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 21544.620000000003,
+        "candidate": 19378.265
+      },
+      "change_percent": -10.05520171625215
+    },
+    {
+      "count": 1,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 1545.4,
+        "candidate": 40.75
+      },
+      "change_percent": -97.36314222854925
+    },
+    {
+      "count": 4,
+      "width": 0,
+      "reject": false,
+      "median_ns": {
+        "baseline": 11544.74,
+        "candidate": 10654.83
+      },
+      "change_percent": -7.708358958278838
+    },
+    {
+      "count": 4,
+      "width": 0,
+      "reject": true,
+      "median_ns": {
+        "baseline": 358.7,
+        "candidate": 92.9
+      },
+      "change_percent": -74.10091998884863
+    },
+    {
+      "count": 4,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 82260.33,
+        "candidate": 79541.375
+      },
+      "change_percent": -3.3053052425148333
+    },
+    {
+      "count": 4,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 9282.08,
+        "candidate": 5186.860000000001
+      },
+      "change_percent": -44.11963697791873
+    },
+    {
+      "count": 16,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 318009.1,
+        "candidate": 310007.55
+      },
+      "change_percent": -2.516138689112979
+    },
+    {
+      "count": 16,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 38854.1,
+        "candidate": 19060.05
+      },
+      "change_percent": -50.944559261442166
+    },
+    {
+      "count": 64,
+      "width": 16,
+      "reject": false,
+      "median_ns": {
+        "baseline": 1379999.25,
+        "candidate": 1323161.05
+      },
+      "change_percent": -4.118712383358181
+    },
+    {
+      "count": 64,
+      "width": 16,
+      "reject": true,
+      "median_ns": {
+        "baseline": 253282.4,
+        "candidate": 168828.05
+      },
+      "change_percent": -33.34394730940642
+    }
+  ],
+  "validation": {
+    "records": [
+      {
+        "label": "baseline-with-new-tests",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-compose"
+        ],
+        "exit_code": 0,
+        "expected_test_rejection": false,
+        "log_sha256": "98754bd6f97a0af98b741e5e112b2fecc8e17f01c8869078429f06e886d52358",
+        "source_sha256": "5eca5c18313592c68a1c3da2939db7349594fcc048f10958bc8aba86891ba1e2"
+      },
+      {
+        "label": "unsorted-expected-bindings",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-compose",
+          "--test",
+          "complete_footprint",
+          "reordered_authorization_preserves_inputs_calls_and_owned_witnesses",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "ce1c591b8fd815cde83d4d992c4160aa45ec14d2cd9787be908d796ca567a313",
+        "source_sha256": "9b45fde53a5c3ffca21237f2c0e5b9cf4362607fddface40f287b462c5ea6e4a"
+      },
+      {
+        "label": "one-based-rejection-index",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-compose",
+          "--test",
+          "complete_footprint",
+          "verifier_rejection_preserves_the_canonical_index_and_stops_later_calls",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "bb55491ca08d18fffc2e71e35da73bd97092170377ad2dffa92756de193af102",
+        "source_sha256": "927855f47aae812a5bbedbe7f617461222535a078abaf037b8f273d8a4645a70"
+      },
+      {
+        "label": "skip-later-footprint-evidence",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-compose",
+          "--test",
+          "complete_footprint",
+          "reordered_authorization_preserves_inputs_calls_and_owned_witnesses",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "63e61ebdbf8dc5dda9adb6e49ee61943f716227ab02e6061445d4cea6e9b5091",
+        "source_sha256": "9c110c5f312a31ce6ab35d951f52e66ba2a235b1f2d4cec6dfa8bf5d0d50c6e8"
+      },
+      {
+        "label": "skip-duplicate-authority-check",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-compose",
+          "--test",
+          "complete_footprint",
+          "combined_authorization_defects_keep_the_first_error_before_callbacks",
+          "--",
+          "--exact",
+          "--nocapture"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "db97d89ab4bc23046bff2722b99eada6a97dcf90c10a3cba42b3802d832ce613",
+        "source_sha256": "438d1ebf1c1ba1ac769dafdbd34c516da6386f349ce81f81c3008cb29fc1d668"
+      },
+      {
+        "label": "selected-focused-tests",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-compose",
+          "-p",
+          "zeno-fcis-domain",
+          "-p",
+          "zeno-fcis-composed-program"
+        ],
+        "exit_code": 0,
+        "expected_test_rejection": false,
+        "log_sha256": "27923e149267dbceeb32910b6b3d7c86b59c356f99e3a6cc9b6a6f28c22c36b6",
+        "source_sha256": "723f5aa90329e868eae767c70c22d2c53e6ffdfebdb6f15e93102a970265d44f"
+      }
+    ],
+    "sources_restored": true
+  },
+  "final_checks": [
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "clippy",
+        "--locked",
+        "-p",
+        "zeno-fcis-compose",
+        "-p",
+        "zeno-fcis-domain",
+        "-p",
+        "zeno-fcis-composed-program",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c69f6cc5a85de23600c41ca4d602dcd4594c5e56995af7ea2ea25d1f8dd4c65a"
+    },
+    {
+      "name": "no-std",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "check",
+        "--locked",
+        "-p",
+        "zeno-fcis-compose",
+        "--no-default-features"
+      ],
+      "exit_code": 0,
+      "log_sha256": "7ac75f9f4bb374d7b0cf3b2ea11ddab826ff033b523a1cc51cea0d9a993fe91d"
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "assurance",
+      "command": [
+        "python3",
+        "tools/check_assurance.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "ce6eaf0fac7ecdc1e3b6a5f8f2c1667b6c6280e411ee24fac9b2fa7843c5e4a8"
+    }
+  ],
+  "models": {
+    "fable": {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "fable",
+      "requested_model": "claude-fable-5-1",
+      "assistant_models": [
+        "<synthetic>"
+      ],
+      "exit_code": 1,
+      "subtype": "success",
+      "is_error": true,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 2.601521,
+      "events_sha256": "6899edd004bd97d9a6547b344e01eabcf872bbd18e31b05d88b536f3250f7c3f",
+      "prompt_sha256": "d5a5a2f6db86df24a5a55d20c8b8d4594b1674ac57b39bb62b9d2e304d6eaecb",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    "opus": {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "opus",
+      "requested_model": "claude-opus-5",
+      "assistant_models": [
+        "claude-opus-5"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [
+        "Glob",
+        "Glob",
+        "Read",
+        "Grep",
+        "Read",
+        "Read",
+        "Read",
+        "Read",
+        "Glob",
+        "Glob",
+        "Read",
+        "Edit",
+        "Edit",
+        "Read",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Read",
+        "Read"
+      ],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 492.190592,
+      "events_sha256": "4c74369f05a25ff4dbccb23d407bf54bc76b2a99f06814665d38604f63b5be6a",
+      "prompt_sha256": "b07f8ba0eed1376ec5b71d80b85c57ffc9b0bed6432449986adc2e9b4abed2a7",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    "opus-review": {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "opus-review",
+      "requested_model": "claude-opus-5",
+      "assistant_models": [
+        "claude-opus-5"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 263.096293,
+      "events_sha256": "6b0c7af694e8f4017fe2adca03aef0137ef9bffbbe2bf587c8de03a36c72951d",
+      "prompt_sha256": "824979da726a0dc5ad1066f655823ff273e1aa3049ba4321f73e89dd22d4796e",
+      "authority": "ADVISORY; independent root validation required"
+    }
+  },
+  "root_review_corrections": "Opus release advice incorrectly described detached HEAD, inferred full PR path filters from only the last patch, and presumed that feedback requires prior tagged publication. Root verified the live branch and full diff and did not adopt those conclusions.",
+  "evidence_directory": "/tmp/zenofcis-binding-order-20260912",
+  "resource_limits": "existing pinned toolchains and cached Rust builds; no Lean installation, copy or version change",
+  "claim": "fewer copied binding bytes and allocations for the measured nested shapes; no portable latency, global optimum or release qualification claim"
+}

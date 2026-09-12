@@ -172,6 +172,10 @@ A measured SQLite statement-cache prototype was rejected because schema changes
 altered error details. The new regression checks preserve that counterexample,
 full-history validation and later-row error precedence.
 
+The [parallel authorization sorting review](PARALLEL_AUTHORIZATION_SORTING.md)
+replaces deep-copied expected bindings with a sorted list of references,
+preserving every authority check and callback order.
+
 1. Any future SQLite batching or expected-row reuse must preserve every row
    check and exact first-error detail, including schema failures. The existing
    direct queries remain; checking only touched rows would narrow corruption

@@ -1,5 +1,7 @@
 //! Adversarial laws for complete static footprint authorization.
 
+use std::cell::RefCell;
+
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Hash32};
 use zeno_fcis_compose::{
     AccessPath, ComponentContract, ComponentId, CompositionClaim, CompositionEvidence,
@@ -655,4 +657,275 @@ fn authority_binding_set_cannot_self_validate_a_changed_contract() {
             component: ComponentId::new(1)
         })
     );
+}
+
+/// One recorded call made by `authorize_deterministic_parallel` on the
+/// authority-selected footprint verifier.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FootprintVerifierCall {
+    VerifierHash,
+    Verify(u32),
+}
+
+struct RecordingFootprintVerifier {
+    identity: Hash32,
+    rejected_component: Option<u32>,
+    calls: RefCell<Vec<FootprintVerifierCall>>,
+}
+
+impl RecordingFootprintVerifier {
+    fn accepting() -> Self {
+        Self {
+            identity: hash(44),
+            rejected_component: None,
+            calls: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn rejecting(component: u32) -> Self {
+        Self {
+            identity: hash(44),
+            rejected_component: Some(component),
+            calls: RefCell::new(Vec::new()),
+        }
+    }
+
+    fn calls(&self) -> Vec<FootprintVerifierCall> {
+        self.calls.borrow().clone()
+    }
+}
+
+impl FootprintEvidenceVerifier for RecordingFootprintVerifier {
+    fn verifier_hash(&self) -> Hash32 {
+        self.calls
+            .borrow_mut()
+            .push(FootprintVerifierCall::VerifierHash);
+        self.identity
+    }
+
+    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: Hash32) -> bool {
+        let component = claim.binding().component().get();
+        self.calls
+            .borrow_mut()
+            .push(FootprintVerifierCall::Verify(component));
+        self.rejected_component != Some(component)
+            && claim.commitment::<TestHasher>().ok() == Some(artifact)
+    }
+}
+
+#[test]
+fn reordered_authorization_preserves_inputs_calls_and_owned_witnesses() {
+    let mut canonical_bytes = None;
+    for reverse_bindings in [false, true] {
+        for reverse_evidence in [false, true] {
+            let (spec, evidence, context, mut bindings, mut footprint_items) = parallel_fixture();
+            if reverse_bindings {
+                bindings.reverse();
+            }
+            if reverse_evidence {
+                footprint_items.reverse();
+            }
+            let snapshots = (
+                spec.clone(),
+                evidence.clone(),
+                context.clone(),
+                bindings.clone(),
+            );
+            let mut expected_items = footprint_items.clone();
+            expected_items.sort_by_key(|item| item.claim().binding().component());
+            let verifier = RecordingFootprintVerifier::accepting();
+            let authorization = authorize_deterministic_parallel::<TestHasher, _, _>(
+                &spec,
+                &evidence,
+                &context,
+                &bindings,
+                footprint_items,
+                &ExactCompositionVerifier,
+                &verifier,
+            )
+            .unwrap_or_else(|error| panic!("authorization: {error}"));
+            assert_eq!(
+                (&spec, &evidence, &context, &bindings),
+                (&snapshots.0, &snapshots.1, &snapshots.2, &snapshots.3)
+            );
+            assert_eq!(
+                verifier.calls(),
+                vec![
+                    FootprintVerifierCall::VerifierHash,
+                    FootprintVerifierCall::Verify(1),
+                    FootprintVerifierCall::VerifierHash,
+                    FootprintVerifierCall::Verify(2),
+                ]
+            );
+            assert_eq!(authorization.footprint_witnesses().len(), 2);
+            for (witness, supplied) in authorization
+                .footprint_witnesses()
+                .iter()
+                .zip(&expected_items)
+            {
+                assert_eq!(witness.claim(), supplied.claim());
+                assert_eq!(witness.artifact(), supplied.artifact());
+                assert_eq!(witness.verifier_hash(), supplied.verifier_hash());
+            }
+            let bytes = authorization
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("authorization bytes: {error}"));
+            if let Some(expected) = &canonical_bytes {
+                assert_eq!(&bytes, expected);
+            } else {
+                canonical_bytes = Some(bytes.clone());
+            }
+            drop((spec, evidence, context, bindings, snapshots, expected_items));
+            assert_eq!(
+                authorization
+                    .canonical_bytes()
+                    .unwrap_or_else(|error| panic!("owned authorization bytes: {error}")),
+                bytes
+            );
+        }
+    }
+}
+
+#[test]
+fn combined_authorization_defects_keep_the_first_error_before_callbacks() {
+    let (spec, evidence, context, bindings, footprint_items) = parallel_fixture();
+    // The existing case deliberately supplies component 2 before component 1.
+    let first = &bindings[1];
+    let second = &bindings[0];
+    let first_evidence = &footprint_items[1];
+    let second_evidence = &footprint_items[0];
+    let changed_first = base_binding(1, 88);
+    let stale_first = footprint_evidence(binding(
+        1,
+        11,
+        21,
+        empty_footprint(),
+        PathSet::empty(),
+        30,
+        31,
+        32,
+        99,
+    ));
+    let cases = [
+        (
+            vec![first.clone(), first.clone(), second.clone()],
+            vec![
+                first_evidence.clone(),
+                first_evidence.clone(),
+                second_evidence.clone(),
+            ],
+            ParallelAuthorizationError::AuthorityBindingSetCardinality,
+        ),
+        (
+            vec![first.clone(), first.clone()],
+            vec![first_evidence.clone()],
+            ParallelAuthorizationError::DuplicateAuthorityBinding,
+        ),
+        (
+            bindings.clone(),
+            vec![
+                first_evidence.clone(),
+                first_evidence.clone(),
+                second_evidence.clone(),
+            ],
+            ParallelAuthorizationError::FootprintEvidenceSetCardinality,
+        ),
+        (
+            vec![second.clone(), changed_first.clone()],
+            vec![first_evidence.clone(), first_evidence.clone()],
+            ParallelAuthorizationError::DuplicateFootprintEvidence,
+        ),
+        (
+            vec![second.clone(), changed_first],
+            vec![second_evidence.clone(), stale_first.clone()],
+            ParallelAuthorizationError::AuthorityBindingMismatch {
+                component: ComponentId::new(1),
+            },
+        ),
+        (
+            bindings.clone(),
+            vec![second_evidence.clone(), stale_first],
+            ParallelAuthorizationError::FootprintEvidenceBindingMismatch {
+                component: ComponentId::new(1),
+            },
+        ),
+    ];
+    for (bindings, footprint_items, expected) in cases {
+        let verifier = RecordingFootprintVerifier::rejecting(1);
+        let before = bindings.clone();
+        assert_eq!(
+            authorize_deterministic_parallel::<TestHasher, _, _>(
+                &spec,
+                &evidence,
+                &context,
+                &bindings,
+                footprint_items,
+                &ExactCompositionVerifier,
+                &verifier,
+            ),
+            Err(expected)
+        );
+        assert!(verifier.calls().is_empty());
+        assert_eq!(bindings, before);
+    }
+}
+
+#[test]
+fn verifier_rejection_preserves_the_canonical_index_and_stops_later_calls() {
+    let (spec, evidence, context, bindings, footprint_items) = parallel_fixture();
+    for component in [1, 2] {
+        let verifier = RecordingFootprintVerifier::rejecting(component);
+        assert_eq!(
+            authorize_deterministic_parallel::<TestHasher, _, _>(
+                &spec,
+                &evidence,
+                &context,
+                &bindings,
+                footprint_items.clone(),
+                &ExactCompositionVerifier,
+                &verifier,
+            ),
+            Err(ParallelAuthorizationError::FootprintEvidence {
+                component: ComponentId::new(component),
+                index: component - 1,
+                error: FootprintWitnessError::UnverifiedEvidence,
+            })
+        );
+        let expected_calls = if component == 1 {
+            vec![
+                FootprintVerifierCall::VerifierHash,
+                FootprintVerifierCall::Verify(1),
+            ]
+        } else {
+            vec![
+                FootprintVerifierCall::VerifierHash,
+                FootprintVerifierCall::Verify(1),
+                FootprintVerifierCall::VerifierHash,
+                FootprintVerifierCall::Verify(2),
+            ]
+        };
+        assert_eq!(verifier.calls(), expected_calls);
+    }
+    let verifier = RecordingFootprintVerifier {
+        identity: Hash32::ZERO,
+        rejected_component: None,
+        calls: RefCell::new(Vec::new()),
+    };
+    assert_eq!(
+        authorize_deterministic_parallel::<TestHasher, _, _>(
+            &spec,
+            &evidence,
+            &context,
+            &bindings,
+            footprint_items,
+            &ExactCompositionVerifier,
+            &verifier,
+        ),
+        Err(ParallelAuthorizationError::FootprintEvidence {
+            component: ComponentId::new(1),
+            index: 0,
+            error: FootprintWitnessError::VerifierIdentityMismatch,
+        })
+    );
+    assert_eq!(verifier.calls(), vec![FootprintVerifierCall::VerifierHash]);
 }
