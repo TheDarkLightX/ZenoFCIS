@@ -118,3 +118,18 @@ Raw probes, source copies, model receipts and logs are retained in
 proof or stable V1 release qualification. Lean, locked dependencies, public APIs,
 persistent formats and version `1.0.0-rc.3` remain unchanged. The required
 precommit acceptance run is recorded separately with the final commit.
+
+## Hosted Miri follow-up
+
+The [previous Miri run](https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/34703756250)
+was cancelled at the existing 50-minute job limit. Its log reports no assertion
+failure; it stops in the synthesis choice tests after the first completed case.
+The next test compares all 1,268 assignments against the previous implementation,
+whose repeated value reconstruction is expensive under interpretation.
+
+The job allowance is now 180 minutes. Every package, test, input case, strict
+provenance flag and toolchain pin is unchanged. Opus 5 made the one-line change;
+Codex checked the exact diff. This permits more runner time and does not establish
+that the complete Miri run passes. GitHub's
+[job timeout setting](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes)
+controls cancellation; the fresh hosted result remains a release gate.
