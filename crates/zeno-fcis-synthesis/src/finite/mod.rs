@@ -7,6 +7,9 @@
 pub mod emit;
 mod ir;
 
+#[cfg(test)]
+mod choice_tests;
+
 pub use ir::{Domain, MAX_FIELDS, MAX_NODES, Op, PROFILE, Program};
 
 use crate::{
@@ -190,13 +193,22 @@ impl Sketch {
             .map(|slot| match slot {
                 Slot::Fixed(op) => Ok(op.clone()),
                 Slot::Choice { id, alternatives } => {
+                    let hole_id = HoleId::try_new(*id)?;
                     let value = assignment
-                        .get(HoleId::try_new(*id)?)
+                        .get(hole_id)
                         .ok_or(Error::Invalid("missing-assignment"))?;
-                    alternatives
+                    // Construction gives these alternatives and the hole's values
+                    // the same canonical order. Holes retain node order, so locate
+                    // this hole by its stable ID.
+                    self.holes
                         .iter()
-                        .find(|op| op.value() == *value)
-                        .cloned()
+                        .find(|hole| hole.id() == hole_id)
+                        .and_then(|hole| {
+                            hole.values()
+                                .zip(alternatives.iter())
+                                .find(|(candidate, _)| *candidate == value)
+                        })
+                        .map(|(_, op)| op.clone())
                         .ok_or(Error::Invalid("unknown-assignment"))
                 }
             })

@@ -161,13 +161,15 @@ The [search encoding review](SEARCH_ENCODING_IMPROVEMENTS.md) compares four
 ways to reduce synthesis allocations while preserving complete certificate
 bytes, checker behavior and temporary-buffer lifetimes.
 
+The [finite choice lookup review](FINITE_CHOICE_LOOKUP.md) compares stored-value
+lookup with a hole iterator and binary search. It removes temporary instruction
+values while preserving programs, traces and failure order, with the expected
+checker-source identity refresh recorded separately.
+
 1. Measure SQLite query batching and reuse of expected outbox rows while
    retaining validation of every history and outbox row. Checking only touched
    rows would narrow corruption detection and was rejected.
-2. Measure comparison with stored hole values when constructing a finite
-   synthesis candidate program.
-   Preserve canonical preimages, selection order and independent acceptance.
-3. Revisit namespace grouping for path conflicts when application workloads
+2. Revisit namespace grouping for path conflicts when application workloads
    justify it. A scratch prototype helped large multi-namespace sets but hurt
    tiny and single-namespace sets. A simple merge over full sorted paths is
    incorrect with wildcards, so the existing algorithm remains.

@@ -1,0 +1,627 @@
+{
+  "schema": "zeno-fcis/finite-choice-results/1",
+  "baseline_commit": "ceaf13b23c9bef92bfcc9b7c4bb9f4368e1dca7e",
+  "source_file": "crates/zeno-fcis-synthesis/src/finite/mod.rs",
+  "selected_source_sha256": "7fc6356a94085fdc082f8923ed488b73c0de7c124fc60f205596e810407799dd",
+  "test_source": {
+    "path": "crates/zeno-fcis-synthesis/src/finite/choice_tests.rs",
+    "sha256": "a3198ffd76a8fd0919408066099ca6852a016e72eeb368b54d18770c4fb6fe1f",
+    "new_tests": 4,
+    "baseline_tests_passed": 4,
+    "direct_assignment_comparisons": 1268,
+    "baseline_log_sha256": "9eb479660efd1f328bf7c87be5a9605a812fe445a0c9322e4005435df528f074"
+  },
+  "design_decision": "Use immutable stored values found by stable hole ID. Prefer six added production lines with no new fields, helper, cursor state or encoding path. Retain binary search as a viable measured tradeoff for wide grammars, not as rejected or incorrect code.",
+  "relied_on_invariant": "Sketch alternatives and the corresponding Hole values are privately owned, equally long, and sorted by identical canonical keys; duplicate keys are rejected. Therefore each stored value equals Op::value for the instruction at its position.",
+  "preserved_behavior": [
+    "selected programs and canonical program bytes",
+    "replay cases and first counterexamples",
+    "search traces, selection order and evaluated counts",
+    "missing and unknown assignment errors and first-error order",
+    "all alternative validation and Program::try_new",
+    "independent acceptance claims and graph/search budgets"
+  ],
+  "intentional_identity_change": "The finite checker hashes its actual source. Its identity and the overall certificate commitment change; every other certificate byte is compared unchanged.",
+  "public_interfaces_changed": false,
+  "canonical_formats_changed": false,
+  "dependencies_changed": false,
+  "lean_changed": false,
+  "complexity": {
+    "tool": "Lizard 1.24.0",
+    "scope": "Production mod.rs, excluding the cfg(test) choice_tests declaration; branch points sum CCN minus 1",
+    "variants": {
+      "baseline": {
+        "source_sha256": "42294c31ddb420550aa4105dd127bbc7cb87f65df413642010fee9cea261446b",
+        "production_functions": 23,
+        "production_nloc": 624,
+        "branch_points": 80,
+        "close_ccn": 5,
+        "close_nloc": 25,
+        "source_bytes": 25414
+      },
+      "borrowed": {
+        "source_sha256": "7fc6356a94085fdc082f8923ed488b73c0de7c124fc60f205596e810407799dd",
+        "production_functions": 23,
+        "production_nloc": 630,
+        "branch_points": 80,
+        "close_ccn": 5,
+        "close_nloc": 31,
+        "source_bytes": 25970
+      },
+      "iterator": {
+        "source_sha256": "76f6aaeb417de80cc4d9c87af1b3d73fb22cd16d09d23a398f592dfd9f5afa6e",
+        "production_functions": 23,
+        "production_nloc": 629,
+        "branch_points": 80,
+        "close_ccn": 5,
+        "close_nloc": 30,
+        "source_bytes": 25788
+      },
+      "binary": {
+        "source_sha256": "b2655e8475b80af3f8e7f2db75b11bc0309b6e4e7e476f28acaa94e20ba6ea37",
+        "production_functions": 23,
+        "production_nloc": 632,
+        "branch_points": 83,
+        "close_ccn": 8,
+        "close_nloc": 33,
+        "source_bytes": 26149
+      }
+    }
+  },
+  "behavior_comparison": {
+    "public_cases": 155,
+    "certificate_records": 137,
+    "observations_sha256": "08a2f5767ca99304fb98e047f9faf51fc2496a5bf664637ff90bba3df4dae113",
+    "probe_source_sha256": "e6ec8eaf62e3a0c0a7bcade1205eac44e1b025330d649f1cd50883134bd4647d",
+    "identity_check": "Independently reconstruct and check bytes [160,192) from actual mod.rs and ir.rs source hashes, schema, relation, profile and budget; recompute complete certificate commitment; compare every remaining byte.",
+    "variants": [
+      {
+        "name": "baseline",
+        "source_sha256": "42294c31ddb420550aa4105dd127bbc7cb87f65df413642010fee9cea261446b",
+        "binary_sha256": "e886318d3c10100922d3cb72dfdfd4a7889fecbfea4f074682c1c742cfdc46b1",
+        "raw_certificates_sha256": "4b19625b57f47425bd8ab5cefc93c0a1ff530f8dd4db038411cb068973b2d262",
+        "all_other_observations_equal": true
+      },
+      {
+        "name": "borrowed",
+        "source_sha256": "7fc6356a94085fdc082f8923ed488b73c0de7c124fc60f205596e810407799dd",
+        "binary_sha256": "ec79c0fb43967028f639a37b6bc85ed88fdda8148f6503f01f2216f742c17b97",
+        "raw_certificates_sha256": "523ef56a3560f4ba6bf1f15581fab1fc1d89230e7346c1ce23d7a594135852c2",
+        "all_other_observations_equal": true
+      },
+      {
+        "name": "iterator",
+        "source_sha256": "76f6aaeb417de80cc4d9c87af1b3d73fb22cd16d09d23a398f592dfd9f5afa6e",
+        "binary_sha256": "9c2b34b67ef0fea52eb49bcf72d70c760abd2007c5f11075fe8ec259d56139d9",
+        "raw_certificates_sha256": "18696a7ce99a1ab8a92b3eeff4ec2b49baa93236f47329baba7995c72b6ebd82",
+        "all_other_observations_equal": true
+      },
+      {
+        "name": "binary",
+        "source_sha256": "b2655e8475b80af3f8e7f2db75b11bc0309b6e4e7e476f28acaa94e20ba6ea37",
+        "binary_sha256": "bbbeaf3e096f9df9f26cdd4f74c997959cc32ff6748330ea2217ff2479c3e71e",
+        "raw_certificates_sha256": "59343fee7dddf2a3b1dadddd3c50fd2e74c85cfe9f621cb4a471cd7e2ca06198",
+        "all_other_observations_equal": true
+      }
+    ]
+  },
+  "measurements": {
+    "variant_order": [
+      "baseline",
+      "borrowed",
+      "iterator",
+      "binary"
+    ],
+    "cases": [
+      {
+        "case": "one_choice",
+        "allocation_calls": [
+          110,
+          109,
+          109,
+          112
+        ],
+        "requested_bytes": [
+          7552,
+          7488,
+          7488,
+          7562
+        ],
+        "peak_live_requested_bytes": 2099,
+        "median_nanoseconds": [
+          1436692,
+          1540732,
+          1543233,
+          1553392
+        ]
+      },
+      {
+        "case": "width_16",
+        "allocation_calls": [
+          535,
+          399,
+          399,
+          447
+        ],
+        "requested_bytes": [
+          32466,
+          23762,
+          23762,
+          24946
+        ],
+        "peak_live_requested_bytes": 4364,
+        "median_nanoseconds": [
+          2071343,
+          2025383,
+          2236164,
+          2222694
+        ]
+      },
+      {
+        "case": "width_256",
+        "allocation_calls": [
+          37867,
+          4971,
+          4971,
+          5739
+        ],
+        "requested_bytes": [
+          2408946,
+          303602,
+          303602,
+          322546
+        ],
+        "peak_live_requested_bytes": 55586,
+        "median_nanoseconds": [
+          26531193,
+          15101105,
+          15261095,
+          13172251
+        ]
+      },
+      {
+        "case": "width_1024",
+        "allocation_calls": [
+          544369,
+          19569,
+          19569,
+          22641
+        ],
+        "requested_bytes": [
+          34786290,
+          1199090,
+          1199090,
+          1274866
+        ],
+        "peak_live_requested_bytes": 220706,
+        "median_nanoseconds": [
+          263320675,
+          81950352,
+          79900089,
+          47112126
+        ]
+      },
+      {
+        "case": "three_holes_1000",
+        "allocation_calls": [
+          38728,
+          22228,
+          22228,
+          31228
+        ],
+        "requested_bytes": [
+          2668732,
+          1612732,
+          1612732,
+          1834732
+        ],
+        "peak_live_requested_bytes": 71224,
+        "median_nanoseconds": [
+          60835189,
+          54856309,
+          53518796,
+          56421551
+        ]
+      },
+      {
+        "case": "64_single_choices",
+        "allocation_calls": [
+          807,
+          743,
+          743,
+          935
+        ],
+        "requested_bytes": [
+          116890,
+          112794,
+          112794,
+          117530
+        ],
+        "peak_live_requested_bytes": 39068,
+        "median_nanoseconds": [
+          2593574,
+          2730045,
+          2667225,
+          2775205
+        ]
+      }
+    ],
+    "interleaved_timing_summary": {
+      "baseline": {
+        "one_choice": {
+          "median_ns": 1436692,
+          "min_ns": 1329902,
+          "max_ns": 2149274,
+          "samples": 15
+        },
+        "width_16": {
+          "median_ns": 2071343,
+          "min_ns": 2012844,
+          "max_ns": 2664234,
+          "samples": 15
+        },
+        "width_256": {
+          "median_ns": 26531193,
+          "min_ns": 24281080,
+          "max_ns": 28836926,
+          "samples": 15
+        },
+        "width_1024": {
+          "median_ns": 263320675,
+          "min_ns": 249821365,
+          "max_ns": 281623545,
+          "samples": 15
+        },
+        "three_holes_1000": {
+          "median_ns": 60835189,
+          "min_ns": 57108313,
+          "max_ns": 63860153,
+          "samples": 15
+        },
+        "64_single_choices": {
+          "median_ns": 2593574,
+          "min_ns": 2417664,
+          "max_ns": 2751995,
+          "samples": 15
+        }
+      },
+      "borrowed": {
+        "one_choice": {
+          "median_ns": 1540732,
+          "min_ns": 1400892,
+          "max_ns": 2654954,
+          "samples": 15
+        },
+        "width_16": {
+          "median_ns": 2025383,
+          "min_ns": 1959483,
+          "max_ns": 2279073,
+          "samples": 15
+        },
+        "width_256": {
+          "median_ns": 15101105,
+          "min_ns": 13815782,
+          "max_ns": 15709705,
+          "samples": 15
+        },
+        "width_1024": {
+          "median_ns": 81950352,
+          "min_ns": 78039467,
+          "max_ns": 84833328,
+          "samples": 15
+        },
+        "three_holes_1000": {
+          "median_ns": 54856309,
+          "min_ns": 52246494,
+          "max_ns": 57104423,
+          "samples": 15
+        },
+        "64_single_choices": {
+          "median_ns": 2730045,
+          "min_ns": 2608774,
+          "max_ns": 2941215,
+          "samples": 15
+        }
+      },
+      "iterator": {
+        "one_choice": {
+          "median_ns": 1543233,
+          "min_ns": 1380303,
+          "max_ns": 2694124,
+          "samples": 15
+        },
+        "width_16": {
+          "median_ns": 2236164,
+          "min_ns": 2043464,
+          "max_ns": 2284553,
+          "samples": 15
+        },
+        "width_256": {
+          "median_ns": 15261095,
+          "min_ns": 13316462,
+          "max_ns": 16713007,
+          "samples": 15
+        },
+        "width_1024": {
+          "median_ns": 79900089,
+          "min_ns": 75871443,
+          "max_ns": 108590567,
+          "samples": 15
+        },
+        "three_holes_1000": {
+          "median_ns": 53518796,
+          "min_ns": 52640485,
+          "max_ns": 55670601,
+          "samples": 15
+        },
+        "64_single_choices": {
+          "median_ns": 2667225,
+          "min_ns": 2377594,
+          "max_ns": 2739084,
+          "samples": 15
+        }
+      },
+      "binary": {
+        "one_choice": {
+          "median_ns": 1553392,
+          "min_ns": 1390802,
+          "max_ns": 2784684,
+          "samples": 15
+        },
+        "width_16": {
+          "median_ns": 2222694,
+          "min_ns": 1980763,
+          "max_ns": 2287634,
+          "samples": 15
+        },
+        "width_256": {
+          "median_ns": 13172251,
+          "min_ns": 12229310,
+          "max_ns": 13857212,
+          "samples": 15
+        },
+        "width_1024": {
+          "median_ns": 47112126,
+          "min_ns": 45394574,
+          "max_ns": 49415530,
+          "samples": 15
+        },
+        "three_holes_1000": {
+          "median_ns": 56421551,
+          "min_ns": 53410037,
+          "max_ns": 58733425,
+          "samples": 15
+        },
+        "64_single_choices": {
+          "median_ns": 2775205,
+          "min_ns": 2416414,
+          "max_ns": 3206376,
+          "samples": 15
+        }
+      }
+    },
+    "full_timing_log_sha256": "c7cde5dc3ccaa5083b7cfcd7547a64428f046c0fa055079b609cdbb156a40f4e",
+    "profile": "Rust 1.97.1 library dev build, debug=0, incremental=0; external probe opt-level=2. Full synthesis includes implementation source hashing.",
+    "scope": "Prebuilt contracts and sketches excluded; complete synthesize calls counted. Calls include allocations and reallocations. Peak sums live requested Layout sizes, excluding allocator overhead, internal realloc behavior and prebuilt values; not RSS.",
+    "timing_limit": "Three interleaved rounds, reversed middle order, 15 timing samples per variant and workload. Two tiny selected cases are slower in this run. Local development-profile observations, not performance guarantees."
+  },
+  "validation": {
+    "synthesis_tests_passed": 28,
+    "mutations": {
+      "mutations": [
+        {
+          "mutation": "reverse_alternative_alignment",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test finite::choice_tests::bad_assignments_keep_the_first_error_and_extra_ids_are_ignored ... FAILED",
+            "test finite::choice_tests::closing_every_choice_matches_the_previous_value_comparison ... FAILED"
+          ],
+          "source_sha256": "68a20b4bad98944328944a876a86843ab16900e8406e13a4a7a89ea4544c5440",
+          "log_sha256": "e77ca74e716c2f4a8d3bd6176e5e0fa2c65fed22f1e2a422fc2bc95da56706d0"
+        },
+        {
+          "mutation": "use_first_hole_instead_of_id",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test finite::choice_tests::bad_assignments_keep_the_first_error_and_extra_ids_are_ignored ... FAILED",
+            "test finite::choice_tests::closing_every_choice_matches_the_previous_value_comparison ... FAILED"
+          ],
+          "source_sha256": "e5fb2dc9906eee48e04b59996628eebdb1778fda2873b0877f6bf23b12578477",
+          "log_sha256": "de508b76aed6e805c350aebb0e4907198ca97bdc082aa101568d7987aa199f7c"
+        },
+        {
+          "mutation": "return_first_alternative",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test finite::choice_tests::bad_assignments_keep_the_first_error_and_extra_ids_are_ignored ... FAILED",
+            "test finite::choice_tests::closing_every_choice_matches_the_previous_value_comparison ... FAILED"
+          ],
+          "source_sha256": "81de54986ea28ff5bb76a708a97c5c11ed3dcf7337fae331512008b617066158",
+          "log_sha256": "dabfec7ffb338e66adae8f7af06e7f3b63bbe03fd3353457a785091f8b90c5fd"
+        },
+        {
+          "mutation": "change_missing_assignment_error",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test finite::choice_tests::bad_assignments_keep_the_first_error_and_extra_ids_are_ignored ... FAILED"
+          ],
+          "source_sha256": "42847ae13b30b82c5f6085c3f209292be874c9c2d972b1ffeedb1e4b5143dd84",
+          "log_sha256": "12f60d443d0e839c46d96ddfd576f3905f920ef3fc1a49dc10f332b8740b99ef"
+        },
+        {
+          "mutation": "wrong_checker_source",
+          "compiled": true,
+          "rejected_by_independent_identity_check": true,
+          "source_sha256": "f37f3991d64aef2486b5ee26aa3d3bc5b4f8d66d81e8b56d4fc317be79d9d213",
+          "log_sha256": "26580c80aa29547c8bbe09fc5f16975053e16d17bc0a6d0357e6935c41ea45cb"
+        }
+      ],
+      "restored_source_sha256": "7fc6356a94085fdc082f8923ed488b73c0de7c124fc60f205596e810407799dd"
+    },
+    "checks": [
+      {
+        "check": "final-tests",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-synthesis"
+        ],
+        "exit_code": 0,
+        "log_sha256": "7e7a434bbc2e3da46b99ea76b973ef5e92cb97eeeb4b56e60bd0b8fc84a6da49"
+      },
+      {
+        "check": "final-format",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "check": "final-clippy",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "clippy",
+          "--locked",
+          "-p",
+          "zeno-fcis-synthesis",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "log_sha256": "91f41159908d865b442ac0ddc8c008ade471353d1b98df9d163eeac8edeb52cd"
+      },
+      {
+        "check": "final-no-std",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "check",
+          "--locked",
+          "-p",
+          "zeno-fcis-synthesis",
+          "--no-default-features"
+        ],
+        "exit_code": 0,
+        "log_sha256": "5ef0300052b1b4356018f8242015b10457ccb810d612e861583ca81bd7eb89aa"
+      },
+      {
+        "command": [
+          "python3",
+          "tools/check_assurance.py",
+          "--self-test"
+        ],
+        "exit_code": 0,
+        "log_sha256": "fd63ed6d08a46176c12c909fb0cc65894d3992c85aa6bec50c940f64240a9e22"
+      }
+    ],
+    "required_final_gate": "python3 tools/atdd.py run --all immediately before committing; result retained separately with the commit"
+  },
+  "starter_refresh": {
+    "changed_manifest_fields": [
+      "certificate"
+    ],
+    "previous_certificate": "85a5720338505e48a3403a6b2461044901b409c0d8536da78023d2b8d733fa7b",
+    "current_certificate": "58328664a463f604b6b51366607c4c60180a2d3a5f2ed54fff1bf8e0bb477db7",
+    "unchanged_files": [
+      {
+        "path": "problem.json",
+        "sha256": "86f4bf4f3361cf3fec0a657c9eb63e4ee37b4e0cb860584a91dbe6f5034b5aca"
+      },
+      {
+        "path": "program.zcve",
+        "sha256": "b01007b058bf8f270dff2cd39ab97e43b8f09f96aae71d34d34d33b2c4498e28"
+      },
+      {
+        "path": "transition.rs",
+        "sha256": "8e22132f1cd6aaeff0c77b7c4fc32d85f51e965a2ddcc49bb4fb4470be452cdd"
+      },
+      {
+        "path": "vectors.json",
+        "sha256": "914252568ea2ef175f6310d1d9ee28465d39c7169348b21738e3bb85b0dc4457"
+      }
+    ]
+  },
+  "advisory_models": [
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "fable",
+      "requested_model": "claude-fable-5-1",
+      "assistant_models": [
+        "claude-fable-5-1"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 229.442392,
+      "events_sha256": "1d594125fd4dd599762f76e9fab3f88bd5fff946f32e7f3f621ab8e8167dc519",
+      "prompt_sha256": "d77f974444632ae4200b9988e73284b4b1d6c7bc2c0278c5459d2b1b900927ef",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "fable-comparison",
+      "requested_model": "claude-fable-5-1",
+      "assistant_models": [
+        "claude-fable-5-1"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 212.615615,
+      "events_sha256": "4823a65bfd433198610597fbfb7fcc4618b4145e7b6bda408cae90d41ff34163",
+      "prompt_sha256": "b180421d237e0ab4bed26c3325e75668d32f34fcf58ec108c46c4ddfa6f5fb39",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "opus",
+      "requested_model": "claude-opus-5",
+      "assistant_models": [
+        "claude-opus-5"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [
+        "Read",
+        "Grep",
+        "Grep",
+        "Edit",
+        "Grep",
+        "Grep",
+        "Edit",
+        "Read"
+      ],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 78.514162,
+      "events_sha256": "e630e6d79aa46ee0d8469d16dd4f50972dac3ffe3349d39d2641224cee315112",
+      "prompt_sha256": "9d6fa70ef6a2148d4cd5c198c457d45125ab7938ba4017d0f472c37afb1ba997",
+      "authority": "ADVISORY; independent root validation required"
+    }
+  ],
+  "local_evidence_directory": "/tmp/zenofcis-finite-choices-20260912",
+  "claim_limit": "Bounded execution and allocation comparisons. No general equivalence theorem, unique optimality, portable benchmark, stable V1 release or production-readiness claim."
+}
