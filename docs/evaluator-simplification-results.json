@@ -1,0 +1,419 @@
+{
+  "schema": "zeno-fcis/evaluator-simplification-results/1",
+  "baseline_commit": "e70f1735cb025fdc1084b4f27258d0200e057308",
+  "baseline_hosted_checks": {
+    "total": 44,
+    "success": 44,
+    "pending": 0
+  },
+  "production_file": "crates/zeno-fcis-spec/src/logic.rs",
+  "baseline_committed_source_sha256": "9e797aa0dbdac75b777dddad4ded7c91a04d95d7cdd6e78daf5fd425c658067f",
+  "candidate_source_sha256": "652dbf943e7402139ef7c1d30105bb5b001843e5f99d648964002043c588efe8",
+  "test_source": {
+    "path": "crates/zeno-fcis-spec/tests/logic/evaluation_tests.rs",
+    "sha256": "8e7f2a4b38e795997fc2a91e9ae755c0ddbd1b0827ed584325b2a6c5bf7ef81a",
+    "new_tests": 7
+  },
+  "preserved_behavior": [
+    "ordered name lookup and shadowing",
+    "restoration of enclosing bindings on success and error",
+    "checked arithmetic and first error",
+    "range semantics and early quantifier exits",
+    "eager Boolean and scalar operand order",
+    "predicate names, argument values and call order",
+    "all evaluator fuel charges and limits",
+    "finite temporal results, failure positions and proof-obligation mode"
+  ],
+  "design_tradeoff": "Scalar evaluation uses the existing mutable variable stack instead of an immutable copied slice; every sum must restore the stack before returning a result or error.",
+  "public_interfaces_changed": false,
+  "canonical_formats_changed": false,
+  "dependencies_changed": false,
+  "lean_changed": false,
+  "complexity": {
+    "baseline": {
+      "production_sha256": "4f92503322348eb8f104c6940b133f40ab7713987afac9bb62f8b528b6d14176",
+      "functions": 31,
+      "branch_points": 103,
+      "nloc": 539,
+      "affected": {
+        "eval_rel": {
+          "ccn": 30,
+          "nloc": 86
+        },
+        "eval_value": {
+          "ccn": 16,
+          "nloc": 52
+        }
+      }
+    },
+    "candidate": {
+      "production_sha256": "1206990c19ea29bc6f515126ba462e64bec34dad4d75e6425179bdb45f660139",
+      "functions": 31,
+      "branch_points": 103,
+      "nloc": 538,
+      "affected": {
+        "eval_rel": {
+          "ccn": 30,
+          "nloc": 86
+        },
+        "eval_value": {
+          "ccn": 16,
+          "nloc": 51
+        }
+      }
+    }
+  },
+  "behavior_comparison": {
+    "counts": {
+      "formulas": 4250,
+      "relational_observations": 374000,
+      "temporal_observations": 213840,
+      "total": 587840
+    },
+    "exact_output_match": true,
+    "observations_sha256": "d86a3c45b7675d6f737e351972467e27e8935a8ce17d78a07c48d9e9e8817581",
+    "baseline_probe": {
+      "label": "baseline",
+      "production_sha256": "0a6317094f9438ee547517a37b42ca66c9d12354cc378281ef1074e5cb5396e5",
+      "probe_source_sha256": "e4b0beb4c0555026fc36e169cae24f4a1cfb6945921fff9a12312aecfde12716",
+      "probe_binary_sha256": "b4e8edeca1b31d3124d1d5debf34f74ffa49beded8664275fd0df6ae44a80dba",
+      "observations_sha256": "d86a3c45b7675d6f737e351972467e27e8935a8ce17d78a07c48d9e9e8817581",
+      "counts": {
+        "formulas": 4250,
+        "relational_observations": 374000,
+        "temporal_observations": 213840,
+        "total": 587840
+      },
+      "allocations": [
+        {
+          "case": "simple_quantifier",
+          "outcome": "True",
+          "allocation_calls": 1004,
+          "requested_bytes": 1320
+        },
+        {
+          "case": "nested_sums",
+          "outcome": "True",
+          "allocation_calls": 50404,
+          "requested_bytes": 1016520
+        },
+        {
+          "case": "scalar",
+          "outcome": "True",
+          "allocation_calls": 3,
+          "requested_bytes": 192
+        }
+      ],
+      "build_profile": "dev, debug=0; external probe opt-level=2",
+      "authority": "bounded execution comparison, not a general proof"
+    },
+    "candidate_probe": {
+      "label": "candidate-final",
+      "production_sha256": "652dbf943e7402139ef7c1d30105bb5b001843e5f99d648964002043c588efe8",
+      "probe_source_sha256": "e4b0beb4c0555026fc36e169cae24f4a1cfb6945921fff9a12312aecfde12716",
+      "probe_binary_sha256": "aeffcc6c05c836c5a2c9354a58bfa3f0ca991107ac1a515913b1c1a3df3f6592",
+      "observations_sha256": "d86a3c45b7675d6f737e351972467e27e8935a8ce17d78a07c48d9e9e8817581",
+      "counts": {
+        "formulas": 4250,
+        "relational_observations": 374000,
+        "temporal_observations": 213840,
+        "total": 587840
+      },
+      "allocations": [
+        {
+          "case": "simple_quantifier",
+          "outcome": "True",
+          "allocation_calls": 4,
+          "requested_bytes": 320
+        },
+        {
+          "case": "nested_sums",
+          "outcome": "True",
+          "allocation_calls": 4,
+          "requested_bytes": 320
+        },
+        {
+          "case": "scalar",
+          "outcome": "True",
+          "allocation_calls": 3,
+          "requested_bytes": 192
+        }
+      ],
+      "build_profile": "dev, debug=0; external probe opt-level=2",
+      "authority": "bounded execution comparison, not a general proof"
+    },
+    "scope": "Deterministic bounded corpus; includes exact outcomes and ordered predicate-call arguments. Not a general equivalence proof."
+  },
+  "allocation_comparison": {
+    "cases": [
+      {
+        "case": "simple_quantifier",
+        "before": {
+          "case": "simple_quantifier",
+          "outcome": "True",
+          "allocation_calls": 1004,
+          "requested_bytes": 1320
+        },
+        "after": {
+          "case": "simple_quantifier",
+          "outcome": "True",
+          "allocation_calls": 4,
+          "requested_bytes": 320
+        }
+      },
+      {
+        "case": "nested_sums",
+        "before": {
+          "case": "nested_sums",
+          "outcome": "True",
+          "allocation_calls": 50404,
+          "requested_bytes": 1016520
+        },
+        "after": {
+          "case": "nested_sums",
+          "outcome": "True",
+          "allocation_calls": 4,
+          "requested_bytes": 320
+        }
+      },
+      {
+        "case": "scalar",
+        "before": {
+          "case": "scalar",
+          "outcome": "True",
+          "allocation_calls": 3,
+          "requested_bytes": 192
+        },
+        "after": {
+          "case": "scalar",
+          "outcome": "True",
+          "allocation_calls": 3,
+          "requested_bytes": 192
+        }
+      }
+    ],
+    "meaning": "Allocator allocation/reallocation calls and cumulative requested bytes during one public evaluation; excludes input construction; not timing or peak memory.",
+    "build_profile": "dev, debug=0; external probe opt-level=2"
+  },
+  "mutation_checks": {
+    "mutations": [
+      {
+        "mutation": "lookup_outer_name_first",
+        "compiled": true,
+        "rejected_by_tests": true,
+        "exit_code": 101,
+        "failures": [
+          "test logic::evaluation_tests::nested_quantifiers_restore_bindings_after_early_success ... FAILED",
+          "test logic::evaluation_tests::nested_sums_restore_each_outer_binding_and_argument_order ... FAILED"
+        ],
+        "source_sha256": "5d36a3814adca0d33b7bd6370328374d8642e24fb61b0f89cb4c9b8574b80f5b"
+      },
+      {
+        "mutation": "skip_sum_iteration_budget",
+        "compiled": true,
+        "rejected_by_tests": true,
+        "exit_code": 101,
+        "failures": [
+          "test logic::evaluation_tests::eager_boolean_evaluation_and_predicate_failure_order_are_preserved ... FAILED",
+          "test logic::evaluation_tests::quantifier_and_sum_bindings_are_removed_on_every_failure_path ... FAILED",
+          "test logic::evaluation_tests::scalar_operands_keep_the_first_error_inside_nested_sums ... FAILED"
+        ],
+        "source_sha256": "cd78bb7f5dfea200c5d48e570dea7e86d400801e2465ba416976b81e77f47055"
+      },
+      {
+        "mutation": "propagate_sum_error_before_pop",
+        "compiled": true,
+        "rejected_by_tests": true,
+        "exit_code": 101,
+        "failures": [
+          "test logic::evaluation_tests::eager_boolean_evaluation_and_predicate_failure_order_are_preserved ... FAILED",
+          "test logic::evaluation_tests::quantifier_and_sum_bindings_are_removed_on_every_failure_path ... FAILED",
+          "test logic::evaluation_tests::scalar_operands_keep_the_first_error_inside_nested_sums ... FAILED"
+        ],
+        "source_sha256": "78829b518ce1dbed6d273c8b8971e1488bf204d6b7e1d201d19dbf0cc5e966af"
+      },
+      {
+        "mutation": "short_circuit_relational_and",
+        "compiled": true,
+        "rejected_by_tests": true,
+        "exit_code": 101,
+        "failures": [
+          "test logic::evaluation_tests::eager_boolean_evaluation_and_predicate_failure_order_are_preserved ... FAILED"
+        ],
+        "source_sha256": "0321882c6813194b96fc5bb049ff8fd5e99c64dda6f83378e18a675b7d8b544a"
+      }
+    ],
+    "restored_source_sha256": "652dbf943e7402139ef7c1d30105bb5b001843e5f99d648964002043c588efe8"
+  },
+  "focused_validation": {
+    "source_sha256": "652dbf943e7402139ef7c1d30105bb5b001843e5f99d648964002043c588efe8",
+    "regression_tests_sha256": "8e7f2a4b38e795997fc2a91e9ae755c0ddbd1b0827ed584325b2a6c5bf7ef81a",
+    "checks": [
+      {
+        "check": "relocated-baseline-tests",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-spec"
+        ],
+        "log_sha256": "261088cf1c7c8c961578e17bedd17a5d1861075d31129819cc5506f4cfb43b49"
+      },
+      {
+        "check": "final-candidate-tests",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-spec"
+        ],
+        "log_sha256": "2b56071e120115a1657e4ab490bb7a1b92434143aa11abb356d0aeef0babc419"
+      },
+      {
+        "check": "final-mutations",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "/tmp/zenofcis-evaluator-20260912/check_mutations.py"
+        ],
+        "log_sha256": "84b5b8250dcb0bd0e1aead96526234ad434a8220ecac01f6dda4909863637e5d"
+      },
+      {
+        "check": "final-format",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "check": "final-clippy",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "clippy",
+          "--locked",
+          "-p",
+          "zeno-fcis-spec",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "log_sha256": "8638019dcd84a5512a90d924804812c3d3f13c01cfc3c4771202b9f872117dcc"
+      },
+      {
+        "check": "final-no-std",
+        "exit_code": 0,
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "check",
+          "--locked",
+          "-p",
+          "zeno-fcis-spec",
+          "--no-default-features"
+        ],
+        "log_sha256": "f869f65c113859f932cefc9ca40d46822deca1dbc18609b3e3e9f42181899eca"
+      },
+      {
+        "check": "final-assurance",
+        "exit_code": 0,
+        "command": [
+          "python3",
+          "tools/check_assurance.py",
+          "--self-test"
+        ],
+        "log_sha256": "fd63ed6d08a46176c12c909fb0cc65894d3992c85aa6bec50c940f64240a9e22"
+      }
+    ]
+  },
+  "model_reviews": {
+    "fable": {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "fable-review",
+      "requested_model": "claude-fable-5-1",
+      "assistant_models": [
+        "claude-fable-5-1"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 337.733521,
+      "events_sha256": "8422272edfc7446c6044180acbb3626dcd904185a3ba08e9d770048fb89ee29e",
+      "prompt_sha256": "b70f67ccb2d18858bf2900796d1a1002e661d90e54b20d975754be6392c398c3",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    "opus": {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "opus",
+      "requested_model": "claude-opus-5",
+      "assistant_models": [
+        "claude-opus-5"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [
+        "Read",
+        "Glob",
+        "Read",
+        "Read",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Read",
+        "Grep",
+        "Glob"
+      ],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 101.417596,
+      "events_sha256": "2f25b1ca0345fc858adaa56f611fa3dd2363db73400681beca699c447c723f81",
+      "prompt_sha256": "3ee5abfe5ecce8338f22a919562893f80ad0d50599e8d7e7bb5ae9274c180a5a",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    "integration_and_acceptance": "Independent root review and execution; model output is advisory.",
+    "initial_fable_attempt": "Completed with only a proposed command; excluded as a design review. A subsequent source-only request produced the reviewed recommendation."
+  },
+  "local_evidence_directory": "/tmp/zenofcis-evaluator-20260912",
+  "local_probe_sources": [
+    {
+      "file": "probe.rs",
+      "sha256": "e4b0beb4c0555026fc36e169cae24f4a1cfb6945921fff9a12312aecfde12716"
+    },
+    {
+      "file": "run_probe.py",
+      "sha256": "b554aa1d6e3d71203ba5146acc4f3e395869cb378f253fc9501bfd2f2abde17f"
+    },
+    {
+      "file": "check_mutations.py",
+      "sha256": "0b20876d779d74a949781ef3108a9c19adf7efd582d560be5ff5c437bf937f5b"
+    },
+    {
+      "file": "validate_layout.py",
+      "sha256": "2e6ca6aa13b38cadea40e83b0c41525f60d25ed485c0066c16bd7f8ffd7ea566"
+    }
+  ],
+  "precommit_gate": {
+    "command": "python3 tools/atdd.py run --all",
+    "result_location": "Local atdd-precommit.log and precommit-validation.json recorded immediately before the commit. Not predicted by this document."
+  },
+  "release_status": "RC3; this evidence is not stable-V1 or independent release approval."
+}

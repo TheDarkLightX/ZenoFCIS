@@ -335,11 +335,11 @@ fn operation_bound(limits: EvalLimits) -> usize {
     usize::try_from(limits.max_operations()).unwrap_or(usize::MAX)
 }
 
-fn eval_rel<P: PredicateProvider + ?Sized>(
-    formula: &RelExpr,
+fn eval_rel<'formula, P: PredicateProvider + ?Sized>(
+    formula: &'formula RelExpr,
     step: &TraceStep,
     predicates: &P,
-    variables: &mut Vec<(Identifier, i128)>,
+    variables: &mut Vec<(&'formula Identifier, i128)>,
     fuel: &mut Fuel,
 ) -> Result<bool, IndeterminateReason> {
     fuel.operation()?;
@@ -392,7 +392,7 @@ fn eval_rel<P: PredicateProvider + ?Sized>(
             validate_range(*start, *end)?;
             for value in *start..*end {
                 fuel.quantifier()?;
-                variables.push((variable.clone(), value));
+                variables.push((variable, value));
                 let result = eval_rel(body, step, predicates, variables, fuel);
                 variables.pop();
                 if !result? {
@@ -410,7 +410,7 @@ fn eval_rel<P: PredicateProvider + ?Sized>(
             validate_range(*start, *end)?;
             for value in *start..*end {
                 fuel.quantifier()?;
-                variables.push((variable.clone(), value));
+                variables.push((variable, value));
                 let result = eval_rel(body, step, predicates, variables, fuel);
                 variables.pop();
                 if result? {
@@ -422,10 +422,10 @@ fn eval_rel<P: PredicateProvider + ?Sized>(
     }
 }
 
-fn eval_value(
-    value: &ValueExpr,
+fn eval_value<'formula>(
+    value: &'formula ValueExpr,
     step: &TraceStep,
-    variables: &[(Identifier, i128)],
+    variables: &mut Vec<(&'formula Identifier, i128)>,
     fuel: &mut Fuel,
 ) -> Result<i128, IndeterminateReason> {
     fuel.operation()?;
@@ -434,7 +434,7 @@ fn eval_value(
         ValueExpr::Var(name) => variables
             .iter()
             .rev()
-            .find(|(candidate, _)| candidate == name)
+            .find(|(candidate, _)| *candidate == name)
             .map(|(_, value)| *value)
             .ok_or(IndeterminateReason::MissingProjection),
         ValueExpr::Projection(path) => step.get(path).ok_or(IndeterminateReason::MissingProjection),
@@ -460,14 +460,13 @@ fn eval_value(
         } => {
             validate_range(*start, *end)?;
             let mut total = 0i128;
-            let mut owned = variables.to_vec();
             for current in *start..*end {
                 fuel.quantifier()?;
-                owned.push((variable.clone(), current));
-                let addend = eval_value(body, step, &owned, fuel)?;
-                owned.pop();
+                variables.push((variable, current));
+                let addend = eval_value(body, step, variables, fuel);
+                variables.pop();
                 total = total
-                    .checked_add(addend)
+                    .checked_add(addend?)
                     .ok_or(IndeterminateReason::Overflow)?;
             }
             Ok(total)
@@ -585,6 +584,10 @@ fn first_failure<P: PredicateProvider + ?Sized>(
     }
     0
 }
+
+#[cfg(test)]
+#[path = "../tests/logic/evaluation_tests.rs"]
+mod evaluation_tests;
 
 #[cfg(test)]
 mod tests {
