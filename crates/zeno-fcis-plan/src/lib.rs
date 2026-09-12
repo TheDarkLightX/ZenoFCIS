@@ -217,7 +217,7 @@ impl OutboxEntry {
     ) -> Result<Hash32, EncodeError> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(candidate_id.as_bytes());
-        bytes.extend_from_slice(&self.canonical_bytes()?);
+        self.encode_to(&mut bytes)?;
         let domain = Domain::new("zeno-fcis/delivery", 1)?;
         commitment::<H>(domain, &bytes)
     }
@@ -700,6 +700,72 @@ mod tests {
             bytes.extend_from_slice(encoded);
         }
         bytes
+    }
+
+    #[test]
+    fn delivery_id_preserves_recorded_hash_input() {
+        struct RecordedHasher;
+        impl CommitmentHasher for RecordedHasher {
+            const ALGORITHM_ID: &'static str = "test/recorded-delivery-input";
+
+            fn hash(bytes: &[u8]) -> Hash32 {
+                // Captured before direct encoding; this provider checks the
+                // complete framing before returning its recorded SHA-256.
+                assert_eq!(
+                    bytes,
+                    &[
+                        90, 69, 78, 79, 70, 67, 73, 83, 45, 72, 65, 83, 72, 0, 0, 1, 0, 18, 122,
+                        101, 110, 111, 45, 102, 99, 105, 115, 47, 100, 101, 108, 105, 118, 101,
+                        114, 121, 0, 0, 0, 0, 0, 0, 0, 50, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+                        42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+                        42, 42, 42, 0, 0, 0, 7, 0, 0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 1, 2
+                    ]
+                );
+                Hash32::new([
+                    27, 179, 49, 243, 149, 88, 107, 201, 76, 187, 167, 125, 203, 69, 244, 66, 120,
+                    103, 204, 225, 190, 180, 75, 246, 61, 166, 77, 125, 88, 30, 4, 172,
+                ])
+            }
+        }
+        let entry = OutboxEntry::new(7, 20, Value::Unit, Value::Bool(true));
+        assert_eq!(
+            entry.delivery_id::<RecordedHasher>(Hash32::new([42; 32])),
+            Ok(Hash32::new([
+                27, 179, 49, 243, 149, 88, 107, 201, 76, 187, 167, 125, 203, 69, 244, 66, 120, 103,
+                204, 225, 190, 180, 75, 246, 61, 166, 77, 125, 88, 30, 4, 172
+            ]))
+        );
+    }
+
+    #[test]
+    fn invalid_delivery_values_preserve_error_order_without_hashing() {
+        struct RejectHashing;
+        impl CommitmentHasher for RejectHashing {
+            const ALGORITHM_ID: &'static str = "test/no-hash-on-invalid-delivery";
+
+            fn hash(_: &[u8]) -> Hash32 {
+                panic!("invalid delivery must not reach the hash provider")
+            }
+        }
+        let text = Value::Text(alloc::string::String::from("é").into_boxed_str());
+        let record = Value::Record(
+            vec![
+                zeno_fcis_value::Field::new(1, Value::Unit),
+                zeno_fcis_value::Field::new(1, Value::Unit),
+            ]
+            .into_boxed_slice(),
+        );
+        let cases = [
+            (text.clone(), record.clone(), EncodeError::NonAsciiText),
+            (record, text.clone(), EncodeError::NonCanonicalRecord),
+            (Value::Unit, text, EncodeError::NonAsciiText),
+        ];
+        for (destination, payload, error) in cases {
+            let entry = OutboxEntry::new(u32::MAX, u32::MAX, destination, payload);
+            let before = entry.clone();
+            assert_eq!(entry.delivery_id::<RejectHashing>(Hash32::ZERO), Err(error));
+            assert_eq!(entry, before);
+        }
     }
 
     #[test]
