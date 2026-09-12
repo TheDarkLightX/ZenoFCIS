@@ -1,0 +1,586 @@
+{
+  "schema": "zeno-fcis/search-encoding-results/1",
+  "baseline_commit": "be2f246f87a34444819311b9215d1154ffe85bac",
+  "source_file": "crates/zeno-fcis-synthesis/src/lib.rs",
+  "baseline_source_sha256": "d6fbfec7cd9a8ea50143660233efa534fffb6109c926bb45bf7fe5172eed8402",
+  "selected_source_sha256": "c736f5f22935ad2e107efed8851b0c296cd34607757bf66f98b388898b77dec4",
+  "test_source": {
+    "path": "crates/zeno-fcis-synthesis/tests/search.rs",
+    "sha256": "cf7ed7fed42dfecd026ff4cf037c171037491d0632f65ff0b8c8f0a2a58215d5",
+    "new_public_tests": 3,
+    "new_private_oracle_tests": 1
+  },
+  "preserved_behavior": [
+    "canonical assignment order and complete bytes",
+    "complete certificate and trace bytes",
+    "checker identity and exact call sequence",
+    "both independent acceptance claims",
+    "first error and stop position",
+    "problem admission and complete-search budgets",
+    "baseline temporary encoding-buffer lifetime"
+  ],
+  "design_tradeoff": "One private encoder uses immutable, constructor-derived candidate bytes; tests must keep its hash equal to the unchanged public Assignment encoder. A per-call buffer avoids extra state and memory retention during external checker execution, at the cost of more allocations than a reusable buffer.",
+  "additional_polish": "Removed two repeated identical std feature guards; their conjunction equals the remaining guard. Default-feature tests and the no-default-feature check pass.",
+  "public_interfaces_changed": false,
+  "canonical_formats_changed": false,
+  "dependencies_changed": false,
+  "lean_changed": false,
+  "complexity": {
+    "tool": "Lizard 1.24.0",
+    "scope": "lib.rs before the cfg(test) module; nloc is the complete production section, function_nloc is the sum within functions; branch_points sums CCN minus 1",
+    "variants": {
+      "baseline": {
+        "production_sha256": "168f762643056a4778bd1f106f2878ec1a11c061b1287bbe62e1d06a62c2b3f6",
+        "functions": 33,
+        "branch_points": 48,
+        "nloc": 518,
+        "function_nloc": 374,
+        "search_ccn": 11
+      },
+      "trace-only": {
+        "production_sha256": "501e23c6a003148fce91cad6c12bb8d96504f2de499b6654580db8462980c0d8",
+        "functions": 33,
+        "branch_points": 48,
+        "nloc": 518,
+        "function_nloc": 374,
+        "search_ccn": 11
+      },
+      "encoder-reuse": {
+        "production_sha256": "4d195071bdcb05b9f533024ba82385df5b3a5085236149673e1aab2746d040de",
+        "functions": 33,
+        "branch_points": 49,
+        "nloc": 521,
+        "function_nloc": 377,
+        "search_ccn": 12
+      },
+      "cached-reuse": {
+        "production_sha256": "3a9bfe7c7538993fce023ed13f8bb8962da9e3d6adc8d6a194492fb03e9b21e3",
+        "functions": 34,
+        "branch_points": 51,
+        "nloc": 533,
+        "function_nloc": 389,
+        "search_ccn": 11
+      },
+      "selected-local": {
+        "production_sha256": "97030730241d360b951abd77e4d808e06d462f8f424524efe94e20dfe8db99b2",
+        "functions": 34,
+        "branch_points": 51,
+        "nloc": 529,
+        "function_nloc": 387,
+        "search_ccn": 11
+      }
+    }
+  },
+  "behavior_comparison": {
+    "counts": {
+      "search_and_construction_cases": 3325,
+      "checker_calls": 13975,
+      "base_spaces": 72,
+      "declaration_orders": 2
+    },
+    "observations_sha256": "642780d3e4bc4881a7711470d425486d0122151973ff16520af39607a2b718da",
+    "probe_source_sha256": "b3aed88c0103baf0eb4ed2410abe6686195f16b290739cebf3d33324ffc0fd17",
+    "variants": [
+      {
+        "name": "baseline",
+        "source_sha256": "d6fbfec7cd9a8ea50143660233efa534fffb6109c926bb45bf7fe5172eed8402",
+        "probe_binary_sha256": "37b9f0de0a5fdceffe3c9d33ea46ae1b9f3201b8f3db7b686de249f377dde706",
+        "exact_output_match": true,
+        "allocations": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 16011,
+            "requested_bytes": 893840
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 85011,
+            "requested_bytes": 14762840
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 13,
+            "requested_bytes": 689
+          }
+        ]
+      },
+      {
+        "name": "trace-capacity",
+        "source_sha256": "38c99b4c2ddece4f290c4398c95e5f37cd7b8eb481a47cc74dad99fad067b82f",
+        "probe_binary_sha256": "7c29606e5cfc509492177302a833fd9e030daa234abc494297f4374ea57c4733",
+        "exact_output_match": true,
+        "allocations": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 14011,
+            "requested_bytes": 766840
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 83011,
+            "requested_bytes": 14635840
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 11,
+            "requested_bytes": 562
+          }
+        ]
+      },
+      {
+        "name": "public-encoder-reuse",
+        "source_sha256": "dd8a34166b10ac26e048d03c6d0a6e27aeec54f8f110407dd8086b7f20029612",
+        "probe_binary_sha256": "daddf9785f3334f21fe008611820a15d938d9444b4f4a998209899531ff7e3c3",
+        "exact_output_match": true,
+        "allocations": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 9016,
+            "requested_bytes": 519088
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 78016,
+            "requested_bytes": 9248233
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 11,
+            "requested_bytes": 562
+          }
+        ]
+      },
+      {
+        "name": "cached-reuse",
+        "source_sha256": "cacefc3d751961fe8c01c9a240e0a49ac3a80545c1736161d5fe88ad28c7550a",
+        "probe_binary_sha256": "d388c346686a32d413e2d775d140905ecf7aca97c56a43b780b76d2104cf3f3a",
+        "exact_output_match": true,
+        "allocations": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 3016,
+            "requested_bytes": 444088
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 57016,
+            "requested_bytes": 4481233
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 9,
+            "requested_bytes": 537
+          }
+        ]
+      },
+      {
+        "name": "selected-local",
+        "source_sha256": "c736f5f22935ad2e107efed8851b0c296cd34607757bf66f98b388898b77dec4",
+        "probe_binary_sha256": "739e93ac10a770393ee155cd2c545383062dc77fc88e7be23041f42ab3ef1ad4",
+        "exact_output_match": true,
+        "allocations": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 8011,
+            "requested_bytes": 691840
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 62011,
+            "requested_bytes": 9868840
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 9,
+            "requested_bytes": 537
+          }
+        ]
+      }
+    ],
+    "scope": "Complete observed assignments, compiled values, certificates, hashes, checker calls and errors; bounded execution comparison, not a general equivalence proof. The million-assignment admission case selects its first candidate."
+  },
+  "memory_comparison": {
+    "probe_source_sha256": "4312578c407c79a63189c5c2ea6722dee7210e1bb0ce08b9442a1f013e6bac0a",
+    "units": "Live requested allocator Layout sizes; excludes prebuilt problem data, allocator overhead and internal realloc implementation; not process RSS. Single-thread probes do not free preexisting allocations inside the counting window.",
+    "large_case": "One 2 MiB byte-value assignment; checker uses an 8 MiB temporary workspace and returns Indeterminate.",
+    "variants": [
+      {
+        "name": "baseline",
+        "source_sha256": "d6fbfec7cd9a8ea50143660233efa534fffb6109c926bb45bf7fe5172eed8402",
+        "measurements": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 16011,
+            "requested_bytes": 893840,
+            "peak_live_requested_bytes": 65849,
+            "max_live_at_checker": 65704
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 85011,
+            "requested_bytes": 14762840,
+            "peak_live_requested_bytes": 73612,
+            "max_live_at_checker": 69736
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 13,
+            "requested_bytes": 689,
+            "peak_live_requested_bytes": 312,
+            "max_live_at_checker": 56
+          },
+          {
+            "case": "checker_workspace",
+            "allocation_calls": 9,
+            "requested_bytes": 14680174,
+            "peak_live_requested_bytes": 10485816
+          }
+        ]
+      },
+      {
+        "name": "encoder-reuse",
+        "source_sha256": "dd8a34166b10ac26e048d03c6d0a6e27aeec54f8f110407dd8086b7f20029612",
+        "measurements": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 9016,
+            "requested_bytes": 519088,
+            "peak_live_requested_bytes": 65929,
+            "max_live_at_checker": 65832
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 78016,
+            "requested_bytes": 9248233,
+            "peak_live_requested_bytes": 73612,
+            "max_live_at_checker": 72804
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 11,
+            "requested_bytes": 562,
+            "peak_live_requested_bytes": 344,
+            "max_live_at_checker": 88
+          },
+          {
+            "case": "checker_workspace",
+            "allocation_calls": 9,
+            "requested_bytes": 14680174,
+            "peak_live_requested_bytes": 12582985
+          }
+        ]
+      },
+      {
+        "name": "candidate",
+        "source_sha256": "cacefc3d751961fe8c01c9a240e0a49ac3a80545c1736161d5fe88ad28c7550a",
+        "measurements": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 3016,
+            "requested_bytes": 444088,
+            "peak_live_requested_bytes": 65929,
+            "max_live_at_checker": 65832
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 57016,
+            "requested_bytes": 4481233,
+            "peak_live_requested_bytes": 72901,
+            "max_live_at_checker": 72804
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 9,
+            "requested_bytes": 537,
+            "peak_live_requested_bytes": 344,
+            "max_live_at_checker": 88
+          },
+          {
+            "case": "checker_workspace",
+            "allocation_calls": 7,
+            "requested_bytes": 12583009,
+            "peak_live_requested_bytes": 12582985
+          }
+        ]
+      },
+      {
+        "name": "selected-final",
+        "source_sha256": "c736f5f22935ad2e107efed8851b0c296cd34607757bf66f98b388898b77dec4",
+        "measurements": [
+          {
+            "case": "scalar_1000",
+            "assignments": 1000,
+            "allocation_calls": 8011,
+            "requested_bytes": 691840,
+            "peak_live_requested_bytes": 65832,
+            "max_live_at_checker": 65704
+          },
+          {
+            "case": "nested_1000",
+            "assignments": 1000,
+            "allocation_calls": 62011,
+            "requested_bytes": 9868840,
+            "peak_live_requested_bytes": 72804,
+            "max_live_at_checker": 69736
+          },
+          {
+            "case": "single_assignment",
+            "assignments": 1,
+            "allocation_calls": 9,
+            "requested_bytes": 537,
+            "peak_live_requested_bytes": 312,
+            "max_live_at_checker": 56
+          },
+          {
+            "case": "checker_workspace",
+            "allocation_calls": 7,
+            "requested_bytes": 12583009,
+            "peak_live_requested_bytes": 10485816
+          }
+        ]
+      }
+    ]
+  },
+  "measurement_environment": {
+    "rust": "1.97.1",
+    "library_profile": "dev, debug=0, incremental=0",
+    "external_probe": "rustc opt-level=2; counting allocator outside library",
+    "scope": "Allocation work and memory lifetime in stated workloads, not application timing or portable performance guarantees."
+  },
+  "validation": {
+    "synthesis_crate_tests_passed": 24,
+    "public_regression_tests_also_passed_on_baseline": 3,
+    "mutations": {
+      "mutations": [
+        {
+          "mutation": "wrong_assignment_domain",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_bytes ... FAILED"
+          ],
+          "exit_code": 101,
+          "source_sha256": "79abb15918e33400a0e16202e1162dd838d11bd157dbf3143625ad5391e38df0"
+        },
+        {
+          "mutation": "always_hash_first_candidate",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_bytes ... FAILED"
+          ],
+          "exit_code": 101,
+          "source_sha256": "472d2209b0a258e8a04f18a649f85e2244afeb526703f28d09b589ce9856c983"
+        },
+        {
+          "mutation": "omit_candidate_blob_length",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_bytes ... FAILED"
+          ],
+          "exit_code": 101,
+          "source_sha256": "161c57fa01fa757ba386c4bf3e770326985f80ac0406bc8ce65ba843ab7b029a"
+        },
+        {
+          "mutation": "accept_one_missing_claim",
+          "compiled": true,
+          "rejected_by_tests": true,
+          "failures": [
+            "test checker_errors_stop_at_the_same_assignment_and_keep_first_error_order ... FAILED"
+          ],
+          "exit_code": 101,
+          "source_sha256": "543dab0b6bff83917c7289eb04fd4ad5fc34d1f0eb45e78ca4085e04b91a17da"
+        }
+      ],
+      "restored_source_sha256": "c736f5f22935ad2e107efed8851b0c296cd34607757bf66f98b388898b77dec4"
+    },
+    "checks": [
+      {
+        "check": "restored-tests",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-synthesis"
+        ],
+        "exit_code": 0,
+        "log_sha256": "c962778b57d05e3bb4b23420004c37012ad2a56db2d746cd5b6bf81fb891c051"
+      },
+      {
+        "check": "format",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "check": "clippy",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "clippy",
+          "--locked",
+          "-p",
+          "zeno-fcis-synthesis",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "log_sha256": "73bc826086840f9fb8c1feac7457f91e6a71fe5662fbf2d8cbd9fdf389e3c544"
+      },
+      {
+        "check": "no-std",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "check",
+          "--locked",
+          "-p",
+          "zeno-fcis-synthesis",
+          "--no-default-features"
+        ],
+        "exit_code": 0,
+        "log_sha256": "416d34226cb31dfabd65afe4f4ea7a6971a8ec7382b288fbc85ec1e3898121e1"
+      },
+      {
+        "check": "assurance",
+        "command": [
+          "python3",
+          "tools/check_assurance.py",
+          "--self-test"
+        ],
+        "exit_code": 0,
+        "log_sha256": "fd63ed6d08a46176c12c909fb0cc65894d3992c85aa6bec50c940f64240a9e22"
+      }
+    ],
+    "required_final_gate": "python3 tools/atdd.py run --all immediately before committing; result recorded separately with the resulting commit"
+  },
+  "advisory_models": [
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "fable",
+      "requested_model": "claude-fable-5-1",
+      "assistant_models": [
+        "claude-fable-5-1"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 279.81795,
+      "events_sha256": "9715bd5dd3817be992f54a013108b3c150b8f5eae1a695cae58b7afd874519e0",
+      "prompt_sha256": "2eeb5e519ecc55a3f1106c8de6421e8354982a565be16ec8a9314d748b574d2b",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "fable-memory",
+      "requested_model": "claude-fable-5-1",
+      "assistant_models": [
+        "claude-fable-5-1"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 197.540744,
+      "events_sha256": "8f85692a7c3c12833262cabe9f179c2933e2ca91c7580032a3a9f0356d080f71",
+      "prompt_sha256": "5c4e352233254861202f76bb06699668a9a62f321fa5b69b65d5553b752f2ce5",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "opus",
+      "requested_model": "claude-opus-5",
+      "assistant_models": [
+        "claude-opus-5"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [
+        "Read",
+        "Glob",
+        "Read",
+        "Edit",
+        "Edit",
+        "Edit",
+        "Grep",
+        "Grep",
+        "Grep",
+        "Glob",
+        "Read",
+        "Read"
+      ],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 63.106682,
+      "events_sha256": "4edd64f8340aa09ead8630adaba43f1b5f0e1707148a3f8ea6b3df57e3a3e2e6",
+      "prompt_sha256": "6624482590d9e08a1f3b009b963572abc8bc06098c75db2607128db1c4a17dc8",
+      "authority": "ADVISORY; independent root validation required"
+    },
+    {
+      "schema": "zeno-fcis/advisory-model-receipt/1",
+      "name": "opus-local",
+      "requested_model": "claude-opus-5",
+      "assistant_models": [
+        "claude-opus-5"
+      ],
+      "exit_code": 0,
+      "subtype": "success",
+      "is_error": false,
+      "permission_denials": [],
+      "tools": [
+        "Read",
+        "Edit",
+        "Edit"
+      ],
+      "wall_clock_limit_seconds": null,
+      "elapsed_seconds": 50.186406,
+      "events_sha256": "c9df921da5a5e9a1f76281e021311cb904e777ca156896dbd0db743a08dd81f3",
+      "prompt_sha256": "fce3f0c4d22c4631c843778068110f992d136832e3f78c944500bd4b93c5d6c6",
+      "authority": "ADVISORY; independent root validation required"
+    }
+  ],
+  "local_evidence_directory": "/tmp/zenofcis-search-20260912",
+  "claim_limit": "Behavior preservation and resource comparisons on the stated corpus; no general proof, stable V1 release, publication or production-readiness claim."
+}

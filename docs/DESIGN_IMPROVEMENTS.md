@@ -157,11 +157,15 @@ The [evaluator simplification review](EVALUATOR_SIMPLIFICATION.md) covers
 borrowed variable names and removal of copied sum stacks, with identical
 before-and-after evaluation observations and measured allocation reductions.
 
+The [search encoding review](SEARCH_ENCODING_IMPROVEMENTS.md) compares four
+ways to reduce synthesis allocations while preserving complete certificate
+bytes, checker behavior and temporary-buffer lifetimes.
+
 1. Measure SQLite query batching and reuse of expected outbox rows while
    retaining validation of every history and outbox row. Checking only touched
    rows would narrow corruption detection and was rejected.
-2. Measure allocation reuse in generic assignment encoding and finite-sketch
-   alternative lookup.
+2. Measure comparison with stored hole values when constructing a finite
+   synthesis candidate program.
    Preserve canonical preimages, selection order and independent acceptance.
 3. Revisit namespace grouping for path conflicts when application workloads
    justify it. A scratch prototype helped large multi-namespace sets but hurt
