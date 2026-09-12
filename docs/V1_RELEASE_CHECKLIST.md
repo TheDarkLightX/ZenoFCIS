@@ -6,6 +6,9 @@ repository gates makes a source revision eligible for release review. It does
 not merge a pull request, sign a tag, publish a crate, create a GitHub release,
 complete an independent audit, or qualify a downstream deployment.
 
+The [2026-09-12 status assessment](V1_RELEASE_STATUS.md) records the current
+qualification gaps. Its dated observations do not replace this checklist.
+
 ## Release identities
 
 For RC3, all of these values must agree:
