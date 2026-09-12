@@ -404,7 +404,7 @@ pub fn search<C: CandidateChecker>(
     let mut counterexamples = Vec::new();
     for ordinal in 0..problem.cardinality {
         let assignment = assignment_at(problem, &indexes);
-        let assignment_hash = assignment.commitment()?;
+        let assignment_hash = assignment_hash_at(problem, &indexes)?;
         let result = checker.check(&assignment);
         match result {
             CheckResult::Accepted {
@@ -481,6 +481,24 @@ fn assignment_at(problem: &SynthesisProblem, indexes: &[usize]) -> Assignment {
     Assignment { entries }
 }
 
+// Must produce the same preimage as `Assignment`'s canonical encoder, reusing
+// the candidate bytes each hole already stores.
+// The preimage buffer stays local so it is freed before the caller invokes the
+// external checker.
+fn assignment_hash_at(
+    problem: &SynthesisProblem,
+    indexes: &[usize],
+) -> Result<Hash32, SynthesisError> {
+    let mut encoding = Vec::new();
+    let entries = problem.holes.iter().zip(indexes);
+    put_length(&mut encoding, entries.len()).map_err(SynthesisError::Encode)?;
+    for (hole, index) in entries {
+        encoding.extend_from_slice(&hole.id.get().to_be_bytes());
+        put_blob(&mut encoding, &hole.values[*index].bytes).map_err(SynthesisError::Encode)?;
+    }
+    hash_bytes("zeno-fcis/synthesis-assignment", &encoding)
+}
+
 fn increment_indexes(problem: &SynthesisProblem, indexes: &mut [usize]) {
     for position in (0..indexes.len()).rev() {
         indexes[position] += 1;
@@ -525,7 +543,7 @@ fn extend_trace(
     outcome: u8,
     bindings: &[Hash32],
 ) -> Result<Hash32, SynthesisError> {
-    let mut bytes = Vec::new();
+    let mut bytes = Vec::with_capacity(32 + 32 + 1 + 32 * bindings.len());
     bytes.extend_from_slice(previous.as_bytes());
     bytes.extend_from_slice(assignment.as_bytes());
     bytes.push(outcome);
@@ -642,8 +660,6 @@ impl fmt::Display for SynthesisError {
 }
 
 #[cfg(feature = "std")]
-#[cfg(feature = "std")]
-#[cfg(feature = "std")]
 impl std::error::Error for SynthesisError {}
 
 #[cfg(test)]
@@ -669,6 +685,41 @@ mod tests {
             values.into_iter().map(Value::U128).collect(),
         )
         .unwrap_or_else(|error| panic!("hole: {error}"))
+    }
+
+    #[test]
+    fn assignment_hash_matches_public_encoder_for_the_same_indexes() {
+        let problem = SynthesisProblem::try_new(
+            bindings(),
+            vec![
+                Hole::try_new(
+                    HoleId::try_new(91).unwrap_or_else(|error| panic!("{error}")),
+                    vec![Value::Bytes(vec![0; 300].into_boxed_slice()), Value::Unit],
+                )
+                .unwrap_or_else(|error| panic!("{error}")),
+                hole(7, vec![0, u128::MAX]),
+            ],
+            SearchBudget { max_assignments: 4 },
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+        // Short and trailing index slices must match the existing constructor's zip.
+        for indexes in [
+            &[][..],
+            &[0],
+            &[1],
+            &[0, 0],
+            &[0, 1],
+            &[1, 0],
+            &[1, 1],
+            &[0, 1, usize::MAX],
+            &[],
+        ] {
+            let assignment = assignment_at(&problem, indexes);
+            assert_eq!(
+                assignment_hash_at(&problem, indexes),
+                assignment.commitment()
+            );
+        }
     }
 
     struct SumChecker;
