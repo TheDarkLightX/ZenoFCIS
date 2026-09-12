@@ -1,0 +1,27 @@
+   Compiling zeno-fcis-crypto v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-crypto)
+   Compiling zeno-fcis-refine v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-refine)
+   Compiling zeno-fcis-evidence v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-evidence)
+   Compiling zeno-fcis-compose v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-compose)
+   Compiling zeno-fcis-transition v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-transition)
+   Compiling zeno-fcis-laws v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-laws)
+   Compiling rusqlite v0.40.1
+   Compiling zeno-fcis-authority v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-authority)
+   Compiling zeno-fcis-shell-sqlite v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-shell-sqlite)
+    Finished `test` profile [unoptimized] target(s) in 5.33s
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_shell_sqlite-663626725be63bb6)
+
+running 1 test
+
+thread 'tests::transaction_tests::pending_delivery_rejects_row_substitution_between_reads' (149) panicked at crates/zeno-fcis-shell-sqlite/src/tests/transaction_tests.rs:132:5:
+row substitution escaped membership validation: Ok(Some(PendingDelivery { delivery_id: Hash32([27, 230, 146, 68, 167, 67, 42, 128, 57, 249, 64, 175, 99, 181, 189, 237, 120, 203, 146, 70, 28, 129, 155, 196, 191, 205, 200, 53, 176, 41, 216, 241]), entry_hash: Hash32([109, 3, 217, 166, 52, 68, 180, 65, 109, 104, 247, 46, 244, 152, 24, 127, 79, 137, 82, 100, 90, 165, 251, 191, 61, 112, 185, 88, 118, 224, 132, 18]), authorization_id: Hash32([25, 62, 200, 210, 137, 160, 255, 108, 223, 2, 25, 112, 208, 78, 47, 177, 75, 59, 232, 115, 128, 9, 20, 190, 108, 142, 128, 68, 165, 177, 116, 236]), candidate_id: CandidateId(Hash32([240, 233, 203, 193, 29, 252, 173, 92, 108, 90, 213, 188, 181, 91, 215, 89, 174, 242, 102, 42, 146, 21, 127, 105, 254, 36, 118, 110, 246, 252, 14, 222])), entry: OutboxEntry { ordinal: 0, channel: 7, destination: Text("attacker"), payload: U128(99) } }))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test tests::transaction_tests::pending_delivery_rejects_row_substitution_between_reads ... FAILED
+
+failures:
+
+failures:
+    tests::transaction_tests::pending_delivery_rejects_row_substitution_between_reads
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.23s
+
+error: test failed, to rerun pass `-p zeno-fcis-shell-sqlite --lib`

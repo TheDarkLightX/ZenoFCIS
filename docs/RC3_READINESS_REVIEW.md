@@ -101,7 +101,7 @@ executable-admission set caught 45 mutations with 8 unviable mutations. No
 mutation survived either final run. These results are candidate evidence and
 must be repeated or retained by the exact-source release gate.
 
-The full registry contains 25 scenarios. Each Gherkin scenario has exactly one
+The full registry contains 26 scenarios. Each Gherkin scenario has exactly one
 `@atdd-*` tag and one closed tuple of argument arrays. Feature prose never
 becomes a command.
 

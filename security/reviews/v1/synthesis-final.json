@@ -1,0 +1,12 @@
+{
+  "command": [
+    "python3",
+    "tools/check_synthesis.py",
+    "--receipt",
+    "/tmp/zenofcis-v1-release-evidence-20260912/synthesis-final-receipt.json"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-12T20:18:57.515489+00:00",
+  "elapsed_seconds": 77.382721,
+  "log_sha256": "6a82d8136a3146456bb0a241edb4fb2bca76142f1d9665d17754bd3d98bed0bf"
+}

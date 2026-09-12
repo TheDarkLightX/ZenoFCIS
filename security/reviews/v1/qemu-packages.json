@@ -1,0 +1,42 @@
+[
+  {
+    "name": "libfdt1_1.7.0-2build1_amd64.deb",
+    "bytes": 20128,
+    "sha256": "274d20dfab9d6b216b5de85446a93f6ce5b2cd82c847b8dfdc508577f76eb96a"
+  },
+  {
+    "name": "libpmem1_1.13.1-1.1ubuntu2_amd64.deb",
+    "bytes": 84760,
+    "sha256": "8f1be1cc834a98f0cf5c0950153f7f939a0c2c92095e98cd7bb40c752c545c1b"
+  },
+  {
+    "name": "libslirp0_4.7.0-1ubuntu3.1_amd64.deb",
+    "bytes": 63830,
+    "sha256": "4efa2d1c509de4d10fe965e86a3d864bf542996caf476d9111fd882c73857164"
+  },
+  {
+    "name": "liburing2_2.5-1build1_amd64.deb",
+    "bytes": 21092,
+    "sha256": "c2aef62accee92a06263c3ad4ef46132c13e409b54296c44792a20491830a7b0"
+  },
+  {
+    "name": "ovmf_2024.02-2ubuntu0.9_all.deb",
+    "bytes": 5187470,
+    "sha256": "a094c13d06f2740691ff57d108dff32aa087179363ddb0de42d463b4f7f9bc13"
+  },
+  {
+    "name": "qemu-system-common_1%3a8.2.2+ds-0ubuntu1.18_amd64.deb",
+    "bytes": 1255316,
+    "sha256": "0a0b744f31e87d72dd0465436b8dfbb1ef9f574ecd0d5a2e9dd8c5cb7d0fef1f"
+  },
+  {
+    "name": "qemu-system-data_1%3a8.2.2+ds-0ubuntu1.18_all.deb",
+    "bytes": 1796342,
+    "sha256": "a14b88d864859bd61c8a3274971da4ecb7da6cec15be6c265d0d411f783d5f2e"
+  },
+  {
+    "name": "qemu-system-x86_1%3a8.2.2+ds-0ubuntu1.18_amd64.deb",
+    "bytes": 11222476,
+    "sha256": "14602e262627adac030329d2cecfee5f6c0938b34566ff2ea2d4c9a9eb02430d"
+  }
+]

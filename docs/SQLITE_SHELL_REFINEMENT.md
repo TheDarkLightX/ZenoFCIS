@@ -102,6 +102,11 @@ destination and payload bytes with recomputed row-local hashes, redundant bundle
 changes, noncontiguous state versions, live committed-state replacement, and
 version-zero genesis replacement.
 
+A scheduled second-connection test also replaces a pending row between reads,
+then restores the authentic row before later database validation. Delivery
+must reject the replacement even when its row-local hashes are consistent:
+the returned entry and authorization must belong to the cached approved bundle.
+
 ## Trusted dependencies and bounds
 
 SQLite transaction, locking, WAL/rollback behavior, the host filesystem, and
@@ -121,7 +126,9 @@ it is bounded testing, not a proof of SQLite or filesystem correctness. The
 adapter does not provide an online migration from schema v4 or earlier,
 replication, multi-process qualification, backup and restore evidence, key
 management, a retained-history or total-reopen-work bound, persisted
-acknowledgement authentication against direct database writes, filesystem fault
+acknowledgement authentication against direct database writes, detection of a
+complete rollback to an earlier internally consistent database after restart,
+filesystem fault
 qualification, or a production delivery transport. Production promotion still
 requires mounted runtime refinement, dependency review, and an audited
 migration plan. Per-artifact reconstruction is bounded executable validation;

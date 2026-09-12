@@ -1,6 +1,6 @@
 # `.zeno` language version 1
 
-This is the implemented language contract for ZenoFCIS `1.0.0-rc.3`.
+This is the implemented language contract for ZenoFCIS `1.0.0`.
 `ZENO_DSL_VERSION`, `PROJECT_SPEC_FORMAT_VERSION`, and
 `TEMPORAL_SPEC_FORMAT_VERSION` are all `1`.
 

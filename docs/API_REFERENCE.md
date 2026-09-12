@@ -5,7 +5,7 @@
 After publication, rustdoc for the umbrella crate is available at:
 
 ```text
-https://docs.rs/zeno-fcis/1.0.0-rc.3/zeno_fcis/
+https://docs.rs/zeno-fcis/1.0.0/zeno_fcis/
 ```
 
 Every public subcrate is published at the same exact version and receives its
@@ -18,12 +18,12 @@ RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc \
   --workspace --all-features --locked --no-deps --open
 ```
 
-The RC bundle also contains a static rustdoc archive generated from the exact
+The release bundle also contains a static rustdoc archive generated from the exact
 release commit.
 
 ## Recommended entry points
 
-For machine discovery of the development CLI, use `zeno-fcis describe` or
+For machine discovery of the CLI, use `zeno-fcis describe` or
 `zeno-fcis describe generate`. The [agent guide](LLM_USAGE.md) describes the
 versioned JSON workflow and recovery by exit class.
 
@@ -79,6 +79,6 @@ strict plan reauthorization, and nominal authenticated publication.
 
 ## Stability
 
-`1.0.0-rc.3` freezes a candidate Rust API for review. Corrections may change
+`1.0.0` freezes a candidate Rust API for review. Corrections may change
 that API in a later release candidate. Stable protocol identifiers remain
 independent of Cargo versions and may not be silently reinterpreted.

@@ -12,7 +12,7 @@
 8. [V1 product contract](V1_PRODUCT_CONTRACT.md)
 9. [BDD and acceptance testing](ACCEPTANCE_TESTING.md)
 10. [Deterministic developer guardrails](DEVELOPER_GUARDRAILS.md)
-11. [RC3 release notes](RC3_RELEASE_NOTES.md)
+11. [V1 release notes](V1_RELEASE_NOTES.md)
 12. [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md)
 13. [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
 14. [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
@@ -28,6 +28,10 @@
 24. [Release assurance](RELEASE_ASSURANCE.md)
 25. [RC3 readiness review](RC3_READINESS_REVIEW.md)
 26. [V1 polish review and remaining gates](V1_POLISH_REVIEW.md)
+27. [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
+28. [Security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
+29. [Security hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
+30. [Security standards snapshot](SECURITY_STANDARDS_SNAPSHOT.md)
 
 ## Project definition and typed construction
 
@@ -89,6 +93,10 @@ and other tools can use the same public boundaries.
 - [SHA-256 provider policy](SHA256_PROVIDER_POLICY.md)
 - [Secret handling and constant time](SECRET_HANDLING_AND_CONSTANT_TIME.md)
 - [Side/covert-channel security](SIDE_CHANNEL_COVERT_CHANNEL_SECURITY.md)
+- [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
+- [Evidence-first security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
+- [EPI hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
+- [Security standards and threat-intelligence snapshot](SECURITY_STANDARDS_SNAPSHOT.md)
 
 ## Canonical admission and decoding
 
@@ -103,8 +111,10 @@ and other tools can use the same public boundaries.
 
 ## Status
 
-The workspace is version `1.0.0-rc.3`, the current public API and packaging
-candidate. The documentation describes implemented APIs and explicit
-boundaries. Final Cargo V1 stability begins only at `1.0.0`. The RC does not
+The workspace is version `1.0.0`, the stable Cargo API release. The
+documentation describes implemented APIs and explicit boundaries. It does not
 claim general deployment qualification, a bundled concurrent runtime, or an
-end-to-end proof for arbitrary downstream projects.
+end-to-end proof for arbitrary downstream projects. Historical
+[RC3 notes](RC3_RELEASE_NOTES.md) describe the earlier published candidate.
+
+- [V1 implementation and release review](V1_REVIEW.md)

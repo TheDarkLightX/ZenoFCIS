@@ -1,6 +1,6 @@
 # `zeno-fcis` CLI reference
 
-The `zeno-fcis-cli` package in `1.0.0-rc.3` publishes the `zeno-fcis` binary.
+The `zeno-fcis-cli` package in `1.0.0` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
@@ -61,8 +61,8 @@ may still reject a value. Descriptive help text is not an executable instruction
 `subcommand_required` distinguishes groups that require a child command from
 commands that can be invoked on their own.
 Unknown command paths return versioned JSON and exit `64`. Discovery reads no
-project or tool input and grants no authority. These interfaces are development
-additions after the original RC3 package; use a binary built from this source.
+project or tool input and grants no authority. These interfaces are available
+in the 1.0.0 CLI.
 
 `generate --format json` returns `status: "generated"`; with `--check` it
 returns `current` (exit `0`) or `drift` (exit `1`). Results include `path`,
@@ -76,7 +76,7 @@ output remains available. See the [agent recovery loop](LLM_USAGE.md).
 
 ## Tools manifest
 
-RC3 uses tools-manifest format `zeno-fcis/tools/2`. A tools/1 manifest is
+V1 uses tools-manifest format `zeno-fcis/tools/2`. A tools/1 manifest is
 rejected with exit code `2` and an error that names both formats:
 
 ```text
@@ -129,8 +129,8 @@ Formal commands apply the exit classes to each backend result:
 
 | Backend result | `prove` | `counterexample` | Meaning |
 | --- | ---: | ---: | --- |
-| CVC5 returns UNSAT with proof-shaped output | 2 | 2 | The proposal and output are retained. RC3 does not independently check the proof. |
-| Z3 returns UNSAT | 2 | 2 | The result remains blocked because RC3 has no Z3 proof checker. |
+| CVC5 returns UNSAT with proof-shaped output | 2 | 2 | The proposal and output are retained. V1 does not independently check the proof. |
+| Z3 returns UNSAT | 2 | 2 | The result remains blocked because V1 has no Z3 proof checker. |
 | CVC5 or Z3 returns SAT and the built-in evaluator replays the model | 1 | 0 | A normalized counterexample is retained. |
 | Qualified Lean returns `KernelChecked` with the configured exact axiom report | 0 | unavailable | The generated theorem passed the Lean kernel check under the recorded RC3 Linux x86-64 toolchain identity. |
 | A custom Lean tree reports kernel success | 2 | unavailable | The run is retained as unqualified evidence. |

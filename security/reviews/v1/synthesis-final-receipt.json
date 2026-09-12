@@ -1,0 +1,494 @@
+{
+  "schema": "zeno-fcis/synthesis-validation/1",
+  "status": "passed",
+  "counter": {
+    "status": "passed",
+    "targets": [
+      {
+        "authority": "none",
+        "certificate": "58328664a463f604b6b51366607c4c60180a2d3a5f2ed54fff1bf8e0bb477db7",
+        "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+        "contract": "271a99960085aebc479e10414e66e69931e82bf63734484f5ce652b89f42e2f3",
+        "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+        "execution_artifact_sha256": "f6e7f387f1e0bca3d35e43df4d16c3e8b3b5604603f1e278135aceb1526be445",
+        "fixture_sha256": "b66e43b117a518f48de457d1627deb657bf9c476a1b9b3993309b30d2984099b",
+        "inputs_checked": 64,
+        "manifest_sha256": "4ce58ece430aa9264f48194b8636e7f503db37b2b21e97051d80c3c7e121e04b",
+        "outputs_per_input": 6,
+        "profile": "zeno-fcis/finite-i64/1",
+        "program_sha256": "b01007b058bf8f270dff2cd39ab97e43b8f09f96aae71d34d34d33b2c4498e28",
+        "schema": "zeno-fcis/synthesis-conformance/1",
+        "source_sha256": "8e22132f1cd6aaeff0c77b7c4fc32d85f51e965a2ddcc49bb4fb4470be452cdd",
+        "status": "passed",
+        "stdout_sha256": "733c9646e50cd17882a05f61565c4d7234bcfb3cb3ed05f8f86589168f3727e1",
+        "target": "rust",
+        "tool": {
+          "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
+          "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+          "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+          "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+        }
+      },
+      {
+        "authority": "none",
+        "certificate": "58328664a463f604b6b51366607c4c60180a2d3a5f2ed54fff1bf8e0bb477db7",
+        "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+        "contract": "271a99960085aebc479e10414e66e69931e82bf63734484f5ce652b89f42e2f3",
+        "emitter_sha256": "bac87d37daa4d95ffc8ef2b5b579452f0a9d931dfa687c5afd4106f71a9b0df9",
+        "execution_artifact_sha256": "274400ba778bab3809f2723f286ae13ae988d570c5fc9cc9efed618270516a14",
+        "fixture_sha256": "274400ba778bab3809f2723f286ae13ae988d570c5fc9cc9efed618270516a14",
+        "inputs_checked": 64,
+        "manifest_sha256": "271bff7045751f71bf3dd43bfc8a31434c8f1fb80d907db3da6ce561f305bb3a",
+        "outputs_per_input": 6,
+        "profile": "zeno-fcis/finite-i64/1",
+        "program_sha256": "b01007b058bf8f270dff2cd39ab97e43b8f09f96aae71d34d34d33b2c4498e28",
+        "schema": "zeno-fcis/synthesis-conformance/1",
+        "source_sha256": "be9c9fc3617684cb07aac25fbeec5cf3286d9da4513d6980349b1af410a36fb8",
+        "status": "passed",
+        "stdout_sha256": "733c9646e50cd17882a05f61565c4d7234bcfb3cb3ed05f8f86589168f3727e1",
+        "target": "python",
+        "tool": {
+          "binary_sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+          "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+          "path": "/usr/bin/python3.12",
+          "version": "Python 3.12.3"
+        }
+      },
+      {
+        "authority": "none",
+        "certificate": "58328664a463f604b6b51366607c4c60180a2d3a5f2ed54fff1bf8e0bb477db7",
+        "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+        "contract": "271a99960085aebc479e10414e66e69931e82bf63734484f5ce652b89f42e2f3",
+        "emitter_sha256": "271785969cdb28fbc7f9c88633a588dd96d2644c8a002a009e4afc0706914170",
+        "execution_artifact_sha256": "b4531732b0eb67c671753b8ae68e21aaa1ce67988f95a000e8bba8428282a052",
+        "fixture_sha256": "bfba546d0e5bffacfda1652701a86c6889d2e2f2d8a8f307297f931ef228f2fe",
+        "inputs_checked": 64,
+        "manifest_sha256": "f36aa8836c273ac0932045cf5284512a4ae0c46aa5501f5cd219568000bccc32",
+        "outputs_per_input": 6,
+        "profile": "zeno-fcis/finite-i64/1",
+        "program_sha256": "b01007b058bf8f270dff2cd39ab97e43b8f09f96aae71d34d34d33b2c4498e28",
+        "schema": "zeno-fcis/synthesis-conformance/1",
+        "source_sha256": "da3ff1acb88c820162d1c2af7dbf133565e48936500012513e932f45ea872eda",
+        "status": "passed",
+        "stdout_sha256": "733c9646e50cd17882a05f61565c4d7234bcfb3cb3ed05f8f86589168f3727e1",
+        "target": "javascript",
+        "tool": {
+          "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
+          "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+          "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+          "version": "v22.23.1"
+        }
+      }
+    ],
+    "claim": "finite pure-step conformance; application authority is checked separately"
+  },
+  "generic": [
+    {
+      "authority": "none",
+      "certificate": "0af29c51c90a95c0dea6830c6607b4cb07a021e92d5fa9ecf7c31cca21c7407a",
+      "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+      "contract": "25cd664c3987a7e7cf634f3bfd36bbcc0bfe22aaa97e2844aa1e19db1e8b80d3",
+      "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+      "execution_artifact_sha256": "e0a08168cf801f08acd989b2292fe2c20539fd36e6034c3196320bcc8a676160",
+      "fixture_sha256": "b66e43b117a518f48de457d1627deb657bf9c476a1b9b3993309b30d2984099b",
+      "inputs_checked": 16,
+      "manifest_sha256": "412f38dc9ea94a257408e1e16fef380391c94e46544d2070f44c7cf856f3d64c",
+      "outputs_per_input": 1,
+      "profile": "zeno-fcis/finite-i64/1",
+      "program_sha256": "9756cd8f3ad2b9ac8e4ad958ccc507c6a2c09c02daf52e38d3d3e20d01b04c4e",
+      "schema": "zeno-fcis/synthesis-conformance/1",
+      "source_sha256": "b740bff093d4e039397cecd37fd79b5e75e32b3729271335d4e3d274a6a0efe8",
+      "status": "passed",
+      "stdout_sha256": "6015d4a0c23cfcbb1f8e992a7aee284998f8c3f4926c330a4abb3e9cfa7960d2",
+      "target": "rust",
+      "tool": {
+        "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
+        "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+        "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+        "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+      }
+    },
+    {
+      "authority": "none",
+      "certificate": "0af29c51c90a95c0dea6830c6607b4cb07a021e92d5fa9ecf7c31cca21c7407a",
+      "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+      "contract": "25cd664c3987a7e7cf634f3bfd36bbcc0bfe22aaa97e2844aa1e19db1e8b80d3",
+      "emitter_sha256": "bac87d37daa4d95ffc8ef2b5b579452f0a9d931dfa687c5afd4106f71a9b0df9",
+      "execution_artifact_sha256": "50d11d5021f50be60043fad3c59589cc837fd5907193b318ba40c4a31bfcb013",
+      "fixture_sha256": "50d11d5021f50be60043fad3c59589cc837fd5907193b318ba40c4a31bfcb013",
+      "inputs_checked": 16,
+      "manifest_sha256": "4c21e94a8de76e5bfb6ce81ce888bc52935c0f6be4bb4d924519d3833390bf26",
+      "outputs_per_input": 1,
+      "profile": "zeno-fcis/finite-i64/1",
+      "program_sha256": "9756cd8f3ad2b9ac8e4ad958ccc507c6a2c09c02daf52e38d3d3e20d01b04c4e",
+      "schema": "zeno-fcis/synthesis-conformance/1",
+      "source_sha256": "f517107d4b878850db0149aa121bef9c5f53273f2d9cd82cd9c291e873a7bccc",
+      "status": "passed",
+      "stdout_sha256": "6015d4a0c23cfcbb1f8e992a7aee284998f8c3f4926c330a4abb3e9cfa7960d2",
+      "target": "python",
+      "tool": {
+        "binary_sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+        "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+        "path": "/usr/bin/python3.12",
+        "version": "Python 3.12.3"
+      }
+    },
+    {
+      "authority": "none",
+      "certificate": "0af29c51c90a95c0dea6830c6607b4cb07a021e92d5fa9ecf7c31cca21c7407a",
+      "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+      "contract": "25cd664c3987a7e7cf634f3bfd36bbcc0bfe22aaa97e2844aa1e19db1e8b80d3",
+      "emitter_sha256": "271785969cdb28fbc7f9c88633a588dd96d2644c8a002a009e4afc0706914170",
+      "execution_artifact_sha256": "366500aae70ba0dfc80e72837c44b81be32b7dff51bb80945fbd4b11acbbecb8",
+      "fixture_sha256": "bfba546d0e5bffacfda1652701a86c6889d2e2f2d8a8f307297f931ef228f2fe",
+      "inputs_checked": 16,
+      "manifest_sha256": "0005026863148b8f068aeb372395707035dfbe2ccbad2329ad4879c94411bb34",
+      "outputs_per_input": 1,
+      "profile": "zeno-fcis/finite-i64/1",
+      "program_sha256": "9756cd8f3ad2b9ac8e4ad958ccc507c6a2c09c02daf52e38d3d3e20d01b04c4e",
+      "schema": "zeno-fcis/synthesis-conformance/1",
+      "source_sha256": "50a6750983b19ca758c06da4b617078aa0df0195f3b07dff22c317ef23b18e8f",
+      "status": "passed",
+      "stdout_sha256": "6015d4a0c23cfcbb1f8e992a7aee284998f8c3f4926c330a4abb3e9cfa7960d2",
+      "target": "javascript",
+      "tool": {
+        "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
+        "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+        "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+        "version": "v22.23.1"
+      }
+    }
+  ],
+  "integer_boundaries": [
+    {
+      "case": "above-number-precision",
+      "targets": [
+        {
+          "authority": "none",
+          "certificate": "756c6766a6274870ae9a8dbe86ae955e44c995ecd34f992c6165745ffbe8bbb6",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "dd52352811055fae417282bb997f548d870ffde023f58c6280c876993b3bc7e3",
+          "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+          "execution_artifact_sha256": "fd2510538b413267b7c93e9b6c3ad3045c9e010a130b473df0176a01cd08f012",
+          "fixture_sha256": "b66e43b117a518f48de457d1627deb657bf9c476a1b9b3993309b30d2984099b",
+          "inputs_checked": 3,
+          "manifest_sha256": "09df6c3f08dd03ad0346c376411c55048170d1ba241f62715162cb4700abf497",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "a7a8f99ef8087978d5a590c8e7a5f70a1c22441a2fa195e44bfbdd054e707934",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "2b7028eb0218b13976e14e4ed1fe51be4932b74d4bd66e504594c01ba8f27a81",
+          "status": "passed",
+          "stdout_sha256": "b95af1cc1fc928e1403b8ca678aa022e5d91caf4f6f3282d65621ce9df6e4327",
+          "target": "rust",
+          "tool": {
+            "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "756c6766a6274870ae9a8dbe86ae955e44c995ecd34f992c6165745ffbe8bbb6",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "dd52352811055fae417282bb997f548d870ffde023f58c6280c876993b3bc7e3",
+          "emitter_sha256": "bac87d37daa4d95ffc8ef2b5b579452f0a9d931dfa687c5afd4106f71a9b0df9",
+          "execution_artifact_sha256": "c33e5234e8d02d324b0359822d1b21b2048be57b5116e12c1e028ffa17da06ef",
+          "fixture_sha256": "c33e5234e8d02d324b0359822d1b21b2048be57b5116e12c1e028ffa17da06ef",
+          "inputs_checked": 3,
+          "manifest_sha256": "e2a448530d0e7979a637b6b2423e872f8140cf1d38b1739569a7751d29660d52",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "a7a8f99ef8087978d5a590c8e7a5f70a1c22441a2fa195e44bfbdd054e707934",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "d911f782cf1eb15496f2f3496244b19504815726b8dea3c0874c33be5e1283ea",
+          "status": "passed",
+          "stdout_sha256": "b95af1cc1fc928e1403b8ca678aa022e5d91caf4f6f3282d65621ce9df6e4327",
+          "target": "python",
+          "tool": {
+            "binary_sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/usr/bin/python3.12",
+            "version": "Python 3.12.3"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "756c6766a6274870ae9a8dbe86ae955e44c995ecd34f992c6165745ffbe8bbb6",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "dd52352811055fae417282bb997f548d870ffde023f58c6280c876993b3bc7e3",
+          "emitter_sha256": "271785969cdb28fbc7f9c88633a588dd96d2644c8a002a009e4afc0706914170",
+          "execution_artifact_sha256": "8e71d3e6e0cff1c3644f6bd884566261f095807ebaa696347f0c8621562b74d1",
+          "fixture_sha256": "bfba546d0e5bffacfda1652701a86c6889d2e2f2d8a8f307297f931ef228f2fe",
+          "inputs_checked": 3,
+          "manifest_sha256": "107897fd5c7dc077a726b50c5a44e8da79690f8855ceb6f8853004898b7c3d88",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "a7a8f99ef8087978d5a590c8e7a5f70a1c22441a2fa195e44bfbdd054e707934",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "1b3778991d1f402a33d724d308c2cea154797cb971d77d0d3bae029be4191a2a",
+          "status": "passed",
+          "stdout_sha256": "b95af1cc1fc928e1403b8ca678aa022e5d91caf4f6f3282d65621ce9df6e4327",
+          "target": "javascript",
+          "tool": {
+            "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "version": "v22.23.1"
+          }
+        }
+      ]
+    },
+    {
+      "case": "i64-min",
+      "targets": [
+        {
+          "authority": "none",
+          "certificate": "a60592c5db45fd42f7c31063ab09bb1156cb358a737366e2f35bff8dc55dadd4",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "fe7f42b0cb728770b003949be5c861112f900425676c6a65b7fde2e0d8995a61",
+          "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+          "execution_artifact_sha256": "4a38ed655b2aa1695f44ed6a153f2dbdda670540d6e3955e72c3d7711008c270",
+          "fixture_sha256": "b66e43b117a518f48de457d1627deb657bf9c476a1b9b3993309b30d2984099b",
+          "inputs_checked": 3,
+          "manifest_sha256": "1c3d0b4834066d0eb2c2fe765f0b67e16470987f23b1b5e08769787855d0aecd",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "4234835e7104f8f4606df75d8f6b407cceacca4013884fabaf9a874df9f4d6f6",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "b9ee2e4bd9888d3faea71e78b5167701355a96f35aecb1cc32a46667cfa6f349",
+          "status": "passed",
+          "stdout_sha256": "ead243f28c701425e3a2ad5f7a194d33d5d66069b8041796b4e2ceb74ade1753",
+          "target": "rust",
+          "tool": {
+            "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "a60592c5db45fd42f7c31063ab09bb1156cb358a737366e2f35bff8dc55dadd4",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "fe7f42b0cb728770b003949be5c861112f900425676c6a65b7fde2e0d8995a61",
+          "emitter_sha256": "bac87d37daa4d95ffc8ef2b5b579452f0a9d931dfa687c5afd4106f71a9b0df9",
+          "execution_artifact_sha256": "e2568695b46769b36b0db4d3206fa92c6a35f3730ced28ea64dedfcb4c239046",
+          "fixture_sha256": "e2568695b46769b36b0db4d3206fa92c6a35f3730ced28ea64dedfcb4c239046",
+          "inputs_checked": 3,
+          "manifest_sha256": "760921fa4de6edaee9890abaf0e035a2ed8344d006624c030977e5071c5cc386",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "4234835e7104f8f4606df75d8f6b407cceacca4013884fabaf9a874df9f4d6f6",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "9d45543c141c9d4ef8ee5aa3ee2b5f81c30d43eb4da91ebf170bebe012338674",
+          "status": "passed",
+          "stdout_sha256": "ead243f28c701425e3a2ad5f7a194d33d5d66069b8041796b4e2ceb74ade1753",
+          "target": "python",
+          "tool": {
+            "binary_sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/usr/bin/python3.12",
+            "version": "Python 3.12.3"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "a60592c5db45fd42f7c31063ab09bb1156cb358a737366e2f35bff8dc55dadd4",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "fe7f42b0cb728770b003949be5c861112f900425676c6a65b7fde2e0d8995a61",
+          "emitter_sha256": "271785969cdb28fbc7f9c88633a588dd96d2644c8a002a009e4afc0706914170",
+          "execution_artifact_sha256": "7a425a9d4f86774d88d231a0b16e7263f0723ceb1273be4782f6989f003c0fc7",
+          "fixture_sha256": "bfba546d0e5bffacfda1652701a86c6889d2e2f2d8a8f307297f931ef228f2fe",
+          "inputs_checked": 3,
+          "manifest_sha256": "1e948e5434e06eac9c6d3a150676de076d9bdeaaa26c9832860489c25dc18024",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "4234835e7104f8f4606df75d8f6b407cceacca4013884fabaf9a874df9f4d6f6",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "348e86b9e189cbce6e28ef0d8fcef49492f7b29af06ac803cb9a5170419f5a7e",
+          "status": "passed",
+          "stdout_sha256": "ead243f28c701425e3a2ad5f7a194d33d5d66069b8041796b4e2ceb74ade1753",
+          "target": "javascript",
+          "tool": {
+            "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "version": "v22.23.1"
+          }
+        }
+      ]
+    },
+    {
+      "case": "i64-max",
+      "targets": [
+        {
+          "authority": "none",
+          "certificate": "673b6be37d42128938c245e7fbaee30531b687ead834f2b4eff8e0449b6788b3",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "14d31f447c607cfa39ebf218743229a5ff4d9c58c44012b5c3b2c537651d9036",
+          "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+          "execution_artifact_sha256": "b5c2416d6e6c2f3fbbeb01b73894f96bccedf1385b1abc53c5cb1ade8320516d",
+          "fixture_sha256": "b66e43b117a518f48de457d1627deb657bf9c476a1b9b3993309b30d2984099b",
+          "inputs_checked": 3,
+          "manifest_sha256": "430656e4c4b34a696da7a080bec4c4228a12303a350a0822b56d54dd919c9c10",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "c23353f014712f20d04bcd8be06b0db2f4b5316172d71a8edb92b9bfe9aa7ed6",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "f6a3e7f864e83c8843d4a6054f69fd4231a166edf5806314322520b29af90da1",
+          "status": "passed",
+          "stdout_sha256": "7bb4e57ac635e90c3ed9979b4cbc727aa59ef1eb91d518620cacf2e3ee59df40",
+          "target": "rust",
+          "tool": {
+            "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "673b6be37d42128938c245e7fbaee30531b687ead834f2b4eff8e0449b6788b3",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "14d31f447c607cfa39ebf218743229a5ff4d9c58c44012b5c3b2c537651d9036",
+          "emitter_sha256": "bac87d37daa4d95ffc8ef2b5b579452f0a9d931dfa687c5afd4106f71a9b0df9",
+          "execution_artifact_sha256": "4329998feb3cc29e8ab65d74929289729d532303033610223388f7cbd7d72049",
+          "fixture_sha256": "4329998feb3cc29e8ab65d74929289729d532303033610223388f7cbd7d72049",
+          "inputs_checked": 3,
+          "manifest_sha256": "44df9da34394877ae8020cc992b2cf7fe6dae3a664edb052e68e08cd758b422c",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "c23353f014712f20d04bcd8be06b0db2f4b5316172d71a8edb92b9bfe9aa7ed6",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "d02caa8bda633f6606f0eaf9dcc1570a2089b2d093eed2392913e2954b42569f",
+          "status": "passed",
+          "stdout_sha256": "7bb4e57ac635e90c3ed9979b4cbc727aa59ef1eb91d518620cacf2e3ee59df40",
+          "target": "python",
+          "tool": {
+            "binary_sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/usr/bin/python3.12",
+            "version": "Python 3.12.3"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "673b6be37d42128938c245e7fbaee30531b687ead834f2b4eff8e0449b6788b3",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "14d31f447c607cfa39ebf218743229a5ff4d9c58c44012b5c3b2c537651d9036",
+          "emitter_sha256": "271785969cdb28fbc7f9c88633a588dd96d2644c8a002a009e4afc0706914170",
+          "execution_artifact_sha256": "2e423fa34e935a27b9b2aab36139f3d41308f50fa8ee1f63bbf3655e90cd3895",
+          "fixture_sha256": "bfba546d0e5bffacfda1652701a86c6889d2e2f2d8a8f307297f931ef228f2fe",
+          "inputs_checked": 3,
+          "manifest_sha256": "279642d72781f28fb774e365b4566a253d68cad9c6edecb906de78634d3071e5",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "c23353f014712f20d04bcd8be06b0db2f4b5316172d71a8edb92b9bfe9aa7ed6",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "a4d463127c34c0e5b7cc2c7f61a701116fcd6f55022c83d2f8996d83b2d66cb9",
+          "status": "passed",
+          "stdout_sha256": "7bb4e57ac635e90c3ed9979b4cbc727aa59ef1eb91d518620cacf2e3ee59df40",
+          "target": "javascript",
+          "tool": {
+            "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "version": "v22.23.1"
+          }
+        }
+      ]
+    },
+    {
+      "case": "zero-input",
+      "targets": [
+        {
+          "authority": "none",
+          "certificate": "6317eb4249230f0da0267094972fd6ad9aba5eac4aa31f8d02990647d15d2b1a",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "001a79be8d12b34c9bbb362bce0f46b4b645bf165a8447bfb5f2f5767ba5a081",
+          "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+          "execution_artifact_sha256": "8ac1405638ec44ad645d7e3352392121334972316bc2508234bc0a4583a3f75a",
+          "fixture_sha256": "b66e43b117a518f48de457d1627deb657bf9c476a1b9b3993309b30d2984099b",
+          "inputs_checked": 1,
+          "manifest_sha256": "002ca6454fb27ec03fc762735920ffa91dd85fbe4cd466c8425fee60d6954cff",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "b19c808057973bbb17e38fb294f7b8784fca9f60b5091f273772cec5a8fda0bb",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "c8ab6884592285ec5bcb9bdbd53eea8b8abe66a75671831af91fd3aac180c77d",
+          "status": "passed",
+          "stdout_sha256": "6597fb5664deb37b5413ea87a2566ffb9da2fb1376d820e4a40dd30c05aa8b04",
+          "target": "rust",
+          "tool": {
+            "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "6317eb4249230f0da0267094972fd6ad9aba5eac4aa31f8d02990647d15d2b1a",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "001a79be8d12b34c9bbb362bce0f46b4b645bf165a8447bfb5f2f5767ba5a081",
+          "emitter_sha256": "bac87d37daa4d95ffc8ef2b5b579452f0a9d931dfa687c5afd4106f71a9b0df9",
+          "execution_artifact_sha256": "4ee604261b1fd1729c5e2ba5e31f7f2e493e309aa373aca3bb052bc2c66aacaf",
+          "fixture_sha256": "4ee604261b1fd1729c5e2ba5e31f7f2e493e309aa373aca3bb052bc2c66aacaf",
+          "inputs_checked": 1,
+          "manifest_sha256": "255f9b961782ecc2a42eb5a10e5b466c3a17911241d4e0eb49831c6b5d15e0d1",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "b19c808057973bbb17e38fb294f7b8784fca9f60b5091f273772cec5a8fda0bb",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "438899a1d09a32e437e4df64f43c5f093d258a8a1c33c405d4de4a884da9b084",
+          "status": "passed",
+          "stdout_sha256": "6597fb5664deb37b5413ea87a2566ffb9da2fb1376d820e4a40dd30c05aa8b04",
+          "target": "python",
+          "tool": {
+            "binary_sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/usr/bin/python3.12",
+            "version": "Python 3.12.3"
+          }
+        },
+        {
+          "authority": "none",
+          "certificate": "6317eb4249230f0da0267094972fd6ad9aba5eac4aa31f8d02990647d15d2b1a",
+          "claim": "exact emitted function agrees with the interpreter and reviewed relation on every admitted input",
+          "contract": "001a79be8d12b34c9bbb362bce0f46b4b645bf165a8447bfb5f2f5767ba5a081",
+          "emitter_sha256": "271785969cdb28fbc7f9c88633a588dd96d2644c8a002a009e4afc0706914170",
+          "execution_artifact_sha256": "ef48cc76a0800bcec3314f043fc6b90db7ab180c35d3721657e84b2b66ddc4c2",
+          "fixture_sha256": "bfba546d0e5bffacfda1652701a86c6889d2e2f2d8a8f307297f931ef228f2fe",
+          "inputs_checked": 1,
+          "manifest_sha256": "74543ec438805f71b2f244c7ff37c60096506c7279dff396571d67739dc456d5",
+          "outputs_per_input": 1,
+          "profile": "zeno-fcis/finite-i64/1",
+          "program_sha256": "b19c808057973bbb17e38fb294f7b8784fca9f60b5091f273772cec5a8fda0bb",
+          "schema": "zeno-fcis/synthesis-conformance/1",
+          "source_sha256": "06a89b2dbbf489d21aec4a1c1a5e16afbd9dc6ccdede0493af2ecb9febd79579",
+          "status": "passed",
+          "stdout_sha256": "6597fb5664deb37b5413ea87a2566ffb9da2fb1376d820e4a40dd30c05aa8b04",
+          "target": "javascript",
+          "tool": {
+            "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
+            "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
+            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "version": "v22.23.1"
+          }
+        }
+      ]
+    }
+  ],
+  "negative_cases": [
+    "source-and-manifest-tampering",
+    "assignment-budget",
+    "work-budget",
+    "unsupported-target",
+    "missing-tool",
+    "receipt-location",
+    "missing-problem",
+    "inherited-node-environment"
+  ]
+}

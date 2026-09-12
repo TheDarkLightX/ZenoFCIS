@@ -70,7 +70,7 @@ path and import the curated prelude:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -93,17 +93,24 @@ ProjectProfile + ProjectCatalog
 Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
 [crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
-[LLM integration guide](docs/LLM_USAGE.md). Agents can discover this development
-CLI with `zeno-fcis describe` and inspect generation drift with
+[LLM integration guide](docs/LLM_USAGE.md). Agents can discover the CLI with `zeno-fcis describe` and inspect generation drift with
 `zeno-fcis generate --out generated --check --format json`. The
-[V1 product contract](docs/V1_PRODUCT_CONTRACT.md) defines the RC3 feature
-freeze and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md)
+[V1 product contract](docs/V1_PRODUCT_CONTRACT.md) defines the stable V1 feature scope and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md)
 bind those journeys to fixed executable commands, while the optional
 [developer guardrails](docs/DEVELOPER_GUARDRAILS.md) reject selected unsafe
 coding-agent actions before execution. The
-[LLM cybersecurity review brief](docs/LLM_CYBERSECURITY_REVIEW.md) provides a repeatable threat-model prompt, anti-pattern checklist, evidence rules, and report format for security review. The
-[RC3 release notes](docs/RC3_RELEASE_NOTES.md) describe the exact candidate
-surface and remaining final-release blockers. The owner-facing
+[LLM cybersecurity review orchestrator](docs/LLM_CYBERSECURITY_REVIEW.md),
+[evidence-first playbook](docs/SECURITY_REVIEW_PLAYBOOK.md),
+[EPI hotspot model](docs/SECURITY_HOTSPOT_MODEL.md), and
+[dated standards snapshot](docs/SECURITY_STANDARDS_SNAPSHOT.md) provide a
+deterministic review queue, constrained prompts for less-capable models,
+exploit-chain proof obligations, scanner guidance, and a machine-readable
+report contract. Run `python3 tools/security_hotspots.py check` to reject
+unreviewed ranking or model drift. The
+[V1 release notes](docs/V1_RELEASE_NOTES.md) describe the stable API, new
+workflows and compatibility boundaries. The
+[RC3 release notes](docs/RC3_RELEASE_NOTES.md) retain the historical candidate
+scope. The owner-facing
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
 repository evidence from signing, publication, and external review actions.
 Runnable examples are checked permanently:
@@ -114,9 +121,9 @@ cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --lo
 python3 tools/atdd.py run --all
 ```
 
-## RC3 authoring path
+## Authoring and checked synthesis
 
-RC3 adds the inert `.zeno` language, canonical typed project AST, accumulated
+V1 includes the inert `.zeno` language, canonical typed project AST, accumulated
 diagnostics, bounded relational and temporal logic, deterministic formal-tool
 adapters, and the `zeno-fcis` CLI. Start with the
 [authoring contract](docs/RC3_AUTHORING_CONTRACT.md),
@@ -129,9 +136,9 @@ adapters, and the `zeno-fcis` CLI. Start with the
 [RC3 readiness review](docs/RC3_READINESS_REVIEW.md).
 
 ```bash
-cargo +1.97.1 run -p zeno-fcis-cli -- new /tmp/zeno-demo --template minimal
-cargo +1.97.1 run -p zeno-fcis-cli -- check /tmp/zeno-demo/project.zeno
-cargo +1.97.1 run -p zeno-fcis-cli -- generate \
+cargo +1.97.1 run -p zeno-fcis-cli --locked -- new /tmp/zeno-demo --template minimal
+cargo +1.97.1 run -p zeno-fcis-cli --locked -- check /tmp/zeno-demo/project.zeno
+cargo +1.97.1 run -p zeno-fcis-cli --locked -- generate \
   /tmp/zeno-demo/project.zeno --out /tmp/zeno-demo/generated
 cargo +1.97.1 run -p zeno-fcis-spec --example mini_determinator --locked
 python3 tools/qemu_demo.py run
@@ -242,7 +249,7 @@ code should enable the smallest explicit feature set, for example:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0", default-features = false, features = ["composed-program"] }
 ```
 
 The umbrella crate's default and `no_std` feature sets are project-neutral.
@@ -318,12 +325,12 @@ python3 tools/atdd.py run --all
 
 See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`, Miri, fuzz, supply-chain, and source-manifest gates. Package-specific boundaries are documented in `docs/`.
 
-RC packaging is fail closed and reviewable:
+Release packaging is fail closed and reviewable:
 
 ```bash
 python3 tools/rc_package.py self-test
 python3 tools/rc_package.py check
-python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc3
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-v1
 ```
 
 The build retains all public `.crate` packages, rustdoc, source and diagnostic
@@ -334,14 +341,13 @@ binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 
 ## Assurance posture
 
-Version `1.0.0-rc.3` is the planned public API and packaging candidate for the
-reusable core library. It is ready for downstream API evaluation and
-integration testing, while remaining a pre-release candidate until the
-independent exact-head review and final release gates pass. The pinned ZenoDEX
-single-vault zUSD mount is bounded executable refinement evidence. Production
+Version `1.0.0` establishes the stable Cargo API for the reusable core library.
+The release's evidence covers the declared library, packaging and integration
+checks. The pinned ZenoDEX single-vault zUSD mount is bounded executable
+refinement evidence. Production
 value-moving promotion still requires each profile's independently reviewed
 laws and evidence, qualified concrete storage and outbox-delivery interpreters,
-deployment qualification, and an exact-head audit. This RC does not claim
+deployment qualification, and an exact-head audit. This release does not claim
 audit completion, project-specific economic correctness, side-channel
 resistance, full ZenoDEX coverage, or approval of an external JMT, ESSO,
 solver, prover, compiler, or LLM runtime.

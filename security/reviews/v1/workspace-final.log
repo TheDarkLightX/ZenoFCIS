@@ -1,0 +1,1206 @@
+   Compiling zeno-fcis-transition v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-transition)
+   Compiling zeno-fcis-laws v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-laws)
+   Compiling zeno-fcis-authority v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-authority)
+   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
+   Compiling zeno-fcis-composed-program v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-composed-program)
+   Compiling zeno-fcis-bootstrap v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-bootstrap)
+   Compiling zeno-fcis-shell-sqlite v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-shell-sqlite)
+   Compiling zeno-fcis-authenticated-authority v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-authenticated-authority)
+   Compiling zeno-fcis-formal-tools v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-formal-tools)
+   Compiling zeno-fcis v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+   Compiling zeno-fcis-cli v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-cli)
+   Compiling zeno-fcis-spec v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-spec)
+   Compiling zeno-fcis-catalog v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-catalog)
+    Finished `test` profile [unoptimized] target(s) in 27.16s
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis-322bbf12ff477c96)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_adapter-ecad6cbfb0c43c90)
+
+running 5 tests
+test tests::callable_panic_is_a_crash ... ok
+test tests::mismatch_produces_content_bound_replay ... ok
+test tests::canonical_line_round_trips_exactly ... ok
+test tests::uppercase_hex_fails_closed ... ok
+test tests::whitespace_and_unknown_fields_fail_closed ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_adapter_zenodex-082a2de9a32f05be)
+
+running 5 tests
+test zusd::tests::wrong_native_root_fails_closed ... ok
+test zusd::tests::unknown_reason_fails_closed ... ok
+test zusd::tests::whitespace_alias_fails_closed ... ok
+test zusd::tests::decoded_decision_cannot_be_normalized_for_another_input ... ok
+test zusd::tests::rejection_normalizes_without_candidate_artifacts ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/bin/mount-zenodex-zusd.rs (/tmp/zenofcis-milestone-target/debug/deps/mount_zenodex_zusd-96bdd3f46547d3c6)
+
+running 2 tests
+test tests::clean_worktree_cannot_mask_the_wrong_revision ... ok
+test tests::pinned_revision_requires_a_clean_worktree ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_authenticated-2e965bb461a971a4)
+
+running 14 tests
+test tests::authenticated_collection_reservation_is_wire_bounded ... ok
+test tests::planning_rejects_projector_identity_substitution ... ok
+test tests::matching_declared_identity_is_not_semantic_attestation ... ok
+test tests::profile_rejects_zero_projector_identity ... ok
+test tests::authenticated_plan_v2_binds_projector_commitment ... ok
+test tests::stale_version_rejects_without_mutation ... ok
+test tests::planning_at_maximum_version_returns_overflow ... ok
+test tests::authenticated_plans_strictly_round_trip_as_non_authoritative_transport ... ok
+test tests::insertion_history_does_not_change_root ... ok
+test tests::proof_context_substitution_fails_closed ... ok
+test tests::mutated_proof_fails_against_external_root ... ok
+test tests::membership_and_absence_proofs_verify_against_exact_context ... ok
+test tests::sparse_proofs_strictly_round_trip_and_reject_transport_mutations ... ok
+test tests::planned_update_matches_full_rebuild ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_authenticated_authority-95a8510b25be0b65)
+
+running 9 tests
+test tests::provider_hash_is_sha256 ... ok
+test tests::qualification_binds_exact_evidence_and_limits ... ok
+test tests::qualification_rejects_substitution_and_non_attestation ... ok
+test tests::qualification_rejects_zero_verifier_attestation_and_engine ... ok
+test tests::projector_omitting_changed_state_fails_required_relation ... ok
+test tests::persisted_plan_requires_strict_decode_and_exact_reconstruction ... ok
+test tests::candidate_bound_material_requires_exact_projection_relation ... ok
+test tests::configuration_and_authorization_identities_bind_setup_and_candidate ... ok
+test tests::projection_relation_rejects_indeterminate_zero_witness_and_semantic_substitution ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_authority-e7154a1c9eabb947)
+
+running 13 tests
+test tests::authority_rejects_transition_program_build_mismatch ... ok
+test tests::violated_genesis_law_cannot_initialize_authorized_shell ... ok
+test tests::shell_owned_transition_limits_cannot_be_replaced_by_program ... ok
+test tests::ordinary_reject_never_creates_commit_authority ... ok
+test tests::schema_valid_wrong_root_cannot_mint_genesis_authority ... ok
+test tests::exact_authorization_commits_and_replays_idempotently ... ok
+test tests::violated_project_law_cannot_mint_commit_authority ... ok
+test tests::persisted_authorization_decoder_fails_closed_on_bounds_and_shape ... ok
+test tests::principal_and_replay_are_bound_into_candidate_and_authorization ... ok
+test tests::shell_rejects_authorization_from_another_deployment_policy ... ok
+test tests::every_genesis_policy_field_changes_policy_and_genesis_identity ... ok
+test tests::persisted_authorization_is_reexecuted_into_exact_nominal_authority ... ok
+test tests::persisted_authorization_rejects_body_invocation_and_policy_substitution ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_backend-b5989265e29e3699)
+
+running 8 tests
+test tests::limits_and_usage_fail_closed ... ok
+test tests::capabilities_are_history_independent ... ok
+test tests::response_requires_advertised_operation ... ok
+test tests::response_requires_exact_output_byte_accounting ... ok
+test tests::response_revalidates_usage_against_request_limits ... ok
+test tests::generic_backend_drives_canonical_synthesis ... ok
+test tests::no_solution_binds_independent_verifier_attestation ... ok
+test tests::synthesis_result_binds_independent_verifier_attestation ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_bootstrap-2c4de4b13f6a8074)
+
+running 13 tests
+test render::tests::duplicate_and_nonportable_paths_fail_closed ... ok
+test render::tests::wrong_catalog_provider_fails_closed ... ok
+test render::tests::exact_per_file_boundary_fails_closed ... ok
+test render::tests::non_record_context_generates_typed_root_observation ... ok
+test render::tests::reserved_zero_bootstrap_commitment_fails_closed ... ok
+test render::tests::manifest_binds_catalog_schema_codegen_and_every_nonmanifest_file ... ok
+test render::tests::declaration_order_does_not_change_output ... ok
+test render::tests::files_are_strictly_ordered_and_include_manifest ... ok
+test render::tests::migration_and_evidence_begin_without_authority ... ok
+test render::tests::repeated_generation_is_byte_identical ... ok
+test render::tests::generated_helpers_use_exact_ids_and_schema_types ... ok
+test render::tests::exact_aggregate_boundary_includes_bootstrap_manifest ... ok
+test render::tests::exact_file_count_boundary_includes_bootstrap_manifest ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/schema_lowering.rs (/tmp/zenofcis-milestone-target/debug/deps/schema_lowering-bc891da6582d5b80)
+
+running 8 tests
+test lowering_preserves_primitive_roles_and_requires_a_state_root ... ok
+test authored_records_and_sums_lower_to_the_independently_constructed_schema ... ok
+test lowering_rejects_ambiguous_and_primitive_structures ... ok
+test lowering_rejects_field_width_overflow_without_renumbering ... ok
+test lowering_rejects_hidden_compound_bindings_and_variant_overflow ... ok
+test source_and_leaf_order_do_not_change_schema_bytes ... ok
+test lowering_requires_exact_leaf_binding_coverage ... ok
+test schema_checks_still_reject_cycles_invalid_bounds_names_and_resource_limits ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_catalog-59595131fd9cc1dd)
+
+running 18 tests
+test tests::catalog_commitment_binds_profile_schema_manifest_and_limits ... ok
+test tests::aggregate_resource_limits_are_enforced ... ok
+test tests::custom_flow_requires_exact_nonzero_claim_bindings ... ok
+test tests::durable_outbox_channels_may_carry_value_movement ... ok
+test tests::declaration_order_does_not_change_manifest ... ok
+test tests::channels_fail_closed_for_unknown_ids_and_wrong_shapes ... ok
+test tests::effect_authority_requirement_is_enforced ... ok
+test tests::economic_reclassification_changes_registry_and_manifest_identity ... ok
+test tests::effect_subject_requirement_is_enforced ... ok
+test tests::effect_payload_must_match_its_schema ... ok
+test tests::profile_must_bind_the_exact_effect_registry ... ok
+test tests::known_typed_plans_are_admitted_with_exact_metrics ... ok
+test tests::profile_may_not_hide_an_extra_effect ... ok
+test tests::profile_state_type_must_equal_the_schema_root ... ok
+test tests::reason_precedence_must_be_total_and_gap_free ... ok
+test tests::reason_cannot_cross_decision_classes ... ok
+test tests::value_flows_are_nonempty_bounded_canonical_sets ... ok
+test tests::unregistered_effects_fail_closed ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis-e2c92c389db7003e)
+
+running 15 tests
+test synth::runner::process_tests::inherited_node_switches_and_toolchain_overrides_cannot_reach_a_child ... ok
+test tests::exit_classes_are_stable ... ok
+test synth::runner::process_tests::source_creation_preserves_existing_files_and_symlink_targets ... ok
+test tests::project_reader_stops_before_consuming_the_full_input ... ok
+test tests::hostile_source_is_inert ... ok
+test synth::tests::discovery_has_distinct_language_adapters_and_missing_tools_stay_unknown ... ok
+test tests::rc3_mini_os_check ... ok
+test tests::help_and_version_succeed_while_invalid_usage_is_64 ... ok
+test synth::tests::source_admission_rejects_duplicates_unknown_fields_and_noninteger_atoms ... ok
+test tests::every_described_command_has_explicit_effect_metadata ... ok
+test synth::tests::javascript_runner_refuses_an_unqualified_runtime_version ... ok
+test synth::runner::process_tests::final_capture_is_bounded_and_exited_parents_do_not_leave_running_children ... ok
+test tests::rc3_project_new ... ok
+test synth::tests::counter_satisfies_independent_full_decision_table_and_mutations ... ok
+test synth::tests::runner_verdicts_require_exact_outputs_and_complete_coverage ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/cli_adopter_flow.rs (/tmp/zenofcis-milestone-target/debug/deps/cli_adopter_flow-4fdf83766ffd3a89)
+
+running 13 tests
+test pinned_lean_cli_prove_is_process_level ... ignored, requires the workflow-pinned Lean 4.30.0 Linux x86-64 distribution
+test rc3_cli_invalid_json_diagnostics_are_versioned_and_ordered ... ok
+test rc3_cli_mini_determinator_check_json_contract ... ok
+test rc3_cli_computes_a_portable_lean_inventory_for_tools_v2 ... ok
+test rc3_cli_new_refuses_existing_content_and_usage_is_64 ... ok
+test rc3_cli_generate_check_is_read_only_and_detects_drift ... ok
+test cli_project_read_failures_preserve_json_and_exit_class ... ok
+test agent_command_discovery_is_deterministic_and_needs_no_project ... ok
+test agent_generation_json_distinguishes_drift_and_failures_without_writes ... ok
+test cli_project_file_budget_accepts_the_limit_and_stops_one_over ... ok
+test cli_durable_counter_emits_a_complete_project_without_overwriting ... ok
+test cli_tool_timeout_is_execution_failure ... ok
+test rc3_cli_formal_outcomes_and_retention_are_process_level ... ok
+
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/synthesis_javascript.rs (/tmp/zenofcis-milestone-target/debug/deps/synthesis_javascript-495ae331e00b105d)
+
+running 1 test
+test javascript_executes_precision_overflow_and_inert_input_boundaries ... ignored, requires Node.js; the finite-synthesis ATDD scenario runs this explicitly
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_codec-2193dee4962bde86)
+
+running 21 tests
+test tests::commitment_preserves_exact_framing_for_legacy_and_segmented_hashers ... ok
+test tests::admitted_value_encoding_matches_raw_and_is_repeatable ... ok
+test tests::collection_reservation_is_bounded_by_remaining_wire_bytes ... ok
+test tests::domain_preimage_is_explicit_and_versioned ... ok
+test tests::admitted_envelope_limit_is_exact ... ok
+test tests::envelope_round_trip_binds_type_and_schema ... ok
+test tests::envelope_byte_mutations_report_exact_errors ... ok
+test tests::admitted_envelope_matches_raw_bytes_and_is_repeatable ... ok
+test tests::domain_name_admission_boundaries_are_unchanged ... ok
+test tests::every_value_tag_round_trips_in_a_value_and_an_envelope ... ok
+test tests::legacy_hasher_parts_preserve_concatenation_and_empty_parts ... ok
+test tests::map_encoding_preserves_the_zcve_v1_golden_bytes ... ok
+test tests::map_entry_checks_keep_their_order_from_raw_blob_to_value ... ok
+test tests::map_order_is_encoded_key_order ... ok
+test tests::nested_map_blobs_share_the_parent_depth_node_and_payload_budgets ... ok
+test tests::raw_envelope_admission_is_fail_closed ... ok
+test tests::raw_value_encoding_remains_fail_closed ... ok
+test tests::trailing_bytes_are_rejected ... ok
+test tests::truncated_large_collection_declarations_are_rejected ... ok
+test tests::value_round_trip_is_exact ... ok
+test tests::decoded_values_and_envelopes_always_re_encode_to_their_input ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_codegen-da1c75fe208ac630)
+
+running 10 tests
+test vectors::tests::hardcoded_record_tag_matches_codec ... ok
+test vectors::tests::positive_vector_round_trips ... ok
+test vectors::tests::vector_set_is_deterministic ... ok
+test tests::generated_python_module_contains_replay_function ... ok
+test tests::generated_files_are_in_canonical_path_order ... ok
+test tests::generated_bundle_exposes_generator_and_formatter_identity ... ok
+test tests::manifest_binds_schema_hash_and_vector_set_hash ... ok
+test tests::generated_sources_expose_stable_identifiers ... ok
+test tests::negative_vectors_cover_all_categories ... ok
+test tests::repeated_generation_is_byte_identical ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_collections-d58d55674606b637)
+
+running 40 tests
+test tests::btreemap_empty_is_empty ... ok
+test tests::btreemap_canonical_bytes_differ_for_different_maps ... ok
+test tests::btreemap_canonical_bytes_round_trip_is_stable ... ok
+test tests::btreemap_entries_are_sorted_by_encoded_key ... ok
+test tests::btreemap_empty_map_value_is_map ... ok
+test tests::btreemap_insert_does_not_mutate_original ... ok
+test tests::btreemap_canonical_bytes_deterministic ... ok
+test tests::btreemap_differential_insert_remove_sequence ... ok
+test tests::btreemap_insertion_history_independence ... ok
+test tests::btreemap_get_after_remove_returns_none ... ok
+test tests::btreemap_insert_and_get ... ok
+test tests::btreemap_insertion_order_independence_all_permutations ... ok
+test tests::btreemap_multiple_removes_are_cumulative ... ok
+test tests::btreemap_old_version_stability ... ok
+test tests::btreemap_remove_all_yields_empty_entries ... ok
+test tests::btreemap_remove_does_not_mutate_original ... ok
+test tests::btreemap_remove_nonexistent_is_noop ... ok
+test tests::btreemap_remove_returns_empty ... ok
+test tests::btreemap_remove_then_reinsert_is_identity ... ok
+test tests::btreemap_snapshot_retention ... ok
+test tests::btreemap_try_to_value_map_succeeds ... ok
+test tests::btreemap_try_canonical_bytes_succeeds ... ok
+test tests::btreemap_update_replaces_value ... ok
+test tests::btreemap_update_value_changes_bytes_but_key_set_stable ... ok
+test tests::logical_entry_try_new_accepts_matching_encoding ... ok
+test tests::logical_entry_try_new_rejects_empty_encoding ... ok
+test tests::logical_entry_try_new_rejects_mismatched_encoding ... ok
+test tests::materialization_rejects_a_backend_stored_key_mismatch ... ok
+test tests::ordered_map_tests::ordered_empty_is_empty ... ok
+test tests::ordered_map_tests::ordered_insert_and_get ... ok
+test tests::ordered_map_tests::ordered_insertion_history_independence ... ok
+test tests::ordered_map_tests::ordered_differential_vs_btreemap ... ok
+test tests::ordered_map_tests::ordered_snapshot_retention ... ok
+test tests::ordered_map_tests::previous_type_name_accepts_the_ordered_map ... ok
+test tests::rpds_tests::rpds_empty_is_empty ... ok
+test tests::rpds_tests::rpds_insert_and_get ... ok
+test tests::rpds_tests::rpds_insertion_history_independence ... ok
+test tests::rpds_tests::rpds_snapshot_retention ... ok
+test tests::rpds_tests::rpds_differential_vs_btreemap ... ok
+test tests::ordered_map_tests::ordered_map_preserves_branching_snapshots_and_thread_safety ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_compose-e65c2c0f2d19c1cf)
+
+running 6 tests
+test tests::directional_path_relations_are_distinct ... ok
+test tests::effects_conflict_conservatively_even_when_paths_differ ... ok
+test tests::raw_equal_result_hashes_without_bound_parity_do_not_promote ... ok
+test tests::parity_context_mutation_is_rejected ... ok
+test tests::provider_set_is_part_of_the_verified_assumption_claim ... ok
+test tests::effect_and_outbox_conflicts_require_exact_laws_and_parity ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/complete_footprint.rs (/tmp/zenofcis-milestone-target/debug/deps/complete_footprint-6e41103470c4450d)
+
+running 14 tests
+test exhaustive_proof_method_requires_an_exact_domain_manifest ... ok
+test declared_footprints_reject_rare_effect_outbox_and_map_key_substitutions ... ok
+test decision_class_coverage_is_complete_and_identity_bearing ... ok
+test witness_requires_exact_verifier_identity_and_acceptance ... ok
+test every_authority_identity_substitution_invalidates_witness_minting ... ok
+test exhaustive_domain_is_canonical_unique_and_nonempty ... ok
+test deterministic_parallel_authorization_requires_exact_complete_evidence_set ... ok
+test authority_binding_set_cannot_self_validate_a_changed_contract ... ok
+test deterministic_parallel_authorization_rejects_missing_duplicate_and_stale_evidence ... ok
+test deterministic_parallel_authorization_obeys_selected_footprint_verifier ... ok
+test combined_authorization_defects_keep_the_first_error_before_callbacks ... ok
+test verifier_rejection_preserves_the_canonical_index_and_stops_later_calls ... ok
+test reordered_authorization_preserves_inputs_calls_and_owned_witnesses ... ok
+test exhaustive_domain_enforces_the_exact_cardinality_boundary ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/composition_identity.rs (/tmp/zenofcis-milestone-target/debug/deps/composition_identity-777e03e2b72415ae)
+
+running 5 tests
+test missing_evidence_blockers_keep_their_component_order ... ok
+test a_missing_composition_obligation_still_blocks_authorization ... ok
+test parity_blockers_keep_their_order_for_context_result_and_verifier_failures ... ok
+test provider_guarantees_are_found_at_the_first_middle_and_last_sorted_claim ... ok
+test each_public_entry_commits_the_specification_once_after_every_footprint_check ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/frame_authorization.rs (/tmp/zenofcis-milestone-target/debug/deps/frame_authorization-7e2a335ba0048078)
+
+running 4 tests
+test broad_frame_authorizes_descendant_destination ... ok
+test narrow_frame_does_not_authorize_ancestor_destination ... ok
+test exact_frame_authorizes_exact_destination ... ok
+test frame_does_not_authorize_sibling_destination ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_composed_program-e6bcc41cf1e480b0)
+
+running 3 tests
+test tests::executed_machine_requires_its_external_output ... ok
+test tests::unexecuted_machine_cannot_supply_output ... ok
+test tests::unexecuted_suffix_does_not_require_external_output ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/construction.rs (/tmp/zenofcis-milestone-target/debug/deps/construction-d51035b19f6e61a8)
+
+running 8 tests
+test direct_projection_rejects_map_keys_overlapping_state_and_excess_depth ... ok
+test duplicate_or_empty_machine_reason_domains_fail_closed ... ok
+test machine_identity_substitution_changes_the_required_program_hash ... ok
+test matching_schema_reachable_nonroot_state_projection_path_is_constructible ... ok
+test exact_semantic_program_identity_is_constructible ... ok
+test routed_or_inactive_output_roles_cannot_replace_an_external_effect ... ok
+test fixed_effect_authority_must_satisfy_the_catalog ... ok
+test state_projection_path_must_equal_the_exact_interface_path ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_core-6ee663ecfc967844)
+
+running 5 tests
+test tests::decision_candidate_mapping_preserves_kind ... ok
+test tests::reason_selection_is_independent_of_input_order ... ok
+test tests::failed_budget_charge_is_atomic ... ok
+test tests::rejected_charge_reports_no_partial_usage ... ok
+test tests::transition_returns_explicit_usage_from_immutable_limits ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_crypto-62f767f3d3da7807)
+
+running 7 tests
+test tests::semantic_domain_vector_is_stable ... ok
+test tests::rustcrypto_matches_fixed_vectors ... ok
+test tests::known_answers_reject_a_broken_segmented_path ... ok
+test tests::libcrux_matches_fixed_vectors ... ok
+test tests::independent_providers_match_on_boundary_inputs ... ok
+test tests::rustcrypto_segmented_hashes_equal_one_shot ... ok
+test tests::libcrux_segmented_hashes_equal_one_shot ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.31s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_domain-0ebbf4b29a009b56)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fixed_matrix.rs (/tmp/zenofcis-milestone-target/debug/deps/fixed_matrix-fa3c9b95004f63a2)
+
+running 12 tests
+test fixed_interface_rejects_zero_shape_and_wildcards ... ok
+test cell_and_context_boundaries_reject_partial_authority ... ok
+test destination_frame_must_authorize_the_source ... ok
+test active_input_requires_one_exact_wiring ... ok
+test backward_wiring_is_rejected ... ok
+test pre_state_and_invocation_must_match_exact_schema_bindings ... ok
+test executes_fixed_rows_and_routes_one_exact_output ... ok
+test machine_identity_and_candidate_output_fail_closed ... ok
+test rejection_discards_every_provisional_candidate ... ok
+test committed_failure_preserves_state_through_the_failing_machine ... ok
+test read_only_state_cell_cannot_change ... ok
+test state_and_invocation_cannot_cross_composition_identity ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_evidence-e9edcbf654dc89fa)
+
+running 73 tests
+test tests::all_tool_kinds_can_be_enveloped ... ok
+test tests::assumption_rejects_zero_hash ... ok
+test tests::assumption_rejects_empty_label ... ok
+test tests::best_coverage_keeps_exhaustive_over_proof_assisted ... ok
+test tests::best_coverage_prefers_exhaustive_over_bounded ... ok
+test tests::best_coverage_prefers_proof_assisted_over_bounded ... ok
+test tests::best_coverage_returns_none_for_empty_importer ... ok
+test tests::builder_adds_assumptions ... ok
+test tests::builder_creates_valid_envelope ... ok
+test tests::builder_rejects_missing_artifact_digest ... ok
+test tests::builder_propagates_validation_errors ... ok
+test tests::builder_rejects_missing_claim_hash ... ok
+test tests::builder_rejects_missing_coverage ... ok
+test tests::builder_rejects_missing_result ... ok
+test tests::builder_rejects_missing_query_id ... ok
+test tests::crash_is_blocking ... ok
+test tests::disproven_is_blocking ... ok
+test tests::envelope_accepts_valid_construction ... ok
+test tests::envelope_canonical_bytes_are_deterministic ... ok
+test tests::envelope_canonical_bytes_differ_for_different_claims ... ok
+test tests::envelope_canonical_bytes_differ_for_different_coverage ... ok
+test tests::envelope_canonical_bytes_differ_for_different_results ... ok
+test tests::envelope_canonical_bytes_include_assumptions ... ok
+test tests::envelope_rejects_blocking_result ... ok
+test tests::envelope_rejects_empty_query_id ... ok
+test tests::envelope_rejects_too_many_assumptions ... ok
+test tests::envelope_rejects_unbounded_coverage ... ok
+test tests::envelope_rejects_zero_cardinality ... ok
+test tests::envelope_rejects_zero_artifact_digest ... ok
+test tests::envelope_rejects_zero_case_budget ... ok
+test tests::envelope_rejects_zero_claim_hash ... ok
+test tests::envelope_rejects_zero_domain_hash ... ok
+test tests::envelope_rejects_zero_theorem_claim ... ok
+test tests::envelope_round_trips_canonical_encoding ... ok
+test tests::evidence_result_round_trips_through_u8 ... ok
+test tests::evidence_result_try_from_invalid_tag ... ok
+test tests::exhaustive_finite_is_admissible ... ok
+test tests::importer_accepts_valid_envelopes ... ok
+test tests::importer_converts_to_tool_evidence ... ok
+test tests::importer_rejects_failed_artifact_check ... ok
+test tests::importer_tracks_runtime_refinement ... ok
+test tests::promotion_gate_rejects_duplicate_tools ... ok
+test tests::query_id_accepts_valid_string ... ok
+test tests::source_bindings_reject_zero_algorithm ... ok
+test tests::structural_checker_validates_artifact_and_result ... ok
+test tests::timeout_is_blocking ... ok
+test tests::unbounded_coverage_is_not_admissible ... ok
+test tests::importer_rejects_stale_source_commit ... ok
+test tests::evidence_result_try_from_valid_tags ... ok
+test tests::promotion_gate_requires_all_tools ... ok
+test tests::promotion_gate_satisfied_with_all_evidence ... ok
+test tests::reject_all_checker_always_returns_false ... ok
+test tests::query_id_rejects_non_ascii ... ok
+test tests::tool_identity_rejects_empty_name ... ok
+test tests::importer_rejects_duplicate_tool_kind ... ok
+test tests::inconclusive_is_blocking ... ok
+test tests::solver_disagreement_is_blocking ... ok
+test tests::proven_is_conclusive_success ... ok
+test tests::importer_rejects_algorithm_mismatch ... ok
+test tests::importer_rejects_profile_mismatch ... ok
+test tests::query_id_rejects_empty ... ok
+test tests::query_id_display_matches_inner ... ok
+test tests::importer_rejects_schema_mismatch ... ok
+test tests::tool_identity_accepts_valid_fields ... ok
+test tests::source_bindings_accept_all_nonzero ... ok
+test tests::source_bindings_reject_zero_schema ... ok
+test tests::tool_identity_rejects_zero_binary_hash ... ok
+test tests::unbounded_coverage_returns_none_for_refine ... ok
+test tests::source_bindings_reject_zero_profile ... ok
+test tests::source_bindings_reject_zero_source_commit ... ok
+test tests::promotion_gate_requires_runtime_refinement ... ok
+test tests::tool_identity_rejects_non_ascii_name ... ok
+test tests::importer_rejects_too_many_envelopes ... ok
+
+test result: ok. 73 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_formal_tools-1838dc990eb4ece6)
+
+running 40 tests
+test tests::pinned_lean_translation_kernel_checks ... ignored, requires the workflow-pinned Lean distribution
+test tests::pinned_smt_translation_differential_check ... ignored, requires the workflow-pinned CVC5 and Z3 executables
+test tests::process_helper_checked_copy ... ignored, spawned by the checked-executable regression test
+test tests::process_helper_crash ... ignored, spawned by the fail-closed process-adapter test
+test tests::process_helper_holds_inherited_pipes ... ignored, spawned by the process-tree containment regression test
+test tests::process_helper_output_limit ... ignored, spawned by the fail-closed process-adapter test
+test tests::process_helper_sleeps_without_solver_pipes ... ignored, spawned by the successful process-tree containment regression test
+test tests::process_helper_spawns_detached_pipe_child ... ignored, spawned by the successful process-tree containment regression test
+test tests::process_helper_spawns_pipe_holder ... ignored, spawned by the process-tree containment regression test
+test tests::process_helper_timeout ... ignored, spawned by the fail-closed process-adapter test
+test tests::finite_smt_checks_every_nonempty_trace_length_and_replays_the_selected_one ... ok
+test tests::rc3_custom_lean_identity_cannot_receive_kernel_checked ... ok
+test tests::rc3_export_preflight_has_exact_mode_and_resource_boundaries ... ok
+test tests::rc3_formal_export_limits_fail_closed_before_rendering ... ok
+test tests::lean_export_preserves_the_exact_relational_atom_and_claim_identity ... ok
+test tests::rc3_formal_tools_bind_exact_claim_and_strong_next ... ok
+test tests::rc3_lean_render_budget_is_live ... ok
+test tests::rc3_formal_tools_translation_parity ... ok
+test tests::rc3_run_record_encoding_is_injective_and_complete ... ok
+test tests::rc3_smt_predicate_symbols_are_injective ... ok
+test tests::smt_checked_arithmetic_makes_overflow_a_counterexample_condition ... ok
+test translation_tests::operator_corpus_checks_with_existing_lean ... ignored, requires an explicitly supplied existing Lean executable; installs and copies no runtime
+test translation_tests::nested_until_has_distinct_witness_and_prefix_times ... ok
+test tests::unknown_and_z3_unsat_remain_blocked ... ok
+test translation_tests::temporal_next_keeps_its_offset_inside_a_nested_quantifier ... ok
+test translation_tests::nested_temporal_quantifiers_retain_the_outer_time_bound ... ok
+test tests::rc3_untrusted_special_files_and_post_enumeration_swaps_are_blocked ... ok
+test translation_tests::relational_operator_corpus_matches_independent_expected_outcomes ... ok
+test tests::rc3_process_output_accepts_the_exact_byte_limit ... ok
+test tests::rc3_lean_runtime_mutation_during_version_probe_is_blocked ... ok
+test tests::rc3_smt_followup_cannot_contradict_the_decision ... ok
+test tests::rc3_tools_manifest_requires_only_lean_to_bind_a_runtime_closure ... ok
+test tests::rc3_process_success_kills_descendants_after_collecting_output ... ok
+test tests::rc3_process_timeout_includes_blocked_stdin_delivery ... ok
+test tests::rc3_lean_runtime_closure_is_portable_private_and_fail_closed ... ok
+test tests::rc3_tool_admission_checks_exact_size_hash_status_and_version ... ok
+test tests::rc3_retention_publishes_only_complete_bundles ... ok
+test tests::rc3_formal_fail_closed_and_model_replay ... ok
+test tests::rc3_private_executable_preserves_the_admitted_bytes ... ok
+test tests::rc3_process_timeout_kills_descendant_holding_solver_pipes ... ok
+
+test result: ok. 29 passed; 0 failed; 11 ignored; 0 measured; 0 filtered out; finished in 2.02s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_generated_code_tests-b5d5ec3ae032b646)
+
+running 32 tests
+test tests::bootstrap_effect_helper_uses_catalogued_operation_and_payload ... ok
+test tests::generated_input_admission_enforces_provider_and_validation_bounds ... ok
+test tests::generated_project_rejects_wrong_commitment_provider ... ok
+test tests::generated_binding_failures_precede_transition_input_failures ... ok
+test tests::generated_root_envelope_enforces_caller_validation_budget ... ok
+test tests::generated_root_envelope_binds_schema_type_and_metrics ... ok
+test tests::generated_root_admission_checks_provider_before_typed_conversion ... ok
+test tests::generated_inputs_bind_exact_types_schema_domains_and_commitments ... ok
+test tests::generated_project_reconstructs_exact_catalog_profile_and_schema ... ok
+test tests::generated_input_commitments_are_deterministic_and_value_sensitive ... ok
+test tests::generated_root_reconstructs_the_exact_source_schema ... ok
+test tests::generated_root_envelope_rejects_wrong_hash_provider ... ok
+test tests::generated_transition_rejects_wrong_root_type_after_schema_binding ... ok
+test tests::generated_project_starts_and_seals_accept_from_root_envelope ... ok
+test tests::generated_transition_rejects_wrong_schema_envelope ... ok
+test tests::integer_range_enforced_by_adapter ... ok
+test tests::outgoing_schema_bounds_are_enforced_by_adapter ... ok
+test tests::negative_vectors_reject_at_decode_or_validate ... ok
+test tests::patch_path_constructors_use_stable_field_ids ... ok
+test tests::positive_vector_round_trips_through_codec ... ok
+test tests::generated_transition_preserves_complete_invocation_bindings ... ok
+test tests::typed_adapter_round_trips_minimal ... ok
+test tests::typed_value_failure_precedes_provider_mismatch ... ok
+test tests::generated_typed_rejection_uses_exact_catalog_reason ... ok
+test tests::unknown_variant_rejected_by_adapter ... ok
+test tests::generated_typed_context_field_observation_records_only_exact_context_footprint ... ok
+test tests::generated_typed_effect_and_channel_stage_exact_catalog_values ... ok
+test tests::generated_typed_root_update_rejects_invalid_value_without_staging ... ok
+test tests::generated_typed_root_read_returns_exact_type_and_records_only_read_footprint ... ok
+test tests::generated_typed_staging_rejects_invalid_values_without_staging ... ok
+test tests::generated_typed_reason_condition_and_duplicates_preserve_semantics ... ok
+test tests::generated_typed_root_update_uses_exact_field_path_and_value ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-d094edace6a2f017)
+
+running 5 tests
+test python_generation_rejects_shadowing_names ... ok
+test python_vector_replay_succeeds ... ok
+test python_composite_values_reject_malformed_structure ... ok
+test python_outgoing_schema_bounds_are_enforced ... ok
+test python_innocent_names_generate_and_replay ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_laws-68413af13d39f8d5)
+
+running 15 tests
+test tests::custom_value_flow_requires_exact_independently_evidenced_law ... ok
+test tests::external_value_channel_derives_the_same_nonwaivable_laws ... ok
+test tests::artifact_mutation_fails_before_checker_attestation ... ok
+test tests::mandatory_genesis_applicability_cannot_be_weakened ... ok
+test tests::every_applicable_law_is_evaluated_exactly_once ... ok
+test tests::genesis_evaluates_the_exact_required_law_set ... ok
+test tests::noncanonical_assumptions_fail_closed ... ok
+test tests::ordinary_reject_needs_no_engine_observation_for_framework_purity_law ... ok
+test tests::formal_certificate_does_not_override_runtime_violation ... ok
+test tests::separate_accept_and_failure_definitions_may_cover_one_family ... ok
+test tests::genesis_missing_or_violated_law_fails_closed ... ok
+test tests::economic_laws_must_cover_accept_and_committed_failure ... ok
+test tests::proof_and_runtime_evaluation_both_bind_acceptance ... ok
+test tests::settlement_requires_every_economic_family ... ok
+test tests::value_flows_mechanically_require_their_economic_law_families ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_patch-cfcb03e1a51b2dea)
+
+running 13 tests
+test tests::collection_reservation_is_bounded_by_remaining_wire_bytes ... ok
+test tests::non_adjacent_overlapping_paths_are_rejected ... ok
+test tests::overlapping_paths_are_rejected ... ok
+test tests::record_insert_and_delete_are_pure ... ok
+test tests::strict_decoder_propagates_nested_zcve_limits ... ok
+test tests::strict_decoder_enforces_path_and_aggregate_value_limits ... ok
+test tests::strict_decoder_rejects_malformed_tags_flags_trailing_bytes_and_truncation ... ok
+test tests::strict_decoder_rejects_noncanonical_order_overlap_and_key_mismatch ... ok
+test tests::strict_decoder_round_trips_and_accepts_exact_outer_limits ... ok
+test tests::strict_decoder_validates_canonical_map_keys_and_their_exact_bound ... ok
+test tests::truncated_large_operation_declaration_is_rejected ... ok
+test tests::update_checks_pre_root_and_old_value ... ok
+test tests::value_at_resolves_nested_paths_without_mutation ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_plan-7a37f6f00ca264a9)
+
+running 14 tests
+test tests::collection_reservation_is_bounded_by_remaining_wire_bytes ... ok
+test tests::duplicate_outbox_ordinals_fail_closed ... ok
+test tests::effect_order_is_canonical ... ok
+test tests::delivery_id_preserves_recorded_hash_input ... ok
+test tests::duplicate_ordinals_are_rejected_during_reconstruction ... ok
+test tests::aggregate_value_limits_cover_complete_outbox_plans ... ok
+test tests::input_and_cardinality_limits_are_exact ... ok
+test tests::alternate_item_order_is_rejected_for_both_plan_kinds ... ok
+test tests::invalid_delivery_values_preserve_error_order_without_hashing ... ok
+test tests::malformed_nested_and_item_bytes_fail_closed ... ok
+test tests::nested_value_limits_propagate_without_partial_plans ... ok
+test tests::strict_decoders_round_trip_complete_canonical_plans ... ok
+test tests::truncated_large_plan_declarations_are_rejected ... ok
+test tests::top_level_trailing_and_truncated_inputs_fail_closed ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_profile_zenodex-d825fab84bcb8fae)
+
+running 6 tests
+test tests::legacy_epoch_command_is_not_protocol_authority ... ok
+test tests::reason_registry_has_stable_total_precedence ... ok
+test tests::promotion_policy_requires_independent_and_mounted_evidence ... ok
+test tests::total_debt_cap_and_conservation_are_hard_invariants ... ok
+test tests::zusd_state_round_trip_preserves_canonical_fields ... ok
+test tests::profile_and_precedence_commitments_are_deterministic ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_project-58c5b9dbe5dde78b)
+
+running 9 tests
+test tests::duplicate_stable_identifier_and_name_are_rejected ... ok
+test tests::additive_successor_may_add_but_not_rebind_entries ... ok
+test tests::names_are_normalized_and_fail_closed ... ok
+test tests::evolution_artifact_cannot_bind_an_incompatible_pair ... ok
+test tests::additive_binding_changes_require_exact_extension_evidence ... ok
+test tests::migration_requires_an_explicit_nonzero_commitment ... ok
+test tests::evolution_artifact_binds_exact_profiles_and_migration ... ok
+test tests::unused_or_zero_extension_evidence_is_rejected ... ok
+test tests::registry_declaration_order_does_not_change_bytes ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_receipt-59ef643557638298)
+
+running 8 tests
+test tests::reject_receipt_is_unchanged_state_only ... ok
+test tests::strict_reject_receipt_decoder_round_trips_and_rejects_non_ascii ... ok
+test tests::committed_failure_requires_a_reason ... ok
+test tests::candidate_seals_patch_plan_receipt_and_bundle_together ... ok
+test tests::strict_decoders_reject_malformed_flags_trailing_bytes_and_truncation ... ok
+test tests::strict_bundle_decoder_enforces_nested_and_outer_bounds ... ok
+test tests::strict_decoders_round_trip_complete_artifacts_at_exact_limits ... ok
+test tests::strict_bundle_decoder_rejects_candidate_receipt_and_state_substitution ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_refine-b0ce4c23e8475133)
+
+running 16 tests
+test tests::proof_assisted_promotion_requires_theorem_evidence ... ok
+test tests::unidentified_verifier_cannot_issue_a_promotion_report ... ok
+test tests::empty_domain_requires_explicit_verified_declaration ... ok
+test tests::exact_comparison_reports_artifact_differences ... ok
+test tests::rejected_decisions_cannot_carry_candidates ... ok
+test tests::strict_reconstruction_rejects_fabricated_equal_decisions ... ok
+test tests::legacy_bounded_evidence_remains_diagnostic_only ... ok
+test tests::exhaustive_manifest_rejects_duplicate_and_reordered_members ... ok
+test tests::legacy_cardinality_only_exhaustive_coverage_fails_closed ... ok
+test tests::strict_reconstruction_binds_exact_invocation_and_domain ... ok
+test tests::duplicate_inputs_fail_even_when_derived_case_ids_differ ... ok
+test tests::exhaustive_evidence_rejects_missing_and_extra_members ... ok
+test tests::validated_cases_cannot_cross_approved_provider_bindings ... ok
+test tests::exhaustive_promotion_requires_exact_independent_coverage_evidence ... ok
+test tests::report_identity_binds_source_importer_and_verifier ... ok
+test tests::every_committed_artifact_substitution_fails_reconstruction ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_schema-b95b9752aaff4d17)
+
+running 14 tests
+test envelope::tests::rejects_value_outside_root_schema ... ok
+test envelope::tests::rejects_value_with_wrong_root_kind ... ok
+test envelope::tests::selected_type_mismatch_fails_before_structural_admission ... ok
+test envelope::tests::binds_root_type_schema_hash_and_validation_report ... ok
+test envelope::tests::rejects_structurally_invalid_value_after_schema_shape_validation ... ok
+test envelope::tests::schema_declaration_order_does_not_change_envelope_bytes ... ok
+test envelope::tests::binds_selected_non_root_type_schema_hash_and_validation_report ... ok
+test envelope::tests::schema_version_changes_bound_envelope_bytes ... ok
+test envelope::tests::validation_budget_is_applied_before_later_admission_stages ... ok
+test tests::input_order_does_not_change_schema_bytes ... ok
+test tests::schema_hash_changes_with_version ... ok
+test validate::tests::rejects_recursive_type_graph ... ok
+test validate::tests::tuple_budget_is_deterministic ... ok
+test validate::tests::validates_bounded_scalar ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_secret-aa1a59b623815cfa)
+
+running 10 tests
+test tests::assignment_and_selection_reject_different_secret_identities ... ok
+test tests::dynamic_length_is_explicit_and_assignment_checks_it ... ok
+test tests::explicit_exposure_emits_content_bound_event ... ok
+test tests::clear_and_replace_erase_owned_storage_before_reuse ... ok
+test tests::exposure_permit_is_bound_to_exact_secret_identity ... ok
+test tests::exposure_limit_fails_closed ... ok
+test tests::hardened_execution_detects_debug_assertions ... ok
+test tests::fixed_secret_equality_and_selection_use_choice ... ok
+test tests::rejected_owned_input_is_zeroized_before_return ... ok
+test tests::oversized_owned_input_is_zeroized_before_return ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_security-7de92116332b6f49)
+
+running 12 tests
+test tests::bounded_declassification_is_explicit ... ok
+test tests::changed_declassified_observation_requires_nonzero_bit_accounting ... ok
+test tests::missing_deployment_mitigation_fails_closed ... ok
+test tests::exact_rule_detects_output_length_channel ... ok
+test tests::leakage_report_binds_exact_policy_and_trace_pair ... ok
+test tests::covert_capacity_is_a_promotion_gate ... ok
+test tests::information_flow_lattice_is_explicit ... ok
+test tests::promotion_rejects_report_from_weaker_policy ... ok
+test tests::promotion_succeeds_only_with_complete_deployment_evidence ... ok
+test tests::policy_construction_is_history_independent ... ok
+test tests::promotion_binds_threat_model_and_input_bounds ... ok
+test tests::successful_promotion_identity_binds_exact_evidence ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_shell-64fb59766007e184)
+
+running 3 tests
+test tests::wrong_expected_root_publishes_nothing ... ok
+test tests::acknowledgement_binds_exact_entry_content ... ok
+test tests::commit_is_atomic_and_replay_is_idempotent ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_shell_sqlite-cf2a9fcd1433e30a)
+
+running 28 tests
+test tests::reopen_rejects_an_uninitialized_store ... ok
+test tests::schema_v4_requires_explicit_history_migration ... ok
+test tests::schema_v3_requires_explicit_genesis_migration ... ok
+test tests::legacy_unversioned_database_fails_closed ... ok
+test tests::authorized_genesis_cannot_initialize_an_existing_store_twice ... ok
+test tests::database_rejects_authorization_from_another_deployment_policy ... ok
+test tests::database_rejects_interpreter_bound_by_another_policy ... ok
+test tests::reopen_rejects_a_different_deployment_policy ... ok
+test tests::snapshot_rejects_a_stored_root_that_does_not_commit_to_the_stored_state ... ok
+test tests::persisted_policy_corruption_is_detected_before_read_or_commit ... ok
+test tests::delivery_rejects_payload_rewrite_even_with_recomputed_row_hashes ... ok
+test tests::live_snapshot_rejects_committed_state_substitution ... ok
+test tests::reopen_rejects_tampered_genesis_authorization ... ok
+test tests::reopen_rejects_version_zero_state_substitution ... ok
+test tests::snapshot_rejects_trailing_bytes_after_the_stored_state_value ... ok
+test tests::commit_evidence_is_persisted_without_delivery ... ok
+test tests::acknowledgement_binds_exact_entry_hash ... ok
+test tests::sqlite_trace_matches_reference_commit ... ok
+test tests::postcommit_crash_recovers_by_replay_and_pending_delivery ... ok
+test tests::reopen_revalidates_persisted_genesis_without_caller_state ... ok
+test tests::transaction_tests::failed_sqlite_commit_preserves_memory_and_allows_retry ... ok
+test tests::replay_and_snapshot_reject_missing_or_extra_outbox_rows ... ok
+test tests::reopen_rejects_redundant_bundle_bytes_and_noncontiguous_versions ... ok
+test tests::transaction_tests::repeated_reads_survive_schema_change_corruption_and_reopen ... ok
+test tests::transaction_tests::repeated_reads_match_across_a_three_transition_history ... ok
+test tests::every_precommit_crash_rolls_back_complete_set ... ok
+test tests::transaction_tests::pending_delivery_rejects_row_substitution_between_reads ... ok
+test tests::transaction_tests::replay_and_acknowledgement_preserve_first_history_errors ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_spec-50e1d3cec2177543)
+
+running 20 tests
+test ast::shape_tests::formula_shapes_count_scalar_relational_and_temporal_depth_exactly ... ok
+test logic::evaluation_tests::both_quantifiers_restore_bindings_on_early_and_complete_exits ... ok
+test logic::evaluation_tests::empty_extreme_and_invalid_ranges_keep_their_results_and_fuel ... ok
+test logic::evaluation_tests::eager_boolean_evaluation_and_predicate_failure_order_are_preserved ... ok
+test logic::evaluation_tests::nested_quantifiers_restore_bindings_after_early_success ... ok
+test logic::evaluation_tests::quantifier_and_sum_bindings_are_removed_on_every_failure_path ... ok
+test logic::evaluation_tests::nested_sums_restore_each_outer_binding_and_argument_order ... ok
+test logic::evaluation_tests::scalar_operands_keep_the_first_error_inside_nested_sums ... ok
+test logic::tests::direct_formula_node_count_is_checked_against_operation_budget ... ok
+test logic::tests::division_errors_are_indeterminate ... ok
+test logic::tests::exact_division_and_signed_overflow_fail_closed ... ok
+test logic::tests::floor_and_ceil_follow_mathematical_sign_rules ... ok
+test logic::tests::unbounded_proof_obligations_ignore_runtime_operation_budget ... ok
+test logic::tests::strong_next_is_false_at_final_step ... ok
+test mini_determinator::tests::arithmetic_and_step_failures_roll_back ... ok
+test mini_determinator::tests::conflict_is_stable_and_pre_state_is_unchanged ... ok
+test mini_determinator::tests::finite_programs_are_schedule_independent ... ok
+test mini_determinator::tests::permutations_have_equal_complete_results ... ok
+test mini_determinator::tests::workers_cannot_observe_other_private_workspaces ... ok
+test mini_determinator::tests::program_conflicts_have_one_stable_witness ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/rc3_acceptance.rs (/tmp/zenofcis-milestone-target/debug/deps/rc3_acceptance-12183a72ec706469)
+
+running 16 tests
+test diagnostic_code_registry_is_complete_and_unique ... ok
+test builder_parser_manual_constructor_bytes_are_equivalent ... ok
+test rc3_composition_diagnostics ... ok
+test rc3_derived_views ... ok
+test rc3_finite_horizon_is_bounded_during_elaboration ... ok
+test direct_relational_depth_is_checked_on_a_small_stack ... ok
+test rc3_input_inert ... ok
+test rc3_generated_drift ... ok
+test rc3_mini_os_conflict ... ok
+test direct_temporal_depth_is_checked_on_a_small_stack ... ok
+test rc3_mini_os_replay ... ok
+test rc3_resource_limits_fail_closed ... ok
+test rc3_temporal_modes ... ok
+test rc3_spec_canonical ... ok
+test rc3_parser_depth_is_bounded_before_recursion ... ok
+test rc3_parser_operator_chains_are_bounded_before_ast_construction ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_synthesis-89704641752e8b05)
+
+running 12 tests
+test finite::ir::evaluation_tests::arithmetic_traps_clear_partial_nodes_before_the_next_input ... ok
+test finite::choice_tests::duplicate_choice_values_are_rejected_at_construction ... ok
+test finite::ir::evaluation_tests::invalid_inputs_are_rejected_before_buffer_reservation ... ok
+test finite::ir::evaluation_tests::domain_failures_clear_old_results_and_allow_reuse ... ok
+test tests::truncated_budget_is_not_no_solution ... ok
+test finite::choice_tests::bad_assignments_keep_the_first_error_and_extra_ids_are_ignored ... ok
+test tests::indeterminate_checker_blocks_certificate ... ok
+test tests::no_solution_retains_every_counterexample ... ok
+test tests::declaration_order_does_not_change_certificate ... ok
+test tests::assignment_hash_matches_public_encoder_for_the_same_indexes ... ok
+test finite::choice_tests::stored_choice_values_match_instructions_in_canonical_order ... ok
+test finite::choice_tests::closing_every_choice_matches_the_previous_value_comparison ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/finite.rs (/tmp/zenofcis-milestone-target/debug/deps/finite-1214bdb6e2a117d4)
+
+running 13 tests
+test checks_budgets_and_closed_types_before_search ... ok
+test a_trap_inside_a_row_precedes_that_rows_unrealizability ... ok
+test realizability_reports_a_trap_after_an_earlier_satisfying_output ... ok
+test arithmetic_and_contract_traps_never_become_evidence ... ok
+test the_input_space_matches_a_straightforward_product_and_clones_independently ... ok
+test an_earlier_unrealizable_input_precedes_a_later_trap ... ok
+test the_evaluator_agrees_with_the_straightforward_reference_on_every_input ... ok
+test budget_includes_selected_replay_and_contract_identity_includes_partition ... ok
+test distinguishes_unrealizable_contract_from_insufficient_grammar ... ok
+test a_trapped_candidate_does_not_disturb_the_next_candidate ... ok
+test unselected_arithmetic_still_traps_and_hole_order_is_canonical ... ok
+test synthesizes_a_generic_relation_and_refutes_identity ... ok
+test language_adapters_keep_distinct_identities_extensions_and_stated_abis ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/search.rs (/tmp/zenofcis-milestone-target/debug/deps/search-5877f6f903e73758)
+
+running 3 tests
+test invalid_values_are_rejected_before_a_problem_can_be_searched ... ok
+test checker_errors_stop_at_the_same_assignment_and_keep_first_error_order ... ok
+test every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_bytes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_transition-e2b760710558c449)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/laws.rs (/tmp/zenofcis-milestone-target/debug/deps/laws-8093822de858ed1c)
+
+running 12 tests
+test export_footprint_sealing_vectors ... ignored, manual canonical-vector export for comparison between source revisions
+test exact_transition_limits_pass_and_one_over_limits_fail_without_output ... ok
+test accepted_transition_binds_catalog_plans_footprint_budget_and_successor ... ok
+test committed_failure_carries_a_complete_catalogued_candidate ... ok
+test repeated_applicable_reason_is_idempotent_at_the_exact_reason_bound ... ok
+test overlapping_patch_and_invalid_successor_schema_fail_closed ... ok
+test invalid_pre_state_stale_replay_and_invalid_context_paths_fail_closed ... ok
+test unknown_effect_wrong_payload_and_duplicate_ordinal_fail_closed ... ok
+test total_reason_precedence_is_independent_of_call_order_and_rejects_without_a_candidate ... ok
+test wrong_reason_disposition_fails_before_sealing ... ok
+test staging_order_does_not_change_the_complete_decision ... ok
+test sealing_preserves_complete_footprints_at_exact_observation_limits ... ok
+
+test result: ok. 11 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_value-bada0ff5907b6641)
+
+running 18 tests
+test tests::admitted_text_keeps_exact_zcve_bytes ... ok
+test tests::admitted_bytes_keep_exact_zcve_bytes ... ok
+test tests::admitted_value_rejects_raw_non_ascii_text ... ok
+test tests::admitted_value_retains_exact_default_metrics_and_value ... ok
+test tests::admitted_value_is_bound_to_default_limits ... ok
+test tests::individually_admitted_byte_leaves_still_obey_aggregate_limits ... ok
+test tests::default_helper_ceiling_matches_default_payload_limit ... ok
+test tests::individually_admitted_text_leaves_still_obey_aggregate_limits ... ok
+test tests::bounded_vector_owns_and_checks_length ... ok
+test tests::map_entry_derives_exact_key_bytes ... ok
+test tests::maps_reject_duplicate_encoded_keys ... ok
+test tests::records_require_stable_field_order ... ok
+test tests::structural_limits_are_checked_transitively ... ok
+test tests::value_ascii_text_accepts_exact_bound ... ok
+test tests::value_ascii_text_preserves_non_ascii_precedence ... ok
+test tests::value_ascii_text_rejects_one_over_bound ... ok
+test tests::value_bytes_accept_exact_bound ... ok
+test tests::value_bytes_reject_one_over_bound ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_adapter
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_adapter_zenodex
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_authenticated
+
+running 1 test
+test crates/zeno-fcis-authenticated/src/lib.rs - ContextVerifiedSparseProof (line 899) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+   Doc-tests zeno_fcis_authenticated_authority
+
+running 1 test
+test crates/zeno-fcis-authenticated-authority/src/lib.rs - CatalogAuthorizedAuthenticatedCommit (line 673) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+   Doc-tests zeno_fcis_authority
+
+running 2 tests
+test crates/zeno-fcis-authority/src/lib.rs - CatalogAuthorizedGenesis (line 639) - compile fail ... ok
+test crates/zeno-fcis-authority/src/lib.rs - CatalogAuthorizedTransition (line 1396) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+   Doc-tests zeno_fcis_backend
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_bootstrap
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_catalog
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_codec
+
+running 1 test
+test crates/zeno-fcis-codec/src/lib.rs - AdmittedEnvelope (line 263) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+   Doc-tests zeno_fcis_codegen
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_collections
+
+running 3 tests
+test crates/zeno-fcis-collections/src/lib.rs - LogicalEntry (line 36) - compile fail ... ok
+test crates/zeno-fcis-collections/src/lib.rs - PersistentMap (line 188) - compile fail ... ok
+test crates/zeno-fcis-collections/src/lib.rs - PersistentMap (line 181) - compile fail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+   Doc-tests zeno_fcis_compose
+
+running 1 test
+test crates/zeno-fcis-compose/src/lib.rs - CompleteFootprintWitness (line 1671) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+   Doc-tests zeno_fcis_composed_program
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_crypto
+
+running 1 test
+test crates/zeno-fcis-crypto/src/lib.rs - ApprovedCommitmentProvider (line 120) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+   Doc-tests zeno_fcis_domain
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_evidence
+
+running 1 test
+test crates/zeno-fcis-evidence/src/lib.rs - EvidenceEnvelopeBuilder (line 576) ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.31s; merged doctests compilation took 0.31s
+   Doc-tests zeno_fcis_formal_tools
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_generated_code_tests
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_laws
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_patch
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_plan
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_profile_zenodex
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_project
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_receipt
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_refine
+
+running 1 test
+test crates/zeno-fcis-refine/src/lib.rs - ValidatedNormalizedDecision (line 317) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+   Doc-tests zeno_fcis_schema
+
+running 1 test
+test crates/zeno-fcis-schema/src/envelope.rs - envelope::SchemaAdmittedEnvelope (line 63) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+   Doc-tests zeno_fcis_secret
+
+running 2 tests
+test crates/zeno-fcis-secret/src/lib.rs - (line 22) - compile fail ... ok
+test crates/zeno-fcis-secret/src/lib.rs - (line 35) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+   Doc-tests zeno_fcis_security
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_shell
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_shell_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_synthesis
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_transition
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_value
+
+running 2 tests
+test crates/zeno-fcis-value/src/lib.rs - AdmittedValue (line 684) - compile fail ... ok
+test crates/zeno-fcis-value/src/lib.rs - MapEntry (line 261) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+

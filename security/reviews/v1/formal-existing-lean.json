@@ -1,0 +1,21 @@
+{
+  "command": [
+    "env",
+    "ZENO_FCIS_TRANSLATION_LEAN=/home/trevormoc/.elan/toolchains/leanprover--lean4---v4.32.0/bin/lean",
+    "cargo",
+    "+1.97.1",
+    "test",
+    "-p",
+    "zeno-fcis-formal-tools",
+    "--locked",
+    "translation_tests::operator_corpus_checks_with_existing_lean",
+    "--",
+    "--ignored",
+    "--exact",
+    "--nocapture"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-12T20:12:31.176759+00:00",
+  "elapsed_seconds": 7.840133,
+  "log_sha256": "acfd71f05b34ed83f970f41435686b4691882a9131bd5e35235fc0e56842e68b"
+}

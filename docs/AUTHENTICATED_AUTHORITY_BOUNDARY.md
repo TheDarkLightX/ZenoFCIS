@@ -48,6 +48,15 @@ Each request supplies only:
 The request cannot substitute the mounted projector, verifier identity,
 relation engine, state domain, provider, or authenticated profile.
 
+The setup owner also defines which semantic policies may publish to this tree.
+The mounted relation engine must check `ProjectionRelationSubject::policy_id()`
+against that policy or an explicit allowed set, and its `engine_hash()` must
+commit to this configuration as well as its implementation. This permits a
+tree intentionally shared by several policies. The generic authenticated
+authority does not infer a single policy from the Rust type or automatically
+mount a SQLite shell's policy. Omitting this check admits any otherwise valid
+semantic authorization that satisfies the selected relation engine.
+
 ## Outputs
 
 Successful setup produces an `AuthenticatedCommitAuthority`. Its configuration

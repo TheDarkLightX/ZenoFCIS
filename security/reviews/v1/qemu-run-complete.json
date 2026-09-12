@@ -1,0 +1,13 @@
+{
+  "command": [
+    "python3",
+    "tools/qemu_demo.py",
+    "capture",
+    "--out",
+    "/tmp/zenofcis-v1-release-evidence-20260912/qemu-capture"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-12T20:09:27.121675+00:00",
+  "elapsed_seconds": 3.821318,
+  "log_sha256": "b3dd8ccd5793bae4db254baf3582b77dfe5e0d0c9cb39cbf2f52513daadcf920"
+}

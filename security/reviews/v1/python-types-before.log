@@ -1,0 +1,31 @@
+   Compiling zeno-fcis-spec v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-spec)
+   Compiling zeno-fcis-bootstrap v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-bootstrap)
+   Compiling zeno-fcis-receipt v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-receipt)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+   Compiling zeno-fcis-crypto v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-crypto)
+   Compiling zeno-fcis-transition v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-transition)
+   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
+    Finished `test` profile [unoptimized] target(s) in 6.02s
+     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-6f79b7aee78d2c7a)
+
+running 1 test
+
+thread 'python_outgoing_schema_bounds_are_enforced' (163) panicked at crates/zeno-fcis-generated-code-tests/tests/python_replay.rs:191:5:
+python outgoing-bound checks failed
+stdout: 
+stderr: Traceback (most recent call last):
+  File "<string>", line 64, in <module>
+  File "<string>", line 15, in rejects
+AssertionError: expected type_mismatch
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test python_outgoing_schema_bounds_are_enforced ... FAILED
+
+failures:
+
+failures:
+    python_outgoing_schema_bounds_are_enforced
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `-p zeno-fcis-generated-code-tests --test python_replay`

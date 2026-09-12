@@ -1,13 +1,13 @@
-# Release-candidate packaging
+# Release packaging
 
-This document describes the ZenoFCIS `1.0.0-rc.3` artifact set.
+This document describes the ZenoFCIS `1.0.0` artifact set.
 
 ## Package set
 
 `release/package-set.toml` is the reviewed package authority. It contains:
 
 - 36 public crates in dependency-first publication order;
-- one private compiled code-generation fixture;
+- one private crate for compiled generated-code tests;
 - the `zeno-fcis` authoring CLI and `mount-zenodex-zusd` diagnostic target;
 - the exact Cargo version and Rust toolchain.
 
@@ -118,7 +118,7 @@ release.
 ## Publication
 
 Crates are published in the exact order in `release/package-set.toml`. The
-fixture crate has `publish = false`. Publishing, signing, creating a Git tag,
+generated-code test crate has `publish = false`. Publishing, signing, creating a Git tag,
 or creating a GitHub release remains an owner action after review.
 
 The repository's permanent workflows are read-only. This package does not add
@@ -127,7 +127,7 @@ a write-enabled release workflow or weaken that policy.
 The complete owner procedure for exact-head review, signed tagging,
 dependency-ordered crates.io publication, release evidence, and failure
 recovery is the [V1 release checklist](V1_RELEASE_CHECKLIST.md). The permanent
-release-candidate workflow also runs on `v1.0.0-rc.*` tags so the immutable tag
+release-candidate workflow also runs on `v1.0.0-rc.*` and `v1.0.0` tags so the immutable tag
 is packaged through the same read-only gate used during review.
 
 ## Nonclaims

@@ -837,7 +837,7 @@ impl CatalogLimits {
         Ok(self)
     }
 
-    /// Returns the maximum authoritative-effect count.
+    /// Returns the maximum count of non-executable commit evidence entries.
     #[must_use]
     pub const fn max_effects(self) -> u32 {
         self.max_effects

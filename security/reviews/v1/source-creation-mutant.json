@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "+1.97.1",
+    "test",
+    "-p",
+    "zeno-fcis-cli",
+    "--locked",
+    "source_creation_preserves_existing_files_and_symlink_targets",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "started_at": "2026-09-12T20:14:02.384099+00:00",
+  "elapsed_seconds": 7.083988,
+  "log_sha256": "87f23ba89fea5001129ddc94c702b5ebaa3125857a8ca95fd68bb327a5d467a5"
+}

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "+1.97.1",
+    "test",
+    "-p",
+    "zeno-fcis-codegen",
+    "-p",
+    "zeno-fcis-generated-code-tests",
+    "--all-features",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-12T20:25:13.311737+00:00",
+  "elapsed_seconds": 6.311331,
+  "log_sha256": "3cb5f4f2c966701f18a769202bbc26b1b825d713985707a1e797614eeee0d1ba"
+}

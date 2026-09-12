@@ -1,6 +1,6 @@
-# Formal tools in RC3
+# Formal tools in V1
 
-ZenoFCIS `1.0.0-rc.3` pins and exercises process adapters for CVC5 `1.3.3`,
+ZenoFCIS `1.0.0` pins and exercises process adapters for CVC5 `1.3.3`,
 Z3 `4.16.0`, and Lean `4.30.0`. Each adapter gives its result a deliberately
 limited classification. `zeno-fcis-formal-tools` is a standard-library shell
 around the pure exporters. It cannot construct `BackendCertificate` or
@@ -55,7 +55,7 @@ The human form prints the tree hash, file count, and total bytes. The
 `--format json` form prints the canonical `zeno-fcis/toolchain-inventory/1`
 record.
 
-RC3 qualifies the official Lean `4.30.0` Linux x86-64 archive recorded in
+V1 retains qualification of the official Lean `4.30.0` Linux x86-64 archive recorded in
 `release/formal-tools-linux-x86_64.sha256`. Its required portable tree hash is
 recorded in `release/lean-4.30.0-tree.sha256` and exposed as
 `LEAN_LINUX_X86_64_TREE_SHA256`. A different inventory can support repeatable
@@ -63,7 +63,7 @@ local checks, while its proof outcome remains blocked as unqualified evidence.
 
 ### Moving from tools/1
 
-RC3 accepts `zeno-fcis/tools/2`. A tools/1 manifest produces exit code `2`
+V1 accepts `zeno-fcis/tools/2`. A tools/1 manifest produces exit code `2`
 with the expected and actual formats:
 
 ```text
@@ -112,12 +112,13 @@ checked arithmetic, bounded sums and quantifiers, and every temporal operator.
 The generated source ends with an axiom-report command. A generic relational
 placeholder is never substituted for the typed claim.
 
-Deterministic Lean source tests currently cover exact claim identity,
-projection paths, equality, and `always`. The pinned Lean workflow
-kernel-checks the representative Mini Determinator claim 501 through both the
-library and the CLI. The remaining translation branches are present in the RC3
-exporter, with operator-complete source and kernel acceptance required before
-stable V1.
+The pinned Lean workflow kernel-checks the representative Mini Determinator
+claim 501 through both the library and the CLI. It also checks the relational
+operator corpus and temporal equivalences, including nested time binders,
+using the same existing executable. The ordinary tests compare relational
+results with independently specified outcomes and check the previously faulty
+nested binder cases. These are selected translation checks, not a proof of
+the exporter for every input; see the [translation contract](TEMPORAL_LOGIC_V1.md).
 
 The timeout clock starts before process creation and covers input delivery,
 execution, and output collection. On Unix, every tool runs in a new process
@@ -133,7 +134,7 @@ output overflow, `unknown`, unsupported proof output, failed model replay, or
 an axiom report different from the configured exact set remains blocked or
 failed.
 
-| Backend output | RC3 classification | CLI result |
+| Backend output | V1 classification | CLI result |
 | --- | --- | --- |
 | CVC5 UNSAT with proof-shaped output | `ProposedUnsat` | Retain the proposal and return exit code `2`. The proof output is not independently checked. |
 | Z3 UNSAT | `Blocked(UnsupportedEvidence)` | Retain the blocked run and return exit code `2`. |

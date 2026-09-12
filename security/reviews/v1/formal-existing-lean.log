@@ -1,0 +1,11 @@
+   Compiling zeno-fcis-formal-tools v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-formal-tools)
+    Finished `test` profile [unoptimized] target(s) in 2.63s
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_formal_tools-6d0fc29f43a9fda8)
+
+running 1 test
+Lean (version 4.32.0, x86_64-unknown-linux-gnu, commit 8c9756b28d64dab099da31a4c09229a9e6a2ef35, Release)
+translation corpus: /tmp/zeno-fcis-translation-corpus-62-1789243954626241482/Translation.lean
+test translation_tests::operator_corpus_checks_with_existing_lean ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 5.17s
+

@@ -332,8 +332,13 @@ pub enum ProjectionRelationDecision {
 }
 
 /// Setup-selected pure checker for project-specific projection completeness laws.
+///
+/// The deployment owner must check [`ProjectionRelationSubject::policy_id`]
+/// against the policies permitted to publish to this tree. The authority does
+/// not infer a policy restriction from the semantic authorization's Rust type.
 pub trait ProjectionRelationEngine {
-    /// Returns the exact reviewed checker implementation commitment.
+    /// Returns the reviewed checker implementation and configuration commitment,
+    /// including any allowed semantic policies.
     fn engine_hash(&self) -> Hash32;
 
     /// Evaluates the complete semantic/authenticated relation.

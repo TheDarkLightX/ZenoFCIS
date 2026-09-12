@@ -60,6 +60,7 @@ feature file. This keeps Gherkin prose outside execution authority.
 | `sqlite-authority` | Crash-atomic authorized history and durable outbox. |
 | `release-contract` | Local formatting, lint, tests, docs, assurance, packaging, and benchmark input checks. |
 | `probity-guardrails` | Hostile and permitted coding-agent workflow commands. |
+| `security-hotspots` | Prompt-inert deterministic EPI model and exact review-queue baseline. |
 | `rc3-project-new` | Create a bounded project without overwriting files. |
 | `rc3-mini-os-check` | Check the Mini Determinator project in one command. |
 | `rc3-spec-canonical` | Equivalent source produces identical typed AST bytes. |

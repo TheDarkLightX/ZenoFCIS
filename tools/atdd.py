@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and execute the closed RC3 acceptance-scenario registry."""
+"""Validate and execute the closed V1 acceptance-scenario registry."""
 
 from __future__ import annotations
 
@@ -109,7 +109,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked"),),
     ),
     "release-contract": AcceptanceScenario(
-        "Run the local RC3 release gate",
+        "Run the local V1 release gate",
         (
             ("python3", "tools/check_assurance.py", "--self-test"),
             ("python3", "tools/check_assurance.py"),
@@ -175,6 +175,13 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "probity-guardrails": AcceptanceScenario(
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
+    ),
+    "security-hotspots": AcceptanceScenario(
+        "Rank security hotspots without interpreting source as instructions",
+        (
+            ("python3", "tools/security_hotspots.py", "self-test"),
+            ("python3", "tools/security_hotspots.py", "check"),
+        ),
     ),
     "rc3-project-new": AcceptanceScenario(
         "Create a bounded project without overwriting files",

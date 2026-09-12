@@ -1,0 +1,81 @@
+   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
+   Compiling zeno-fcis-bootstrap v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-bootstrap)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+    Finished `test` profile [unoptimized] target(s) in 6.02s
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_codegen-914df6bcf237afad)
+
+running 10 tests
+test vectors::tests::hardcoded_record_tag_matches_codec ... ok
+test vectors::tests::positive_vector_round_trips ... ok
+test vectors::tests::vector_set_is_deterministic ... ok
+test tests::generated_python_module_contains_replay_function ... ok
+test tests::generated_bundle_exposes_generator_and_formatter_identity ... ok
+test tests::generated_files_are_in_canonical_path_order ... ok
+test tests::manifest_binds_schema_hash_and_vector_set_hash ... ok
+test tests::generated_sources_expose_stable_identifiers ... ok
+test tests::repeated_generation_is_byte_identical ... ok
+test tests::negative_vectors_cover_all_categories ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_generated_code_tests-a2ddf1f1a4509b9f)
+
+running 32 tests
+test tests::bootstrap_effect_helper_uses_catalogued_operation_and_payload ... ok
+test tests::generated_project_rejects_wrong_commitment_provider ... ok
+test tests::generated_input_admission_enforces_provider_and_validation_bounds ... ok
+test tests::generated_root_envelope_binds_schema_type_and_metrics ... ok
+test tests::generated_root_envelope_enforces_caller_validation_budget ... ok
+test tests::generated_root_admission_checks_provider_before_typed_conversion ... ok
+test tests::generated_root_envelope_rejects_wrong_hash_provider ... ok
+test tests::generated_inputs_bind_exact_types_schema_domains_and_commitments ... ok
+test tests::generated_binding_failures_precede_transition_input_failures ... ok
+test tests::generated_project_reconstructs_exact_catalog_profile_and_schema ... ok
+test tests::generated_input_commitments_are_deterministic_and_value_sensitive ... ok
+test tests::generated_root_reconstructs_the_exact_source_schema ... ok
+test tests::generated_transition_rejects_wrong_schema_envelope ... ok
+test tests::integer_range_enforced_by_adapter ... ok
+test tests::generated_transition_rejects_wrong_root_type_after_schema_binding ... ok
+test tests::outgoing_schema_bounds_are_enforced_by_adapter ... ok
+test tests::patch_path_constructors_use_stable_field_ids ... ok
+test tests::generated_project_starts_and_seals_accept_from_root_envelope ... ok
+test tests::negative_vectors_reject_at_decode_or_validate ... ok
+test tests::positive_vector_round_trips_through_codec ... ok
+test tests::typed_adapter_round_trips_minimal ... ok
+test tests::typed_value_failure_precedes_provider_mismatch ... ok
+test tests::unknown_variant_rejected_by_adapter ... ok
+test tests::generated_typed_context_field_observation_records_only_exact_context_footprint ... ok
+test tests::generated_typed_rejection_uses_exact_catalog_reason ... ok
+test tests::generated_transition_preserves_complete_invocation_bindings ... ok
+test tests::generated_typed_staging_rejects_invalid_values_without_staging ... ok
+test tests::generated_typed_root_update_rejects_invalid_value_without_staging ... ok
+test tests::generated_typed_root_read_returns_exact_type_and_records_only_read_footprint ... ok
+test tests::generated_typed_effect_and_channel_stage_exact_catalog_values ... ok
+test tests::generated_typed_reason_condition_and_duplicates_preserve_semantics ... ok
+test tests::generated_typed_root_update_uses_exact_field_path_and_value ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-6f79b7aee78d2c7a)
+
+running 5 tests
+test python_generation_rejects_shadowing_names ... ok
+test python_outgoing_schema_bounds_are_enforced ... ok
+test python_vector_replay_succeeds ... ok
+test python_composite_values_reject_malformed_structure ... ok
+test python_innocent_names_generate_and_replay ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+   Doc-tests zeno_fcis_codegen
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_generated_code_tests
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

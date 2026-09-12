@@ -1,0 +1,91 @@
+{
+  "advisories": [
+    {
+      "ghsa_id": "GHSA-gqvv-2mrq-wpjv",
+      "cve_id": "CVE-2026-84365",
+      "html_url": "https://github.com/advisories/GHSA-gqvv-2mrq-wpjv",
+      "summary": "Hono: Incomplete fix for CVE-2026-39408: `toSSG()` still writes files outside the output directory",
+      "severity": "medium",
+      "published_at": "2026-09-08T21:23:51Z",
+      "updated_at": "2026-09-08T21:23:51Z",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "hono"
+          },
+          "vulnerable_version_range": "< 4.13.5",
+          "first_patched_version": "4.13.5",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-g6gw-c38x-mqfc",
+      "cve_id": "CVE-2026-84364",
+      "html_url": "https://github.com/advisories/GHSA-g6gw-c38x-mqfc",
+      "summary": "Hono: Unbounded dot-notation nesting in `parseBody()` can cause memory exhaustion",
+      "severity": "medium",
+      "published_at": "2026-09-08T21:23:02Z",
+      "updated_at": "2026-09-08T21:23:04Z",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "hono"
+          },
+          "vulnerable_version_range": "< 4.13.5",
+          "first_patched_version": "4.13.5",
+          "vulnerable_functions": []
+        }
+      ]
+    },
+    {
+      "ghsa_id": "GHSA-crvj-82cr-hjcx",
+      "cve_id": "CVE-2026-84363",
+      "html_url": "https://github.com/advisories/GHSA-crvj-82cr-hjcx",
+      "summary": "Hono: Query parser reads parameters after the URL fragment, causing cache-key and proxy interpretation differentials",
+      "severity": "medium",
+      "published_at": "2026-09-08T21:22:50Z",
+      "updated_at": "2026-09-08T21:22:51Z",
+      "vulnerabilities": [
+        {
+          "package": {
+            "ecosystem": "npm",
+            "name": "hono"
+          },
+          "vulnerable_version_range": "< 4.13.5",
+          "first_patched_version": "4.13.5",
+          "vulnerable_functions": []
+        }
+      ]
+    }
+  ],
+  "latest": {
+    "name": "hono",
+    "version": "4.13.7",
+    "engines": {
+      "node": ">=16.9.0"
+    },
+    "dependencies": null,
+    "dist": {
+      "shasum": "80fdab8326f03d02f049117fd968101933493600",
+      "tarball": "https://registry.npmjs.org/hono/-/hono-4.13.7.tgz",
+      "fileCount": 568,
+      "integrity": "sha512-c8/gF9ac8Y78/agExVocyLevgR+JlpNB444Py0FSX8pJoPdYUfUzRcXtYEYGwt6l19qIlVZPN5Mfsw9jFShmQQ==",
+      "signatures": [
+        {
+          "sig": "MEUCIF8KbiJJgSXwg5T74vg0SRS60s30xyAyDf5sWxeJ5fX2AiEA3+9mhlvLJKlCUjleWj9RACXOexmaUIoUpmpGfzM1HbY=",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "attestations": {
+        "url": "https://registry.npmjs.org/-/npm/v1/attestations/hono@4.13.7",
+        "provenance": {
+          "predicateType": "https://slsa.dev/provenance/v1"
+        }
+      },
+      "unpackedSize": 1391192
+    }
+  }
+}

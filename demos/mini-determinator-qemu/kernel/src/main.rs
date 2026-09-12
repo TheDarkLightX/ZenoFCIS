@@ -81,7 +81,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     serial_line(format_args!("BOOT=KERNEL"));
     serial_line(format_args!("FIRMWARE_HANDOFF=COMPLETE"));
     serial_line(format_args!("TARGET=x86_64-unknown-none"));
-    serial_line(format_args!("CORE=zeno-fcis-spec/1.0.0-rc.3"));
+    serial_line(format_args!("CORE=zeno-fcis-spec/1.0.0"));
 
     let outcome = run_semantic_demo();
     serial_line(format_args!("REPLAY_ORDER_A=2,1"));

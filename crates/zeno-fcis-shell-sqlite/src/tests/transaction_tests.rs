@@ -3,6 +3,139 @@
 use super::*;
 
 #[test]
+fn pending_delivery_rejects_row_substitution_between_reads() {
+    use rusqlite::hooks::{AuthAction, AuthContext, Authorization};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let catalog = catalog();
+    let authority = authority(&catalog, 53);
+    let authorization = authorized(&authority, &catalog, 6);
+    let candidate = authorization.bundle().candidate_id();
+    let original = authorization.bundle().outbox_plan().entries()[0].clone();
+    let replacement = OutboxEntry::new(
+        original.ordinal(),
+        original.channel(),
+        Value::text_ascii(String::from("attacker"))
+            .unwrap_or_else(|error| panic!("destination: {error}")),
+        Value::U128(99),
+    );
+    let encode_row = |entry: &OutboxEntry| {
+        (
+            entry
+                .delivery_id::<RustCryptoSha256>(candidate.hash())
+                .unwrap_or_else(|error| panic!("delivery id: {error}")),
+            hash_outbox_entry(entry).unwrap_or_else(|error| panic!("entry hash: {error}")),
+            entry
+                .destination()
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("destination bytes: {error}")),
+            entry
+                .payload()
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("payload bytes: {error}")),
+        )
+    };
+    let original_row = encode_row(&original);
+    let changed_rows = [encode_row(&replacement), original_row.clone()];
+    let sequence = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_else(|error| panic!("clock: {error}"))
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "zeno-sqlite-pending-{}-{sequence}.db",
+        std::process::id()
+    ));
+    let genesis = authority
+        .authorize_genesis(initial_state(&catalog))
+        .unwrap_or_else(|error| panic!("genesis: {error}"));
+    let mut database = TestShell::create(
+        &path,
+        &authority,
+        genesis,
+        authority.bind_delivery_interpreter(MemoryDestination::default()),
+    )
+    .unwrap_or_else(|error| panic!("create shell: {error}"));
+    database
+        .connection
+        .pragma_update(None, "journal_mode", "WAL")
+        .unwrap_or_else(|error| panic!("enable concurrent writer: {error}"));
+    database
+        .commit(authorization)
+        .unwrap_or_else(|error| panic!("commit: {error}"));
+    let writer = Connection::open(&path).unwrap_or_else(|error| panic!("writer: {error}"));
+    let reads = Arc::new(AtomicUsize::new(0));
+    let observed_reads = Arc::clone(&reads);
+    const REWRITE: &str = "UPDATE outbox SET delivery_id = ?1, entry_hash = ?2, destination_bytes = ?3, payload_bytes = ?4 WHERE candidate_id = ?5 AND ordinal = 0";
+    database
+        .connection
+        .authorizer(Some(move |context: AuthContext<'_>| {
+            if matches!(
+                context.action,
+                AuthAction::Read {
+                    table_name: "outbox",
+                    column_name: "delivery_id",
+                }
+            ) {
+                let read = observed_reads.fetch_add(1, Ordering::SeqCst) + 1;
+                // History first observes the authentic row. The pending-row
+                // query then sees the replacement, and a later revalidation
+                // sees the restored authentic row. Both row-local hashes agree.
+                if matches!(read, 2 | 3) {
+                    let row = &changed_rows[read - 2];
+                    writer
+                        .execute(
+                            REWRITE,
+                            params![
+                                row.0.as_bytes().as_slice(),
+                                row.1.as_bytes().as_slice(),
+                                &row.2,
+                                &row.3,
+                                candidate.hash().as_bytes().as_slice(),
+                            ],
+                        )
+                        .unwrap_or_else(|error| panic!("interleaved row rewrite: {error}"));
+                }
+            }
+            Authorization::Allow
+        }))
+        .unwrap_or_else(|error| panic!("schedule row rewrites: {error}"));
+
+    let result = database.next_pending();
+    database
+        .connection
+        .authorizer(None::<fn(AuthContext<'_>) -> Authorization>)
+        .unwrap_or_else(|error| panic!("remove scheduler: {error}"));
+    database
+        .connection
+        .execute(
+            REWRITE,
+            params![
+                original_row.0.as_bytes().as_slice(),
+                original_row.1.as_bytes().as_slice(),
+                &original_row.2,
+                &original_row.3,
+                candidate.hash().as_bytes().as_slice(),
+            ],
+        )
+        .unwrap_or_else(|error| panic!("restore original: {error}"));
+    let restored = database
+        .next_pending()
+        .unwrap_or_else(|error| panic!("restored pending: {error}"))
+        .unwrap_or_else(|| panic!("missing original delivery"));
+    assert_eq!(restored.entry(), &original);
+    drop(database);
+    std::fs::remove_file(&path).unwrap_or_else(|error| panic!("remove test database: {error}"));
+    assert!(reads.load(Ordering::SeqCst) >= 2);
+    assert!(
+        matches!(result, Err(SqliteShellError::CorruptOutbox)),
+        "row substitution escaped membership validation: {result:?}"
+    );
+}
+
+#[test]
 fn replay_and_acknowledgement_preserve_first_history_errors() {
     let catalog = catalog();
     let authority = authority(&catalog, 53);

@@ -1,6 +1,6 @@
 # Temporal logic version 1
 
-ZenoFCIS `1.0.0-rc.3` gives every temporal claim an explicit mode.
+ZenoFCIS `1.0.0` gives every temporal claim an explicit mode.
 
 ## Modes
 
@@ -60,10 +60,14 @@ against the exact typed claim in the built-in evaluator.
 
 Lean receives unbounded temporal proof obligations. The source generator has
 translation branches for projection paths, relational atoms, bounded sums and
-quantifiers, checked arithmetic conditions, and temporal operators. RC3's
-exact-tool acceptance evidence covers claim 501, which uses projection,
-equality, and `always`. Operator-complete source and kernel checks remain a
-stable V1 gate. Evidence binds the exact claim ID, generated source, Lean
+quantifiers, checked arithmetic conditions, and temporal operators. The
+permanent formal-tools workflow checks claim 501 and a separate operator
+corpus against pinned Lean 4.30.0. The corpus includes closed relational
+results, undefined arithmetic, projection paths, bounded quantifiers and sums,
+and temporal negation, conjunction, disjunction, next, always, eventually,
+until, and nested time binders. These are selected translation checks, not a
+proof that every possible generated formula is correct. Evidence binds the
+exact claim ID, generated source, Lean
 toolchain identity, successful kernel check, and exact allowed-axiom set. A
 process exit code or parsed word alone is never a certificate.
 

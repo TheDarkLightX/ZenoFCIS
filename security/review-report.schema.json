@@ -1,0 +1,764 @@
+{
+  "$id": "https://thedarklightx.github.io/ZenoFCIS/security/review-report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "chains": {
+      "items": {
+        "$ref": "#/$defs/chain"
+      },
+      "type": "array"
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/finding"
+      },
+      "type": "array"
+    },
+    "format": {
+      "const": "zeno-fcis/security-review/1"
+    },
+    "hotspot_triage": {
+      "items": {
+        "$ref": "#/$defs/hotspotTriage"
+      },
+      "type": "array"
+    },
+    "review_identity": {
+      "$ref": "#/$defs/reviewIdentity"
+    },
+    "threat_model": {
+      "$ref": "#/$defs/threatModel"
+    },
+    "tool_runs": {
+      "items": {
+        "$ref": "#/$defs/toolRun"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "format",
+    "review_identity",
+    "threat_model",
+    "tool_runs",
+    "hotspot_triage",
+    "findings",
+    "chains",
+    "decision"
+  ],
+  "title": "ZenoFCIS security review report",
+  "type": "object",
+  "$defs": {
+    "chain": {
+      "additionalProperties": false,
+      "properties": {
+        "cfi": {
+          "additionalProperties": false,
+          "properties": {
+            "edge_evidence_min": {
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "precondition_feasibility": {
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "reliability": {
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "score": {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "enum": [
+                "unsubstantiated",
+                "plausible",
+                "source-established",
+                "reproduced"
+              ]
+            },
+            "terminal_authority_impact": {
+              "maximum": 5,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "edge_evidence_min",
+            "terminal_authority_impact",
+            "precondition_feasibility",
+            "reliability",
+            "score",
+            "status"
+          ],
+          "type": "object"
+        },
+        "edge_evidence": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "consumer_finding": {
+                "$ref": "#/$defs/findingId"
+              },
+              "evidence_level": {
+                "maximum": 5,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "evidence_refs": {
+                "$ref": "#/$defs/nonemptyStrings"
+              },
+              "intervening_controls": {
+                "$ref": "#/$defs/nonemptyStrings"
+              },
+              "matched_fact": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "missing_experiment": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "provider_finding": {
+                "$ref": "#/$defs/findingId"
+              },
+              "same_context_justification": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider_finding",
+              "consumer_finding",
+              "matched_fact",
+              "same_context_justification",
+              "intervening_controls",
+              "evidence_level",
+              "evidence_refs",
+              "missing_experiment"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "finding_ids": {
+          "items": {
+            "$ref": "#/$defs/findingId"
+          },
+          "minItems": 2,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "id": {
+          "pattern": "^CHAIN-[0-9]{3,}$",
+          "type": "string"
+        },
+        "original_attacker_facts": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "residual_risk": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "terminal_impact": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "finding_ids",
+        "original_attacker_facts",
+        "edge_evidence",
+        "terminal_impact",
+        "cfi",
+        "residual_risk"
+      ],
+      "type": "object"
+    },
+    "claimLevel": {
+      "enum": [
+        "core-enforced",
+        "shell-enforced",
+        "evidence-gated",
+        "project-obligation",
+        "unsupported-claim"
+      ]
+    },
+    "decision": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted_risks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "compensating_controls": {
+                "$ref": "#/$defs/nonemptyStrings"
+              },
+              "expires": {
+                "format": "date",
+                "type": "string"
+              },
+              "finding_id": {
+                "$ref": "#/$defs/findingId"
+              },
+              "owner": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "finding_id",
+              "owner",
+              "expires",
+              "compensating_controls"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "blockers": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "confirmed_properties": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "evidence_gated_properties": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "explicit_nonclaims": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "next_bounded_slice": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "blocked",
+            "changes-required",
+            "bounded-review-clean",
+            "indeterminate"
+          ]
+        },
+        "unreviewed_scope": {
+          "$ref": "#/$defs/nonemptyStrings"
+        }
+      },
+      "required": [
+        "outcome",
+        "blockers",
+        "confirmed_properties",
+        "evidence_gated_properties",
+        "accepted_risks",
+        "unreviewed_scope",
+        "explicit_nonclaims",
+        "next_bounded_slice"
+      ],
+      "type": "object"
+    },
+    "finding": {
+      "additionalProperties": false,
+      "properties": {
+        "categories": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "claim_level": {
+          "$ref": "#/$defs/claimLevel"
+        },
+        "cves": {
+          "items": {
+            "pattern": "^CVE-[0-9]{4}-[0-9]{4,}$",
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "cvss_v4": {
+          "additionalProperties": false,
+          "properties": {
+            "score": {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "number"
+            },
+            "vector": {
+              "pattern": "^CVSS:4\\.0/",
+              "type": "string"
+            }
+          },
+          "required": [
+            "vector",
+            "score"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "cwes": {
+          "items": {
+            "pattern": "^CWE-[0-9]+$",
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "entry": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "epi_at_discovery": {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "epss": {
+          "additionalProperties": false,
+          "properties": {
+            "model_version": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "percentile": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            "retrieved": {
+              "format": "date",
+              "type": "string"
+            },
+            "score": {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            }
+          },
+          "required": [
+            "score",
+            "percentile",
+            "model_version",
+            "retrieved"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "id": {
+          "$ref": "#/$defs/findingId"
+        },
+        "impact": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "kev": {
+          "enum": [
+            "listed",
+            "not-listed",
+            "not-applicable",
+            "not-checked"
+          ]
+        },
+        "locations": {
+          "items": {
+            "$ref": "#/$defs/location"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "mitigation": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "preconditions": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "provides": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "reachable_path": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "reliability": {
+          "enum": [
+            "deterministic",
+            "schedule-dependent",
+            "probabilistic",
+            "theoretical",
+            "unknown"
+          ]
+        },
+        "reproducer": {
+          "additionalProperties": false,
+          "properties": {
+            "evidence_ref": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "unit-test",
+                "integration-test",
+                "property-test",
+                "fuzz-counterexample",
+                "crash-trace",
+                "proof",
+                "source-trace",
+                "missing"
+              ]
+            },
+            "safe_boundary": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "safe_boundary",
+            "evidence_ref"
+          ],
+          "type": "object"
+        },
+        "requires": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "residual_risk": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "informational",
+            "not-assigned"
+          ]
+        },
+        "ssvc_decision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "confirmed",
+            "likely",
+            "hypothesis",
+            "false-positive",
+            "not-applicable"
+          ]
+        },
+        "title": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "status",
+        "severity",
+        "claim_level",
+        "epi_at_discovery",
+        "categories",
+        "cwes",
+        "cves",
+        "cvss_v4",
+        "epss",
+        "kev",
+        "ssvc_decision",
+        "locations",
+        "entry",
+        "preconditions",
+        "reachable_path",
+        "impact",
+        "reliability",
+        "evidence_refs",
+        "reproducer",
+        "requires",
+        "provides",
+        "mitigation",
+        "residual_risk"
+      ],
+      "type": "object"
+    },
+    "findingId": {
+      "pattern": "^ZSEC-[0-9]{3,}$",
+      "type": "string"
+    },
+    "hotspotTriage": {
+      "additionalProperties": false,
+      "properties": {
+        "categories_checked": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "deferred_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "epi": {
+          "maximum": 100,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "evidence_refs": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "finding_ids": {
+          "items": {
+            "$ref": "#/$defs/findingId"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "result": {
+          "enum": [
+            "reviewed",
+            "deferred",
+            "excluded"
+          ]
+        },
+        "tier": {
+          "enum": [
+            "priority-1",
+            "priority-2",
+            "priority-3",
+            "priority-4",
+            "priority-5"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "epi",
+        "tier",
+        "result",
+        "categories_checked",
+        "evidence_refs",
+        "finding_ids",
+        "deferred_reason"
+      ],
+      "type": "object"
+    },
+    "location": {
+      "additionalProperties": false,
+      "properties": {
+        "end_line": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "start_line": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "start_line",
+        "end_line"
+      ],
+      "type": "object"
+    },
+    "nonemptyStrings": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "reviewIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "ended": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hotspot_inventory_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "hotspot_model_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reviewer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "standards_snapshot": {
+          "format": "date",
+          "type": "string"
+        },
+        "started": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "tree_state": {
+          "enum": [
+            "clean",
+            "recorded-dirty"
+          ]
+        }
+      },
+      "required": [
+        "repository",
+        "commit",
+        "tree_state",
+        "reviewer",
+        "started",
+        "ended",
+        "standards_snapshot",
+        "hotspot_model_sha256",
+        "hotspot_inventory_sha256"
+      ],
+      "type": "object"
+    },
+    "threatModel": {
+      "additionalProperties": false,
+      "properties": {
+        "attacker_capabilities": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "excluded_conditions": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "protected_assets": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "security_objectives": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "supported_deployments": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "trust_boundaries": {
+          "$ref": "#/$defs/nonemptyStrings"
+        }
+      },
+      "required": [
+        "protected_assets",
+        "security_objectives",
+        "attacker_capabilities",
+        "trust_boundaries",
+        "supported_deployments",
+        "excluded_conditions"
+      ],
+      "type": "object"
+    },
+    "toolRun": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_refs": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "command": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "configuration_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exit_status": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "identity": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "limitations": {
+          "$ref": "#/$defs/nonemptyStrings"
+        },
+        "outcome": {
+          "enum": [
+            "pass",
+            "findings",
+            "failed",
+            "timeout",
+            "unsupported",
+            "unavailable",
+            "not-run"
+          ]
+        },
+        "stderr_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stdout_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "identity",
+        "command",
+        "configuration_sha256",
+        "outcome",
+        "exit_status",
+        "stdout_sha256",
+        "stderr_sha256",
+        "artifact_refs",
+        "limitations"
+      ],
+      "type": "object"
+    }
+  }
+}
