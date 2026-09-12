@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "tools/test_generated_application.py",
+    "PackagedStagingTests"
+  ],
+  "exit_code": 1,
+  "started_at": "2026-09-12T21:50:41.285634+00:00",
+  "elapsed_seconds": 0.168051,
+  "log_sha256": "a9b52bcd5e92dd3db12ab468146fc6a6cb21ebbbffe452b6d62a321dfd7f4daa"
+}

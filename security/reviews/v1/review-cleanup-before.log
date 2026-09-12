@@ -1,0 +1,42 @@
+...FFEF.
+======================================================================
+ERROR: test_standalone_invalid_packages_leave_output_available_for_retry (__main__.PackagedStagingTests.test_standalone_invalid_packages_leave_output_available_for_retry) (attempt=1)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/zenofcis-v1-release-20260912/tools/test_generated_application.py", line 167, in test_standalone_invalid_packages_leave_output_available_for_retry
+    rc_package.verify_packaged(packages, output, "1.0.0")
+  File "/tmp/zenofcis-v1-release-20260912/tools/rc_package.py", line 1142, in verify_packaged
+    output.mkdir(parents=True)
+  File "/usr/lib/python3.12/pathlib.py", line 1313, in mkdir
+    os.mkdir(self, mode)
+FileExistsError: [Errno 17] File exists: '/tmp/zeno-fcis-verify-retry-0ohtvk2e/result'
+
+======================================================================
+FAIL: test_standalone_interruption_removes_owned_output (__main__.PackagedStagingTests.test_standalone_interruption_removes_owned_output)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/zenofcis-v1-release-20260912/tools/test_generated_application.py", line 209, in test_standalone_interruption_removes_owned_output
+    self.assertFalse(output.exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_standalone_invalid_packages_leave_output_available_for_retry (__main__.PackagedStagingTests.test_standalone_invalid_packages_leave_output_available_for_retry) (attempt=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/zenofcis-v1-release-20260912/tools/test_generated_application.py", line 168, in test_standalone_invalid_packages_leave_output_available_for_retry
+    self.assertFalse(output.exists())
+AssertionError: True is not false
+
+======================================================================
+FAIL: test_standalone_receipt_write_failure_removes_partial_output (__main__.PackagedStagingTests.test_standalone_receipt_write_failure_removes_partial_output)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/zenofcis-v1-release-20260912/tools/test_generated_application.py", line 182, in test_standalone_receipt_write_failure_removes_partial_output
+    self.assertFalse(output.exists())
+AssertionError: True is not false
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.035s
+
+FAILED (failures=3, errors=1)
+rc-package: packaged application PASS; receipt: /tmp/zeno-fcis-verify-success-ixsgc3vp/result/PACKAGED-APPLICATION.json

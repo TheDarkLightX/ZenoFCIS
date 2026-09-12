@@ -153,6 +153,61 @@ class PackagedStagingTests(unittest.TestCase):
             self.assertEqual(list(root.iterdir()), [marker])
             self.assertEqual(marker.read_bytes(), b"existing output")
 
+    def test_standalone_invalid_packages_leave_output_available_for_retry(self):
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-verify-retry-") as directory:
+            root = Path(directory)
+            packages = root / "packages"
+            packages.mkdir()
+            output = root / "result"
+            marker = root / "preserve"
+            marker.write_bytes(b"existing output")
+            for attempt in range(2):
+                with self.subTest(attempt=attempt):
+                    with self.assertRaisesRegex(rc_package.RcError, "exact declared crate set"):
+                        rc_package.verify_packaged(packages, output, "1.0.0")
+                    self.assertFalse(output.exists())
+                    self.assertEqual(marker.read_bytes(), b"existing output")
+
+    def test_standalone_receipt_write_failure_removes_partial_output(self):
+        def fail_write(path, result):
+            path.write_text("partial receipt")
+            raise OSError("deliberate receipt write failure")
+
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-verify-write-") as directory:
+            output = Path(directory) / "result"
+            with mock.patch.object(rc_package, "check_packaged_workspace", return_value={}), \
+                    mock.patch.object(rc_package, "write_json", side_effect=fail_write):
+                with self.assertRaisesRegex(OSError, "deliberate receipt write failure"):
+                    rc_package.verify_packaged(Path(directory) / "packages", output, "1.0.0")
+            self.assertFalse(output.exists())
+
+    def test_standalone_success_retains_receipt_and_rejects_existing_output(self):
+        result = {"format": "zeno-fcis/packaged-application/1", "status": "passed"}
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-verify-success-") as directory:
+            output = Path(directory) / "result"
+            with mock.patch.object(rc_package, "check_packaged_workspace", return_value=result) as check:
+                rc_package.verify_packaged(Path(directory) / "packages", output, "1.0.0")
+                receipt = output / "PACKAGED-APPLICATION.json"
+                self.assertEqual(list(output.iterdir()), [receipt])
+                self.assertEqual(rc_package.load_json_object(receipt), result)
+                before = receipt.read_bytes()
+                with self.assertRaises(FileExistsError):
+                    rc_package.verify_packaged(Path(directory) / "packages", output, "1.0.0")
+                self.assertEqual(receipt.read_bytes(), before)
+                check.assert_called_once()
+
+    def test_standalone_interruption_removes_owned_output(self):
+        def interrupt_check(packages, version, staging, environment):
+            (staging / "partial-build").write_bytes(b"temporary")
+            raise KeyboardInterrupt()
+
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-verify-interrupt-") as directory:
+            output = Path(directory) / "result"
+            with mock.patch.object(rc_package, "check_packaged_workspace", side_effect=interrupt_check):
+                with self.assertRaises(KeyboardInterrupt):
+                    rc_package.verify_packaged(Path(directory) / "packages", output, "1.0.0")
+            self.assertFalse(output.exists())
+
 
 class CompilerFlagTests(unittest.TestCase):
     def test_spaced_paths_compile_and_documentation_warnings_remain_errors(self):

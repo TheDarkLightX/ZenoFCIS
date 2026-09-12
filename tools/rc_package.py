@@ -1141,9 +1141,14 @@ def check_packaged_workspace(
 def verify_packaged(packages: Path, output: Path, version: str) -> None:
     output.mkdir(parents=True)
     target = output / ".cargo-target"
-    result = verify_packaged_workspace(packages, version, target, dict(os.environ))
-    write_json(output / "PACKAGED-APPLICATION.json", result)
-    target.rmdir()
+    try:
+        result = verify_packaged_workspace(packages, version, target, dict(os.environ))
+        write_json(output / "PACKAGED-APPLICATION.json", result)
+        target.rmdir()
+    except BaseException:
+        # The exclusive mkdir above establishes ownership before cleanup.
+        shutil.rmtree(output)
+        raise
     print(f"rc-package: packaged application PASS; receipt: {output / 'PACKAGED-APPLICATION.json'}")
 
 
