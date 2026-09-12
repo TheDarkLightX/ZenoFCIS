@@ -1,0 +1,434 @@
+{
+  "schema": "zeno-fcis/outbox-encoding-results/1",
+  "date": "2026-09-12",
+  "baseline_commit": "696559dae92884d4fb1367d41f110e197abb2f9b",
+  "source_sha256": {
+    "crates/zeno-fcis-plan/src/lib.rs": "72fc884763589e31321005dcc9ae6525239792b17c187c298e3177dd66bee85c",
+    "crates/zeno-fcis-shell-sqlite/src/tests/transaction_tests.rs": "29e0b2f772f275f17d4fc6019e2e77b3c62397b275726c20582677fb5333c12d"
+  },
+  "sqlite_production_unchanged": true,
+  "selected_change": "Append outbox encoding to the existing candidate-prefixed delivery-id buffer",
+  "behavior": {
+    "delivery_cases": 7066,
+    "hash_provider_inputs_and_segment_boundaries_identical": true,
+    "hash_outputs_and_exact_encoding_errors_identical": true,
+    "entry_ownership_preserved": true,
+    "observations_sha256": "329dc8a37de97f614aba39ea0b67b08829b1a884953a06b729b336a058f70bd4",
+    "sqlite_corruption_observations": 78,
+    "sqlite_errors_equal_with_new_tests": true,
+    "golden_sha256": "1bb331f395586bc94cbba77dcb45f4427867cce1beb44bf63da64d7d581e04ac"
+  },
+  "allocations": {
+    "baseline": [
+      {
+        "payload_bytes": 0,
+        "allocation_and_reallocation_calls": 7,
+        "requested_bytes": 168,
+        "peak_live_requested_bytes": 96
+      },
+      {
+        "payload_bytes": 1,
+        "allocation_and_reallocation_calls": 7,
+        "requested_bytes": 168,
+        "peak_live_requested_bytes": 96
+      },
+      {
+        "payload_bytes": 16,
+        "allocation_and_reallocation_calls": 9,
+        "requested_bytes": 259,
+        "peak_live_requested_bytes": 134
+      },
+      {
+        "payload_bytes": 64,
+        "allocation_and_reallocation_calls": 9,
+        "requested_bytes": 377,
+        "peak_live_requested_bytes": 204
+      },
+      {
+        "payload_bytes": 1024,
+        "allocation_and_reallocation_calls": 9,
+        "requested_bytes": 3257,
+        "peak_live_requested_bytes": 2124
+      },
+      {
+        "payload_bytes": 65536,
+        "allocation_and_reallocation_calls": 9,
+        "requested_bytes": 196793,
+        "peak_live_requested_bytes": 131148
+      }
+    ],
+    "selected": [
+      {
+        "payload_bytes": 0,
+        "allocation_and_reallocation_calls": 4,
+        "requested_bytes": 112,
+        "peak_live_requested_bytes": 72
+      },
+      {
+        "payload_bytes": 1,
+        "allocation_and_reallocation_calls": 4,
+        "requested_bytes": 112,
+        "peak_live_requested_bytes": 72
+      },
+      {
+        "payload_bytes": 16,
+        "allocation_and_reallocation_calls": 6,
+        "requested_bytes": 261,
+        "peak_live_requested_bytes": 149
+      },
+      {
+        "payload_bytes": 64,
+        "allocation_and_reallocation_calls": 6,
+        "requested_bytes": 309,
+        "peak_live_requested_bytes": 197
+      },
+      {
+        "payload_bytes": 1024,
+        "allocation_and_reallocation_calls": 6,
+        "requested_bytes": 2219,
+        "peak_live_requested_bytes": 2107
+      },
+      {
+        "payload_bytes": 65536,
+        "allocation_and_reallocation_calls": 6,
+        "requested_bytes": 131243,
+        "peak_live_requested_bytes": 131131
+      }
+    ]
+  },
+  "timings": [
+    {
+      "payload_bytes": 0,
+      "median_ns": {
+        "baseline": 9492.29955,
+        "selected": 10121.506949999999
+      },
+      "change_percent": 6.628608765301758
+    },
+    {
+      "payload_bytes": 1,
+      "median_ns": {
+        "baseline": 9690.6366,
+        "selected": 9524.697049999999
+      },
+      "change_percent": -1.712369959265636
+    },
+    {
+      "payload_bytes": 16,
+      "median_ns": {
+        "baseline": 9746.719700000001,
+        "selected": 9560.289700000001
+      },
+      "change_percent": -1.9127460903589966
+    },
+    {
+      "payload_bytes": 64,
+      "median_ns": {
+        "baseline": 12898.538199999999,
+        "selected": 12726.15465
+      },
+      "change_percent": -1.3364580336708176
+    },
+    {
+      "payload_bytes": 1024,
+      "median_ns": {
+        "baseline": 46928.94,
+        "selected": 48059.895000000004
+      },
+      "change_percent": 2.4099308443787493
+    },
+    {
+      "payload_bytes": 65536,
+      "median_ns": {
+        "baseline": 2394681.785,
+        "selected": 2349009.395
+      },
+      "change_percent": -1.907242552479682
+    }
+  ],
+  "complexity": {
+    "baseline": {
+      "function_count": 43,
+      "function_nloc": 384,
+      "branch_points": 75,
+      "delivery_id": {
+        "nloc": 10,
+        "ccn": 3
+      }
+    },
+    "selected": {
+      "function_count": 43,
+      "function_nloc": 384,
+      "branch_points": 75,
+      "delivery_id": {
+        "nloc": 10,
+        "ccn": 3
+      }
+    }
+  },
+  "focused_test_results": [
+    "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+    "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s",
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  ],
+  "mutation_results": {
+    "records": [
+      {
+        "name": "baseline-with-new-tests",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-plan",
+          "-p",
+          "zeno-fcis-shell-sqlite",
+          "--",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "expected_test_rejection": false,
+        "log_sha256": "fb4925b32488bf31e808fd272e2e1db0242a1b874e7fb64d760e130198bf2ce3",
+        "plan_sha256": "e8ba1294f28aa02bec1b7f43e10039dea802414c2f9052f742de94cbbbe16fa7",
+        "sqlite_sha256": "f0d9024fba903d0d306ad528fdea1d3c8f58fb85392b46bb3beaedd1aff84cab"
+      },
+      {
+        "name": "drop-candidate-prefix",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-plan",
+          "tests::delivery_id_preserves_recorded_hash_input",
+          "--",
+          "--exact",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "25c2ef501f0724c0e1bd5095e15664b88110bd3a8bef7c53e9f8a2f7fcc9b568",
+        "plan_sha256": "7a4ee093e0bef1af3f5edd3d2131a11ac85936710ebb184c4b29b3b8cf9dc725",
+        "sqlite_sha256": "f0d9024fba903d0d306ad528fdea1d3c8f58fb85392b46bb3beaedd1aff84cab"
+      },
+      {
+        "name": "hash-invalid-encoding",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-plan",
+          "tests::invalid_delivery_values_preserve_error_order_without_hashing",
+          "--",
+          "--exact",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "a5f56d175465b473b9f236df14ef08dc06819365e073d28527edaad778d1ac9b",
+        "plan_sha256": "292817eb43f7f51fcc91b6339379880cd594e227f9fbee99349b7c7eb50115fe",
+        "sqlite_sha256": "f0d9024fba903d0d306ad528fdea1d3c8f58fb85392b46bb3beaedd1aff84cab"
+      },
+      {
+        "name": "only-check-first-candidate",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-shell-sqlite",
+          "tests::transaction_tests::repeated_reads_match_across_a_three_transition_history",
+          "--",
+          "--exact",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "46e99e8ca153e6baa5cc4ec0d9f1235ac7f579c1499c4eba1a0f64ea18590021",
+        "plan_sha256": "72fc884763589e31321005dcc9ae6525239792b17c187c298e3177dd66bee85c",
+        "sqlite_sha256": "d44e52aa5f744c18107b9e963c223a5894fb46e4339f1045251b6ae680622afe"
+      },
+      {
+        "name": "only-read-first-outbox-row",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-shell-sqlite",
+          "tests::transaction_tests::replay_and_acknowledgement_preserve_first_history_errors",
+          "--",
+          "--exact",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "exit_code": 101,
+        "expected_test_rejection": true,
+        "log_sha256": "855be33282296febfed0e02a4ccd1a67808b9643f4bcb15522ee25881aa55de7",
+        "plan_sha256": "72fc884763589e31321005dcc9ae6525239792b17c187c298e3177dd66bee85c",
+        "sqlite_sha256": "23ebe12ef5288c030e7d64dbeac821cf8ede18be0f868fef586d3bb711db6c4f"
+      },
+      {
+        "name": "selected-focused-tests",
+        "command": [
+          "cargo",
+          "+1.97.1",
+          "test",
+          "--locked",
+          "-p",
+          "zeno-fcis-plan",
+          "-p",
+          "zeno-fcis-shell-sqlite",
+          "-p",
+          "zeno-fcis-shell",
+          "-p",
+          "zeno-fcis-authority",
+          "--",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "expected_test_rejection": false,
+        "log_sha256": "85a79e7db4e4ad38d91bb469a570ad5ba8b1403c090b37cc7d66fef16d1e0075",
+        "plan_sha256": "72fc884763589e31321005dcc9ae6525239792b17c187c298e3177dd66bee85c",
+        "sqlite_sha256": "f0d9024fba903d0d306ad528fdea1d3c8f58fb85392b46bb3beaedd1aff84cab"
+      }
+    ],
+    "sources_restored": true,
+    "cache_rejection_record": "cache-rejection.json"
+  },
+  "rejected_cache": {
+    "candidate": "four cached SELECTs",
+    "decision": "rejected",
+    "test": [
+      "cargo",
+      "+1.97.1",
+      "test",
+      "--locked",
+      "-p",
+      "zeno-fcis-shell-sqlite",
+      "tests::transaction_tests::repeated_reads_survive_schema_change_corruption_and_reopen",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "exit_code": 101,
+    "reason": "Schema rename makes warm cached statement return SqliteFailure while fresh preparation returns SqlInputError with SQL and offset. Exact rejection detail differs.",
+    "source_sha256": "c58eac65a1fe1aa40ae8aaac210c3a24c234bb84577d9bf9f918958dec83b89d",
+    "test_source_sha256": "f593af79090af09a87b1fdb6a7004710d0db4803a3e96e1d7fe9944aad72432d",
+    "log_sha256": "5937832d5298eecca387e815c24e0841919ec9722ffc020c43103b5c2937a09b"
+  },
+  "advisory_models": {
+    "design": "Fable 5.1 identified both candidates; Codex independently resolved the append-only encoding premise",
+    "initial_implementation": "Claude Opus 5; query-cache candidate rejected by root",
+    "selected_implementation": "Claude Opus 5; one-line outbox change",
+    "followup_fable_review": "Not completed: usage credits unavailable",
+    "wall_clock_limit_seconds": null,
+    "acceptance_owner": "Codex root with deterministic checks"
+  },
+  "evidence_sha256": {
+    "baseline-delivery-probe.json": "879f6555b5d17d97df834880b1056d4f7c6de2d0c00aba3532d939d45146ccb5",
+    "selected-delivery-probe.json": "47c77909d6c8534ce9a9d10963f7470504dac75398337499b30ab87cfcfc21a5",
+    "delivery_probe.rs": "d5cbc24fc23a9495aa8009f469aa9c9bf232e5654e6d1d48dcf50b04d8126730",
+    "build_delivery_probe.py": "e419467b12eea57bb1a9fe025a0226e5c2c1158f1d2dc6a4f2f1265dd33830ee",
+    "delivery-timings.json": "5e9a19c7ae2816edc14177ad61ad35c5e2feb87a48e7012b77cddfc485177c2f",
+    "focused-and-mutation-results.json": "19abf4d044a695f155d6bd67c60d6963116db60f3efe0654e996c661ab1eb1b4",
+    "selected-focused-tests.log": "85a79e7db4e4ad38d91bb469a570ad5ba8b1403c090b37cc7d66fef16d1e0075",
+    "baseline-with-new-tests.log": "fb4925b32488bf31e808fd272e2e1db0242a1b874e7fb64d760e130198bf2ce3",
+    "cache-rejection.json": "3aaecd53569f9d466e07f1ce06da9bdde72bb267e7f37ffa411e2ccd2309f481",
+    "cache-schema-counterexample.log": "5937832d5298eecca387e815c24e0841919ec9722ffc020c43103b5c2937a09b",
+    "prototype-comparison.json": "3528a04c335cc29e92c57133a0f0eda75cbfe32e9dfb747aa8aa174691294be5",
+    "timings.json": "e693bdccd8810cf818511fe1972edf58c9ffabebbeea9572ec51598b9770ecdf",
+    "memory.json": "86e4bd83da99643c4287b71139842f04c303b91d38e64d10e776faa397fc21e4",
+    "fable-receipt.json": "347f72f9ae37f2c488778f5e29f3e447fcefefe1396859f0193791b16df78855",
+    "fable-revision-receipt.json": "10350c97c2f4162cf48673aaa80ab32d8064c164b057a2ca2d25775f91cf0785",
+    "opus-receipt.json": "9788f7e3e79cc16556a582d80fa58feada440ee40757342941a17a51ac47df32",
+    "opus-delivery-receipt.json": "e20f4b3b84fb4693ccc7a16e649241faef6950ffaf976df88dfff920554951e9",
+    "delivery-implementation.json": "298fbe9c7a49ec92424906a9e97f4932c5562ca95c787e6b16379665e0517c6e",
+    "final-checks.json": "c996cf6fd0daa10968eecba2444412a815b643ef713c919fdede3deac814c3e6"
+  },
+  "local_evidence_directory": "/tmp/zenofcis-sqlite-outbox-20260912",
+  "dependencies_changed": false,
+  "lean_changed": false,
+  "release_version": "1.0.0-rc.3",
+  "required_precommit_command": "python3 tools/atdd.py run --all",
+  "precommit_result_location": "Retained separately with the final commit",
+  "limits": [
+    "7066 bounded cases and named mutations are not a general proof",
+    "Allocation and timing measurements are local; wall-time differences are mixed",
+    "16-byte measured payload slightly increases requested bytes and peak buffer memory",
+    "No new zero-copy, SIMD, assembly, threading or stable-release claim"
+  ],
+  "focused_checks": [
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "clippy",
+        "--locked",
+        "-p",
+        "zeno-fcis-plan",
+        "-p",
+        "zeno-fcis-shell",
+        "-p",
+        "zeno-fcis-shell-sqlite",
+        "-p",
+        "zeno-fcis-authority",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log_sha256": "abe581c68cf302b159a1868ce4efe45fb2eea2de01edf92c850302bf33dea2fc"
+    },
+    {
+      "name": "no-std",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "check",
+        "--locked",
+        "-p",
+        "zeno-fcis-plan",
+        "--no-default-features"
+      ],
+      "exit_code": 0,
+      "log_sha256": "b5af5e57aa9017e5735dc33a3813b3abb0770e45faa649dc6803ff70ab86e583"
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "static_checks": {
+    "assurance": "PASS:37 crates,27 semantic boundaries,16 effect rules",
+    "library_docs": "PASS:1.0.0-rc.3"
+  }
+}

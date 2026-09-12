@@ -166,9 +166,16 @@ lookup with a hole iterator and binary search. It removes temporary instruction
 values while preserving programs, traces and failure order, with the expected
 checker-source identity refresh recorded separately.
 
-1. Measure SQLite query batching and reuse of expected outbox rows while
-   retaining validation of every history and outbox row. Checking only touched
-   rows would narrow corruption detection and was rejected.
+The [outbox encoding and SQLite review](OUTBOX_ENCODING_AND_SQLITE_CHECKS.md)
+removes a temporary delivery-identifier buffer while preserving exact hash inputs.
+A measured SQLite statement-cache prototype was rejected because schema changes
+altered error details. The new regression checks preserve that counterexample,
+full-history validation and later-row error precedence.
+
+1. Any future SQLite batching or expected-row reuse must preserve every row
+   check and exact first-error detail, including schema failures. The existing
+   direct queries remain; checking only touched rows would narrow corruption
+   detection and was rejected.
 2. Revisit namespace grouping for path conflicts when application workloads
    justify it. A scratch prototype helped large multi-namespace sets but hurt
    tiny and single-namespace sets. A simple merge over full sorted paths is
