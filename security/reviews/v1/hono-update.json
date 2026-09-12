@@ -1,0 +1,35 @@
+{
+  "package": "hono",
+  "before": {
+    "version": "4.12.34",
+    "resolved": "https://registry.npmjs.org/hono/-/hono-4.12.34.tgz",
+    "integrity": "sha512-GqXJqY/xJkJmuloTrnV1ZEXG3fqte+VjkUqoRNZXcrUidiUOP4fMSIHHY4tsqZBK++kVyWmt/AAfSUuy57/eSA==",
+    "dev": true,
+    "license": "MIT",
+    "peer": true,
+    "engines": {
+      "node": ">=16.9.0"
+    }
+  },
+  "after": {
+    "version": "4.13.5",
+    "resolved": "https://registry.npmjs.org/hono/-/hono-4.13.5.tgz",
+    "integrity": "sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==",
+    "dev": true,
+    "license": "MIT",
+    "peer": true,
+    "engines": {
+      "node": ">=16.9.0"
+    }
+  },
+  "unchanged_other_lock_entries": 142,
+  "external_dependencies_added": 0,
+  "probity_version_unchanged": true,
+  "canonical_lock_sha256": "04ada1d1daaf44a9f92f361c6e12f492c9cc7f541bd0d451ecab2b691192da0a",
+  "advisories": [
+    "GHSA-gqvv-2mrq-wpjv",
+    "GHSA-g6gw-c38x-mqfc",
+    "GHSA-crvj-82cr-hjcx"
+  ],
+  "scope": "optional Node development tooling; no Rust dependency or Lean version change"
+}

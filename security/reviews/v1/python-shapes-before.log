@@ -1,0 +1,51 @@
+   Compiling zeno-fcis-catalog v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-catalog)
+   Compiling zeno-fcis-transition v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-transition)
+   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+    Finished `test` profile [unoptimized] target(s) in 2.30s
+     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-6f79b7aee78d2c7a)
+
+running 5 tests
+
+thread 'python_generation_rejects_shadowing_names' (99) panicked at crates/zeno-fcis-generated-code-tests/tests/python_replay.rs:449:9:
+assertion `left == right` failed: type int
+  left: None
+ right: Some(InvalidIdentifier)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test python_generation_rejects_shadowing_names ... FAILED
+test python_vector_replay_succeeds ... ok
+test python_outgoing_schema_bounds_are_enforced ... ok
+
+thread 'python_composite_values_reject_malformed_structure' (98) panicked at crates/zeno-fcis-generated-code-tests/tests/python_replay.rs:36:5:
+python malformed-structure checks failed
+stdout: 
+stderr: Traceback (most recent call last):
+  File "<string>", line 56, in <module>
+  File "<string>", line 15, in rejects
+AssertionError: expected type_mismatch
+
+test python_composite_values_reject_malformed_structure ... FAILED
+
+thread 'python_innocent_names_generate_and_replay' (100) panicked at crates/zeno-fcis-generated-code-tests/tests/python_replay.rs:36:5:
+python innocent-name checks failed
+stdout: vectors replayed: 9
+
+stderr: Traceback (most recent call last):
+  File "<string>", line 16, in <module>
+  File "/tmp/zenofcis-milestone-target/tmp/python_innocent_names/innocent_names.py", line 182, in try_from_value
+    if len(fields) != 10: raise AdapterError("record_shape")
+       ^^^
+UnboundLocalError: cannot access local variable 'len' where it is not associated with a value
+
+test python_innocent_names_generate_and_replay ... FAILED
+
+failures:
+
+failures:
+    python_composite_values_reject_malformed_structure
+    python_generation_rejects_shadowing_names
+    python_innocent_names_generate_and_replay
+
+test result: FAILED. 2 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+error: test failed, to rerun pass `-p zeno-fcis-generated-code-tests --test python_replay`

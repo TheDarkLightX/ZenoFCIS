@@ -1,7 +1,7 @@
 # Installation
 
-ZenoFCIS `1.0.0-rc.3` is a Rust library release candidate. Rust `1.97.1` is
-the minimum supported toolchain for this candidate.
+ZenoFCIS `1.0.0` is the stable Rust library release. Rust `1.97.1` is
+the minimum supported toolchain.
 
 ## Application dependency
 
@@ -10,7 +10,7 @@ application:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -27,25 +27,25 @@ crate:
 
 ```toml
 [dependencies]
-zeno-fcis-core = { version = "=1.0.0-rc.3", default-features = false }
-zeno-fcis-codec = { version = "=1.0.0-rc.3", default-features = false }
+zeno-fcis-core = { version = "=1.0.0", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0", default-features = false }
 ```
 
 All ZenoFCIS crates in one dependency graph should use the same exact release
-candidate version.
+version.
 
 ## Source checkout
 
 ```bash
 git clone https://github.com/TheDarkLightX/ZenoFCIS.git
 cd ZenoFCIS
-git checkout v1.0.0-rc.3
+git checkout v1.0.0
 cargo +1.97.1 test --workspace --all-features --locked
 ```
 
-The tag is created only after the exact release-candidate commit passes every
-required gate. Until that tag exists, use the reviewed branch commit named in
-the RC pull request rather than an unpinned branch dependency.
+The signed release tag identifies the source used to build the published
+packages. See the [release notes](V1_RELEASE_NOTES.md) for compatibility and
+assurance boundaries.
 
 ## Optional coding-agent guardrails
 
@@ -63,17 +63,17 @@ hook setup and explicit nonclaims.
 
 ## Host binaries
 
-The core library does not require a daemon. RC3 includes the authoring CLI and
+The core library does not require a daemon. V1 includes the authoring CLI and
 the existing host diagnostic parity tool:
 
 ```bash
-cargo +1.97.1 install zeno-fcis-cli --version 1.0.0-rc.3 --locked
+cargo +1.97.1 install zeno-fcis-cli --version 1.0.0 --locked
 zeno-fcis check project.zeno
 ```
 
 ```bash
 cargo +1.97.1 install zeno-fcis-adapter-zenodex \
-  --version 1.0.0-rc.3 --locked
+  --version 1.0.0 --locked
 ```
 
 `mount-zenodex-zusd` compares the pinned ZenoDEX Python and Rust transitions.
@@ -83,7 +83,7 @@ value movement.
 
 ## Offline verification
 
-The RC artifact set contains `SHA256SUMS`, `RC-MANIFEST.json`,
+The release artifact set contains `SHA256SUMS`, `RC-MANIFEST.json`,
 `SOURCE-MANIFEST.json`, `SBOM.cdx.json`, and `PROVENANCE-INPUTS.json`.
 
 ```bash

@@ -1,0 +1,55 @@
+[
+  {
+    "name": "patched-npm-ci",
+    "command": [
+      "npm",
+      "ci",
+      "--ignore-scripts",
+      "--cache",
+      "/tmp/zenofcis-npm-naming-cache"
+    ],
+    "exit_code": 0,
+    "log_sha256": "525448b7769b75702300631f9a2bdb1f131e879e188dffbe9d36ab452fb2b495"
+  },
+  {
+    "name": "patched-probity",
+    "command": [
+      "python3",
+      "tools/check_probity.py"
+    ],
+    "exit_code": 0,
+    "log_sha256": "26b03f61103fbe0360a148a00e442f3d01914c9002779ce07f93e2dba6355b1e"
+  },
+  {
+    "name": "patched-npm-audit",
+    "command": [
+      "npm",
+      "audit",
+      "--audit-level=high",
+      "--cache",
+      "/tmp/zenofcis-npm-naming-cache"
+    ],
+    "exit_code": 0,
+    "log_sha256": "6d8c5c8f3d7684adb070417bd608d01ae90aa3dc26a65af03ffda4955f38d9a3"
+  },
+  {
+    "name": "patched-package-selftest",
+    "command": [
+      "python3",
+      "tools/rc_package.py",
+      "self-test"
+    ],
+    "exit_code": 0,
+    "log_sha256": "71a98f328e6cf8c56c9f1169d9637ac89802c466f280b028da756478e31a9a31"
+  },
+  {
+    "name": "patched-package-check",
+    "command": [
+      "python3",
+      "tools/rc_package.py",
+      "check"
+    ],
+    "exit_code": 0,
+    "log_sha256": "13a3812c8f996539b4d2e5ccfaa14288e47ffe8022e44330518d9b18265b7aee"
+  }
+]

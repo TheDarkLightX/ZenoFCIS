@@ -1,9 +1,8 @@
 # ZenoFCIS V1 product contract
 
-This document freezes the reusable core-library scope for `1.0.0-rc.3`. It is
-the product-level complement to the protocol and authority documents. A feature
-belongs in RC3 only when it supports one of the adopter journeys below without
-silently broadening the production claim.
+This document defines the stable reusable core-library scope for `1.0.0`. It
+is the product-level complement to the protocol and authority documents. Each
+feature supports an adopter journey below with an explicit assurance boundary.
 
 ## Intended users
 
@@ -16,9 +15,9 @@ silently broadening the production claim.
 | Runtime integrator | Compare complete mounted decisions, publish authorized transitions atomically, and deliver exact durable outbox obligations. |
 | Release maintainer | Rebuild the complete crate family, documentation, source, binaries, SBOM, provenance inputs, and checksums from one exact revision. |
 
-## RC3 feature freeze
+## Stable V1 scope
 
-RC3 contains these product features:
+V1 contains these product features:
 
 1. Immutable bounded values, deterministic logical budgets, the three-way
    decision algebra, canonical encoding, patches, plans, receipts, and bundles.
@@ -34,18 +33,22 @@ RC3 contains these product features:
 6. Bounded authenticated-state reference semantics, candidate-bound
    authenticated authority, persistent collections, and a crash-atomic SQLite
    reference shell with strict history reconstruction and durable outbox.
-7. A project bootstrap generator, checked examples, isolated-consumer fixture,
+7. A project bootstrap generator, checked examples, isolated consumer project,
    human and LLM documentation, executable acceptance scenarios, and
-   reproducible release-candidate packaging.
+   release packaging with explicit reproducibility checks.
 8. A bounded `.zeno` compiler, canonical typed project AST, accumulated
    diagnostics, equivalent authoring builders, derived composition views, and
    bounded relational/temporal evaluation.
 9. Public deterministic CVC5, Z3, and Lean adapters, a complete `zeno-fcis`
    CLI, and the executable shared-nothing Mini Determinator semantic model.
 
-No new semantic subsystem should enter RC3 after this freeze. A correction to
-an authority or protocol defect requires a new exact candidate head and complete
-revalidation. A feature expansion belongs in a later release.
+10. A concrete bounded finite-contract synthesizer, Rust/Python/JavaScript
+    target conformance, a generated durable application, machine-readable CLI
+    discovery and failures, and qualification from actual packaged crates.
+
+A correction to an authority or protocol defect requires a new exact candidate
+head and complete revalidation. Future changes must follow Cargo API stability
+and the separate canonical protocol version rules.
 
 ## First successful project journey
 
@@ -70,7 +73,7 @@ portfolio.
 
 ## UX acceptance criteria
 
-RC3 is usable when:
+V1 supports these acceptance criteria:
 
 - a new evaluator reaches a successful example with one documented command;
 - feature selection explains the smallest supported dependency surface;
@@ -92,7 +95,7 @@ RC3 is usable when:
 
 ## Explicit nonclaims
 
-The product contract does not claim Cargo API stability before `1.0.0`, project
+Cargo API stability begins at `1.0.0`. The product contract does not claim project
 requirement completeness, a bundled solver or prover, a production scheduler,
 general deployment qualification, a mechanized end-to-end theorem for arbitrary
 projects, or publication of any crate or release artifact. BDD scenarios are

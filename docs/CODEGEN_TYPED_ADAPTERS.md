@@ -94,3 +94,22 @@ The generator produces a `GeneratedBundle` containing:
 - The root smart constructor does **not** select a hash provider, schema,
   profile version, or stable identifier, and it does not establish business
   invariants or production authority.
+
+### Python input contract
+
+Python scalar adapters accept exact builtin `bool`, `int`, `bytes` and `str`
+values. They reject coercions and subclasses with `AdapterError("type_mismatch")`.
+Composite adapters require the declared generated child classes. Incoming
+values use the codec's exact tagged tuples and list payloads; malformed shapes,
+wrong field or variant IDs, missing or extra sum payloads, inconsistent map-key
+bytes, duplicate keys and noncanonical incoming key order are rejected.
+Vector and map constructors retain iterable support, and outgoing maps retain
+canonical sorting. Valid decoded values keep the same canonical bytes.
+
+Generation rejects names that collide with the Python runtime, generated
+constants/classes or reserved method names. This is a target naming constraint,
+not a change to numeric schema identity. Field names that merely resemble local
+variables are supported by positional decoding. Use the bounded canonical
+codec decoder for untrusted bytes. Arbitrary object mutation, runtime
+monkey-patching and cyclic in-memory object graphs are outside the typed
+adapter contract.

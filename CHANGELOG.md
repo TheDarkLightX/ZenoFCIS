@@ -6,6 +6,25 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+## 1.0.0 - 2026-09-12
+
+First stable Cargo API release. See [V1 release notes](docs/V1_RELEASE_NOTES.md)
+for developer workflows, compatibility and assurance limits.
+
+- Add concrete finite-contract synthesis with Rust, Python and JavaScript target
+  conformance; keep proposal, checking, emission and application authority separate.
+- Reduce redundant canonical decoding, composition hashing, finite evaluation,
+  outbox encoding and parallel binding allocation with retained comparison evidence.
+- Promote all 36 public package versions together without upgrading Lean or
+  any external Rust dependency version. Patch the developer-tool Hono dependency
+  to 4.13.5, the first version fixing three newly reported moderate advisories.
+- Reject pending SQLite entries absent from the approved bundle, including
+  row substitution between validation reads.
+- Reject Python adapter primitive coercions and isolate synthesis runner source
+  creation against pre-existing files and symlinks.
+- Avoid a nested Cargo build lock deadlock in the QEMU capture runner and
+  regenerate the real V1 framebuffer and serial transcript.
+
 - Use `test-projects` and `test-data` folders and a private
   `zeno-fcis-generated-code-tests` crate. Rename `ReplayFixture` to
   `DecisionMismatchRecord`, with the previous public name retained as an alias.
@@ -61,7 +80,28 @@ embedded in ZenoFCIS values.
   translation corpus. Lean remains pinned at 4.30.0; the corpus can reuse an
   existing executable without installing or copying its runtime.
 
-## 1.0.0-rc.3 - release date pending
+### Added
+
+- a deterministic, prompt-minimized Exploitability-Potential Index scanner with
+  decomposable hotspot scores, category-specific reviewer cards, candidate
+  multi-stage review routes, hostile self-tests, exact baseline drift
+  detection, and a read-only CI gate;
+- an evidence-first LLM security playbook, dated primary-source standards
+  snapshot, exploit-chain proof obligations, Chain Feasibility Index, and a
+  machine-readable review-report schema;
+- a closed ATDD scenario proving that repository text remains inert while
+  hotspot ranking and the exact source inventory stay reproducible.
+
+### Changed
+
+- the LLM cybersecurity prompt now guides bounded models from threat modeling
+  through hotspot triage, isolated scanners, current advisory/tactic lookup,
+  finding proof, zero-day chain analysis, mitigation, and adversarial re-review;
+- release assurance now retains hotspot model/inventory identities, review
+  scope, chains, and residual-risk decisions without treating a low score or
+  clean scan as a security certificate.
+
+## 1.0.0-rc.3 - 2026-07-30
 
 Authoring and composition usability candidate before stable V1.
 
@@ -76,7 +116,7 @@ Authoring and composition usability candidate before stable V1.
   explanations, formal tools, and backend diagnosis;
 - the executable Mini Determinator private-workspace, get/put, return,
   canonical join, conflict, rollback, budget, and replay reference;
-- sixteen RC3 BDD/ATDD scenarios, tutorials, official formal-tool checksum
+- twenty-six RC3 BDD/ATDD scenarios, tutorials, official formal-tool checksum
   workflow, and a 36-crate public package inventory.
 
 ### Compatibility and limits

@@ -1,0 +1,1072 @@
+{
+  "chains": [],
+  "decision": {
+    "accepted_risks": [],
+    "blockers": [],
+    "confirmed_properties": [
+      "The scheduled SQLite substitution regression fails before the membership fix and passes after it",
+      "The Python type-confusion regression fails before the primitive checks and passes after them",
+      "Replacing exclusive source creation with ordinary overwrite is detected by the regression test",
+      "Existing authority, SQLite, CLI and generated-code tests pass after the initial repairs",
+      "Wrong Python child classes, malformed shapes, namespace collisions and inconsistent map keys are rejected while canonical replay passes",
+      "Rust, Python and JavaScript finite synthesis pass the complete declared domains and hostile cases",
+      "The precommit source inventory is retained at security/reviews/v1/reviewed-source.json",
+      "Full workspace all-features tests and doctests: 654 passed, 0 failed, 14 ignored"
+    ],
+    "evidence_gated_properties": [
+      "Final committed V1 source requires all permanent CI workflows",
+      "36 packages require retained checksum comparison from two clean builders",
+      "Signed tag and owner-authorized publication require the complete release checklist"
+    ],
+    "explicit_nonclaims": [
+      "No EPI score is used as vulnerability probability, severity or release authority",
+      "No composite exploit chain was established by joining unrelated findings",
+      "No model output, clean scan, stable version or successful corpus proves arbitrary application correctness",
+      "The recorded-dirty source manifest identifies this precommit review; final CI and publication are separate"
+    ],
+    "next_bounded_slice": "Validate the exact committed source and compare clean-builder artifacts before publication.",
+    "outcome": "bounded-review-clean",
+    "unreviewed_scope": [
+      "Independent commissioned security audit",
+      "Hardware side channels and arbitrary external verifier implementations",
+      "Production transports, database backups and cross-store atomicity"
+    ]
+  },
+  "findings": [
+    {
+      "categories": [
+        "codegen-build",
+        "input-canonicalization"
+      ],
+      "claim_level": "evidence-gated",
+      "cves": [],
+      "cvss_v4": null,
+      "cwes": [
+        "CWE-367",
+        "CWE-377"
+      ],
+      "entry": "Finite target runner creates working directory and source files",
+      "epi_at_discovery": 79,
+      "epss": null,
+      "evidence_refs": [
+        "security/reviews/v1/source-creation-mutant.log",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "id": "ZSEC-001",
+      "impact": "Co-tenant might substitute source or redirect a write",
+      "kev": "not-applicable",
+      "locations": [
+        {
+          "end_line": 392,
+          "path": "crates/zeno-fcis-cli/src/synth/runner.rs",
+          "start_line": 392
+        }
+      ],
+      "mitigation": "Fixed: directory mode 0700 from creation, exclusive source creation, existing-file and symlink regression. The overwrite mutant is rejected.",
+      "preconditions": [
+        "Hypothetical winning directory-creation race on a shared temporary filesystem"
+      ],
+      "provides": [
+        "Co-tenant might substitute source or redirect a write"
+      ],
+      "reachable_path": [
+        "Finite target runner creates working directory and source files",
+        "Co-tenant might substitute source or redirect a write"
+      ],
+      "reliability": "theoretical",
+      "reproducer": {
+        "evidence_ref": "security/reviews/v1/source-creation-mutant.log",
+        "kind": "source-trace",
+        "safe_boundary": "Isolated tests and public-source review; no external destination or co-tenant attacked"
+      },
+      "requires": [
+        "Hypothetical winning directory-creation race on a shared temporary filesystem"
+      ],
+      "residual_risk": "No exploit of the original timing window was demonstrated. Child tools retain user privileges; hostile compilers remain outside this guarantee.",
+      "severity": "low",
+      "ssvc_decision": null,
+      "status": "hypothesis",
+      "title": "Temporary source creation could follow pre-existing files"
+    },
+    {
+      "categories": [
+        "codegen-build",
+        "input-canonicalization"
+      ],
+      "claim_level": "evidence-gated",
+      "cves": [],
+      "cvss_v4": null,
+      "cwes": [
+        "CWE-20",
+        "CWE-704"
+      ],
+      "entry": "Generated Python to_value and try_from_value",
+      "epi_at_discovery": 89,
+      "epss": null,
+      "evidence_refs": [
+        "security/reviews/v1/python-types-before.log",
+        "security/reviews/v1/boundary-fixes.log",
+        "security/reviews/v1/python-shapes-before.log",
+        "security/reviews/v1/python-map-before.log",
+        "security/reviews/v1/python-map-after.log"
+      ],
+      "id": "ZSEC-002",
+      "impact": "Input meaning changes silently before canonical encoding",
+      "kev": "not-applicable",
+      "locations": [
+        {
+          "end_line": 143,
+          "path": "crates/zeno-fcis-codegen/src/python.rs",
+          "start_line": 143
+        }
+      ],
+      "mitigation": "Fixed: exact primitive and identifier checks precede range and value checks. Valid canonical replay remains passing. Follow-up shape, nominal-child, sum-payload, name-collision and canonical-map checks were independently reproduced and tested.",
+      "preconditions": [
+        "Caller supplies a value of a different Python primitive type"
+      ],
+      "provides": [
+        "Input meaning changes silently before canonical encoding"
+      ],
+      "reachable_path": [
+        "Generated Python to_value and try_from_value",
+        "Input meaning changes silently before canonical encoding"
+      ],
+      "reliability": "deterministic",
+      "reproducer": {
+        "evidence_ref": "security/reviews/v1/python-types-before.log",
+        "kind": "integration-test",
+        "safe_boundary": "Isolated tests and public-source review; no external destination or co-tenant attacked"
+      },
+      "requires": [
+        "Caller supplies a value of a different Python primitive type"
+      ],
+      "residual_risk": "Generated adapters are convenience boundaries, not nominal production authority. Deliberate monkey-patching or hostile runtime replacement is outside scope.",
+      "severity": "low",
+      "ssvc_decision": null,
+      "status": "confirmed",
+      "title": "Generated Python adapters silently coerced wrong primitive types"
+    },
+    {
+      "categories": [
+        "state-replay",
+        "authority-access"
+      ],
+      "claim_level": "shell-enforced",
+      "cves": [],
+      "cvss_v4": null,
+      "cwes": [
+        "CWE-367",
+        "CWE-345"
+      ],
+      "entry": "AuthorizedSqliteShell next_pending and deliver_next",
+      "epi_at_discovery": 98,
+      "epss": null,
+      "evidence_refs": [
+        "security/reviews/v1/sqlite-race-before.log",
+        "security/reviews/v1/boundary-fixes.log"
+      ],
+      "id": "ZSEC-003",
+      "impact": "next_pending can return an entry absent from the approved bundle; deliver_next can then invoke the destination interpreter with it",
+      "kev": "not-applicable",
+      "locations": [
+        {
+          "end_line": 810,
+          "path": "crates/zeno-fcis-shell-sqlite/src/lib.rs",
+          "start_line": 810
+        }
+      ],
+      "mitigation": "Fixed: compare the selected entry and authorization directly with the immutable approved bundle before returning PendingDelivery. Scheduled public-API regression rejects substitution and accepts restored legitimate delivery.",
+      "preconditions": [
+        "Second writer can replace an outbox row after history validation and restore it before subsequent validation"
+      ],
+      "provides": [
+        "next_pending can return an entry absent from the approved bundle; deliver_next can then invoke the destination interpreter with it"
+      ],
+      "reachable_path": [
+        "AuthorizedSqliteShell next_pending and deliver_next",
+        "next_pending can return an entry absent from the approved bundle; deliver_next can then invoke the destination interpreter with it"
+      ],
+      "reliability": "schedule-dependent",
+      "reproducer": {
+        "evidence_ref": "security/reviews/v1/sqlite-race-before.log",
+        "kind": "integration-test",
+        "safe_boundary": "Isolated tests and public-source review; no external destination or co-tenant attacked"
+      },
+      "requires": [
+        "Second writer can replace an outbox row after history validation and restore it before subsequent validation"
+      ],
+      "residual_risk": "Direct database writes can still change acknowledgement availability and enable replay of authentic entries. Destination idempotency and documented anti-rollback limits remain.",
+      "severity": "medium",
+      "ssvc_decision": null,
+      "status": "confirmed",
+      "title": "Pending SQLite row could escape approved-bundle membership between reads"
+    }
+  ],
+  "format": "zeno-fcis/security-review/1",
+  "hotspot_triage": [
+    {
+      "categories_checked": [
+        "authority-access",
+        "effects-injection",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 98,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [
+        "ZSEC-003"
+      ],
+      "path": "crates/zeno-fcis-shell-sqlite/src/lib.rs",
+      "result": "reviewed",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 95,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-formal-tools/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 93,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-adapter-zenodex/src/bin/mount-zenodex-zusd.rs",
+      "result": "deferred",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [
+        "authority-access",
+        "codegen-build",
+        "effects-injection",
+        "formal-evidence",
+        "input-canonicalization",
+        "memory-concurrency",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 93,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-cli/src/main.rs",
+      "result": "reviewed",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 92,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-bootstrap/src/templates.rs",
+      "result": "deferred",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [
+        "authority-access",
+        "errors-observability",
+        "formal-evidence",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 90,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-authority/src/lib.rs",
+      "result": "reviewed",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 89,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-adapter/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [
+        "codegen-build",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay",
+        "supply-chain-release"
+      ],
+      "deferred_reason": null,
+      "epi": 89,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [
+        "ZSEC-002"
+      ],
+      "path": "crates/zeno-fcis-codegen/src/python.rs",
+      "result": "reviewed",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [
+        "authority-access",
+        "codegen-build",
+        "effects-injection",
+        "formal-evidence",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "secrets-crypto",
+        "state-replay",
+        "supply-chain-release"
+      ],
+      "deferred_reason": null,
+      "epi": 89,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [],
+      "path": "tools/rc_package.py",
+      "result": "reviewed",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 87,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "tools/release_manifest.py",
+      "result": "deferred",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [
+        "authority-access",
+        "formal-evidence",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 85,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-authenticated-authority/src/lib.rs",
+      "result": "reviewed",
+      "tier": "priority-1"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/assurance.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/developer-guardrails.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/formal-tools.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/release-candidate.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/secret-hardening.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-authenticated/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-receipt/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-refine/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "tools/check_assurance.py",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "tools/check_generated_application.py",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "tools/qemu_demo.py",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 81,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "tools/security_hotspots.py",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 80,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-formal-tools/src/translation_tests.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 79,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-bootstrap/src/render.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [
+        "authority-access",
+        "codegen-build",
+        "effects-injection",
+        "errors-observability",
+        "formal-evidence",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 79,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [
+        "ZSEC-001"
+      ],
+      "path": "crates/zeno-fcis-cli/src/synth/runner.rs",
+      "result": "reviewed",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 79,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/build.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 79,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-codegen/src/vectors.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 79,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-secret/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 79,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "tools/build_assurance_bundle.py",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 78,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-adapter-zenodex/src/zusd.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 78,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-backend/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 78,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-cli/src/synth/mod.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 77,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "tools/check_synthesis.py",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 76,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/mounted-zenodex.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 73,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/miri.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 73,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-cli/src/synth/problem.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [
+        "authority-access",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 73,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-compose/src/lib.rs",
+      "result": "reviewed",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 71,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/adopter-acceptance.yml",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 71,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-catalog/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 71,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-codegen/src/render.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 71,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-composed-program/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 71,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-spec/src/views.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 71,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-transition/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 70,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-codec/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 70,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-patch/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 70,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-plan/src/lib.rs",
+      "result": "deferred",
+      "tier": "priority-2"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 69,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/fuzz.yml",
+      "result": "deferred",
+      "tier": "priority-3"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 69,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": ".github/workflows/qemu-demo.yml",
+      "result": "deferred",
+      "tier": "priority-3"
+    },
+    {
+      "categories_checked": [],
+      "deferred_reason": "Outside the two scoped source inspections; repository tests and scanner rank are not substitutes for manual review.",
+      "epi": 69,
+      "evidence_refs": [],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/src/laws.rs",
+      "result": "deferred",
+      "tier": "priority-3"
+    },
+    {
+      "categories_checked": [
+        "authority-access",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 65,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-laws/src/lib.rs",
+      "result": "reviewed",
+      "tier": "priority-3"
+    },
+    {
+      "categories_checked": [
+        "input-canonicalization",
+        "resource-exhaustion",
+        "state-replay"
+      ],
+      "deferred_reason": null,
+      "epi": 50,
+      "evidence_refs": [
+        "docs/V1_REVIEW.md",
+        "security/reviews/v1/opus-release-issues-result.md",
+        "security/reviews/v1/opus-release-boundaries-result.md"
+      ],
+      "finding_ids": [],
+      "path": "crates/zeno-fcis-synthesis/src/lib.rs",
+      "result": "reviewed",
+      "tier": "priority-3"
+    }
+  ],
+  "review_identity": {
+    "commit": "cca3f6b30cd81d8af134dc238c06fe7cd5c18b4a",
+    "ended": "2026-09-12T20:26:13.423458+00:00",
+    "hotspot_inventory_sha256": "f1201aa1dd44348b34107d049632591b05266a15a012f17946b7baf8f2984eb5",
+    "hotspot_model_sha256": "66c9b96886e0e0ddb00148868aeee17bacb7681f77be0411e3544516c46c1360",
+    "repository": "https://github.com/TheDarkLightX/ZenoFCIS",
+    "reviewer": "Codex root; actual claude-opus-5 scoped source inspections and implementation; root independent reproduction and patch validation",
+    "standards_snapshot": "2026-07-31",
+    "started": "2026-09-12T19:12:21.156212+00:00",
+    "tree_state": "recorded-dirty"
+  },
+  "threat_model": {
+    "attacker_capabilities": [
+      "Malformed schemas, candidates, primitive values and external tool outputs",
+      "Second SQLite writer substituting rows between public-method reads",
+      "Hypothetical co-tenant with access to a shared temporary directory before permissions were restricted"
+    ],
+    "excluded_conditions": [
+      "Compromise of the selected law, qualification or relation verifier",
+      "A universal economic engine or unbounded end-to-end theorem",
+      "Downstream deployment, multi-process storage, anti-rollback and transport qualification"
+    ],
+    "protected_assets": [
+      "Nominal production authorization and exact approved outbox obligations",
+      "Canonical data, target conformance results, and retained release identity"
+    ],
+    "security_objectives": [
+      "Only the approved transition bundle supplies production delivery entries",
+      "Invalid generated-adapter inputs do not silently change meaning",
+      "Untrusted candidates and external tool output cannot mint nominal authority"
+    ],
+    "supported_deployments": [
+      "Documented reference integrations and bounded finite synthesis targets",
+      "Reviewed host-side authoring and package construction"
+    ],
+    "trust_boundaries": [
+      "Input bytes to structural admission to privately constructed authority",
+      "Approved bundle to database row to destination interpreter",
+      "Proposed finite implementation to deterministic target checker",
+      "Reviewed source to package builder to owner publication"
+    ]
+  },
+  "tool_runs": [
+    {
+      "artifact_refs": [
+        "security/reviews/v1/sqlite-race-before.json",
+        "security/reviews/v1/sqlite-race-before.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-shell-sqlite --locked pending_delivery_rejects_row_substitution_between_reads -- --nocapture",
+      "configuration_sha256": null,
+      "exit_status": 101,
+      "identity": "Rust 1.97.1 and the retained command-specific runtime",
+      "limitations": [
+        "Combined stdout/stderr digest; bounded cases only",
+        "Negative before-fix and mutant commands are expected failures when so named"
+      ],
+      "outcome": "findings",
+      "stderr_sha256": null,
+      "stdout_sha256": "f5c5dfb115669b208c3c4c4a0bd365d92101f86f4cf8a388b095f973c71e4264"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/python-types-before.json",
+        "security/reviews/v1/python-types-before.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-generated-code-tests --locked --test python_replay python_outgoing_schema_bounds_are_enforced -- --nocapture",
+      "configuration_sha256": null,
+      "exit_status": 101,
+      "identity": "Rust 1.97.1 and the retained command-specific runtime",
+      "limitations": [
+        "Combined stdout/stderr digest; bounded cases only",
+        "Negative before-fix and mutant commands are expected failures when so named"
+      ],
+      "outcome": "findings",
+      "stderr_sha256": null,
+      "stdout_sha256": "2fe3f3e7295158b30e5e260d2e5de09e50db06942114baff39238a449cfa6adf"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/boundary-fixes.json",
+        "security/reviews/v1/boundary-fixes.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-shell-sqlite -p zeno-fcis-cli -p zeno-fcis-generated-code-tests -p zeno-fcis-authority --all-features --locked",
+      "configuration_sha256": null,
+      "exit_status": 0,
+      "identity": "Rust 1.97.1 and the retained command-specific runtime",
+      "limitations": [
+        "Combined stdout/stderr digest; bounded cases only",
+        "Negative before-fix and mutant commands are expected failures when so named"
+      ],
+      "outcome": "pass",
+      "stderr_sha256": null,
+      "stdout_sha256": "37baeeab9dace1262261ed67c4e59d7b4f71cbd142c1744a540dbece46a61e80"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/source-creation-mutant.json",
+        "security/reviews/v1/source-creation-mutant.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-cli --locked source_creation_preserves_existing_files_and_symlink_targets -- --nocapture",
+      "configuration_sha256": null,
+      "exit_status": 101,
+      "identity": "Rust 1.97.1 and the retained command-specific runtime",
+      "limitations": [
+        "Combined stdout/stderr digest; bounded cases only",
+        "Negative before-fix and mutant commands are expected failures when so named"
+      ],
+      "outcome": "findings",
+      "stderr_sha256": null,
+      "stdout_sha256": "87f23ba89fea5001129ddc94c702b5ebaa3125857a8ca95fd68bb327a5d467a5"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/formal-existing-lean.json",
+        "security/reviews/v1/formal-existing-lean.log"
+      ],
+      "command": "env ZENO_FCIS_TRANSLATION_LEAN=/home/trevormoc/.elan/toolchains/leanprover--lean4---v4.32.0/bin/lean cargo +1.97.1 test -p zeno-fcis-formal-tools --locked translation_tests::operator_corpus_checks_with_existing_lean -- --ignored --exact --nocapture",
+      "configuration_sha256": null,
+      "exit_status": 0,
+      "identity": "Rust 1.97.1 and the retained command-specific runtime",
+      "limitations": [
+        "Combined stdout/stderr digest; bounded cases only",
+        "Negative before-fix and mutant commands are expected failures when so named"
+      ],
+      "outcome": "pass",
+      "stderr_sha256": null,
+      "stdout_sha256": "acfd71f05b34ed83f970f41435686b4691882a9131bd5e35235fc0e56842e68b"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/python-shapes-before.json",
+        "security/reviews/v1/python-shapes-before.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-generated-code-tests --locked --test python_replay -- --nocapture",
+      "configuration_sha256": null,
+      "exit_status": 101,
+      "identity": "Rust 1.97.1 with Python 3 and the pinned conformance targets where used",
+      "limitations": [
+        "Combined stdout/stderr; before-fix failures are expected evidence",
+        "The declared cases do not prove arbitrary external runtime behavior"
+      ],
+      "outcome": "findings",
+      "stderr_sha256": null,
+      "stdout_sha256": "f2253401245930c694755eefcb3ef72538e21be6ec68fa9f84275e789bfbb50c"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/python-shapes-after.json",
+        "security/reviews/v1/python-shapes-after.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-codegen -p zeno-fcis-generated-code-tests --all-features --locked",
+      "configuration_sha256": null,
+      "exit_status": 0,
+      "identity": "Rust 1.97.1 with Python 3 and the pinned conformance targets where used",
+      "limitations": [
+        "Combined stdout/stderr; before-fix failures are expected evidence",
+        "The declared cases do not prove arbitrary external runtime behavior"
+      ],
+      "outcome": "pass",
+      "stderr_sha256": null,
+      "stdout_sha256": "41f9e0f8110dec8ff924a0f4fbe8089158e17cd6ee682b772be39b0f2b2709e5"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/python-map-before.json",
+        "security/reviews/v1/python-map-before.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-generated-code-tests --locked --test python_replay python_composite_values_reject_malformed_structure -- --nocapture",
+      "configuration_sha256": null,
+      "exit_status": 101,
+      "identity": "Rust 1.97.1 with Python 3 and the pinned conformance targets where used",
+      "limitations": [
+        "Combined stdout/stderr; before-fix failures are expected evidence",
+        "The declared cases do not prove arbitrary external runtime behavior"
+      ],
+      "outcome": "findings",
+      "stderr_sha256": null,
+      "stdout_sha256": "88cc6e5c58c603a9179ce8cd94f6ce6cd15d3ca95ba1ed5bfedf65f469b46827"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/python-map-after.json",
+        "security/reviews/v1/python-map-after.log"
+      ],
+      "command": "cargo +1.97.1 test -p zeno-fcis-codegen -p zeno-fcis-generated-code-tests --all-features --locked",
+      "configuration_sha256": null,
+      "exit_status": 0,
+      "identity": "Rust 1.97.1 with Python 3 and the pinned conformance targets where used",
+      "limitations": [
+        "Combined stdout/stderr; before-fix failures are expected evidence",
+        "The declared cases do not prove arbitrary external runtime behavior"
+      ],
+      "outcome": "pass",
+      "stderr_sha256": null,
+      "stdout_sha256": "3cb5f4f2c966701f18a769202bbc26b1b825d713985707a1e797614eeee0d1ba"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/synthesis-final.json",
+        "security/reviews/v1/synthesis-final.log"
+      ],
+      "command": "python3 tools/check_synthesis.py --receipt /tmp/zenofcis-v1-release-evidence-20260912/synthesis-final-receipt.json",
+      "configuration_sha256": null,
+      "exit_status": 0,
+      "identity": "Rust 1.97.1 with Python 3 and the pinned conformance targets where used",
+      "limitations": [
+        "Combined stdout/stderr; before-fix failures are expected evidence",
+        "The declared cases do not prove arbitrary external runtime behavior"
+      ],
+      "outcome": "pass",
+      "stderr_sha256": null,
+      "stdout_sha256": "6a82d8136a3146456bb0a241edb4fb2bca76142f1d9665d17754bd3d98bed0bf"
+    },
+    {
+      "artifact_refs": [
+        "security/reviews/v1/workspace-final.json",
+        "security/reviews/v1/workspace-final.log"
+      ],
+      "command": "cargo +1.97.1 test --workspace --all-features --locked",
+      "configuration_sha256": "cf24320d37baf911e5a04860260e7c368655f3ad522dfdd29ae6bd362eefdd26",
+      "exit_status": 0,
+      "identity": "Rust 1.97.1",
+      "limitations": [
+        "654 passing tests and 14 explicitly ignored platform/runtime tests; combined stdout/stderr",
+        "Exact pinned formal-tool and Miri workflows remain separate release gates"
+      ],
+      "outcome": "pass",
+      "stderr_sha256": null,
+      "stdout_sha256": "8a234c90b1475b3456af263c9f149bd303270e2a82e8717b7261dc5c50828a1b"
+    }
+  ]
+}

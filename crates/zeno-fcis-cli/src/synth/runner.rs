@@ -139,8 +139,8 @@ impl TargetRunner for RustRunner {
             }
         };
         let identity = identify(&compiler, &temp.0, "rustc 1.97.1 ")?;
-        fs::write(temp.0.join("transition.rs"), source).map_err(io)?;
-        fs::write(temp.0.join("fixture.rs"), RUST_FIXTURE).map_err(io)?;
+        write_source(&temp.0.join("transition.rs"), source)?;
+        write_source(&temp.0.join("fixture.rs"), RUST_FIXTURE)?;
         execute(
             &compiler,
             &[
@@ -196,7 +196,7 @@ impl TargetRunner for PythonRunner {
         };
         let identity = identify(&interpreter, &temp.0, "Python 3.")?;
         let fixture = format!("{source}{PYTHON_FIXTURE}");
-        fs::write(temp.0.join("fixture.py"), &fixture).map_err(io)?;
+        write_source(&temp.0.join("fixture.py"), &fixture)?;
         let stdout = execute(
             &interpreter,
             &["-I".into(), "-B".into(), "fixture.py".into()],
@@ -238,8 +238,8 @@ impl TargetRunner for JavaScriptRunner {
         let identity = identify(&node, &temp.0, "v22.")?;
         let module = temp.0.join("transition.mjs");
         let fixture = temp.0.join("fixture.mjs");
-        fs::write(&module, source).map_err(io)?;
-        fs::write(&fixture, JAVASCRIPT_FIXTURE).map_err(io)?;
+        write_source(&module, source)?;
+        write_source(&fixture, JAVASCRIPT_FIXTURE)?;
         let fixture_sha256 = sha(JAVASCRIPT_FIXTURE.as_bytes());
         let module_sha256 = sha(source.as_bytes());
         let stdout = execute(&node, &["fixture.mjs".into()], &inputs(cases), &temp.0)?;
@@ -389,6 +389,18 @@ fn scrubbed(key: &OsStr) -> bool {
     key.starts_with(b"NODE_") || SCRUBBED.iter().any(|name| name.as_bytes() == key)
 }
 
+fn write_source(path: &Path, source: &str) -> Result<(), RunError> {
+    use std::io::Write as _;
+
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(io)?
+        .write_all(source.as_bytes())
+        .map_err(io)
+}
+
 pub(super) struct Temp(PathBuf);
 impl Temp {
     /// Owned 0700 directory for tests that need a disposable executable.
@@ -402,12 +414,19 @@ impl Temp {
             std::process::id(),
             crate::TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
-        fs::create_dir(&root).map_err(io)?;
         #[cfg(unix)]
         {
-            use std::os::unix::fs::PermissionsExt;
+            use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+            fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&root)
+                .map_err(io)?;
+            // Creation is already private. Restore owner permissions even under
+            // a restrictive umask without ever exposing the directory to peers.
             fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).map_err(io)?;
         }
+        #[cfg(not(unix))]
+        fs::create_dir(&root).map_err(io)?;
         Ok(Self(root))
     }
 }
@@ -569,6 +588,25 @@ mod process_tests {
             assert!(!scrubbed(OsStr::new(inherited)), "{inherited} was removed");
         }
     }
+    #[test]
+    fn source_creation_preserves_existing_files_and_symlink_targets() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+
+        let temp = Temp::new().unwrap_or_else(|e| panic!("{}", e.message));
+        assert_eq!(
+            fs::metadata(&temp.0).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        let original = temp.0.join("original");
+        write_source(&original, "keep").unwrap_or_else(|e| panic!("{}", e.message));
+        assert!(write_source(&original, "replace").is_err());
+        assert_eq!(fs::read(&original).unwrap(), b"keep");
+        let link = temp.0.join("transition.rs");
+        symlink(&original, &link).unwrap();
+        assert!(write_source(&link, "replace").is_err());
+        assert_eq!(fs::read(&original).unwrap(), b"keep");
+    }
+
     #[test]
     fn final_capture_is_bounded_and_exited_parents_do_not_leave_running_children() {
         let temp = Temp::new().unwrap_or_else(|e| panic!("{}", e.message));

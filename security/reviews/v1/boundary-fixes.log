@@ -1,0 +1,181 @@
+   Compiling zeno-fcis-crypto v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-crypto)
+   Compiling zeno-fcis-refine v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-refine)
+   Compiling zeno-fcis-evidence v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-evidence)
+   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
+   Compiling zeno-fcis-bootstrap v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-bootstrap)
+   Compiling zeno-fcis-laws v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-laws)
+   Compiling zeno-fcis-synthesis v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-synthesis)
+   Compiling zeno-fcis-backend v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-backend)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+   Compiling zeno-fcis-spec v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-spec)
+   Compiling zeno-fcis-formal-tools v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-formal-tools)
+   Compiling zeno-fcis-authority v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-authority)
+   Compiling zeno-fcis-shell-sqlite v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-shell-sqlite)
+   Compiling zeno-fcis-cli v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-cli)
+    Finished `test` profile [unoptimized] target(s) in 19.57s
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_authority-a3987d69c863febe)
+
+running 13 tests
+test tests::authority_rejects_transition_program_build_mismatch ... ok
+test tests::violated_genesis_law_cannot_initialize_authorized_shell ... ok
+test tests::schema_valid_wrong_root_cannot_mint_genesis_authority ... ok
+test tests::ordinary_reject_never_creates_commit_authority ... ok
+test tests::persisted_authorization_decoder_fails_closed_on_bounds_and_shape ... ok
+test tests::shell_owned_transition_limits_cannot_be_replaced_by_program ... ok
+test tests::violated_project_law_cannot_mint_commit_authority ... ok
+test tests::persisted_authorization_is_reexecuted_into_exact_nominal_authority ... ok
+test tests::exact_authorization_commits_and_replays_idempotently ... ok
+test tests::every_genesis_policy_field_changes_policy_and_genesis_identity ... ok
+test tests::shell_rejects_authorization_from_another_deployment_policy ... ok
+test tests::principal_and_replay_are_bound_into_candidate_and_authorization ... ok
+test tests::persisted_authorization_rejects_body_invocation_and_policy_substitution ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis-96deb96debf6d2e8)
+
+running 15 tests
+test synth::runner::process_tests::inherited_node_switches_and_toolchain_overrides_cannot_reach_a_child ... ok
+test tests::exit_classes_are_stable ... ok
+test synth::runner::process_tests::source_creation_preserves_existing_files_and_symlink_targets ... ok
+test tests::project_reader_stops_before_consuming_the_full_input ... ok
+test synth::tests::discovery_has_distinct_language_adapters_and_missing_tools_stay_unknown ... ok
+test tests::hostile_source_is_inert ... ok
+test tests::rc3_mini_os_check ... ok
+test tests::help_and_version_succeed_while_invalid_usage_is_64 ... ok
+test synth::tests::source_admission_rejects_duplicates_unknown_fields_and_noninteger_atoms ... ok
+test tests::every_described_command_has_explicit_effect_metadata ... ok
+test synth::tests::javascript_runner_refuses_an_unqualified_runtime_version ... ok
+test tests::rc3_project_new ... ok
+test synth::runner::process_tests::final_capture_is_bounded_and_exited_parents_do_not_leave_running_children ... ok
+test synth::tests::counter_satisfies_independent_full_decision_table_and_mutations ... ok
+test synth::tests::runner_verdicts_require_exact_outputs_and_complete_coverage ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/cli_adopter_flow.rs (/tmp/zenofcis-milestone-target/debug/deps/cli_adopter_flow-1a2143bcb2e0e1e0)
+
+running 13 tests
+test pinned_lean_cli_prove_is_process_level ... ignored, requires the workflow-pinned Lean 4.30.0 Linux x86-64 distribution
+test rc3_cli_invalid_json_diagnostics_are_versioned_and_ordered ... ok
+test rc3_cli_mini_determinator_check_json_contract ... ok
+test rc3_cli_computes_a_portable_lean_inventory_for_tools_v2 ... ok
+test rc3_cli_generate_check_is_read_only_and_detects_drift ... ok
+test rc3_cli_new_refuses_existing_content_and_usage_is_64 ... ok
+test cli_project_file_budget_accepts_the_limit_and_stops_one_over ... ok
+test cli_project_read_failures_preserve_json_and_exit_class ... ok
+test agent_generation_json_distinguishes_drift_and_failures_without_writes ... ok
+test agent_command_discovery_is_deterministic_and_needs_no_project ... ok
+test cli_durable_counter_emits_a_complete_project_without_overwriting ... ok
+test rc3_cli_formal_outcomes_and_retention_are_process_level ... ok
+test cli_tool_timeout_is_execution_failure ... ok
+
+test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/synthesis_javascript.rs (/tmp/zenofcis-milestone-target/debug/deps/synthesis_javascript-be7fe3321b00679e)
+
+running 1 test
+test javascript_executes_precision_overflow_and_inert_input_boundaries ... ignored, requires Node.js; the finite-synthesis ATDD scenario runs this explicitly
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_generated_code_tests-3b0bc24ba0cd0b83)
+
+running 32 tests
+test tests::bootstrap_effect_helper_uses_catalogued_operation_and_payload ... ok
+test tests::generated_binding_failures_precede_transition_input_failures ... ok
+test tests::generated_root_envelope_binds_schema_type_and_metrics ... ok
+test tests::generated_project_rejects_wrong_commitment_provider ... ok
+test tests::generated_input_admission_enforces_provider_and_validation_bounds ... ok
+test tests::generated_root_envelope_enforces_caller_validation_budget ... ok
+test tests::generated_input_commitments_are_deterministic_and_value_sensitive ... ok
+test tests::generated_root_admission_checks_provider_before_typed_conversion ... ok
+test tests::generated_root_envelope_rejects_wrong_hash_provider ... ok
+test tests::generated_inputs_bind_exact_types_schema_domains_and_commitments ... ok
+test tests::generated_root_reconstructs_the_exact_source_schema ... ok
+test tests::generated_transition_rejects_wrong_root_type_after_schema_binding ... ok
+test tests::integer_range_enforced_by_adapter ... ok
+test tests::generated_project_reconstructs_exact_catalog_profile_and_schema ... ok
+test tests::patch_path_constructors_use_stable_field_ids ... ok
+test tests::generated_transition_rejects_wrong_schema_envelope ... ok
+test tests::outgoing_schema_bounds_are_enforced_by_adapter ... ok
+test tests::negative_vectors_reject_at_decode_or_validate ... ok
+test tests::generated_typed_rejection_uses_exact_catalog_reason ... ok
+test tests::generated_typed_context_field_observation_records_only_exact_context_footprint ... ok
+test tests::positive_vector_round_trips_through_codec ... ok
+test tests::typed_adapter_round_trips_minimal ... ok
+test tests::generated_transition_preserves_complete_invocation_bindings ... ok
+test tests::typed_value_failure_precedes_provider_mismatch ... ok
+test tests::generated_project_starts_and_seals_accept_from_root_envelope ... ok
+test tests::generated_typed_effect_and_channel_stage_exact_catalog_values ... ok
+test tests::unknown_variant_rejected_by_adapter ... ok
+test tests::generated_typed_root_update_rejects_invalid_value_without_staging ... ok
+test tests::generated_typed_staging_rejects_invalid_values_without_staging ... ok
+test tests::generated_typed_root_read_returns_exact_type_and_records_only_read_footprint ... ok
+test tests::generated_typed_reason_condition_and_duplicates_preserve_semantics ... ok
+test tests::generated_typed_root_update_uses_exact_field_path_and_value ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-a48b8887397b7766)
+
+running 2 tests
+test python_outgoing_schema_bounds_are_enforced ... ok
+test python_vector_replay_succeeds ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_shell_sqlite-b1aad7f550fbe1ab)
+
+running 28 tests
+test tests::reopen_rejects_an_uninitialized_store ... ok
+test tests::schema_v4_requires_explicit_history_migration ... ok
+test tests::schema_v3_requires_explicit_genesis_migration ... ok
+test tests::legacy_unversioned_database_fails_closed ... ok
+test tests::authorized_genesis_cannot_initialize_an_existing_store_twice ... ok
+test tests::database_rejects_interpreter_bound_by_another_policy ... ok
+test tests::snapshot_rejects_a_stored_root_that_does_not_commit_to_the_stored_state ... ok
+test tests::persisted_policy_corruption_is_detected_before_read_or_commit ... ok
+test tests::snapshot_rejects_trailing_bytes_after_the_stored_state_value ... ok
+test tests::database_rejects_authorization_from_another_deployment_policy ... ok
+test tests::reopen_rejects_a_different_deployment_policy ... ok
+test tests::reopen_rejects_tampered_genesis_authorization ... ok
+test tests::live_snapshot_rejects_committed_state_substitution ... ok
+test tests::reopen_rejects_version_zero_state_substitution ... ok
+test tests::delivery_rejects_payload_rewrite_even_with_recomputed_row_hashes ... ok
+test tests::acknowledgement_binds_exact_entry_hash ... ok
+test tests::postcommit_crash_recovers_by_replay_and_pending_delivery ... ok
+test tests::commit_evidence_is_persisted_without_delivery ... ok
+test tests::reopen_revalidates_persisted_genesis_without_caller_state ... ok
+test tests::sqlite_trace_matches_reference_commit ... ok
+test tests::transaction_tests::failed_sqlite_commit_preserves_memory_and_allows_retry ... ok
+test tests::replay_and_snapshot_reject_missing_or_extra_outbox_rows ... ok
+test tests::reopen_rejects_redundant_bundle_bytes_and_noncontiguous_versions ... ok
+test tests::transaction_tests::repeated_reads_survive_schema_change_corruption_and_reopen ... ok
+test tests::transaction_tests::repeated_reads_match_across_a_three_transition_history ... ok
+test tests::every_precommit_crash_rolls_back_complete_set ... ok
+test tests::transaction_tests::pending_delivery_rejects_row_substitution_between_reads ... ok
+test tests::transaction_tests::replay_and_acknowledgement_preserve_first_history_errors ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+   Doc-tests zeno_fcis_authority
+
+running 2 tests
+test crates/zeno-fcis-authority/src/lib.rs - CatalogAuthorizedGenesis (line 639) - compile fail ... ok
+test crates/zeno-fcis-authority/src/lib.rs - CatalogAuthorizedTransition (line 1396) - compile fail ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+   Doc-tests zeno_fcis_generated_code_tests
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests zeno_fcis_shell_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

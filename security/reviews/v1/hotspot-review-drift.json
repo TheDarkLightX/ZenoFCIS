@@ -1,0 +1,54 @@
+{
+  "model_changed": false,
+  "new_ranked_paths": [
+    "crates/zeno-fcis-cli/src/synth/mod.rs",
+    "crates/zeno-fcis-cli/src/synth/problem.rs",
+    "crates/zeno-fcis-cli/src/synth/runner.rs",
+    "crates/zeno-fcis-cli/templates/durable-counter/build.rs",
+    "crates/zeno-fcis-cli/templates/durable-counter/src/laws.rs",
+    "crates/zeno-fcis-formal-tools/src/translation_tests.rs",
+    "tools/check_generated_application.py",
+    "tools/check_synthesis.py"
+  ],
+  "new_scope": {
+    "admitted_bytes": 2950723,
+    "admitted_files": 151,
+    "inventory_sha256": "f1201aa1dd44348b34107d049632591b05266a15a012f17946b7baf8f2984eb5",
+    "ranked_above_minimum": 128,
+    "reported_hotspots": 50,
+    "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
+    "tier_counts": {
+      "priority-1": 11,
+      "priority-2": 36,
+      "priority-3": 81,
+      "priority-4": 9,
+      "priority-5": 14
+    }
+  },
+  "old_scope": {
+    "admitted_bytes": 2679068,
+    "admitted_files": 130,
+    "inventory_sha256": "82867971da3fe29134461f412f87e71c8dd9e5c633d2c1a8b046950c3e921e40",
+    "ranked_above_minimum": 113,
+    "reported_hotspots": 50,
+    "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
+    "tier_counts": {
+      "priority-1": 11,
+      "priority-2": 29,
+      "priority-3": 73,
+      "priority-4": 8,
+      "priority-5": 9
+    }
+  },
+  "removed_ranked_paths": [
+    "crates/zeno-fcis-laws/src/lib.rs",
+    "crates/zeno-fcis-security/src/lib.rs",
+    "crates/zeno-fcis-spec/src/ast.rs",
+    "crates/zeno-fcis-spec/src/lib.rs",
+    "tools/atdd.py",
+    "tools/capture_cli_terminal.py",
+    "tools/check_probity.py",
+    "tools/render_cli_marketing.py"
+  ],
+  "score_changes": {}
+}

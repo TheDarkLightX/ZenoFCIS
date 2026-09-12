@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "+1.97.1",
+    "test",
+    "-p",
+    "zeno-fcis-shell-sqlite",
+    "-p",
+    "zeno-fcis-cli",
+    "-p",
+    "zeno-fcis-generated-code-tests",
+    "-p",
+    "zeno-fcis-authority",
+    "--all-features",
+    "--locked"
+  ],
+  "exit_code": 0,
+  "started_at": "2026-09-12T20:07:50.710437+00:00",
+  "elapsed_seconds": 20.979192,
+  "log_sha256": "37baeeab9dace1262261ed67c4e59d7b4f71cbd142c1744a540dbece46a61e80"
+}

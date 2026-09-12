@@ -1,8 +1,8 @@
 # ZenoFCIS feature matrix
 
 This matrix covers features on the `zeno-fcis` umbrella crate. The current
-workspace version is `1.0.0-rc.3`; “core” means the implemented
-project-neutral RC surface. Final Cargo V1 API stability begins at `1.0.0`.
+workspace version is `1.0.0`; “core” means the implemented
+project-neutral library surface. Cargo API stability begins at `1.0.0`.
 
 ## Environment labels
 
@@ -110,28 +110,28 @@ graph or production authority.
 
 ```toml
 # Project-neutral semantic values and reference semantics
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false }
+zeno-fcis = { version = "=1.0.0", default-features = false }
 
 # Single-domain, law-aware authorized transitions
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["authority"] }
+zeno-fcis = { version = "=1.0.0", default-features = false, features = ["authority"] }
 
 # Multi-domain deterministic composition
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0", default-features = false, features = ["composed-program"] }
 
 # Host-side starter generation
-zeno-fcis = { version = "=1.0.0-rc.3", features = ["bootstrap"] }
+zeno-fcis = { version = "=1.0.0", features = ["bootstrap"] }
 
 # Concrete local authorized persistence
-zeno-fcis = { version = "=1.0.0-rc.3", features = ["sqlite-shell"] }
+zeno-fcis = { version = "=1.0.0", features = ["sqlite-shell"] }
 
 # Candidate-bound authenticated index publication
-zeno-fcis = { version = "=1.0.0-rc.3", features = ["authenticated-authority"] }
+zeno-fcis = { version = "=1.0.0", features = ["authenticated-authority"] }
 
 # Tool-neutral checked backend protocol
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["backend"] }
+zeno-fcis = { version = "=1.0.0", default-features = false, features = ["backend"] }
 
 # Pure authoring compiler and Mini Determinator
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["authoring"] }
+zeno-fcis = { version = "=1.0.0", default-features = false, features = ["authoring"] }
 ```
 
 ## Deterministic-parallel status

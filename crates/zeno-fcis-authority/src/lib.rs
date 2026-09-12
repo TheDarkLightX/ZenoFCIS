@@ -637,11 +637,18 @@ impl CanonicalEncode for GenesisAuthorizationBody {
 /// Raw schema admission cannot construct this type:
 ///
 /// ```compile_fail
-/// use zeno_fcis_authority::CatalogAuthorizedGenesis;
+/// use zeno_fcis_authority::{CatalogAuthorizedGenesis, CatalogTransitionProgram};
+/// use zeno_fcis_crypto::ApprovedCommitmentProvider;
 /// use zeno_fcis_schema::SchemaAdmittedEnvelope;
 ///
-/// fn raw_is_not_genesis(value: SchemaAdmittedEnvelope) {
-///     let _: CatalogAuthorizedGenesis<(), (), (), ()> = value;
+/// fn raw_is_not_genesis<H, P, L, I>(value: SchemaAdmittedEnvelope)
+///     -> CatalogAuthorizedGenesis<H, P, L, I>
+/// where
+///     H: ApprovedCommitmentProvider,
+///     P: CatalogTransitionProgram<H>,
+///     L: zeno_fcis_laws::ProjectLawEngine,
+/// {
+///     value.into()
 /// }
 /// ```
 pub struct CatalogAuthorizedGenesis<H, P, L, I>

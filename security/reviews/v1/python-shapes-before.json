@@ -1,0 +1,18 @@
+{
+  "command": [
+    "cargo",
+    "+1.97.1",
+    "test",
+    "-p",
+    "zeno-fcis-generated-code-tests",
+    "--locked",
+    "--test",
+    "python_replay",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "started_at": "2026-09-12T20:22:47.957266+00:00",
+  "elapsed_seconds": 2.603577,
+  "log_sha256": "f2253401245930c694755eefcb3ef72538e21be6ec68fa9f84275e789bfbb50c"
+}

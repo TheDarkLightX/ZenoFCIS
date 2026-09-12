@@ -1,0 +1,3 @@
+   Compiling zeno-fcis-cli v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-cli)
+    Finished `dev` profile [unoptimized] target(s) in 2.07s
+finite synthesis: Rust, Python and JavaScript passed counter, generic and exact-integer boundary cases; hostile cases rejected

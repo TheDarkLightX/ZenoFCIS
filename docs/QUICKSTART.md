@@ -12,7 +12,7 @@ ProjectProfile + ProjectCatalog
     -> authorized shell publication
 ```
 
-The workspace is version `1.0.0-rc.3`, the current public API and packaging
+The workspace is version `1.0.0`, the current public API and packaging
 candidate. The APIs below are implemented and ready for downstream evaluation.
 Final Cargo API stability and general deployment qualification are not claimed
 until their separate `1.0.0` gates pass.
@@ -23,7 +23,7 @@ Use the umbrella crate when starting a project:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -78,13 +78,13 @@ Add features only at the boundary that needs them:
 
 ```toml
 # Host-side starter generation
-zeno-fcis = { version = "=1.0.0-rc.3", features = ["bootstrap"] }
+zeno-fcis = { version = "=1.0.0", features = ["bootstrap"] }
 
 # Crash-atomic SQLite publication
-zeno-fcis = { version = "=1.0.0-rc.3", features = ["sqlite-shell"] }
+zeno-fcis = { version = "=1.0.0", features = ["sqlite-shell"] }
 
 # Checked external engines such as an SMT, Lean, CVC5, or private ESSO adapter
-zeno-fcis = { version = "=1.0.0-rc.3", default-features = false, features = ["backend"] }
+zeno-fcis = { version = "=1.0.0", default-features = false, features = ["backend"] }
 ```
 
 Avoid `full` in reusable libraries. It includes project-specific and reference

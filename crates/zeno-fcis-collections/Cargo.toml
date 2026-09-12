@@ -21,8 +21,8 @@ ordered-map = ["dep:rpds"]
 imbl-backend = ["ordered-map"]
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec" }
-zeno-fcis-value = { version = "=1.0.0-rc.3", path = "../zeno-fcis-value" }
+zeno-fcis-codec = { version = "=1.0.0", path = "../zeno-fcis-codec" }
+zeno-fcis-value = { version = "=1.0.0", path = "../zeno-fcis-value" }
 
 # Optional persistent collection backends.
 # Pinned exactly per ZenoFCIS dependency policy.

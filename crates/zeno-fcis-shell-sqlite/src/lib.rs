@@ -809,6 +809,17 @@ where
             .validated_history
             .get(&pending.candidate_id)
             .ok_or(SqliteShellError::CorruptHistory)?;
+        // Later database reads may observe another writer's restored row.
+        // Bind the row selected for delivery to the approved bundle itself.
+        if pending.authorization_id != record.authorization_id
+            || !record
+                .bundle
+                .outbox_plan()
+                .entries()
+                .contains(&pending.entry)
+        {
+            return Err(SqliteShellError::CorruptOutbox);
+        }
         validate_stored_candidate(&self.connection, record)?;
         validate_authorization_mapping(
             &self.connection,

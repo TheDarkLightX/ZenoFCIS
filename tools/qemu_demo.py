@@ -30,7 +30,7 @@ EXPECTED_PREFIX = (
     "BOOT=KERNEL",
     "FIRMWARE_HANDOFF=COMPLETE",
     "TARGET=x86_64-unknown-none",
-    "CORE=zeno-fcis-spec/1.0.0-rc.3",
+    "CORE=zeno-fcis-spec/1.0.0",
     "REPLAY_ORDER_A=2,1",
     "REPLAY_ORDER_B=1,2",
     "REPLAY=PASS",
@@ -137,9 +137,16 @@ def build_image() -> Path:
         "--locked",
         "--quiet",
     ]
+    environment = os.environ.copy()
+    target_dir = environment.pop("CARGO_TARGET_DIR", None)
+    if target_dir is not None:
+        # The bootloader invokes cargo install from its build script. Forward
+        # the outer target as an argument so that child cannot inherit its lock.
+        command.extend(["--target-dir", target_dir])
     completed = subprocess.run(
         command,
         cwd=ROOT,
+        env=environment,
         check=False,
         capture_output=True,
         text=True,
@@ -310,7 +317,13 @@ def boot_and_capture(image: Path, timeout_seconds: float) -> tuple[str, Path, di
                     chunk = os.read(key.fileobj.fileno(), 65536)
                     if chunk:
                         raw.extend(chunk)
-            transcript, dimensions = extract_transcript(bytes(raw))
+            try:
+                transcript, dimensions = extract_transcript(bytes(raw))
+            except DemoError as error:
+                raise DemoError(
+                    f"{error}; QEMU exit status: {process.poll()!r}; "
+                    f"boot output tail: {bytes(raw[-4096:])!r}"
+                ) from error
             monitor_response = monitor_command(
                 monitor, f"screendump {framebuffer}", time.monotonic() + 5.0
             )

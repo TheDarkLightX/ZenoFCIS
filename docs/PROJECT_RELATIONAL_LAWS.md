@@ -177,15 +177,19 @@ No new external dependency is introduced.
 - Missing, duplicate, hidden extra, violated, or indeterminate observations.
 - Missing or invalid genesis applicability, or a genesis observation set that
   differs from the exact required set.
-- Debit, credit, fee, mint, burn, asset, recipient, authority, subject, and
-  effect-count mutations in the executable fixture law engine.
-- Aggregate multi-effect imbalance.
 - Value classification with missing conservation, debit/credit, mint/burn,
   fee/rounding, authority, or committed-failure coverage.
 - Custom value classification with a missing law, substituted claim,
   insufficient scope, or runtime-only evidence.
 - Attempt to authorize an ordinary rejection carrying authority artifacts,
   which is unrepresentable in `LawDecisionView`.
+
+These framework checks establish manifest coverage and rejection behavior.
+Each adopting project must also test its own economic law engine against
+debit, credit, fee, mint, burn, asset, recipient, authority, subject, and
+effect-count mutations, including aggregate multi-effect imbalance. ZenoFCIS
+does not supply a universal economic engine or evidence for those project
+semantics.
 
 ## Assumptions
 

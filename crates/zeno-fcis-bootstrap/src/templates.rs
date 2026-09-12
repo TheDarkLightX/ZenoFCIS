@@ -282,7 +282,7 @@ fn render_typed_reason_enum(
 }
 
 fn render_effect_enum(output: &mut String, catalog: &ProjectCatalog) -> Result<(), BootstrapError> {
-    output.push_str("/// Stable authoritative-effect identifiers.\n");
+    output.push_str("/// Stable identifiers for non-executable commit evidence.\n");
     render_id_attributes(output, catalog.manifest().effects().is_empty());
     output.push_str("pub enum EffectKind {\n");
     for effect in catalog.manifest().effects() {

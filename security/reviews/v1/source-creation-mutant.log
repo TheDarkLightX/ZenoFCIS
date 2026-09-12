@@ -1,0 +1,20 @@
+   Compiling zeno-fcis-formal-tools v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-formal-tools)
+   Compiling zeno-fcis-cli v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-cli)
+    Finished `test` profile [unoptimized] target(s) in 7.03s
+     Running unittests src/main.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis-b25cc11452454f3b)
+
+running 1 test
+
+thread 'synth::runner::process_tests::source_creation_preserves_existing_files_and_symlink_targets' (188) panicked at crates/zeno-fcis-cli/src/synth/runner.rs:594:9:
+assertion failed: write_source(&original, "replace").is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test synth::runner::process_tests::source_creation_preserves_existing_files_and_symlink_targets ... FAILED
+
+failures:
+
+failures:
+    synth::runner::process_tests::source_creation_preserves_existing_files_and_symlink_targets
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p zeno-fcis-cli --bin zeno-fcis`

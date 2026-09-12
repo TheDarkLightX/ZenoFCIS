@@ -1,6 +1,6 @@
 # Mini Determinator QEMU kernel demo
 
-ZenoFCIS `1.0.0-rc.3` includes an isolated, executable `no_std` x86_64 kernel
+ZenoFCIS `1.0.0` includes an isolated, executable `no_std` x86_64 kernel
 demo under `demos/mini-determinator-qemu/`. It boots through OVMF in QEMU,
 calls the public `zeno-fcis-spec` Mini Determinator implementation, writes a
 host-validated result to COM1, renders a guest framebuffer, and halts.

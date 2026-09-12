@@ -15,10 +15,10 @@ default = ["std"]
 std = ["zeno-fcis-codec/std"]
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.0.0-rc.3", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0", path = "../zeno-fcis-codec", default-features = false }
 
 [dev-dependencies]
-zeno-fcis-crypto = { version = "=1.0.0-rc.3", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }
+zeno-fcis-crypto = { version = "=1.0.0", path = "../zeno-fcis-crypto", features = ["rustcrypto"] }
 
 [lints]
 workspace = true

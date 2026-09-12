@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "+1.97.1",
+    "test",
+    "-p",
+    "zeno-fcis-shell-sqlite",
+    "--locked",
+    "pending_delivery_rejects_row_substitution_between_reads",
+    "--",
+    "--nocapture"
+  ],
+  "exit_code": 101,
+  "log_sha256": "f5c5dfb115669b208c3c4c4a0bd365d92101f86f4cf8a388b095f973c71e4264",
+  "stage": "reproducer before fix"
+}
