@@ -1,0 +1,220 @@
+{
+  "schema": "zeno-fcis/shell-simplification-results/1",
+  "date": "2026-09-12",
+  "baseline_commit": "f77a0a5a3cf2766cec18a0fde5057086e5ce70e4",
+  "source_sha256": {
+    "crates/zeno-fcis-shell-sqlite/src/lib.rs": "f0d9024fba903d0d306ad528fdea1d3c8f58fb85392b46bb3beaedd1aff84cab",
+    "crates/zeno-fcis-shell-sqlite/src/tests/transaction_tests.rs": "b60892951cbef30fb27b929914a2817cc116736aa6323c840845f9a89f40daad",
+    "crates/zeno-fcis-authority/src/lib.rs": "2c08cc3f354f94471890d70b1dc2f2b4ecc78104c7d259cf3148146503f4a50b"
+  },
+  "baseline_ci": {
+    "completed_successfully": 44,
+    "commit": "f77a0a5a3cf2766cec18a0fde5057086e5ce70e4",
+    "miri_run": "https://github.com/TheDarkLightX/ZenoFCIS/actions/runs/34354903942",
+    "scope": "Read from GitHub before this pass; not CI evidence for the new commit"
+  },
+  "design_review": {
+    "model": "claude-fable-5-1",
+    "review_date": "2026-09-09",
+    "review_sha256": "e7d93867e3d67be9465400eb23e4fedf8c2a14d550bde4acb4ff9b9c51bc3b85",
+    "scope": "Previously reviewed remaining suggestions; selected against current source by Astra"
+  },
+  "implementation": {
+    "schema": "zeno-fcis/advisory-model-receipt/1",
+    "name": "opus",
+    "requested_model": "claude-opus-5",
+    "assistant_models": [
+      "claude-opus-5"
+    ],
+    "exit_code": 0,
+    "subtype": "success",
+    "is_error": false,
+    "permission_denials": [],
+    "tools": [
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "wall_clock_limit_seconds": null,
+    "elapsed_seconds": 171.953664,
+    "events_sha256": "0d220b42139bdf9c1d3a3976fbb4bf90feae1ccf8b5a80164fc3cc4c12fd197c",
+    "prompt_sha256": "dd4d9b9ac700a3b5806d7c83974a8bc28b0af6dc85b6fbc5763453d26bf1e561",
+    "authority": "ADVISORY; independent root validation required"
+  },
+  "validation_owner": "Astra; model output is advisory",
+  "behavior": {
+    "cases": 76,
+    "baseline_and_candidate_observations_identical": true,
+    "observations_sha256": "858aeb2546a0bb2f5aa52dcad8c43edf8811a4d77ca8b7b73d44a9f6459ef1e0",
+    "test_results": [
+      [
+        "13",
+        "0"
+      ],
+      [
+        "25",
+        "0"
+      ],
+      [
+        "2",
+        "0"
+      ],
+      [
+        "0",
+        "0"
+      ]
+    ],
+    "candidate_log_sha256": "aeafc308dcf022ed0feaec7297af59573174b5ef456f20efe332e231144c79c7"
+  },
+  "query_counts": {
+    "measurements": {
+      "baseline": {
+        "replay_selects": 18,
+        "acknowledgement_selects": 14,
+        "source_sha256": "b0edd3c0283cafb205adf142b8d14adf3c7da815fc8140081fe49c5c1510e319",
+        "binary_sha256": "a66c7a89d3ee430366ee7e0ea08ae228fddaeb8065b7ff20f270058a2ebfd1fd",
+        "log_sha256": "4e19b7103afd5590d4a14e0a11a60b3c90d89dcf7c6d556036fc47be9d41c84f"
+      },
+      "candidate": {
+        "replay_selects": 10,
+        "acknowledgement_selects": 10,
+        "source_sha256": "f0d9024fba903d0d306ad528fdea1d3c8f58fb85392b46bb3beaedd1aff84cab",
+        "binary_sha256": "e9ebad35637db705c93632a9fe9433a4294980b65d8cf75042c523c868bfdaa3",
+        "log_sha256": "d358d39e9bf1073e7df560bfeb0f3608b5e7d93818a85cfdd36d6eaeba6983be"
+      }
+    },
+    "scope": "One committed record with one outbox entry; same SQLite trace instrumentation; complete validation retained",
+    "source_restored": true,
+    "persistent_dependency_changes": false
+  },
+  "complexity": {
+    "tool": "Lizard 1.24.0",
+    "branch_points": "sum(CCN - 1)",
+    "scope": "Production functions before the test modules",
+    "modules": [
+      {
+        "path": "crates/zeno-fcis-shell-sqlite/src/lib.rs",
+        "before": {
+          "functions": 55,
+          "branch_points": 357,
+          "nloc": 1299,
+          "changed_functions": {
+            "commit": 1,
+            "commit_with_crash_point": 53,
+            "acknowledge": 17
+          }
+        },
+        "after": {
+          "functions": 55,
+          "branch_points": 353,
+          "nloc": 1288,
+          "changed_functions": {
+            "commit": 1,
+            "commit_with_crash_point": 50,
+            "acknowledge": 16
+          }
+        }
+      },
+      {
+        "path": "crates/zeno-fcis-authority/src/lib.rs",
+        "before": {
+          "functions": 205,
+          "branch_points": 242,
+          "nloc": 2172,
+          "changed_functions": {
+            "commit": 12
+          }
+        },
+        "after": {
+          "functions": 205,
+          "branch_points": 242,
+          "nloc": 2172,
+          "changed_functions": {
+            "commit": 12
+          }
+        }
+      }
+    ]
+  },
+  "controlled_mutations": {
+    "mutations": [
+      {
+        "name": "skip-replay-history-validation",
+        "test": "tests::transaction_tests::replay_and_acknowledgement_preserve_first_history_errors",
+        "exit_code": 101,
+        "test_rejected_mutation": true,
+        "mutant_source_sha256": "a2e84da1f3f5056d589beec4705ba903f58b7c058e8603a843c9daef2494111d",
+        "log_sha256": "69914f247250db8b320cbaeee8a9664f5fcc85e2b2a09a4f878e8589cd3b3999"
+      },
+      {
+        "name": "skip-acknowledgement-history-validation",
+        "test": "tests::transaction_tests::replay_and_acknowledgement_preserve_first_history_errors",
+        "exit_code": 101,
+        "test_rejected_mutation": true,
+        "mutant_source_sha256": "498ddf0ed7fa4f7d7b8b586017a0959e5bce515dd2db8968cb12904082289ce6",
+        "log_sha256": "d901d0aa44dd5e5da5d3f4c145276dd74e423071bb530662de1fce733df34f19"
+      },
+      {
+        "name": "publish-cache-before-failed-commit",
+        "test": "tests::transaction_tests::failed_sqlite_commit_preserves_memory_and_allows_retry",
+        "exit_code": 101,
+        "test_rejected_mutation": true,
+        "mutant_source_sha256": "6925f8404f8c4ece9e747be5bad6396636d5488f50882345026d51ce169c5ec4",
+        "log_sha256": "83daa7d5a9a5730c6b7f270b72be7e3499d927962e83fce73a1f3966a8f115f4"
+      },
+      {
+        "name": "discard-retained-authorization-records",
+        "test": "tests::exact_authorization_commits_and_replays_idempotently",
+        "exit_code": 101,
+        "test_rejected_mutation": true,
+        "mutant_source_sha256": "17d0d7fe3225c6d3f2ef7844a8b537f3833dbae4a3a6de3dfe4680b89ea4d605",
+        "log_sha256": "99a2e81860afdacc07b7967d1b187034383a3f269e85e298ff2127cb6847dab6"
+      }
+    ],
+    "source_restored": true
+  },
+  "preserved_contract": [
+    "Complete per-operation history validation",
+    "First corruption and caller-error ordering",
+    "Exact replay identities and canonical bytes",
+    "Commit failure leaves cached and persistent state unchanged",
+    "Post-commit crash occurs after memory publication",
+    "Authorization record contents and canonical order"
+  ],
+  "dependencies_changed": false,
+  "lean_changed": false,
+  "release_version": "1.0.0-rc.3",
+  "required_precommit_command": "python3 tools/atdd.py run --all",
+  "precommit_result_location": "Retained separately with the final commit",
+  "evidence_sha256": {
+    "baseline-validation.json": "d8ab4183b711bf4c0afd8213f32e03d276ecbfd8f6bf3a7c5d06c67825ef15ab",
+    "baseline-transaction-tests.log": "d27ef4bf0a47fa4bf0891facd917dea6924890ec569167bfd5fb2a04f901dda9",
+    "baseline-authority-tests.log": "80f9d3ad7635aca2ab073de71bd199afa41cad34ac17e8324835989dc9c954e6",
+    "candidate-tests.log": "aeafc308dcf022ed0feaec7297af59573174b5ef456f20efe332e231144c79c7",
+    "restored-tests.log": "15f34bf402dd23c812839eacb50bf721e8a1dcd67abbd5b279387e488891a80b",
+    "behavior-comparison.json": "f963e7d719cb0af592a4089b92c4ccc0b465880916552c7f72888ef2ff2e369b",
+    "query-counts.json": "c7e10b0a3fd139b992ec0196d6e35a1ad94e3adcfe4d372a3016c857c27855e9",
+    "measure_queries.py": "443c3222f70b8f779d9d93c0fa2e744e0debaaea02153c6b01ba7f4db079804c",
+    "complexity.json": "9f14155c4c76d578d37b4112d964ab60e180d56c0651573225b73dacaa4cd57b",
+    "mutation-results.json": "4c0332c320bb86b1ca8825510dd5ae210af8be992568f016e3d6a896edb15559",
+    "check_mutations.py": "aaafd1e649eae1822a979189e9156238a98df0f383f35bee6db307e6cce73e25",
+    "opus-receipt.json": "1478182f3fce6adad4a529e6cf91c040d0ca75c334e078a12d44079081e797a1",
+    "implementation-request.json": "5d90b4c301507fc9bf2bbc84d3048cc7ad7b0b9f883ab777058279f76cf080c3",
+    "clippy.log": "ac02e0ae6051d290bdd6d0cd5f7b8957108ef09a9d866b89ab59970d4eeb73ae",
+    "no-std.log": "25dbd7b458bdf82023dd536dcbdda349d282de640f4f3d78b27c7139ecaabf23"
+  },
+  "sqlite_transaction_contract": "https://www.sqlite.org/lang_transaction.html",
+  "local_evidence_directory": "/tmp/zenofcis-simplification-20260912",
+  "limits": [
+    "Query counts are for one history record and one outbox entry; no wall-time claim.",
+    "Behavioral comparisons and mutations are bounded checks, not a general equivalence proof.",
+    "No independent release approval or stable V1 promotion."
+  ],
+  "focused_checks": {
+    "clippy_all_targets_warnings_denied": "passed for shell-sqlite and authority",
+    "no_default_features": "authority library passed",
+    "static_assurance": "passed; 37 crates, 27 semantic boundaries, 16 effect rules",
+    "documentation": "passed"
+  }
+}

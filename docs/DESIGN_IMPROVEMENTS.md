@@ -149,6 +149,10 @@ to the commit's validation log, rather than being predicted by this report.
 
 ## Further candidates
 
+The subsequent [shell simplification review](SHELL_SIMPLIFICATION.md) covers
+removal of repeated checks within one SQLite transaction and unnecessary
+authorization-record cloning.
+
 1. Measure SQLite query batching and reuse of expected outbox rows while
    retaining validation of every history and outbox row. Checking only touched
    rows would narrow corruption detection and was rejected.

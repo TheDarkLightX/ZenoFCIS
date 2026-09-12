@@ -595,12 +595,10 @@ where
             {
                 return Err(SqliteShellError::ReplayConflict);
             }
-            let record = self
-                .validated_history
-                .get(&existing_candidate)
-                .ok_or(SqliteShellError::CorruptHistory)?;
-            validate_stored_candidate(&transaction, record)?;
-            validate_history_counts(&transaction, &self.validated_history)?;
+            // Full history was checked in this transaction; no writes have intervened.
+            if !self.validated_history.contains_key(&existing_candidate) {
+                return Err(SqliteShellError::CorruptHistory);
+            }
             transaction.commit().map_err(SqliteShellError::Sqlite)?;
             return Ok(CommitStatus::IdempotentReplay);
         }
@@ -740,14 +738,10 @@ where
             receipt_bytes,
             bundle: bundle.clone(),
         };
-        if let Some(previous) = self.validated_history.insert(candidate, record) {
-            self.validated_history.insert(candidate, previous);
-            return Err(SqliteShellError::CorruptHistory);
-        }
-        if let Err(error) = transaction.commit() {
-            self.validated_history.remove(&candidate);
-            return Err(SqliteShellError::Sqlite(error));
-        }
+        // Publish cached state only after SQLite commits. The earlier membership
+        // check and exclusive borrow rule out replacing an existing record.
+        transaction.commit().map_err(SqliteShellError::Sqlite)?;
+        self.validated_history.insert(candidate, record);
         self.validated_state_root = post_root;
         self.validated_state_version = next_version;
         if crash == Some(CrashPoint::AfterCommit) {
@@ -867,11 +861,10 @@ where
             .map_err(SqliteShellError::Sqlite)?
             .ok_or(SqliteShellError::UnknownDelivery(delivery_id))?;
         let candidate = CandidateId::new(parse_hash(&row.2)?);
-        let record = self
-            .validated_history
-            .get(&candidate)
-            .ok_or(SqliteShellError::CorruptHistory)?;
-        validate_stored_candidate(&transaction, record)?;
+        // Full history was checked in this transaction; no writes have intervened.
+        if !self.validated_history.contains_key(&candidate) {
+            return Err(SqliteShellError::CorruptHistory);
+        }
         let expected = parse_hash(&row.0)?;
         if expected != observed_entry_hash {
             return Err(SqliteShellError::AcknowledgementMismatch {
@@ -1700,6 +1693,8 @@ impl std::error::Error for SqliteShellError {}
 
 #[cfg(test)]
 mod tests {
+    mod transaction_tests;
+
     use super::*;
     use zeno_fcis_authority::{
         CatalogAuthorizationDecision, ExecutionBinding, GenesisPolicyBinding,

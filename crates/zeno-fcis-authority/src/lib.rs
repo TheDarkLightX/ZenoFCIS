@@ -1733,7 +1733,7 @@ where
             authorized.bundle(),
         )?;
         let status = result.status();
-        let mut records = self.records.to_vec();
+        let mut records = self.records.into_vec();
         if status == CommitStatus::Committed {
             let insertion = records
                 .binary_search_by_key(&replay_id, AuthorizationRecord::replay_id)
