@@ -207,7 +207,7 @@ def exercise_v1_consumer(directory: Path, package_roots: dict[str, Path], versio
     source = ROOT / "test-projects/external-consumer/src/main.rs"
     shutil.copyfile(source, consumer / "src/main.rs")
     manifest = (ROOT / "test-projects/external-consumer/Cargo.toml").read_text()
-    manifest = manifest.replace('    path = "../../crates/zeno-fcis",\n', '')
+    manifest = manifest.replace('path = "../../crates/zeno-fcis"\n', '')
     (consumer / "Cargo.toml").write_text(manifest)
     bind_generated_dependencies(consumer / "Cargo.toml", package_roots, version)
     allowed = {(name, version): root / "Cargo.toml" for name, root in package_roots.items()}
@@ -239,7 +239,8 @@ def check(directory: Path) -> None:
     cli = [str((ROOT / Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/zeno-fcis").resolve())]
     run([*cli, "new", str(prepared), "--template", "prepared-counter"], ROOT)
     exercise_prepared_application(prepared, prepared_root, packages, version, dict(os.environ), cli)
-    print("generated applications: isolated consumers, reviewed dependencies, complete decisions and lifecycle passed")
+    exercise_v1_consumer(directory, packages, version, dict(os.environ))
+    print("generated applications: isolated consumers, V1 compatibility, reviewed dependencies, complete decisions and lifecycle passed")
 
 
 def main() -> None:

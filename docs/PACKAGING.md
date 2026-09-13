@@ -50,10 +50,12 @@ generates warning-denied rustdoc, records the Cargo dependency graph as
 CycloneDX 1.6, and content-addresses every retained artifact.
 
 Before deleting the unpacked workspace, the packager also builds its CLI and
-uses that executable to emit a fresh durable-counter application. The separate
-consumer resolves internal dependencies only from the extracted archives and
+uses that executable to emit fresh durable-counter and prepared-counter applications.
+Each separate consumer resolves internal dependencies only from the extracted archives and
 external dependencies from the reviewed lock. Formatting, Clippy, tests, and
-the durable demonstration must all pass. `PACKAGED-APPLICATION.json` retains
+the complete application demonstration must all pass. The same check runs the
+unchanged V1.0 consumer and verifies the retained foundational source baseline
+against the extracted package files. `PACKAGED-APPLICATION.json` retains
 archive and generator hashes, the original emitted-file hashes, admitted
 dependency identities, compiler identity and argument vectors, commands, and
 outcomes. It is included in the release manifest, checksums, and bundle. See
@@ -129,7 +131,7 @@ a write-enabled release workflow or weaken that policy.
 
 The complete owner procedure for exact-head review, signed tagging,
 dependency-ordered crates.io publication, release evidence, and failure
-recovery is the [V1 release checklist](V1_RELEASE_CHECKLIST.md). The permanent
+recovery is the [V1.1 release checklist](V1_1_RELEASE_CHECKLIST.md). The permanent
 release-candidate workflow also runs on `v1.0.0-rc.*`, `v1.0.0` and `v1.1.0` tags so the immutable tag
 is packaged through the same read-only gate used during review.
 

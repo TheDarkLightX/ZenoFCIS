@@ -34,11 +34,11 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/BOUNDED_COMPLETION.md: finite exits, bounded plan import and ordered preparation
 - docs/V1_1_RELEASE_NOTES.md: new workflows and compatibility
 - docs/V1_1_RELEASE_CHECKLIST.md: current release runbook
-- docs/V1_RELEASE_NOTES.md: stable API, new workflows, compatibility and limits
+- docs/V1_RELEASE_NOTES.md: original stable API scope and compatibility limits
 - docs/RC3_RELEASE_NOTES.md: historical third-candidate notes
 - docs/RC2_RELEASE_NOTES.md: historical second-candidate notes
 - docs/RC1_RELEASE_NOTES.md: historical first-candidate notes
-- docs/V1_RELEASE_CHECKLIST.md: exact-source tag, publication, evidence, and rollback runbook
+- docs/V1_RELEASE_CHECKLIST.md: historical V1.0 publication runbook
 - docs/PACKAGING.md: package authority and retained artifacts
 - docs/RELEASE_ASSURANCE.md: repository gates and nonclaims
 

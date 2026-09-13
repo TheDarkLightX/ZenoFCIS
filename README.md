@@ -107,12 +107,14 @@ deterministic review queue, constrained prompts for less-capable models,
 exploit-chain proof obligations, scanner guidance, and a machine-readable
 report contract. Run `python3 tools/security_hotspots.py check` to reject
 unreviewed ranking or model drift. The
-[V1 release notes](docs/V1_RELEASE_NOTES.md) describe the stable API, new
-workflows and compatibility boundaries. The
+[V1.1 release notes](docs/V1_1_RELEASE_NOTES.md) describe the new workflows and
+compatibility boundaries. The [V1 release notes](docs/V1_RELEASE_NOTES.md) retain
+the original stable API scope. The
 [RC3 release notes](docs/RC3_RELEASE_NOTES.md) retain the historical candidate
 scope. The owner-facing
-[V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
-repository evidence from signing, publication, and external review actions.
+[V1.1 release checklist](docs/V1_1_RELEASE_CHECKLIST.md) separates exact-source
+repository evidence from signing, publication, and external review actions;
+the [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) remains historical.
 Runnable examples are checked permanently:
 
 ```bash
@@ -338,7 +340,7 @@ The build retains all public `.crate` packages, rustdoc, source and diagnostic
 binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 [packaging reference](docs/PACKAGING.md),
 [RC3 readiness review](docs/RC3_READINESS_REVIEW.md), and
-[V1 release checklist](docs/V1_RELEASE_CHECKLIST.md).
+[V1.1 release checklist](docs/V1_1_RELEASE_CHECKLIST.md).
 
 ## Assurance posture
 

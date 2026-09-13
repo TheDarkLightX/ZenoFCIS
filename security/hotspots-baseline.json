@@ -2361,7 +2361,7 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 223,
+      "production_lines": 224,
       "rank": 23,
       "score": 81,
       "signals": [
@@ -2372,7 +2372,7 @@
             235,
             239,
             241,
-            249,
+            242,
             250,
             251,
             252
@@ -5046,9 +5046,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3076324,
+    "admitted_bytes": 3078472,
     "admitted_files": 165,
-    "inventory_sha256": "58da40de16eef739ee55ebfee506a2ac73c7d8d9a3ee92ec339b431ff5962795",
+    "inventory_sha256": "cc618e62ee7a8b81ed012cc015001c6bcc4d28120d55cd5fd2a16fab97c513ac",
     "ranked_above_minimum": 138,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
