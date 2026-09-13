@@ -1,0 +1,48 @@
+{
+  "format": "zeno-fcis/v1-compatibility/1",
+  "baseline_version": "1.0.0",
+  "baseline_commit": "02694c2186f18c9e799291167cad8f0f02996cc5",
+  "scope": "One unchanged V1 consumer and unchanged foundational protocol implementations with embedded wire tests; not universal downstream source compatibility.",
+  "files": [
+    {
+      "path": "test-projects/external-consumer/src/main.rs",
+      "bytes": 3120,
+      "sha256": "3cfacacf15c1eca62712c08377a99bb2f5de2bb198088d44ece5fed379f87fdc"
+    },
+    {
+      "path": "crates/zeno-fcis-value/src/lib.rs",
+      "bytes": 35574,
+      "sha256": "8bcbd067b5d9fff33dd2a038c170d3317575ca0698c831997fb792313eeb3cde"
+    },
+    {
+      "path": "crates/zeno-fcis-core/src/lib.rs",
+      "bytes": 16485,
+      "sha256": "b2733a41c08fc85035f6e6bbf5b8fbed287398d51baa9244ee8c8bd4770d9b49"
+    },
+    {
+      "path": "crates/zeno-fcis-codec/src/lib.rs",
+      "bytes": 57306,
+      "sha256": "8b53a21580cc6e8434ccdc3e038831cf72a4d987de8dd437f123041724c74a33"
+    },
+    {
+      "path": "crates/zeno-fcis-crypto/src/lib.rs",
+      "bytes": 19208,
+      "sha256": "a5a4540bc1e6c7f857f4d476789473aab09849719761e89c0f806aa91dc67e5c"
+    },
+    {
+      "path": "crates/zeno-fcis-patch/src/lib.rs",
+      "bytes": 60367,
+      "sha256": "fd97d34cc9360acf50dfd70ceab138c9feb14dd6e2e09f63d0d27cd132c9ac83"
+    },
+    {
+      "path": "crates/zeno-fcis-plan/src/lib.rs",
+      "bytes": 35584,
+      "sha256": "72fc884763589e31321005dcc9ae6525239792b17c187c298e3177dd66bee85c"
+    },
+    {
+      "path": "crates/zeno-fcis-receipt/src/lib.rs",
+      "bytes": 41230,
+      "sha256": "4e343ba9d5a3f9d646f5cf9cde84f4a1ec8ad364925a526703907014c5218853"
+    }
+  ]
+}

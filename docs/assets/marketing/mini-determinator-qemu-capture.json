@@ -1,8 +1,8 @@
 {
-  "disk_image_sha256": "e198005bff8c4ba41a92217e57d9378b736c24133596e7a849a35634b489ced5",
+  "disk_image_sha256": "50c40dd1ce49a751820694a7695becc2b6d4f7c9f921d810f3d4f039cb46c168",
   "framebuffer": "1280x800",
   "framebuffer_png_sha256": "87929f13bfd8ebf0cc70bcff12e81f44710e7456663cf8f522281bd2f24562ee",
-  "guest_transcript_sha256": "0d67ead5c58cc4daf96b12fdc6884cf483262578a6f1a6fac432d6c9a6a6f806",
+  "guest_transcript_sha256": "e0e9d39374d43fce5a9c04d9f383b6589f12b819495fa880e0c5ab800331852e",
   "qemu": "QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)",
   "rust_toolchain": "nightly-2026-07-21",
   "schema": "zeno-fcis-qemu-demo-capture/1"

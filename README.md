@@ -70,7 +70,7 @@ path and import the curated prelude:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0", default-features = false, features = [
+zeno-fcis = { version = "=1.1.0", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -250,7 +250,7 @@ code should enable the smallest explicit feature set, for example:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.1.0", default-features = false, features = ["composed-program"] }
 ```
 
 The umbrella crate's default and `no_std` feature sets are project-neutral.
@@ -342,7 +342,9 @@ binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 
 ## Assurance posture
 
-Version `1.0.0` establishes the stable Cargo API for the reusable core library.
+Version `1.1.0` extends the stable Cargo API with checked finite exit plans and
+bounded ordered preparation. See [V1.1 release notes](docs/V1_1_RELEASE_NOTES.md)
+and the [V1.1 release checklist](docs/V1_1_RELEASE_CHECKLIST.md).
 The release's evidence covers the declared library, packaging and integration
 checks. The pinned ZenoDEX single-vault zUSD mount is bounded executable
 refinement evidence. Production

@@ -2,6 +2,7 @@
 
 import copy
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -11,7 +12,55 @@ import unittest
 from unittest import mock
 
 import check_generated_application as application
+import check_v1_compatibility
 import rc_package
+
+
+class ReproducibleApplicationReceiptTests(unittest.TestCase):
+    def test_variable_test_logs_are_checked_but_never_exported(self):
+        report = {"schema": "zeno-fcis/completion-result/1", "status": "verified",
+                  "authority": "none", "assurance": "complete-finite", "states_checked": 4,
+                  "commands_per_state": 27, "maximum_exit_steps": 1,
+                  "problem": "a" * 64, "plan_sha256": "b" * 64}
+        result = {"status": "passed", "demonstration": json.dumps(
+            {"status": "passed", "count": 0, "bundles": 2, "deliveries": 2,
+             "pending": 0, "publication_bytes": 1893})}
+        receipts = []
+        for duration in ("0.10", "9.99"):
+            log = f"completion_problem={'a' * 64}\ntest result: ok; finished in {duration}s\n"
+            with mock.patch.object(application, "exercise_rust_application", return_value=(result, log)), \
+                    mock.patch.object(application.check_synthesis, "exercise_counter", return_value={}), \
+                    mock.patch.object(application, "run", side_effect=[json.dumps(report), json.dumps(report),
+                                      json.dumps({**report, "replay": "matched"})]):
+                ordinary = application.exercise_application(Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+                prepared = application.exercise_prepared_application(Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+                receipts.append((ordinary, prepared))
+                self.assertNotIn(duration, json.dumps(receipts[-1]))
+        self.assertEqual(receipts[0], receipts[1])
+
+
+class V1PackagedSourceTests(unittest.TestCase):
+    def test_changed_archive_source_cannot_borrow_the_checkout_baseline(self):
+        baseline = check_v1_compatibility.check()
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-v1-packaged-source-") as directory:
+            packages = {}
+            for entry in baseline["files"]:
+                relative = Path(entry["path"])
+                if relative.parts[0] != "crates":
+                    continue
+                root = Path(directory) / relative.parts[1]
+                packages[relative.parts[1]] = root
+                target = root.joinpath(*relative.parts[2:])
+                target.parent.mkdir(parents=True)
+                target.write_bytes((application.ROOT / relative).read_bytes())
+            self.assertEqual(check_v1_compatibility.check(packages), baseline)
+            codec = packages["zeno-fcis-codec"] / "src/lib.rs"
+            codec.write_bytes(codec.read_bytes() + b"\n// Altered archive source.\n")
+            with self.assertRaisesRegex(RuntimeError, "V1 compatibility baseline changed"):
+                check_v1_compatibility.check(packages)
+            # The independently retained checkout still matches. It cannot
+            # substitute for the altered archive in packaged qualification.
+            self.assertEqual(check_v1_compatibility.check(), baseline)
 
 
 class DependencyAdmissionTests(unittest.TestCase):

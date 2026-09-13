@@ -1,6 +1,6 @@
 # Release packaging
 
-This document describes the ZenoFCIS `1.0.0` artifact set.
+This document describes the ZenoFCIS `1.1.0` artifact set.
 
 ## Package set
 
@@ -130,7 +130,7 @@ a write-enabled release workflow or weaken that policy.
 The complete owner procedure for exact-head review, signed tagging,
 dependency-ordered crates.io publication, release evidence, and failure
 recovery is the [V1 release checklist](V1_RELEASE_CHECKLIST.md). The permanent
-release-candidate workflow also runs on `v1.0.0-rc.*` and `v1.0.0` tags so the immutable tag
+release-candidate workflow also runs on `v1.0.0-rc.*`, `v1.0.0` and `v1.1.0` tags so the immutable tag
 is packaged through the same read-only gate used during review.
 
 ## Nonclaims

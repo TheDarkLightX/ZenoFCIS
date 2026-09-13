@@ -32,6 +32,8 @@ REQUIRED_FILES = (
     Path("docs/INSTALLATION.md"),
     Path("docs/QUICKSTART.md"),
     Path("docs/API_REFERENCE.md"),
+    Path("docs/V1_1_RELEASE_NOTES.md"),
+    Path("docs/V1_1_RELEASE_CHECKLIST.md"),
     Path("docs/V1_PRODUCT_CONTRACT.md"),
     Path("docs/V1_RELEASE_NOTES.md"),
     Path("docs/ACCEPTANCE_TESTING.md"),
@@ -103,7 +105,7 @@ VERSIONED_DOCS = (
     Path("docs/API_REFERENCE.md"),
     Path("docs/CRATE_MAP.md"),
     Path("docs/FEATURE_MATRIX.md"),
-    Path("docs/V1_RELEASE_NOTES.md"),
+    Path("docs/V1_1_RELEASE_NOTES.md"),
     Path("docs/V1_PRODUCT_CONTRACT.md"),
     Path("docs/ZENO_LANGUAGE_V1.md"),
     Path("docs/TEMPORAL_LOGIC_V1.md"),
@@ -111,7 +113,7 @@ VERSIONED_DOCS = (
     Path("docs/MINI_DETERMINATOR.md"),
     Path("docs/QEMU_MINI_DETERMINATOR.md"),
     Path("docs/CLI_REFERENCE.md"),
-    Path("docs/V1_RELEASE_CHECKLIST.md"),
+    Path("docs/V1_1_RELEASE_CHECKLIST.md"),
     Path("docs/PACKAGING.md"),
 )
 REQUIRED_README_MARKERS = (
@@ -155,6 +157,7 @@ REQUIRED_CODEOWNER_MARKERS = (
 REQUIRED_RELEASE_WORKFLOW_MARKERS = (
     '"v1.0.0-rc.*"',
     '"v1.0.0"',
+    '"v1.1.0"',
     "workflow_dispatch:",
     "contents: read",
     "python3 tools/rc_package.py build",

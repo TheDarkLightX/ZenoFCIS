@@ -1,0 +1,56 @@
+//! Closed file set for the bounded preparation example.
+
+pub(crate) const FILES: &[(&str, &[u8])] = &[
+    (
+        "project.zeno",
+        include_bytes!("../templates/prepared-counter/project.zeno"),
+    ),
+    (
+        "README.md",
+        include_bytes!("../templates/prepared-counter/README.md"),
+    ),
+    (
+        "Cargo.toml",
+        include_bytes!("../templates/prepared-counter/Cargo.toml.in"),
+    ),
+    (
+        "build.rs",
+        include_bytes!("../templates/prepared-counter/build.rs"),
+    ),
+    (
+        "profile.rs",
+        include_bytes!("../templates/prepared-counter/profile.rs"),
+    ),
+    (
+        "src/lib.rs",
+        include_bytes!("../templates/prepared-counter/src/lib.rs"),
+    ),
+    (
+        "src/main.rs",
+        include_bytes!("../templates/prepared-counter/src/main.rs"),
+    ),
+    (
+        "src/program.rs",
+        include_bytes!("../templates/prepared-counter/src/program.rs"),
+    ),
+    (
+        "src/laws.rs",
+        include_bytes!("../templates/prepared-counter/src/laws.rs"),
+    ),
+    (
+        "src/delivery.rs",
+        include_bytes!("../templates/prepared-counter/src/delivery.rs"),
+    ),
+    (
+        "src/prepare.rs",
+        include_bytes!("../templates/prepared-counter/src/prepare.rs"),
+    ),
+    (
+        "tests/lifecycle.rs",
+        include_bytes!("../templates/prepared-counter/tests/lifecycle.rs"),
+    ),
+    (
+        "completion.json",
+        include_bytes!("../templates/prepared-counter/completion.json"),
+    ),
+];

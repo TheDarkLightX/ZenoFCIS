@@ -1,6 +1,6 @@
 # Installation
 
-ZenoFCIS `1.0.0` is the stable Rust library release. Rust `1.97.1` is
+ZenoFCIS `1.1.0` is the stable Rust library release. Rust `1.97.1` is
 the minimum supported toolchain.
 
 ## Application dependency
@@ -10,7 +10,7 @@ application:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0", default-features = false, features = [
+zeno-fcis = { version = "=1.1.0", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -27,8 +27,8 @@ crate:
 
 ```toml
 [dependencies]
-zeno-fcis-core = { version = "=1.0.0", default-features = false }
-zeno-fcis-codec = { version = "=1.0.0", default-features = false }
+zeno-fcis-core = { version = "=1.1.0", default-features = false }
+zeno-fcis-codec = { version = "=1.1.0", default-features = false }
 ```
 
 All ZenoFCIS crates in one dependency graph should use the same exact release
@@ -39,7 +39,7 @@ version.
 ```bash
 git clone https://github.com/TheDarkLightX/ZenoFCIS.git
 cd ZenoFCIS
-git checkout v1.0.0
+git checkout v1.1.0
 cargo +1.97.1 test --workspace --all-features --locked
 ```
 
@@ -67,13 +67,13 @@ The core library does not require a daemon. V1 includes the authoring CLI and
 the existing host diagnostic parity tool:
 
 ```bash
-cargo +1.97.1 install zeno-fcis-cli --version 1.0.0 --locked
+cargo +1.97.1 install zeno-fcis-cli --version 1.1.0 --locked
 zeno-fcis check project.zeno
 ```
 
 ```bash
 cargo +1.97.1 install zeno-fcis-adapter-zenodex \
-  --version 1.0.0 --locked
+  --version 1.1.0 --locked
 ```
 
 `mount-zenodex-zusd` compares the pinned ZenoDEX Python and Rust transitions.

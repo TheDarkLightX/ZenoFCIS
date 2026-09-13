@@ -6,6 +6,22 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+## 1.1.0 - 2026-09-13
+
+- Add independently checked finite exit plans, bounded canonical plan import,
+  structured completion CLI discovery and exact replay files for agents.
+- Add owned ordered preparation with whole-operation resource reservations,
+  chunk rollback and exact invocation/root/version checks before exposing output.
+- Add the generated prepared-counter application with independent authorization,
+  full publication-size admission, atomic state/outbox publication and recovery.
+- Qualify both generated applications and an unchanged V1.0 consumer against actual
+  crate archives; preserve the foundational protocol and wire-test source baseline.
+- Reject unknown fields in Boolean synthesis domains, matching the existing closed
+  JSON schema instead of silently ignoring malformed input.
+- Retain Lean 4.30.0, Rust 1.97.1 and the existing external Cargo dependencies.
+
+See [V1.1 release notes](docs/V1_1_RELEASE_NOTES.md) for the exact scope and limits.
+
 ## 1.0.0 - 2026-09-12
 
 First stable Cargo API release. See [V1 release notes](docs/V1_RELEASE_NOTES.md)

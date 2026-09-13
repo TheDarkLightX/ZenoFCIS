@@ -11,9 +11,26 @@ permissions:
   contents: read
 
 jobs:
-  semantic-core:
+  interpret:
+    name: interpret (${{ matrix.group }})
     runs-on: ubuntu-24.04
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: values
+            packages: -p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret
+          - group: schemas
+            packages: -p zeno-fcis-project -p zeno-fcis-catalog -p zeno-fcis-schema -p zeno-fcis-refine
+          - group: plans
+            packages: -p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt -p zeno-fcis-security
+          - group: publication
+            packages: -p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain
+          - group: synthesis
+            packages: -p zeno-fcis-synthesis
+          - group: specification
+            packages: -p zeno-fcis-spec -p zeno-fcis-backend
     env:
       MIRIFLAGS: -Zmiri-strict-provenance
     steps:
@@ -28,14 +45,15 @@ jobs:
           cargo +nightly-2026-07-21 miri setup
 
       - name: Interpret semantic boundary tests
-        run: |
-          cargo +nightly-2026-07-21 miri test --locked \
-            -p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec \
-            -p zeno-fcis-project -p zeno-fcis-catalog \
-            -p zeno-fcis-transition -p zeno-fcis-authority \
-            -p zeno-fcis-security -p zeno-fcis-secret \
-            -p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt \
-            -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain \
-            -p zeno-fcis-refine \
-            -p zeno-fcis-schema -p zeno-fcis-synthesis -p zeno-fcis-backend \
-            -p zeno-fcis-spec
+        run: cargo +nightly-2026-07-21 miri test --locked ${{ matrix.packages }}
+
+  semantic-core:
+    name: semantic-core
+    needs: interpret
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every Miri group to pass
+        env:
+          INTERPRET_RESULT: ${{ needs.interpret.result }}
+        run: test "$INTERPRET_RESULT" = success

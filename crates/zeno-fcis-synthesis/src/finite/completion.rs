@@ -10,8 +10,8 @@ use super::{
 use crate::{SynthesisError, hash_bytes, hash_canonical};
 use alloc::{collections::VecDeque, vec, vec::Vec};
 use core::fmt;
-use zeno_fcis_codec::{CanonicalEncode, Hash32};
-use zeno_fcis_value::Value;
+use zeno_fcis_codec::{CanonicalEncode, DecodeError, DecodeLimits, Hash32, decode_value};
+use zeno_fcis_value::{Value, ValueLimits};
 
 const MAX_POLICY_BYTES: u64 = 16 * 1024 * 1024;
 const PLAN_PROFILE: &str = "zeno-fcis/completion-plan/1";
@@ -75,6 +75,8 @@ pub enum CompletionError {
     },
     /// Canonical encoding or identity construction failed.
     Encoding(SynthesisError),
+    /// Portable plan bytes failed canonical decoding or its structural limits.
+    Decoding(DecodeError),
 }
 impl fmt::Display for CompletionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -88,6 +90,11 @@ impl From<SynthesisError> for CompletionError {
         Self::Encoding(error)
     }
 }
+impl From<DecodeError> for CompletionError {
+    fn from(error: DecodeError) -> Self {
+        Self::Decoding(error)
+    }
+}
 
 /// Owned finite model and independently supplied completion/resource contract.
 #[derive(Clone, Debug)]
@@ -96,6 +103,7 @@ pub struct CompletionProblem {
     terminal: Program,
     states: usize,
     commands: usize,
+    plan_byte_limit: u64,
     problem_hash: Hash32,
 }
 impl CompletionProblem {
@@ -151,11 +159,8 @@ impl CompletionProblem {
         // Scalar positions have fixed-width I128/U128 encoding in this profile.
         let row_header = value_size(&ir::tuple(vec![Value::U128(0)]))?;
         let plan_header = value_size(&plan_value(Hash32::ZERO, &[]))?;
-        require(
-            "policy-bytes",
-            plan_header + states * (row_header + command_size),
-            limits.max_policy_bytes,
-        )?;
+        let plan_byte_limit = plan_header + states * (row_header + command_size);
+        require("policy-bytes", plan_byte_limit, limits.max_policy_bytes)?;
         let source = hash_bytes(
             "zeno-fcis/completion-checker-source",
             include_bytes!("completion.rs"),
@@ -193,6 +198,7 @@ impl CompletionProblem {
             states: usize::try_from(states).map_err(|_| CompletionError::Invalid("states"))?,
             commands: usize::try_from(commands)
                 .map_err(|_| CompletionError::Invalid("commands"))?,
+            plan_byte_limit,
             problem_hash,
         })
     }
@@ -210,6 +216,13 @@ impl CompletionProblem {
     #[must_use]
     pub const fn command_count(&self) -> usize {
         self.commands
+    }
+    /// Maximum canonical plan bytes for this model, including every row.
+    ///
+    /// Shells can use this admitted bound before reading an untrusted plan file.
+    #[must_use]
+    pub const fn plan_byte_limit(&self) -> u64 {
+        self.plan_byte_limit
     }
     fn state_domains(&self) -> &[Domain] {
         &self.step.outputs()[1..]
@@ -259,8 +272,8 @@ impl VerifiedCompletion {
     }
     /// Canonical versioned plan bytes, bounded by the problem's admission.
     ///
-    /// Decoding bytes never grants this type; reconstructed plan rows must pass
-    /// `verify_completion` against the consumer's independently chosen problem.
+    /// Import with `verify_completion_bytes` against the consumer's independently
+    /// chosen problem. Decoding alone never grants this type.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, CompletionError> {
         plan_value(self.plan.problem_hash, &self.plan.steps)
             .canonical_bytes()
@@ -273,6 +286,95 @@ impl VerifiedCompletion {
         let row = &self.plan.steps[index];
         Ok((row.remaining != 0).then_some(row.command.as_slice()))
     }
+}
+
+/// Imports an exact canonical plan and checks it against the caller's problem.
+///
+/// The problem supplies every byte, node, depth, collection and payload bound
+/// before the existing decoder allocates owned values. Only exact version-1
+/// tuples are admitted, with U128 ranks and I128 finite command scalars. The
+/// supplied bytes cannot select their expected problem or bypass
+/// `verify_completion`; success grants no application or publication authority.
+pub fn verify_completion_bytes(
+    problem: &CompletionProblem,
+    bytes: &[u8],
+) -> Result<VerifiedCompletion, CompletionError> {
+    let states = u64::try_from(problem.states).map_err(|_| DecodeError::LengthOverflow)?;
+    let command_fields =
+        u64::try_from(problem.command_domains().len()).map_err(|_| DecodeError::LengthOverflow)?;
+    let collection = problem.states.max(problem.command_domains().len()).max(3);
+    let value = decode_value(
+        bytes,
+        DecodeLimits {
+            max_input_bytes: problem.plan_byte_limit,
+            value: ValueLimits {
+                // Root, profile, binding, rows; then row, rank, command tuple
+                // and its scalar fields. Admission already bounds both counts.
+                max_nodes: 4 + states * (3 + command_fields),
+                max_depth: 4,
+                max_collection_len: u32::try_from(collection)
+                    .map_err(|_| DecodeError::LengthOverflow)?,
+                max_payload_bytes: u64::try_from(PLAN_PROFILE.len() + 32)
+                    .map_err(|_| DecodeError::LengthOverflow)?,
+            },
+        },
+    )?;
+    let Value::Tuple(fields) = value else {
+        return Err(invalid_plan("plan-shape", None));
+    };
+    let [
+        Value::Text(profile),
+        Value::Bytes(binding),
+        Value::Tuple(rows),
+    ] = fields.as_ref()
+    else {
+        return Err(invalid_plan("plan-shape", None));
+    };
+    if profile.as_ref() != PLAN_PROFILE {
+        return Err(invalid_plan("plan-profile", None));
+    }
+    let binding = Hash32::new(
+        binding
+            .as_ref()
+            .try_into()
+            .map_err(|_| invalid_plan("problem-binding", None))?,
+    );
+    if binding != problem.problem_hash {
+        return Err(invalid_plan("problem-binding", None));
+    }
+    if rows.len() != problem.states {
+        return Err(invalid_plan("row-count", None));
+    }
+    let mut steps = Vec::with_capacity(problem.states);
+    for row in rows {
+        let Value::Tuple(fields) = row else {
+            return Err(invalid_plan("row-shape", None));
+        };
+        let [Value::U128(remaining), Value::Tuple(command)] = fields.as_ref() else {
+            return Err(invalid_plan("row-shape", None));
+        };
+        let remaining = u32::try_from(*remaining).map_err(|_| invalid_plan("rank-range", None))?;
+        if command.len() > problem.command_domains().len() {
+            return Err(invalid_plan("command-shape", None));
+        }
+        let command = command
+            .iter()
+            .map(|value| match value {
+                Value::I128(value) => {
+                    i64::try_from(*value).map_err(|_| invalid_plan("command-range", None))
+                }
+                _ => Err(invalid_plan("command-scalar", None)),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        steps.push(CompletionStep { remaining, command });
+    }
+    verify_completion(
+        problem,
+        &CompletionPlan {
+            problem_hash: binding,
+            steps,
+        },
+    )
 }
 
 /// Finds shortest exit paths using reverse BFS; search output remains untrusted.
