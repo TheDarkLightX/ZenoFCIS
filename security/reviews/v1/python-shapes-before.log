@@ -1,9 +1,9 @@
-   Compiling zeno-fcis-catalog v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-catalog)
-   Compiling zeno-fcis-transition v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-transition)
-   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
-   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+   Compiling zeno-fcis-catalog v1.0.0 (<workdir>/crates/zeno-fcis-catalog)
+   Compiling zeno-fcis-transition v1.0.0 (<workdir>/crates/zeno-fcis-transition)
+   Compiling zeno-fcis-codegen v1.0.0 (<workdir>/crates/zeno-fcis-codegen)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (<workdir>/crates/zeno-fcis-generated-code-tests)
     Finished `test` profile [unoptimized] target(s) in 2.30s
-     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-6f79b7aee78d2c7a)
+     Running tests/python_replay.rs (<workdir>/debug/deps/python_replay-6f79b7aee78d2c7a)
 
 running 5 tests
 
@@ -32,7 +32,7 @@ stdout: vectors replayed: 9
 
 stderr: Traceback (most recent call last):
   File "<string>", line 16, in <module>
-  File "/tmp/zenofcis-milestone-target/tmp/python_innocent_names/innocent_names.py", line 182, in try_from_value
+  File "<workdir>/tmp/python_innocent_names/innocent_names.py", line 182, in try_from_value
     if len(fields) != 10: raise AdapterError("record_shape")
        ^^^
 UnboundLocalError: cannot access local variable 'len' where it is not associated with a value

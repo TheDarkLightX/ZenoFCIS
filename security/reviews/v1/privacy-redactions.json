@@ -1,0 +1,242 @@
+{
+  "schema": "zeno-fcis/evidence-privacy/1",
+  "source_version": "v1.0.0",
+  "changes": [
+    "personal home directories replaced with <HOME>",
+    "temporary review work directories replaced with <workdir>",
+    "references to changed evidence hashes refreshed"
+  ],
+  "qualification": "These are redacted copies of earlier observations, not fresh test executions. Original bytes remain private with the owner. Earlier signed source history is unchanged.",
+  "files": [
+    {
+      "path": "docs/DESIGN_IMPROVEMENTS.md",
+      "original_sha256": "85593d2690673cabbfed2088eb11b091597a4bdf47110105706f32e1e93d60f9",
+      "public_sha256": "cfe6150834ba3c6e347a2db4b1b70da5f48ba19dc9036523cc2b5dca72d54c3d"
+    },
+    {
+      "path": "docs/EVALUATOR_SIMPLIFICATION.md",
+      "original_sha256": "5ac615a5ac472b25257709586ec825a86545a83e1550e69fda8113ca912d44a7",
+      "public_sha256": "28bc72a8abea8215b97f07ffdc015e9195a3c7f368474032675c9403dbd94259"
+    },
+    {
+      "path": "docs/FINITE_CHOICE_LOOKUP.md",
+      "original_sha256": "98a293973a1e7a010ab6a2c00d2b49c10d89912a2c41cf93e049147797a9fb75",
+      "public_sha256": "b2124d9381e22b22541fe203740f5bf3e6c632eba95d880aa865e1f935519b3a"
+    },
+    {
+      "path": "docs/GENERATED_APPLICATION_MILESTONE.md",
+      "original_sha256": "293a9094f9821969caad43374cc31e7c36a04ea6df241dc50f9d9671abca7de4",
+      "public_sha256": "ef65089103aa3eb3210a9711210d2e01698e332757c06e44de59cd339417d67c"
+    },
+    {
+      "path": "docs/OUTBOX_ENCODING_AND_SQLITE_CHECKS.md",
+      "original_sha256": "ce304354e273613f162070ec19245edcc6e29e8a0a8877a384ee2298db4beeff",
+      "public_sha256": "29fd10e6ea0dc52dcb166f8c951c888fea18a8e71a652210afef6474935734ec"
+    },
+    {
+      "path": "docs/PARALLEL_AUTHORIZATION_SORTING.md",
+      "original_sha256": "958a1accca9e87232183a670d62646f0fe7720b1c86ba0b351d022de999130af",
+      "public_sha256": "3dd34e383b205363c6fad4f5d5f19c2a237f43761c89651c6d9cac2012d37a48"
+    },
+    {
+      "path": "docs/SEARCH_ENCODING_IMPROVEMENTS.md",
+      "original_sha256": "4fda9bc0fa9a6305dca3cc4537a782b4249f10df0f836b50d99e14d4a54f2d49",
+      "public_sha256": "2bd737c9e0791900ff72c44772f371fd29ee66a16a978e875dbe8ad1f4c3926e"
+    },
+    {
+      "path": "docs/SHELL_SIMPLIFICATION.md",
+      "original_sha256": "0e5c10cbad0289ccb687c135afe4dcd52659d72138b63afc09f0be645f57e156",
+      "public_sha256": "f4f3ebd3aeecb8da472cc2ac201c37c4ab7fa7ded459ccc614ef65fd3fb7e672"
+    },
+    {
+      "path": "docs/design-improvement-results.json",
+      "original_sha256": "b6166982dc8378fc47ef25c56af625b01e127a5d55e39a7c3a0e5291a4ca5142",
+      "public_sha256": "0f991e36b77dd50ffc34959f87976045bb750ebbdf5b172a2487b91d81d9836c"
+    },
+    {
+      "path": "docs/evaluator-simplification-results.json",
+      "original_sha256": "e7d02899e56bf5b12ea1ac07c5f7e67dcbb3056a34788acd106d49accc6020e4",
+      "public_sha256": "2587f1735efac635261b74a7af52932a978a21c8fac4788d729c653e0768a719"
+    },
+    {
+      "path": "docs/finite-choice-results.json",
+      "original_sha256": "db084f124c46746675071094580cd316dd86695062934098f1a7f9efa454e829",
+      "public_sha256": "4bfac503c421ab82400b6e7dd8a0616c346f2f935cd7b9b93d53d82a55a6efbd"
+    },
+    {
+      "path": "docs/outbox-encoding-results.json",
+      "original_sha256": "05bb0c7e2858952fbc2897a2aa873950180a8b61f51917da12e1db59f1a8f196",
+      "public_sha256": "2cc57098e23f68d07273820b89447d3e76eed625c63320a8d12fcb24d0df9598"
+    },
+    {
+      "path": "docs/parallel-authorization-sorting-results.json",
+      "original_sha256": "c04b145c87065f2b3c3092384ddcb725da957a65e2a609ee30a150ec98c4b873",
+      "public_sha256": "58065f4f333fe1fcdf7130ec10d2d48d9a5cc11eb6fcc62bf9780e785cf2b93a"
+    },
+    {
+      "path": "docs/search-encoding-results.json",
+      "original_sha256": "2696cd0a43b6cfc9a205a0bec48168f6681478b192b12698e29483fdc6d9d8e9",
+      "public_sha256": "102f8d5a5f5cd7409e5c2a84616c7d4940951bdb5bba113fbff36c066f312d69"
+    },
+    {
+      "path": "docs/shell-simplification-results.json",
+      "original_sha256": "c4620ba017b98b522351ab5681c8f5a6f60ce98eb92fe21626d6d33b2cbe604d",
+      "public_sha256": "b6ac9f72ee84a93f940cd8b9187e2fc033e0a9a319315fe6a858e506eb787ad0"
+    },
+    {
+      "path": "security/reviews/v1/boundary-fixes.json",
+      "original_sha256": "a03a7e0ce06db33e652049289c7801666a25840300873796beb7e267511e930a",
+      "public_sha256": "9286c6d82196581a5e65aac396fb3b7265b2e5ac175d1dc67c30716580d7760a"
+    },
+    {
+      "path": "security/reviews/v1/boundary-fixes.log",
+      "original_sha256": "37baeeab9dace1262261ed67c4e59d7b4f71cbd142c1744a540dbece46a61e80",
+      "public_sha256": "e40687ba2bbfac91a196794324814ab1ee79ff6388676942ca1d5d719e8576bb"
+    },
+    {
+      "path": "security/reviews/v1/evidence-sha256.json",
+      "original_sha256": "2cb6bd037c28a55ea10e4a50f185325f8e469427c7b98e5f8900d04f934dcd4b",
+      "public_sha256": "7abf7286c6585eb5f47bb1b4be9c56cdd1ab4e254dc5138ed39a35e68afa5862"
+    },
+    {
+      "path": "security/reviews/v1/formal-existing-lean.json",
+      "original_sha256": "166647b2d31e37e67cd8d3e98c9f38558654f2ae8102a55be99cbd92aab21391",
+      "public_sha256": "212ac21324ef7a07e3ef1c70952a8277422ba8b399cca898981abf6c32867af8"
+    },
+    {
+      "path": "security/reviews/v1/formal-existing-lean.log",
+      "original_sha256": "acfd71f05b34ed83f970f41435686b4691882a9131bd5e35235fc0e56842e68b",
+      "public_sha256": "5d19111411cae65d4694ae9c3586c249a8921cc8b1a36a924611c2081cb389d1"
+    },
+    {
+      "path": "security/reviews/v1/patched-node-checks.json",
+      "original_sha256": "cdfdce93e6ce1ad6e22564be315e2da5b13efdbd8da50a0dff7fe3003d138385",
+      "public_sha256": "0b271ddca527b4ca5adf426a794c165bc1c5a4fc5dcaf8c2489b41a719a36943"
+    },
+    {
+      "path": "security/reviews/v1/pr-100-cleanup.json",
+      "original_sha256": "db2cf5ad78a1a024bc54dfa40f816332c945da4cd4e2aec53b21f6e32a7ef8d3",
+      "public_sha256": "150c718a482a5fd1d4c396de257c9803fdae2d464b20208325e072e8518a6275"
+    },
+    {
+      "path": "security/reviews/v1/python-map-after.json",
+      "original_sha256": "e85d0d395e995f734a8b1e11f971de99bc051f9c6e9fc23becb6f8db385ebb1e",
+      "public_sha256": "e95ed14b013131458c90ddd0f42436f431c2a0c016d41df77064d53eb7f2f8d8"
+    },
+    {
+      "path": "security/reviews/v1/python-map-after.log",
+      "original_sha256": "3cb5f4f2c966701f18a769202bbc26b1b825d713985707a1e797614eeee0d1ba",
+      "public_sha256": "a39a9a93dea5cadb9ad9269a92906516bf285680d6a5255377afa169b7dc78d1"
+    },
+    {
+      "path": "security/reviews/v1/python-map-before.json",
+      "original_sha256": "757bc252832b64604dea92e47adb869f16d3e3b35fae324879e50f155931a2e4",
+      "public_sha256": "f814e4ef9dc80f2b9cad557957897bc1ca7c1f81df73e187536348d695b57255"
+    },
+    {
+      "path": "security/reviews/v1/python-map-before.log",
+      "original_sha256": "88cc6e5c58c603a9179ce8cd94f6ce6cd15d3ca95ba1ed5bfedf65f469b46827",
+      "public_sha256": "14515228e11be2888570ddb420f18a94e3bb8d09d5c41d47284322c18698587c"
+    },
+    {
+      "path": "security/reviews/v1/python-shapes-after.json",
+      "original_sha256": "f8a53b9f170b712481ea43d0a0bb0b210f5ff65bdd1151b8a913b0494f646d6d",
+      "public_sha256": "145aa83ad5a257721fd5bf613cdf18cad0677f64ed72d11d939ed004bd356b1e"
+    },
+    {
+      "path": "security/reviews/v1/python-shapes-after.log",
+      "original_sha256": "41f9e0f8110dec8ff924a0f4fbe8089158e17cd6ee682b772be39b0f2b2709e5",
+      "public_sha256": "6795b1a365831c7973e79e9e19d42c86cd581e4c006c47a5e05f5ef7f6fd288e"
+    },
+    {
+      "path": "security/reviews/v1/python-shapes-before.json",
+      "original_sha256": "428b84330017beb62822f0086d860bdb18a28fe34dc4110f37dbdcba770e2ed8",
+      "public_sha256": "3f9278ed5656a1af733b3a9e31ecf775764c5616156efccd2551c0023eebe5f6"
+    },
+    {
+      "path": "security/reviews/v1/python-shapes-before.log",
+      "original_sha256": "f2253401245930c694755eefcb3ef72538e21be6ec68fa9f84275e789bfbb50c",
+      "public_sha256": "da8513becb87d3b65ade23c78813b8a8bf5d25a5e54e2fa4d3c15f886026fbec"
+    },
+    {
+      "path": "security/reviews/v1/python-types-before.json",
+      "original_sha256": "a9ef5ef4e94bcbaab6c4f6ff5115de6d3305f0fbd6594e4c05a82a64aa9aeaf8",
+      "public_sha256": "420b9acdeaaa0ca6fb07208d189e6fdb8926353658168c0d975ee2ed8f9f5f5f"
+    },
+    {
+      "path": "security/reviews/v1/python-types-before.log",
+      "original_sha256": "2fe3f3e7295158b30e5e260d2e5de09e50db06942114baff39238a449cfa6adf",
+      "public_sha256": "4a472ff7d3d3637cd2575e5ac8e37c5852da623aa4c77d00eb071cb5ddb03455"
+    },
+    {
+      "path": "security/reviews/v1/qemu-capture-complete.log",
+      "original_sha256": "b3dd8ccd5793bae4db254baf3582b77dfe5e0d0c9cb39cbf2f52513daadcf920",
+      "public_sha256": "415a2f7059dcb5907049bd9e022273b7cf413554b86c3b72fc0730adc84a6edd"
+    },
+    {
+      "path": "security/reviews/v1/qemu-run-complete.json",
+      "original_sha256": "72803256d727ed13c8cb069570af9ecf292607a5ea12d0b82440a18d1e6c6a3a",
+      "public_sha256": "2fbb01d12e49818dafa69bd92dfc03e26cdc9438f51570dc0dc06ea756fc1b4c"
+    },
+    {
+      "path": "security/reviews/v1/review-cleanup-before.json",
+      "original_sha256": "50e2fb997c77c8e76c3b0b035947d04362ad5ae2c5ce79a81da2a1d70ee8d8bc",
+      "public_sha256": "63135189d75129d38b563afaea5531ef35e87e4c9d87835af3dd9a8379f00519"
+    },
+    {
+      "path": "security/reviews/v1/review-cleanup-before.log",
+      "original_sha256": "a9b52bcd5e92dd3db12ab468146fc6a6cb21ebbbffe452b6d62a321dfd7f4daa",
+      "public_sha256": "709d99166f191ec99a6b3ce656b35ff81df70e151cd3725fba6b258ab8a08c2f"
+    },
+    {
+      "path": "security/reviews/v1/source-creation-mutant.json",
+      "original_sha256": "a0a157aab1e2c7e22350bc4495239daeaf461ffa4e495bae79f57dd5b0a0a7d9",
+      "public_sha256": "75c795681f6249e4cc2d4afdfd4c74ca5d8d664dda175171f94988cf487fdd8f"
+    },
+    {
+      "path": "security/reviews/v1/source-creation-mutant.log",
+      "original_sha256": "87f23ba89fea5001129ddc94c702b5ebaa3125857a8ca95fd68bb327a5d467a5",
+      "public_sha256": "b7d93cc118221d716eb6ef0749834412d9aee796edbcd1ad6305c6df834d4229"
+    },
+    {
+      "path": "security/reviews/v1/sqlite-race-before.json",
+      "original_sha256": "364fcf7e98da15ea199a3406186fae2f4bbd4fb1a145b11ee2018ac953814b59",
+      "public_sha256": "08e2bd413f6de445ea9dc5c622d1dc273e5094f98bb7e0c02db45e9e8137bee6"
+    },
+    {
+      "path": "security/reviews/v1/sqlite-race-before.log",
+      "original_sha256": "f5c5dfb115669b208c3c4c4a0bd365d92101f86f4cf8a388b095f973c71e4264",
+      "public_sha256": "0aaa0dd6082e6c841d8e374df700a57c2987fb05bf21ea3d20c2af8c9eb4717d"
+    },
+    {
+      "path": "security/reviews/v1/synthesis-final-receipt.json",
+      "original_sha256": "3ac0d56f5f520094acee1800b93394ab5bcd55b397d58743b344cc2096e2f70a",
+      "public_sha256": "5816cac53f3d4f50814b9a525bc768aa1c44d6c967bf27615cec931bc819e02b"
+    },
+    {
+      "path": "security/reviews/v1/synthesis-final.json",
+      "original_sha256": "ea0d85dae7b6a911c8c525fb445b13f94702e6a128003bc83ee73d40e5e3c1ce",
+      "public_sha256": "8b64477f0eeb1e76a59fede34200ea50d03e0b31f717f441845b18bb467659e6"
+    },
+    {
+      "path": "security/reviews/v1/synthesis-final.log",
+      "original_sha256": "6a82d8136a3146456bb0a241edb4fb2bca76142f1d9665d17754bd3d98bed0bf",
+      "public_sha256": "c6972c6bff8b9e363a4ae245eeae94b86d42000805f6ba9839e5947481bab551"
+    },
+    {
+      "path": "security/reviews/v1/workspace-final.json",
+      "original_sha256": "9bb33158894e698c77b291b08ff7dacdece603c323b22249993a4355cc901b87",
+      "public_sha256": "8ce30a988ce92008b2f2e18fa2d8efcd0ed8812604e3c99dd8b5c20fe8265c71"
+    },
+    {
+      "path": "security/reviews/v1/workspace-final.log",
+      "original_sha256": "8a234c90b1475b3456af263c9f149bd303270e2a82e8717b7261dc5c50828a1b",
+      "public_sha256": "5e375391f3da94c0470fc4a1b9edc36356c4bc99d7534445663d5b379dc0f6f8"
+    },
+    {
+      "path": "security/v1-review.json",
+      "original_sha256": "78c2180cbccf95e4e636801e137030b11bb09019cf08ccd2039a7c6baca4d0c0",
+      "public_sha256": "89d0088c8bc85d8e4c475ebf549055493e5c3015d190664a297c0a1529a06f10"
+    }
+  ]
+}

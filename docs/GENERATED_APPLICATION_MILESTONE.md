@@ -1,7 +1,7 @@
 # Generated application and translation milestone
 
 Base: `4025ccdcaaa455e3d7e5626153c92ecf6c997026`.
-Worktree: `/tmp/zenofcis-generated-app-translation-20260905`.
+Worktree: `<workdir>`.
 Branch: `agent/generated-app-translation-20260905`.
 
 This is the first implementation milestone from the architecture review. It

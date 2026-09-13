@@ -74,6 +74,11 @@ Source diagnostics retain `status: "invalid"` and exit `1` in JSON mode.
 Generation failures use `generation-failed` and exit `3`. The default human
 output remains available. See the [agent recovery loop](LLM_USAGE.md).
 
+The next patch rejects Unix named-pipe artifacts without waiting for a writer.
+Failed individual file writes remove their incomplete file; a failed replacement
+preserves the previous destination. Generation is atomic per file. A failure
+after other files finish can leave a partial directory.
+
 ## Tools manifest
 
 V1 uses tools-manifest format `zeno-fcis/tools/2`. A tools/1 manifest is

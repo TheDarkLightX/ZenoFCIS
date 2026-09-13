@@ -193,7 +193,7 @@ Fable's source review was tool-disabled. Opus could read and edit its isolated
 checkout but could not run tests or git commands. Both completed without a
 wall-clock cutoff. Their output was advisory; the main agent owned integration
 and validation. The raw local evidence directory is
-`/tmp/zenofcis-design-review-20260909`; its one-off benchmark harness and full
+`<workdir>`; its one-off benchmark harness and full
 logs are not installed library components or a portable benchmark suite.
 
 Dependency versions and Lean remain unchanged. This pass does not promote RC3

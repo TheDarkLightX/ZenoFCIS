@@ -87,6 +87,6 @@ measurements, and corrected unsupported conclusions in the model's release
 assessment. The attempted Fable review failed for exhausted usage credits;
 it is not counted as a completed review. Neither model has release authority.
 
-Raw probes and logs are under `/tmp/zenofcis-binding-order-20260912`.
+Raw probes and logs are under `<workdir>`.
 Lean, dependency versions and finite-checker certificate identities are
 unchanged. This optimization does not promote RC3 to stable V1.

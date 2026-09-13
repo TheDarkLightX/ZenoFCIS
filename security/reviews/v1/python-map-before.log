@@ -1,6 +1,6 @@
-   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (<workdir>/crates/zeno-fcis-generated-code-tests)
     Finished `test` profile [unoptimized] target(s) in 0.38s
-     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-6f79b7aee78d2c7a)
+     Running tests/python_replay.rs (<workdir>/debug/deps/python_replay-6f79b7aee78d2c7a)
 
 running 1 test
 

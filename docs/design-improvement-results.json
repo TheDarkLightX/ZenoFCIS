@@ -413,7 +413,7 @@
     "atdd-stale-template.log": "acc63967b96c13cefd49df536e6e3646e3d7ab27fcb189c16fad999ff3c3bf7b",
     "starter-certificate-refresh.json": "4cc93579b766dc296e6ea2003ccf1100b1636a229edd5d9a3cee63c756278305"
   },
-  "local_evidence_directory": "/tmp/zenofcis-design-review-20260909",
+  "local_evidence_directory": "<workdir>",
   "limits": [
     "Bounded behavioral comparisons; no general equivalence or global optimality proof.",
     "Benchmarks are local fixed workloads; tiny synthesis and unchanged path controls include regressions.",

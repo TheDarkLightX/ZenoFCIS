@@ -363,7 +363,7 @@
     "delivery-implementation.json": "298fbe9c7a49ec92424906a9e97f4932c5562ca95c787e6b16379665e0517c6e",
     "final-checks.json": "c996cf6fd0daa10968eecba2444412a815b643ef713c919fdede3deac814c3e6"
   },
-  "local_evidence_directory": "/tmp/zenofcis-sqlite-outbox-20260912",
+  "local_evidence_directory": "<workdir>",
   "dependencies_changed": false,
   "lean_changed": false,
   "release_version": "1.0.0-rc.3",

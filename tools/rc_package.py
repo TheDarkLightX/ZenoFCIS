@@ -1156,6 +1156,7 @@ def build(output: Path) -> None:
     configured, _ = validate_package_set()
     version = require_string(configured, "version")
     commit = require_clean_commit()
+    run([sys.executable, "tools/check_release_privacy.py", "check"])
     if output.exists() and any(output.iterdir()):
         raise RcError("output directory must not exist or must be empty")
     output.mkdir(parents=True, exist_ok=True)
@@ -1344,6 +1345,7 @@ def build(output: Path) -> None:
         encoding="utf-8",
     )
     deterministic_bundle(output, bundle_path)
+    run([sys.executable, "tools/check_release_privacy.py", "check", str(output)])
     print(
         f"rc-package: built {len(require_string_list(configured, 'publish_order'))} "
         f"crate packages and {len(entries)} retained artifacts at {commit}"
@@ -1355,6 +1357,7 @@ def main() -> int:
     try:
         configured, _ = validate_package_set()
         if args.command == "check":
+            run([sys.executable, "tools/check_release_privacy.py", "check"])
             print(
                 "rc-package: PASS "
                 f"({len(require_string_list(configured, 'publish_order'))} public, "
@@ -1362,6 +1365,7 @@ def main() -> int:
                 f"version {require_string(configured, 'version')})"
             )
         elif args.command == "self-test":
+            run([sys.executable, "tools/test_release_privacy.py"])
             run_self_test(configured, cargo_metadata(complete=False))
             run_rustdoc_normalization_self_test()
             run_tree_archive_mode_self_test()

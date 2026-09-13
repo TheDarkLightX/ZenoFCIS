@@ -1,8 +1,8 @@
-   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
-   Compiling zeno-fcis-bootstrap v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-bootstrap)
-   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
+   Compiling zeno-fcis-codegen v1.0.0 (<workdir>/crates/zeno-fcis-codegen)
+   Compiling zeno-fcis-bootstrap v1.0.0 (<workdir>/crates/zeno-fcis-bootstrap)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (<workdir>/crates/zeno-fcis-generated-code-tests)
     Finished `test` profile [unoptimized] target(s) in 6.02s
-     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_codegen-914df6bcf237afad)
+     Running unittests src/lib.rs (<workdir>/debug/deps/zeno_fcis_codegen-914df6bcf237afad)
 
 running 10 tests
 test vectors::tests::hardcoded_record_tag_matches_codec ... ok
@@ -18,7 +18,7 @@ test tests::negative_vectors_cover_all_categories ... ok
 
 test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_generated_code_tests-a2ddf1f1a4509b9f)
+     Running unittests src/lib.rs (<workdir>/debug/deps/zeno_fcis_generated_code_tests-a2ddf1f1a4509b9f)
 
 running 32 tests
 test tests::bootstrap_effect_helper_uses_catalogued_operation_and_payload ... ok
@@ -56,7 +56,7 @@ test tests::generated_typed_staging_rejects_invalid_values_without_staging ... o
 
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-6f79b7aee78d2c7a)
+     Running tests/python_replay.rs (<workdir>/debug/deps/python_replay-6f79b7aee78d2c7a)
 
 running 5 tests
 test python_generation_rejects_shadowing_names ... ok

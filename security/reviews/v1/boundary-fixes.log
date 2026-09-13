@@ -1,19 +1,19 @@
-   Compiling zeno-fcis-crypto v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-crypto)
-   Compiling zeno-fcis-refine v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-refine)
-   Compiling zeno-fcis-evidence v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-evidence)
-   Compiling zeno-fcis-codegen v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-codegen)
-   Compiling zeno-fcis-bootstrap v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-bootstrap)
-   Compiling zeno-fcis-laws v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-laws)
-   Compiling zeno-fcis-synthesis v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-synthesis)
-   Compiling zeno-fcis-backend v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-backend)
-   Compiling zeno-fcis-generated-code-tests v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-generated-code-tests)
-   Compiling zeno-fcis-spec v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-spec)
-   Compiling zeno-fcis-formal-tools v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-formal-tools)
-   Compiling zeno-fcis-authority v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-authority)
-   Compiling zeno-fcis-shell-sqlite v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-shell-sqlite)
-   Compiling zeno-fcis-cli v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-cli)
+   Compiling zeno-fcis-crypto v1.0.0 (<workdir>/crates/zeno-fcis-crypto)
+   Compiling zeno-fcis-refine v1.0.0 (<workdir>/crates/zeno-fcis-refine)
+   Compiling zeno-fcis-evidence v1.0.0 (<workdir>/crates/zeno-fcis-evidence)
+   Compiling zeno-fcis-codegen v1.0.0 (<workdir>/crates/zeno-fcis-codegen)
+   Compiling zeno-fcis-bootstrap v1.0.0 (<workdir>/crates/zeno-fcis-bootstrap)
+   Compiling zeno-fcis-laws v1.0.0 (<workdir>/crates/zeno-fcis-laws)
+   Compiling zeno-fcis-synthesis v1.0.0 (<workdir>/crates/zeno-fcis-synthesis)
+   Compiling zeno-fcis-backend v1.0.0 (<workdir>/crates/zeno-fcis-backend)
+   Compiling zeno-fcis-generated-code-tests v1.0.0 (<workdir>/crates/zeno-fcis-generated-code-tests)
+   Compiling zeno-fcis-spec v1.0.0 (<workdir>/crates/zeno-fcis-spec)
+   Compiling zeno-fcis-formal-tools v1.0.0 (<workdir>/crates/zeno-fcis-formal-tools)
+   Compiling zeno-fcis-authority v1.0.0 (<workdir>/crates/zeno-fcis-authority)
+   Compiling zeno-fcis-shell-sqlite v1.0.0 (<workdir>/crates/zeno-fcis-shell-sqlite)
+   Compiling zeno-fcis-cli v1.0.0 (<workdir>/crates/zeno-fcis-cli)
     Finished `test` profile [unoptimized] target(s) in 19.57s
-     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_authority-a3987d69c863febe)
+     Running unittests src/lib.rs (<workdir>/debug/deps/zeno_fcis_authority-a3987d69c863febe)
 
 running 13 tests
 test tests::authority_rejects_transition_program_build_mismatch ... ok
@@ -32,7 +32,7 @@ test tests::persisted_authorization_rejects_body_invocation_and_policy_substitut
 
 test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running unittests src/main.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis-96deb96debf6d2e8)
+     Running unittests src/main.rs (<workdir>/debug/deps/zeno_fcis-96deb96debf6d2e8)
 
 running 15 tests
 test synth::runner::process_tests::inherited_node_switches_and_toolchain_overrides_cannot_reach_a_child ... ok
@@ -53,7 +53,7 @@ test synth::tests::runner_verdicts_require_exact_outputs_and_complete_coverage .
 
 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
 
-     Running tests/cli_adopter_flow.rs (/tmp/zenofcis-milestone-target/debug/deps/cli_adopter_flow-1a2143bcb2e0e1e0)
+     Running tests/cli_adopter_flow.rs (<workdir>/debug/deps/cli_adopter_flow-1a2143bcb2e0e1e0)
 
 running 13 tests
 test pinned_lean_cli_prove_is_process_level ... ignored, requires the workflow-pinned Lean 4.30.0 Linux x86-64 distribution
@@ -72,14 +72,14 @@ test cli_tool_timeout_is_execution_failure ... ok
 
 test result: ok. 12 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.24s
 
-     Running tests/synthesis_javascript.rs (/tmp/zenofcis-milestone-target/debug/deps/synthesis_javascript-be7fe3321b00679e)
+     Running tests/synthesis_javascript.rs (<workdir>/debug/deps/synthesis_javascript-be7fe3321b00679e)
 
 running 1 test
 test javascript_executes_precision_overflow_and_inert_input_boundaries ... ignored, requires Node.js; the finite-synthesis ATDD scenario runs this explicitly
 
 test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_generated_code_tests-3b0bc24ba0cd0b83)
+     Running unittests src/lib.rs (<workdir>/debug/deps/zeno_fcis_generated_code_tests-3b0bc24ba0cd0b83)
 
 running 32 tests
 test tests::bootstrap_effect_helper_uses_catalogued_operation_and_payload ... ok
@@ -117,7 +117,7 @@ test tests::generated_typed_root_update_uses_exact_field_path_and_value ... ok
 
 test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
-     Running tests/python_replay.rs (/tmp/zenofcis-milestone-target/debug/deps/python_replay-a48b8887397b7766)
+     Running tests/python_replay.rs (<workdir>/debug/deps/python_replay-a48b8887397b7766)
 
 running 2 tests
 test python_outgoing_schema_bounds_are_enforced ... ok
@@ -125,7 +125,7 @@ test python_vector_replay_succeeds ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
 
-     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_shell_sqlite-b1aad7f550fbe1ab)
+     Running unittests src/lib.rs (<workdir>/debug/deps/zeno_fcis_shell_sqlite-b1aad7f550fbe1ab)
 
 running 28 tests
 test tests::reopen_rejects_an_uninitialized_store ... ok

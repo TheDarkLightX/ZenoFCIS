@@ -82,7 +82,7 @@ cyclomatic complexity is unchanged.
 The [measurement record](evaluator-simplification-results.json) identifies
 source hashes, model receipts, output hashes and validation logs. Local probe
 source, replay scripts, executables and full logs are retained in
-`/tmp/zenofcis-evaluator-20260912`. This is bounded comparison evidence, not a
+`<workdir>`. This is bounded comparison evidence, not a
 general equivalence proof or a portable benchmark suite.
 
 The final commit requires `python3 tools/atdd.py run --all` with the pinned

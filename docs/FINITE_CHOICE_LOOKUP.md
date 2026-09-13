@@ -117,7 +117,7 @@ that earlier source; regeneration is required for the updated checker identity.
 
 The [measurement record](finite-choice-results.json) binds the source, probes,
 model receipts and validation logs. Full local evidence is retained in
-`/tmp/zenofcis-finite-choices-20260912`. The comparisons are bounded execution
+`<workdir>`. The comparisons are bounded execution
 evidence, not a general equivalence proof or a portable benchmark suite.
 
 The commit additionally requires `python3 tools/atdd.py run --all` immediately

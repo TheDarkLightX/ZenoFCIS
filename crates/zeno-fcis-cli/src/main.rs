@@ -576,7 +576,16 @@ fn generate(path: &Path, out: &Path, check_only: bool, format: OutputFormat) -> 
 }
 
 fn artifact_is_current(path: &Path, expected: &[u8]) -> std::io::Result<bool> {
-    let file = match fs::File::open(path) {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        // A FIFO can block during open, before the file-type check below.
+        // Regular files retain their normal behavior with this flag.
+        options.custom_flags(nix::libc::O_NONBLOCK);
+    }
+    let file = match options.open(path) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
         Err(error) => return Err(error),
@@ -1070,8 +1079,13 @@ fn tool_run_exit(status: &ToolRunStatus, counterexample: bool) -> u8 {
 
 fn atomic_create(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut file = OpenOptions::new().create_new(true).write(true).open(path)?;
-    file.write_all(bytes)?;
-    file.sync_all()
+    let result = file.write_all(bytes).and_then(|()| file.sync_all());
+    drop(file);
+    if result.is_err() {
+        // Exclusive creation above established ownership of this file.
+        fs::remove_file(path)?;
+    }
+    result
 }
 
 fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -1087,13 +1101,7 @@ fn atomic_replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         std::process::id(),
         TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
     ));
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temp)?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    drop(file);
+    atomic_create(&temp, bytes)?;
     if let Err(error) = fs::rename(&temp, path) {
         let _ = fs::remove_file(&temp);
         return Err(error);

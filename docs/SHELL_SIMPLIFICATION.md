@@ -71,7 +71,7 @@ again afterward.
 The [measurement record](shell-simplification-results.json) identifies the
 sources, model provenance, query counts and validation logs. Local replay tools,
 baseline executables and full logs are retained in
-`/tmp/zenofcis-simplification-20260912`. The required final gate is
+`<workdir>`. The required final gate is
 `python3 tools/atdd.py run --all`; its result is recorded with the commit.
 
 SQLite query batching, additional caches and relational-evaluator changes

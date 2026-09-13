@@ -89,6 +89,21 @@ temporary assembly scripts, write-enabled workflows, credentials, or retained
 CI payload fragments. Generated source that is part of the public contract must
 have a deterministic generator, retained manifest, and compile/replay gate.
 
+Before committing or publishing evidence, run
+`python3 tools/check_release_privacy.py check`. For release attachments, pass
+their complete directory as the final argument. The check inspects nested
+archives and reports categories and locations without echoing private data.
+For known private identifiers such as a personal email or workstation name,
+set `ZENO_FCIS_PRIVATE_MARKERS_FILE` to a file outside Git and the upload
+directory, with one literal identifier per line (at least four bytes each,
+at most 128 identifiers and 64 KiB). Packaging checks inherit this setting.
+The standalone check also accepts `--private-markers-file <private-file>`.
+Use a public or GitHub noreply identity for public commits. Do not upload raw
+GitHub workflow responses without checking their author and committer metadata.
+Review logs and metadata as well: pattern checks cannot detect every secret.
+Public evidence copies use neutral paths and document redactions; their hashes
+must describe the redacted bytes. Keep original local records outside Git.
+
 CODEOWNERS declares repository review ownership. Repository settings must
 separately enforce protected branches and required approvals. A passing CI run
 does not replace independent review for authority-bearing or protocol changes.

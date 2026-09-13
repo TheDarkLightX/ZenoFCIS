@@ -114,7 +114,7 @@ usage credits were unavailable; it is not counted as a review. Neither completed
 model task had a wall-clock cutoff. Models remained advisory.
 
 Raw probes, source copies, model receipts and logs are retained in
-`/tmp/zenofcis-sqlite-outbox-20260912`. These are bounded checks, not a general
+`<workdir>`. These are bounded checks, not a general
 proof or stable V1 release qualification. Lean, locked dependencies, public APIs,
 persistent formats and version `1.0.0-rc.3` remain unchanged. The required
 precommit acceptance run is recorded separately with the final commit.

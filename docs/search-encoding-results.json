@@ -581,6 +581,6 @@
       "authority": "ADVISORY; independent root validation required"
     }
   ],
-  "local_evidence_directory": "/tmp/zenofcis-search-20260912",
+  "local_evidence_directory": "<workdir>",
   "claim_limit": "Behavior preservation and resource comparisons on the stated corpus; no general proof, stable V1 release, publication or production-readiness claim."
 }

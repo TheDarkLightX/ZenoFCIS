@@ -38,17 +38,17 @@
         "--edition=2024",
         "-C",
         "opt-level=2",
-        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "<workdir>/binding_probe.rs",
         "--extern",
-        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_compose.rlib",
+        "zeno_fcis_compose=<workdir>/debug/libzeno_fcis_compose.rlib",
         "--extern",
-        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/debug/deps/libzeno_fcis_codec-40d8c657a2e8d5cf.rlib",
+        "zeno_fcis_codec=<workdir>/debug/deps/libzeno_fcis_codec-40d8c657a2e8d5cf.rlib",
         "--extern",
-        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_crypto.rlib",
+        "zeno_fcis_crypto=<workdir>/debug/libzeno_fcis_crypto.rlib",
         "-L",
-        "dependency=/tmp/zenofcis-milestone-target/debug/deps",
+        "dependency=<workdir>/debug/deps",
         "-o",
-        "/tmp/zenofcis-binding-order-20260912/baseline-binding-probe"
+        "<workdir>/baseline-binding-probe"
       ],
       "profile": "dev libraries opt-level0 debug0; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
     },
@@ -76,17 +76,17 @@
         "--edition=2024",
         "-C",
         "opt-level=2",
-        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "<workdir>/binding_probe.rs",
         "--extern",
-        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_compose.rlib",
+        "zeno_fcis_compose=<workdir>/debug/libzeno_fcis_compose.rlib",
         "--extern",
-        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/debug/deps/libzeno_fcis_codec-40d8c657a2e8d5cf.rlib",
+        "zeno_fcis_codec=<workdir>/debug/deps/libzeno_fcis_codec-40d8c657a2e8d5cf.rlib",
         "--extern",
-        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/debug/libzeno_fcis_crypto.rlib",
+        "zeno_fcis_crypto=<workdir>/debug/libzeno_fcis_crypto.rlib",
         "-L",
-        "dependency=/tmp/zenofcis-milestone-target/debug/deps",
+        "dependency=<workdir>/debug/deps",
         "-o",
-        "/tmp/zenofcis-binding-order-20260912/candidate-binding-probe"
+        "<workdir>/candidate-binding-probe"
       ],
       "profile": "dev libraries opt-level0 debug0; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
     },
@@ -115,17 +115,17 @@
         "--edition=2024",
         "-C",
         "opt-level=2",
-        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "<workdir>/binding_probe.rs",
         "--extern",
-        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/release/libzeno_fcis_compose.rlib",
+        "zeno_fcis_compose=<workdir>/release/libzeno_fcis_compose.rlib",
         "--extern",
-        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/release/deps/libzeno_fcis_codec-8ab4f87418899eee.rlib",
+        "zeno_fcis_codec=<workdir>/release/deps/libzeno_fcis_codec-8ab4f87418899eee.rlib",
         "--extern",
-        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/release/libzeno_fcis_crypto.rlib",
+        "zeno_fcis_crypto=<workdir>/release/libzeno_fcis_crypto.rlib",
         "-L",
-        "dependency=/tmp/zenofcis-milestone-target/release/deps",
+        "dependency=<workdir>/release/deps",
         "-o",
-        "/tmp/zenofcis-binding-order-20260912/release-baseline-binding-probe"
+        "<workdir>/release-baseline-binding-probe"
       ],
       "profile": "release libraries; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
     },
@@ -154,17 +154,17 @@
         "--edition=2024",
         "-C",
         "opt-level=2",
-        "/tmp/zenofcis-binding-order-20260912/binding_probe.rs",
+        "<workdir>/binding_probe.rs",
         "--extern",
-        "zeno_fcis_compose=/tmp/zenofcis-milestone-target/release/libzeno_fcis_compose.rlib",
+        "zeno_fcis_compose=<workdir>/release/libzeno_fcis_compose.rlib",
         "--extern",
-        "zeno_fcis_codec=/tmp/zenofcis-milestone-target/release/deps/libzeno_fcis_codec-8ab4f87418899eee.rlib",
+        "zeno_fcis_codec=<workdir>/release/deps/libzeno_fcis_codec-8ab4f87418899eee.rlib",
         "--extern",
-        "zeno_fcis_crypto=/tmp/zenofcis-milestone-target/release/libzeno_fcis_crypto.rlib",
+        "zeno_fcis_crypto=<workdir>/release/libzeno_fcis_crypto.rlib",
         "-L",
-        "dependency=/tmp/zenofcis-milestone-target/release/deps",
+        "dependency=<workdir>/release/deps",
         "-o",
-        "/tmp/zenofcis-binding-order-20260912/release-candidate-binding-probe"
+        "<workdir>/release-candidate-binding-probe"
       ],
       "profile": "release libraries; external probe opt-level2; pinned Rust1.97.1; no dependency updates"
     }
@@ -699,7 +699,7 @@
     }
   },
   "root_review_corrections": "Opus release advice incorrectly described detached HEAD, inferred full PR path filters from only the last patch, and presumed that feedback requires prior tagged publication. Root verified the live branch and full diff and did not adopt those conclusions.",
-  "evidence_directory": "/tmp/zenofcis-binding-order-20260912",
+  "evidence_directory": "<workdir>",
   "resource_limits": "existing pinned toolchains and cached Rust builds; no Lean installation, copy or version change",
   "claim": "fewer copied binding bytes and allocations for the measured nested shapes; no portable latency, global optimum or release qualification claim"
 }

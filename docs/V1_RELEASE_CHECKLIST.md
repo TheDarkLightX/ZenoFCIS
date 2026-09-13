@@ -63,6 +63,7 @@ NODE_BIN=<exact-node-22.23.1> python3 tools/check_probity.py
 npm audit --audit-level=high
 python3 tools/rc_package.py self-test
 python3 tools/rc_package.py check
+python3 tools/check_release_privacy.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
@@ -157,6 +158,15 @@ override.
 
 ## E. Publish release evidence
 
+- [ ] Scan the exact final upload directory, including all evidence and nested
+      archives: `python3 tools/check_release_privacy.py check <release-assets>`.
+      Resolve every finding and inspection error before signing or uploading.
+      Set `ZENO_FCIS_PRIVATE_MARKERS_FILE` to a private file outside the upload
+      directory containing local usernames, hostnames, and personal emails,
+      one literal identifier per line, to include them in the check.
+      Inspect exported metadata and logs for personal paths and other private
+      information that pattern checks may miss. Keep raw records private;
+      label sanitized copies and refresh their checksums and signatures.
 - [ ] Create the stable GitHub release from the immutable signed tag.
 - [ ] Attach the RC bundle, individual retained artifacts, `SHA256SUMS`, and the
       owner-selected detached signature or signed transparency-log reference.

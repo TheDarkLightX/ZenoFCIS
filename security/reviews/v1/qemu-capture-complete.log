@@ -1,6 +1,6 @@
-capture: /tmp/zenofcis-v1-release-evidence-20260912/qemu-capture/mini-determinator-qemu-kernel.png
-serial: /tmp/zenofcis-v1-release-evidence-20260912/qemu-capture/mini-determinator-qemu-serial.txt
-metadata: /tmp/zenofcis-v1-release-evidence-20260912/qemu-capture/mini-determinator-qemu-capture.json
+capture: <workdir>/qemu-capture/mini-determinator-qemu-kernel.png
+serial: <workdir>/qemu-capture/mini-determinator-qemu-serial.txt
+metadata: <workdir>/qemu-capture/mini-determinator-qemu-capture.json
 ZENOFCIS_QEMU_DEMO/1
 BOOT=KERNEL
 FIRMWARE_HANDOFF=COMPLETE

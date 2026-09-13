@@ -622,6 +622,6 @@
       "authority": "ADVISORY; independent root validation required"
     }
   ],
-  "local_evidence_directory": "/tmp/zenofcis-finite-choices-20260912",
+  "local_evidence_directory": "<workdir>",
   "claim_limit": "Bounded execution and allocation comparisons. No general equivalence theorem, unique optimality, portable benchmark, stable V1 release or production-readiness claim."
 }

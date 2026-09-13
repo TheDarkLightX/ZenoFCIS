@@ -280,7 +280,7 @@
         "exit_code": 0,
         "command": [
           "python3",
-          "/tmp/zenofcis-evaluator-20260912/check_mutations.py"
+          "<workdir>/check_mutations.py"
         ],
         "log_sha256": "84b5b8250dcb0bd0e1aead96526234ad434a8220ecac01f6dda4909863637e5d"
       },
@@ -392,7 +392,7 @@
     "integration_and_acceptance": "Independent root review and execution; model output is advisory.",
     "initial_fable_attempt": "Completed with only a proposed command; excluded as a design review. A subsequent source-only request produced the reviewed recommendation."
   },
-  "local_evidence_directory": "/tmp/zenofcis-evaluator-20260912",
+  "local_evidence_directory": "<workdir>",
   "local_probe_sources": [
     {
       "file": "probe.rs",

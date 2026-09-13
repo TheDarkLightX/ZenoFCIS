@@ -205,7 +205,7 @@
     "no-std.log": "25dbd7b458bdf82023dd536dcbdda349d282de640f4f3d78b27c7139ecaabf23"
   },
   "sqlite_transaction_contract": "https://www.sqlite.org/lang_transaction.html",
-  "local_evidence_directory": "/tmp/zenofcis-simplification-20260912",
+  "local_evidence_directory": "<workdir>",
   "limits": [
     "Query counts are for one history record and one outbox entry; no wall-time claim.",
     "Behavioral comparisons and mutations are bounded checks, not a general equivalence proof.",

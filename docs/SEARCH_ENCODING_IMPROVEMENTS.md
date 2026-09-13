@@ -109,7 +109,7 @@ restoration was verified before rerunning the checks. Results are recorded in
 the [measurement record](search-encoding-results.json).
 
 The record binds sources, probes, model receipts and validation logs. Full local
-evidence is retained in `/tmp/zenofcis-search-20260912`. This is bounded execution
+evidence is retained in `<workdir>`. This is bounded execution
 evidence, not a general equivalence proof or a portable benchmark suite.
 
 The final commit requires `python3 tools/atdd.py run --all`; its result is

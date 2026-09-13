@@ -896,7 +896,7 @@
       ],
       "outcome": "findings",
       "stderr_sha256": null,
-      "stdout_sha256": "f5c5dfb115669b208c3c4c4a0bd365d92101f86f4cf8a388b095f973c71e4264"
+      "stdout_sha256": "0aaa0dd6082e6c841d8e374df700a57c2987fb05bf21ea3d20c2af8c9eb4717d"
     },
     {
       "artifact_refs": [
@@ -913,7 +913,7 @@
       ],
       "outcome": "findings",
       "stderr_sha256": null,
-      "stdout_sha256": "2fe3f3e7295158b30e5e260d2e5de09e50db06942114baff39238a449cfa6adf"
+      "stdout_sha256": "4a472ff7d3d3637cd2575e5ac8e37c5852da623aa4c77d00eb071cb5ddb03455"
     },
     {
       "artifact_refs": [
@@ -930,7 +930,7 @@
       ],
       "outcome": "pass",
       "stderr_sha256": null,
-      "stdout_sha256": "37baeeab9dace1262261ed67c4e59d7b4f71cbd142c1744a540dbece46a61e80"
+      "stdout_sha256": "e40687ba2bbfac91a196794324814ab1ee79ff6388676942ca1d5d719e8576bb"
     },
     {
       "artifact_refs": [
@@ -947,14 +947,14 @@
       ],
       "outcome": "findings",
       "stderr_sha256": null,
-      "stdout_sha256": "87f23ba89fea5001129ddc94c702b5ebaa3125857a8ca95fd68bb327a5d467a5"
+      "stdout_sha256": "b7d93cc118221d716eb6ef0749834412d9aee796edbcd1ad6305c6df834d4229"
     },
     {
       "artifact_refs": [
         "security/reviews/v1/formal-existing-lean.json",
         "security/reviews/v1/formal-existing-lean.log"
       ],
-      "command": "env ZENO_FCIS_TRANSLATION_LEAN=/home/trevormoc/.elan/toolchains/leanprover--lean4---v4.32.0/bin/lean cargo +1.97.1 test -p zeno-fcis-formal-tools --locked translation_tests::operator_corpus_checks_with_existing_lean -- --ignored --exact --nocapture",
+      "command": "env ZENO_FCIS_TRANSLATION_LEAN=<HOME>/.elan/toolchains/leanprover--lean4---v4.32.0/bin/lean cargo +1.97.1 test -p zeno-fcis-formal-tools --locked translation_tests::operator_corpus_checks_with_existing_lean -- --ignored --exact --nocapture",
       "configuration_sha256": null,
       "exit_status": 0,
       "identity": "Rust 1.97.1 and the retained command-specific runtime",
@@ -964,7 +964,7 @@
       ],
       "outcome": "pass",
       "stderr_sha256": null,
-      "stdout_sha256": "acfd71f05b34ed83f970f41435686b4691882a9131bd5e35235fc0e56842e68b"
+      "stdout_sha256": "5d19111411cae65d4694ae9c3586c249a8921cc8b1a36a924611c2081cb389d1"
     },
     {
       "artifact_refs": [
@@ -981,7 +981,7 @@
       ],
       "outcome": "findings",
       "stderr_sha256": null,
-      "stdout_sha256": "f2253401245930c694755eefcb3ef72538e21be6ec68fa9f84275e789bfbb50c"
+      "stdout_sha256": "da8513becb87d3b65ade23c78813b8a8bf5d25a5e54e2fa4d3c15f886026fbec"
     },
     {
       "artifact_refs": [
@@ -998,7 +998,7 @@
       ],
       "outcome": "pass",
       "stderr_sha256": null,
-      "stdout_sha256": "41f9e0f8110dec8ff924a0f4fbe8089158e17cd6ee682b772be39b0f2b2709e5"
+      "stdout_sha256": "6795b1a365831c7973e79e9e19d42c86cd581e4c006c47a5e05f5ef7f6fd288e"
     },
     {
       "artifact_refs": [
@@ -1015,7 +1015,7 @@
       ],
       "outcome": "findings",
       "stderr_sha256": null,
-      "stdout_sha256": "88cc6e5c58c603a9179ce8cd94f6ce6cd15d3ca95ba1ed5bfedf65f469b46827"
+      "stdout_sha256": "14515228e11be2888570ddb420f18a94e3bb8d09d5c41d47284322c18698587c"
     },
     {
       "artifact_refs": [
@@ -1032,14 +1032,14 @@
       ],
       "outcome": "pass",
       "stderr_sha256": null,
-      "stdout_sha256": "3cb5f4f2c966701f18a769202bbc26b1b825d713985707a1e797614eeee0d1ba"
+      "stdout_sha256": "a39a9a93dea5cadb9ad9269a92906516bf285680d6a5255377afa169b7dc78d1"
     },
     {
       "artifact_refs": [
         "security/reviews/v1/synthesis-final.json",
         "security/reviews/v1/synthesis-final.log"
       ],
-      "command": "python3 tools/check_synthesis.py --receipt /tmp/zenofcis-v1-release-evidence-20260912/synthesis-final-receipt.json",
+      "command": "python3 tools/check_synthesis.py --receipt <workdir>/synthesis-final-receipt.json",
       "configuration_sha256": null,
       "exit_status": 0,
       "identity": "Rust 1.97.1 with Python 3 and the pinned conformance targets where used",
@@ -1049,7 +1049,7 @@
       ],
       "outcome": "pass",
       "stderr_sha256": null,
-      "stdout_sha256": "6a82d8136a3146456bb0a241edb4fb2bca76142f1d9665d17754bd3d98bed0bf"
+      "stdout_sha256": "c6972c6bff8b9e363a4ae245eeae94b86d42000805f6ba9839e5947481bab551"
     },
     {
       "artifact_refs": [
@@ -1066,7 +1066,7 @@
       ],
       "outcome": "pass",
       "stderr_sha256": null,
-      "stdout_sha256": "8a234c90b1475b3456af263c9f149bd303270e2a82e8717b7261dc5c50828a1b"
+      "stdout_sha256": "5e375391f3da94c0470fc4a1b9edc36356c4bc99d7534445663d5b379dc0f6f8"
     }
   ]
 }

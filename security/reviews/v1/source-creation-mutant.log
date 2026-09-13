@@ -1,7 +1,7 @@
-   Compiling zeno-fcis-formal-tools v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-formal-tools)
-   Compiling zeno-fcis-cli v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-cli)
+   Compiling zeno-fcis-formal-tools v1.0.0 (<workdir>/crates/zeno-fcis-formal-tools)
+   Compiling zeno-fcis-cli v1.0.0 (<workdir>/crates/zeno-fcis-cli)
     Finished `test` profile [unoptimized] target(s) in 7.03s
-     Running unittests src/main.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis-b25cc11452454f3b)
+     Running unittests src/main.rs (<workdir>/debug/deps/zeno_fcis-b25cc11452454f3b)
 
 running 1 test
 
