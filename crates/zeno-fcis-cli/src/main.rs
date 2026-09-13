@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 mod durable_counter;
+mod prepared_counter;
 mod synth;
 
 use std::fs::{self, OpenOptions};
@@ -212,6 +213,7 @@ enum Template {
     Minimal,
     MiniDeterminator,
     DurableCounter,
+    PreparedCounter,
 }
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
@@ -369,8 +371,22 @@ fn describe_effects(path: &[String]) -> Value {
     let path: Vec<_> = path.iter().map(String::as_str).collect();
     let (reads, writes, executes_tools, read_only_flag): (&[&str], &[&str], bool, Option<&str>) =
         match path.as_slice() {
-            [] | ["backend"] | ["synth"] => return json!({"classification": "command-group"}),
-            ["describe"] | ["backend", "list"] | ["synth", "discover"] => (&[], &[], false, None),
+            [] | ["backend"] | ["synth"] | ["synth", "completion"] => {
+                return json!({"classification": "command-group"});
+            }
+            ["describe"]
+            | ["backend", "list"]
+            | ["synth", "discover"]
+            | ["synth", "completion", "discover"] => (&[], &[], false, None),
+            ["synth", "completion", "find"] => {
+                (&["completion-problem"], &["completion-case"], false, None)
+            }
+            ["synth", "completion", "verify" | "replay"] => (
+                &["completion-problem", "completion-evidence"],
+                &[],
+                false,
+                None,
+            ),
             ["synth", "run"] => (
                 &["synthesis-problem", "synthesis-artifacts"],
                 &["synthesis-artifacts"],
@@ -428,8 +444,13 @@ fn new_project(dir: &Path, template: Template) -> u8 {
     } else if let Err(error) = fs::create_dir(dir) {
         return io_error("create target", error);
     }
-    if matches!(template, Template::DurableCounter) {
-        for (relative, content) in durable_counter::FILES {
+    let application = match template {
+        Template::DurableCounter => Some(durable_counter::FILES),
+        Template::PreparedCounter => Some(prepared_counter::FILES),
+        _ => None,
+    };
+    if let Some(files) = application {
+        for (relative, content) in files {
             let path = dir.join(relative);
             if let Some(parent) = path.parent()
                 && let Err(error) = fs::create_dir_all(parent)
@@ -452,7 +473,7 @@ fn new_project(dir: &Path, template: Template) -> u8 {
             MINI,
             "# Mini Determinator\n\nA pure shared-nothing semantic example. Run `zeno-fcis check`.\n",
         ),
-        Template::DurableCounter => unreachable!("handled above"),
+        Template::DurableCounter | Template::PreparedCounter => unreachable!("handled above"),
     };
     if let Err(error) = atomic_create(&dir.join("project.zeno"), source.as_bytes()) {
         return io_error("write project", error);

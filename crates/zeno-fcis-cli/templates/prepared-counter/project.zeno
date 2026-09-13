@@ -1,0 +1,30 @@
+zeno 1;
+project 1 prepared_counter;
+namespace 2 core;
+type 100 state CounterState;
+type 101 command CounterCommand;
+type 102 context CounterContext;
+type 103 destination NotificationDestination;
+type 104 payload Notification;
+type 105 int CounterValue;
+type 106 int CounterDelta;
+field 110 100 count 105;
+field 112 104 notified_count 105;
+field 120 101 first 106;
+field 121 101 second 106;
+field 122 101 third 106;
+reason 200 denied precedence 0;
+reason 201 capacity precedence 1;
+channel 300 notify destination 103 payload 104;
+component 400 counter {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 bounded_state = post.100.110 >= 0 && post.100.110 <= 3;
+law 501 accepted_batch = context.102 == 1 && pre.100.110 + command.101.120 >= 0 && pre.100.110 + command.101.120 <= 3 && pre.100.110 + command.101.120 + command.101.121 >= 0 && pre.100.110 + command.101.120 + command.101.121 <= 3 && post.100.110 == pre.100.110 + command.101.120 + command.101.121 + command.101.122;
+law 502 no_committed_failure = false;
+law 503 reject_no_authority = true;

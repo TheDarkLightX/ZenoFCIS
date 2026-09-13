@@ -1,6 +1,6 @@
 # Formal tools in V1
 
-ZenoFCIS `1.0.0` pins and exercises process adapters for CVC5 `1.3.3`,
+ZenoFCIS `1.1.0` pins and exercises process adapters for CVC5 `1.3.3`,
 Z3 `4.16.0`, and Lean `4.30.0`. Each adapter gives its result a deliberately
 limited classification. `zeno-fcis-formal-tools` is a standard-library shell
 around the pure exporters. It cannot construct `BackendCertificate` or

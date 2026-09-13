@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
 use zeno_fcis_synthesis::finite::{Contract, Domain, Error, Op, PROFILE, Program, Sketch, Slot};
@@ -30,24 +30,38 @@ struct Source {
     contract: Graph,
     sketch: SketchGraph,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Field {
-    name: String,
+pub(super) struct Field {
+    pub(super) name: String,
     #[serde(rename = "type")]
     kind: Type,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum Type {
-    Bool,
+    Bool {},
     Int { min: i64, max: i64 },
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Graph {
+pub(super) struct Graph {
     nodes: Vec<Vec<Value>>,
     roots: Vec<u16>,
+}
+impl Graph {
+    pub(super) fn program(
+        &self,
+        inputs: Vec<Domain>,
+        outputs: Vec<Domain>,
+    ) -> Result<Program, String> {
+        let nodes = self
+            .nodes
+            .iter()
+            .map(|op| parse_op(op))
+            .collect::<Result<Vec<_>, _>>()?;
+        Program::try_new(inputs, outputs, nodes, self.roots.clone()).map_err(error)
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -142,7 +156,7 @@ pub(super) fn parse(bytes: Vec<u8>) -> Result<Problem, String> {
 fn error(error: Error) -> String {
     error.to_string()
 }
-fn fields(fields: &[Field]) -> Result<Vec<Domain>, String> {
+pub(super) fn fields(fields: &[Field]) -> Result<Vec<Domain>, String> {
     if fields.len() > 16 {
         return Err("too-many-fields".into());
     }
@@ -161,7 +175,7 @@ fn fields(fields: &[Field]) -> Result<Vec<Domain>, String> {
                 return Err("invalid-or-duplicate-field-name".into());
             }
             Ok(match f.kind {
-                Type::Bool => Domain::Bool,
+                Type::Bool {} => Domain::Bool,
                 Type::Int { min, max } => Domain::Int { min, max },
             })
         })

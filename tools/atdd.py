@@ -69,8 +69,9 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         ),
     ),
     "external-consumer": AcceptanceScenario(
-        "Compile an isolated downstream consumer",
+        "Compile an unchanged V1 consumer against the current release",
         (
+            ("python3", "tools/check_v1_compatibility.py"),
             (
                 "cargo",
                 "+1.97.1",

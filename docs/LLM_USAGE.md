@@ -338,3 +338,19 @@ all signed 64-bit values without JavaScript `Number` rounding or object
 conversion hooks. `synth verify --target javascript` uses an existing Node.js
 installation. Consult discovery for the supported runtime and exact ABI;
 problem and vector JSON also require lossless integer handling in your client.
+
+
+## V1.1 completion and preparation
+
+Start with `zeno-fcis describe synth completion` and
+`zeno-fcis synth completion discover`. Keep the expected model separate from
+imported plan or reproduction files. `status: "verified"` covers the complete
+declared finite model under its fixed environment; `authority: "none"` is
+intentional. A matched failure replay remains a failed completion claim.
+
+For `PreparedFold`, retain the admitted ordered input and exact trusted context.
+Use offset/count to advance; discard or replay original input after interruption.
+Do not serialize partial accumulators into trusted recovery state. Completion
+still requires normal application laws and authorization. The generated
+`prepared-counter` application demonstrates this whole path and its negative
+checks without adding a publication shortcut.

@@ -1,6 +1,6 @@
 # ZenoFCIS V1 product contract
 
-This document defines the stable reusable core-library scope for `1.0.0`. It
+This document defines the stable reusable core-library scope for the V1 family, currently `1.1.0`. It
 is the product-level complement to the protocol and authority documents. Each
 feature supports an adopter journey below with an explicit assurance boundary.
 

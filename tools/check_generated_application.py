@@ -125,9 +125,8 @@ def bind_generated_dependencies(manifest: Path, package_roots: dict[str, Path], 
             output.write(f'{name} = {{ path = {json.dumps(str(packages[name][0]))} }}\n')
 
 
-def exercise_application(app: Path, directory: Path, package_roots: dict[str, Path],
-                         version: str, environment: dict[str, str], cli: list[str]) -> dict:
-    synthesis = check_synthesis.exercise_counter(cli, app, directory, environment)
+def exercise_rust_application(app: Path, directory: Path, package_roots: dict[str, Path],
+                              version: str, environment: dict[str, str]) -> tuple[dict, str]:
     generated = generated_file_manifest(app)
     manifest = app / "Cargo.toml"
     consumer = tomllib.loads(manifest.read_text())["package"]
@@ -140,22 +139,90 @@ def exercise_application(app: Path, directory: Path, package_roots: dict[str, Pa
         ["cargo", "+1.97.1", "clippy", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"],
         ["cargo", "+1.97.1", "test", "--locked", "--offline"],
     ]
+    test_output = ""
     for command in commands:
-        run(command, app, environment=environment)
+        if command[2] == "test":
+            command.extend(["--", "--nocapture"])
+            test_output = run(command, app, capture=True, environment=environment)
+            print(test_output, end="")
+        else:
+            run(command, app, environment=environment)
     demonstration = run(["cargo", "+1.97.1", "run", "--locked", "--offline", "--",
                          str(directory / "counter.sqlite")], app, capture=True, environment=environment)
     print(demonstration, end="")
-    return {"generated_files": generated, "resolved_graph": graph, "synthesis": synthesis,
+    # Keep variable test timing/order in the private log, outside the reproducible
+    # receipt. Callers may inspect its model identity before discarding it.
+    return {"generated_files": generated, "resolved_graph": graph,
             "commands": commands + [["cargo", "+1.97.1", "run", "--locked", "--offline", "--", "<new-database>"]],
-            "demonstration": demonstration.strip(), "status": "passed"}
+            "demonstration": demonstration.strip(), "status": "passed"}, test_output
 
+
+
+def exercise_application(app: Path, directory: Path, package_roots: dict[str, Path],
+                         version: str, environment: dict[str, str], cli: list[str]) -> dict:
+    synthesis = check_synthesis.exercise_counter(cli, app, directory, environment)
+    result, _ = exercise_rust_application(app, directory, package_roots, version, environment)
+    return {**result, "synthesis": synthesis}
+
+
+def exercise_prepared_application(app: Path, directory: Path, package_roots: dict[str, Path],
+                                  version: str, environment: dict[str, str], cli: list[str]) -> dict:
+    case = directory / "completion-case"
+    reports = []
+    for arguments in (["find", "completion.json", "--out", str(case)],
+                      ["verify", "completion.json", "--plan", str(case / "plan.zcve")],
+                      ["replay", "completion.json", "--case", str(case)]):
+        reports.append(json.loads(run([*cli, "synth", "completion", *arguments], app,
+                                      capture=True, environment=environment)))
+    if any(report.get("schema") != "zeno-fcis/completion-result/1" or
+           report.get("status") != "verified" or report.get("authority") != "none" or
+           report.get("assurance") != "complete-finite" or report.get("states_checked") != 4 or
+           report.get("commands_per_state") != 27 or report.get("maximum_exit_steps") != 1
+           for report in reports):
+        raise RuntimeError("prepared application completion claim did not pass")
+    if (reports[2].get("replay") != "matched" or
+        len({report.get("problem") for report in reports}) != 1 or
+        len({report.get("plan_sha256") for report in reports}) != 1):
+        raise RuntimeError("prepared application completion replay differs")
+    result, test_output = exercise_rust_application(app, directory, package_roots, version, environment)
+    identities = [line.removeprefix("completion_problem=") for line in test_output.splitlines()
+                  if line.startswith("completion_problem=")]
+    if identities != [reports[0]["problem"]]:
+        raise RuntimeError("CLI completion model differs from the exhaustive runtime comparison model")
+    demonstration = json.loads(result["demonstration"])
+    if (demonstration.get("status") != "passed" or
+        tuple(demonstration.get(key) for key in ("count", "bundles", "deliveries", "pending")) != (0, 2, 2, 0) or
+        not 0 < demonstration.get("publication_bytes", 0) <= 16384):
+        raise RuntimeError("prepared application lifecycle did not pass")
+    return {**result, "completion": reports,
+            "nonclaims": ["eligible exits in the fixed allowed context", "no production deployment qualification"]}
+
+
+def exercise_v1_consumer(directory: Path, package_roots: dict[str, Path], version: str,
+                         environment: dict[str, str]) -> dict:
+    import check_v1_compatibility
+    baseline = check_v1_compatibility.check(package_roots)
+    consumer = directory / "v1-consumer"
+    (consumer / "src").mkdir(parents=True)
+    source = ROOT / "test-projects/external-consumer/src/main.rs"
+    shutil.copyfile(source, consumer / "src/main.rs")
+    manifest = (ROOT / "test-projects/external-consumer/Cargo.toml").read_text()
+    manifest = manifest.replace('    path = "../../crates/zeno-fcis",\n', '')
+    (consumer / "Cargo.toml").write_text(manifest)
+    bind_generated_dependencies(consumer / "Cargo.toml", package_roots, version)
+    allowed = {(name, version): root / "Cargo.toml" for name, root in package_roots.items()}
+    allowed[("zeno-fcis-external-consumer", "0.0.0")] = consumer / "Cargo.toml"
+    graph = resolve_reviewed_graph(consumer, allowed, environment)
+    run(["cargo", "+1.97.1", "run", "--locked", "--offline"], consumer, environment=environment)
+    return {"status": "passed", "baseline": baseline, "resolved_graph": graph,
+            "consumer_source_sha256": hashlib.sha256(source.read_bytes()).hexdigest()}
 
 def check(directory: Path) -> None:
     app = directory / "counter"
     run(["cargo", "+1.97.1", "fetch", "--locked"], ROOT)
     packaged = set(run(["cargo", "+1.97.1", "package", "-p", "zeno-fcis-cli", "--list",
                         "--allow-dirty", "--locked", "--offline"], ROOT, capture=True).splitlines())
-    template = ROOT / "crates/zeno-fcis-cli/templates/durable-counter"
+    template = ROOT / "crates/zeno-fcis-cli/templates"
     for source in template.rglob("*"):
         if source.is_file() and str(source.relative_to(ROOT / "crates/zeno-fcis-cli")) not in packaged:
             raise RuntimeError(f"CLI package omits template resource: {source}")
@@ -166,7 +233,13 @@ def check(directory: Path) -> None:
     version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
     exercise_application(app, directory, packages, version, dict(os.environ),
                          [str((ROOT / Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/zeno-fcis").resolve())])
-    print("generated application: isolated consumer, locked dependencies, lifecycle and decision table passed")
+    prepared_root = directory / "prepared"
+    prepared_root.mkdir()
+    prepared = prepared_root / "counter"
+    cli = [str((ROOT / Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/zeno-fcis").resolve())]
+    run([*cli, "new", str(prepared), "--template", "prepared-counter"], ROOT)
+    exercise_prepared_application(prepared, prepared_root, packages, version, dict(os.environ), cli)
+    print("generated applications: isolated consumers, reviewed dependencies, complete decisions and lifecycle passed")
 
 
 def main() -> None:

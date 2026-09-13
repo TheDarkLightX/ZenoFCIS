@@ -11,7 +11,7 @@ cargo +1.97.1 run -p zeno-fcis --example bounded_completion --features synthesis
 ```
 
 The API entry points are `CompletionProblem::try_new`, `find_completion`,
-`verify_completion`, and `PreparedFold::{start, advance, finish}`. All diagnostics
+`verify_completion`, `verify_completion_bytes`, and `PreparedFold::{start, advance, finish}`. All diagnostics
 are typed. `NoExit` carries the first exact state without a path; failed folds
 carry an absolute item index. `PreparedFold` debug output reveals progress and
 operation identity, without dumping its program, inputs, or partial accumulator.
@@ -100,7 +100,7 @@ authority, SQLite, replay, and outbox acceptance gates unchanged.
 
 ## Executed focused checks
 
-The 26 focused Rust tests include every two-state graph with one optional
+The original 26 focused Rust tests include every two-state graph with one optional
 successor per state and every terminal-state set (36 models). Fold comparison
 covers 390 complete chunk partitions over 120 small initial/input instances,
 plus a separate order-dependent recurrence and checked-arithmetic traps.
@@ -130,3 +130,45 @@ durability, or atomic external settlement. Persisting an accumulator and calling
 it verified is unsupported. Recovery replays original inputs. Any future
 authoritative pending-operation format requires an explicit profile/version
 and a separate observational-refinement and storage qualification.
+
+
+## Portable plans and agent workflow
+
+V1.1 imports the existing canonical plan bytes with bounds derived from the
+independently admitted model. The decoder limits bytes, nodes, depth, tuple
+length and payload before allocation. It rejects alternate profiles, wrong
+bindings, noncanonical/truncated/trailing encodings and invalid ranks/commands.
+Only the independent verifier constructs a `VerifiedCompletion`.
+
+```sh
+zeno-fcis synth completion discover
+zeno-fcis new counter --template prepared-counter
+cd counter
+zeno-fcis synth completion find completion.json --out completion-case
+zeno-fcis synth completion verify completion.json --plan completion-case/plan.zcve
+zeno-fcis synth completion replay completion.json --case completion-case
+```
+
+`find` creates a new directory containing the normalized closed problem,
+canonical plan on success and deterministic result. `verify` and `replay` use
+a separately supplied model. A matched replay of a failing claim retains the
+failure exit code and reports `replay: "matched"`; reproduction is not acceptance.
+These files contain data, never executable checkpoints or authority.
+
+The [prepared application](../crates/zeno-fcis-cli/templates/prepared-counter/README.md)
+connects complete private work to ordinary authorization and SQLite publication.
+Its 216-case corpus checks decisions, successor state, notification, rejection
+precedence and complete publication bytes. Four partitions, cancellation, failed
+chunks, context/root/version changes, a recurring root, competing database handles,
+all seven commit crash points and exact replay are exercised. The release gate
+builds and runs it from actual crate archives.
+
+`completion_scaling` measures chains of 8, 64, 512 and 4,096 declared states,
+including search, independent verification and strict import:
+
+```sh
+cargo +1.97.1 run -p zeno-fcis --example completion_scaling --features synthesis --release --locked
+```
+
+Elapsed times describe that local run only. They establish no comparative speedup,
+universal complexity bound, constant-time behavior or production latency promise.

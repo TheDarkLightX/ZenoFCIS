@@ -1,6 +1,6 @@
 # `zeno-fcis` CLI reference
 
-The `zeno-fcis-cli` package in `1.0.0` publishes the `zeno-fcis` binary.
+The `zeno-fcis-cli` package in `1.1.0` publishes the `zeno-fcis` binary.
 It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
@@ -62,7 +62,7 @@ may still reject a value. Descriptive help text is not an executable instruction
 commands that can be invoked on their own.
 Unknown command paths return versioned JSON and exit `64`. Discovery reads no
 project or tool input and grants no authority. These interfaces are available
-in the 1.0.0 CLI.
+in the 1.1.0 CLI.
 
 `generate --format json` returns `status: "generated"`; with `--check` it
 returns `current` (exit `0`) or `drift` (exit `1`). Results include `path`,
@@ -160,3 +160,14 @@ separate new receipt file outside DIR. Both commands accept
 `--max-assignments` and `--max-steps`. See
 [language-neutral synthesis](LANGUAGE_NEUTRAL_SYNTHESIS.md) for the JSON
 contract, distinct failure outcomes, and target-conformance boundary.
+
+
+## Bounded completion in 1.1.0
+
+`zeno-fcis describe synth completion` lists the exact options and filesystem
+effects of `discover`, `find`, `verify` and `replay`. These commands use the
+closed `zeno-fcis/completion-problem/1` JSON schema and existing finite-i64
+instructions; they never execute supplied code. See
+[bounded completion](BOUNDED_COMPLETION.md) for commands and evidence limits.
+The `prepared-counter` template connects preparation to independently checked
+nominal authorization and atomic state/outbox publication.

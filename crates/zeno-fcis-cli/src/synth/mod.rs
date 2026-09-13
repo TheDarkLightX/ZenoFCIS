@@ -1,4 +1,5 @@
 //! Language-neutral synthesis authoring; no commit or publication authority.
+mod completion;
 mod problem;
 mod runner;
 
@@ -21,6 +22,11 @@ use zeno_fcis_synthesis::finite::{
 
 #[derive(Subcommand)]
 pub(super) enum Command {
+    /// Find, import, and replay bounded completion plans without authority.
+    Completion {
+        #[command(subcommand)]
+        command: completion::Command,
+    },
     /// List semantic profiles, target adapters, bounds, and evidence stages.
     Discover,
     /// Synthesize a complete finite relation and emit a pure target module.
@@ -151,6 +157,7 @@ fn semantic(error: Error) -> Failure {
 }
 pub(super) fn run(command: Command) -> u8 {
     let result = match command {
+        Command::Completion { command } => return completion::run(command),
         Command::Discover => Ok(
             json!({"schema":"zeno-fcis/synthesis-discovery/1","authority":"none","profiles":[PROFILE],"problem_schema":problem::SCHEMA,"targets":targets().iter().map(|target|json!({"language":target.emitter.target().language,"revision":target.emitter.target().revision,"extension":target.emitter.target().extension,"compiler":target.runner.tool_requirement(),"abi":target.emitter.abi(),"conformance_invocation":target.runner.invocation(),"pure_module":true})).collect::<Vec<_>>(),"instructions":problem::OPERATIONS.iter().map(|(name,arity)|json!({"opcode":name,"wire_items":arity})).collect::<Vec<_>>(),"contract_environment":"input fields followed by output fields","example_command":"zeno-fcis new counter --template durable-counter","limits":{"source_bytes":problem::MAX_BYTES,"fields_per_side":16,"nodes_per_graph":256,"input_tuples":65536,"output_tuples":4096,"graph_steps":100000000},"runtime_platform":"linux", "stages":["realizability","canonical-search","emission","target-conformance"],"semantics":{"evaluation":"eager","arithmetic":"checked-i64","boolean_wire":[0,1],"temporal":"unsupported","effects":"output-data-only"}}),
         ),

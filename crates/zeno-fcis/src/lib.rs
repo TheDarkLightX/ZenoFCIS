@@ -92,7 +92,7 @@ pub mod prelude {
     pub use zeno_fcis_synthesis::finite::{
         completion::{
             CompletionError, CompletionLimits, CompletionProblem, VerifiedCompletion,
-            find_completion, verify_completion,
+            find_completion, verify_completion, verify_completion_bytes,
         },
         preparation::{PreparationContext, PreparationError, PreparationLimits, PreparedFold},
     };

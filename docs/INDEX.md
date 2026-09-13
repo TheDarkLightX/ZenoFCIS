@@ -118,3 +118,7 @@ end-to-end proof for arbitrary downstream projects. Historical
 [RC3 notes](RC3_RELEASE_NOTES.md) describe the earlier published candidate.
 
 - [V1 implementation and release review](V1_REVIEW.md)
+
+- [V1.1 release notes](V1_1_RELEASE_NOTES.md)
+- [V1.1 release checklist](V1_1_RELEASE_CHECKLIST.md)
+- [Bounded completion and preparation](BOUNDED_COMPLETION.md)

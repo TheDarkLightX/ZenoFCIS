@@ -38,7 +38,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "04ada1d1daaf44a9f92f361c6e12f492c9cc7f541bd0d451ecab2b691192da0a"
+    "a6d94e9105c8301a27055af755aa60878d9e65422364b326a68dedfec9a6f576"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -1011,7 +1011,9 @@ def compiler_flag_evidence(environment: dict[str, str], source: Path, label: str
 def packaged_checker_inputs() -> list[dict[str, str]]:
     return [{"path": name, "sha256": sha256(ROOT / name)} for name in (
         "tools/rc_package.py", "tools/check_generated_application.py", "tools/check_synthesis.py",
-        "Cargo.lock", "release/package-set.toml",
+        "Cargo.lock", "release/package-set.toml", "tools/check_v1_compatibility.py",
+        "test-data/v1-compatibility/baseline.json",
+        "test-projects/external-consumer/src/main.rs", "test-projects/external-consumer/Cargo.toml",
     )]
 
 
@@ -1115,6 +1117,17 @@ def check_packaged_workspace(
     application = generated_application.exercise_application(
         app, application_root, package_roots, version, check_environment, [str(executable)],
     )
+    prepared_root = verification_root / "prepared-application"
+    prepared_root.mkdir()
+    prepared_app = prepared_root / "counter"
+    run([str(executable), "new", str(prepared_app), "--template", "prepared-counter"],
+        environment=check_environment, cwd=prepared_root)
+    prepared_application = generated_application.exercise_prepared_application(
+        prepared_app, prepared_root, package_roots, version, check_environment, [str(executable)],
+    )
+    v1_consumer = generated_application.exercise_v1_consumer(
+        verification_root, package_roots, version, check_environment,
+    )
     compiler = run(["rustc", "+1.97.1", "-vV"], capture=True)
     if (packaged_checker_inputs() != inputs or git_text("rev-parse", "HEAD") != commit
             or (not git_text("status", "--porcelain", "--untracked-files=all")) != clean):
@@ -1131,6 +1144,8 @@ def check_packaged_workspace(
                                 "path": (root / "Cargo.toml").relative_to(verification_root).as_posix()}
                                for name, root in sorted(package_roots.items())],
         "application": application,
+        "prepared_application": prepared_application,
+        "v1_consumer": v1_consumer,
         "nonclaims": ["not a registry-only installation check", "not fresh external dependency resolution",
                       "not an independent review",
                       "not production deployment qualification", "not release authorization"],
