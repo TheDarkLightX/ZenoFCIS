@@ -176,7 +176,7 @@ override.
       owner-selected detached signature or signed transparency-log reference.
 - [ ] Attach or link the hosted provenance/attestation for the exact tagged
       artifacts. `PROVENANCE-INPUTS.json` is input evidence, not an attestation.
-- [ ] Link `V1_RELEASE_NOTES.md`, `SECURITY.md`, the independent review report,
+- [ ] Link `V1_1_RELEASE_NOTES.md`, `SECURITY.md`, the independent review report,
       and known limitations.
 - [ ] Verify the GitHub release commit and all artifact digests from a separate
       machine.
@@ -188,7 +188,7 @@ override.
 
 If any pre-publication check fails, stop and repair in a new commit. If the
 `v1.1.0` tag already exists, select a new version; never retarget `v1.1.0`. A
-compatible correction after V1 normally uses `1.0.1`.
+compatible correction after V1.1 normally uses `1.1.1`.
 
 If publication is partially complete:
 
@@ -205,12 +205,12 @@ and issue a fixed release. Deleting artifacts or moving tags is not recovery.
 
 ## G. Stable compatibility review
 
-Stable `1.1.0` requires a separate reviewed commit and tag from RC3:
+Stable `1.1.0` requires a separate reviewed commit and tag from V1.0:
 
-- [ ] Resolve RC API feedback and document every intentional breaking change.
+- [ ] Resolve V1 API feedback and preserve the stable public contract.
 - [ ] Complete an independent exact-head review of the final source and
       authority topology.
-- [ ] Close every issue designated as a core-library V1 blocker.
+- [ ] Close every issue designated as a core-library V1.1 blocker.
 - [ ] Reconfirm production-facing storage and outbox-delivery-interpreter nonclaims;
       downstream qualification remains project specific.
 - [ ] Change the workspace and package-set versions to `1.1.0`, update all
@@ -218,5 +218,5 @@ Stable `1.1.0` requires a separate reviewed commit and tag from RC3:
       lockfile and package evidence.
 - [ ] Run this complete checklist again using tag `v1.1.0`.
 
-Cargo API stability begins at `1.1.0`. Existing canonical protocol
+Cargo API stability began at `1.0.0` and continues in `1.1.0`. Existing canonical protocol
 identifiers do not change merely because the Cargo version changes.

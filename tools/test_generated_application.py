@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import tarfile
 import tempfile
+import tomllib
 import unittest
 from unittest import mock
 
@@ -40,6 +41,35 @@ class ReproducibleApplicationReceiptTests(unittest.TestCase):
 
 
 class V1PackagedSourceTests(unittest.TestCase):
+    def test_retained_consumer_manifest_parses_and_copies_without_a_checkout_dependency(self):
+        retained = application.ROOT / "test-projects/external-consumer"
+        manifest_bytes = (retained / "Cargo.toml").read_bytes()
+        source_bytes = (retained / "src/main.rs").read_bytes()
+        manifest = tomllib.loads(manifest_bytes.decode())
+        version = tomllib.loads((application.ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+        dependency = manifest["dependencies"]["zeno-fcis"]
+        self.assertEqual(dependency, {
+            "version": f"={version}", "path": "../../crates/zeno-fcis", "default-features": False,
+            "features": ["std", "bootstrap", "composed-program", "backend", "authenticated-authority", "authoring"],
+        })
+        packages = {tomllib.loads(path.read_text())["package"]["name"]: path.parent
+                    for path in sorted((application.ROOT / "crates").glob("*/Cargo.toml"))}
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-v1-consumer-manifest-") as directory:
+            with mock.patch.object(application, "resolve_reviewed_graph", return_value={}), \
+                    mock.patch.object(application, "run", return_value=""):
+                report = application.exercise_v1_consumer(Path(directory), packages, version, {})
+            consumer = Path(directory) / "v1-consumer"
+            copied = tomllib.loads((consumer / "Cargo.toml").read_text())
+            self.assertEqual(copied["dependencies"]["zeno-fcis"], {
+                key: value for key, value in dependency.items() if key != "path"
+            })
+            for key in ("package", "workspace", "lints"):
+                self.assertEqual(copied[key], manifest[key])
+            self.assertEqual((consumer / "src/main.rs").read_bytes(), source_bytes)
+            self.assertEqual(report["status"], "passed")
+        self.assertEqual((retained / "Cargo.toml").read_bytes(), manifest_bytes)
+        self.assertEqual((retained / "src/main.rs").read_bytes(), source_bytes)
+
     def test_changed_archive_source_cannot_borrow_the_checkout_baseline(self):
         baseline = check_v1_compatibility.check()
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-v1-packaged-source-") as directory:
