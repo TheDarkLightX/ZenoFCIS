@@ -1571,6 +1571,7 @@ name = "zeno-fcis-synthesis"
 version = "1.0.0"
 dependencies = [
  "zeno-fcis-codec",
+ "zeno-fcis-core",
  "zeno-fcis-crypto",
  "zeno-fcis-value",
 ]

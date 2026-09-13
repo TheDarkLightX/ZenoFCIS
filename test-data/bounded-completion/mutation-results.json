@@ -1,0 +1,175 @@
+{
+  "schema": "zeno-fcis/bounded-completion-mutations/1",
+  "status": "passed",
+  "source_sha256": {
+    "crates/zeno-fcis-synthesis/src/finite/completion.rs": "e4c2ad2582b80d3fa4e0d1738c996531c609c83ce611a486430a1d48275fe441",
+    "crates/zeno-fcis-synthesis/src/finite/preparation.rs": "59e78c608f1a3e9569b06a740b2b2a710a535db68f6a2857cde4b30015dd5c6e"
+  },
+  "test_sha256": {
+    "crates/zeno-fcis-synthesis/tests/completion.rs": "85c97684bec51e17202493f42a7a4a92ca92ef21828542fece04a43ab1bca30b",
+    "crates/zeno-fcis-synthesis/tests/preparation.rs": "a93cc6af2a063ec36a56e1b2b164b9f1a33641513ad9010f5b0ee7e8f16769e3"
+  },
+  "mutations": [
+    {
+      "mutation": "expected-problem",
+      "source": "crates/zeno-fcis-synthesis/src/finite/completion.rs",
+      "test": "bindings_include_resource_policy_and_program_semantics",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "completion",
+        "--locked",
+        "--",
+        "bindings_include_resource_policy_and_program_semantics",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "strict-rank",
+      "source": "crates/zeno-fcis-synthesis/src/finite/completion.rs",
+      "test": "the_verifier_rejects_changed_bindings_rows_commands_and_ranks",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "completion",
+        "--locked",
+        "--",
+        "the_verifier_rejects_changed_bindings_rows_commands_and_ranks",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "hidden-terminal-trap",
+      "source": "crates/zeno-fcis-synthesis/src/finite/completion.rs",
+      "test": "unselected_and_terminal_state_commands_cannot_hide_an_arithmetic_trap",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "completion",
+        "--locked",
+        "--",
+        "unselected_and_terminal_state_commands_cannot_hide_an_arithmetic_trap",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "completion-capacity",
+      "source": "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
+      "test": "output_capacity_is_reserved_before_any_progress",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "preparation",
+        "--locked",
+        "--",
+        "output_capacity_is_reserved_before_any_progress",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "tuple-framing",
+      "source": "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
+      "test": "the_reserved_input_bytes_include_both_tuple_frames_and_every_item",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "preparation",
+        "--locked",
+        "--",
+        "the_reserved_input_bytes_include_both_tuple_frames_and_every_item",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "starting-version",
+      "source": "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
+      "test": "full_state_version_and_invocation_must_still_match_at_finish",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "preparation",
+        "--locked",
+        "--",
+        "full_state_version_and_invocation_must_still_match_at_finish",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "item-order",
+      "source": "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
+      "test": "an_order_dependent_fold_keeps_item_order_across_every_partition",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "preparation",
+        "--locked",
+        "--",
+        "an_order_dependent_fold_keeps_item_order_across_every_partition",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "expected-offset",
+      "source": "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
+      "test": "repeated_skipped_empty_and_oversized_ranges_preserve_progress",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "preparation",
+        "--locked",
+        "--",
+        "repeated_skipped_empty_and_oversized_ranges_preserve_progress",
+        "--exact"
+      ],
+      "exit_code": 101
+    }
+  ],
+  "qualification": "Named faults rejected by actual Rust tests; not an exhaustive fault model or proof."
+}

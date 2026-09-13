@@ -4,8 +4,12 @@
 //! checking and encoded as 0/1 at the language boundary. This profile proves
 //! neither unbounded temporal properties nor adequacy of the reviewed contract.
 
+/// Finite exit-path search and independent decreasing-rank verification.
+pub mod completion;
 pub mod emit;
 mod ir;
+/// Bounded, ordered preparation without publication authority.
+pub mod preparation;
 
 #[cfg(test)]
 mod choice_tests;
@@ -22,6 +26,17 @@ use core::fmt;
 use ir::{schema_value, tuple, validate_roots, validate_shape};
 use zeno_fcis_codec::{CanonicalEncode, Hash32};
 use zeno_fcis_value::Value;
+
+/// Canonical scalar tuple shared by the optional finite operation profiles.
+/// Boolean positions retain the finite ABI's exact integer values 0 and 1.
+fn finite_tuple(values: &[i64]) -> Value {
+    tuple(
+        values
+            .iter()
+            .map(|value| Value::I128(i128::from(*value)))
+            .collect(),
+    )
+}
 
 /// Hard input-space ceiling, checked before any enumeration.
 pub const MAX_INPUTS: u64 = 65_536;

@@ -91,6 +91,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "synthesis_javascript", "--locked", "--", "--ignored"),
          ("python3", "tools/check_synthesis.py")),
     ),
+    "bounded-completion": AcceptanceScenario(
+        "Verify finite exits and prepare bounded chunks without publication authority",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--test", "completion", "--test", "preparation", "--locked"),
+         ("cargo", "+1.97.1", "run", "-p", "zeno-fcis", "--example", "bounded_completion", "--features", "synthesis", "--locked"),
+         ("cargo", "+1.97.1", "check", "-p", "zeno-fcis", "--no-default-features", "--features", "synthesis", "--locked")),
+    ),
     "generated-application": AcceptanceScenario(
         "Run an authored application through durable authorization",
         (("python3", "tools/test_generated_application.py"),

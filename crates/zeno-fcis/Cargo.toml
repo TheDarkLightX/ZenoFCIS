@@ -35,6 +35,7 @@ std = [
     "zeno-fcis-profile-zenodex?/std",
     "zeno-fcis-schema?/std",
     "zeno-fcis-backend?/std",
+    "zeno-fcis-synthesis?/std",
     "zeno-fcis-collections?/std",
     "zeno-fcis-spec?/std",
 ]

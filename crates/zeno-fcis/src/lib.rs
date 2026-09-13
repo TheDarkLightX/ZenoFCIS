@@ -88,6 +88,15 @@ pub mod prelude {
         ProjectLimits, ProjectSpec, SourceLimits, elaborate_project, parse_project,
     };
 
+    #[cfg(feature = "synthesis")]
+    pub use zeno_fcis_synthesis::finite::{
+        completion::{
+            CompletionError, CompletionLimits, CompletionProblem, VerifiedCompletion,
+            find_completion, verify_completion,
+        },
+        preparation::{PreparationContext, PreparationError, PreparationLimits, PreparedFold},
+    };
+
     #[cfg(feature = "bootstrap")]
     pub use crate::{BootstrapLimits, BootstrapSpec, generate_project};
 }
