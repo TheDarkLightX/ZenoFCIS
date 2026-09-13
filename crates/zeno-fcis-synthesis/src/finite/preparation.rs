@@ -58,7 +58,7 @@ pub enum PreparationError {
     Capacity {
         /// Exceeded structural resource.
         resource: &'static str,
-        /// Complete requirement, including framing where applicable.
+        /// Complete requirement for admitted tuples, including framing.
         required: u64,
         /// Declared maximum.
         declared: u64,
@@ -187,15 +187,26 @@ impl PreparedFold {
         // admitted accumulator has this exact length, including the final one.
         let tuple_header = encoded_size(&[])?;
         let mut input_bytes = output_bytes + 2 * tuple_header;
-        require_capacity("input-bytes", input_bytes, limits.max_input_bytes)?;
+        let item_domains = &program.inputs()[fields..];
+        let item_bytes = encoded_size(
+            &item_domains
+                .iter()
+                .map(|domain| domain.bounds().0)
+                .collect::<Vec<_>>(),
+        )?;
+        let complete_input_bytes = count
+            .checked_mul(item_bytes)
+            .and_then(|bytes| bytes.checked_add(input_bytes))
+            .ok_or(PreparationError::Invalid("input-size"))?;
+        require_input_capacity(input_bytes, complete_input_bytes, limits.max_input_bytes)?;
         for (index, item) in (0..limits.max_items).zip(&items) {
-            if !ir::admitted(&program.inputs()[fields..], item) {
+            if !ir::admitted(item_domains, item) {
                 return Err(PreparationError::InvalidItem { item: index });
             }
             input_bytes = input_bytes
-                .checked_add(encoded_size(item)?)
+                .checked_add(item_bytes)
                 .ok_or(PreparationError::Invalid("input-size"))?;
-            require_capacity("input-bytes", input_bytes, limits.max_input_bytes)?;
+            require_input_capacity(input_bytes, complete_input_bytes, limits.max_input_bytes)?;
         }
         let reads = count
             * u64::try_from(program.inputs().len())
@@ -352,6 +363,18 @@ fn require_capacity(
         return Err(PreparationError::Capacity {
             resource,
             required,
+            declared,
+        });
+    }
+    Ok(())
+}
+
+// Preserve prefix/domain error order while reporting the complete retry limit.
+fn require_input_capacity(prefix: u64, total: u64, declared: u64) -> Result<(), PreparationError> {
+    if prefix > declared {
+        return Err(PreparationError::Capacity {
+            resource: "input-bytes",
+            required: total,
             declared,
         });
     }
