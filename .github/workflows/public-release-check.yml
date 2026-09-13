@@ -1,0 +1,38 @@
+name: public-release-download-check
+
+on:
+  push:
+    branches:
+      - release-verification/v1.1.0-20260913
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    if: github.repository == 'TheDarkLightX/ZenoFCIS'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed verification branch
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check hostile metadata and download cases without network
+        run: PYTHONDONTWRITEBYTECODE=1 python3 tools/test_public_release.py
+
+      - name: Verify published tag and every asset against fixed input
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/check_public_release.py \
+            --input release/public-release-v1.1.0.json \
+            --out "${RUNNER_TEMP}/zeno-fcis-public-release-check"
+
+      - name: Retain unsigned download verification result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: zeno-fcis-public-release-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/zeno-fcis-public-release-check/result.json
+          if-no-files-found: error
+          retention-days: 90

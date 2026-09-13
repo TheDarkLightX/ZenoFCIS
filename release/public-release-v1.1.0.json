@@ -1,0 +1,278 @@
+{
+  "assets": [
+    {
+      "name": "PACKAGED-APPLICATION.json",
+      "sha256": "c0eb14563cef457d1db3d796d7d3504c1092d44f07136a8b121de135e1fd2ba4",
+      "size": 94882
+    },
+    {
+      "name": "PROVENANCE-INPUTS.json",
+      "sha256": "702508d29999bd658bde7145d9fcaea9863f2692a80c87c571239d9b025895e1",
+      "size": 2222
+    },
+    {
+      "name": "RC-MANIFEST.json",
+      "sha256": "509c0e9748a18ce481a22ff392ca10aa020426791bc410775f17dbc41dd3c6ef",
+      "size": 7960
+    },
+    {
+      "name": "RELEASE-SHA256SUMS",
+      "sha256": "a9645a3ec2ed41bc79469938b6613744b6ec50dab38dd6c39f613763fc4a479d",
+      "size": 4901
+    },
+    {
+      "name": "RELEASE-SHA256SUMS.sig",
+      "sha256": "9201346b5326b1a9d4c09325714c6bc779bac03f436ec931e5940c32bb6044bd",
+      "size": 2959
+    },
+    {
+      "name": "RELEASE-VERIFICATION.json",
+      "sha256": "e8b074a8ea1a0dd9939a2dbfc9f13bcca3f9fc45d3d622b98dfe15f87aef21f4",
+      "size": 3176
+    },
+    {
+      "name": "SBOM.cdx.json",
+      "sha256": "960fc0b37d36faa616cdd115ca4bb94cd17f63b5f2e3280f83d3f60786713b3f",
+      "size": 124851
+    },
+    {
+      "name": "SHA256SUMS",
+      "sha256": "d00b63c4bcfb0fdd4bcca63ebc0679792874bbfe96d71805d9ebaf20c64d453a",
+      "size": 4706
+    },
+    {
+      "name": "SHA256SUMS.sig",
+      "sha256": "7301971467be09253164fc4b80c0e7ce72d50014fc9d00da3f429bf8f89c1d4f",
+      "size": 2959
+    },
+    {
+      "name": "SOURCE-MANIFEST.json",
+      "sha256": "64765c917ea14033aadc37aacb525ab6d575d9f69857421cb4a0d43fcf65624a",
+      "size": 74934
+    },
+    {
+      "name": "ZenoFCIS-SSH-SIGNING-KEY.pub",
+      "sha256": "a6d7a77ba7f2614cac9c1c74550aa23fffd3fe26b7b803fe52641c9e5e9403ad",
+      "size": 1405
+    },
+    {
+      "name": "mount-zenodex-zusd-1.1.0-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "d26d6786ebb9409d01d327f5fc2e8cacd8bb4c6959b6e35734f519522799c73c",
+      "size": 380384
+    },
+    {
+      "name": "zeno-fcis-1.1.0-rc-bundle.zip",
+      "sha256": "ad57be7c7e2113961ef1a2118930faef4aca46c0cca83532ed9688efe4b0e144",
+      "size": 13204659
+    },
+    {
+      "name": "zeno-fcis-1.1.0-source.tar.gz",
+      "sha256": "5ee055c4f202abe93689317cca63c6df3be8505f80f62de022fd15c0e32653e7",
+      "size": 2692655
+    },
+    {
+      "name": "zeno-fcis-1.1.0-verification-evidence.zip",
+      "sha256": "21062421d9dbb05e44c25a1f57b07b51fe805b503dc4fb4482412518064aa530",
+      "size": 339285
+    },
+    {
+      "name": "zeno-fcis-1.1.0-x86_64-unknown-linux-gnu.tar.gz",
+      "sha256": "4b56dfa30f87d18e0b0c3b63ea319c427e99d0b8ca6792b03be23c6991511fd9",
+      "size": 1076511
+    },
+    {
+      "name": "zeno-fcis-1.1.0.crate",
+      "sha256": "82f2ca7af3323760c3b08aa22d21ddc9a542d3294eac6b6641ed0a5739ad7bce",
+      "size": 26999
+    },
+    {
+      "name": "zeno-fcis-adapter-1.1.0.crate",
+      "sha256": "7819455f6914df6bc6cdd01899d7a6f320b70c27593f18304777155f901a15fa",
+      "size": 16550
+    },
+    {
+      "name": "zeno-fcis-adapter-zenodex-1.1.0.crate",
+      "sha256": "6e2e0a8a1135981bec818ca1ed35c66719f0cad314d713e0c5dc963bc0dcf48c",
+      "size": 23276
+    },
+    {
+      "name": "zeno-fcis-authenticated-1.1.0.crate",
+      "sha256": "bb879847d34db174e84612cd3f7e48399d271160d2f248b13cfd231c6e83ef5b",
+      "size": 22369
+    },
+    {
+      "name": "zeno-fcis-authenticated-authority-1.1.0.crate",
+      "sha256": "91da1be6a01479939ba178848ba4e728f5cb0e27ce7c8f7954b4e0677d1871db",
+      "size": 25357
+    },
+    {
+      "name": "zeno-fcis-authority-1.1.0.crate",
+      "sha256": "be9d44490de8c1bf86b0947de80f461cb88f13f5ac709c61fb12e7648539ae84",
+      "size": 33954
+    },
+    {
+      "name": "zeno-fcis-backend-1.1.0.crate",
+      "sha256": "bf52a1ae484b462416c8a41cf226abf3c6b51daf1be9bb6efebe4515ff443f65",
+      "size": 19915
+    },
+    {
+      "name": "zeno-fcis-bootstrap-1.1.0.crate",
+      "sha256": "4d4f06f18ea9c63a0f4e7f2ef6e8481c0e09cf5d453a18e1fe3316a4e0ad5af2",
+      "size": 32426
+    },
+    {
+      "name": "zeno-fcis-catalog-1.1.0.crate",
+      "sha256": "f46ab7e51743a589f2477ee4021304de0de4ac77ad471c49744284ad4825d5cf",
+      "size": 24059
+    },
+    {
+      "name": "zeno-fcis-cli-1.1.0.crate",
+      "sha256": "2159b1ea8bca6c81bc3c8e9f77e61be7ebe4361b69f59f7a764d872270023bb8",
+      "size": 81885
+    },
+    {
+      "name": "zeno-fcis-codec-1.1.0.crate",
+      "sha256": "1ba7dfd218a481d8df9e740adcc1d6f8616b9586da8b06dd75f1a38d2029e96d",
+      "size": 20761
+    },
+    {
+      "name": "zeno-fcis-codegen-1.1.0.crate",
+      "sha256": "2b843f94f274a123f35049921f2bd96bcaaf76c587fff4bc8108957ba1426b49",
+      "size": 34236
+    },
+    {
+      "name": "zeno-fcis-collections-1.1.0.crate",
+      "sha256": "6357871fbc46ebe22613f1e260f4bc6ab238e4a8caa8656c2f8fd0b4a6826940",
+      "size": 22505
+    },
+    {
+      "name": "zeno-fcis-compose-1.1.0.crate",
+      "sha256": "9b5d4a9da9bf05d580c653b099812253cff7ca7cd49f2ce50dae00bf6c18d845",
+      "size": 35599
+    },
+    {
+      "name": "zeno-fcis-composed-program-1.1.0.crate",
+      "sha256": "ca76234d7bcccff9253cf2cd8af004b99a55ab53c31c56a6e8e0061028070c01",
+      "size": 23648
+    },
+    {
+      "name": "zeno-fcis-core-1.1.0.crate",
+      "sha256": "2475cd06711e984a722d90ac06cce4a24007eae14369b14b481acce4389897b4",
+      "size": 13084
+    },
+    {
+      "name": "zeno-fcis-crypto-1.1.0.crate",
+      "sha256": "83062bfc86077eac5df10d9d2443f3e80e6297363f0adcfdc202921ec32ba484",
+      "size": 21975
+    },
+    {
+      "name": "zeno-fcis-domain-1.1.0.crate",
+      "sha256": "3810779fcccd46c11fea3e2f4e9affddd6b981d22298fd7cf5dfb6313ed7246c",
+      "size": 23004
+    },
+    {
+      "name": "zeno-fcis-evidence-1.1.0.crate",
+      "sha256": "1abd24c05b0b41dcf113fea7fbb92ff88906a76d141e865794d3228abde962ee",
+      "size": 21921
+    },
+    {
+      "name": "zeno-fcis-formal-tools-1.1.0.crate",
+      "sha256": "961453d757a1795c42c706c77e4bc4c0f85f17285f22df3a447b9cc2de92304b",
+      "size": 49436
+    },
+    {
+      "name": "zeno-fcis-laws-1.1.0.crate",
+      "sha256": "8e96d2a11867efa0e9b0143c4258e18b2c0ae162c46197bac7e486dfdbe35f56",
+      "size": 27756
+    },
+    {
+      "name": "zeno-fcis-patch-1.1.0.crate",
+      "sha256": "73b49a963bba783cc69e45cb0eb479bba6aea6cf79b9599e4bb9ef35f141e5c4",
+      "size": 19501
+    },
+    {
+      "name": "zeno-fcis-plan-1.1.0.crate",
+      "sha256": "61a774628ec0bfde3eb9387fc4016e54f4a19e802f6d1bc8a261e340da7e1a00",
+      "size": 16156
+    },
+    {
+      "name": "zeno-fcis-profile-zenodex-1.1.0.crate",
+      "sha256": "d96ee877d9497d9eedc4d4ee467e37583e533a1c934efb08ed6556f301c0f528",
+      "size": 18369
+    },
+    {
+      "name": "zeno-fcis-project-1.1.0.crate",
+      "sha256": "ebd192919b4ed7d432a4c63a0eb4cb4468148b23aea280428d668c7365bec729",
+      "size": 17661
+    },
+    {
+      "name": "zeno-fcis-receipt-1.1.0.crate",
+      "sha256": "0d613266f5e182862872b498f57a11181f9ac74983cc564e1e69d3a4fea73c42",
+      "size": 17198
+    },
+    {
+      "name": "zeno-fcis-refine-1.1.0.crate",
+      "sha256": "a25eb6e56769f11a059db8db193c32330825823aaafabe9c69beece962dad9f8",
+      "size": 29671
+    },
+    {
+      "name": "zeno-fcis-rustdoc-1.1.0.tar.gz",
+      "sha256": "a281e52725e1f886f4d42b29ad29870502b29fc88b92b47f93077c3cea3c0492",
+      "size": 7762393
+    },
+    {
+      "name": "zeno-fcis-schema-1.1.0.crate",
+      "sha256": "ba8e01cbbd4e280d8b1913d96e7a39b13410a5c3b46268f4eb97edac80557555",
+      "size": 20425
+    },
+    {
+      "name": "zeno-fcis-secret-1.1.0.crate",
+      "sha256": "d79efde606fa936aed6f042ece9b5aa20707f24ff8463c895a200bdfd61ba32e",
+      "size": 15724
+    },
+    {
+      "name": "zeno-fcis-security-1.1.0.crate",
+      "sha256": "969cf2b206f0a8090e7a0133b70a89dd79889272d07690ab8f1b8e7d2c857354",
+      "size": 23463
+    },
+    {
+      "name": "zeno-fcis-shell-1.1.0.crate",
+      "sha256": "4f4d299f2a8c85efea07e5649b9b869245658940fa79e58233d56300ae314de8",
+      "size": 14215
+    },
+    {
+      "name": "zeno-fcis-shell-sqlite-1.1.0.crate",
+      "sha256": "9a791259a8feea5b4847c8f0308489d86126cbfd18c28c6c29ec073b21b17eb7",
+      "size": 35332
+    },
+    {
+      "name": "zeno-fcis-spec-1.1.0.crate",
+      "sha256": "3a601b81110b48fe3743c756d74b13d704c38da837bdba8ce8e76bbf24fe3f3b",
+      "size": 52022
+    },
+    {
+      "name": "zeno-fcis-synthesis-1.1.0.crate",
+      "sha256": "084e3b49d035d0bdcbfbe9f41070e9a29cd63cc995dc7624ac30e5f13679ec43",
+      "size": 55391
+    },
+    {
+      "name": "zeno-fcis-transition-1.1.0.crate",
+      "sha256": "8cd9c87537fb8c5e68c5efc24e16d9333e52be749ce649cb675749fc96a0740f",
+      "size": 23989
+    },
+    {
+      "name": "zeno-fcis-value-1.1.0.crate",
+      "sha256": "8f0482c29b0800288251858c98e615ab98a65e75b7995f5c4ddc9607b3592972",
+      "size": 16409
+    }
+  ],
+  "release_id": 388056886,
+  "repository": "https://github.com/TheDarkLightX/ZenoFCIS",
+  "schema": "zeno-fcis/public-release-download-input/1",
+  "signature_namespace": "zeno-fcis-release",
+  "signing_key_fingerprint": "SHA256:uPpB0mTOYACtRhOWrMqKcQL6EfNcSOmQReDXyCALaYE",
+  "source_commit": "3b2224d5a081e7ab3e2e282ad6704bcb177d25ac",
+  "tag": "v1.1.0",
+  "tag_object": "f3f833f9eff158cae925405fc7f573311fc234b4",
+  "version": "1.1.0"
+}
