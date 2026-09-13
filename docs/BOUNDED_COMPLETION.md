@@ -15,7 +15,9 @@ The API entry points are `CompletionProblem::try_new`, `find_completion`,
 are typed. `NoExit` carries the first exact state without a path; failed folds
 carry an absolute item index. `PreparedFold` debug output reveals progress and
 operation identity, without dumping its program, inputs, or partial accumulator.
-Capacity errors include the resource, required amount, and declared limit;
+Capacity errors include the resource, complete required amount for admitted
+tuples, and declared limit; input sizing preserves prefix/domain error order.
+The item schema supplies one fixed encoded size, avoiding per-item encoding;
 invalid-item diagnostics identify the input position without printing its contents.
 
 See [the complete example](../crates/zeno-fcis/examples/bounded_completion.rs).
@@ -98,17 +100,18 @@ authority, SQLite, replay, and outbox acceptance gates unchanged.
 
 ## Executed focused checks
 
-The 24 focused Rust tests include every two-state graph with one optional
+The 26 focused Rust tests include every two-state graph with one optional
 successor per state and every terminal-state set (36 models). Fold comparison
 covers 390 complete chunk partitions over 120 small initial/input instances,
 plus a separate order-dependent recurrence and checked-arithmetic traps.
 The public example, progress-only debug output, private accumulator boundary,
 and `no_std` umbrella build are checked by the new acceptance scenario.
 
-[Eight deliberate faults](../test-data/bounded-completion/mutation-results.json)
+[Nine deliberate faults](../test-data/bounded-completion/mutation-results.json)
 were rejected by the actual Rust tests: wrong problem binding, non-decreasing
 ranks, hidden terminal-state traps, missing output capacity, missing tuple
-framing, ignored starting version, reversed items, and ignored offsets. The
+framing, ignored starting version, reversed items, ignored offsets, and incomplete
+capacity diagnostics. The
 record names the exact source/test hashes and commands. It is historical
 negative evidence, not an exhaustive fault model or a proof certificate.
 

@@ -8,6 +8,6 @@ Feature: Complete bounded operations without exposing partial results
     Given a closed finite transition and a separately declared terminal condition
     And an owned ordered operation with complete input and output reservations
     When exit search is checked independently and preparation advances in chunks
-    Then every checked command decreases its exit rank
+    Then every selected command decreases its exit rank
     And partial failed stale or over-budget preparation releases no result
     And completion equals the original whole operation without granting authority

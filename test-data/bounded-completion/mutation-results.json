@@ -3,11 +3,11 @@
   "status": "passed",
   "source_sha256": {
     "crates/zeno-fcis-synthesis/src/finite/completion.rs": "e4c2ad2582b80d3fa4e0d1738c996531c609c83ce611a486430a1d48275fe441",
-    "crates/zeno-fcis-synthesis/src/finite/preparation.rs": "59e78c608f1a3e9569b06a740b2b2a710a535db68f6a2857cde4b30015dd5c6e"
+    "crates/zeno-fcis-synthesis/src/finite/preparation.rs": "7d1e264e47ecd54dd42c8ca50c32b6563aa4ba1cb2c5739c830958b7cf717d37"
   },
   "test_sha256": {
     "crates/zeno-fcis-synthesis/tests/completion.rs": "85c97684bec51e17202493f42a7a4a92ca92ef21828542fece04a43ab1bca30b",
-    "crates/zeno-fcis-synthesis/tests/preparation.rs": "a93cc6af2a063ec36a56e1b2b164b9f1a33641513ad9010f5b0ee7e8f16769e3"
+    "crates/zeno-fcis-synthesis/tests/preparation.rs": "5d91f4eaa00a1631f82ce28e369fb38cfa1996e66e70bf62c691ec3bd7080196"
   },
   "mutations": [
     {
@@ -166,6 +166,26 @@
         "--locked",
         "--",
         "repeated_skipped_empty_and_oversized_ranges_preserve_progress",
+        "--exact"
+      ],
+      "exit_code": 101
+    },
+    {
+      "mutation": "complete-input-requirement",
+      "source": "crates/zeno-fcis-synthesis/src/finite/preparation.rs",
+      "test": "capacity_diagnostics_report_the_complete_input_requirement",
+      "status": "killed",
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "-p",
+        "zeno-fcis-synthesis",
+        "--test",
+        "preparation",
+        "--locked",
+        "--",
+        "capacity_diagnostics_report_the_complete_input_requirement",
         "--exact"
       ],
       "exit_code": 101

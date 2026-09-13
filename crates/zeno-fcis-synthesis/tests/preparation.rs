@@ -285,6 +285,86 @@ fn the_reserved_input_bytes_include_both_tuple_frames_and_every_item() {
 }
 
 #[test]
+fn capacity_diagnostics_report_the_complete_input_requirement() {
+    let required =
+        u64::try_from(wire(&[0]).len() + 2 * wire(&[]).len() + 3 * wire(&[1]).len()).unwrap();
+    for limit in 0..required {
+        let error = PreparedFold::start(
+            sum_program(),
+            vec![0],
+            vec![vec![1], vec![2], vec![3]],
+            context(),
+            PreparationLimits {
+                max_input_bytes: limit,
+                ..PreparationLimits::default()
+            },
+            budget(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            PreparationError::Capacity {
+                resource: "input-bytes",
+                required,
+                declared: limit,
+            }
+        );
+    }
+    assert!(
+        PreparedFold::start(
+            sum_program(),
+            vec![0],
+            vec![vec![1], vec![2], vec![3]],
+            context(),
+            PreparationLimits {
+                max_input_bytes: required,
+                ..PreparationLimits::default()
+            },
+            budget(),
+        )
+        .is_ok()
+    );
+}
+
+#[test]
+fn input_capacity_and_invalid_items_keep_the_first_error_precedence() {
+    let frame = u64::try_from(wire(&[]).len()).unwrap();
+    let scalar = u64::try_from(wire(&[0]).len()).unwrap();
+    let initial = scalar + 2 * frame;
+    let required = initial + 3 * scalar;
+    for (items, limit, invalid) in [
+        (vec![vec![], vec![2], vec![3]], initial - 1, None),
+        (vec![vec![], vec![2], vec![3]], initial, Some(0)),
+        (vec![vec![1], vec![], vec![3]], initial, None),
+        (vec![vec![1], vec![], vec![3]], initial + scalar, Some(1)),
+    ] {
+        let error = PreparedFold::start(
+            sum_program(),
+            vec![0],
+            items,
+            context(),
+            PreparationLimits {
+                max_input_bytes: limit,
+                ..PreparationLimits::default()
+            },
+            budget(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            invalid.map_or(
+                PreparationError::Capacity {
+                    resource: "input-bytes",
+                    required,
+                    declared: limit,
+                },
+                |item| PreparationError::InvalidItem { item }
+            )
+        );
+    }
+}
+
+#[test]
 fn every_modeled_resource_must_cover_completion_at_start() {
     let required = start(0, &[1, 2]).reserved_budget();
     for resource in [
