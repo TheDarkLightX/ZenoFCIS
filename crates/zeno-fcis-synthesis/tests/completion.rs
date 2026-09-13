@@ -918,12 +918,12 @@ fn graph_problem(edges: &[[Option<usize>; 2]], terminals: &[bool]) -> Completion
     CompletionProblem::try_new(step, terminal, CompletionLimits::default()).unwrap()
 }
 
-#[test]
-fn larger_branching_graphs_match_independent_all_pairs_shortest_paths() {
+fn check_larger_branching_graph_group(group: u64) {
     const STATES: usize = 8;
+    assert!(group < 8);
     let mut complete = 0;
     let mut dead_ends = 0;
-    for seed in 0..32u64 {
+    for seed in group * 4..group * 4 + 4 {
         let mut random = seed + 1;
         let mut edges = [[None; 2]; STATES];
         let mut terminals = [false; STATES];
@@ -998,9 +998,11 @@ fn larger_branching_graphs_match_independent_all_pairs_shortest_paths() {
                     state: vec![i64::try_from(first).unwrap()]
                 }
             );
+            assert_ne!(seed, 1, "the all-terminal case must complete");
             dead_ends += 1;
             continue;
         }
+        assert_ne!(seed, 0, "the empty graph must have a dead end");
         let proposed = find_completion(&model).unwrap();
         let checked =
             verify_completion_bytes(&model, &plan_value(&proposed).canonical_bytes().unwrap())
@@ -1028,7 +1030,49 @@ fn larger_branching_graphs_match_independent_all_pairs_shortest_paths() {
         }
         complete += 1;
     }
-    assert!(complete > 0);
-    assert!(dead_ends > 0);
-    assert_eq!(complete + dead_ends, 32);
+    if group == 0 {
+        assert!(complete > 0);
+        assert!(dead_ends > 0);
+    }
+    assert_eq!(complete + dead_ends, 4);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_00_to_03() {
+    check_larger_branching_graph_group(0);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_04_to_07() {
+    check_larger_branching_graph_group(1);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_08_to_11() {
+    check_larger_branching_graph_group(2);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_12_to_15() {
+    check_larger_branching_graph_group(3);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_16_to_19() {
+    check_larger_branching_graph_group(4);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_20_to_23() {
+    check_larger_branching_graph_group(5);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_24_to_27() {
+    check_larger_branching_graph_group(6);
+}
+
+#[test]
+fn larger_branching_graphs_seeds_28_to_31() {
+    check_larger_branching_graph_group(7);
 }

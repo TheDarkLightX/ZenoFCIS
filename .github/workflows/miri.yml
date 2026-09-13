@@ -18,21 +18,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - group: values
-            packages: -p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret
-          - group: schemas
-            packages: -p zeno-fcis-project -p zeno-fcis-catalog -p zeno-fcis-schema -p zeno-fcis-refine
-          - group: plans
-            packages: -p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt -p zeno-fcis-security
-          - group: publication
-            packages: -p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain
-          - group: synthesis
-            packages: -p zeno-fcis-synthesis
-          - group: specification
-            packages: -p zeno-fcis-spec -p zeno-fcis-backend
+        # JSON is also YAML; the preflight reads these exact rows without a YAML dependency.
+        include: [
+          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret"},
+          {"group": "schemas", "packages": "-p zeno-fcis-project -p zeno-fcis-catalog -p zeno-fcis-schema -p zeno-fcis-refine"},
+          {"group": "plans", "packages": "-p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt -p zeno-fcis-security"},
+          {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain"},
+          {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend"},
+          {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib"},
+          {"group": "synthesis-documentation", "packages": "-p zeno-fcis-synthesis", "target": "--doc"},
+          {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
+          {"group": "synthesis-preparation", "packages": "-p zeno-fcis-synthesis", "target": "--test preparation"},
+          {"group": "synthesis-search", "packages": "-p zeno-fcis-synthesis", "target": "--test search"},
+          {"group": "synthesis-completion", "packages": "-p zeno-fcis-synthesis", "target": "--test completion"},
+          {"group": "synthesis-graphs-00-to-03", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_00_to_03"},
+          {"group": "synthesis-graphs-04-to-07", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_04_to_07"},
+          {"group": "synthesis-graphs-08-to-11", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_08_to_11"},
+          {"group": "synthesis-graphs-12-to-15", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_12_to_15"},
+          {"group": "synthesis-graphs-16-to-19", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_16_to_19"},
+          {"group": "synthesis-graphs-20-to-23", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_20_to_23"},
+          {"group": "synthesis-graphs-24-to-27", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_24_to_27"},
+          {"group": "synthesis-graphs-28-to-31", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_28_to_31"}
+        ]
     env:
       MIRIFLAGS: -Zmiri-strict-provenance
+      MIRI_TEST_ARGS: ""
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -44,8 +54,82 @@ jobs:
           rustup toolchain install nightly-2026-07-21 --profile minimal --component miri
           cargo +nightly-2026-07-21 miri setup
 
+      - name: Check synthesis target and test coverage
+        if: matrix.packages == '-p zeno-fcis-synthesis'
+        env:
+          SELECTED_GROUP: ${{ toJSON(matrix) }}
+        run: |
+          python3 - <<'PY'
+          import collections
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import shlex
+          import subprocess
+
+          def run(arguments):
+              return subprocess.run(arguments, check=True, text=True, stdout=subprocess.PIPE).stdout
+
+          source = Path('.github/workflows/miri.yml').read_text()
+          rows = json.loads(source.split('        include: ', 1)[1].split('    env:', 1)[0])
+          assert len({row['group'] for row in rows}) == len(rows), 'duplicate Miri group'
+          rows = [row for row in rows if row['packages'] == '-p zeno-fcis-synthesis']
+          selected = json.loads(os.environ['SELECTED_GROUP'])
+          assert selected in rows, 'selected group is absent from the checked matrix'
+          cargo = ['cargo', '+nightly-2026-07-21']
+          metadata = json.loads(run(cargo + ['metadata', '--locked', '--offline', '--no-deps', '--format-version', '1']))
+          package = next(p for p in metadata['packages'] if p['name'] == 'zeno-fcis-synthesis')
+          expected_targets = []
+          for target in package['targets']:
+              if target['kind'] == ['lib']:
+                  assert target['test'] and target['doctest'], 'library coverage changed'
+                  expected_targets.extend([('--lib',), ('--doc',)])
+              else:
+                  assert target['kind'] == ['test'] and target['test'], 'unpartitioned synthesis target'
+                  expected_targets.append(('--test', target['name']))
+          actual_targets = [tuple(shlex.split(row['target'])) for row in rows if 'test' not in row]
+          assert collections.Counter(actual_targets) == collections.Counter(expected_targets), 'synthesis target coverage differs'
+          groups = {f'larger_branching_graphs_seeds_{g * 4:02}_to_{g * 4 + 3:02}': str(g) for g in range(8)}
+          exact_rows = [row for row in rows if 'test' in row]
+          assert collections.Counter(row['test'] for row in exact_rows) == collections.Counter(groups.keys()), 'graph group coverage differs'
+          assert all(row['target'] == '--test completion' for row in exact_rows), 'graph group target differs'
+          tests = Path('crates/zeno-fcis-synthesis/tests/completion.rs').read_text()
+          wrappers = re.findall(r'#\[test\]\s+fn (larger_branching_graphs_seeds_\d{2}_to_\d{2})\(\) \{\s+check_larger_branching_graph_group\((\d+)\);\s+\}', tests)
+          assert len(wrappers) == 8 and dict(wrappers) == groups, 'graph groups must each run their four seeds'
+
+          def arguments(row):
+              if 'test' in row:
+                  return ['--exact', row['test']]
+              return ['--exact'] + [arg for row in exact_rows for arg in ('--skip', row['test'])]
+
+          def listed(arguments):
+              output = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'completion', '--'] + arguments + ['--list', '--format', 'terse'])
+              names = output.splitlines()
+              assert names and all(re.fullmatch(r'\w+(?:::\w+)*: test', name) for name in names), 'unexpected or empty test inventory'
+              return [name.removesuffix(': test') for name in names]
+
+          if selected['target'] == '--test completion':
+              if 'test' in selected:
+                  assert listed(arguments(selected)) == [selected['test']], 'exact selector must run one test'
+              else:
+                  all_tests = listed([])
+                  assert len(all_tests) == len(set(all_tests)), 'duplicate completion tests'
+                  assert {name for name in all_tests if name.startswith('larger_branching_graphs_seeds_')} == set(groups), 'declared graph tests differ'
+                  chosen = []
+                  for row in [selected] + exact_rows:
+                      names = listed(arguments(row))
+                      expected = [row['test']] if 'test' in row else sorted(set(all_tests) - set(groups))
+                      assert sorted(names) == expected, 'completion selector coverage differs'
+                      chosen.extend(names)
+                  assert collections.Counter(chosen) == collections.Counter(all_tests), 'completion tests must run exactly once'
+                  print(f'Checked {len(all_tests)} completion tests: {len(all_tests) - len(groups)} common tests and all 32 graph seeds.')
+              with Path(os.environ['GITHUB_ENV']).open('a') as output:
+                  output.write('MIRI_TEST_ARGS=-- ' + shlex.join(arguments(selected)) + '\n')
+          PY
+
       - name: Interpret semantic boundary tests
-        run: cargo +nightly-2026-07-21 miri test --locked ${{ matrix.packages }}
+        run: cargo +nightly-2026-07-21 miri test --locked ${{ matrix.packages }} ${{ matrix.target }} ${MIRI_TEST_ARGS:-}
 
   semantic-core:
     name: semantic-core
