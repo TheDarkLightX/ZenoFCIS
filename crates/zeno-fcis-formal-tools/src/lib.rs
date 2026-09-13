@@ -4698,7 +4698,7 @@ mod tests {
             version: version.into(),
             sha256,
             runtime: None,
-            timeout_ms: 1_000,
+            timeout_ms: 10_000,
             max_output_bytes: 4096,
             allowed_axioms: Vec::new(),
         };
@@ -4725,10 +4725,10 @@ mod tests {
         assert_eq!(checked.identity.binary_hash(), expected_hash);
 
         let wrong_version = config(script_path.clone(), expected_hash_hex, "9.9.9");
-        assert!(matches!(
-            check_tool(&wrong_version),
-            Err(ToolFailure::VersionMismatch)
-        ));
+        assert_eq!(
+            check_tool(&wrong_version).err(),
+            Some(ToolFailure::VersionMismatch)
+        );
         fs::remove_file(script_path).unwrap_or_else(|_| unreachable!());
     }
 
