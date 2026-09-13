@@ -1,0 +1,43 @@
+name: tau-proof-carrying-synthesis
+
+on:
+  pull_request:
+    paths:
+      - "tools/tau_fcis.py"
+      - "tools/tests/test_tau_fcis.py"
+      - "docs/TAU_PROOF_CARRYING_SYNTHESIS.md"
+      - "demos/tau-proof-carrying-synthesis/**"
+      - ".github/workflows/tau-proof-carrying-synthesis.yml"
+  push:
+    branches:
+      - main
+      - "feature/**"
+    paths:
+      - "tools/tau_fcis.py"
+      - "tools/tests/test_tau_fcis.py"
+      - "docs/TAU_PROOF_CARRYING_SYNTHESIS.md"
+      - "demos/tau-proof-carrying-synthesis/**"
+      - ".github/workflows/tau-proof-carrying-synthesis.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tau-proof-carrying-synthesis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adversarial-harness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Compile the bridge
+        run: python3 -m py_compile tools/tau_fcis.py
+
+      - name: Run fail-closed capture/replay tests
+        run: python3 -m unittest -v tools/tests/test_tau_fcis.py
