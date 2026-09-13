@@ -11,6 +11,6 @@
     "--nocapture"
   ],
   "exit_code": 101,
-  "log_sha256": "f5c5dfb115669b208c3c4c4a0bd365d92101f86f4cf8a388b095f973c71e4264",
+  "log_sha256": "0aaa0dd6082e6c841d8e374df700a57c2987fb05bf21ea3d20c2af8c9eb4717d",
   "stage": "reproducer before fix"
 }

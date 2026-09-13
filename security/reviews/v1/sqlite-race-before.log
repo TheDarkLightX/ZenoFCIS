@@ -1,14 +1,14 @@
-   Compiling zeno-fcis-crypto v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-crypto)
-   Compiling zeno-fcis-refine v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-refine)
-   Compiling zeno-fcis-evidence v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-evidence)
-   Compiling zeno-fcis-compose v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-compose)
-   Compiling zeno-fcis-transition v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-transition)
-   Compiling zeno-fcis-laws v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-laws)
+   Compiling zeno-fcis-crypto v1.0.0 (<workdir>/crates/zeno-fcis-crypto)
+   Compiling zeno-fcis-refine v1.0.0 (<workdir>/crates/zeno-fcis-refine)
+   Compiling zeno-fcis-evidence v1.0.0 (<workdir>/crates/zeno-fcis-evidence)
+   Compiling zeno-fcis-compose v1.0.0 (<workdir>/crates/zeno-fcis-compose)
+   Compiling zeno-fcis-transition v1.0.0 (<workdir>/crates/zeno-fcis-transition)
+   Compiling zeno-fcis-laws v1.0.0 (<workdir>/crates/zeno-fcis-laws)
    Compiling rusqlite v0.40.1
-   Compiling zeno-fcis-authority v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-authority)
-   Compiling zeno-fcis-shell-sqlite v1.0.0 (/tmp/zenofcis-v1-release-20260912/crates/zeno-fcis-shell-sqlite)
+   Compiling zeno-fcis-authority v1.0.0 (<workdir>/crates/zeno-fcis-authority)
+   Compiling zeno-fcis-shell-sqlite v1.0.0 (<workdir>/crates/zeno-fcis-shell-sqlite)
     Finished `test` profile [unoptimized] target(s) in 5.33s
-     Running unittests src/lib.rs (/tmp/zenofcis-milestone-target/debug/deps/zeno_fcis_shell_sqlite-663626725be63bb6)
+     Running unittests src/lib.rs (<workdir>/debug/deps/zeno_fcis_shell_sqlite-663626725be63bb6)
 
 running 1 test
 

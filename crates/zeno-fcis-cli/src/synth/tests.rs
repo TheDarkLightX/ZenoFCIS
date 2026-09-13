@@ -151,5 +151,5 @@ fn javascript_runner_refuses_an_unqualified_runtime_version() {
     else {
         panic!("unqualified runtime was admitted")
     };
-    assert_eq!(failure.code, "tool-version");
+    assert_eq!(failure.code, "tool-version", "{}", failure.message);
 }

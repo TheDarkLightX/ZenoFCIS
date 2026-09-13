@@ -1,7 +1,7 @@
 {
   "command": [
     "env",
-    "ZENO_FCIS_TRANSLATION_LEAN=/home/trevormoc/.elan/toolchains/leanprover--lean4---v4.32.0/bin/lean",
+    "ZENO_FCIS_TRANSLATION_LEAN=<HOME>/.elan/toolchains/leanprover--lean4---v4.32.0/bin/lean",
     "cargo",
     "+1.97.1",
     "test",
@@ -17,5 +17,5 @@
   "exit_code": 0,
   "started_at": "2026-09-12T20:12:31.176759+00:00",
   "elapsed_seconds": 7.840133,
-  "log_sha256": "acfd71f05b34ed83f970f41435686b4691882a9131bd5e35235fc0e56842e68b"
+  "log_sha256": "5d19111411cae65d4694ae9c3586c249a8921cc8b1a36a924611c2081cb389d1"
 }

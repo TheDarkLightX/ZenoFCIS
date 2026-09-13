@@ -25,7 +25,7 @@
         "tool": {
           "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
           "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-          "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+          "path": "<HOME>/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
           "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
         }
       },
@@ -75,7 +75,7 @@
         "tool": {
           "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
           "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-          "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+          "path": "<HOME>/.nvm/versions/node/v22.23.1/bin/node",
           "version": "v22.23.1"
         }
       }
@@ -104,7 +104,7 @@
       "tool": {
         "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
         "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-        "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+        "path": "<HOME>/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
         "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
       }
     },
@@ -154,7 +154,7 @@
       "tool": {
         "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
         "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-        "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+        "path": "<HOME>/.nvm/versions/node/v22.23.1/bin/node",
         "version": "v22.23.1"
       }
     }
@@ -184,7 +184,7 @@
           "tool": {
             "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "path": "<HOME>/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
             "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
           }
         },
@@ -234,7 +234,7 @@
           "tool": {
             "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "path": "<HOME>/.nvm/versions/node/v22.23.1/bin/node",
             "version": "v22.23.1"
           }
         }
@@ -264,7 +264,7 @@
           "tool": {
             "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "path": "<HOME>/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
             "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
           }
         },
@@ -314,7 +314,7 @@
           "tool": {
             "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "path": "<HOME>/.nvm/versions/node/v22.23.1/bin/node",
             "version": "v22.23.1"
           }
         }
@@ -344,7 +344,7 @@
           "tool": {
             "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "path": "<HOME>/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
             "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
           }
         },
@@ -394,7 +394,7 @@
           "tool": {
             "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "path": "<HOME>/.nvm/versions/node/v22.23.1/bin/node",
             "version": "v22.23.1"
           }
         }
@@ -424,7 +424,7 @@
           "tool": {
             "binary_sha256": "d3a664c970a9fd8361b64194861bebc1ae37b9054e5ee3400dc1c9e691797eea",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
+            "path": "<HOME>/.rustup/toolchains/1.97.1-x86_64-unknown-linux-gnu/bin/rustc",
             "version": "rustc 1.97.1 (8bab26f4f 2026-07-14)"
           }
         },
@@ -474,7 +474,7 @@
           "tool": {
             "binary_sha256": "93956de2e59480474a7b46571da1651180b1a050cdf32641ebec4ce6e478e068",
             "identity_scope": "executable-and-version; dynamic dependencies and compiler correctness are external premises",
-            "path": "/home/trevormoc/.nvm/versions/node/v22.23.1/bin/node",
+            "path": "<HOME>/.nvm/versions/node/v22.23.1/bin/node",
             "version": "v22.23.1"
           }
         }
