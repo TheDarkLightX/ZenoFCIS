@@ -193,10 +193,11 @@ The workspace now includes the complete package ladder:
 - an explicit dual-root sparse authenticated-state reference with strict bounded proof/plan decoding, projector-bound profiles, context-verified membership/absence witnesses, expected-version publication, and full-rebuild equality checks;
 - a candidate-bound authenticated authority that verifies exact retained projector evidence at setup, requires a project-specific per-transition projection law, reconstructs persisted plans locally, and exposes a production-facing port that accepts only nominal `CatalogAuthorizedAuthenticatedCommit` values;
 - [language-neutral finite synthesis](docs/LANGUAGE_NEUTRAL_SYNTHESIS.md) with relational realizability checks, canonical hole search, Rust/Python/JavaScript emission, and separate exhaustive target conformance;
+- [bounded completion and ordered preparation](docs/BOUNDED_COMPLETION.md) with finite exit-path search, independent rank checking, complete resource reservations, and resumable computation that grants no publication authority;
 - crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
 - persistent collections with reference, shared hash-map, and shared ordered-map implementations, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
-- a frozen V1 product contract, 26 human-readable BDD scenarios, a closed
+- a frozen V1 product contract, human-readable BDD scenarios, a closed
   fail-closed ATDD registry, and optional deterministic Probity guardrails with
   a pinned Node/npm graph and hostile command corpus.
 

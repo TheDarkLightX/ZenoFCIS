@@ -13,12 +13,14 @@ readme.workspace = true
 [features]
 default = ["std"]
 std = [
+    "zeno-fcis-core/std",
     "zeno-fcis-codec/std",
     "zeno-fcis-crypto/std",
     "zeno-fcis-value/std",
 ]
 
 [dependencies]
+zeno-fcis-core = { version = "=1.0.0", path = "../zeno-fcis-core", default-features = false }
 zeno-fcis-codec = { version = "=1.0.0", path = "../zeno-fcis-codec", default-features = false }
 zeno-fcis-crypto = { version = "=1.0.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
 zeno-fcis-value = { version = "=1.0.0", path = "../zeno-fcis-value", default-features = false }
