@@ -27,9 +27,9 @@ PRIVATE_FILENAMES = {
 }
 PATTERNS = {
     "personal-home-path": re.compile(
-        rb"/(?:home|Users)/(?!(?:runner|build|builder|user|example|USERNAME|YOUR_USER)/)[^/\s\"'<>]+/"
+        rb"/(?:home|Users)/(?!(?:runner|build|builder|user|example|USERNAME|YOUR_USER)(?:[/\s\"'<>]|$))[^/\s\"'<>]+(?:/|(?=[\s\"'<>]|$))"
     ),
-    "windows-home-path": re.compile(rb"[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"'<>]+[\\/]"),
+    "windows-home-path": re.compile(rb"[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"'<>]+(?:[\\/]|(?=[\s\"'<>]|$))"),
     "private-key": re.compile(rb"-----BEGIN (?:OPENSSH |RSA |EC |DSA |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----"),
     "github-token": re.compile(rb"(?:gh[pousr]_[A-Za-z0-9]{20,255}|github_pat_[A-Za-z0-9_]{30,255})"),
     "model-api-token": re.compile(rb"sk-(?:ant-|proj-|svcacct-)?[A-Za-z0-9_-]{35,255}"),
@@ -53,7 +53,8 @@ class Scan:
             raise ValueError("private-marker-too-short")
         self.patterns = dict(PATTERNS)
         if private_markers:
-            self.patterns["private-marker"] = re.compile(b"|".join(map(re.escape, private_markers)))
+            longest_first = sorted(private_markers, key=len, reverse=True)
+            self.patterns["private-marker"] = re.compile(b"|".join(map(re.escape, longest_first)))
         self.private_marker_count = len(private_markers)
         self.seen: set[bytes] = set()
         self.files = 0

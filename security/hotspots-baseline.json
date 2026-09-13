@@ -3445,33 +3445,33 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 206,
+      "production_lines": 207,
       "rank": 34,
       "score": 77,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            182
+            183
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            97
+            98
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            213
+            214
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
             45,
-            204
+            205
           ]
         }
       ],
@@ -4898,9 +4898,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 2974727,
+    "admitted_bytes": 2976068,
     "admitted_files": 153,
-    "inventory_sha256": "dc5c5fb444d187966db6814f151cac51ff1650f09724e5dab18e753e915be1e8",
+    "inventory_sha256": "410be1e6ba848d251059d032e1e3ac39eec18e1e3812041316439f6ac811ea5f",
     "ranked_above_minimum": 130,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

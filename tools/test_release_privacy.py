@@ -16,6 +16,28 @@ from check_release_privacy import Scan
 
 
 class PrivacyTests(unittest.TestCase):
+    def test_overlapping_identifiers_do_not_leave_email_fragments_in_locations(self):
+        username = b"owner"
+        email = b"owner+private@example.invalid"
+        for markers in [(username, email), (email, username)]:
+            scan = Scan(markers)
+            scan.inspect("archive!" + email.decode(), b"safe")
+            self.assertEqual(scan.report()["status"], "failed")
+            self.assertNotIn("example.invalid", json.dumps(scan.report()))
+
+    def test_home_directory_roots_are_private_without_a_trailing_separator(self):
+        for home in [b"/home/" + b"private-owner", b"/Users/" + b"private-owner",
+                     b"C:\\Users\\" + b"private-owner"]:
+            for value in [home, b'{"home":"' + home + b'"}', home + b" other value"]:
+                scan = Scan()
+                scan.inspect("record", value)
+                self.assertEqual(scan.report()["status"], "failed")
+        for home in [b"/home/runner", b"/home/user", b"/Users/example"]:
+            for value in [home, home + b"/project", b'{"home":"' + home + b'"}']:
+                scan = Scan()
+                scan.inspect("record", value)
+                self.assertEqual(scan.report()["status"], "passed")
+
     def test_owner_identifiers_are_literal_private_and_scoped_to_each_scan(self):
         marker = b"owner+private@example.invalid"
         scan = Scan((marker,))
