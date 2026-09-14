@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,7 @@ import tempfile
 import tomllib
 
 import check_synthesis
+import check_v1_compatibility
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -198,10 +200,41 @@ def exercise_prepared_application(app: Path, directory: Path, package_roots: dic
             "nonclaims": ["eligible exits in the fixed allowed context", "no production deployment qualification"]}
 
 
+def checked_receipt_test_output(output: str) -> list[str]:
+    names = re.findall(r"^test (validation_tests::\w+) \.\.\. ok$", output, re.MULTILINE)
+    summaries = re.findall(
+        r"^test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; "
+        r"\d+ filtered out; finished in .+$", output, re.MULTILINE)
+    if (sorted(names) != list(check_v1_compatibility.TEST_NAMES) or
+            summaries != [(str(len(names)), "0", "0", "0")]):
+        raise RuntimeError("receipt differential tests were missing, skipped, duplicated, or unsuccessful")
+    return sorted(names)
+
+
+def exercise_receipt_compatibility(package_roots: dict[str, Path],
+                                   environment: dict[str, str]) -> dict:
+    compatibility = check_v1_compatibility.check(package_roots)
+    receipt = package_roots["zeno-fcis-receipt"]
+    command = ["cargo", "+1.97.1", "test", "--manifest-path", str(receipt / "Cargo.toml"),
+               "--lib", "--locked", "--offline", "validation_tests::", "--", "--test-threads=1"]
+    output = run(command, receipt, capture=True, environment=environment)
+    print(output, end="")
+    names = checked_receipt_test_output(output)
+    if check_v1_compatibility.check(package_roots) != compatibility:
+        raise RuntimeError("receipt compatibility inputs changed during execution")
+    public_command = [*command]
+    public_command[4] = "<receipt-manifest>"
+    compatibility["receipt_refactor"]["behavior"] = {
+        "status": "passed", "command": public_command, "test_names": names,
+        "scope": "bounded differential sealing, validation, canonical bytes, field mutations, and first errors",
+    }
+    compatibility["status"] = "passed"
+    return compatibility
+
+
 def exercise_v1_consumer(directory: Path, package_roots: dict[str, Path], version: str,
                          environment: dict[str, str]) -> dict:
-    import check_v1_compatibility
-    baseline = check_v1_compatibility.check(package_roots)
+    compatibility = exercise_receipt_compatibility(package_roots, environment)
     consumer = directory / "v1-consumer"
     (consumer / "src").mkdir(parents=True)
     source = ROOT / "test-projects/external-consumer/src/main.rs"
@@ -214,7 +247,8 @@ def exercise_v1_consumer(directory: Path, package_roots: dict[str, Path], versio
     allowed[("zeno-fcis-external-consumer", "0.0.0")] = consumer / "Cargo.toml"
     graph = resolve_reviewed_graph(consumer, allowed, environment)
     run(["cargo", "+1.97.1", "run", "--locked", "--offline"], consumer, environment=environment)
-    return {"status": "passed", "baseline": baseline, "resolved_graph": graph,
+    return {"status": "passed", "baseline": compatibility["baseline"],
+            "compatibility": compatibility, "resolved_graph": graph,
             "consumer_source_sha256": hashlib.sha256(source.read_bytes()).hexdigest()}
 
 def check(directory: Path) -> None:
