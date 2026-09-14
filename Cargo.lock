@@ -1480,8 +1480,10 @@ dependencies = [
 name = "zeno-fcis-receipt"
 version = "1.1.0"
 dependencies = [
+ "criterion",
  "zeno-fcis-codec",
  "zeno-fcis-core",
+ "zeno-fcis-crypto",
  "zeno-fcis-patch",
  "zeno-fcis-plan",
  "zeno-fcis-value",

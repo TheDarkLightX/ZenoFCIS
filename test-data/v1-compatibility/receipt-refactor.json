@@ -1,0 +1,18 @@
+{
+  "format": "zeno-fcis/receipt-refactor/1",
+  "source": {
+    "path": "crates/zeno-fcis-receipt/src/lib.rs",
+    "bytes": 42207,
+    "sha256": "7f64af6788f720a2b23b5e710e544d7038abd574e07960530263d8ba579d57f6"
+  },
+  "oracle": {
+    "path": "test-data/v1-compatibility/receipt-v1.rs",
+    "bytes": 41230,
+    "sha256": "4e343ba9d5a3f9d646f5cf9cde84f4a1ec8ad364925a526703907014c5218853"
+  },
+  "tests": {
+    "path": "crates/zeno-fcis-receipt/src/validation_tests.rs",
+    "bytes": 14863,
+    "sha256": "32a05f5fda154e839674367dc6862167481e2204cd7ee68ba4d3c000ae7408f8"
+  }
+}

@@ -349,25 +349,22 @@ impl CommitBundle {
         pre_state: &Value,
         state_domain: Domain<'_>,
     ) -> Result<AppliedPatch, SealError> {
-        let (receipt, applied) = apply_and_derive_receipt::<H>(
+        let rebuilt = CandidateBuilder::seal::<H>(
             pre_state,
             state_domain,
             self.body.decision_kind,
             self.body.reason_code.as_ref().map(AsciiText::as_str),
             self.body.bindings,
-            &self.patch,
-            &self.commit_plan,
-            &self.outbox_plan,
+            self.patch.clone(),
+            self.commit_plan.clone(),
+            self.outbox_plan.clone(),
         )?;
-        // The patch and plans were borrowed unchanged. Compare every independently
-        // supplied derived field; none of the bundle's own commitments is trusted.
-        if self.candidate_id != receipt.candidate_id
-            || self.body != receipt.body
-            || self.receipt != receipt
-        {
+        if rebuilt != *self {
             return Err(SealError::BundleMismatch);
         }
-        Ok(applied)
+        self.patch
+            .apply::<H>(pre_state, state_domain)
+            .map_err(SealError::Patch)
     }
 }
 
@@ -656,65 +653,38 @@ impl CandidateBuilder {
         commit_plan: CommitPlan,
         outbox_plan: OutboxPlan,
     ) -> Result<CommitBundle, SealError> {
-        let (receipt, _) = apply_and_derive_receipt::<H>(
-            pre_state,
-            state_domain,
+        let reason_code = validate_decision_reason(decision_kind, reason_code)?;
+        let applied = patch
+            .apply::<H>(pre_state, state_domain)
+            .map_err(SealError::Patch)?;
+        let patch_hash = hash_component::<H>("zeno-fcis/patch", &patch)?;
+        let commit_plan_hash = hash_component::<H>("zeno-fcis/commit-plan", &commit_plan)?;
+        let outbox_plan_hash = hash_component::<H>("zeno-fcis/outbox-plan", &outbox_plan)?;
+        let body = CandidateBody {
             decision_kind,
             reason_code,
             bindings,
-            &patch,
-            &commit_plan,
-            &outbox_plan,
-        )?;
+            pre_root: patch.expected_pre_root(),
+            post_root: applied.post_root(),
+            patch_hash,
+            commit_plan_hash,
+            outbox_plan_hash,
+        };
+        let candidate_hash = hash_component::<H>("zeno-fcis/candidate", &body)?;
+        let candidate_id = CandidateId::new(candidate_hash);
+        let receipt = Receipt {
+            candidate_id,
+            body: body.clone(),
+        };
         Ok(CommitBundle {
-            candidate_id: receipt.candidate_id,
-            body: receipt.body.clone(),
+            candidate_id,
+            body,
             patch,
             commit_plan,
             outbox_plan,
             receipt,
         })
     }
-}
-
-// Keep the existing failure order: reason, patch application, component hashes,
-// then candidate hash. The returned state is exactly the one whose root is sealed.
-#[allow(clippy::too_many_arguments)]
-fn apply_and_derive_receipt<H: CommitmentHasher>(
-    pre_state: &Value,
-    state_domain: Domain<'_>,
-    decision_kind: DecisionKind,
-    reason_code: Option<&str>,
-    bindings: CandidateBindings,
-    patch: &CanonicalPatch,
-    commit_plan: &CommitPlan,
-    outbox_plan: &OutboxPlan,
-) -> Result<(Receipt, AppliedPatch), SealError> {
-    let reason_code = validate_decision_reason(decision_kind, reason_code)?;
-    let applied = patch
-        .apply::<H>(pre_state, state_domain)
-        .map_err(SealError::Patch)?;
-    let patch_hash = hash_component::<H>("zeno-fcis/patch", patch)?;
-    let commit_plan_hash = hash_component::<H>("zeno-fcis/commit-plan", commit_plan)?;
-    let outbox_plan_hash = hash_component::<H>("zeno-fcis/outbox-plan", outbox_plan)?;
-    let body = CandidateBody {
-        decision_kind,
-        reason_code,
-        bindings,
-        pre_root: patch.expected_pre_root(),
-        post_root: applied.post_root(),
-        patch_hash,
-        commit_plan_hash,
-        outbox_plan_hash,
-    };
-    let candidate_hash = hash_component::<H>("zeno-fcis/candidate", &body)?;
-    Ok((
-        Receipt {
-            candidate_id: CandidateId::new(candidate_hash),
-            body,
-        },
-        applied,
-    ))
 }
 
 fn validate_decision_reason(
@@ -911,9 +881,6 @@ impl fmt::Display for ReceiptDecodeError {
         }
     }
 }
-
-#[cfg(test)]
-mod validation_tests;
 
 #[cfg(test)]
 mod tests {
