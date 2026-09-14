@@ -72,6 +72,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Compile an unchanged V1 consumer against the current release",
         (
             ("python3", "tools/check_v1_compatibility.py"),
+            ("python3", "tools/test_v1_compatibility.py"),
             (
                 "cargo",
                 "+1.97.1",

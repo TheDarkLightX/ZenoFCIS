@@ -81,5 +81,8 @@ strict plan reauthorization, and nominal authenticated publication.
 
 `1.1.0` extends the stable V1 Cargo API with optional finite completion and
 preparation. Protocol identifiers remain independent of Cargo versions and may
-not be silently reinterpreted. The release gate retains an unchanged V1.0 consumer
-and foundational protocol source baseline; see [V1.1 notes](V1_1_RELEASE_NOTES.md).
+not be silently reinterpreted. The release gate retains the original V1.0 source
+baseline and unchanged consumer. A separately recorded receipt refactor is checked
+against the released implementation with protected-source and differential tests;
+it is not described as unchanged source. See [packaging](PACKAGING.md) for the
+current checks and [V1.1 notes](V1_1_RELEASE_NOTES.md) for the published baseline.

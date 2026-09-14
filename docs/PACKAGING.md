@@ -54,8 +54,13 @@ uses that executable to emit fresh durable-counter and prepared-counter applicat
 Each separate consumer resolves internal dependencies only from the extracted archives and
 external dependencies from the reviewed lock. Formatting, Clippy, tests, and
 the complete application demonstration must all pass. The same check runs the
-unchanged V1.0 consumer and verifies the retained foundational source baseline
-against the extracted package files. `PACKAGED-APPLICATION.json` retains
+unchanged V1.0 consumer and checks seven unchanged source files against the
+historical baseline. The receipt implementation is qualified separately: its
+source guard reconstructs the exact released file outside the two reviewed
+function replacements, and the packager executes its pinned differential tests
+from the extracted crate. The result distinguishes source identity from bounded
+behavior preservation; the original V1 baseline is retained unchanged.
+`PACKAGED-APPLICATION.json` retains
 archive and generator hashes, the original emitted-file hashes, admitted
 dependency identities, compiler identity and argument vectors, commands, and
 outcomes. It is included in the release manifest, checksums, and bundle. See

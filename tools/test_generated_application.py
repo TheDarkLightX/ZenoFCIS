@@ -54,9 +54,12 @@ class V1PackagedSourceTests(unittest.TestCase):
         })
         packages = {tomllib.loads(path.read_text())["package"]["name"]: path.parent
                     for path in sorted((application.ROOT / "crates").glob("*/Cargo.toml"))}
+        test_output = "\n".join(f"test {name} ... ok" for name in check_v1_compatibility.TEST_NAMES)
+        test_output += "\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n"
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-v1-consumer-manifest-") as directory:
             with mock.patch.object(application, "resolve_reviewed_graph", return_value={}), \
-                    mock.patch.object(application, "run", return_value=""):
+                    mock.patch.object(application, "run", side_effect=[test_output, ""]), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
                 report = application.exercise_v1_consumer(Path(directory), packages, version, {})
             consumer = Path(directory) / "v1-consumer"
             copied = tomllib.loads((consumer / "Cargo.toml").read_text())
@@ -74,7 +77,7 @@ class V1PackagedSourceTests(unittest.TestCase):
         baseline = check_v1_compatibility.check()
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-v1-packaged-source-") as directory:
             packages = {}
-            for entry in baseline["files"]:
+            for entry in baseline["baseline"]["files"]:
                 relative = Path(entry["path"])
                 if relative.parts[0] != "crates":
                     continue
@@ -83,10 +86,12 @@ class V1PackagedSourceTests(unittest.TestCase):
                 target = root.joinpath(*relative.parts[2:])
                 target.parent.mkdir(parents=True)
                 target.write_bytes((application.ROOT / relative).read_bytes())
+            tests = packages["zeno-fcis-receipt"] / "src/validation_tests.rs"
+            tests.write_bytes((application.ROOT / check_v1_compatibility.TEST_SOURCE).read_bytes())
             self.assertEqual(check_v1_compatibility.check(packages), baseline)
             codec = packages["zeno-fcis-codec"] / "src/lib.rs"
             codec.write_bytes(codec.read_bytes() + b"\n// Altered archive source.\n")
-            with self.assertRaisesRegex(RuntimeError, "V1 compatibility baseline changed"):
+            with self.assertRaisesRegex(RuntimeError, "V1 compatibility source changed"):
                 check_v1_compatibility.check(packages)
             # The independently retained checkout still matches. It cannot
             # substitute for the altered archive in packaged qualification.

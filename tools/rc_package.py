@@ -1013,6 +1013,9 @@ def packaged_checker_inputs() -> list[dict[str, str]]:
         "tools/rc_package.py", "tools/check_generated_application.py", "tools/check_synthesis.py",
         "Cargo.lock", "release/package-set.toml", "tools/check_v1_compatibility.py",
         "test-data/v1-compatibility/baseline.json",
+        "test-data/v1-compatibility/receipt-refactor.json",
+        "test-data/v1-compatibility/receipt-v1.rs",
+        "crates/zeno-fcis-receipt/src/validation_tests.rs",
         "test-projects/external-consumer/src/main.rs", "test-projects/external-consumer/Cargo.toml",
     )]
 
@@ -1087,6 +1090,9 @@ def check_packaged_workspace(
         {(name, version): root / "Cargo.toml" for name, root in package_roots.items()},
         check_environment,
     )
+    # Source admission precedes compilation; exercise_v1_consumer below also
+    # executes the exact differential tests from these extracted package roots.
+    generated_application.check_v1_compatibility.check(package_roots)
     run(
         [
             "cargo",

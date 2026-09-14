@@ -1353,15 +1353,15 @@
         "host-tool",
         "release-control"
       ],
-      "production_lines": 1244,
+      "production_lines": 1248,
       "rank": 10,
       "score": 89,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            1160,
-            1185
+            1166,
+            1191
           ]
         },
         {
@@ -1372,9 +1372,9 @@
             612,
             941,
             1012,
-            1062,
-            1141,
-            1310
+            1065,
+            1147,
+            1316
           ]
         },
         {
@@ -1423,7 +1423,7 @@
             636,
             935,
             950,
-            1352
+            1358
           ]
         }
       ],
@@ -2122,7 +2122,7 @@
       "path_roles": [
         "strict-admission"
       ],
-      "production_lines": 701,
+      "production_lines": 728,
       "rank": 20,
       "score": 81,
       "signals": [
@@ -2130,19 +2130,19 @@
           "id": "canonical-commitment",
           "lines": [
             228,
-            374,
-            375,
-            376,
             377,
             378,
-            569,
-            710
+            379,
+            380,
+            381,
+            572,
+            740
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            860
+            890
           ]
         },
         {
@@ -2155,14 +2155,14 @@
         {
           "id": "strict-decoder",
           "lines": [
-            401,
-            414,
-            422,
-            462,
-            464,
+            404,
+            417,
+            425,
             465,
             467,
-            492
+            468,
+            470,
+            495
           ]
         }
       ],
@@ -2362,70 +2362,70 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 224,
+      "production_lines": 253,
       "rank": 23,
       "score": 81,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            234,
-            235,
-            239,
-            241,
-            242,
-            250,
-            251,
-            252
+            268,
+            269,
+            273,
+            275,
+            276,
+            284,
+            285,
+            286
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            69,
-            75,
-            218
+            71,
+            77,
+            252
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            211
+            244
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            64,
-            65,
-            69,
-            75,
-            80,
+            66,
+            67,
+            71,
+            77,
             82,
-            132,
-            209
+            84,
+            134,
+            242
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            28
+            30
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            61,
-            175,
-            192
+            63,
+            177,
+            194
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            76,
-            115,
-            226
+            78,
+            117,
+            260
           ]
         }
       ],
@@ -3946,6 +3946,96 @@
     },
     {
       "categories": [
+        "authority-access",
+        "effects-injection",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "secrets-crypto",
+        "supply-chain-release"
+      ],
+      "components": {
+        "authority": 4,
+        "chain_adjacency": 5,
+        "complexity": 3,
+        "hazardous_mechanisms": 4,
+        "reachability": 5,
+        "state_coupling": 1
+      },
+      "confidence": "high",
+      "cwes": [
+        "CWE-20",
+        "CWE-22",
+        "CWE-73",
+        "CWE-78",
+        "CWE-89",
+        "CWE-94",
+        "CWE-174",
+        "CWE-200",
+        "CWE-208",
+        "CWE-269",
+        "CWE-284",
+        "CWE-285",
+        "CWE-321",
+        "CWE-327",
+        "CWE-331",
+        "CWE-353",
+        "CWE-400",
+        "CWE-494",
+        "CWE-502",
+        "CWE-532",
+        "CWE-674",
+        "CWE-770",
+        "CWE-789",
+        "CWE-829",
+        "CWE-834",
+        "CWE-862",
+        "CWE-863",
+        "CWE-1104",
+        "CWE-1287",
+        "CWE-1357"
+      ],
+      "path": "tools/check_v1_compatibility.py",
+      "path_roles": [
+        "host-tool"
+      ],
+      "production_lines": 125,
+      "rank": 40,
+      "score": 75,
+      "signals": [
+        {
+          "id": "cryptographic-verification",
+          "lines": [
+            41,
+            115,
+            120
+          ]
+        },
+        {
+          "id": "filesystem-read-path",
+          "lines": [
+            40,
+            103,
+            119
+          ]
+        },
+        {
+          "id": "json-or-line-protocol",
+          "lines": [
+            104,
+            122
+          ]
+        },
+        {
+          "id": "strict-decoder",
+          "lines": [
+            57
+          ]
+        }
+      ],
+      "tier": "priority-2"
+    },
+    {
+      "categories": [
         "effects-injection",
         "formal-evidence",
         "input-canonicalization",
@@ -3985,7 +4075,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 207,
-      "rank": 40,
+      "rank": 41,
       "score": 73,
       "signals": [
         {
@@ -4053,7 +4143,7 @@
         "semantic-authority"
       ],
       "production_lines": 2446,
-      "rank": 41,
+      "rank": 42,
       "score": 73,
       "signals": [
         {
@@ -4121,7 +4211,7 @@
         "workflow"
       ],
       "production_lines": 36,
-      "rank": 42,
+      "rank": 43,
       "score": 71,
       "signals": [
         {
@@ -4188,7 +4278,7 @@
         "semantic-authority"
       ],
       "production_lines": 1455,
-      "rank": 43,
+      "rank": 44,
       "score": 71,
       "signals": [
         {
@@ -4257,7 +4347,7 @@
         "generator-boundary"
       ],
       "production_lines": 283,
-      "rank": 44,
+      "rank": 45,
       "score": 71,
       "signals": [
         {
@@ -4319,7 +4409,7 @@
         "semantic-authority"
       ],
       "production_lines": 1136,
-      "rank": 45,
+      "rank": 46,
       "score": 71,
       "signals": [
         {
@@ -4394,7 +4484,7 @@
         "strict-admission"
       ],
       "production_lines": 319,
-      "rank": 46,
+      "rank": 47,
       "score": 71,
       "signals": [
         {
@@ -4454,7 +4544,7 @@
         "semantic-authority"
       ],
       "production_lines": 1077,
-      "rank": 47,
+      "rank": 48,
       "score": 71,
       "signals": [
         {
@@ -4483,6 +4573,7 @@
     {
       "categories": [
         "authority-access",
+        "codegen-build",
         "effects-injection",
         "input-canonicalization",
         "resource-exhaustion",
@@ -4497,7 +4588,7 @@
         "reachability": 5,
         "state_coupling": 1
       },
-      "confidence": "medium",
+      "confidence": "high",
       "cwes": [
         "CWE-20",
         "CWE-22",
@@ -4530,31 +4621,53 @@
         "CWE-1287",
         "CWE-1357"
       ],
-      "path": "tools/check_v1_compatibility.py",
+      "path": "tools/test_v1_compatibility.py",
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 21,
-      "rank": 48,
+      "production_lines": 202,
+      "rank": 49,
       "score": 71,
       "signals": [
         {
           "id": "cryptographic-verification",
           "lines": [
-            24
+            55
+          ]
+        },
+        {
+          "id": "filesystem-mutation",
+          "lines": [
+            39,
+            48,
+            56,
+            70,
+            85,
+            91,
+            97,
+            158
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            12,
-            23
+            32,
+            39,
+            46,
+            52,
+            54,
+            60,
+            70,
+            85
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            12
+            32,
+            52,
+            60,
+            154
           ]
         }
       ],
@@ -4596,7 +4709,7 @@
         "strict-admission"
       ],
       "production_lines": 705,
-      "rank": 49,
+      "rank": 50,
       "score": 70,
       "signals": [
         {
@@ -4628,84 +4741,6 @@
             470,
             554,
             599
-          ]
-        }
-      ],
-      "tier": "priority-2"
-    },
-    {
-      "categories": [
-        "input-canonicalization",
-        "resource-exhaustion",
-        "state-replay"
-      ],
-      "components": {
-        "authority": 3,
-        "chain_adjacency": 3,
-        "complexity": 4,
-        "hazardous_mechanisms": 3,
-        "reachability": 5,
-        "state_coupling": 3
-      },
-      "confidence": "medium",
-      "cwes": [
-        "CWE-20",
-        "CWE-174",
-        "CWE-362",
-        "CWE-367",
-        "CWE-400",
-        "CWE-502",
-        "CWE-664",
-        "CWE-667",
-        "CWE-674",
-        "CWE-770",
-        "CWE-789",
-        "CWE-834",
-        "CWE-841",
-        "CWE-1287"
-      ],
-      "path": "crates/zeno-fcis-patch/src/lib.rs",
-      "path_roles": [
-        "strict-admission"
-      ],
-      "production_lines": 1027,
-      "rank": 50,
-      "score": 70,
-      "signals": [
-        {
-          "id": "canonical-commitment",
-          "lines": [
-            182,
-            195,
-            200,
-            203,
-            211,
-            213,
-            220,
-            232
-          ]
-        },
-        {
-          "id": "potential-amplification",
-          "lines": [
-            246,
-            255,
-            267,
-            397,
-            479
-          ]
-        },
-        {
-          "id": "strict-decoder",
-          "lines": [
-            373,
-            404,
-            421,
-            431,
-            436,
-            439,
-            449,
-            465
           ]
         }
       ],
@@ -5047,16 +5082,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3085323,
-    "admitted_files": 165,
-    "inventory_sha256": "73be4d7b0fd9ba4b9a1b59d748ae07908a7c3564d8862391a74f2edb250968d8",
-    "ranked_above_minimum": 138,
+    "admitted_bytes": 3122357,
+    "admitted_files": 167,
+    "inventory_sha256": "33ec9d54ffed23f5963edaf4c8fe4c16277e512e10b3b8cca47b92b2359588e2",
+    "ranked_above_minimum": 140,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 12,
-      "priority-2": 40,
-      "priority-3": 86,
+      "priority-2": 41,
+      "priority-3": 87,
       "priority-4": 11,
       "priority-5": 16
     }

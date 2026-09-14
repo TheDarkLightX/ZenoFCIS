@@ -27,5 +27,13 @@ zeno-fcis-patch = { version = "=1.1.0", path = "../zeno-fcis-patch", default-fea
 zeno-fcis-plan = { version = "=1.1.0", path = "../zeno-fcis-plan", default-features = false }
 zeno-fcis-value = { version = "=1.1.0", path = "../zeno-fcis-value", default-features = false }
 
+[dev-dependencies]
+zeno-fcis-crypto = { version = "=1.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["parity"] }
+criterion = "=0.5.1"
+
+[[bench]]
+name = "validation"
+harness = false
+
 [lints]
 workspace = true

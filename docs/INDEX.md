@@ -63,6 +63,7 @@
 - [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md)
 - [Policy-bound genesis authorization](GENESIS_AUTHORIZATION.md)
 - [Candidate and commit boundary](CANDIDATE_COMMIT_BOUNDARY.md)
+- [Commit bundle validation](BUNDLE_VALIDATION.md)
 - [Commitment allocation optimization](COMMITMENT_OPTIMIZATION.md)
 - [Owned footprint sealing](OWNED_FOOTPRINT_SEALING.md)
 
@@ -111,7 +112,7 @@ and other tools can use the same public boundaries.
 
 ## Status
 
-The workspace is version `1.0.0`, the stable Cargo API release. The
+The workspace is version `1.1.0`, extending the stable V1 Cargo API. The
 documentation describes implemented APIs and explicit boundaries. It does not
 claim general deployment qualification, a bundled concurrent runtime, or an
 end-to-end proof for arbitrary downstream projects. Historical
