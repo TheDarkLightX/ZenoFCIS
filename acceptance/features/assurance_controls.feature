@@ -36,7 +36,8 @@ Feature: Report evidence that cannot distinguish system behavior
   Scenario: Pin what the zeno language cannot state about the zUSD lane
     Given the single-vault zUSD lane written in zeno version 1 from the pinned native semantics
     When its laws are evaluated with the library evaluator on concrete states
-    Then an effect law holds for an accepted and a rejected deposit alike
+    Then an unguarded effect law holds for an accepted and a rejected deposit alike
+    And a guarded deposit law matches the native outcomes and rejects the opposite ones
     And the solvency law overflows inside the declared domain
     And unresolved paths, literals beyond u64, and a leading parenthesized scalar behave as recorded
 

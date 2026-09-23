@@ -19,15 +19,21 @@ separate semantic core.
   - the 32 state fields;
   - the command;
   - all 46 reasons of `ZusdRejectV1`, with registry precedence;
-  - five state invariants and three action laws.
+  - five state invariants and four action laws, including law 513, which
+    restates the native acceptance conditions for a deposit.
 
-  It passes `zeno-fcis check`, and every law is `may-constrain-transition`.
+  It passes `zeno-fcis check` with `--require-resolved-paths` and
+  `--require-substantive`.
 - **Tests.** `crates/zeno-fcis-spec/tests/zusd_lane_gaps.rs` pins each language
   finding with the library's own parser and evaluator. A change that closes a
   gap fails its test.
-- **Native reason order.** Reproduced by running the pinned Python authority's
-  `_step_python` on inputs where two checks fail. The Rust shadow was
+- **Native behavior.** Reproduced by running the pinned Python authority's
+  `_step_python`: the reason order on inputs where two checks fail, and four
+  deposit outcomes that law 513 is tested against. The Rust shadow was
   inspected, not run.
+- **Review.** An independent review of commit `521b768` found that finding 5
+  and the reason-order conclusions overstated their evidence. They are
+  corrected here, and its counterexample is a permanent test.
 
 ## What the lane needs
 
@@ -54,9 +60,9 @@ separate semantic core.
 | 2 | Collateral-ratio and solvency checks | Writable, but the checked i128 products overflow inside the declared domain. `no_bad_debt` is `Indeterminate(Overflow)` at collateral and price 10^20. | Not representable | `zusd_lane_solvency_law_overflows_inside_the_declared_domain` |
 | 3 | Grouped arithmetic | A comparison cannot start with a parenthesized scalar. `(a + b) * c` fails to parse, while `c * (a + b)` parses, so the attempt distributes products by hand. | Not applicable | `zeno_v1_comparisons_cannot_start_with_a_parenthesized_scalar` |
 | 4 | Fees and liquidation compensation | `div_ceil` and `div_floor` exist. Minimum and saturation have no operator, conditional expression, or local binding, so each becomes a case split that repeats the whole expression. Not attempted. | Not representable | Language reference |
-| 5 | Which reason a rejection carries | Not stateable. A reason declares a name and one global rank, but no condition. Law paths cannot refer to the decision or its reason. So an effect law must admit both outcomes: the deposit law holds for the accepted and the rejected deposit alike. | Output codes can carry a reason, but see row 1 | `zusd_lane_laws_cannot_tell_an_accepted_deposit_from_a_rejected_one` |
-| 6 | Reason order | Not reproducible. See [Reason order](#reason-order). | Not applicable | Pinned Python authority |
-| 7 | Frame: fields a step leaves unchanged | Expressible only by listing every field. The deposit law needs 64 comparisons, 63 of them frame equalities. | Not applicable | Law 510 in the attempt |
+| 5 | Which outcome occurs, and which reason a rejection carries | The outcome is stateable; the reason is not observable. Law paths cannot refer to the decision or its reason code, and a reason declares no condition. A law can still require the right outcome by restating the acceptance conditions as a guard on the pre-state and command. Law 513 does this for a deposit, in 191 comparisons, and matches four native outcomes. Law 510, which omits the guard, admits both outcomes; that is a weak example law, not a language limit. | Output codes can carry a reason, but see row 1 | `zusd_lane_guarded_deposit_law_matches_native_outcomes`; `reviewer_guarded_law_distinguishes_required_deposit_from_unchanged_state`; `zusd_lane_unguarded_effect_law_admits_both_outcomes` |
+| 6 | Reason order | The registry's ranks disagree with native order when several checks fail. Disjoint guards or early returns reproduce native order under any ranking, but then the precedence does not decide which reason wins. See [Reason order](#reason-order). | Not applicable | Pinned Python authority |
+| 7 | Frame: fields a step leaves unchanged | Expressible only by listing every field. Law 510 needs 65 comparisons, 63 of them frame equalities. | Not applicable | Laws 510 and 513 in the attempt |
 | 8 | Conservation over fixed fields | Expressible: supply conservation, liquidation collateral conservation, and the matching debt burn. Conservation across vaults would need collections, which v1 lacks. | Not representable | Laws 501, 511, and 512 |
 | 9 | Checked field references | Elaboration does not resolve paths against the schema: `post.100.999`, `command.101.777`, and `post.555.1.2.3` elaborate without a diagnostic. `zeno-fcis check` now warns about them, and `--require-resolved-paths` refuses them ([law path resolution](LAW_PATH_RESOLUTION.md)). | Not applicable | `zeno_v1_accepts_formula_paths_that_name_no_declared_field` |
 | 10 | Unbounded command arguments | A bounded schema rejects a large argument at admission, where the native code rejects it through the action's own checks. The mounted `ZusdCommandV1` holds amounts as `u128`, so an argument of 2^128 or more is not representable. | Not representable | `ZusdCommandV1` |
@@ -64,8 +70,9 @@ separate semantic core.
 ### Reason order
 
 The transition builder selects the applicable reason with the lowest global
-rank. The native code instead returns its first failing check in per-action
-order. The pinned Python authority returns these reasons:
+rank among the reasons a program records. The native code instead returns its
+first failing check, in per-action order. The pinned Python authority returns
+these reasons:
 
 | Input | Native reason (rank) | Lowest-ranked failing check |
 | --- | --- | --- |
@@ -73,12 +80,22 @@ order. The pinned Python authority returns these reasons:
 | `oracle_report` with `price_e8 = 0` on an unbootstrapped state | `oracle_not_bootstrapped` (6) | `not_positive_int` (0) |
 | `withdraw_collateral` above the collateral, on a state that breaks supply conservation | `insufficient_collateral` (11) | `invariant_violation` (2) |
 
-In the Rust shadow, `invariant_violation` is also the reason for a malformed
-pre-state, checked before any action check. It would need to rank both before
-and after the action reasons. No single rank per reason reproduces the native
-reason. A ZenoFCIS program must therefore return early in native order, and the
-committed precedence then does not describe which reason wins. The mount is
-unaffected, because its adapter copies the native reason.
+These inputs show that the registry's ranks disagree with native order. What
+follows for other rankings depends on how a program records failures:
+
+- A program that records every failing check, with guards that overlap, needs
+  a ranking consistent with each action's native order. In the Rust shadow,
+  `invariant_violation` is also the reason for a malformed pre-state, checked
+  before any action check. If malformed pre-states are admitted inputs, that
+  reason would need to rank both before and after the action reasons, so no
+  ranking fits. The Python authority rejects such states when they are
+  constructed, so the conflict depends on which input domain is modeled.
+- A program whose guards are disjoint, each restating the negation of every
+  earlier check, reproduces native order under any ranking. So does a program
+  that returns early. In both cases the committed precedence does not decide
+  which reason wins.
+
+The mount is unaffected, because its adapter copies the native reason.
 
 ### Registry and code
 
@@ -98,26 +115,33 @@ reason can occur.
   registry precedence.
 - State invariants, checked at realistic magnitudes.
 - Conservation laws over fixed fields.
-- Action effect laws in the form "the effect happened, or nothing changed". A
-  runtime law check detects a wrong effect: a deposit that credits one unit too
-  much is `False`.
+- Action laws that require the right outcome, when they restate the
+  acceptance conditions as guards. Law 513 does so for a deposit and matches
+  the native outcomes it is tested against. A runtime law check detects a
+  wrong effect: a deposit that credits one unit too much is `False`.
 
 ## Implications for the decision
 
-Stating the lane needs at least these additions, whichever option is chosen:
+Stating the lane precisely and compactly needs these additions, whichever
+option is chosen:
 
-- reason conditions, with decision and reason observations in laws;
-- per-action reason order, or first-failing-check semantics in the order the
-  author writes;
+- decision and reason observations in laws, or reason conditions in the
+  catalog, so a law can say which reason a rejection carries;
+- a way to state per-action reason order without restating every earlier
+  check in each guard;
 - a frame construct;
 - path resolution in elaboration (1.x `check` now reports unresolved paths);
 - minimum, conditional expressions, and local bindings;
 - evaluation beyond i128, and literals beyond u64.
 
+Without the first two, the lane is still stateable with disjoint guards, at the
+cost that law 513 shows for a single action.
+
 The candidate semantic-core design covers reason conditions, the frame, path
 resolution, and conditional expressions. Its decision rows follow one catalog
-precedence, so as designed it would not reproduce the per-action order either.
-Neither option has wide integers yet.
+precedence. It reproduces per-action order only with disjoint guards, which its
+design permits; with overlapping guards it does not. Neither option has wide
+integers yet.
 
 The finite IR cannot carry the lane's arithmetic. It could carry a Boolean
 skeleton of the checks, which condition fails first, only if every arithmetic
@@ -137,13 +161,15 @@ To reproduce the native reasons, copy `src/core/zusd.py`,
 `src/core/zusd_multi_redeem_selector.py`, and `src/state/canonical.py` from the
 pinned commit into an importable `src` package. Then call
 `zusd._step_python(state, zusd.ZUSDCommand(tag=..., args=...))` with the inputs
-in the table above.
+in the table above. The four deposit outcomes use the same call with tag
+`deposit_collateral`; `zusd_lane_gaps.rs` lists their states.
 
 ## Explicit nonclaims
 
-- The attempt states a subset of the lane: five invariants and three action
+- The attempt states a subset of the lane: five invariants and four action
   laws. It is not a complete specification, and the lane's owner has not
   reviewed it.
+- Law 513 is tested against four native deposit outcomes, not all inputs.
 - The findings describe `.zeno` v1 and `finite-i64/1` at v1.1.0 plus this
   branch. They make no claim about the correctness of ZenoDEX.
 - The native reason order was reproduced with the Python authority only.
