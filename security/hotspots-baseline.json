@@ -1044,7 +1044,7 @@
       "path_roles": [
         "nominal-authority"
       ],
-      "production_lines": 1969,
+      "production_lines": 1976,
       "rank": 7,
       "score": 90,
       "signals": [
@@ -1052,60 +1052,60 @@
           "id": "authority-construction",
           "lines": [
             79,
-            782,
-            901,
-            1435,
-            1612,
-            1624,
-            1700,
-            1825
+            799,
+            918,
+            1452,
+            1629,
+            1641,
+            1717,
+            1842
           ]
         },
         {
           "id": "canonical-commitment",
           "lines": [
-            707,
-            708,
-            709,
-            947,
-            961,
-            1280,
-            1281,
-            1282
+            724,
+            725,
+            726,
+            964,
+            978,
+            1297,
+            1298,
+            1299
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            919,
-            990
+            936,
+            1007
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            2326
+            2343
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            195,
-            1258,
-            1459,
-            1460,
-            1606,
-            1716,
-            1894,
-            1904
+            212,
+            1275,
+            1476,
+            1477,
+            1623,
+            1733,
+            1911,
+            1921
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            995,
-            997,
-            999
+            1012,
+            1014,
+            1016
           ]
         }
       ],
@@ -3468,37 +3468,37 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 850,
+      "production_lines": 849,
       "rank": 34,
       "score": 78,
       "signals": [
         {
           "id": "canonical-commitment",
           "lines": [
-            447
+            446
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            198,
-            474,
-            882,
-            922,
-            927
+            200,
+            473,
+            881,
+            921,
+            926
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            514
+            513
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            192,
-            198
+            194,
+            200
           ]
         }
       ],
@@ -5048,9 +5048,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3146415,
+    "admitted_bytes": 3151534,
     "admitted_files": 168,
-    "inventory_sha256": "9258fd2783ac990c5f44e236ad9365fa532c45584f0e5286a1f4559cd59c2987",
+    "inventory_sha256": "d8b649b3c2ef11e95a16eb3fd84e437b0444e944ab625bf43835093b4ff4a469",
     "ranked_above_minimum": 140,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

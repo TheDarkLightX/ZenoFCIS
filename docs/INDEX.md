@@ -93,6 +93,7 @@ and other tools can use the same public boundaries.
 - [Candidate-bound authenticated authority](AUTHENTICATED_AUTHORITY_BOUNDARY.md)
 - [Persistent collections](PERSISTENT_COLLECTIONS.md)
 - [SHA-256 provider policy](SHA256_PROVIDER_POLICY.md)
+- [Reserved commitment-domain namespace](RESERVED_DOMAIN_NAMESPACE.md)
 - [Secret handling and constant time](SECRET_HANDLING_AND_CONSTANT_TIME.md)
 - [Side/covert-channel security](SIDE_CHANNEL_COVERT_CHANNEL_SECURITY.md)
 - [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)

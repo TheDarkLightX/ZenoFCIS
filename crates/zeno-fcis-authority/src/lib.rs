@@ -110,6 +110,23 @@ impl StateDomainBinding {
         })
     }
 
+    /// Creates a project state-domain binding outside the reserved ZenoFCIS
+    /// namespace, so a state root cannot share a commitment domain with
+    /// library identities such as candidate IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns every error of [`StateDomainBinding::try_new`], and
+    /// `AuthorityError::Encode(EncodeError::InvalidDomain)` when `name` lies in
+    /// the namespace reserved by `zeno_fcis_project::RESERVED_DOMAIN_NAMESPACE`.
+    pub fn try_new_project(name: impl Into<String>, version: u16) -> Result<Self, AuthorityError> {
+        let binding = Self::try_new(name, version)?;
+        if zeno_fcis_project::is_reserved_domain_name(binding.name()) {
+            return Err(AuthorityError::Encode(EncodeError::InvalidDomain));
+        }
+        Ok(binding)
+    }
+
     /// Returns the domain name.
     #[must_use]
     pub const fn name(&self) -> &str {
@@ -2438,6 +2455,19 @@ impl std::error::Error for AuthorizedShellError {}
 
 #[cfg(all(test, feature = "rustcrypto"))]
 mod tests {
+    #[test]
+    fn project_state_domains_cannot_enter_the_reserved_namespace() {
+        assert!(StateDomainBinding::try_new_project("durable-counter/state", 1).is_ok());
+        for reserved in ["zeno-fcis/candidate", "zeno-fcis"] {
+            assert_eq!(
+                StateDomainBinding::try_new_project(reserved, 1),
+                Err(AuthorityError::Encode(EncodeError::InvalidDomain))
+            );
+            // The V1 constructor keeps accepting it; V2 makes the check mandatory.
+            assert!(StateDomainBinding::try_new(reserved, 1).is_ok());
+        }
+    }
+
     use alloc::vec;
 
     use super::*;

@@ -110,6 +110,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--lib", "--locked", "system::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "counter_system_properties")),
     ),
+    "reserved-domains": AcceptanceScenario(
+        "Keep project commitment domains out of the library namespace",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-project", "--lib", "--locked", "reserved_domain_tests"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "project_state_domains_cannot_enter_the_reserved_namespace"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-adapter-zenodex", "--lib", "--locked", "precondition_hash_matches_the_explicit_value_domain")),
+    ),
     "generated-application": AcceptanceScenario(
         "Run an authored application through durable authorization",
         (("python3", "tools/test_generated_application.py"),
