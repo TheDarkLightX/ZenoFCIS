@@ -20,3 +20,11 @@ Feature: Report evidence that cannot distinguish system behavior
     And a property the output domains already imply is reported as domain-implied
     And a planted guard bug is reported as not total at its first input
     And an unreplayable solver model is refused
+
+  @atdd-reserved-domains
+  Scenario: Keep project commitment domains out of the library namespace
+    Given library identities such as candidate IDs in the zeno-fcis namespace
+    When a project binds a state domain or profile prefix through the project constructors
+    Then names inside the reserved namespace are rejected
+    And names outside it and the V1 constructors are unchanged
+    And the zUSD patch precondition hash stays byte-identical

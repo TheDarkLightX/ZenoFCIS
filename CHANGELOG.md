@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Reserve the `zeno-fcis` commitment-domain namespace. Add
+  `is_reserved_domain_name`, `DomainPrefix::try_new_project` and
+  `StateDomainBinding::try_new_project`, which reject names that would share a
+  domain with library identities such as candidate IDs. The V1 constructors
+  are unchanged. The zUSD mount computes its patch precondition through the
+  shared `hash_precondition_value` helper, with byte-identical results.
+
 - Check properties against an exact finite transition program.
   `check_system_property` enumerates every admitted input and runs a
   domain-only control that reports properties the output domains already

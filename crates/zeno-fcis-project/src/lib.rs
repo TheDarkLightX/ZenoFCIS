@@ -27,6 +27,19 @@ pub const PROFILE_EVOLUTION_FORMAT_VERSION: u16 = 1;
 pub const MAX_STABLE_NAME_BYTES: usize = 64;
 /// Maximum byte length of a domain prefix.
 pub const MAX_DOMAIN_PREFIX_BYTES: usize = 160;
+/// Commitment-domain namespace that ZenoFCIS reserves for its own identities.
+///
+/// Library commitments such as candidate IDs, receipts, and patch
+/// preconditions use names that start with `zeno-fcis/`. A project domain in
+/// the same namespace could share a commitment domain with those identities.
+pub const RESERVED_DOMAIN_NAMESPACE: &str = "zeno-fcis";
+
+/// Returns true when `name` is the reserved namespace itself or lies inside it.
+#[must_use]
+pub fn is_reserved_domain_name(name: &str) -> bool {
+    name.strip_prefix(RESERVED_DOMAIN_NAMESPACE)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
 /// Maximum number of stable registry entries in one profile.
 pub const MAX_REGISTRY_ENTRIES: usize = 65_536;
 
@@ -95,6 +108,21 @@ impl DomainPrefix {
     #[must_use]
     pub const fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Creates a project prefix outside the reserved ZenoFCIS namespace.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProfileError::InvalidDomainPrefix`] for every prefix
+    /// [`DomainPrefix::try_new`] rejects, and for the reserved namespace
+    /// described by [`RESERVED_DOMAIN_NAMESPACE`].
+    pub fn try_new_project(value: impl Into<String>) -> Result<Self, ProfileError> {
+        let prefix = Self::try_new(value)?;
+        if is_reserved_domain_name(prefix.as_str()) {
+            return Err(ProfileError::InvalidDomainPrefix);
+        }
+        Ok(prefix)
     }
 }
 
@@ -1006,6 +1034,44 @@ impl fmt::Display for EvolutionError {
 
 #[cfg(feature = "std")]
 impl std::error::Error for EvolutionError {}
+
+#[cfg(test)]
+mod reserved_domain_tests {
+    use super::*;
+
+    #[test]
+    fn reserved_domain_names_cover_the_namespace_and_nothing_else() {
+        for reserved in [
+            "zeno-fcis",
+            "zeno-fcis/",
+            "zeno-fcis/candidate",
+            "zeno-fcis/value",
+        ] {
+            assert!(is_reserved_domain_name(reserved), "{reserved}");
+        }
+        for project in [
+            "zeno-fcisx",
+            "zeno-fcis-app/state",
+            "myproject/zeno-fcis/x",
+            "zeno",
+        ] {
+            assert!(!is_reserved_domain_name(project), "{project}");
+        }
+    }
+
+    #[test]
+    fn project_prefixes_outside_the_reserved_namespace_are_accepted() {
+        assert!(DomainPrefix::try_new_project("durable-counter/core").is_ok());
+        for reserved in ["zeno-fcis", "zeno-fcis/project"] {
+            assert_eq!(
+                DomainPrefix::try_new_project(reserved),
+                Err(ProfileError::InvalidDomainPrefix)
+            );
+            // The V1 constructor keeps accepting it; V2 makes the check mandatory.
+            assert!(DomainPrefix::try_new(reserved).is_ok());
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

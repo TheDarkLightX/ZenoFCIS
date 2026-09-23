@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::DecisionKind;
 use zeno_fcis_crypto::RustCryptoSha256;
-use zeno_fcis_patch::{CanonicalPatch, PatchError, PatchOp, ValuePath, hash_value};
+use zeno_fcis_patch::{
+    CanonicalPatch, PatchError, PatchOp, ValuePath, hash_precondition_value, hash_value,
+};
 use zeno_fcis_plan::{CommitPlan, OutboxPlan};
 use zeno_fcis_profile_zenodex::{
     ProfileError, ZUSD_COMMAND_TYPE_V1, ZUSD_STATE_TYPE_V1, ZenoDexProfileV1, ZusdCommandTagV1,
@@ -311,11 +313,8 @@ pub fn normalize_zusd_native_decision_v1(
         .post_state
         .to_value()
         .map_err(ZusdMountError::State)?;
-    let old_hash = hash_value::<RustCryptoSha256>(
-        Domain::new("zeno-fcis/value", 1).map_err(ZusdMountError::Encode)?,
-        &pre_state,
-    )
-    .map_err(ZusdMountError::Patch)?;
+    let old_hash =
+        hash_precondition_value::<RustCryptoSha256>(&pre_state).map_err(ZusdMountError::Patch)?;
     let patch = CanonicalPatch::try_new(
         ZUSD_STATE_TYPE_V1,
         pre_root,
@@ -983,6 +982,24 @@ mod tests {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect()
+    }
+
+    #[test]
+    fn precondition_hash_matches_the_explicit_value_domain() {
+        // The accepted-path patch precondition uses the shared helper; it must
+        // stay byte-identical to the explicit "zeno-fcis/value" v1 commitment.
+        let state = ZusdStateV1::reference_initial()
+            .unwrap_or_else(|error| panic!("state: {error}"))
+            .to_value()
+            .unwrap_or_else(|error| panic!("value: {error:?}"));
+        let explicit = hash_value::<RustCryptoSha256>(
+            Domain::new("zeno-fcis/value", 1).unwrap_or_else(|error| panic!("domain: {error}")),
+            &state,
+        )
+        .unwrap_or_else(|error| panic!("explicit: {error:?}"));
+        let shared = hash_precondition_value::<RustCryptoSha256>(&state)
+            .unwrap_or_else(|error| panic!("shared: {error:?}"));
+        assert_eq!(shared, explicit);
     }
 
     #[test]
