@@ -154,6 +154,26 @@ reproducibility boundary.
 
 Evidence is additive. A newer test run does not retroactively validate older source or external runtime artifacts.
 
+## Revision-stamped gate evidence
+
+`tools/record_gate_evidence.py --out FILE` runs the local gates for the
+committed revision and records the results in `zeno-fcis/gate-evidence/1`
+JSON:
+
+- the commit and tree it tested, and the Rust, Python, Node.js, cargo-deny,
+  and pinned formal-tool versions;
+- the full acceptance run, the kernel law harnesses, and `cargo deny` on the
+  harness dependencies, each with its command, exit code, and test counts;
+- the pinned CVC5, Z3, and Lean checks of the formal-tools workflow, when
+  `ZENO_FCIS_CVC5`, `ZENO_FCIS_Z3`, `ZENO_FCIS_LEAN`, and
+  `ZENO_FCIS_LEAN_ROOT` point at the pinned executables, and the Lean runtime
+  tree hash against `release/lean-4.30.0-tree.sha256`;
+- every ignored test, and the step, acceptance scenario, or parent test that
+  runs it, or `null` when nothing in the record does.
+
+The tool refuses to start when tracked files differ from the commit, and fails
+if the commit or tracked files change during the run.
+
 ## Failure and recovery
 
 Any failed gate blocks release. Repair occurs in a new commit, followed by a complete rerun from a clean checkout. Do not reuse a source manifest, generated artifact, refinement fixture, or checker certificate across changed source unless its content address and all bound identifiers are unchanged and independently verified.

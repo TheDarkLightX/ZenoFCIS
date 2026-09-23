@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add `tools/record_gate_evidence.py`, which runs the local gates for the
+  committed revision and writes a revision-stamped JSON record: tool
+  versions, each command's exit code and test counts, the pinned CVC5, Z3 and
+  Lean checks when their executables are supplied, and an inventory of every
+  ignored test and what runs it. The formal-tools workflow also runs the new
+  pinned solver-route differential.
+
 - Connect the durable-counter template's finite model to the executed
   application. The generated application's new `tests/conformance.rs` runs all
   64 admitted inputs through admission, the authority, the Rust adapter, and
