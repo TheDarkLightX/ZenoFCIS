@@ -116,6 +116,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "project_state_domains_cannot_enter_the_reserved_namespace"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-adapter-zenodex", "--lib", "--locked", "precondition_hash_matches_the_explicit_value_domain")),
     ),
+    "effect-spellings": AcceptanceScenario(
+        "Reject effect spellings that bypass qualified-path rules",
+        (("python3", "tools/check_assurance.py", "--self-test"),),
+    ),
     "zusd-lane-gaps": AcceptanceScenario(
         "Pin what the zeno language cannot state about the zUSD lane",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--test", "zusd_lane_gaps", "--locked"),),

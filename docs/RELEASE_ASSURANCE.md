@@ -97,8 +97,9 @@ The CI workflows add:
 `tools/check_assurance.py` fails when:
 
 - a workspace library omits `#![forbid(unsafe_code)]`;
-- a semantic crate directly accesses filesystems, networking, processes, environment variables, wall clocks, threads, async runtimes, or randomness;
-- a semantic crate introduces unsafe or foreign-function code, mutable statics, or shared interior-mutability primitives;
+- a semantic crate directly accesses filesystems, networking, processes, environment variables, standard I/O, wall clocks, threads or thread-local storage, async runtimes, or randomness, including through grouped, glob, or aliased `std` imports;
+- a semantic crate introduces unsafe or foreign-function code, mutable statics, shared interior-mutability primitives, atomics, or lazily initialized cells, whether or not the type is spelled with generic arguments;
+- a semantic crate uses hash-ordered collections or hasher state (`HashMap`, `HashSet`, `RandomState`, `DefaultHasher`), whose default iteration order varies between runs;
 - a semantic crate introduces floating-point types;
 - a lower dependency ring imports a higher ring;
 - an external Cargo dependency lacks an exact `=version` pin;
@@ -106,6 +107,9 @@ The CI workflows add:
 - a third-party workflow action is not pinned to a full commit.
 
 The check has hostile witnesses for every forbidden-pattern rule. `--self-test` proves those witnesses are rejected before repository scanning begins.
+It also has safe witnesses, such as `WorkspaceCell`, `BTreeMap`, and `use std::{collections::BTreeSet}`, that no rule may reject.
+
+The rules match source text and do not resolve names. A dependency that re-exports an effect under another name is outside their reach; the dependency-ring and exact-pin checks limit which dependencies a semantic crate can use.
 
 ## Supply-chain policy
 

@@ -36,3 +36,10 @@ Feature: Report evidence that cannot distinguish system behavior
     Then an effect law holds for an accepted and a rejected deposit alike
     And the solvency law overflows inside the declared domain
     And unresolved paths, literals beyond u64, and a leading parenthesized scalar behave as recorded
+
+  @atdd-effect-spellings
+  Scenario: Reject effect spellings that bypass qualified-path rules
+    Given hostile witnesses for standard I/O, grouped, glob and aliased std imports, thread-local storage, atomics, cells and hash-ordered collections
+    When the assurance checker runs its self-test
+    Then every hostile witness is rejected by its own rule
+    And no safe witness such as WorkspaceCell or BTreeMap is rejected
