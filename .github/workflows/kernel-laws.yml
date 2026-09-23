@@ -1,0 +1,33 @@
+name: kernel-laws
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "agent/**"
+
+permissions:
+  contents: read
+
+jobs:
+  harnesses:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        run: rustup toolchain install 1.97.1 --profile minimal
+
+      - name: Run exhaustive and random kernel law harnesses
+        run: cargo +1.97.1 test --manifest-path verification/Cargo.toml --locked
+
+      - name: Install pinned supply-chain tools
+        run: cargo +1.97.1 install cargo-deny --version 0.20.2 --locked
+
+      - name: Check harness licenses, sources, and advisories
+        run: cargo +1.97.1 deny --manifest-path verification/Cargo.toml --config deny.toml check

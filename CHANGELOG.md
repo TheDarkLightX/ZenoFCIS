@@ -6,6 +6,14 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add kernel law harnesses in a separate `verification/` workspace. Four laws
+  (budget charges, reason choice, canonical decoding, and patch overlap) each
+  have one predicate, checked exhaustively over a small stated domain and at
+  random under bolero 0.13.4. Planted bugs for each law are detected. bolero and
+  its dependencies are pinned in `verification/Cargo.lock` and never enter the
+  published crates' lockfile. A `kernel-laws` workflow runs the harnesses and
+  `cargo deny` on their dependencies.
+
 - Report law and claim paths that name no declared type or field. Add
   `resolve_path`, `law_paths`, `claim_paths` and `PathResolution` to
   `zeno-fcis-spec`. `zeno-fcis check` warns about each unresolved path, adds

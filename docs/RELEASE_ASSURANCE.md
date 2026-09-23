@@ -137,7 +137,7 @@ For a release candidate, retain:
 
 1. the source commit and tag;
 2. `SOURCE-MANIFEST.json` generated with `--require-clean`;
-3. complete CI logs for stable, Miri, fuzz-build, feature-matrix, and supply-chain jobs;
+3. complete CI logs for stable, Miri, fuzz-build, kernel-laws, feature-matrix, and supply-chain jobs;
 4. generated schema/codegen manifests and cross-language replay output for every promoted profile;
 5. mounted-runtime refinement fixtures for the exact external runtime build;
 6. any proof/checker evidence referenced by a promotion certificate;
