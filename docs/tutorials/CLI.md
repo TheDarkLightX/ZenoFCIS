@@ -16,6 +16,19 @@ checked examples/minimal/project.zeno: project=1 components=1 claims=1 unresolve
 The line shows the project ID, number of components, number of claims, checks
 that still need evidence, and the identity of the checked program.
 
+The command also prints two warnings on stderr:
+
+```text
+warning: law 400 identity is always true, so it can never detect a faulty transition
+warning: claim 500 identity is always true, so proving it says nothing about this system
+```
+
+The minimal example's law and claim compare the state with itself, so they
+hold for every transition. [Law and claim substance](../CLAIM_SUBSTANCE.md)
+explains the classification. `check` also warns about any law or claim path
+that names no declared type or field; see
+[law path resolution](../LAW_PATH_RESOLUTION.md).
+
 For automation, request JSON:
 
 ```bash
@@ -24,7 +37,7 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
 ```
 
 ```json
-{"claims":1,"components":1,"path":"examples/minimal/project.zeno","project_id":1,"schema":"zeno-fcis/cli/1","semantic_program_hash":"57385a54387db8ad3e2da9a46a9ae22d2e72502b336120f570791d79e736b365","status":"valid","unresolved_obligations":2}
+{"claims":1,"components":1,"path":"examples/minimal/project.zeno","project_id":1,"schema":"zeno-fcis/cli/1","semantic_program_hash":"57385a54387db8ad3e2da9a46a9ae22d2e72502b336120f570791d79e736b365","status":"valid","substance":{"claims":[{"code":"constant-true","id":500,"name":"identity"}],"laws":[{"code":"constant-true","id":400,"name":"identity"}]},"unresolved_obligations":2,"unresolved_paths":{"claims":[],"laws":[]}}
 ```
 
 The keys appear in stable order and the schema has an explicit version.

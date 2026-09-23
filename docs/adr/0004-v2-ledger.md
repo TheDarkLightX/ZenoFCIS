@@ -49,9 +49,9 @@ These changes are deferred to V2.
 
 ### Language
 
-- `.zeno` elaboration rejects law and claim paths that name no declared type,
-  field, or variant. In 1.x these paths elaborate without a diagnostic; a 1.x
-  warning can come first.
+- `.zeno` elaboration rejects law and claim paths that name no declared type
+  or field. In 1.x they still elaborate; `zeno-fcis check` warns about them,
+  and `--require-resolved-paths` refuses them.
 
 ### Codec
 
@@ -108,4 +108,5 @@ would make it mandatory. The V2 migration guide is written from this ledger.
 - Opt-in replacements already shipped on this branch:
   - `try_new_project` (reserved namespace);
   - `system::Property` (a relation that the frozen `Contract` does not expose);
-  - `--require-substantive` (vacuity as a failure).
+  - `--require-substantive` (vacuity as a failure);
+  - `--require-resolved-paths` (unresolved law paths as a failure).

@@ -847,57 +847,58 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1180,
+      "production_lines": 1301,
       "rank": 5,
       "score": 93,
       "signals": [
         {
           "id": "concurrency-primitive",
           "lines": [
-            35
+            36
           ]
         },
         {
           "id": "external-verifier-result",
           "lines": [
-            1066
+            1198
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            451,
-            1239
+            461,
+            1371
           ]
         },
         {
           "id": "generated-source",
           "lines": [
             25,
-            629
+            761
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            264
+            268
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1178
+            1310
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            356,
-            357,
-            577,
-            727,
-            1101,
-            1161
+            366,
+            367,
+            615,
+            709,
+            859,
+            1233,
+            1293
           ]
         }
       ],
@@ -5048,9 +5049,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3153526,
-    "admitted_files": 168,
-    "inventory_sha256": "10907d5449d06c299771d596e61c0bd64437980ec87086cbe9e1447432f8205a",
+    "admitted_bytes": 3169254,
+    "admitted_files": 169,
+    "inventory_sha256": "04fdc9a300027facce26d4f59cc6bdfb514ad22660863de9565557f05c063a03",
     "ranked_above_minimum": 140,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
@@ -5058,7 +5059,7 @@
       "priority-1": 12,
       "priority-2": 40,
       "priority-3": 88,
-      "priority-4": 11,
+      "priority-4": 12,
       "priority-5": 17
     }
   }

@@ -17,6 +17,7 @@ mod lexer;
 mod logic;
 mod mini_determinator;
 mod parser;
+mod paths;
 mod substance;
 mod views;
 
@@ -35,6 +36,7 @@ pub use mini_determinator::{
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
 pub use parser::parse_project;
+pub use paths::{PathResolution, claim_paths, law_paths, resolve_path};
 pub use substance::{
     Substance, claim_substance, law_substance, relation_substance, temporal_substance,
 };

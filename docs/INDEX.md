@@ -72,6 +72,7 @@
 - [Formal-tools tutorial](tutorials/FORMAL_TOOLS.md)
 - [Mini Determinator tutorial](tutorials/MINI_DETERMINATOR.md)
 - [Law and claim substance](CLAIM_SUBSTANCE.md)
+- [Law path resolution](LAW_PATH_RESOLUTION.md)
 - [System properties of finite transitions](SYSTEM_PROPERTIES.md)
 - [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md)
 - [Deterministic synthesis](DETERMINISTIC_SYNTHESIS.md)

@@ -6,6 +6,14 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Report law and claim paths that name no declared type or field. Add
+  `resolve_path`, `law_paths`, `claim_paths` and `PathResolution` to
+  `zeno-fcis-spec`. `zeno-fcis check` warns about each unresolved path, adds
+  an `unresolved_paths` object to JSON output, and accepts
+  `--require-resolved-paths`. Elaboration, canonical bytes and default exit
+  codes are unchanged. The CLI tutorial's `check` transcript now shows the
+  current JSON output and substance warnings.
+
 - Close effect spellings that the static assurance check missed in semantic
   crates: standard I/O; grouped, glob and aliased `std` imports;
   `thread_local!`; atomics and cells written without generic arguments, such

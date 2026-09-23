@@ -6,7 +6,7 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 ```text
 zeno-fcis describe [COMMAND...]
 zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter
-zeno-fcis check [project.zeno] [--format human|json] [--require-substantive]
+zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
 zeno-fcis explain [project.zeno] [--code CODE] [--format human|json]
@@ -23,7 +23,11 @@ It also classifies every law and claim by
 [substance](CLAIM_SUBSTANCE.md). Human output warns on stderr about formulas
 that cannot constrain any transition. JSON output adds a `substance` object,
 and `--require-substantive` exits 1 with `status: "vacuous"` when any are
-found. `prove` prints a `scope:` line explaining that current obligations
+found. It also reports law and claim paths that name no declared type or
+field ([law path resolution](LAW_PATH_RESOLUTION.md)): human output warns on
+stderr, JSON output adds an `unresolved_paths` object, and
+`--require-resolved-paths` exits 1 with `status: "unresolved-paths"` when any
+are found. `prove` prints a `scope:` line explaining that current obligations
 contain no system model.
 `generate` replaces each deterministic Rust/manifest file atomically;
 `--check` writes nothing and reports drift. `graph` and `explain` are derived

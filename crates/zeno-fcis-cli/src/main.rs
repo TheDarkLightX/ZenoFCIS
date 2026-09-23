@@ -20,9 +20,10 @@ use zeno_fcis_formal_tools::{
     verify_tool,
 };
 use zeno_fcis_spec::{
-    ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, ProjectLimits, ProjectSpec,
-    SourceLimits, StableId, Substance, claim_substance, derive_composition, elaborate_project,
-    generate_project, law_substance, parse_project, render_graph,
+    ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, PathResolution, ProjectLimits,
+    ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits, StableId, Substance, claim_paths,
+    claim_substance, derive_composition, elaborate_project, generate_project, law_paths,
+    law_substance, parse_project, render_graph, resolve_path,
 };
 
 const JSON_SCHEMA: &str = "zeno-fcis/cli/1";
@@ -127,6 +128,9 @@ enum Command {
         /// Fail when any law or claim cannot constrain a transition.
         #[arg(long)]
         require_substantive: bool,
+        /// Fail when any law or claim path names no declared type or field.
+        #[arg(long)]
+        require_resolved_paths: bool,
     },
     /// Generate deterministic Rust and manifest artifacts, or check for drift.
     Generate {
@@ -266,7 +270,13 @@ fn run(command: Command) -> u8 {
             project,
             format,
             require_substantive,
-        } => check(&project, format, require_substantive),
+            require_resolved_paths,
+        } => check(
+            &project,
+            format,
+            require_substantive,
+            require_resolved_paths,
+        ),
         Command::Generate {
             project,
             out,
@@ -492,7 +502,12 @@ fn new_project(dir: &Path, template: Template) -> u8 {
     OK
 }
 
-fn check(path: &Path, format: OutputFormat, require_substantive: bool) -> u8 {
+fn check(
+    path: &Path,
+    format: OutputFormat,
+    require_substantive: bool,
+    require_resolved_paths: bool,
+) -> u8 {
     let spec = match project_or_report(path, format) {
         Ok(value) => value,
         Err(code) => return code,
@@ -505,7 +520,16 @@ fn check(path: &Path, format: OutputFormat, require_substantive: bool) -> u8 {
         }
     };
     let substance = SubstanceReport::of(&spec);
-    let refused = require_substantive && substance.vacuous_count() > 0;
+    let vacuous = require_substantive && substance.vacuous_count() > 0;
+    let paths = PathReport::of(&spec);
+    let unresolved = require_resolved_paths && paths.unresolved_count() > 0;
+    let status = if unresolved {
+        "unresolved-paths"
+    } else if vacuous {
+        "vacuous"
+    } else {
+        "valid"
+    };
     match format {
         OutputFormat::Human => {
             println!(
@@ -518,7 +542,14 @@ fn check(path: &Path, format: OutputFormat, require_substantive: bool) -> u8 {
                 derived.semantic_program_hash()
             );
             substance.warn();
-            if refused {
+            paths.warn();
+            if unresolved {
+                eprintln!(
+                    "error: --require-resolved-paths: {} path(s) name no declared type or field",
+                    paths.unresolved_count()
+                );
+            }
+            if vacuous {
                 eprintln!(
                     "error: --require-substantive: {} law(s) or claim(s) cannot constrain any transition",
                     substance.vacuous_count()
@@ -529,12 +560,113 @@ fn check(path: &Path, format: OutputFormat, require_substantive: bool) -> u8 {
             "claims": spec.claims().len(), "components": spec.components().len(),
             "path": path.display().to_string(), "project_id": spec.project_id().get(),
             "schema": JSON_SCHEMA, "semantic_program_hash": derived.semantic_program_hash().to_string(),
-            "status": if refused { "vacuous" } else { "valid" },
+            "status": status,
             "substance": substance.to_json(),
-            "unresolved_obligations": derived.obligations().len()
+            "unresolved_obligations": derived.obligations().len(),
+            "unresolved_paths": paths.to_json()
         })),
     }
-    if refused { INVALID } else { OK }
+    if unresolved || vacuous { INVALID } else { OK }
+}
+
+/// Law and claim paths that name no declared type or field, in declaration
+/// order.
+struct PathReport<'a> {
+    laws: Vec<(StableId, &'a str, &'a ProjectionPath, PathResolution)>,
+    claims: Vec<(StableId, &'a str, &'a ProjectionPath, PathResolution)>,
+}
+
+impl<'a> PathReport<'a> {
+    fn of(spec: &'a ProjectSpec) -> Self {
+        let unresolved = |id: StableId, name: &'a str, paths: Vec<&'a ProjectionPath>| {
+            paths
+                .into_iter()
+                .map(move |path| (id, name, path, resolve_path(spec, path)))
+                .filter(|(_, _, _, resolution)| resolution.is_unresolved())
+        };
+        Self {
+            laws: spec
+                .laws()
+                .iter()
+                .flat_map(|law| unresolved(law.id(), law.name().as_str(), law_paths(law)))
+                .collect(),
+            claims: spec
+                .claims()
+                .iter()
+                .flat_map(|claim| unresolved(claim.id(), claim.name().as_str(), claim_paths(claim)))
+                .collect(),
+        }
+    }
+
+    fn unresolved_count(&self) -> usize {
+        self.laws.len() + self.claims.len()
+    }
+
+    fn to_json(&self) -> Value {
+        let entries = |items: &[(StableId, &str, &ProjectionPath, PathResolution)]| {
+            items
+                .iter()
+                .map(|(id, name, path, resolution)| {
+                    json!({
+                        "code": resolution.code(), "id": id.get(), "name": name,
+                        "path": path_text(path)
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
+        json!({ "claims": entries(&self.claims), "laws": entries(&self.laws) })
+    }
+
+    fn warn(&self) {
+        for (kind, items) in [("law", &self.laws), ("claim", &self.claims)] {
+            for (id, name, path, resolution) in items {
+                eprintln!(
+                    "warning: {kind} {} {name} reads {}, but {}",
+                    id.get(),
+                    path_text(path),
+                    path_problem(path, *resolution)
+                );
+            }
+        }
+    }
+}
+
+fn path_text(path: &ProjectionPath) -> String {
+    let mut text = String::from(root_name(path.root()));
+    for segment in path.segments() {
+        text.push('.');
+        text.push_str(&segment.get().to_string());
+    }
+    text
+}
+
+const fn root_name(root: ProjectionRoot) -> &'static str {
+    match root {
+        ProjectionRoot::Pre => "pre",
+        ProjectionRoot::Post => "post",
+        ProjectionRoot::Command => "command",
+        ProjectionRoot::Context => "context",
+        ProjectionRoot::Effects => "effects",
+        ProjectionRoot::Outbox => "outbox",
+        ProjectionRoot::Events => "events",
+    }
+}
+
+fn path_problem(path: &ProjectionPath, resolution: PathResolution) -> String {
+    match resolution {
+        PathResolution::UnknownRootType { segment } => {
+            let kind = match path.root() {
+                ProjectionRoot::Command => "command",
+                ProjectionRoot::Context => "context",
+                _ => "state",
+            };
+            format!("{} is not a declared {kind} type", segment.get())
+        }
+        PathResolution::UnknownField { owner, segment } => {
+            format!("type {} declares no field {}", owner.get(), segment.get())
+        }
+        _ => String::from("it does not resolve"),
+    }
 }
 
 /// Syntactic substance of every authored law and claim, in declaration order.

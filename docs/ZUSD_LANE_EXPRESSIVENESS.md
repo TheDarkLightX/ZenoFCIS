@@ -58,7 +58,7 @@ separate semantic core.
 | 6 | Reason order | Not reproducible. See [Reason order](#reason-order). | Not applicable | Pinned Python authority |
 | 7 | Frame: fields a step leaves unchanged | Expressible only by listing every field. The deposit law needs 64 comparisons, 63 of them frame equalities. | Not applicable | Law 510 in the attempt |
 | 8 | Conservation over fixed fields | Expressible: supply conservation, liquidation collateral conservation, and the matching debt burn. Conservation across vaults would need collections, which v1 lacks. | Not representable | Laws 501, 511, and 512 |
-| 9 | Checked field references | Paths are not resolved against the schema. `post.100.999`, `command.101.777`, and `post.555.1.2.3` elaborate without a diagnostic. A mistyped field becomes a missing observation at evaluation. | Not applicable | `zeno_v1_accepts_formula_paths_that_name_no_declared_field` |
+| 9 | Checked field references | Elaboration does not resolve paths against the schema: `post.100.999`, `command.101.777`, and `post.555.1.2.3` elaborate without a diagnostic. `zeno-fcis check` now warns about them, and `--require-resolved-paths` refuses them ([law path resolution](LAW_PATH_RESOLUTION.md)). | Not applicable | `zeno_v1_accepts_formula_paths_that_name_no_declared_field` |
 | 10 | Unbounded command arguments | A bounded schema rejects a large argument at admission, where the native code rejects it through the action's own checks. The mounted `ZusdCommandV1` holds amounts as `u128`, so an argument of 2^128 or more is not representable. | Not representable | `ZusdCommandV1` |
 
 ### Reason order
@@ -110,7 +110,7 @@ Stating the lane needs at least these additions, whichever option is chosen:
 - per-action reason order, or first-failing-check semantics in the order the
   author writes;
 - a frame construct;
-- path resolution against the schema;
+- path resolution in elaboration (1.x `check` now reports unresolved paths);
 - minimum, conditional expressions, and local bindings;
 - evaluation beyond i128, and literals beyond u64.
 
