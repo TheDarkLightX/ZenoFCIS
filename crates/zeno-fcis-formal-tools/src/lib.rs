@@ -2492,6 +2492,31 @@ fn run_fixed(
     }
 }
 
+/// Starts `command`, retrying a bounded number of times while its executable
+/// is busy.
+///
+/// Linux refuses to execute a file that any process holds open for writing
+/// (`ETXTBSY`). A child that another thread forks while this process writes a
+/// private executable copy inherits that descriptor until it executes its own
+/// program, so the condition clears quickly. The copy is private and its bytes
+/// are already admitted, so running it later is the same run. Every other
+/// error, and a file that stays busy through the last attempt, fails closed.
+#[cfg(unix)]
+fn spawn_unless_busy(command: &mut Command) -> std::io::Result<Child> {
+    let busy = nix::errno::Errno::ETXTBSY as i32;
+    let mut delay = Duration::from_millis(1);
+    for _ in 0..8 {
+        match command.spawn() {
+            Err(error) if error.raw_os_error() == Some(busy) => {
+                thread::sleep(delay);
+                delay = delay.saturating_mul(2);
+            }
+            result => return result,
+        }
+    }
+    command.spawn()
+}
+
 #[cfg(unix)]
 fn run_fixed_unix(
     path: &Path,
@@ -2517,9 +2542,8 @@ fn run_fixed_unix(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     command.process_group(0);
-    let child = command
-        .spawn()
-        .map_err(|error| ToolFailure::Io(error.to_string()))?;
+    let child =
+        spawn_unless_busy(&mut command).map_err(|error| ToolFailure::Io(error.to_string()))?;
     let mut child = ContainedChild::new(child)?;
     let stdout = child
         .child
@@ -4048,6 +4072,56 @@ mod tests {
         for variant in variants {
             assert_ne!(left, variant.unwrap_or_else(|_| unreachable!()));
         }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn busy_executables_are_retried_briefly_then_fail_closed() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-busy-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap_or_else(|error| panic!("create busy root: {error}"));
+        let script = root.join("tool");
+        fs::write(&script, b"#!/bin/sh\nprintf ok\n")
+            .unwrap_or_else(|error| panic!("write busy tool: {error}"));
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o700))
+            .unwrap_or_else(|error| panic!("make busy tool executable: {error}"));
+        let hold = || {
+            OpenOptions::new()
+                .write(true)
+                .open(&script)
+                .unwrap_or_else(|error| panic!("hold busy tool: {error}"))
+        };
+
+        // A writer that closes soon, as an inherited descriptor does at its
+        // child's exec: the bounded retry reaches the tool.
+        let writer = hold();
+        let release = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(5));
+            drop(writer);
+        });
+        let output = run_fixed(&script, &[], None, 5_000, 4096)
+            .unwrap_or_else(|error| panic!("run briefly busy tool: {error:?}"));
+        release
+            .join()
+            .unwrap_or_else(|_| panic!("release busy tool"));
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"ok");
+
+        // A writer that stays open: every attempt fails and the run fails closed.
+        let writer = hold();
+        let failure = run_fixed(&script, &[], None, 5_000, 4096);
+        drop(writer);
+        assert!(
+            matches!(&failure, Err(ToolFailure::Io(message)) if message.contains("busy")),
+            "{:?}",
+            failure.map(|output| output.status)
+        );
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

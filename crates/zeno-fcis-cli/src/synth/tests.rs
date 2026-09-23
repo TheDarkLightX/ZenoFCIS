@@ -156,6 +156,43 @@ fn javascript_runner_refuses_an_unqualified_runtime_version() {
     assert_eq!(failure.code, "tool-version", "{}", failure.message);
 }
 
+#[test]
+fn runner_retries_a_briefly_busy_executable_then_fails_closed() {
+    use std::os::unix::fs::PermissionsExt;
+    let temp = runner::Temp::new().unwrap_or_else(|error| panic!("{}", error.message));
+    let stand_in = temp.path().join("node");
+    fs::write(&stand_in, "#!/bin/sh\necho v18.20.8\n").unwrap();
+    fs::set_permissions(&stand_in, fs::Permissions::from_mode(0o700)).unwrap();
+    let hold = || fs::OpenOptions::new().write(true).open(&stand_in).unwrap();
+    let run = || {
+        target("javascript")
+            .unwrap()
+            .runner
+            .run("", &[], Some(&stand_in))
+    };
+
+    // Released soon, as an inherited descriptor is at its child's exec: the
+    // stand-in starts and its unqualified version is refused as usual.
+    let writer = hold();
+    let release = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        drop(writer);
+    });
+    let Err(failure) = run() else {
+        panic!("unqualified runtime was admitted")
+    };
+    release.join().unwrap();
+    assert_eq!(failure.code, "tool-version", "{}", failure.message);
+
+    // Held throughout: the start fails closed.
+    let writer = hold();
+    let Err(failure) = run() else {
+        panic!("busy runtime was admitted")
+    };
+    drop(writer);
+    assert_eq!(failure.code, "tool-start", "{}", failure.message);
+}
+
 const COUNTER_PROGRAM: &[u8] =
     include_bytes!("../../templates/durable-counter/synthesized/program.zcve");
 
