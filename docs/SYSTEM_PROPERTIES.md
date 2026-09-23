@@ -42,8 +42,22 @@ question is yes:
 
 `system_verdict` asks a caller-supplied solver function for each answer in
 that order and returns one `SystemVerdict` with the same codes. The function
-parses its output with `parse_system_answer`. A satisfying model is accepted
-only after the program interpreter reproduces its failure.
+parses its output with `parse_system_answer(kind, stdout, inputs, outputs)`.
+A satisfying answer is a `SystemAnswer::Sat { input, output }`. The domain-only
+script also requests its proposed outputs (`free_out_0` onward); the other
+scripts leave `output` empty.
+
+A model is accepted only when all of these hold:
+
+- it has one value per variable, and every value lies inside its declared
+  domain;
+- the program interpreter reproduces the failure the model claims: a
+  totality failure on an admitted input, a false or undefined property on the
+  transition's actual output, or, for the domain-only control, a false or
+  undefined property on the proposed admitted input and output.
+
+Otherwise the result is `SystemSolveError::UnreplayableModel`, never a
+verdict.
 
 ## Authority boundary
 
@@ -72,10 +86,13 @@ program nodes.
 2. A property reaches `system-property` only when the domain-only control finds
    an admitted output tuple that violates it.
 3. Stages are reported in a fixed order: totality, then property, then the
-   domain-only control. Witnesses are the first failing input in canonical
-   lexicographic order.
-4. A solver model that the interpreter cannot reproduce is an error, never a
-   verdict.
+   domain-only control. Each stage covers every admitted input before the next
+   begins, so a property failure never hides a totality failure. Exhaustive
+   witnesses are the first failing input in canonical lexicographic order.
+4. A solver model that is outside the declared domains, has the wrong number
+   of values, or that the interpreter cannot reproduce is an error, never a
+   verdict. This includes domain-only models, whose proposed outputs are
+   replayed.
 
 ## Negative cases
 
@@ -92,6 +109,47 @@ then check:
   `[0, 3, 1, 1]`: a recorded failure at `pre.failures = 3`.
 - A solver that claims every script is satisfiable is refused, because the
   interpreter cannot reproduce its model.
+- A totality model outside the input domain, such as input 2 for a program
+  over {0, 1}, is refused. It used to be reported as a totality failure,
+  because the interpreter rejects it at its own domain check.
+- A domain-only model for a constant-true property is refused, because no
+  admitted pair makes the property false. It used to be accepted without
+  replay.
+- Doubling over {0, 1} with the property `post == 1` is `not-total` at input 1,
+  not `violated` at input 0.
+- Over a bounded collection of 80 cases, the solver route and the exhaustive
+  route return identical verdicts and witnesses. The cases are 10 one-input
+  programs over {0, 1, 2} and 8 properties, including one that traps. They
+  cover every verdict, and cases that fail totality on some inputs and the
+  property on others. The solver route here uses a reference that answers each
+  obligation by enumeration. The pinned CVC5 run repeats the collection and
+  requires the same stage.
+
+The last four cases come from an independent review of commit `521b768`. Its
+three probes are kept in `crates/zeno-fcis-formal-tools/tests/system_contract.rs`.
+
+## Controls
+
+Each critical check was removed in a working tree, and the named test failed.
+The edits were reverted; none is committed.
+
+| Check removed | Detected by |
+| --- | --- |
+| Totality decided on every input before the property | `totality_is_decided_on_every_input_before_any_property_result` |
+| Domain-only control (always `domain-implied`) | `transition_dependent_property_is_a_system_property` |
+| Domain-only control (always `system-property`) | `domain_only_control_reports_properties_the_domains_already_imply` |
+| Trapping tuples counted as violations in the control | `solver_route_agrees_with_exhaustive_route_on_small_programs` |
+| Admission of totality models | `solver_models_must_be_admitted_before_they_are_replayed` |
+| Replay of totality models | `system_verdict_rejects_models_the_interpreter_cannot_replay` |
+| Replay of property models | `solver_models_must_be_admitted_before_they_are_replayed` |
+| Replay of domain-only models | `domain_only_models_are_replayed_with_their_proposed_outputs` |
+| Admission of proposed domain-only outputs | `domain_only_models_are_replayed_with_their_proposed_outputs` |
+| Totality handled before the property answer | `solver_route_agrees_with_exhaustive_route_on_small_programs` |
+| Output domains kept out of the totality assumption | `system_obligations_never_assume_output_domains_for_totality` |
+
+Two first attempts were not valid controls, and were redone. One named a test
+that could not observe the removed check. The other edit left the checked
+answer unchanged.
 
 ## Assumptions
 
@@ -110,3 +168,8 @@ then check:
   property is the right requirement.
 - Local runs with an unpinned solver are supplemental. The pinned CVC5 run is
   in the formal-tools workflow.
+- The reference-solver comparison checks how answers are validated, replayed,
+  and combined. Only the pinned CVC5 runs check the SMT encoding itself, and
+  only over the collections they cover.
+- A positive SMT verdict still rests on the solver's unchecked `unsat` answers
+  for totality and the property. Only the witnesses are replayed.

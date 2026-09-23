@@ -19,7 +19,10 @@ Feature: Report evidence that cannot distinguish system behavior
     Then transition-dependent properties are system properties
     And a property the output domains already imply is reported as domain-implied
     And a planted guard bug is reported as not total at its first input
-    And an unreplayable solver model is refused
+    And totality is decided on every input before any property result
+    And a solver model outside the declared domains, or one that does not replay, is refused
+    And a domain-only model is replayed with its proposed outputs
+    And the solver and exhaustive routes agree on a bounded collection of small programs
 
   @atdd-reserved-domains
   Scenario: Keep project commitment domains out of the library namespace

@@ -317,7 +317,7 @@ fn pinned_counter_system_smt_agrees_with_exhaustive_check() {
             .spawn()
             .unwrap();
         child.stdin.take().unwrap().write_all(script).unwrap();
-        parse_system_answer(kind, &child.wait_with_output().unwrap().stdout, 4)
+        parse_system_answer(kind, &child.wait_with_output().unwrap().stdout, 4, 6)
     };
     let properties = [
         vec![Op::Input(6), Op::Input(1), Op::Lt(0, 1), Op::Not(2)],

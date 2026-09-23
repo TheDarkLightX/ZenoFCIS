@@ -108,6 +108,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Check properties against the exact finite transition program",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--lib", "--locked", "system::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--lib", "--locked", "system::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--test", "system_contract", "--locked"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "counter_system_properties")),
     ),
     "reserved-domains": AcceptanceScenario(
