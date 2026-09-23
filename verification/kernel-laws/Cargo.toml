@@ -1,0 +1,17 @@
+[package]
+name = "zeno-fcis-kernel-laws"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "Property harnesses for ZenoFCIS kernel laws"
+
+[dependencies]
+
+[dev-dependencies]
+bolero = "=0.13.4"
+zeno-fcis-codec = { version = "=1.1.0", path = "../../crates/zeno-fcis-codec" }
+zeno-fcis-core = { version = "=1.1.0", path = "../../crates/zeno-fcis-core" }
+zeno-fcis-patch = { version = "=1.1.0", path = "../../crates/zeno-fcis-patch" }
+zeno-fcis-value = { version = "=1.1.0", path = "../../crates/zeno-fcis-value" }

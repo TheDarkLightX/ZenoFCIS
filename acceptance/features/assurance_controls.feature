@@ -51,3 +51,10 @@ Feature: Report evidence that cannot distinguish system behavior
     Then each unresolved path is reported with its law or claim and the missing type or field
     And the resolved-paths requirement refuses the project
     And every shipped example and template resolves without warnings
+
+  @atdd-kernel-laws
+  Scenario: Check kernel laws exhaustively over small stated domains
+    Given one predicate each for budget charges, reason choice, canonical decoding, and patch overlap
+    When each predicate is enumerated over its stated small domain
+    Then every case satisfies its law
+    And each harness enumerates exactly its stated number of cases

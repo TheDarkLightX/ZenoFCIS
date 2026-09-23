@@ -1,0 +1,5 @@
+# Kernel law harnesses, kept out of the main workspace so their dependencies
+# never enter the published crates' lockfile.
+[workspace]
+resolver = "3"
+members = ["kernel-laws"]

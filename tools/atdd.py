@@ -125,6 +125,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--lib", "--locked", "paths::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "cli_adopter_flow", "--locked", "law_and_claim_paths")),
     ),
+    "kernel-laws": AcceptanceScenario(
+        "Check kernel laws exhaustively over small stated domains",
+        (("cargo", "+1.97.1", "test", "--manifest-path", "verification/Cargo.toml", "--locked", "holds_on_every_small_input"),),
+    ),
     "zusd-lane-gaps": AcceptanceScenario(
         "Pin what the zeno language cannot state about the zUSD lane",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--test", "zusd_lane_gaps", "--locked"),),

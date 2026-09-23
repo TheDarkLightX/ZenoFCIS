@@ -50,7 +50,7 @@ python3 tools/rc_package.py self-test
 python3 tools/rc_package.py check
 ```
 
-Permanent CI adds `no_std`, Miri, fuzz-build, supply-chain, source-manifest,
+Permanent CI adds `no_std`, Miri, fuzz-build, kernel-laws, supply-chain, source-manifest,
 mounted-runtime, persistence, adopter-acceptance, deterministic developer
 guardrails, and assurance-specific gates. See
 [`docs/ACCEPTANCE_TESTING.md`](docs/ACCEPTANCE_TESTING.md) and
