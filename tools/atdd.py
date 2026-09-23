@@ -116,6 +116,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "project_state_domains_cannot_enter_the_reserved_namespace"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-adapter-zenodex", "--lib", "--locked", "precondition_hash_matches_the_explicit_value_domain")),
     ),
+    "zusd-lane-gaps": AcceptanceScenario(
+        "Pin what the zeno language cannot state about the zUSD lane",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--test", "zusd_lane_gaps", "--locked"),),
+    ),
     "generated-application": AcceptanceScenario(
         "Run an authored application through durable authorization",
         (("python3", "tools/test_generated_application.py"),

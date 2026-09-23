@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Record what `.zeno` v1 and the `finite-i64/1` IR can state about the
+  single-vault zUSD lane. A `.zeno` v1 attempt states the lane's 32 fields,
+  46 reasons, invariants and conservation laws, and six characterization
+  tests pin what it cannot state: the reason a rejection carries, per-action
+  reason order, products beyond i128, literals beyond u64, a leading
+  parenthesized scalar, and field paths the schema does not declare.
+
 - Add design records under `docs/adr/`: the meaning-first assurance review,
   the principles for the V2 assurance program, a five-level vocabulary for
   the epistemic status of evidence that classifies the V1.1 status and

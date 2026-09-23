@@ -28,3 +28,11 @@ Feature: Report evidence that cannot distinguish system behavior
     Then names inside the reserved namespace are rejected
     And names outside it and the V1 constructors are unchanged
     And the zUSD patch precondition hash stays byte-identical
+
+  @atdd-zusd-lane-gaps
+  Scenario: Pin what the zeno language cannot state about the zUSD lane
+    Given the single-vault zUSD lane written in zeno version 1 from the pinned native semantics
+    When its laws are evaluated with the library evaluator on concrete states
+    Then an effect law holds for an accepted and a rejected deposit alike
+    And the solvency law overflows inside the declared domain
+    And unresolved paths, literals beyond u64, and a leading parenthesized scalar behave as recorded

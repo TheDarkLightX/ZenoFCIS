@@ -119,6 +119,7 @@ and other tools can use the same public boundaries.
 - [0002: Principles for the V2 assurance program](adr/0002-principles.md)
 - [0003: Epistemic status of evidence and witnesses](adr/0003-epistemic-status.md)
 - [0004: V2 ledger of deferred breaking changes](adr/0004-v2-ledger.md)
+- [zUSD lane expressiveness with V1 representations](ZUSD_LANE_EXPRESSIVENESS.md)
 
 ## Status
 
