@@ -50,6 +50,14 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         include_bytes!("../templates/durable-counter/tests/laws.rs"),
     ),
     (
+        "tests/conformance.rs",
+        include_bytes!("../templates/durable-counter/tests/conformance.rs"),
+    ),
+    (
+        "tests/decision-examples.txt",
+        include_bytes!("../templates/durable-counter/tests/decision-examples.txt"),
+    ),
+    (
         "synthesis.json",
         include_bytes!("../templates/durable-counter/synthesis.json"),
     ),

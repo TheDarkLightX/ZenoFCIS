@@ -63,6 +63,8 @@ fn cli_durable_counter_emits_a_complete_project_without_overwriting() {
         "src/laws.rs",
         "src/delivery.rs",
         "tests/lifecycle.rs",
+        "tests/conformance.rs",
+        "tests/decision-examples.txt",
         "synthesis.json",
         "synthesized/transition.rs",
         "synthesized/manifest.json",
