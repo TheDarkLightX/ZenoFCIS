@@ -6,6 +6,12 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Correct overstated claims found by an independent review of 521b768. The
+  zUSD record's outcome and reason-order findings are scoped, with the
+  reviewer's guarded-deposit counterexample kept as a test, and design record
+  0003 now states the scope, assumptions, and trusted base of every
+  classification.
+
 - Make the system-property checkers honor their stated contracts. The
   exhaustive checker decides totality on every admitted input before any
   property result. `system_verdict` refuses solver models with the wrong
@@ -41,10 +47,12 @@ embedded in ZenoFCIS values.
 
 - Record what `.zeno` v1 and the `finite-i64/1` IR can state about the
   single-vault zUSD lane. A `.zeno` v1 attempt states the lane's 32 fields,
-  46 reasons, invariants and conservation laws, and six characterization
-  tests pin what it cannot state: the reason a rejection carries, per-action
-  reason order, products beyond i128, literals beyond u64, a leading
-  parenthesized scalar, and field paths the schema does not declare.
+  46 reasons, invariants, conservation laws, and a guarded deposit law that
+  matches four native outcomes. Characterization tests pin what v1 cannot
+  state directly: the reason code a rejection carries, products beyond i128,
+  literals beyond u64, a leading parenthesized scalar, and field paths the
+  schema does not declare. The record scopes its reason-order findings to how
+  a program records failures, after an independent review of 521b768.
 
 - Add design records under `docs/adr/`: the meaning-first assurance review,
   the principles for the V2 assurance program, a five-level vocabulary for

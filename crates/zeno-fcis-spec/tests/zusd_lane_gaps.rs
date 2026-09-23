@@ -141,11 +141,11 @@ fn zusd_lane_declares_every_state_field_and_reason_in_registry_order() {
             reason.name().as_str()
         );
     }
-    assert_eq!(spec.laws().len(), 8);
+    assert_eq!(spec.laws().len(), 9);
 }
 
 #[test]
-fn zusd_lane_laws_cannot_tell_an_accepted_deposit_from_a_rejected_one() {
+fn zusd_lane_unguarded_effect_law_admits_both_outcomes() {
     let spec = elaborate(LANE);
     let pre = vault();
     let mut accepted = pre;
@@ -153,8 +153,10 @@ fn zusd_lane_laws_cannot_tell_an_accepted_deposit_from_a_rejected_one() {
     let mut over_credited = accepted;
     over_credited[COLLATERAL] += 1;
 
-    // No law can observe the decision, so the effect law must admit both
-    // outcomes. It still rejects a wrong effect.
+    // Law 510 states "the effect happened, or nothing changed" without the
+    // acceptance conditions, so it admits both outcomes. That is a weak
+    // example law, not a language limit: law 513 below states the conditions.
+    // It still rejects a wrong effect.
     assert_eq!(
         law(&spec, 510, &step(&pre, &accepted, E8)),
         EvalOutcome::True
@@ -219,4 +221,120 @@ fn zeno_v1_integer_literals_stop_at_the_u64_range() {
 fn zeno_v1_comparisons_cannot_start_with_a_parenthesized_scalar() {
     assert!(!parse_codes(&with_law("(post.100.110 + 1) * 2 == 4")).is_empty());
     assert!(parse_codes(&with_law("2 * (post.100.110 + 1) == 4")).is_empty());
+}
+
+/// Native outcomes of `deposit_collateral` from the pinned ZenoDEX Python
+/// authority (commit e3cf1aad40e487893230ae0c55f1f0dda62f9955, `_step_python`).
+struct NativeDeposit {
+    case: &'static str,
+    pre: [i128; STATE_FIELDS],
+    amount: i128,
+    accepted: bool,
+}
+
+fn native_deposits() -> Vec<NativeDeposit> {
+    let mut bad_debt = vault();
+    bad_debt[PRICE] = 1;
+    bad_debt[PRICE_PENDING] = 1;
+    let mut full = bad_debt;
+    full[COLLATERAL] = 10_i128.pow(30);
+    vec![
+        // Accepted: collateral 10e8 becomes 11e8, and nothing else changes.
+        NativeDeposit {
+            case: "normal deposit",
+            pre: vault(),
+            amount: E8,
+            accepted: true,
+        },
+        // "amount_e8 must be a positive int".
+        NativeDeposit {
+            case: "zero amount",
+            pre: vault(),
+            amount: 0,
+            accepted: false,
+        },
+        // "invariant violation: inv_system_no_bad_debt".
+        NativeDeposit {
+            case: "bad debt after deposit",
+            pre: bad_debt,
+            amount: E8,
+            accepted: false,
+        },
+        // "collateral_e8 exceeds MAX_AMOUNT_E8".
+        NativeDeposit {
+            case: "beyond the bound",
+            pre: full,
+            amount: 1,
+            accepted: false,
+        },
+    ]
+}
+
+#[test]
+fn zusd_lane_guarded_deposit_law_matches_native_outcomes() {
+    // Law 513 restates the native acceptance conditions for a deposit: the
+    // pre-state shape, a positive amount, the stored-amount bound, and the
+    // post-state invariants. It requires the effect when they hold, and an
+    // unchanged state otherwise, so it tells the two outcomes apart without
+    // observing the decision.
+    let spec = elaborate(LANE);
+    for deposit in native_deposits() {
+        // A rejected zero deposit would credit nothing, so its wrong outcome
+        // credits one unit instead.
+        let mut credited = deposit.pre;
+        credited[COLLATERAL] += deposit.amount.max(1);
+        let (native, other) = if deposit.accepted {
+            (credited, deposit.pre)
+        } else {
+            (deposit.pre, credited)
+        };
+        let check = |post| law(&spec, 513, &step(&deposit.pre, post, deposit.amount));
+        assert_eq!(
+            check(&native),
+            EvalOutcome::True,
+            "{} native outcome",
+            deposit.case
+        );
+        assert_eq!(
+            check(&other),
+            EvalOutcome::False,
+            "{} other outcome",
+            deposit.case
+        );
+    }
+    // At a realistic price, the same guard overflows near the stored-amount
+    // bound: strict connectives evaluate every conjunct (finding 2).
+    let mut full = vault();
+    full[COLLATERAL] = 10_i128.pow(30);
+    assert_eq!(
+        law(&spec, 513, &step(&full, &full, 1)),
+        EvalOutcome::Indeterminate(IndeterminateReason::Overflow)
+    );
+}
+
+#[test]
+fn reviewer_guarded_law_distinguishes_required_deposit_from_unchanged_state() {
+    // Counterexample from the independent review of 521b768, kept in its
+    // form: guarding on one exact pre-state already separates the accepted
+    // deposit from an unchanged state.
+    let pre = vault();
+    let mut accepted = pre;
+    accepted[COLLATERAL] += E8;
+    let mut guards: Vec<String> = pre
+        .iter()
+        .enumerate()
+        .map(|(index, value)| format!("pre.100.{} == {value}", 110 + index))
+        .collect();
+    guards.push(format!("command.101.150 == {DEPOSIT_COLLATERAL}"));
+    guards.push(format!("command.101.151 == {E8}"));
+    let formula = format!(
+        "{} -> post.100.116 == pre.100.116 + command.101.151",
+        guards.join(" && ")
+    );
+    let spec = elaborate(&with_law(&formula));
+    assert_eq!(
+        law(&spec, 900, &step(&pre, &accepted, E8)),
+        EvalOutcome::True
+    );
+    assert_eq!(law(&spec, 900, &step(&pre, &pre, E8)), EvalOutcome::False);
 }

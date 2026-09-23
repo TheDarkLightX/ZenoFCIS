@@ -84,7 +84,9 @@ The random harnesses use bolero's default iteration count and cap each input:
 
 - An exhaustive result is complete only for its stated domain. In the terms of
   [design record 0003](adr/0003-epistemic-status.md), it is Proved for that
-  domain. Beyond it, the random results are Checked samples.
+  domain, with the Rust compiler, the kernel crate, and the predicate as a
+  statement of the law as its trusted base. Beyond the domain, the random
+  results are Checked samples.
 - The harnesses do not yet run under a fuzzing engine or Kani. The predicates
   are written so they can.
 - The other kernel laws are not covered yet.

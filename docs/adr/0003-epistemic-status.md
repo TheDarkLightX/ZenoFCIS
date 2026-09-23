@@ -5,6 +5,15 @@
 Accepted on 2026-09-23. This record defines the vocabulary and classifies the
 V1.1 types. Computing levels in code is later work (see Consequences).
 
+Amended on 2026-09-23 after an independent review of commit `521b768`. The
+changes:
+
+- every classification names its scope, assumptions, and trusted base;
+- the composite rule states when it applies;
+- `ValidatedCoverage` is classified per variant;
+- `SystemVerdict` witnesses count as Checked only because models are now
+  checked against their declared domains before replay.
+
 ## Context
 
 V1 names its results after who produced them or after the tool's own word:
@@ -34,12 +43,22 @@ never from a name.
 | Proved | The claim holds for every input in its stated scope. A small, named trusted base re-checks the argument: exhaustive enumeration by a library interpreter, or a proof checked by a proof checker. A solver's bare `unsat` is not enough. |
 | Accepted | A named owner accepts a residual risk that no evidence covers. It is a decision, not evidence, and it is outside the order of the other levels. |
 
+A level alone is not a classification. Each one also states:
+
+- **scope**: the statement and the inputs it covers;
+- **assumptions**: what must be true for the result to mean what it says;
+- **trusted base**: the code, tools, and components a reader must trust.
+
 Identified, Attested, Checked, and Proved are ordered from weakest to strongest.
 Three rules apply:
 
-1. **A composite claim has the lowest level among the parts it relies on.**
-   Authorization re-executes the program (Checked), but law satisfaction comes
-   from the project's law engine (Attested). So "this commit satisfies the
+1. **A composite claim is at most as strong as its weakest part, and only
+   when the parts fit together.** The parts must cover the same scope, their
+   assumptions must be discharged or carried forward, and the step that joins
+   them must itself be established. Otherwise the composite has no level until
+   that step is checked. For example, authorization re-executes the program
+   (Checked), while law satisfaction comes from the project's law engine
+   (Attested). Both concern the same invocation, so "this commit satisfies the
    project laws" is Attested.
 2. **Scope is part of the claim.** A Proved result about a model-free
    obligation holds for every system alike. It establishes its statement, but
@@ -56,65 +75,71 @@ Three rules apply:
 
 Admission and integrity:
 
-| Type | Claim | Level | Why |
+| Type | Claim and scope | Level | Trusted base and assumptions |
 | --- | --- | --- | --- |
-| `BoundedVec` | Length is within the declared bounds | Checked | Constructors check the length |
-| `AdmittedValue`, `AdmittedEnvelope` | The value is canonical and within the default limits | Checked | Construction runs one complete validation |
-| `VerifiedProvider` | The hash provider computes the fixed known answers | Checked | The library runs the known-answer suite in this build. It is not binary or hardware attestation. |
-| `ProviderParityReport` | Two providers agree on the bytes checked | Checked | The library compares their outputs |
-| `ValidatedNormalizedDecision` | The decision matches its receipt or bundle, pre-state root, and bindings | Checked | The library decodes the artifacts and rebuilds the decision |
+| `BoundedVec` | This vector's length lies within the declared bounds | Checked | The constructors check the length. |
+| `AdmittedValue`, `AdmittedEnvelope` | This value is canonical and within the default limits | Checked | Construction runs one complete validation in the value and codec crates. |
+| `VerifiedProvider` | This hash provider computes the fixed known answers in this build | Checked | Scope: the fixed vectors, in the current process. It is not binary or hardware attestation. |
+| `ProviderParityReport` | Two providers agree on the bytes checked | Checked | Scope: those bytes only. |
+| `ValidatedNormalizedDecision` | This decision matches its receipt or bundle, pre-state root, and bindings | Checked | The library decodes the artifacts and rebuilds the decision. It says nothing about whether the decision is right. |
 
 Authorization:
 
-| Type | Claim | Level | Why |
+| Type | Claim and scope | Level | Trusted base and assumptions |
 | --- | --- | --- | --- |
-| `CatalogAuthorizedTransition`, `CatalogAuthorizedReject` | The decision is the program's output for this invocation, and bindings and chain are coherent | Checked | The authority re-executes the program and compares |
-| | The project laws hold for this invocation | Attested | `LawStatus` values come from the bound `ProjectLawEngine` |
-| | The program is the reviewed build | Identified | `CatalogTransitionProgram::transition_build_hash` is reported by the program and only compared with the policy |
-| `CatalogAuthorizedGenesis` | The initial state passes schema admission | Checked | Library schema validation |
-| | Genesis laws hold | Attested | `ProjectLawEngine::evaluate_genesis` |
-| `CatalogAuthorizedAuthenticatedCommit` | The projection relation holds | Attested | `ProjectionRelationEvaluation` comes from a `ProjectionRelationEngine` |
-| `TransitionResourceReport`, `MachineExecutionReport` | Usage is within the limits | Attested | Limits are checked against a usage figure the caller supplies |
+| `CatalogAuthorizedTransition`, `CatalogAuthorizedReject` | The decision is the program's output for this invocation, and its bindings and chain are coherent | Checked | The authority re-executes the program and compares. Trusted: the authority crate and the program's own code. Assumes the program is deterministic. |
+| | The project laws hold for this invocation | Attested | `LawStatus` values come from the bound `ProjectLawEngine`, which is trusted. |
+| | The program is the reviewed build | Identified | `CatalogTransitionProgram::transition_build_hash` is reported by the program and only compared with the policy. |
+| `CatalogAuthorizedGenesis` | The initial state passes schema admission | Checked | Library schema validation. |
+| | Genesis laws hold | Attested | `ProjectLawEngine::evaluate_genesis`, which is trusted. |
+| `CatalogAuthorizedAuthenticatedCommit` | The projection relation holds for this commit | Attested | A `ProjectionRelationEngine` reports the `ProjectionRelationEvaluation`. |
+| `TransitionResourceReport`, `MachineExecutionReport` | Usage is within the limits | Attested | Limits are checked against a usage figure that the caller supplies. |
 | `BoundDeliveryInterpreter` | The delivery interpreter is correct | Identified | Any value of the interpreter type can be bound. Its identity is not checked when it is bound. |
 
 Pluggable verifiers and tools:
 
-| Type | Claim | Level | Why |
+| Type | Claim and scope | Level | Trusted base and assumptions |
 | --- | --- | --- | --- |
-| `LawStatus` | One law's verdict for one invocation | Attested | Reported by the project law engine |
-| `VerifiedProjectLaws` | The law manifest matches the catalog's requirements | Checked | Library validation |
-| | The law engine is the reviewed build | Identified | `engine_build_hash` is a caller-supplied argument |
-| `VerifiedLawEvidence`, `LawProofDecision` | The retained artifact establishes the law's proof subject | Attested | `LawEvidenceVerifier` receives the artifact bytes, but the library does not recheck its answer |
-| `VerifiedBackendRun` | The response is well formed for the request and backend identity | Checked | `BackendResponse::validate_for` |
-| | The response is correct | Attested | `BackendVerifier` returns a `VerificationDecision` |
-| `BackendOutcome`, `VerificationDecision` | The backend's result, and the verifier's decision on it | Attested | Reported by the mounted backend and the pluggable verifier |
-| `CompleteFootprintWitness`, `DecisionCoverageStatus` | The static footprint covers every admitted input, including classes claimed unreachable | Attested | `FootprintEvidenceVerifier::verify` returns a Boolean for a claim and an artifact hash |
-| `ParallelParityEvidence` | Parallel and sequential execution agree | Attested | The caller supplies the compared hashes |
-| `EvidenceResult` | A tool's outcome | Attested | Recorded as the tool reported it |
-| `ValidatedRefinementCase`, `RefinementReport` | Model and runtime agree on this case | Checked | The library compares the decisions. It says nothing about other inputs or about the model. |
-| `ValidatedCoverage` | Coverage of the input domain | Attested | Exhaustive and proof-assisted coverage rest on `ToolEvidence`. Bounded coverage samples the domain. |
+| `LawStatus` | One law's verdict for one invocation | Attested | Reported by the project law engine. |
+| `VerifiedProjectLaws` | The law manifest matches the catalog's requirements | Checked | Library validation. |
+| | The law engine is the reviewed build | Identified | `engine_build_hash` is a caller-supplied argument. |
+| `VerifiedLawEvidence`, `LawProofDecision` | The retained artifact establishes the law's proof subject | Attested | `LawEvidenceVerifier` receives the artifact bytes, but the library does not recheck its answer. |
+| `VerifiedBackendRun` | The response is well formed for the request and backend identity | Checked | `BackendResponse::validate_for`. |
+| | The response is correct | Attested | `BackendVerifier` returns a `VerificationDecision`. |
+| `BackendOutcome`, `VerificationDecision` | The backend's result, and the verifier's decision on it | Attested | Reported by the mounted backend and the pluggable verifier. |
+| `CompleteFootprintWitness`, `DecisionCoverageStatus` | The static footprint covers every admitted input, including classes claimed unreachable | Attested | `FootprintEvidenceVerifier::verify` returns a Boolean for a claim and an artifact hash. |
+| `ParallelParityEvidence` | Parallel and sequential execution agree | Attested | The caller supplies the compared hashes. |
+| `EvidenceResult` | A tool's outcome | Attested | Recorded as the tool reported it. |
+| `ValidatedRefinementCase`, `RefinementReport` | Model and runtime agree on this case | Checked | Scope: this case. It says nothing about other inputs or about the model's correctness. |
+| `ValidatedCoverage::Exhaustive` | Every manifest input was replayed exactly once | Checked | The strict promotion path compares the cases with the manifest. |
+| | The manifest enumerates the whole input domain | Attested | Rests on the variant's `ToolEvidence`. |
+| `ValidatedCoverage::Bounded` | The nonempty case set stays within its budget | Checked | It makes no completeness claim. Each case is Checked on its own. |
+| `ValidatedCoverage::ProofAssisted` | A theorem covers the input domain | Attested | Rests on the theorem's tool evidence. |
 
 Formal results:
 
-| Type | Claim | Level | Why |
+| Type | Claim and scope | Level | Trusted base and assumptions |
 | --- | --- | --- | --- |
-| `ToolRunStatus::ProposedUnsat` | The exported obligation is valid | Attested | cvc5's answer and proof text are not checked |
-| `ToolRunStatus::KernelChecked` | The exported obligation is valid | Proved | The Lean kernel checks the proof. The scope is `without-system-model`. |
-| `ToolRunStatus::Refuted` | The claim is false at this observation assignment | Checked | The model is replayed through the evaluator. It may be unreachable in the system. |
-| `finite::Outcome::Selected` | The program satisfies the contract on every admitted input | Proved | Exhaustive check. Trusted base: the `finite-i64/1` interpreter. |
-| `finite::Outcome::NoSolution` | No program in the grammar satisfies the contract | Proved | Every candidate is refuted |
-| `finite::Outcome::Unrealizable`, `finite::Witness` | This input has no admitted output, or this candidate fails here | Checked | Concrete witness |
-| `VerifiedCompletion` | Every state has a strictly decreasing path to a terminal state | Proved | `verify_completion` checks every row and command. Trusted base: the interpreter. |
+| `ToolRunStatus::ProposedUnsat` | The exported SMT obligation is valid | Attested | cvc5's `unsat` answer. Its proof text is not checked. |
+| `ToolRunStatus::KernelChecked` | The exported Lean theorem holds | Proved | Scope: the theorem as emitted, over observation assignments without a system model. Trusted: the pinned Lean kernel and runtime, the axioms the check allows, and the translation from `.zeno` to Lean. |
+| `ToolRunStatus::Refuted` | The claim is false at this observation assignment | Checked | The model is replayed through the evaluator. The assignment may be unreachable in the system. |
+| `finite::Outcome::Selected` | The program satisfies the contract on every admitted input | Proved | Exhaustive check. Trusted: the `finite-i64/1` interpreter and enumeration. |
+| `finite::Outcome::NoSolution` | No program in the grammar satisfies the contract | Proved | Every candidate is refuted. Same trusted base. |
+| `finite::Outcome::Unrealizable`, `finite::Witness` | This input has no admitted output, or this candidate fails here | Checked | Concrete witness. |
+| `VerifiedCompletion` | Every state has a strictly decreasing path to a terminal state | Proved | `verify_completion` checks every row and command. Trusted: the interpreter. |
 
-Types added on this branch:
+Results added on this branch:
 
-| Type | Claim | Level | Why |
+| Result | Claim and scope | Level | Trusted base and assumptions |
 | --- | --- | --- | --- |
-| `Substance` | The formula's value cannot depend on a transition | Checked | Syntactic classification. It is diagnostic only. |
-| `SystemCheck::SystemProperty`, `SystemCheck::DomainImplied` | The property holds on every admitted input, and it does or does not depend on the transition | Proved | Exhaustive enumeration. Trusted base: the interpreter. |
-| `SystemCheck::NotTotal`, `Violated`, `Undefined` | Failure at this input | Checked | The interpreter produced the witness |
+| `Substance` | The formula's value cannot depend on a transition | Checked | Syntactic and diagnostic only. Assumes every observation is present and evaluation stays within its limits. |
+| `PathResolution` | The path names declared types and fields | Checked | Names only, not how a law engine binds values to paths. |
+| `SystemCheck::SystemProperty`, `SystemCheck::DomainImplied` | The property holds on every admitted input of the finite program, and does or does not depend on the transition | Proved | Scope: the finite program and its declared domains. Trusted: the interpreter and enumeration. Assumes the program's inputs model the executed invocation; the Rust adapter is outside this scope. |
+| `SystemCheck::NotTotal`, `Violated`, `Undefined` | Failure at this input | Checked | The interpreter produced the witness. |
 | `SystemVerdict::SystemProperty`, `SystemVerdict::DomainImplied` | As for `SystemCheck` | Attested | Totality, the property, and `domain-implied` rest on solver `unsat` answers that nothing rechecks. The domain-only witness behind `system-property` is replayed. The pinned differential tests compare the routes over stated collections. |
 | `SystemVerdict::NotTotal`, `Violated`, `Undefined` | Failure at this input | Checked | The model's values are checked against the declared domains, then the interpreter reproduces the failure. Before this check, an input outside the domain was reported as a totality failure. |
+| Exhaustive kernel law harness | The law holds on every input of its stated domain | Proved | Trusted: the Rust compiler, the kernel crate, and the harness predicate as a statement of the law. |
+| Random kernel law harness | The law holds on the sampled inputs | Checked | A sample; each run draws fresh inputs. |
 
 `SystemCheck` and `SystemVerdict` share verdict codes but not levels. This is
 intended: the level follows the route, not the code.
@@ -124,9 +149,9 @@ package's "Assumptions" and "Explicit nonclaims" sections.
 
 ## Consequences
 
-- New status types state the level of each claim they support in their
-  documentation. They use `Verified`, `Proved`, or `Proven` in a name only for
-  Checked or Proved claims.
+- New status types state the level, scope, assumptions, and trusted base of
+  each claim they support in their documentation. They use `Verified`,
+  `Proved`, or `Proven` in a name only for Checked or Proved claims.
 - The V1 names stay for compatibility. Renaming is recorded in the
   [V2 ledger](0004-v2-ledger.md).
 - A later assurance-case package computes levels in code from evidence kind and
@@ -148,5 +173,9 @@ The classifications follow these constructors and signatures:
 - `verify_complete_footprint` accepts `FootprintEvidenceVerifier::verify`.
 - `bind_delivery_interpreter` binds any value of the interpreter type.
 - `replay_model` replays solver models.
+- `ValidatedCoverage::Bounded` is documented as "a nonempty bounded case set
+  without a completeness claim".
 - `verify_completion` checks every state row.
 - `check_system_property` enumerates every admitted input.
+- `system_verdict` checks every model against the declared domains before
+  replaying it.
