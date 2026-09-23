@@ -141,7 +141,8 @@ impl SystemCheck {
 
 /// Checks `property` against `transition` on every admitted input.
 ///
-/// The check has three stages, reported in this order:
+/// The check has three stages. Each stage covers every admitted input before
+/// the next begins, and results are reported in this order:
 ///
 /// 1. Totality: every admitted input must yield a defined output inside the
 ///    declared output domains.
@@ -167,6 +168,13 @@ pub fn check_system_property(
     let inputs = property.input_space()?.cardinality();
     if inputs > limits.max_inputs {
         return Err(Error::Limit("system-inputs"));
+    }
+    // Totality is decided on every admitted input before any property result,
+    // so a property failure never hides a later totality failure.
+    for input in property.input_space()? {
+        if transition.evaluate(&input).is_err() {
+            return Ok(SystemCheck::NotTotal { input });
+        }
     }
     for input in property.input_space()? {
         let Ok(output) = transition.evaluate(&input) else {
@@ -298,6 +306,37 @@ mod tests {
         assert_eq!(
             check_system_property(&counter(4), &monotone(), SystemLimits::default()),
             Ok(SystemCheck::NotTotal { input: vec![3] })
+        );
+    }
+
+    #[test]
+    fn totality_is_decided_on_every_input_before_any_property_result() {
+        // Doubling over {0, 1}: input 0 violates `post == 1`, and input 1
+        // leaves the output domain. The totality failure is reported even
+        // though the property fails at an earlier input.
+        let bit = Domain::Int { min: 0, max: 1 };
+        let double = Program::try_new(
+            vec![bit],
+            vec![bit],
+            vec![Op::Input(0), Op::Add(0, 0)],
+            vec![1],
+        )
+        .unwrap_or_else(|error| panic!("double program: {error:?}"));
+        let is_one = Contract::try_new(
+            vec![bit],
+            vec![bit],
+            Program::try_new(
+                vec![bit, bit],
+                vec![Domain::Bool],
+                vec![Op::Input(1), Op::Int(1), Op::Eq(0, 1)],
+                vec![2],
+            )
+            .unwrap_or_else(|error| panic!("relation: {error:?}")),
+        )
+        .unwrap_or_else(|error| panic!("contract: {error:?}"));
+        assert_eq!(
+            check_system_property(&double, &is_one, SystemLimits::default()),
+            Ok(SystemCheck::NotTotal { input: vec![1] })
         );
     }
 

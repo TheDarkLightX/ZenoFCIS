@@ -6,6 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Make the system-property checkers honor their stated contracts. The
+  exhaustive checker decides totality on every admitted input before any
+  property result. `system_verdict` refuses solver models with the wrong
+  number of values or values outside the declared domains, and replays
+  domain-only models, whose scripts now also request the proposed outputs
+  (`SystemAnswer::Sat { input, output }`; `parse_system_answer` takes the
+  output count). A bounded differential compares the exhaustive and solver
+  routes on 80 cases, and eleven planted-defect controls each fail a named
+  test. The three regressions come from an independent review of 521b768.
+
 - Add kernel law harnesses in a separate `verification/` workspace. Four laws
   (budget charges, reason choice, canonical decoding, and patch overlap) each
   have one predicate, checked exhaustively over a small stated domain and at

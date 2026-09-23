@@ -113,8 +113,8 @@ Types added on this branch:
 | `Substance` | The formula's value cannot depend on a transition | Checked | Syntactic classification. It is diagnostic only. |
 | `SystemCheck::SystemProperty`, `SystemCheck::DomainImplied` | The property holds on every admitted input, and it does or does not depend on the transition | Proved | Exhaustive enumeration. Trusted base: the interpreter. |
 | `SystemCheck::NotTotal`, `Violated`, `Undefined` | Failure at this input | Checked | The interpreter produced the witness |
-| `SystemVerdict::SystemProperty`, `SystemVerdict::DomainImplied` | As for `SystemCheck` | Attested | They rest on solver `unsat` answers that nothing rechecks. The pinned differential tests compare them with the exhaustive route for the shipped programs. |
-| `SystemVerdict::NotTotal`, `Violated`, `Undefined` | Failure at this input | Checked | The interpreter reproduces the solver's model before the verdict is returned |
+| `SystemVerdict::SystemProperty`, `SystemVerdict::DomainImplied` | As for `SystemCheck` | Attested | Totality, the property, and `domain-implied` rest on solver `unsat` answers that nothing rechecks. The domain-only witness behind `system-property` is replayed. The pinned differential tests compare the routes over stated collections. |
+| `SystemVerdict::NotTotal`, `Violated`, `Undefined` | Failure at this input | Checked | The model's values are checked against the declared domains, then the interpreter reproduces the failure. Before this check, an input outside the domain was reported as a totality failure. |
 
 `SystemCheck` and `SystemVerdict` share verdict codes but not levels. This is
 intended: the level follows the route, not the code.
