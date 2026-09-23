@@ -17,6 +17,7 @@ mod lexer;
 mod logic;
 mod mini_determinator;
 mod parser;
+mod substance;
 mod views;
 
 pub use ast::*;
@@ -34,6 +35,9 @@ pub use mini_determinator::{
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
 pub use parser::parse_project;
+pub use substance::{
+    Substance, claim_substance, law_substance, relation_substance, temporal_substance,
+};
 pub use views::{
     DerivedComposition, GeneratedProject, GraphFormat, ObligationKind, UnresolvedObligation,
     derive_composition, generate_project, render_graph,

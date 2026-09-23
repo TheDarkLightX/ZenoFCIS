@@ -6,7 +6,7 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 ```text
 zeno-fcis describe [COMMAND...]
 zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter
-zeno-fcis check [project.zeno] [--format human|json]
+zeno-fcis check [project.zeno] [--format human|json] [--require-substantive]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
 zeno-fcis explain [project.zeno] [--code CODE] [--format human|json]
@@ -19,6 +19,12 @@ zeno-fcis backend inventory-lean ROOT [--format human|json]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
+It also classifies every law and claim by
+[substance](CLAIM_SUBSTANCE.md). Human output warns on stderr about formulas
+that cannot constrain any transition. JSON output adds a `substance` object,
+and `--require-substantive` exits 1 with `status: "vacuous"` when any are
+found. `prove` prints a `scope:` line explaining that current obligations
+contain no system model.
 `generate` replaces each deterministic Rust/manifest file atomically;
 `--check` writes nothing and reports drift. `graph` and `explain` are derived
 diagnostic views. `prove` and `counterexample` use only the separate checked

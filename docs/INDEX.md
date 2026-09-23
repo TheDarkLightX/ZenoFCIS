@@ -71,6 +71,7 @@
 - [Temporal tutorial](tutorials/TEMPORAL.md)
 - [Formal-tools tutorial](tutorials/FORMAL_TOOLS.md)
 - [Mini Determinator tutorial](tutorials/MINI_DETERMINATOR.md)
+- [Law and claim substance](CLAIM_SUBSTANCE.md)
 - [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md)
 - [Deterministic synthesis](DETERMINISTIC_SYNTHESIS.md)
 - [Language-neutral synthesis and target conformance](LANGUAGE_NEUTRAL_SYNTHESIS.md)

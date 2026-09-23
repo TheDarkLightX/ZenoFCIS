@@ -21,8 +21,8 @@ use zeno_fcis_formal_tools::{
 };
 use zeno_fcis_spec::{
     ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, ProjectLimits, ProjectSpec,
-    SourceLimits, StableId, derive_composition, elaborate_project, generate_project, parse_project,
-    render_graph,
+    SourceLimits, StableId, Substance, claim_substance, derive_composition, elaborate_project,
+    generate_project, law_substance, parse_project, render_graph,
 };
 
 const JSON_SCHEMA: &str = "zeno-fcis/cli/1";
@@ -124,6 +124,9 @@ enum Command {
         project: PathBuf,
         #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
         format: OutputFormat,
+        /// Fail when any law or claim cannot constrain a transition.
+        #[arg(long)]
+        require_substantive: bool,
     },
     /// Generate deterministic Rust and manifest artifacts, or check for drift.
     Generate {
@@ -259,7 +262,11 @@ fn run(command: Command) -> u8 {
         Command::Describe { command } => describe(&command),
         Command::Synth { command } => synth::run(command),
         Command::New { dir, template } => new_project(&dir, template),
-        Command::Check { project, format } => check(&project, format),
+        Command::Check {
+            project,
+            format,
+            require_substantive,
+        } => check(&project, format, require_substantive),
         Command::Generate {
             project,
             out,
@@ -485,7 +492,7 @@ fn new_project(dir: &Path, template: Template) -> u8 {
     OK
 }
 
-fn check(path: &Path, format: OutputFormat) -> u8 {
+fn check(path: &Path, format: OutputFormat, require_substantive: bool) -> u8 {
     let spec = match project_or_report(path, format) {
         Ok(value) => value,
         Err(code) => return code,
@@ -497,24 +504,121 @@ fn check(path: &Path, format: OutputFormat) -> u8 {
             return FAILURE;
         }
     };
+    let substance = SubstanceReport::of(&spec);
+    let refused = require_substantive && substance.vacuous_count() > 0;
     match format {
-        OutputFormat::Human => println!(
-            "checked {}: project={} components={} claims={} unresolved_obligations={} semantic_program_hash={}",
-            path.display(),
-            spec.project_id().get(),
-            spec.components().len(),
-            spec.claims().len(),
-            derived.obligations().len(),
-            derived.semantic_program_hash()
-        ),
+        OutputFormat::Human => {
+            println!(
+                "checked {}: project={} components={} claims={} unresolved_obligations={} semantic_program_hash={}",
+                path.display(),
+                spec.project_id().get(),
+                spec.components().len(),
+                spec.claims().len(),
+                derived.obligations().len(),
+                derived.semantic_program_hash()
+            );
+            substance.warn();
+            if refused {
+                eprintln!(
+                    "error: --require-substantive: {} law(s) or claim(s) cannot constrain any transition",
+                    substance.vacuous_count()
+                );
+            }
+        }
         OutputFormat::Json => print_json(&json!({
             "claims": spec.claims().len(), "components": spec.components().len(),
             "path": path.display().to_string(), "project_id": spec.project_id().get(),
             "schema": JSON_SCHEMA, "semantic_program_hash": derived.semantic_program_hash().to_string(),
-            "status": "valid", "unresolved_obligations": derived.obligations().len()
+            "status": if refused { "vacuous" } else { "valid" },
+            "substance": substance.to_json(),
+            "unresolved_obligations": derived.obligations().len()
         })),
     }
-    OK
+    if refused { INVALID } else { OK }
+}
+
+/// Syntactic substance of every authored law and claim, in declaration order.
+struct SubstanceReport<'a> {
+    laws: Vec<(StableId, &'a str, Substance)>,
+    claims: Vec<(StableId, &'a str, Substance)>,
+}
+
+impl<'a> SubstanceReport<'a> {
+    fn of(spec: &'a ProjectSpec) -> Self {
+        Self {
+            laws: spec
+                .laws()
+                .iter()
+                .map(|law| (law.id(), law.name().as_str(), law_substance(law)))
+                .collect(),
+            claims: spec
+                .claims()
+                .iter()
+                .map(|claim| (claim.id(), claim.name().as_str(), claim_substance(claim)))
+                .collect(),
+        }
+    }
+
+    fn vacuous_count(&self) -> usize {
+        self.laws
+            .iter()
+            .chain(&self.claims)
+            .filter(|(_, _, substance)| substance.is_vacuous())
+            .count()
+    }
+
+    fn to_json(&self) -> Value {
+        let entries = |items: &[(StableId, &str, Substance)]| {
+            items
+                .iter()
+                .map(|(id, name, substance)| {
+                    json!({ "code": substance.code(), "id": id.get(), "name": name })
+                })
+                .collect::<Vec<_>>()
+        };
+        json!({ "claims": entries(&self.claims), "laws": entries(&self.laws) })
+    }
+
+    fn warn(&self) {
+        for (id, name, substance) in &self.laws {
+            if let Some(reason) = law_warning(*substance) {
+                eprintln!("warning: law {} {name} {reason}", id.get());
+            }
+        }
+        for (id, name, substance) in &self.claims {
+            if let Some(reason) = claim_warning(*substance) {
+                eprintln!("warning: claim {} {name} {reason}", id.get());
+            }
+        }
+    }
+}
+
+fn law_warning(substance: Substance) -> Option<&'static str> {
+    match substance {
+        Substance::Constant { value: true } => {
+            Some("is always true, so it can never detect a faulty transition")
+        }
+        Substance::Constant { value: false } => Some(
+            "is always false; any effect it has depends on which decisions it is applied to, which .zeno does not state",
+        ),
+        Substance::IgnoresTransition => Some(
+            "reads no post-state, effect, outbox, or event, so no transition outcome can change it",
+        ),
+        _ => None,
+    }
+}
+
+fn claim_warning(substance: Substance) -> Option<&'static str> {
+    match substance {
+        Substance::Constant { value: true } => {
+            Some("is always true, so proving it says nothing about this system")
+        }
+        Substance::Constant { value: false } => Some("is always false, so it cannot be proved"),
+        Substance::IgnoresTransition => {
+            Some("reads no observation a transition can change, so it says nothing about behavior")
+        }
+        _ => None,
+    }
 }
 
 fn generate(path: &Path, out: &Path, check_only: bool, format: OutputFormat) -> u8 {
@@ -776,6 +880,7 @@ fn prove(
                     continue;
                 }
             };
+            let scope = obligation.scope();
             let run = match execute_tool(config, obligation) {
                 Ok(value) => value,
                 Err(error) => {
@@ -793,6 +898,7 @@ fn prove(
                 exit = exit.max(FAILURE);
                 continue;
             }
+            let scope_note = scope.meaning(run.status());
             let code = match run.status() {
                 ToolRunStatus::ProposedUnsat if counterexample => {
                     println!(
@@ -851,6 +957,13 @@ fn prove(
                     tool_run_exit(run.status(), counterexample)
                 }
             };
+            if let Some(note) = scope_note {
+                println!(
+                    "{} claim {} scope: {note}",
+                    backend_name(tool_backend),
+                    claim.id().get()
+                );
+            }
             exit = exit.max(code);
         }
     }

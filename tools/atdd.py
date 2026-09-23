@@ -98,6 +98,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "run", "-p", "zeno-fcis", "--example", "bounded_completion", "--features", "synthesis", "--locked"),
          ("cargo", "+1.97.1", "check", "-p", "zeno-fcis", "--no-default-features", "--features", "synthesis", "--locked")),
     ),
+    "claim-substance": AcceptanceScenario(
+        "Report laws and claims that cannot constrain any transition",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--lib", "--locked", "substance"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "cli_adopter_flow", "--locked", "substan"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "cli_adopter_flow", "--locked", "rc3_cli_formal_outcomes_and_retention_are_process_level")),
+    ),
     "generated-application": AcceptanceScenario(
         "Run an authored application through durable authorization",
         (("python3", "tools/test_generated_application.py"),
