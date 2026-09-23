@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Close effect spellings that the static assurance check missed in semantic
+  crates: standard I/O; grouped, glob and aliased `std` imports;
+  `thread_local!`; atomics and cells written without generic arguments, such
+  as `AtomicU64::new` and `RefCell::new`; and hash-ordered collections. The
+  self-test now also requires that safe witnesses such as `WorkspaceCell` and
+  `BTreeMap` pass. No semantic crate needed a change.
+
 - Record what `.zeno` v1 and the `finite-i64/1` IR can state about the
   single-vault zUSD lane. A `.zeno` v1 attempt states the lane's 32 fields,
   46 reasons, invariants and conservation laws, and six characterization

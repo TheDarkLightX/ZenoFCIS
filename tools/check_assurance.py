@@ -124,6 +124,48 @@ FORBIDDEN_PATTERNS = (
     ),
     ForbiddenPattern("floating-point", re.compile(r"\b(?:f32|f64)\b"), "let value: f64 = 1.0;"),
     ForbiddenPattern("mutable-static", re.compile(r"\bstatic\s+mut\b"), "static mut STATE: u8 = 0;"),
+    # The rules above match only fully qualified paths or a generic `<`. These
+    # close the spellings that reach the same effects without them.
+    ForbiddenPattern(
+        "standard-io",
+        re.compile(r"\bstd::io(?:::|\b)"),
+        "std::io::stdin().read_line(&mut line)",
+    ),
+    ForbiddenPattern(
+        "grouped-std-import",
+        re.compile(r"\bstd::(?:\*|\{[^}]*\b(?:fs|net|process|env|time|thread|io)\b)"),
+        "use std::{fs, io::Read};",
+    ),
+    ForbiddenPattern(
+        "std-alias",
+        re.compile(r"\b(?:use\s+(?:::)?std|extern\s+crate\s+std)\s+as\b"),
+        "use std as platform;",
+    ),
+    ForbiddenPattern("thread-local", re.compile(r"\bthread_local!"), "thread_local! { static DEPTH: u8 = 0; }"),
+    ForbiddenPattern(
+        "atomic-type",
+        re.compile(r"\bAtomic[A-Z][A-Za-z0-9_]*\b"),
+        "static COUNT: AtomicU64 = AtomicU64::new(0);",
+    ),
+    ForbiddenPattern(
+        "cell-type",
+        re.compile(
+            r"\b(?:Cell|UnsafeCell|OnceCell|OnceLock|LazyCell|LazyLock|RefCell|Mutex|RwLock)\s*(?:<|::)"
+        ),
+        "let state = RefCell::new(0);",
+    ),
+    ForbiddenPattern(
+        "hash-ordered-collection",
+        re.compile(r"\b(?:HashMap|HashSet|RandomState|DefaultHasher)\b"),
+        "let seen = HashMap::new();",
+    ),
+)
+SAFE_WITNESSES = (
+    "fn transition(state: &State) -> State { state.clone() }",
+    "use core::{cmp::Ordering, fmt::Write};",
+    "use std::{collections::BTreeSet, vec::Vec};",
+    "let cells: BTreeMap<u32, WorkspaceCell> = BTreeMap::new();",
+    "enum Mode { Atomic, Staged }",
 )
 
 DECODER_ALLOCATION_REGIONS = (
@@ -357,10 +399,10 @@ def run_self_test() -> list[str]:
     for forbidden in FORBIDDEN_PATTERNS:
         if forbidden.expression.search(forbidden.witness) is None:
             failures.append(f"self-test failed for {forbidden.name}")
-    safe_witness = "fn transition(state: &State) -> State { state.clone() }"
-    unexpected = [item.name for item in FORBIDDEN_PATTERNS if item.expression.search(safe_witness)]
-    if unexpected:
-        failures.append(f"safe witness rejected by: {', '.join(unexpected)}")
+    for safe_witness in SAFE_WITNESSES:
+        unexpected = [item.name for item in FORBIDDEN_PATTERNS if item.expression.search(safe_witness)]
+        if unexpected:
+            failures.append(f"safe witness {safe_witness!r} rejected by: {', '.join(unexpected)}")
 
     guarded = "Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 1)?)"
     requirement = (

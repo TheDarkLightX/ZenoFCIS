@@ -2276,23 +2276,23 @@
         "host-tool",
         "release-control"
       ],
-      "production_lines": 376,
+      "production_lines": 415,
       "rank": 22,
       "score": 81,
       "signals": [
         {
           "id": "filesystem-read-path",
           "lines": [
-            263,
-            301,
-            324,
-            338
+            305,
+            343,
+            366,
+            380
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            262
+            304
           ]
         }
       ],
@@ -5048,9 +5048,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3151759,
+    "admitted_bytes": 3153526,
     "admitted_files": 168,
-    "inventory_sha256": "7eb2b2ad0fd5f18cf5d0d62c2817ee359cc88c256df8c13d6faa80fd996e655d",
+    "inventory_sha256": "10907d5449d06c299771d596e61c0bd64437980ec87086cbe9e1447432f8205a",
     "ranked_above_minimum": 140,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
