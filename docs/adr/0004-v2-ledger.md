@@ -47,6 +47,12 @@ These changes are deferred to V2.
 - Rename `ToolKind` to `EvidenceKind` and `Proven` to a name that states its
   level. Drop `source_commit`.
 
+### Language
+
+- `.zeno` elaboration rejects law and claim paths that name no declared type,
+  field, or variant. In 1.x these paths elaborate without a diagnostic; a 1.x
+  warning can come first.
+
 ### Codec
 
 - Encoding validates against the supplied limits, and payload metrics agree
