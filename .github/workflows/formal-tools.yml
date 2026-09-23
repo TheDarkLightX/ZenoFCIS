@@ -118,6 +118,10 @@ jobs:
               system::tests::pinned_system_smt_agrees_with_exhaustive_check -- --ignored --exact
           ZENO_FCIS_CVC5="$PWD/$CVC5_BIN" \
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              -p zeno-fcis-formal-tools --locked \
+              system::tests::pinned_solver_route_agrees_with_exhaustive_route_on_small_programs -- --ignored --exact
+          ZENO_FCIS_CVC5="$PWD/$CVC5_BIN" \
+            cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
               -p zeno-fcis-cli --bin zeno-fcis --locked \
               synth::tests::pinned_counter_system_smt_agrees_with_exhaustive_check -- --ignored --exact
       - name: Check pure authoring compiler without std
