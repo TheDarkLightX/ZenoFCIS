@@ -38,6 +38,7 @@ Feature: Adopt the ZenoFCIS core library
     Then all bounded input cases obey the reviewed decision table
     And rejection publishes no state, replay or delivery rows
     And committed failure, exact replay, database reopen and delivery retry preserve the expected state
+    And every admitted input matches the finite model and the independent examples through the executed application
 
   @atdd-finite-synthesis
   Scenario: Synthesize and replay one contract across languages

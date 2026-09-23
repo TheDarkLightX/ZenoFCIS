@@ -57,6 +57,23 @@ identify reviewed example policy, not certified binaries or release evidence.
 Changing the source changes policy identity and requires a new database unless
 a separately reviewed migration is implemented. No Lean installation is used.
 
+## Check the application against its model
+
+`tests/conformance.rs` runs every admitted input (16 states, two commands, and
+two contexts) through the application: admission, the authority, the adapter
+in `src/program.rs`, the law checker, the committed patch, and the outbox. It
+compares each decision, reason, new state, and notification with:
+
+- the synthesized function, read through the output table documented in the
+  test;
+- `tests/decision-examples.txt`, examples written from this README without
+  reading any generated file, keyed by the numeric IDs in `project.zeno`.
+
+It also checks that schema admission and the finite input domain agree in both
+directions, that genesis is exactly zero, and that every admitted state is
+reachable from genesis. Swapping the count and failure bindings in the adapter
+fails these tests. The examples await review by the project's owner.
+
 ## Inspect and replay synthesis
 
 `synthesis.json` independently specifies all 64 combinations of current state,

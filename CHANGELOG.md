@@ -6,6 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Connect the durable-counter template's finite model to the executed
+  application. The generated application's new `tests/conformance.rs` runs all
+  64 admitted inputs through admission, the authority, the Rust adapter, and
+  the law checker, and requires the decision, reason, new state, and
+  notification to equal the synthesized program's output read through a
+  declared table. It also checks schema admission against the finite input
+  domain, genesis, reachability of every admitted state, and twelve examples
+  written from the README (`tests/decision-examples.txt`, awaiting owner
+  review). Swapping two same-type adapter bindings fails these tests.
+
 - Retry a process start a bounded number of times, about 250 ms in total, when
   its executable is busy (`ETXTBSY`), in the formal-tools process adapter
   and the synthesis runner. A child forked by another thread while a private

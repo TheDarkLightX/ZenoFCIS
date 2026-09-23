@@ -153,17 +153,25 @@ answer unchanged.
 
 ## Assumptions
 
-- The program's inputs model the executed invocation completely.
-- In the template, the Rust adapter maps output codes to decisions, reasons,
-  field updates and outbox entries as the reviewed table states.
+- The program's inputs model the executed invocation completely. For the
+  durable-counter template, `tests/conformance.rs` checks this on every
+  admitted input (see below).
+- Other adapters map output codes to decisions as their reviewed tables state,
+  unless a conformance test like the durable counter's checks them.
 
 ## Explicit nonclaims
 
-- These results cover the finite program, not the Rust code that maps its
-  outputs to builder calls. An exhaustive differential test of that adapter
-  against a declared output table is follow-up work. So is deriving the
-  initial state and input domains from the executed genesis and admission
-  rules.
+- These results cover the finite program. For the durable-counter template
+  only, the generated application's `tests/conformance.rs` connects them to the
+  executed application: on all 64 admitted inputs, the decision, reason, new
+  state, and notification produced through admission, the authority, the Rust
+  adapter, and the law checker equal the finite program's output read through
+  a declared table. Schema admission equals the finite input domain in both
+  directions, genesis is exactly zero, and all 16 admitted states are
+  reachable from it. Swapping two same-type bindings in the adapter, swapping
+  its two reject reasons, or swapping the notification fields fails these
+  tests. Twelve examples written from the template README are checked the same
+  way; they await owner review.
 - A domain-only control that finds a violating tuple does not show that the
   property is the right requirement.
 - Local runs with an unpinned solver are supplemental. The pinned CVC5 run is
