@@ -26,6 +26,12 @@ use zeno_fcis_spec::{
     TemporalFormula, TraceStep, ValueExpr, evaluate_relational, evaluate_temporal,
 };
 
+mod system;
+pub use system::{
+    SystemAnswer, SystemObligationKind, SystemObligations, SystemSolveError, SystemVerdict,
+    export_system_smt, parse_system_answer, system_verdict,
+};
+
 /// Formal-tools manifest format.
 pub const TOOLS_MANIFEST_FORMAT: &str = "zeno-fcis/tools/2";
 /// CVC5 release qualified by RC3.

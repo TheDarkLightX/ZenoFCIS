@@ -106,6 +106,6 @@ The tests keep these outcomes:
 - The analysis is syntactic. It does not detect formulas that are implied by
   schema bounds or other laws, such as a law that restates a field's declared
   range.
-- `without-system-model` results remain model-free. A proof about a transition
-  needs an obligation that includes the transition relation, initial state,
-  and domain. That is separate, later work.
+- `without-system-model` results remain model-free. For finite transition
+  programs, [system properties](SYSTEM_PROPERTIES.md) checks properties
+  against the transition relation itself.
