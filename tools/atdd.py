@@ -120,6 +120,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Reject effect spellings that bypass qualified-path rules",
         (("python3", "tools/check_assurance.py", "--self-test"),),
     ),
+    "law-paths": AcceptanceScenario(
+        "Report law and claim paths that name no declared type or field",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--lib", "--locked", "paths::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "cli_adopter_flow", "--locked", "law_and_claim_paths")),
+    ),
     "zusd-lane-gaps": AcceptanceScenario(
         "Pin what the zeno language cannot state about the zUSD lane",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--test", "zusd_lane_gaps", "--locked"),),

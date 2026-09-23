@@ -43,3 +43,11 @@ Feature: Report evidence that cannot distinguish system behavior
     When the assurance checker runs its self-test
     Then every hostile witness is rejected by its own rule
     And no safe witness such as WorkspaceCell or BTreeMap is rejected
+
+  @atdd-law-paths
+  Scenario: Report law and claim paths that name no declared type or field
+    Given a project whose law reads an undeclared field and whose claim reads a command type as state
+    When the project is checked with and without the resolved-paths requirement
+    Then each unresolved path is reported with its law or claim and the missing type or field
+    And the resolved-paths requirement refuses the project
+    And every shipped example and template resolves without warnings

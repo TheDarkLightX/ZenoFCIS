@@ -923,6 +923,73 @@ fn check_reports_substance_of_laws_and_claims_that_cannot_constrain_a_transition
 }
 
 #[test]
+fn check_reports_law_and_claim_paths_that_name_no_declared_field() {
+    let root = TempRoot::new("paths");
+    let project = root.path().join("project.zeno");
+    fs::write(
+        &project,
+        "zeno 1;\nproject 1 paths;\nnamespace 10 core;\n\
+         type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+         type 103 destination Destination;\ntype 104 payload Payload;\ntype 105 int Count;\n\
+         field 110 100 count 105;\n\
+         reason 200 invalid precedence 0;\n\
+         component 300 machine {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 1024;\n}\n\
+         merge [300];\n\
+         law 400 typo = post.100.119 >= 0 && post.100.110 <= 3;\n\
+         claim 500 wrong_root cvc5 relational = pre.101 <= post.100.110;\n",
+    )
+    .unwrap_or_else(|error| panic!("write paths project: {error}"));
+
+    let human = run(Command::new(cli()).arg("check").arg(&project));
+    assert_eq!(human.status.code(), Some(0));
+    let warnings = String::from_utf8_lossy(&human.stderr);
+    for expected in [
+        "warning: law 400 typo reads post.100.119, but type 100 declares no field 119",
+        "warning: claim 500 wrong_root reads pre.101, but 101 is not a declared state type",
+    ] {
+        assert!(
+            warnings.contains(expected),
+            "missing {expected:?} in {warnings}"
+        );
+    }
+    assert!(!warnings.contains("post.100.110,"), "{warnings}");
+
+    let json = run(Command::new(cli())
+        .arg("check")
+        .arg(&project)
+        .args(["--format", "json"]));
+    assert_eq!(json.status.code(), Some(0));
+    let document = json_stdout(&json);
+    assert_eq!(document["status"], "valid");
+    assert_eq!(
+        document["unresolved_paths"],
+        json!({
+            "claims": [
+                {"code": "unknown-root-type", "id": 500, "name": "wrong_root", "path": "pre.101"}
+            ],
+            "laws": [
+                {"code": "unknown-field", "id": 400, "name": "typo", "path": "post.100.119"}
+            ]
+        })
+    );
+
+    let refused = run(Command::new(cli()).arg("check").arg(&project).args([
+        "--format",
+        "json",
+        "--require-resolved-paths",
+    ]));
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(json_stdout(&refused)["status"], "unresolved-paths");
+
+    let shipped = repository_root().join("examples/mini-determinator/project.zeno");
+    let clean = run(Command::new(cli())
+        .arg("check")
+        .arg(&shipped)
+        .arg("--require-resolved-paths"));
+    assert_eq!(clean.status.code(), Some(0));
+}
+
+#[test]
 fn require_substantive_refuses_vacuous_projects_and_accepts_transition_laws() {
     let vacuous = repository_root().join("examples/mini-determinator/project.zeno");
     let refused = run(Command::new(cli()).arg("check").arg(&vacuous).args([
@@ -939,7 +1006,8 @@ fn require_substantive_refuses_vacuous_projects_and_accepts_transition_laws() {
         &project,
         "zeno 1;\nproject 1 substantive;\nnamespace 10 core;\n\
          type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
-         type 103 destination Destination;\ntype 104 payload Payload;\n\
+         type 103 destination Destination;\ntype 104 payload Payload;\ntype 105 int Count;\n\
+         field 110 100 count 105;\n\
          reason 200 invalid precedence 0;\n\
          component 300 machine {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 1024;\n}\n\
          merge [300];\n\
