@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
+use zeno_fcis_synthesis::finite::{Domain, Op, Program};
+use zeno_fcis_synthesis::system::{Property, SystemCheck, SystemLimits, check_system_property};
 
 const COUNTER: &[u8] = include_bytes!("../../templates/durable-counter/synthesis.json");
 fn selected() -> (problem::Problem, Vec<Case>) {
@@ -152,4 +154,195 @@ fn javascript_runner_refuses_an_unqualified_runtime_version() {
         panic!("unqualified runtime was admitted")
     };
     assert_eq!(failure.code, "tool-version", "{}", failure.message);
+}
+
+const COUNTER_PROGRAM: &[u8] =
+    include_bytes!("../../templates/durable-counter/synthesized/program.zcve");
+
+/// A property over the counter's four inputs followed by its six outputs.
+fn counter_property(problem: &problem::Problem, nodes: Vec<Op>) -> Property {
+    let inputs = problem.contract.inputs().to_vec();
+    let outputs = problem.contract.outputs().to_vec();
+    let root = u16::try_from(nodes.len() - 1).unwrap();
+    let relation = Program::try_new(
+        [inputs.clone(), outputs.clone()].concat(),
+        vec![Domain::Bool],
+        nodes,
+        vec![root],
+    )
+    .unwrap();
+    Property::try_new(inputs, outputs, relation).unwrap()
+}
+
+#[test]
+fn counter_system_properties_are_checked_against_the_exact_program() {
+    // Inputs: 0 pre.count, 1 pre.failures, 2 command.record_failure,
+    // 3 context.allowed. Outputs: 4 decision, 5 post.count, 6 post.failures,
+    // 7 outbox.notify, 8 outbox.count, 9 outbox.failures.
+    let problem = problem::parse(COUNTER.to_vec()).unwrap();
+    let Outcome::Selected { program, .. } =
+        synthesize(&problem.contract, &problem.sketch, Budget::default()).unwrap()
+    else {
+        panic!("counter must be expressible")
+    };
+    // The obligations bind to the exact shipped program bytes.
+    assert_eq!(program.value().canonical_bytes().unwrap(), COUNTER_PROGRAM);
+    let limits = SystemLimits::default();
+    let check = |property: &Contract| check_system_property(&program, property, limits).unwrap();
+    let checked = |property: &Property| check(property.contract());
+
+    // Refinement: the program satisfies the reviewed relation, and the relation
+    // is not implied by the output domains alone.
+    assert_eq!(
+        check(&problem.contract),
+        SystemCheck::SystemProperty { inputs: 64 }
+    );
+
+    // Positive controls: transition-dependent properties.
+    let failures_monotone = counter_property(
+        &problem,
+        vec![Op::Input(6), Op::Input(1), Op::Lt(0, 1), Op::Not(2)],
+    );
+    let reject_keeps_state = counter_property(
+        &problem,
+        vec![
+            Op::Input(4),
+            Op::Int(2),
+            Op::Lt(0, 1),
+            Op::Input(5),
+            Op::Input(0),
+            Op::Eq(3, 4),
+            Op::Input(6),
+            Op::Input(1),
+            Op::Eq(6, 7),
+            Op::And(5, 8),
+            Op::Not(9),
+            Op::And(2, 10),
+            Op::Not(11),
+        ],
+    );
+    let notification_matches_state = counter_property(
+        &problem,
+        vec![
+            Op::Input(7),
+            Op::Input(8),
+            Op::Input(5),
+            Op::Eq(1, 2),
+            Op::Input(9),
+            Op::Input(6),
+            Op::Eq(4, 5),
+            Op::And(3, 6),
+            Op::Not(7),
+            Op::And(0, 8),
+            Op::Not(9),
+        ],
+    );
+    for property in [
+        &failures_monotone,
+        &reject_keeps_state,
+        &notification_matches_state,
+    ] {
+        assert_eq!(
+            checked(property),
+            SystemCheck::SystemProperty { inputs: 64 }
+        );
+    }
+
+    // Domain-only control: `post.count <= 3` is implied by the output domain,
+    // so it cannot satisfy the positive control.
+    let count_bounded = counter_property(
+        &problem,
+        vec![Op::Int(3), Op::Input(5), Op::Lt(0, 1), Op::Not(2)],
+    );
+    assert_eq!(
+        checked(&count_bounded),
+        SystemCheck::DomainImplied {
+            inputs: 64,
+            pairs: 64 * 2048
+        }
+    );
+
+    // Negative control: raise the capacity guard's bound from 3 to 4. The
+    // first admitted input that now leaves the output domain is a failure
+    // recorded at pre.failures = 3.
+    let nodes = program.nodes();
+    let guard = (0..nodes.len())
+        .find(|&index| {
+            nodes[index] == Op::Int(3)
+                && nodes[index + 1..]
+                    .iter()
+                    .any(|op| matches!(op, Op::Lt(_, bound) if usize::from(*bound) == index))
+        })
+        .unwrap();
+    let mut mutated = nodes.to_vec();
+    mutated[guard] = Op::Int(4);
+    let buggy = Program::try_new(
+        program.inputs().to_vec(),
+        program.outputs().to_vec(),
+        mutated,
+        program.roots().to_vec(),
+    )
+    .unwrap();
+    let first = vec![0, 3, 1, 1];
+    assert_eq!(
+        check_system_property(&buggy, failures_monotone.contract(), limits).unwrap(),
+        SystemCheck::NotTotal {
+            input: first.clone()
+        }
+    );
+    assert!(buggy.evaluate(&first).is_err());
+    assert!(program.evaluate(&first).is_ok());
+}
+
+#[test]
+#[ignore = "requires the workflow-pinned CVC5 executable"]
+fn pinned_counter_system_smt_agrees_with_exhaustive_check() {
+    use std::io::Write as _;
+    use std::process::Stdio;
+    use zeno_fcis_formal_tools::{parse_system_answer, system_verdict};
+
+    let cvc5 = std::path::PathBuf::from(std::env::var_os("ZENO_FCIS_CVC5").unwrap());
+    let problem = problem::parse(COUNTER.to_vec()).unwrap();
+    let Outcome::Selected { program, .. } =
+        synthesize(&problem.contract, &problem.sketch, Budget::default()).unwrap()
+    else {
+        panic!("counter must be expressible")
+    };
+    assert_eq!(program.value().canonical_bytes().unwrap(), COUNTER_PROGRAM);
+    let solve = |kind, script: &[u8]| {
+        let mut child = std::process::Command::new(&cvc5)
+            .args(["--lang", "smt2"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(script).unwrap();
+        parse_system_answer(kind, &child.wait_with_output().unwrap().stdout, 4)
+    };
+    let properties = [
+        vec![Op::Input(6), Op::Input(1), Op::Lt(0, 1), Op::Not(2)],
+        vec![
+            Op::Input(4),
+            Op::Int(2),
+            Op::Lt(0, 1),
+            Op::Input(5),
+            Op::Input(0),
+            Op::Eq(3, 4),
+            Op::Input(6),
+            Op::Input(1),
+            Op::Eq(6, 7),
+            Op::And(5, 8),
+            Op::Not(9),
+            Op::And(2, 10),
+            Op::Not(11),
+        ],
+        vec![Op::Int(3), Op::Input(5), Op::Lt(0, 1), Op::Not(2)],
+    ];
+    for nodes in properties {
+        let property = counter_property(&problem, nodes);
+        let exhaustive =
+            check_system_property(&program, property.contract(), SystemLimits::default()).unwrap();
+        let verdict = system_verdict(&program, &property, solve).unwrap();
+        assert_eq!(verdict.code(), exhaustive.code());
+    }
 }

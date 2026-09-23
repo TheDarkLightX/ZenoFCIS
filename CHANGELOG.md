@@ -6,6 +6,14 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Check properties against an exact finite transition program.
+  `check_system_property` enumerates every admitted input and runs a
+  domain-only control that reports properties the output domains already
+  imply. `export_system_smt` exports totality, property and domain-only
+  obligations that include the transition relation. `system_verdict` accepts
+  a solver model only after the interpreter reproduces it. Pinned CVC5 runs
+  must agree with the exhaustive check on the durable-counter program.
+
 - Classify every `.zeno` law and claim by substance: `constant-true`,
   `constant-false`, `ignores-transition` or `may-constrain-transition`.
   `zeno-fcis check` warns about formulas that cannot constrain any

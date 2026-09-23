@@ -104,6 +104,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "cli_adopter_flow", "--locked", "substan"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "cli_adopter_flow", "--locked", "rc3_cli_formal_outcomes_and_retention_are_process_level")),
     ),
+    "system-properties": AcceptanceScenario(
+        "Check properties against the exact finite transition program",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--lib", "--locked", "system::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--lib", "--locked", "system::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "counter_system_properties")),
+    ),
     "generated-application": AcceptanceScenario(
         "Run an authored application through durable authorization",
         (("python3", "tools/test_generated_application.py"),

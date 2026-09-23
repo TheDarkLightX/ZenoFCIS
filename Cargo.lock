@@ -1406,6 +1406,7 @@ dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
 ]
 
 [[package]]
