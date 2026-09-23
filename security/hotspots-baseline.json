@@ -554,7 +554,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3680,
+      "production_lines": 3694,
       "rank": 3,
       "score": 95,
       "signals": [
@@ -563,17 +563,17 @@
           "lines": [
             833,
             883,
-            2505,
-            2566,
-            2775
+            2530,
+            2590,
+            2799
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             142,
-            2646,
-            2660
+            2670,
+            2684
           ]
         },
         {
@@ -621,7 +621,7 @@
         {
           "id": "host-process-execution",
           "lines": [
-            2507
+            2532
           ]
         },
         {
@@ -2924,68 +2924,68 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 608,
+      "production_lines": 623,
       "rank": 28,
       "score": 79,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            332,
-            412,
-            485,
-            500
+            356,
+            436,
+            509,
+            524
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            426,
-            429,
-            614
+            450,
+            453,
+            638
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            119,
-            133,
-            194,
-            233,
-            335,
-            504,
-            507,
-            597
+            143,
+            157,
+            218,
+            257,
+            359,
+            528,
+            531,
+            621
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            477
+            501
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            67,
-            69,
-            595,
-            597,
-            601,
-            603,
-            605,
-            607
+            91,
+            93,
+            619,
+            621,
+            625,
+            627,
+            629,
+            631
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            71,
-            277,
-            308,
-            345,
-            503,
-            553
+            95,
+            301,
+            332,
+            369,
+            527,
+            577
           ]
         }
       ],
@@ -5049,9 +5049,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3190695,
+    "admitted_bytes": 3194765,
     "admitted_files": 170,
-    "inventory_sha256": "3c9a13e9321edbb05da252dd97562780b580c82f24a79d57634a68eb7a13629c",
+    "inventory_sha256": "218a88cc0e5305881a21b66a32f7a7ca9b54174ee166d90adcbad00bd39922fa",
     "ranked_above_minimum": 141,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

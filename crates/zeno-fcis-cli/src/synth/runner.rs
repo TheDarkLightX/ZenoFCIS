@@ -21,6 +21,30 @@ use std::{
 
 #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
 const MAX_OUTPUT: u64 = 32 * 1024 * 1024;
+
+/// Starts `command`, retrying a bounded number of times while its executable
+/// is busy.
+///
+/// Linux refuses to execute a file that any process holds open for writing
+/// (`ETXTBSY`). A child that another thread forks while this process writes an
+/// executable inherits that descriptor until it executes its own program, so
+/// the condition clears quickly. Every other error, and a file that stays busy
+/// through the last attempt, fails closed.
+#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+fn spawn_unless_busy(command: &mut Command) -> std::io::Result<std::process::Child> {
+    let busy = nix::errno::Errno::ETXTBSY as i32;
+    let mut delay = Duration::from_millis(1);
+    for _ in 0..8 {
+        match command.spawn() {
+            Err(e) if e.raw_os_error() == Some(busy) => {
+                std::thread::sleep(delay);
+                delay = delay.saturating_mul(2);
+            }
+            result => return result,
+        }
+    }
+    command.spawn()
+}
 #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
 const TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -488,7 +512,7 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
             }
         }
         command.env("LC_ALL", "C");
-        let mut child = command.spawn().map_err(|e| error("tool-start", e))?;
+        let mut child = spawn_unless_busy(&mut command).map_err(|e| error("tool-start", e))?;
         let pid = match i32::try_from(child.id()) {
             Ok(pid) => Pid::from_raw(pid),
             Err(_) => {

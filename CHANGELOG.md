@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Retry a process start a bounded number of times, about 250 ms in total, when
+  its executable is busy (`ETXTBSY`), in the formal-tools process adapter
+  and the synthesis runner. A child forked by another thread while a private
+  executable copy is written briefly inherits the write descriptor; this made
+  two tests fail intermittently with "Text file busy". Every other error, and
+  a file that stays busy, still fails closed.
+
 - Correct overstated claims found by an independent review of 521b768. The
   zUSD record's outcome and reason-order findings are scoped, with the
   reviewer's guarded-deposit counterexample kept as a test, and design record
