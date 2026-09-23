@@ -27,10 +27,16 @@ The successful path prints:
 
 ```text
 lean claim 501: generated theorem kernel checked with the qualified RC3 toolchain identity and exact axiom report; production authority unchanged
+lean claim 501 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
 ```
 
 This result covers the exact generated theorem, qualified Lean tree, and axiom
-report. It leaves production authority unchanged. The next sections show how
+report. It leaves production authority unchanged. The `scope:` line matters:
+claim 501 is `always atom(pre.100 == pre.100)`, which is true for every
+observation assignment. The exported obligation contains no transition
+relation, so a proof says nothing specific about the Mini Determinator.
+`zeno-fcis check` reports this claim as `constant-true`. See
+[law and claim substance](../CLAIM_SUBSTANCE.md). The next sections show how
 to prepare the tool identity and how blocked solver results appear.
 
 ## Ask CVC5 about one finite claim
@@ -77,6 +83,7 @@ below. The `printf` command prints the exit code on the second line:
 
 ```text
 cvc5 claim 500: UNSAT proposal retained; proof output was not independently checked
+cvc5 claim 500 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
 exit 2
 ```
 
@@ -179,6 +186,7 @@ prints the exit code on the second line:
 
 ```text
 lean claim 501: generated theorem kernel checked with the qualified RC3 toolchain identity and exact axiom report; production authority unchanged
+lean claim 501 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
 exit 0
 ```
 

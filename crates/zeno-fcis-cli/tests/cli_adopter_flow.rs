@@ -731,6 +731,10 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
         .arg(&cvc5_manifest));
     assert_eq!(cvc5_result.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&cvc5_result.stdout).contains("UNSAT proposal retained"));
+    assert!(
+        String::from_utf8_lossy(&cvc5_result.stdout)
+            .contains("cvc5 claim 500 scope: no transition relation was exported")
+    );
     let cvc5_evidence = evidence_directory(&cvc5_project);
     assert_retained(
         &cvc5_evidence,
@@ -786,6 +790,10 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
         .arg(&z3_manifest));
     assert_eq!(prove.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&prove.stdout).contains("replayed counterexample retained"));
+    assert!(
+        String::from_utf8_lossy(&prove.stdout)
+            .contains("z3 claim 500 scope: no transition relation constrained the observations")
+    );
     let counterexample = run(Command::new(cli())
         .arg("counterexample")
         .arg(&z3_project)
@@ -875,4 +883,78 @@ fn pinned_lean_cli_prove_is_process_level() {
             "transcript-01-kernel-stdout",
         ],
     );
+}
+
+#[test]
+fn check_reports_substance_of_laws_and_claims_that_cannot_constrain_a_transition() {
+    let project = repository_root().join("examples/mini-determinator/project.zeno");
+    let human = run(Command::new(cli()).arg("check").arg(&project));
+    assert_eq!(human.status.code(), Some(0));
+    let warnings = String::from_utf8_lossy(&human.stderr);
+    for expected in [
+        "warning: law 400 worker_isolation is always true",
+        "warning: claim 500 finite_state_reflexivity is always true",
+        "warning: claim 501 unbounded_state_reflexivity is always true",
+    ] {
+        assert!(
+            warnings.contains(expected),
+            "missing {expected:?} in {warnings}"
+        );
+    }
+
+    let json = run(Command::new(cli())
+        .arg("check")
+        .arg(&project)
+        .args(["--format", "json"]));
+    assert_eq!(json.status.code(), Some(0));
+    assert!(json.stderr.is_empty());
+    let document = json_stdout(&json);
+    assert_eq!(document["status"], "valid");
+    assert_eq!(
+        document["substance"],
+        json!({
+            "claims": [
+                {"code": "constant-true", "id": 500, "name": "finite_state_reflexivity"},
+                {"code": "constant-true", "id": 501, "name": "unbounded_state_reflexivity"}
+            ],
+            "laws": [{"code": "constant-true", "id": 400, "name": "worker_isolation"}]
+        })
+    );
+}
+
+#[test]
+fn require_substantive_refuses_vacuous_projects_and_accepts_transition_laws() {
+    let vacuous = repository_root().join("examples/mini-determinator/project.zeno");
+    let refused = run(Command::new(cli()).arg("check").arg(&vacuous).args([
+        "--format",
+        "json",
+        "--require-substantive",
+    ]));
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(json_stdout(&refused)["status"], "vacuous");
+
+    let root = TempRoot::new("substantive");
+    let project = root.path().join("project.zeno");
+    fs::write(
+        &project,
+        "zeno 1;\nproject 1 substantive;\nnamespace 10 core;\n\
+         type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+         type 103 destination Destination;\ntype 104 payload Payload;\n\
+         reason 200 invalid precedence 0;\n\
+         component 300 machine {\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 1024;\n}\n\
+         merge [300];\n\
+         law 400 bounded = post.100.110 >= 0 && post.100.110 <= 3;\n",
+    )
+    .unwrap_or_else(|error| panic!("write substantive project: {error}"));
+    let accepted = run(Command::new(cli())
+        .arg("check")
+        .arg(&project)
+        .arg("--require-substantive"));
+    assert_eq!(
+        accepted.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&accepted.stderr)
+    );
+    assert!(accepted.stderr.is_empty());
 }

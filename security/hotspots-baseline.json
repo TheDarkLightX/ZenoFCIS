@@ -554,7 +554,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3643,
+      "production_lines": 3675,
       "rank": 3,
       "score": 95,
       "signals": [
@@ -563,17 +563,17 @@
           "lines": [
             827,
             877,
-            2455,
-            2516,
-            2725
+            2499,
+            2560,
+            2769
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             136,
-            2596,
-            2610
+            2640,
+            2654
           ]
         },
         {
@@ -591,9 +591,9 @@
             1043,
             1159,
             1160,
-            1882,
-            2012,
-            2122
+            1926,
+            2056,
+            2166
           ]
         },
         {
@@ -605,8 +605,8 @@
             989,
             1004,
             1007,
-            2371,
-            2377
+            2415,
+            2421
           ]
         },
         {
@@ -615,19 +615,19 @@
             692,
             734,
             959,
-            2305
+            2349
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            2457
+            2501
           ]
         },
         {
           "id": "information-flow-observation",
           "lines": [
-            2043
+            2087
           ]
         },
         {
@@ -636,9 +636,9 @@
             287,
             336,
             536,
-            2247,
-            2267,
-            2273
+            2291,
+            2311,
+            2317
           ]
         },
         {
@@ -651,15 +651,15 @@
             705,
             952,
             1068,
-            1289
+            1333
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            2012,
-            2122,
-            2134
+            2056,
+            2166,
+            2178
           ]
         },
         {
@@ -847,7 +847,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1076,
+      "production_lines": 1180,
       "rank": 5,
       "score": 93,
       "signals": [
@@ -860,43 +860,44 @@
         {
           "id": "external-verifier-result",
           "lines": [
-            953
+            1066
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            444,
-            1126
+            451,
+            1239
           ]
         },
         {
           "id": "generated-source",
           "lines": [
-            24,
-            525
+            25,
+            629
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            261
+            264
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1065
+            1178
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            349,
-            350,
-            623,
-            988,
-            1048
+            356,
+            357,
+            577,
+            727,
+            1101,
+            1161
           ]
         }
       ],
@@ -5047,16 +5048,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3085323,
-    "admitted_files": 165,
-    "inventory_sha256": "73be4d7b0fd9ba4b9a1b59d748ae07908a7c3564d8862391a74f2edb250968d8",
-    "ranked_above_minimum": 138,
+    "admitted_bytes": 3110022,
+    "admitted_files": 166,
+    "inventory_sha256": "6312333404aabfdff1f503070b80f8cd9c39327ae019fde0185bf422f99f5ae8",
+    "ranked_above_minimum": 139,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 12,
       "priority-2": 40,
-      "priority-3": 86,
+      "priority-3": 87,
       "priority-4": 11,
       "priority-5": 16
     }

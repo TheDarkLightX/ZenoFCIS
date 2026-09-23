@@ -1190,6 +1190,50 @@ impl ExportedObligation {
     pub const fn source_hash(&self) -> Hash32 {
         self.source_hash
     }
+    /// Returns what a result for this obligation can establish about a system.
+    #[must_use]
+    pub const fn scope(&self) -> ObligationScope {
+        ObligationScope::WithoutSystemModel
+    }
+}
+
+/// What an exported obligation can establish about a system.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ObligationScope {
+    /// The obligation contains only the claim over bounded, otherwise
+    /// unconstrained observations: no transition relation, initial state,
+    /// schema bound, or law. A proof shows the claim holds for every such
+    /// assignment, independent of any particular system. A counterexample
+    /// assigns values that the system may never produce.
+    WithoutSystemModel,
+}
+
+impl ObligationScope {
+    /// Returns the stable machine-readable name.
+    #[must_use]
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::WithoutSystemModel => "without-system-model",
+        }
+    }
+
+    /// Explains what an accepted or refuted result means under this scope.
+    #[must_use]
+    pub const fn meaning(self, status: &ToolRunStatus) -> Option<&'static str> {
+        match (self, status) {
+            (
+                Self::WithoutSystemModel,
+                ToolRunStatus::ProposedUnsat | ToolRunStatus::KernelChecked,
+            ) => Some(
+                "no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system",
+            ),
+            (Self::WithoutSystemModel, ToolRunStatus::Refuted) => Some(
+                "no transition relation constrained the observations, so this counterexample may be unreachable in this system",
+            ),
+            _ => None,
+        }
+    }
 }
 
 /// Export failure that grants no evidence.

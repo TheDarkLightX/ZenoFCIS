@@ -6,6 +6,17 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Classify every `.zeno` law and claim by substance: `constant-true`,
+  `constant-false`, `ignores-transition` or `may-constrain-transition`.
+  `zeno-fcis check` warns about formulas that cannot constrain any
+  transition, adds a `substance` object to JSON output, and accepts
+  `--require-substantive`. Classification is diagnostic: it changes no
+  canonical bytes, program identity, existing field or default exit code.
+- Add `ObligationScope` to exported formal obligations. `zeno-fcis prove`
+  now states that current obligations contain no system model: accepted
+  results hold for every bounded observation assignment, and counterexamples
+  may be unreachable.
+
 ## 1.1.0 - 2026-09-13
 
 - Add independently checked finite exit plans, bounded canonical plan import,
