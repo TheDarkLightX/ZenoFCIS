@@ -6,6 +6,12 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add design records under `docs/adr/`: the meaning-first assurance review,
+  the principles for the V2 assurance program, a five-level vocabulary for
+  the epistemic status of evidence that classifies the V1.1 status and
+  witness types, and a ledger of breaking changes deferred to V2.
+  Documentation only.
+
 - Reserve the `zeno-fcis` commitment-domain namespace. Add
   `is_reserved_domain_name`, `DomainPrefix::try_new_project` and
   `StateDomainBinding::try_new_project`, which reject names that would share a
