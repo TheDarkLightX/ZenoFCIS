@@ -112,6 +112,14 @@ and other tools can use the same public boundaries.
 - [Strict canonical plan decoders](STRICT_CANONICAL_PLAN_DECODERS.md)
 - [Correct-by-construction map entries](CORRECT_BY_CONSTRUCTION_MAP_ENTRIES.md)
 
+## Design records
+
+- [Design record index](adr/README.md)
+- [0001: Meaning-first assurance](adr/0001-meaning-first-assurance.md)
+- [0002: Principles for the V2 assurance program](adr/0002-principles.md)
+- [0003: Epistemic status of evidence and witnesses](adr/0003-epistemic-status.md)
+- [0004: V2 ledger of deferred breaking changes](adr/0004-v2-ledger.md)
+
 ## Status
 
 The workspace is version `1.0.0`, the stable Cargo API release. The
