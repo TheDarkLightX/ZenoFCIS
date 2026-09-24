@@ -2501,10 +2501,10 @@ fn run_fixed(
 /// program, so the condition clears quickly. The copy is private and its bytes
 /// are already admitted, so running it later is the same run.
 ///
-/// The budget runs from `start` for `budget`. No attempt starts after it ends:
-/// when the next wait would reach the end, the result is `Timeout`. Every other
-/// error, and a file that stays busy through the last attempt, fails closed
-/// with `Io`.
+/// The budget runs from `start` for `budget`. No attempt starts after it ends,
+/// including the first: an exhausted budget, or a wait that would reach its
+/// end, gives `Timeout`. Every other error, and a file that stays busy through
+/// the last attempt, fails closed with `Io`.
 #[cfg(unix)]
 fn spawn_unless_busy(
     command: &mut Command,
@@ -2515,6 +2515,9 @@ fn spawn_unless_busy(
     let mut delay = Duration::from_millis(1);
     let mut retries = 8;
     loop {
+        if start.elapsed() >= budget {
+            return Err(ToolFailure::Timeout);
+        }
         let error = match command.spawn() {
             Ok(child) => return Ok(child),
             Err(error) => error,
@@ -4149,6 +4152,19 @@ mod tests {
             failure.map(|output| output.status)
         );
         assert!(elapsed < Duration::from_millis(100), "{elapsed:?}");
+
+        // An exhausted budget starts nothing, even for an executable that is
+        // not busy. `run_fixed` would time out either way, so this checks the
+        // start itself.
+        match spawn_unless_busy(&mut Command::new(&script), Instant::now(), Duration::ZERO) {
+            Err(ToolFailure::Timeout) => {}
+            Ok(mut child) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("an exhausted budget started a process");
+            }
+            Err(other) => panic!("unexpected {other:?}"),
+        }
         let _ = fs::remove_dir_all(root);
     }
 

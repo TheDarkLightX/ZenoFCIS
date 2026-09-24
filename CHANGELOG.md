@@ -6,6 +6,12 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Check the time budget before the first process start as well, so an
+  exhausted budget starts nothing, in the formal-tools adapter and the
+  synthesis runner. The gate evidence recorder also compares the source with
+  the start after every gate and stops at the first change; a change made and
+  reverted between two checks is still not detected.
+
 - Fix two regressions found by an independent review of 562926d. The busy
   executable retry in the formal-tools adapter and the synthesis runner no
   longer outlives the caller's time budget: no attempt starts after it ends,

@@ -171,8 +171,11 @@ JSON:
 - every ignored test, and the step, acceptance scenario, or parent test that
   runs it, or `null` when nothing in the record does.
 
-The tool refuses to start when tracked files differ from the commit, and fails
-if the commit or tracked files change during the run.
+The tool refuses to start when tracked files differ from the commit. It compares
+the commit, tree, and tracked files with the start after every gate and again
+immediately before writing, and writes nothing if any differ. A change made and
+reverted between two checks is not detected, so run it in a checkout that
+nothing else modifies.
 
 ## Failure and recovery
 
