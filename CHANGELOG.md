@@ -6,6 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Explain in the README how exhaustive verification differs from correctness
+  by construction, and why both are proofs. The synthesis section now shows
+  what each approach trusts, what a bug in the builder does, and what each can
+  cover. It also separates the guarantee for a selected program, which does
+  not trust the search, from a "no solution" result, which does. It names the
+  full synthesis limits (65,536 inputs, 4,096 possible outputs, 16 fields on
+  each side of a contract, 1,000,000 candidates) and the four things the
+  guarantee depends on, including a checker that is tested but not formally
+  proven.
+
 - Explain in the README why ZenoFCIS separates deciding from acting, how
   untrusted proposers and small deterministic judges divide the work, what
   that gives developers, LLMs, and agents, and what synthesized code is
