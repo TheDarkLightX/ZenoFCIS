@@ -563,17 +563,17 @@
           "lines": [
             834,
             884,
-            2973,
-            3032,
-            3241
+            2975,
+            3034,
+            3243
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             143,
-            3112,
-            3126
+            3114,
+            3128
           ]
         },
         {
@@ -593,7 +593,7 @@
             1167,
             2257,
             2387,
-            2593
+            2595
           ]
         },
         {
@@ -605,8 +605,8 @@
             996,
             1011,
             1014,
-            2847,
-            2853
+            2849,
+            2855
           ]
         },
         {
@@ -615,13 +615,13 @@
             699,
             741,
             966,
-            2781
+            2783
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            2975
+            2977
           ]
         },
         {
@@ -637,9 +637,9 @@
             294,
             343,
             543,
-            2720,
-            2743,
-            2749
+            2722,
+            2745,
+            2751
           ]
         },
         {
@@ -661,8 +661,8 @@
             2387,
             2390,
             2457,
-            2593,
-            2605
+            2595,
+            2607
           ]
         },
         {
@@ -4349,6 +4349,88 @@
     },
     {
       "categories": [
+        "errors-observability",
+        "input-canonicalization",
+        "resource-exhaustion",
+        "secrets-crypto",
+        "side-covert-channel",
+        "state-replay"
+      ],
+      "components": {
+        "authority": 4,
+        "chain_adjacency": 5,
+        "complexity": 4,
+        "hazardous_mechanisms": 4,
+        "reachability": 3,
+        "state_coupling": 3
+      },
+      "confidence": "low",
+      "cwes": [
+        "CWE-20",
+        "CWE-174",
+        "CWE-200",
+        "CWE-203",
+        "CWE-208",
+        "CWE-209",
+        "CWE-248",
+        "CWE-321",
+        "CWE-327",
+        "CWE-331",
+        "CWE-362",
+        "CWE-367",
+        "CWE-385",
+        "CWE-400",
+        "CWE-502",
+        "CWE-532",
+        "CWE-664",
+        "CWE-667",
+        "CWE-674",
+        "CWE-754",
+        "CWE-770",
+        "CWE-778",
+        "CWE-789",
+        "CWE-834",
+        "CWE-841",
+        "CWE-1287"
+      ],
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/src/laws.rs",
+      "path_roles": [],
+      "production_lines": 218,
+      "rank": 44,
+      "score": 75,
+      "signals": [
+        {
+          "id": "canonical-commitment",
+          "lines": [
+            198,
+            228
+          ]
+        },
+        {
+          "id": "information-flow-observation",
+          "lines": [
+            43
+          ]
+        },
+        {
+          "id": "panic-or-unchecked-result",
+          "lines": [
+            47,
+            50,
+            90
+          ]
+        },
+        {
+          "id": "potential-amplification",
+          "lines": [
+            74
+          ]
+        }
+      ],
+      "tier": "priority-2"
+    },
+    {
+      "categories": [
         "effects-injection",
         "formal-evidence",
         "input-canonicalization",
@@ -4388,7 +4470,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 207,
-      "rank": 44,
+      "rank": 45,
       "score": 73,
       "signals": [
         {
@@ -4456,7 +4538,7 @@
         "semantic-authority"
       ],
       "production_lines": 2446,
-      "rank": 45,
+      "rank": 46,
       "score": 73,
       "signals": [
         {
@@ -4524,7 +4606,7 @@
         "workflow"
       ],
       "production_lines": 36,
-      "rank": 46,
+      "rank": 47,
       "score": 71,
       "signals": [
         {
@@ -4591,7 +4673,7 @@
         "semantic-authority"
       ],
       "production_lines": 1455,
-      "rank": 47,
+      "rank": 48,
       "score": 71,
       "signals": [
         {
@@ -4660,7 +4742,7 @@
         "generator-boundary"
       ],
       "production_lines": 283,
-      "rank": 48,
+      "rank": 49,
       "score": 71,
       "signals": [
         {
@@ -4722,7 +4804,7 @@
         "semantic-authority"
       ],
       "production_lines": 1136,
-      "rank": 49,
+      "rank": 50,
       "score": 71,
       "signals": [
         {
@@ -4750,66 +4832,6 @@
           "id": "replay-outbox-commit",
           "lines": [
             871
-          ]
-        }
-      ],
-      "tier": "priority-2"
-    },
-    {
-      "categories": [
-        "codegen-build",
-        "input-canonicalization",
-        "resource-exhaustion",
-        "state-replay"
-      ],
-      "components": {
-        "authority": 4,
-        "chain_adjacency": 4,
-        "complexity": 1,
-        "hazardous_mechanisms": 4,
-        "reachability": 4,
-        "state_coupling": 3
-      },
-      "confidence": "medium",
-      "cwes": [
-        "CWE-20",
-        "CWE-73",
-        "CWE-94",
-        "CWE-174",
-        "CWE-353",
-        "CWE-362",
-        "CWE-367",
-        "CWE-400",
-        "CWE-494",
-        "CWE-502",
-        "CWE-664",
-        "CWE-667",
-        "CWE-674",
-        "CWE-770",
-        "CWE-789",
-        "CWE-829",
-        "CWE-834",
-        "CWE-841",
-        "CWE-1287"
-      ],
-      "path": "crates/zeno-fcis-spec/src/views.rs",
-      "path_roles": [
-        "strict-admission"
-      ],
-      "production_lines": 319,
-      "rank": 50,
-      "score": 71,
-      "signals": [
-        {
-          "id": "canonical-commitment",
-          "lines": [
-            94
-          ]
-        },
-        {
-          "id": "generated-source",
-          "lines": [
-            196
           ]
         }
       ],
@@ -5151,16 +5173,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3496797,
+    "admitted_bytes": 3498553,
     "admitted_files": 195,
-    "inventory_sha256": "56d6d5e59dce49a35cbd04fd73f99bad7099938f8f9e96d55f2393607a8ff436",
+    "inventory_sha256": "9c05e3adf18510ae93798bc6a547d76ba73dab96e1ef25d53495e8bbdb25857a",
     "ranked_above_minimum": 157,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 13,
-      "priority-2": 44,
-      "priority-3": 100,
+      "priority-2": 45,
+      "priority-3": 99,
       "priority-4": 15,
       "priority-5": 23
     }

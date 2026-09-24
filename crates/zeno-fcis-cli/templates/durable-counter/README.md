@@ -76,7 +76,7 @@ directions, that genesis is exactly zero, and that every admitted state is
 reachable from genesis. Swapping the count and failure bindings in the adapter
 fails these tests. The project's owner accepted the examples on 2026-09-23.
 
-## Prove that the counters never go negative
+## Check by induction that the counters never go negative
 
 Claim 600 in `project.zeno` states an invariant, and names the laws its
 induction step may assume:
@@ -102,9 +102,13 @@ result: a solver's `unsat` is attested, not independently checked. Run it on a
 copy, because `prove` keeps its records in `.zeno-fcis/evidence` next to the
 project file.
 
-The step says something about this application only with two more checks,
+The step says something about this application only with more checks,
 which `tests/induction.rs` runs:
-- the invariant holds on the exact genesis state that a new shell stores;
+- the law checker observes the state before and after every decision through
+  one function, `state_observations`, which reads every field the invariant
+  reads. The invariant has a definite value on every admitted state;
+- the invariant holds on the exact genesis state that a new shell stores, as
+  that observer sees it;
 - the law manifest checks law 501 on accepts and law 502 on committed
   failures, as the claim assumes.
 

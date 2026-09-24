@@ -116,9 +116,10 @@ describe the full design.
     published;
   - a finite decision core can be synthesized and verified exhaustively
     instead of being written by hand;
-  - an [inductive claim](docs/INDUCTIVE_CLAIMS.md) proves an invariant over the
-    full integer range by induction over the laws the authority enforces, for
-    a hand-written program as much as a synthesized one.
+  - an [inductive claim](docs/INDUCTIVE_CLAIMS.md) checks an invariant over
+    the full integer range by induction over the laws the authority enforces,
+    for a hand-written program as much as a synthesized one. The solver's
+    `unsat` for the step is attested, not independently checked.
 - **Agents** get reproducible, machine-readable feedback:
   - `zeno-fcis describe` and versioned JSON results with stable exit codes;
   - counterexamples to repair against: a synthesis refutation, or a solver

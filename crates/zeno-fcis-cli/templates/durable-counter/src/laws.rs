@@ -39,40 +39,55 @@ impl LawEvidenceVerifier for NoExternalProofs {
     }
 }
 
+fn observe(root: ProjectionRoot, raw: &[u32], value: i128) -> Observation {
+    Observation::new(
+        ProjectionPath::try_new(
+            root,
+            raw.iter()
+                .map(|n| StableId::new(*n).expect("static ID"))
+                .collect(),
+        )
+        .expect("static path"),
+        value,
+    )
+}
+
+/// Observes one counter state under `root`.
+///
+/// The law checker observes the state before and after every decision
+/// through this one mapping. So an invariant over `pre.` paths, such as claim
+/// 600, reads the same fields at genesis, before a step, and after it, which
+/// the induction in `tests/induction.rs` relies on.
+pub fn state_observations(root: ProjectionRoot, state: &CounterState) -> [Observation; 2] {
+    [
+        observe(root, &[100, 110], state.count.0),
+        observe(root, &[100, 111], state.failures.0),
+    ]
+}
+
 fn observations(
     pre: &CounterState,
     post: &CounterState,
     command: &CounterCommand,
     context: &CounterContext,
 ) -> TraceStep {
-    let observe = |root, raw: &[u32], value| {
-        Observation::new(
-            ProjectionPath::try_new(
-                root,
-                raw.iter()
-                    .map(|n| StableId::new(*n).expect("static ID"))
-                    .collect(),
-            )
-            .expect("static path"),
-            value,
-        )
-    };
-    TraceStep::try_new(vec![
-        observe(ProjectionRoot::Pre, &[100, 110], pre.count.0),
-        observe(ProjectionRoot::Pre, &[100, 111], pre.failures.0),
-        observe(ProjectionRoot::Post, &[100, 110], post.count.0),
-        observe(ProjectionRoot::Post, &[100, 111], post.failures.0),
-        observe(
-            ProjectionRoot::Command,
-            &[101],
-            match command {
-                CounterCommand::Increment => 120,
-                CounterCommand::RecordFailure => 121,
-            },
-        ),
-        observe(ProjectionRoot::Context, &[102], i128::from(context.0)),
-    ])
-    .expect("distinct reviewed projections")
+    let mut all = Vec::with_capacity(6);
+    all.extend(state_observations(ProjectionRoot::Pre, pre));
+    all.extend(state_observations(ProjectionRoot::Post, post));
+    all.push(observe(
+        ProjectionRoot::Command,
+        &[101],
+        match command {
+            CounterCommand::Increment => 120,
+            CounterCommand::RecordFailure => 121,
+        },
+    ));
+    all.push(observe(
+        ProjectionRoot::Context,
+        &[102],
+        i128::from(context.0),
+    ));
+    TraceStep::try_new(all).expect("distinct reviewed projections")
 }
 
 impl CounterLaws {

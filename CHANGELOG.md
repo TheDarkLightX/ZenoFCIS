@@ -20,9 +20,10 @@ embedded in ZenoFCIS values.
     evaluate to true on the model.
   - Applications check the rest of the argument: `evaluate_invariant` on the
     exact genesis state, and `LawManifest::check_step_assumptions` against the
-    law manifest. The durable-counter template proves
-    `counters_never_negative` from its action laws alone, and
-    `tests/induction.rs` runs both checks. Adding the claim changes that
+    law manifest. For the durable-counter template's
+    `counters_never_negative`, CVC5 answers `unsat` (attested) from its action
+    laws alone, and `tests/induction.rs` runs the application's checks
+    through the law checker's own observer. Adding the claim changes that
     template's policy identity.
   - A pinned test requires CVC5 and Z3 to agree with exhaustive replay on
     eight inductive steps; it runs in the formal-tools workflow and in the
@@ -31,8 +32,8 @@ embedded in ZenoFCIS values.
     declared values (`declared_domain`), which admission guarantees, and
     replay refuses a model outside them. Action laws written as
     `command == X -> ...` otherwise leave an undeclared command unconstrained.
-    With this, the compliance-gateway strikes invariant proves from its own
-    laws.
+    With this, CVC5 answers `unsat` (attested) for the compliance-gateway
+    strikes invariant, from its own laws.
   - See `docs/INDUCTIVE_CLAIMS.md`, including its limits: the step cannot yet
     assume integer ranges, which live in `build.rs`, and there is no Lean
     export for it.
