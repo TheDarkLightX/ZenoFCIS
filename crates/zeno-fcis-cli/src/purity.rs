@@ -1966,6 +1966,22 @@ mod tests {
                 "compliance-gateway/transition.rs",
                 include_str!("../templates/compliance-gateway/synthesized/transition.rs"),
             ),
+            (
+                "withdrawal-queue/program.rs",
+                include_str!("../templates/withdrawal-queue/src/program.rs"),
+            ),
+            (
+                "withdrawal-queue/laws.rs",
+                include_str!("../templates/withdrawal-queue/src/laws.rs"),
+            ),
+            (
+                "withdrawal-queue/controller.rs",
+                include_str!("../templates/withdrawal-queue/src/controller.rs"),
+            ),
+            (
+                "withdrawal-queue/transition.rs",
+                include_str!("../templates/withdrawal-queue/synthesized/transition.rs"),
+            ),
         ] {
             let findings = findings(name, source);
             assert!(findings.is_empty(), "{name}: {findings:?}");

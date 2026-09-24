@@ -1,0 +1,98 @@
+zeno 1;
+project 1 withdrawal_queue;
+namespace 2 vault;
+// One vault with two withdrawal lanes, A and B. Each lane's owner requests a
+// withdrawal, and a keeper's tick pays at most one lane by following a
+// checked controller. The tick's context carries an alarm. An alarm pauses
+// payouts, but the controller's checked property is that every requested
+// withdrawal is still paid: alarms delay, they never freeze.
+type 100 state Vault;
+type 101 command VaultCommand;
+type 102 context TickContext;
+type 103 destination PayoutDestination;
+type 104 payload PayoutRequest;
+type 105 int Money;
+type 106 int Amount;
+type 107 data VaultAction;
+type 108 data Lane;
+type 109 data LaneStatus;
+type 110 int PauseTicks;
+type 111 bool Flag;
+type 112 data Caller;
+field 120 100 balance 105;
+field 121 100 lane_a 109;
+field 122 100 amount_a 105;
+field 123 100 lane_b 109;
+field 124 100 amount_b 105;
+field 125 100 pause 110;
+field 126 100 must_serve 111;
+field 127 100 priority 108;
+field 130 101 action 107;
+field 131 101 lane 108;
+field 132 101 amount 106;
+field 140 102 caller 112;
+field 141 102 alarm 111;
+field 150 104 paid_lane 108;
+field 151 104 paid_amount 106;
+variant 160 107 Deposit none;
+variant 161 107 RequestWithdrawal none;
+variant 162 107 Tick none;
+variant 170 108 A none;
+variant 171 108 B none;
+variant 180 109 Empty none;
+variant 181 109 Arrived none;
+variant 182 109 Pending none;
+variant 190 112 Operator none;
+variant 191 112 OwnerA none;
+variant 192 112 OwnerB none;
+variant 193 112 Keeper none;
+reason 200 wrong_caller precedence 0;
+reason 201 lane_occupied precedence 1;
+reason 202 insufficient_balance precedence 2;
+reason 203 over_capacity precedence 3;
+channel 300 payout destination 103 payload 104;
+component 400 vault {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+// The balance stays within the vault's capacity of 4 and covers every
+// requested amount, an empty lane holds no amount and an occupied one holds
+// at least one unit, and must-serve is set only outside a pause while a lane
+// is pending.
+law 500 vault_solvent = post.100.120 <= 4 && post.100.120 >= post.100.122 + post.100.124 && (post.100.121 == 180 -> post.100.122 == 0) && (post.100.121 != 180 -> post.100.122 >= 1) && (post.100.123 == 180 -> post.100.124 == 0) && (post.100.123 != 180 -> post.100.124 >= 1) && (post.100.126 == 1 -> post.100.125 == 0 && (post.100.121 == 182 || post.100.123 == 182));
+// Money moves only as the command says: a deposit adds its amount, a request
+// reserves its amount inside the balance, and a tick removes from the balance
+// exactly the amounts that leave the lanes. An amount leaves a lane exactly
+// when the tick empties that lane, and at most one lane per tick.
+law 501 funds_conserved = (command.101.130 == 160 -> post.100.120 == pre.100.120 + command.101.132 && post.100.122 == pre.100.122 && post.100.124 == pre.100.124) && (command.101.130 == 161 -> post.100.120 == pre.100.120 && (command.101.131 == 170 -> post.100.122 == command.101.132 && post.100.124 == pre.100.124) && (command.101.131 == 171 -> post.100.124 == command.101.132 && post.100.122 == pre.100.122)) && (command.101.130 == 162 -> post.100.120 + pre.100.122 - post.100.122 + pre.100.124 - post.100.124 == pre.100.120 && (post.100.121 == 180 -> post.100.122 == 0) && (post.100.121 != 180 -> post.100.122 == pre.100.122) && (post.100.123 == 180 -> post.100.124 == 0) && (post.100.123 != 180 -> post.100.124 == pre.100.124) && (post.100.122 == pre.100.122 || post.100.124 == pre.100.124));
+// Each command comes from its caller and meets its rule: a deposit from the
+// operator adds at least one unit within the capacity of 4; a request from
+// the lane's owner reserves at least one unit of the unreserved balance on an
+// empty lane and records the arrival; a tick comes from the keeper. Deposits
+// and requests leave the controller's part of the state alone.
+law 502 commands_authorized = (command.101.130 == 160 -> context.102.140 == 190 && command.101.132 >= 1 && pre.100.120 + command.101.132 <= 4 && post.100.121 == pre.100.121 && post.100.123 == pre.100.123 && post.100.125 == pre.100.125 && post.100.126 == pre.100.126 && post.100.127 == pre.100.127) && (command.101.130 == 161 -> command.101.132 >= 1 && command.101.132 + pre.100.122 + pre.100.124 <= pre.100.120 && post.100.125 == pre.100.125 && post.100.126 == pre.100.126 && post.100.127 == pre.100.127 && (command.101.131 == 170 -> context.102.140 == 191 && pre.100.121 == 180 && post.100.121 == 181 && post.100.123 == pre.100.123) && (command.101.131 == 171 -> context.102.140 == 192 && pre.100.123 == 180 && post.100.123 == 181 && post.100.121 == pre.100.121)) && (command.101.130 == 162 -> context.102.140 == 193);
+// A tick follows the vault's rules: a paused vault pays nothing and counts the
+// pause down; an alarm outside a pause and outside must-serve pays nothing and
+// starts a pause of two more ticks; otherwise the pause stays at zero; every
+// arrived lane is presented, so none stays arrived; an empty lane stays empty;
+// and must-serve is set exactly when the last paused tick ends with a lane
+// due. Which lane is paid is the strategy's choice: the strategy row and the
+// contract's transition are checked in Rust.
+law 503 tick_follows_the_controller = command.101.130 == 162 -> post.100.121 != 181 && post.100.123 != 181 && (pre.100.121 == 180 -> post.100.121 == 180) && (pre.100.123 == 180 -> post.100.123 == 180) && (pre.100.125 > 0 -> post.100.122 == pre.100.122 && post.100.124 == pre.100.124 && post.100.125 == pre.100.125 - 1) && (pre.100.125 == 0 && context.102.141 == 1 && pre.100.126 == 0 -> post.100.122 == pre.100.122 && post.100.124 == pre.100.124 && post.100.125 == 2) && (pre.100.125 == 0 && (context.102.141 == 0 || pre.100.126 == 1) -> post.100.125 == 0) && (post.100.126 == 1 -> pre.100.125 == 1 && (pre.100.121 != 180 || pre.100.123 != 180)) && (pre.100.125 == 1 && (pre.100.121 != 180 || pre.100.123 != 180) -> post.100.126 == 1);
+// Two claims for `zeno-fcis prove` state, by induction over every committing
+// decision, what the laws above establish for every integer, not only the
+// schema's domain. The authority commits a decision only if every law
+// enforced on it holds, and this application never commits a failure, so
+// laws 501 to 503 bound every committing decision. Claim 600 is law 500's
+// invariant over the vault before a decision: laws 501 to 503 alone keep
+// every committed vault solvent and within capacity. Claim 601 states that
+// laws 502 and 503 keep the pause within the controller's range. Each step
+// says something about this application only with tests/claims.rs, which
+// checks the observer, the exact genesis, and the law manifest.
+claim 600 vault_stays_solvent all inductive assume [501, 502, 503] = pre.100.120 <= 4 && pre.100.120 >= pre.100.122 + pre.100.124 && (pre.100.121 == 180 -> pre.100.122 == 0) && (pre.100.121 != 180 -> pre.100.122 >= 1) && (pre.100.123 == 180 -> pre.100.124 == 0) && (pre.100.123 != 180 -> pre.100.124 >= 1) && (pre.100.126 == 1 -> pre.100.125 == 0 && (pre.100.121 == 182 || pre.100.123 == 182));
+claim 601 pause_stays_in_range all inductive assume [502, 503] = pre.100.125 >= 0 && pre.100.125 <= 2;

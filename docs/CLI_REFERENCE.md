@@ -5,7 +5,7 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
 zeno-fcis describe [COMMAND...]
-zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway
+zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue
 zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
@@ -78,6 +78,11 @@ Four more development templates build realistic applications the same way:
 - [`compliance-gateway`](../crates/zeno-fcis-cli/templates/compliance-gateway/README.md):
   an expert system's rule base turned into a synthesized core, where every
   decision names the rule that fired.
+- [`withdrawal-queue`](../crates/zeno-fcis-cli/templates/withdrawal-queue/README.md):
+  a controller step synthesized from a sketch of a fair policy, whose table
+  OrbitSynthesis checks for every input sequence, so alarms delay
+  withdrawals but never freeze them; a refinement law ties each tick to the
+  finite model.
 
 In each, `check --require-substantive --require-resolved-paths` passes, and
 the same gate compiles and exercises it as an isolated consumer.

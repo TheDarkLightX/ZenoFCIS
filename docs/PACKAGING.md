@@ -51,8 +51,8 @@ CycloneDX 1.6, and content-addresses every retained artifact.
 
 Before deleting the unpacked workspace, the packager also builds its CLI and
 uses that executable to emit fresh durable-counter, prepared-counter,
-account-lockout, order-fulfillment, inventory-reservation, and
-compliance-gateway applications.
+account-lockout, order-fulfillment, inventory-reservation,
+compliance-gateway, and withdrawal-queue applications.
 Each separate consumer resolves internal dependencies only from the extracted archives and
 external dependencies from the reviewed lock. Formatting, Clippy, tests, and
 the complete application demonstration must all pass. The same check runs the

@@ -187,6 +187,19 @@ and Z3 4.16.0, all run on 2026-09-24:
   counterexample before declared domains. With them, CVC5 answers `unsat`
   (attested) from the gateway's own laws. The template ships this as its
   claim 600, with `tests/claims.rs` for the application's checks.
+- The withdrawal-queue template's solvency invariant, the formula of its law
+  500, assumed on every commit its conservation, authorization, and tick laws,
+  which its law checker enforces on every committing decision because the
+  application never commits a failure. The draft's formulas under-described
+  the program, and CVC5 refuted the step four times, each with a transition
+  the README's rules forbid: a deposit from 4 to 5, a deposit of −1, a tick
+  from a pause outside the schema's range that set must-serve, and a tick
+  that emptied a lane while keeping its amount. Each was a rule the Rust part
+  of the law checker enforced but no formula stated. With the deposit's
+  capacity, positive amounts, the must-serve rule, and the lane-and-amount
+  coupling stated as laws, CVC5 answers `unsat` (attested). The pause's range,
+  `0 <= pause <= 2`, was attested from the tick law on the first run. The
+  template ships both as claims 600 and 601, with `tests/claims.rs`.
 
 ## Limits
 
