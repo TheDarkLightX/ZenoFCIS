@@ -6,6 +6,11 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Refuse escaped library keys in the purity manifest check. Cargo decodes
+  Unicode escapes in quoted keys, so an escaped `path` could select source
+  outside `src/` while the check reported the unused default root as confined.
+  Unsupported escaped keys now prevent confinement with a stated reason.
+
 - Add determinism checks for hand-written decision code.
   - `CatalogCommitAuthority::execute_probed` executes one invocation 2 to 64
     times, each on its own copy of the admitted values. It returns the first

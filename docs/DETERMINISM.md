@@ -87,7 +87,8 @@ confined and is reported, including:
 - `package =` renames and `workspace = true` inheritance;
 - `[patch]` and `[replace]`;
 - a `[lib]` `path`, `autolib`, and any `[[bin]]` target;
-- escape sequences and multi-line strings in dependency tables;
+- escape sequences in library keys or dependency tables, and multi-line
+  strings in dependency tables;
 - dependencies or targets declared outside their tables, such as
   `lib.path = "..."`.
 
