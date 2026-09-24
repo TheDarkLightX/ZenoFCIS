@@ -1982,6 +1982,18 @@ mod tests {
                 "withdrawal-queue/transition.rs",
                 include_str!("../templates/withdrawal-queue/synthesized/transition.rs"),
             ),
+            (
+                "agent-treasury-guard/program.rs",
+                include_str!("../templates/agent-treasury-guard/src/program.rs"),
+            ),
+            (
+                "agent-treasury-guard/laws.rs",
+                include_str!("../templates/agent-treasury-guard/src/laws.rs"),
+            ),
+            (
+                "agent-treasury-guard/transition.rs",
+                include_str!("../templates/agent-treasury-guard/synthesized/transition.rs"),
+            ),
         ] {
             let findings = findings(name, source);
             assert!(findings.is_empty(), "{name}: {findings:?}");

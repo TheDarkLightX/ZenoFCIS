@@ -46,14 +46,17 @@ For a complete development application with typed transitions, reviewed laws,
 SQLite restart/replay, and outbox delivery, follow the
 [generated durable-counter journey](GENERATED_APPLICATION_MILESTONE.md). Its
 local acceptance command validates an isolated consumer against this checkout;
-release-package qualification is a separate v1 gate. Five more complete
+release-package qualification is a separate v1 gate. Six more complete
 examples show common patterns: `account-lockout` (time as an input and
 committed failures), `order-fulfillment` (idempotent external requests),
-`inventory-reservation` (a synthesized core and a conservation law), and
-`compliance-gateway` (a rule base as the synthesis contract), and
+`inventory-reservation` (a synthesized core and a conservation law),
+`compliance-gateway` (a rule base as the synthesis contract),
 `withdrawal-queue` (a synthesized controller step whose table is checked
-for every input sequence, and a refinement law that ties each tick to it).
-Create one with
+for every input sequence, and a refinement law that ties each tick to it),
+and `agent-treasury-guard` (an AI agent as an untrusted proposer, guarded by
+a budget, a reserve, and a slippage bound, with a synthesized precedence
+core and inductive claims, attested by CVC5 through `prove`, that its laws
+keep those limits). Create one with
 `new DIR --template account-lockout` and start from its README.
 
 Use umbrella feature `authoring` for the pure parser, typed AST, builders,

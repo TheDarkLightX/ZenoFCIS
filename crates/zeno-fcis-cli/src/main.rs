@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 mod account_lockout;
+mod agent_treasury_guard;
 mod compliance_gateway;
 mod durable_counter;
 mod inventory_reservation;
@@ -240,6 +241,7 @@ enum Template {
     InventoryReservation,
     ComplianceGateway,
     WithdrawalQueue,
+    AgentTreasuryGuard,
 }
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
@@ -492,6 +494,7 @@ fn new_project(dir: &Path, template: Template) -> u8 {
         Template::InventoryReservation => Some(inventory_reservation::FILES),
         Template::ComplianceGateway => Some(compliance_gateway::FILES),
         Template::WithdrawalQueue => Some(withdrawal_queue::FILES),
+        Template::AgentTreasuryGuard => Some(agent_treasury_guard::FILES),
     };
     if let Some(files) = application {
         for (relative, content) in files {
@@ -523,7 +526,8 @@ fn new_project(dir: &Path, template: Template) -> u8 {
         | Template::OrderFulfillment
         | Template::InventoryReservation
         | Template::ComplianceGateway
-        | Template::WithdrawalQueue => unreachable!("application templates return above"),
+        | Template::WithdrawalQueue
+        | Template::AgentTreasuryGuard => unreachable!("application templates return above"),
     };
     if let Err(error) = atomic_create(&dir.join("project.zeno"), source.as_bytes()) {
         return io_error("write project", error);
@@ -1531,6 +1535,7 @@ mod tests {
             ("inventory-reservation", inventory_reservation::FILES),
             ("compliance-gateway", compliance_gateway::FILES),
             ("withdrawal-queue", withdrawal_queue::FILES),
+            ("agent-treasury-guard", agent_treasury_guard::FILES),
         ] {
             let mut pending = vec![root.join(directory)];
             let mut on_disk = BTreeSet::new();

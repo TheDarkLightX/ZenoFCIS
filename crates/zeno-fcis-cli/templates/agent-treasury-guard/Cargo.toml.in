@@ -1,0 +1,46 @@
+[package]
+name = "agent-treasury-guard"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+# The emitted application is independent of any enclosing workspace.
+[workspace]
+
+[dependencies]
+zeno-fcis-authority = "=1.1.0"
+zeno-fcis-catalog = "=1.1.0"
+zeno-fcis-codec = "=1.1.0"
+zeno-fcis-compose = "=1.1.0"
+zeno-fcis-core = "=1.1.0"
+zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
+zeno-fcis-evidence = "=1.1.0"
+zeno-fcis-laws = "=1.1.0"
+zeno-fcis-patch = "=1.1.0"
+zeno-fcis-plan = "=1.1.0"
+zeno-fcis-project = "=1.1.0"
+zeno-fcis-schema = "=1.1.0"
+zeno-fcis-shell = "=1.1.0"
+zeno-fcis-shell-sqlite = "=1.1.0"
+zeno-fcis-spec = "=1.1.0"
+zeno-fcis-transition = "=1.1.0"
+zeno-fcis-value = "=1.1.0"
+
+[build-dependencies]
+zeno-fcis-bootstrap = "=1.1.0"
+zeno-fcis-catalog = "=1.1.0"
+zeno-fcis-codec = "=1.1.0"
+zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
+zeno-fcis-laws = "=1.1.0"
+zeno-fcis-project = "=1.1.0"
+zeno-fcis-schema = "=1.1.0"
+zeno-fcis-spec = "=1.1.0"
+
+# The tests decide about thirty thousand inputs through the authority, which
+# hashes every decision. A light optimization keeps them under a few seconds;
+# overflow checks and debug assertions stay on.
+[profile.dev]
+debug = 0
+incremental = false
+opt-level = 1

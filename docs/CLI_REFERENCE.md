@@ -5,7 +5,7 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
 zeno-fcis describe [COMMAND...]
-zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue
+zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue|agent-treasury-guard
 zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
@@ -83,6 +83,12 @@ Four more development templates build realistic applications the same way:
   OrbitSynthesis checks for every input sequence, so alarms delay
   withdrawals but never freeze them; a refinement law ties each tick to the
   finite model.
+- [`agent-treasury-guard`](../crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md):
+  an AI agent as an untrusted proposer of swaps, guarded by a budget, a
+  reserve, and a slippage bound; a synthesized core decides the rule
+  precedence, inductive claims attested by CVC5 through `prove` state that
+  the action laws keep the treasury within its limits, and requests to
+  ZenoDEX are shaped after its `SwapIntent`.
 
 In each, `check --require-substantive --require-resolved-paths` passes, and
 the same gate compiles and exercises it as an isolated consumer.

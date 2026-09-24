@@ -205,11 +205,21 @@ EXAMPLE_TEMPLATES = {
         "balance": 0, "deposited": 4, "paid": 4, "payout_ticks": [4, 8],
         "bundles": 12, "pending": 0, "deliveries": 2,
     },
+    "agent-treasury-guard": {
+        "status": "passed",
+        "decisions": ["Accept", "Reject", "Reject", "Reject", "Accept", "Reject", "Reject",
+                      "Reject", "Reject", "Reject", "Reject", "Accept", "Reject",
+                      "CommittedFailure", "Reject", "Accept", "CommittedFailure", "Reject",
+                      "Accept", "Accept", "Reject", "Accept", "Accept"],
+        "quote": 5, "base": 3, "spent_today": 3, "last_seen": 10, "swap": "NoSwap",
+        "bundles": 10, "pending": 0, "deliveries": 5,
+    },
 }
 # Examples whose decision core is synthesized, with the check of that synthesis.
 SYNTHESIZED_EXAMPLES = {"inventory-reservation": check_synthesis.exercise_inventory,
                         "compliance-gateway": check_synthesis.exercise_gateway,
-                        "withdrawal-queue": check_synthesis.exercise_withdrawal}
+                        "withdrawal-queue": check_synthesis.exercise_withdrawal,
+                        "agent-treasury-guard": check_synthesis.exercise_guard}
 # Examples whose decision follows a controller checked by OrbitSynthesis: the
 # files its checker reads, and the strategies it must accept and reject.
 CONTROLLER_EXAMPLES = {

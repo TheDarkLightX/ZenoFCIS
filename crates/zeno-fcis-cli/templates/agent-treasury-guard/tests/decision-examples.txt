@@ -1,0 +1,57 @@
+# Decision examples for the agent-treasury-guard template.
+#
+# Provenance: drafted on 2026-09-24 from the rules in README.md by the AI
+# agent that wrote the program and law checker, so the drafting was not blind
+# to the code. Review by the project's owner: pending.
+#
+# Numeric IDs come from project.zeno:
+# - state fields 130 quote (0 to 20), 131 base (0 to 20), 132 spent_today
+#   (0 to 4), 133 last_seen (tick 0 to 11), 134 pending (170 NoSwap,
+#   171 PendingBuy, 172 PendingSell), 135 pending_amount (0 to 3), and
+#   136 pending_min_out (0 to 3);
+# - command fields 140 action (175 ProposeSwap, 176 SwapSettled,
+#   177 SwapFailed), 141 direction (173 BuyBase, 174 SellBase), 142 amount
+#   (1 to 3), 143 min_out (0 to 3), 144 intent (tick 0 to 11), and
+#   145 amount_out (0 to 3); an action ignores the fields it does not use,
+#   which the examples set to their smallest admitted values;
+# - context fields 150 caller (178 Agent, 179 Dex), 151 now (tick 0 to 11),
+#   152 price (1 or 2, quote per base), 153 price_time (tick 0 to 11), and
+#   154 model (180 TreasuryAgentV2, the approved model; 181 TreasuryAgentV1;
+#   182 UnlistedModel);
+# - reasons 200 wrong_caller, 201 clock_not_advanced, 202 unapproved_model,
+#   203 stale_price, 204 swap_outstanding, 205 no_swap_outstanding,
+#   206 stale_callback, 207 short_settlement, 208 over_trade_cap,
+#   209 over_daily_budget, 210 slippage_too_wide, 211 below_reserve, and the
+#   committed failure 212 swap_failed;
+# - a request on channel 300 to `zenodex`: intent_number, asset_in and
+#   asset_out (183 Quote, 184 Base), amount_in, min_amount_out, deadline.
+#
+# A day is 4 ticks; the budget is 4 quote per day, the cap 3 per swap, the
+# reserve 2 quote, and a swap keeps at least three quarters of the oracle
+# value, rounded up.
+#
+# quote base spent_today last_seen pending pending_amount pending_min_out | action direction amount min_out intent amount_out | caller now price price_time model | outcome reason post.130 post.131 post.132 post.133 post.134 post.135 post.136 | request
+6 1 0 0 170 0 0 | 175 173 2 2 0 0 | 178 1 1 1 180 | accept - 4 1 2 1 171 2 2 | 1 183 184 2 2 3
+4 1 2 1 171 2 2 | 176 173 1 0 1 2 | 179 2 1 2 180 | accept - 4 3 2 2 170 0 0 | -
+4 1 2 1 171 2 2 | 175 173 1 1 0 0 | 178 2 1 2 180 | reject 204 4 1 2 1 171 2 2 | -
+4 1 2 1 171 2 2 | 176 173 1 0 1 2 | 178 2 1 2 180 | reject 200 4 1 2 1 171 2 2 | -
+4 1 2 1 171 2 2 | 176 173 1 0 1 1 | 179 2 1 2 180 | reject 207 4 1 2 1 171 2 2 | -
+4 3 2 2 170 0 0 | 176 173 1 0 1 2 | 179 3 1 3 180 | reject 205 4 3 2 2 170 0 0 | -
+4 3 2 2 170 0 0 | 175 174 2 3 0 0 | 178 3 2 3 180 | reject 208 4 3 2 2 170 0 0 | -
+4 3 2 2 170 0 0 | 175 173 1 1 0 0 | 178 3 1 1 180 | reject 203 4 3 2 2 170 0 0 | -
+4 3 2 2 170 0 0 | 175 173 3 3 0 0 | 178 3 1 3 180 | reject 209 4 3 2 2 170 0 0 | -
+4 3 2 2 170 0 0 | 175 173 2 1 0 0 | 178 3 1 3 180 | reject 210 4 3 2 2 170 0 0 | -
+4 3 2 2 170 0 0 | 175 173 1 1 0 0 | 178 3 1 3 182 | reject 202 4 3 2 2 170 0 0 | -
+4 3 2 2 170 0 0 | 175 173 1 1 0 0 | 178 3 1 3 181 | reject 202 4 3 2 2 170 0 0 | -
+4 3 2 2 170 0 0 | 175 174 1 2 0 0 | 178 3 2 3 180 | accept - 4 2 4 3 172 1 2 | 3 184 183 1 2 5
+4 2 4 3 172 1 2 | 176 173 1 0 1 2 | 179 4 2 4 180 | reject 206 4 2 4 3 172 1 2 | -
+4 2 4 3 172 1 2 | 177 173 1 0 3 0 | 179 4 2 4 180 | failure 212 4 3 0 4 170 0 0 | -
+4 3 0 4 170 0 0 | 175 173 3 3 0 0 | 178 5 1 5 180 | reject 211 4 3 0 4 170 0 0 | -
+4 3 2 6 170 0 0 | 175 173 3 3 0 0 | 178 7 1 7 180 | reject 209 4 3 2 6 170 0 0 | -
+2 6 0 8 170 0 0 | 175 173 1 1 0 0 | 178 8 1 8 180 | reject 201 2 6 0 8 170 0 0 | -
+2 6 0 8 170 0 0 | 175 174 3 3 0 0 | 178 9 1 9 180 | accept - 2 3 3 9 172 3 3 | 9 184 183 3 3 11
+2 3 3 9 172 3 3 | 176 173 1 0 9 3 | 179 10 1 10 180 | accept - 5 3 3 10 170 0 0 | -
+6 1 0 0 170 0 0 | 175 173 3 2 0 0 | 178 1 2 1 180 | accept - 3 1 3 1 171 3 2 | 1 183 184 3 2 3
+6 1 0 0 170 0 0 | 175 173 3 1 0 0 | 178 1 2 1 180 | reject 210 6 1 0 0 170 0 0 | -
+6 1 4 3 170 0 0 | 175 173 2 2 0 0 | 178 4 1 4 180 | accept - 4 1 2 4 171 2 2 | 4 183 184 2 2 6
+2 6 0 8 170 0 0 | 177 173 1 0 8 0 | 179 9 1 9 180 | reject 205 2 6 0 8 170 0 0 | -

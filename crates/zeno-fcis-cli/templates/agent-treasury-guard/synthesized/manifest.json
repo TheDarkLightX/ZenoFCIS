@@ -1,0 +1,77 @@
+{
+  "abi": {
+    "inputs": [
+      "command.action.propose_settled_failed",
+      "fact.caller_ok",
+      "fact.clock_ok",
+      "fact.model_ok",
+      "fact.price_fresh",
+      "fact.swap_pending",
+      "fact.intent_current",
+      "fact.settlement_sufficient",
+      "fact.within_cap",
+      "fact.within_budget",
+      "fact.slippage_ok",
+      "fact.reserve_ok"
+    ],
+    "outputs": [
+      "decision.accept_or_reason_rank_or_failure"
+    ]
+  },
+  "assignments_evaluated": 8,
+  "authority": "none",
+  "certificate": "6559edf716728053b4505ae8b791b0a8bd8755edd2c87ae62746902f778b3cfa",
+  "contract": "c7b52644d36664b6000644cb3640faba48cad80a6bd2ecc9e76af5e936aab910",
+  "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+  "files": [
+    {
+      "bytes": 8756,
+      "path": "problem.json",
+      "sha256": "9eafb5c42f33c1b5d37edcc42898c9712d17d258feab849503c1e28de41cc180"
+    },
+    {
+      "bytes": 4310,
+      "path": "program.zcve",
+      "sha256": "e2d8a9d8058500a5a2c168921c0b8d2ade3bc8487954a6d1deafa8b37c9e2c6f"
+    },
+    {
+      "bytes": 4956,
+      "path": "transition.rs",
+      "sha256": "9368e513a20d0a7a7616e6d9215baa4716967cac756cfbd3adfe8850ce4bf6c7"
+    },
+    {
+      "bytes": 1265885,
+      "path": "vectors.json",
+      "sha256": "1f08d4b9f50501691150e3924adc1a6bbe07a8930c7371c3893f1d89492f4d4e"
+    }
+  ],
+  "first_counterexample": {
+    "input": [
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "output": [
+      4
+    ]
+  },
+  "input_coverage": 6144,
+  "profile": "zeno-fcis/finite-i64/1",
+  "runtime_conformance": "not-run",
+  "schema": "zeno-fcis/synthesis-artifact/1",
+  "status": "selected",
+  "target": {
+    "language": "rust",
+    "revision": 1
+  },
+  "trace": "9ea82f03a8114b034e34f303f18974bca07f8a22062bfa4626bcd161cd862166"
+}

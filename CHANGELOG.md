@@ -6,6 +6,55 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add the `agent-treasury-guard` application template for
+  `zeno-fcis new --template`. An AI agent proposes swaps for a treasury; the
+  proposal is only a command, and the decision is the guard. Whatever the
+  agent proposes, the treasury commits at most its daily budget, keeps its
+  reserve, stays within the slippage bound against the oracle price, and has
+  at most one swap outstanding. Only an approved model identity, carried in
+  the context, may propose. Accepted swaps leave through the outbox as
+  requests shaped after ZenoDEX's `SwapIntent`, numbered by their proposal
+  tick, and a settlement or failure naming another intent is rejected as
+  stale. A failure refunds the swap and commits as a failure; it does not
+  restore the budget.
+  - A hand-written adapter computes the guard's facts with checked
+    arithmetic; a core that `zeno-fcis synth` selected from a sketch with
+    three holes, and checked on all 6,144 fact tuples, decides which rule
+    applies first. The gate replays the core in Rust, Python, and JavaScript
+    against an independent restatement of the rules.
+  - `project.zeno` carries two inductive claims for `zeno-fcis prove`.
+    Claim 600 states law 500's invariant over the treasury before a
+    decision: the reserve, a non-negative base, a day's committed value
+    between 0 and the budget, and the swap bookkeeping. It assumes laws 501
+    and 502 on every commit, 503 to 507 on accepts, and 508 on committed
+    failures, the scopes the manifest enforces them on. Claim 601 states the
+    budget's part from the clock, the day accounting, the proposal's debit
+    and limits, and the refund. CVC5 1.3.3 answers `unsat` for both steps
+    (attested; `prove` exits 2), and Z3 4.16.0 answers `unsat` too, recorded
+    as `blocked: UnsupportedEvidence`. Stating claim 600 found six
+    transitions the draft's formulas admitted and the README's rules
+    forbid: a buy of 0, a buy into the reserve, a proposal over the budget,
+    a sell of more base than held, a sell at a negative price, and a
+    settlement from a negative held minimum. Laws 505 and 507 now state the
+    positive amount, the floors, the budget, and the positive price, and
+    law 500 the non-negative held minimum. `tests/claims.rs` checks that
+    claim 600 restates law 500, that the law checker's own observer reads
+    every field the invariants read and gives each its stated value on all
+    105,840 admitted treasuries at a tick, that both hold on the exact
+    genesis, and that the manifest enforces each assumed law where the
+    claim assumes it.
+  - Every law formula is substantive with resolved paths. The template ships
+    24 decision examples, a conformance test that decides 25,094 inputs over
+    a scaled finite domain and evaluates both invariants before and after
+    each of its 4,596 committed decisions, including a search of every state
+    one day can reach that shows no sequence of proposals commits more than
+    the budget, direct law-checker tests with one decision per law that
+    breaks only that law and the six counterexamples each refused by the
+    law that now states its rule, a lifecycle test, a determinism probe over
+    864 inputs, and clean purity results. The gate, the release packager,
+    and the ATDD scenarios cover it with the other examples. The decision
+    examples await review by the project's owner.
+
 - Add the `withdrawal-queue` application template: a vault with two
   withdrawal lanes whose keeper tick runs a controller step that
   `zeno-fcis synth` selected from a sketch of a fair policy, checking every

@@ -46,6 +46,7 @@ fn cli_example_templates_emit_substantive_projects_without_overwriting() {
         "inventory-reservation",
         "compliance-gateway",
         "withdrawal-queue",
+        "agent-treasury-guard",
     ] {
         let temp = TempRoot::new(template);
         let target = temp.path().join("app");

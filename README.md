@@ -256,12 +256,13 @@ outbox, tests, and a README that states its rules.
 | `inventory-reservation` | A decision core synthesized and verified on all 432 inputs, commands with quantities, and a conservation law. |
 | `compliance-gateway` | An expert system's rule base as the synthesis contract, checked on all 720 inputs; every decision names the rule that fired, a rule base with a conflict, a gap, or a dead rule fails the build, and claims for `zeno-fcis prove` state the strikes invariant's inductive steps. |
 | `withdrawal-queue` | A controller step synthesized by `zeno-fcis synth` from a sketch of a fair policy, whose table OrbitSynthesis certified for every input sequence, so an alarm can delay a withdrawal but never freeze it; a refinement law that ties each tick to that finite model; and inductive claims, attested by CVC5, that the action laws alone keep the vault solvent. |
+| `agent-treasury-guard` | An AI agent as an untrusted proposer: a treasury that commits at most its daily budget, keeps its reserve, and bounds slippage against the oracle price, decided by a core synthesized and checked on all 6,144 fact tuples; inductive claims, attested by CVC5, that the action laws alone keep the treasury within those limits; and SwapIntent-shaped requests to ZenoDEX. |
 | `prepared-counter` | Checked bounded completion and prepared batches with a bounded publication size. |
 
 In the account-lockout, order-fulfillment, inventory-reservation,
-compliance-gateway, and withdrawal-queue examples, every law formula in
-`project.zeno` can constrain some transition and reads only declared fields
-(`zeno-fcis check --require-substantive
+compliance-gateway, withdrawal-queue, and agent-treasury-guard examples, every
+law formula in `project.zeno` can constrain some transition and reads only
+declared fields (`zeno-fcis check --require-substantive
 --require-resolved-paths` passes). Each also ships decision examples, a
 conformance test through the running application, a determinism probe, and the
 purity command for its decision code. `python3 tools/check_generated_application.py`
