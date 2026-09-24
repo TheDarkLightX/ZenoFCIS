@@ -53,6 +53,30 @@ def check_vectors(directory: Path, domain: str) -> None:
                         else:
                             out = [2, count + 1, failures, 1, count + 1, failures]
                         expected[count, failures, command, allowed] = out
+    elif domain == "inventory":
+        expected = {}
+        for available in range(6):
+            for reserved in range(6):
+                for action in range(4):
+                    for quantity in range(1, 4):
+                        # Codes: 0 short available, 1 short reserved, 2 over
+                        # capacity, 3 accept; then available, reserved, ship.
+                        kept = [available, reserved, 0]
+                        if action == 0:
+                            out = ([0, *kept] if quantity > available else
+                                   [2, *kept] if reserved + quantity > 5 else
+                                   [3, available - quantity, reserved + quantity, 0])
+                        elif action == 1:
+                            out = ([1, *kept] if quantity > reserved else
+                                   [2, *kept] if available + quantity > 5 else
+                                   [3, available + quantity, reserved - quantity, 0])
+                        elif action == 2:
+                            out = ([1, *kept] if quantity > reserved else
+                                   [3, available, reserved - quantity, 1])
+                        else:
+                            out = ([2, *kept] if available + quantity > 5 else
+                                   [3, available + quantity, reserved, 0])
+                        expected[available, reserved, action, quantity] = out
     else:
         expected = {(a, b): [min(a + b, 3)] for a in range(4) for b in range(4)}
     if actual != expected:
@@ -62,21 +86,33 @@ def check_vectors(directory: Path, domain: str) -> None:
 def exercise_counter(cli: list[str], app: Path, directory: Path,
                      environment: dict[str, str]) -> dict:
     """Used by both source-consumer and actual packaged-consumer qualification."""
+    return exercise_synthesized(cli, app, directory, environment, "counter", 64)
+
+
+def exercise_inventory(cli: list[str], app: Path, directory: Path,
+                       environment: dict[str, str]) -> dict:
+    """The inventory-reservation example's synthesized stock step."""
+    return exercise_synthesized(cli, app, directory, environment, "inventory", 432)
+
+
+def exercise_synthesized(cli: list[str], app: Path, directory: Path,
+                         environment: dict[str, str], domain: str, inputs: int) -> dict:
+    """Checks an application's mounted synthesis and replays it in every target."""
     spec = str(app / "synthesis.json")
     rust = app / "synthesized"
     current = invoke(cli, ["synth", "run", spec, "--out", str(rust), "--check"], directory, environment)
     if current["status"] != "current":
         raise RuntimeError("mounted Rust artifact drifted")
-    check_vectors(rust, "counter")
+    check_vectors(rust, domain)
     records = [invoke(cli, ["synth", "verify", spec, "--out", str(rust)], directory, environment)]
     for language in TARGETS:
         if language == "rust":
             continue
-        out = directory / f"counter-{language}"
+        out = directory / f"{domain}-{language}"
         invoke(cli, ["synth", "run", spec, "--target", language, "--out", str(out)], directory, environment)
-        check_vectors(out, "counter")
+        check_vectors(out, domain)
         records.append(invoke(cli, ["synth", "verify", spec, "--target", language, "--out", str(out)], directory, environment))
-    if any(record["status"] != "passed" or record["inputs_checked"] != 64 for record in records):
+    if any(record["status"] != "passed" or record["inputs_checked"] != inputs for record in records):
         raise RuntimeError("target did not pass complete finite conformance")
     if len({record["certificate"] for record in records}) != 1 or len({record["stdout_sha256"] for record in records}) != 1:
         raise RuntimeError("language targets disagree on semantics or output")

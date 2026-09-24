@@ -1,7 +1,10 @@
 //! `zeno-fcis` authoring CLI.
 #![forbid(unsafe_code)]
 
+mod account_lockout;
 mod durable_counter;
+mod inventory_reservation;
+mod order_fulfillment;
 mod prepared_counter;
 mod purity;
 mod synth;
@@ -230,6 +233,9 @@ enum Template {
     MiniDeterminator,
     DurableCounter,
     PreparedCounter,
+    AccountLockout,
+    OrderFulfillment,
+    InventoryReservation,
 }
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
@@ -472,10 +478,14 @@ fn new_project(dir: &Path, template: Template) -> u8 {
     } else if let Err(error) = fs::create_dir(dir) {
         return io_error("create target", error);
     }
+    // Exhaustive, so a new template cannot compile without choosing its files.
     let application = match template {
+        Template::Minimal | Template::MiniDeterminator => None,
         Template::DurableCounter => Some(durable_counter::FILES),
         Template::PreparedCounter => Some(prepared_counter::FILES),
-        _ => None,
+        Template::AccountLockout => Some(account_lockout::FILES),
+        Template::OrderFulfillment => Some(order_fulfillment::FILES),
+        Template::InventoryReservation => Some(inventory_reservation::FILES),
     };
     if let Some(files) = application {
         for (relative, content) in files {
@@ -501,7 +511,11 @@ fn new_project(dir: &Path, template: Template) -> u8 {
             MINI,
             "# Mini Determinator\n\nA pure shared-nothing semantic example. Run `zeno-fcis check`.\n",
         ),
-        Template::DurableCounter | Template::PreparedCounter => unreachable!("handled above"),
+        Template::DurableCounter
+        | Template::PreparedCounter
+        | Template::AccountLockout
+        | Template::OrderFulfillment
+        | Template::InventoryReservation => unreachable!("application templates return above"),
     };
     if let Err(error) = atomic_create(&dir.join("project.zeno"), source.as_bytes()) {
         return io_error("write project", error);
@@ -1464,6 +1478,52 @@ mod tests {
                 panic!("bundled template did not parse");
             };
             assert!(elaborate_project(parsed, ProjectLimits::default()).is_ok());
+        }
+    }
+
+    #[test]
+    fn every_application_template_emits_exactly_its_files() {
+        use std::collections::BTreeSet;
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
+        for (directory, files) in [
+            ("durable-counter", durable_counter::FILES),
+            ("prepared-counter", prepared_counter::FILES),
+            ("account-lockout", account_lockout::FILES),
+            ("order-fulfillment", order_fulfillment::FILES),
+            ("inventory-reservation", inventory_reservation::FILES),
+        ] {
+            let mut pending = vec![root.join(directory)];
+            let mut on_disk = BTreeSet::new();
+            while let Some(next) = pending.pop() {
+                for entry in fs::read_dir(&next).unwrap_or_else(|error| panic!("{error}")) {
+                    let path = entry.unwrap_or_else(|error| panic!("{error}")).path();
+                    if path.is_dir() {
+                        pending.push(path);
+                    } else {
+                        let relative = path
+                            .strip_prefix(root.join(directory))
+                            .unwrap_or_else(|error| panic!("{error}"))
+                            .to_string_lossy()
+                            .replace("Cargo.toml.in", "Cargo.toml");
+                        on_disk.insert(relative);
+                    }
+                }
+            }
+            let emitted: BTreeSet<String> =
+                files.iter().map(|(name, _)| (*name).to_owned()).collect();
+            assert_eq!(emitted, on_disk, "{directory}");
+            for (name, content) in files {
+                let source = root.join(directory).join(if *name == "Cargo.toml" {
+                    "Cargo.toml.in"
+                } else {
+                    name
+                });
+                assert_eq!(
+                    fs::read(&source).unwrap_or_else(|error| panic!("{error}")),
+                    *content,
+                    "{directory}/{name}"
+                );
+            }
         }
     }
 

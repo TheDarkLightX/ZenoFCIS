@@ -1,0 +1,38 @@
+# Decision examples for the account-lockout template.
+#
+# Provenance: drafted on 2026-09-24 from the rules in README.md by the AI
+# agent that wrote the program and law checker, so the drafting was not blind
+# to the code. A second AI agent, reading only README.md and this file,
+# checked the first 16 examples and suggested the last 4, which test rule
+# order and an expired deadline. Review by the project's owner: pending.
+#
+# Numeric IDs come from project.zeno:
+# - state fields 110 failed_attempts, 111 locked_until, 112 last_seen;
+# - command variants 120 LoginSucceeded, 121 LoginFailed, 122 AdminUnlock;
+# - context fields 130 now and 131 admin (0 or 1);
+# - reasons 200 clock_regressed, 201 account_locked, 202 not_admin, and the
+#   committed failure 203 login_failed;
+# - alerts on channel 300, with kind 150 Locked or 151 Unlocked and the lock
+#   deadline.
+#
+# pre.110 pre.111 pre.112 command now admin | outcome reason post.110 post.111 post.112 | alert
+0 0 0 121 1000 0 | failure 203 1 0 1000 | -
+1 0 1000 121 1010 0 | failure 203 2 0 1010 | -
+2 0 1010 121 1020 0 | failure 203 0 1920 1020 | 300 150 1920
+0 1920 1020 120 1500 0 | reject 201 0 1920 1020 | -
+0 1920 1020 121 1919 0 | reject 201 0 1920 1020 | -
+0 1920 1020 120 1920 0 | accept - 0 1920 1920 | -
+0 1920 1020 121 1920 0 | failure 203 1 1920 1920 | -
+2 0 1010 120 1015 0 | accept - 0 0 1015 | -
+1 0 1000 120 999 0 | reject 200 1 0 1000 | -
+0 1920 1020 122 1100 0 | reject 202 0 1920 1020 | -
+0 1920 1020 122 1100 1 | accept - 0 0 1100 | 300 151 0
+2 0 1010 122 1010 1 | accept - 0 0 1010 | 300 151 0
+0 1920 1020 122 1000 1 | reject 200 0 1920 1020 | -
+1 0 1000 121 1000 0 | failure 203 2 0 1000 | -
+0 0 0 120 0 1 | accept - 0 0 0 | -
+2 0 4102444000 121 4102444800 0 | failure 203 0 4102445700 4102444800 | 300 150 4102445700
+0 1920 1020 121 1000 0 | reject 200 0 1920 1020 | -
+0 1920 1020 122 1000 0 | reject 200 0 1920 1020 | -
+2 1920 1950 121 1960 0 | failure 203 0 2860 1960 | 300 150 2860
+0 1920 1020 120 1919 0 | reject 201 0 1920 1020 | -

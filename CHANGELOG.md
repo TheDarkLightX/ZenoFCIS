@@ -6,6 +6,35 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add three application templates for `zeno-fcis new --template`:
+  - `account-lockout`: failed logins committed as failures, time as a context
+    input instead of a clock read, administrator unlocks, and security alerts;
+  - `order-fulfillment`: a hand-written state machine that sends idempotent
+    payment and shipping requests. A repeated or late callback is rejected
+    because the order has moved on, and payment callbacks name the attempt
+    they answer, so one about an older attempt is rejected as stale;
+  - `inventory-reservation`: a decision core synthesized and verified on all
+    432 inputs, commands with quantities, and a conservation law.
+
+  Every law formula in their `project.zeno` files can constrain some
+  transition and reads only declared fields:
+  `check --require-substantive --require-resolved-paths` passes. Laws without
+  a formula are registered in `profile.rs` instead of as placeholder formulas:
+  the rejection law, which holds by construction, and inventory's law that no
+  failure is committed, which its law checker enforces. Each template ships
+  decision examples, a conformance test through the running application,
+  direct law-checker tests, a lifecycle test, a determinism probe, and clean
+  purity results. During development, every defect planted in a template's
+  program or law checker failed a named test. The decision examples await
+  review by the project's owner.
+  - `tools/check_generated_application.py` and the release packager build and
+    test each as an isolated package and compare its demonstration summary.
+    `tools/check_synthesis.py` replays the inventory synthesis in Rust, Python,
+    and JavaScript against an independent oracle.
+  - `new` now chooses template files through exhaustive matches, and a test
+    requires every application template to emit exactly the files in its
+    directory.
+
 - Refuse escaped library keys in the purity manifest check. Cargo decodes
   Unicode escapes in quoted keys, so an escaped `path` could select source
   outside `src/` while the check reported the unused default root as confined.

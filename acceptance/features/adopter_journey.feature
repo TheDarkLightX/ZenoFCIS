@@ -39,6 +39,17 @@ Feature: Adopt the ZenoFCIS core library
     And rejection publishes no state, replay or delivery rows
     And committed failure, exact replay, database reopen and delivery retry preserve the expected state
     And every admitted input matches the finite model and the independent examples through the executed application
+    And the account-lockout, order-fulfillment, and inventory-reservation examples each build as isolated packages
+    And each passes its own tests and prints its expected demonstration summary
+    And the inventory-reservation synthesis replays in Rust, Python, and JavaScript against an independent oracle
+
+  @atdd-example-templates
+  Scenario: Emit example applications whose laws all constrain their transitions
+    Given the account-lockout, order-fulfillment, and inventory-reservation templates
+    When an adopter creates each one with the CLI
+    Then every law formula in each project can constrain some transition and every law path resolves
+    And a second creation into the same directory is refused without changing any file
+    And each application template emits exactly the files in its directory
 
   @atdd-finite-synthesis
   Scenario: Synthesize and replay one contract across languages

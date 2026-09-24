@@ -1920,6 +1920,43 @@ mod tests {
     }
 
     #[test]
+    fn the_example_template_decision_code_is_clean() {
+        for (name, source) in [
+            (
+                "account-lockout/program.rs",
+                include_str!("../templates/account-lockout/src/program.rs"),
+            ),
+            (
+                "account-lockout/laws.rs",
+                include_str!("../templates/account-lockout/src/laws.rs"),
+            ),
+            (
+                "order-fulfillment/program.rs",
+                include_str!("../templates/order-fulfillment/src/program.rs"),
+            ),
+            (
+                "order-fulfillment/laws.rs",
+                include_str!("../templates/order-fulfillment/src/laws.rs"),
+            ),
+            (
+                "inventory-reservation/program.rs",
+                include_str!("../templates/inventory-reservation/src/program.rs"),
+            ),
+            (
+                "inventory-reservation/laws.rs",
+                include_str!("../templates/inventory-reservation/src/laws.rs"),
+            ),
+            (
+                "inventory-reservation/transition.rs",
+                include_str!("../templates/inventory-reservation/synthesized/transition.rs"),
+            ),
+        ] {
+            let findings = findings(name, source);
+            assert!(findings.is_empty(), "{name}: {findings:?}");
+        }
+    }
+
+    #[test]
     fn the_durable_counter_decision_code_is_clean() {
         for (name, source) in [
             (

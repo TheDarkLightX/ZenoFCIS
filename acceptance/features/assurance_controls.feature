@@ -41,7 +41,7 @@ Feature: Report evidence that cannot distinguish system behavior
     And a crate is confined only when it is a library-only package that is no_std, forbids unsafe code, and depends only on semantic crates
     And a binary target, a renamed dependency, an unrecognized manifest form, include!, or a path attribute keeps a crate from being confined
     And a directory, link, or file the check cannot read makes the result unreadable, never clean
-    And the durable-counter decision code is clean
+    And the decision code of every application template is clean
     When one invocation is executed repeatedly on fresh copies
     Then its decision is returned only if every execution produced identical canonical bytes
     And a program that changes its decision between runs is withheld with the differing run

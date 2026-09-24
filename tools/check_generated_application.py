@@ -165,6 +165,50 @@ def exercise_application(app: Path, directory: Path, package_roots: dict[str, Pa
     return {**result, "synthesis": synthesis}
 
 
+# Expected demonstration summaries of the example templates. Each demonstration
+# prints one JSON object; only the listed keys are compared.
+EXAMPLE_TEMPLATES = {
+    "account-lockout": {
+        "status": "passed",
+        "decisions": ["CommittedFailure", "CommittedFailure", "CommittedFailure", "Reject",
+                      "Reject", "Reject", "Accept", "CommittedFailure", "Accept"],
+        "failed_attempts": 0, "locked_until": 0, "last_seen": 2010,
+        "bundles": 6, "pending": 0, "deliveries": 2,
+    },
+    "order-fulfillment": {
+        "status": "passed",
+        "decisions": ["Accept", "CommittedFailure", "Reject", "Accept", "Reject", "Reject",
+                      "Accept", "Reject", "Reject", "Accept", "Accept"],
+        "order_status": "Delivered", "payment_attempts": 2,
+        "bundles": 6, "pending": 0, "deliveries": 3,
+    },
+    "inventory-reservation": {
+        "status": "passed",
+        "decisions": ["Accept", "Reject", "Accept", "Accept", "Reject", "Accept", "Reject",
+                      "Reject", "Accept", "Accept", "Accept"],
+        "available": 0, "reserved": 2, "restocked": 5, "shipped": 3,
+        "bundles": 7, "pending": 0, "deliveries": 2,
+    },
+}
+# Examples whose decision core is synthesized, with the check of that synthesis.
+SYNTHESIZED_EXAMPLES = {"inventory-reservation": check_synthesis.exercise_inventory}
+
+
+def exercise_example_application(template: str, app: Path, directory: Path,
+                                 package_roots: dict[str, Path], version: str,
+                                 environment: dict[str, str], cli: list[str]) -> dict:
+    synthesis = None
+    if template in SYNTHESIZED_EXAMPLES:
+        synthesis = SYNTHESIZED_EXAMPLES[template](cli, app, directory, environment)
+    result, _ = exercise_rust_application(app, directory, package_roots, version, environment)
+    demonstration = json.loads(result["demonstration"])
+    expected = EXAMPLE_TEMPLATES[template]
+    if any(demonstration.get(key) != value for key, value in expected.items()):
+        raise RuntimeError(f"{template} demonstration differs from its expected summary")
+    return {**result, "template": template,
+            **({"synthesis": synthesis} if synthesis is not None else {})}
+
+
 def exercise_prepared_application(app: Path, directory: Path, package_roots: dict[str, Path],
                                   version: str, environment: dict[str, str], cli: list[str]) -> dict:
     case = directory / "completion-case"
@@ -239,6 +283,13 @@ def check(directory: Path) -> None:
     cli = [str((ROOT / Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/zeno-fcis").resolve())]
     run([*cli, "new", str(prepared), "--template", "prepared-counter"], ROOT)
     exercise_prepared_application(prepared, prepared_root, packages, version, dict(os.environ), cli)
+    for template in EXAMPLE_TEMPLATES:
+        example_root = directory / template
+        example_root.mkdir()
+        example = example_root / "app"
+        run([*cli, "new", str(example), "--template", template], ROOT)
+        exercise_example_application(template, example, example_root, packages, version,
+                                     dict(os.environ), cli)
     exercise_v1_consumer(directory, packages, version, dict(os.environ))
     print("generated applications: isolated consumers, V1 compatibility, reviewed dependencies, complete decisions and lifecycle passed")
 

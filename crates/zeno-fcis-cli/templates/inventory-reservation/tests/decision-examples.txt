@@ -1,0 +1,39 @@
+# Decision examples for the inventory-reservation template.
+#
+# Provenance: drafted on 2026-09-24 from the rules in README.md by the AI
+# agent that wrote the adapter, the synthesis problem, and the law checker,
+# so the drafting was not blind to them. A second AI agent, reading only
+# README.md and this file, checked the first 16 examples and suggested the
+# last 4, which test rule order and the accepted side of the capacity limits.
+# Review by the project's owner: pending.
+#
+# Numeric IDs come from project.zeno:
+# - state fields 110 available and 111 reserved;
+# - actions (command field 120) 150 Reserve, 151 Release, 152 Ship,
+#   153 Restock, and the quantity (command field 121);
+# - the operator flag (context field 130), 0 or 1;
+# - reasons 200 not_authorized, 201 insufficient_available,
+#   202 insufficient_reserved, 203 over_capacity;
+# - shipment requests on channel 300 with the shipped units.
+#
+# pre.110 pre.111 action quantity authorized | outcome reason post.110 post.111 | shipment
+0 0 153 3 1 | accept - 3 0 | -
+3 0 153 3 1 | reject 203 3 0 | -
+3 0 153 2 1 | accept - 5 0 | -
+5 0 150 3 1 | accept - 2 3 | -
+2 3 150 3 1 | reject 201 2 3 | -
+2 3 151 1 1 | accept - 3 2 | -
+3 2 152 3 1 | reject 202 3 2 | -
+3 2 152 2 0 | reject 200 3 2 | -
+3 2 152 2 1 | accept - 3 0 | 300 2
+3 0 150 3 1 | accept - 0 3 | -
+0 3 152 1 1 | accept - 0 2 | 300 1
+2 4 150 2 1 | reject 203 2 4 | -
+4 2 151 2 1 | reject 203 4 2 | -
+0 0 151 1 1 | reject 202 0 0 | -
+0 0 150 1 1 | reject 201 0 0 | -
+5 5 152 3 0 | reject 200 5 5 | -
+0 0 150 1 0 | reject 200 0 0 | -
+5 0 151 1 1 | reject 202 5 0 | -
+2 3 150 2 1 | accept - 0 5 | -
+2 3 151 3 1 | accept - 5 0 | -

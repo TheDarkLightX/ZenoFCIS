@@ -237,6 +237,30 @@ cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --lo
 python3 tools/atdd.py run --all
 ```
 
+## Example applications
+
+`zeno-fcis new DIR --template NAME` creates a complete application: an
+authored `project.zeno`, generated typed bindings, a decision, a law checker
+that checks every decision before it is published, a SQLite store with an
+outbox, tests, and a README that states its rules.
+
+| Template | What it shows |
+| --- | --- |
+| `durable-counter` | The smallest complete application: a synthesized step, runtime laws, a committed failure, and restart with delivery retry. |
+| `account-lockout` | Failed logins committed as failures, time as an input instead of a clock read, authority from the request context, and alerts through the outbox. |
+| `order-fulfillment` | A hand-written state machine that sends idempotent payment and shipping requests and rejects duplicate or late callbacks. |
+| `inventory-reservation` | A decision core synthesized and verified on all 432 inputs, commands with quantities, and a conservation law. |
+| `prepared-counter` | Checked bounded completion and prepared batches with a bounded publication size. |
+
+In the account-lockout, order-fulfillment, and inventory-reservation examples,
+every law formula in `project.zeno` can constrain some transition and reads
+only declared fields (`zeno-fcis check --require-substantive
+--require-resolved-paths` passes). Each also ships decision examples, a
+conformance test through the running application, a determinism probe, and the
+purity command for its decision code. `python3 tools/check_generated_application.py`
+creates, builds, and tests each template in this table as an isolated package
+against this checkout.
+
 ## Authoring and checked synthesis
 
 V1 includes the inert `.zeno` language, canonical typed project AST, accumulated
@@ -359,9 +383,10 @@ The guarantee depends on four things:
 - **Emitted source needs its own replay, and the target runtimes are trusted.**
   `synth verify` binds its report to the exact source, the emitter, and the
   runtime's executable hash and version. It accepts only Rust 1.97.1, Python 3,
-  and Node.js 22. The repository's synthesis check runs it for the
-  durable-counter in all three, on all 64 inputs each. Production must run that
-  same source on runtimes that behave the same way.
+  and Node.js 22. The repository's synthesis check runs it in all three for
+  the durable-counter template, on all 64 inputs, and for the
+  inventory-reservation template, on all 432. Production must run that same
+  source on runtimes that behave the same way.
 
 In short, a synthesized program is guaranteed to be correct with respect to its
 contract, on every input it accepts, provided the checker is correct. Emitted
