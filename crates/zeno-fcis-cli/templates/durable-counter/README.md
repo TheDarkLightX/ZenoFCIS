@@ -74,7 +74,24 @@ compares each decision, reason, new state, and notification with:
 It also checks that schema admission and the finite input domain agree in both
 directions, that genesis is exactly zero, and that every admitted state is
 reachable from genesis. Swapping the count and failure bindings in the adapter
-fails these tests. The examples await review by the project's owner.
+fails these tests. The project's owner accepted the examples on 2026-09-23.
+
+## Check determinism
+
+`tests/determinism.rs` decides every admitted input eight times through
+`execute_probed`, which withholds a decision whose runs disagree. It then
+decides the corpus again in three child processes: one with a cleared
+environment, one with another time zone, locale, and allocator fill, and one
+in another working directory. Every decision digest must match. The static
+check covers sources that these runs might not exercise:
+
+```sh
+zeno-fcis purity src/program.rs src/laws.rs synthesized/transition.rs
+```
+
+Both are detectors. Agreement shows that these runs matched and that no rule
+fired; it does not prove the application deterministic. See the library's
+determinism guide.
 
 ## Inspect and replay synthesis
 

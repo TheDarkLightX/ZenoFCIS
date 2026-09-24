@@ -4,8 +4,9 @@
 # synthesis.json and the synthesized program earlier in the same working
 # session, so the drafting was not blind to the model. A second, independent
 # reviewer checked all twelve examples against README.md alone on 2026-09-23
-# and accepted them, including denial taking precedence over capacity. Review
-# by the project's owner: pending.
+# and accepted them, including denial taking precedence over capacity. The
+# project's owner accepted them on 2026-09-23, after reading the README rules,
+# project.zeno, and the rejection rule in src/laws.rs.
 #
 # Numeric IDs come from project.zeno: state fields 110 count and 111 failures;
 # command variants 120 Increment and 121 RecordFailure; context allowed (1) or

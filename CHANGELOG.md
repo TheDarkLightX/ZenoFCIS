@@ -6,6 +6,28 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add determinism checks for hand-written decision code.
+  - `CatalogCommitAuthority::execute_probed` executes one invocation 2 to 64
+    times on fresh copies. It returns the first decision only if every
+    execution produced identical canonical bytes, and otherwise withholds it
+    with `ProbeError::Diverged` or `ProbeError::FailedAfterDecision`.
+  - `zeno-fcis purity <PATH>...` parses Rust source and reports clocks,
+    environment reads, randomness, hash-map iteration, shared state, raw
+    addresses, unsafe code, and other ambient effects, with `use` aliases and
+    macro arguments resolved. A crate directory is also checked for
+    confinement. What the check cannot read never leaves a result clean. An
+    unreadable directory, a symbolic link to source, or a directory with no
+    Rust source makes the result `unreadable`. A manifest form the check does
+    not recognize, `include!`, or a `#[path]` attribute keeps a crate from
+    being confined.
+  - The durable-counter template gains `tests/determinism.rs`, which probes
+    all 64 admitted inputs and compares their digests across three
+    changed-environment child processes. Planted controls show that the probe
+    and the child processes catch changes the conformance tests miss.
+  - docs/DETERMINISM.md explains what each check establishes.
+  - The project's owner accepted the durable-counter decision examples on
+    2026-09-23.
+
 - Correct two claim boundaries found by an independent review of 1102d81.
   First, synthesis guarantees the selected program as the interpreter runs it.
   `synth run` reports emitted source as `runtime_conformance: not-run`, and
