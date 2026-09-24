@@ -1,0 +1,52 @@
+zeno 1;
+project 1 account_lockout;
+namespace 2 security;
+// One account. The shell checks the password; the core decides what each
+// verified outcome means for the account. Time arrives in the context.
+type 100 state Account;
+type 101 command AccountCommand;
+type 102 context RequestContext;
+type 103 destination AlertDestination;
+type 104 payload SecurityAlert;
+type 105 int Attempts;
+type 106 int UnixTime;
+type 107 int LockDeadline;
+type 108 bool AdminFlag;
+type 109 data AlertKind;
+field 110 100 failed_attempts 105;
+field 111 100 locked_until 107;
+field 112 100 last_seen 106;
+field 130 102 now 106;
+field 131 102 admin 108;
+field 140 104 alert_kind 109;
+field 141 104 alert_until 107;
+variant 120 101 LoginSucceeded none;
+variant 121 101 LoginFailed none;
+variant 122 101 AdminUnlock none;
+variant 150 109 Locked none;
+variant 151 109 Unlocked none;
+reason 200 clock_regressed precedence 0;
+reason 201 account_locked precedence 1;
+reason 202 not_admin precedence 2;
+reason 203 login_failed precedence 3;
+channel 300 security_alert destination 103 payload 104;
+component 400 account {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+// A lock never outlasts 900 seconds past the last decision, and a locked
+// account carries no failure count.
+law 500 lock_state_consistent = post.100.111 <= post.100.112 + 900 && (post.100.111 > post.100.112 -> post.100.110 == 0);
+// A successful login outside a lock clears the failure count and keeps the
+// deadline. A failed login is never accepted.
+law 501 login_clears_failures = command.101 != 121 && (command.101 == 120 -> context.102.130 >= pre.100.112 && context.102.130 >= pre.100.111 && post.100.110 == 0 && post.100.111 == pre.100.111 && post.100.112 == context.102.130);
+// Only an administrator unlocks, and unlocking clears the lock and the count.
+law 502 admin_unlock_clears_lock = command.101 == 122 -> context.102.131 == 1 && context.102.130 >= pre.100.112 && post.100.110 == 0 && post.100.111 == 0 && post.100.112 == context.102.130;
+// A failed login outside a lock is recorded; the third in a row locks the
+// account for 900 seconds and resets the count.
+law 503 failed_login_is_recorded = command.101 == 121 && context.102.130 >= pre.100.112 && context.102.130 >= pre.100.111 && post.100.112 == context.102.130 && (pre.100.110 < 2 -> post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111) && (pre.100.110 == 2 -> post.100.110 == 0 && post.100.111 == context.102.130 + 900);

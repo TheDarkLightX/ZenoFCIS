@@ -1125,6 +1125,17 @@ def check_packaged_workspace(
     prepared_application = generated_application.exercise_prepared_application(
         prepared_app, prepared_root, package_roots, version, check_environment, [str(executable)],
     )
+    examples = {}
+    for template in generated_application.EXAMPLE_TEMPLATES:
+        example_root = verification_root / f"{template}-application"
+        example_root.mkdir()
+        example_app = example_root / "app"
+        run([str(executable), "new", str(example_app), "--template", template],
+            environment=check_environment, cwd=example_root)
+        examples[template] = generated_application.exercise_example_application(
+            template, example_app, example_root, package_roots, version, check_environment,
+            [str(executable)],
+        )
     v1_consumer = generated_application.exercise_v1_consumer(
         verification_root, package_roots, version, check_environment,
     )
@@ -1145,6 +1156,7 @@ def check_packaged_workspace(
                                for name, root in sorted(package_roots.items())],
         "application": application,
         "prepared_application": prepared_application,
+        "example_applications": examples,
         "v1_consumer": v1_consumer,
         "nonclaims": ["not a registry-only installation check", "not fresh external dependency resolution",
                       "not an independent review",

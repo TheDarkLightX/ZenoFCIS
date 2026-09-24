@@ -5,7 +5,7 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
 zeno-fcis describe [COMMAND...]
-zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter
+zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation
 zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
@@ -58,6 +58,18 @@ current checkout's schema-lowering and complete-invocation APIs. Run
 and exercise it as an isolated consumer of this exact source. See the
 [template README](../crates/zeno-fcis-cli/templates/durable-counter/README.md)
 for its bounded semantics and local demonstration limits.
+
+Three more development templates build realistic applications the same way:
+- [`account-lockout`](../crates/zeno-fcis-cli/templates/account-lockout/README.md):
+  failed logins committed as failures, time as a context input, and
+  administrator unlocks;
+- [`order-fulfillment`](../crates/zeno-fcis-cli/templates/order-fulfillment/README.md):
+  a state machine with idempotent payment and shipping requests;
+- [`inventory-reservation`](../crates/zeno-fcis-cli/templates/inventory-reservation/README.md):
+  a synthesized core over quantities, with a conservation law.
+
+In each, `check --require-substantive --require-resolved-paths` passes, and
+the same gate compiles and exercises it as an isolated consumer.
 
 ## Agent discovery and generation results
 

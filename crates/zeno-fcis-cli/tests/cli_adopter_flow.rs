@@ -39,6 +39,60 @@ fn cli() -> &'static str {
 }
 
 #[test]
+fn cli_example_templates_emit_substantive_projects_without_overwriting() {
+    for template in [
+        "account-lockout",
+        "order-fulfillment",
+        "inventory-reservation",
+    ] {
+        let temp = TempRoot::new(template);
+        let target = temp.path().join("app");
+        let first = run(Command::new(cli())
+            .arg("new")
+            .arg(&target)
+            .args(["--template", template]));
+        assert!(
+            first.status.success(),
+            "{template}: {}",
+            String::from_utf8_lossy(&first.stderr)
+        );
+        for name in [
+            "Cargo.toml",
+            "README.md",
+            "project.zeno",
+            "profile.rs",
+            "build.rs",
+            "src/program.rs",
+            "src/laws.rs",
+            "tests/conformance.rs",
+            "tests/decision-examples.txt",
+            "tests/determinism.rs",
+        ] {
+            assert!(target.join(name).is_file(), "{template}: missing {name}");
+        }
+        // Every law in these examples can constrain a transition, and every
+        // law path resolves.
+        let checked = run(Command::new(cli())
+            .arg("check")
+            .arg(target.join("project.zeno"))
+            .args(["--require-substantive", "--require-resolved-paths"]));
+        assert!(
+            checked.status.success(),
+            "{template}: {}{}",
+            String::from_utf8_lossy(&checked.stdout),
+            String::from_utf8_lossy(&checked.stderr)
+        );
+        let source = read(target.join("src/program.rs"));
+        let repeated = run(Command::new(cli())
+            .arg("new")
+            .arg(&target)
+            .args(["--template", template]));
+        assert!(!repeated.status.success(), "{template}");
+        assert_eq!(read(target.join("src/program.rs")), source, "{template}");
+    }
+}
+
+#[test]
 fn cli_durable_counter_emits_a_complete_project_without_overwriting() {
     let temp = TempRoot::new("durable-counter");
     let target = temp.path().join("app");

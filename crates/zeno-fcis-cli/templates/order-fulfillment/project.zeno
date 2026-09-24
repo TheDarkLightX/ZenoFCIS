@@ -1,0 +1,78 @@
+zeno 1;
+project 1 order_fulfillment;
+namespace 2 fulfillment;
+// One order. Payment and shipping happen in other systems: the order sends
+// them requests through the outbox, and their answers come back as commands.
+// A payment provider's answer names the attempt it refers to.
+type 100 state Order;
+type 101 command OrderCommand;
+type 102 context CallerContext;
+type 103 destination PaymentDestination;
+type 104 payload PaymentRequest;
+type 105 data OrderStatus;
+type 106 int Attempts;
+type 107 data Caller;
+type 108 data PaymentAction;
+type 109 destination CarrierDestination;
+type 110 payload ShippingRequest;
+type 111 data OrderAction;
+field 120 100 status 105;
+field 121 100 payment_attempts 106;
+field 130 102 caller 107;
+field 140 104 request_attempt 106;
+field 141 104 request_action 108;
+field 145 110 paid_attempt 106;
+field 125 101 action 111;
+field 126 101 callback_attempt 106;
+variant 150 111 Checkout none;
+variant 151 111 PaymentCaptured none;
+variant 152 111 PaymentDeclined none;
+variant 153 111 ParcelDispatched none;
+variant 154 111 ParcelDelivered none;
+variant 155 111 CancelOrder none;
+variant 160 105 Placed none;
+variant 161 105 AwaitingPayment none;
+variant 162 105 Paid none;
+variant 163 105 Shipped none;
+variant 164 105 Delivered none;
+variant 165 105 Cancelled none;
+variant 170 107 Customer none;
+variant 171 107 PaymentProvider none;
+variant 172 107 Carrier none;
+variant 175 108 Capture none;
+variant 176 108 Void none;
+reason 200 wrong_caller precedence 0;
+reason 201 invalid_transition precedence 1;
+reason 202 stale_callback precedence 2;
+reason 203 attempts_exhausted precedence 3;
+reason 204 payment_declined precedence 4;
+channel 300 payment_request destination 103 payload 104;
+channel 301 shipping_request destination 109 payload 110;
+component 400 order {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  outbox outbox.301;
+  budget steps 64;
+}
+merge [400];
+// An order awaiting payment, paid, shipped, or delivered has made at least
+// one payment attempt.
+law 500 order_state_consistent = post.100.120 == 161 || post.100.120 == 162 || post.100.120 == 163 || post.100.120 == 164 -> post.100.121 >= 1;
+// The customer checks out a placed order, starting a new payment attempt. A
+// declined payment is never accepted.
+law 501 checkout_requests_payment = command.101.125 != 152 && (command.101.125 == 150 -> context.102.130 == 170 && pre.100.120 == 160 && pre.100.121 < 3 && post.100.120 == 161 && post.100.121 == pre.100.121 + 1);
+// The payment provider's capture of the current attempt pays an order
+// awaiting payment.
+law 502 capture_pays_order = command.101.125 == 151 -> context.102.130 == 171 && pre.100.120 == 161 && command.101.126 == pre.100.121 && post.100.120 == 162 && post.100.121 == pre.100.121;
+// The carrier dispatches a paid order.
+law 503 dispatch_ships_order = command.101.125 == 153 -> context.102.130 == 172 && pre.100.120 == 162 && post.100.120 == 163 && post.100.121 == pre.100.121;
+// The carrier's delivery completes a shipped order.
+law 504 delivery_completes_order = command.101.125 == 154 -> context.102.130 == 172 && pre.100.120 == 163 && post.100.120 == 164 && post.100.121 == pre.100.121;
+// The customer cancels only before payment.
+law 505 cancel_before_payment = command.101.125 == 155 -> context.102.130 == 170 && (pre.100.120 == 160 || pre.100.120 == 161) && post.100.120 == 165 && post.100.121 == pre.100.121;
+// A decline of the current attempt returns the order to placed and keeps the
+// attempt count.
+law 506 declined_payment_reopens_order = command.101.125 == 152 && context.102.130 == 171 && pre.100.120 == 161 && command.101.126 == pre.100.121 && post.100.120 == 160 && post.100.121 == pre.100.121;

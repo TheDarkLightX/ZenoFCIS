@@ -1,0 +1,46 @@
+# Decision examples for the order-fulfillment template.
+#
+# Provenance: drafted on 2026-09-24 from the rules in README.md by the AI
+# agent that wrote the program and law checker, so the drafting was not blind
+# to the code. A second AI agent, reading only README.md and this file,
+# checked the first version of these examples and suggested the rule-order
+# and boundary cases added since. Review by the project's owner: pending.
+#
+# Numeric IDs come from project.zeno:
+# - state fields 120 status and 121 payment_attempts;
+# - statuses 160 Placed, 161 AwaitingPayment, 162 Paid, 163 Shipped,
+#   164 Delivered, 165 Cancelled;
+# - command field 125 action: 150 Checkout, 151 PaymentCaptured,
+#   152 PaymentDeclined, 153 ParcelDispatched, 154 ParcelDelivered,
+#   155 CancelOrder; and command field 126 callback_attempt, the attempt a
+#   payment provider's callback names (0 on other commands, which ignore it);
+# - callers (context field 130) 170 Customer, 171 PaymentProvider, 172 Carrier;
+# - reasons 200 wrong_caller, 201 invalid_transition, 202 stale_callback,
+#   203 attempts_exhausted, and the committed failure 204 payment_declined;
+# - requests: `300 attempt action` on the payment channel, with action
+#   175 Capture or 176 Void, and `301 attempt` on the shipping channel.
+#
+# pre.120 pre.121 action callback_attempt caller | outcome reason post.120 post.121 | request
+160 0 150 0 170 | accept - 161 1 | 300 1 175
+161 1 152 1 171 | failure 204 160 1 | -
+160 1 150 0 170 | accept - 161 2 | 300 2 175
+161 2 152 1 171 | reject 202 161 2 | -
+161 2 151 2 171 | accept - 162 2 | 301 2
+161 2 151 1 171 | reject 202 161 2 | -
+162 2 151 2 171 | reject 201 162 2 | -
+161 1 151 1 170 | reject 200 161 1 | -
+161 1 152 1 170 | reject 200 161 1 | -
+162 2 153 0 172 | accept - 163 2 | -
+163 2 154 0 172 | accept - 164 2 | -
+164 2 155 0 170 | reject 201 164 2 | -
+160 0 155 0 170 | accept - 165 0 | -
+161 1 155 0 170 | accept - 165 1 | 300 1 176
+161 2 155 0 170 | accept - 165 2 | 300 2 176
+165 1 151 1 171 | reject 201 165 1 | -
+160 3 150 0 170 | reject 203 160 3 | -
+160 2 150 0 170 | accept - 161 3 | 300 3 175
+162 1 155 0 170 | reject 201 162 1 | -
+163 1 153 0 171 | reject 200 163 1 | -
+161 3 150 0 170 | reject 201 161 3 | -
+160 1 152 1 171 | reject 201 160 1 | -
+160 3 150 0 171 | reject 200 160 3 | -

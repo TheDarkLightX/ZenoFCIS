@@ -40,6 +40,34 @@ class ReproducibleApplicationReceiptTests(unittest.TestCase):
         self.assertEqual(receipts[0], receipts[1])
 
 
+class ExampleApplicationTests(unittest.TestCase):
+    def test_example_summaries_are_compared_key_by_key(self):
+        for template, expected in application.EXAMPLE_TEMPLATES.items():
+            with self.subTest(template=template):
+                passed = {"status": "passed", "demonstration": json.dumps({**expected, "extra": 1})}
+                synthesis = {"status": "passed"}
+                with mock.patch.object(application, "exercise_rust_application", return_value=(passed, "")), \
+                        mock.patch.dict(application.SYNTHESIZED_EXAMPLES,
+                                        {name: mock.Mock(return_value=synthesis)
+                                         for name in application.SYNTHESIZED_EXAMPLES}):
+                    result = application.exercise_example_application(
+                        template, Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+                self.assertEqual(result["template"], template)
+                self.assertEqual(result.get("synthesis"),
+                                 synthesis if template in application.SYNTHESIZED_EXAMPLES else None)
+                for key in expected:
+                    changed = {"status": "passed",
+                               "demonstration": json.dumps({**expected, key: "different"})}
+                    with mock.patch.object(application, "exercise_rust_application",
+                                           return_value=(changed, "")), \
+                            mock.patch.dict(application.SYNTHESIZED_EXAMPLES,
+                                            {name: mock.Mock(return_value={})
+                                             for name in application.SYNTHESIZED_EXAMPLES}):
+                        with self.assertRaisesRegex(RuntimeError, "demonstration differs"):
+                            application.exercise_example_application(
+                                template, Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+
+
 class V1PackagedSourceTests(unittest.TestCase):
     def test_retained_consumer_manifest_parses_and_copies_without_a_checkout_dependency(self):
         retained = application.ROOT / "test-projects/external-consumer"

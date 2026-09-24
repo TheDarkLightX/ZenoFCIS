@@ -1,0 +1,47 @@
+zeno 1;
+project 1 inventory_reservation;
+namespace 2 warehouse;
+// One stock-keeping unit. Units are available to sell or reserved for an
+// order; shipping sends reserved units out, and restocking brings units in.
+type 100 state Stock;
+type 101 command StockCommand;
+type 102 context StockContext;
+type 103 destination WarehouseDestination;
+type 104 payload ShipmentRequest;
+type 105 int Units;
+type 106 int Quantity;
+type 107 data StockAction;
+type 108 bool OperatorFlag;
+field 110 100 available 105;
+field 111 100 reserved 105;
+field 120 101 action 107;
+field 121 101 quantity 106;
+field 130 102 authorized 108;
+field 140 104 shipped_units 106;
+variant 150 107 Reserve none;
+variant 151 107 Release none;
+variant 152 107 Ship none;
+variant 153 107 Restock none;
+reason 200 not_authorized precedence 0;
+reason 201 insufficient_available precedence 1;
+reason 202 insufficient_reserved precedence 2;
+reason 203 over_capacity precedence 3;
+channel 300 shipment destination 103 payload 104;
+component 400 stock {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+// Every combination of the two fields is a valid state, so the invariant is
+// the bounds themselves; the laws below constrain each movement.
+law 500 stock_within_bounds = post.100.110 >= 0 && post.100.110 <= 5 && post.100.111 >= 0 && post.100.111 <= 5;
+// Units are conserved: reserving and releasing only move units between the
+// two fields, shipping removes exactly the quantity, and restocking adds it.
+law 501 units_conserved = (command.101.120 == 150 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 151 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 152 -> post.100.110 + post.100.111 + command.101.121 == pre.100.110 + pre.100.111) && (command.101.120 == 153 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111 + command.101.121);
+// Only an authorized operator moves stock, and each action moves exactly its
+// quantity between the fields it names.
+law 502 exact_movement = context.102.130 == 1 && (command.101.120 == 150 -> post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (command.101.120 == 151 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 152 -> post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 153 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 == pre.100.111);
