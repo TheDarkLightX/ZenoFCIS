@@ -85,12 +85,10 @@ law 502 reinstate_clears_strikes = command.101.130 == 151 -> context.102.141 == 
 // Only a screening commits a failure. A blocked transfer adds one strike,
 // and a frozen account stays at three.
 law 503 block_adds_a_strike = command.101.130 == 150 && (pre.100.120 < 3 -> post.100.120 == pre.100.120 + 1) && (pre.100.120 == 3 -> post.100.120 == 3);
-// Law 500 is inductive: from a standing within its bounds, each change that
-// laws 501 to 503 admit ends within the bounds, for every integer and not
-// only the schema's domain. Each claim's hypotheses are the law's formula
-// verbatim, with the action it concerns and the bounds before the decision;
-// tests/claims.rs checks that, and tests/conformance.rs checks that every
-// decision the application commits satisfies one of them.
-claim 600 bounded_after_accepted_screening all relational = pre.100.120 >= 0 && pre.100.120 <= 3 && command.101.130 == 150 && (command.101.130 == 150 -> command.101.131 != 162 && pre.100.120 < 3 && post.100.120 == pre.100.120) -> post.100.120 >= 0 && post.100.120 <= 3;
-claim 601 bounded_after_reinstatement all relational = command.101.130 == 151 && (command.101.130 == 151 -> context.102.141 == 1 && pre.100.120 >= 1 && post.100.120 == 0) -> post.100.120 >= 0 && post.100.120 <= 3;
-claim 602 bounded_after_block all relational = pre.100.120 >= 0 && pre.100.120 <= 3 && (command.101.130 == 150 && (pre.100.120 < 3 -> post.100.120 == pre.100.120 + 1) && (pre.100.120 == 3 -> post.100.120 == 3)) -> post.100.120 >= 0 && post.100.120 <= 3;
+// Law 500's bound is also claimed by induction, for `zeno-fcis prove`: from a
+// standing within its bounds, every accept that satisfies laws 501 and 502,
+// and every committed failure that satisfies law 503, ends within the bounds,
+// for every integer and not only the schema's domain. The step assumes each
+// enumerated field holds a declared variant, as admission guarantees.
+// tests/claims.rs checks the base case, the observer, and the law manifest.
+claim 600 strikes_stay_in_bounds all inductive accept [501, 502] failure [503] = pre.100.120 >= 0 && pre.100.120 <= 3;

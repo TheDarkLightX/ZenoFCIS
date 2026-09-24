@@ -30,15 +30,13 @@ use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::ValidationLimits;
 use zeno_fcis_spec::{
     ClaimFormula, EvalLimits, EvalOutcome, EvaluationContext, Identifier, PredicateProvider,
-    ProjectSpec, RelExpr, TraceStep, evaluate_relational,
+    ProjectionRoot, RelExpr, StableId, TraceStep, evaluate_relational, invariant_at,
 };
 use zeno_fcis_value::Value;
 
 const EXAMPLES: &str = include_str!("decision-examples.txt");
-/// The claims of `project.zeno`, by the decision each one is about.
-const BOUNDED_AFTER_ACCEPTED_SCREENING: u32 = 600;
-const BOUNDED_AFTER_REINSTATEMENT: u32 = 601;
-const BOUNDED_AFTER_BLOCK: u32 = 602;
+/// The inductive claim in `project.zeno`: the strikes stay within their bounds.
+const STRIKES_STAY_IN_BOUNDS: u32 = 600;
 const SCREEN: u16 = 150;
 const REINSTATE: u16 = 151;
 const REGIONS: [u16; 3] = [160, 161, 162];
@@ -331,23 +329,20 @@ fn holds(formula: &RelExpr, step: &TraceStep) -> bool {
     )
 }
 
-/// The hypotheses and the conclusion of a relational claim.
-fn claim_parts(spec: &ProjectSpec, id: u32) -> (&RelExpr, &RelExpr) {
+/// The invariant of claim 600, over the state before and after a decision.
+fn invariant(spec: &zeno_fcis_spec::ProjectSpec) -> (RelExpr, RelExpr) {
     let claim = spec
-        .claims()
-        .iter()
-        .find(|claim| claim.id().get() == id)
-        .unwrap_or_else(|| panic!("claim {id} is declared"));
-    match claim.formula() {
-        ClaimFormula::Relational(RelExpr::Implies(hypotheses, conclusion)) => {
-            (hypotheses, conclusion)
-        }
-        other => panic!("claim {id} is a relational implication, not {other:?}"),
-    }
+        .claim(StableId::new(STRIKES_STAY_IN_BOUNDS).unwrap())
+        .expect("claim 600 is declared");
+    let ClaimFormula::Relational(before) = claim.formula() else {
+        panic!("claim 600 states a relational invariant");
+    };
+    let after = invariant_at(before, ProjectionRoot::Post).expect("an invariant over pre. paths");
+    (before.clone(), after)
 }
 
 #[test]
-fn every_admitted_input_matches_the_rule_base_and_satisfies_a_claim() {
+fn every_admitted_input_matches_the_rule_base_and_keeps_the_invariant() {
     let authority = authority().unwrap();
     let project = GeneratedProject::try_new::<RustCryptoSha256>().unwrap();
     let spec = profile::project();
@@ -355,7 +350,8 @@ fn every_admitted_input_matches_the_rule_base_and_satisfies_a_claim() {
     let inputs = every_input();
     assert_eq!(inputs.len(), 2880);
     let mut kinds = BTreeSet::new();
-    let mut exercised: BTreeMap<u32, usize> = BTreeMap::new();
+    let (before, after) = invariant(&spec);
+    let mut exercised: BTreeMap<&str, usize> = BTreeMap::new();
     for input in inputs {
         let observed = observe(&authority, &project, input);
         assert_eq!(observed, model(&rules, input), "input {input:?}");
@@ -363,16 +359,9 @@ fn every_admitted_input_matches_the_rule_base_and_satisfies_a_claim() {
         if observed.kind == "reject" {
             continue;
         }
-        // The claims prove that the strikes stay within their bounds under
-        // the hypotheses each one states. Every committed decision satisfies
-        // the hypotheses of the claim about its kind, so what was proved for
-        // every integer applies to what the application does.
-        let claim_id = match (observed.kind, input.action) {
-            ("failure", _) => BOUNDED_AFTER_BLOCK,
-            (_, SCREEN) => BOUNDED_AFTER_ACCEPTED_SCREENING,
-            _ => BOUNDED_AFTER_REINSTATEMENT,
-        };
-        let (hypotheses, conclusion) = claim_parts(&spec, claim_id);
+        // Claim 600's step is attested for every integer; here the invariant
+        // is evaluated on each committed decision's actual transition, as the
+        // law checker observes it, before and after.
         let step = trace_step(
             &standing(input.strikes),
             &standing(observed.post),
@@ -380,15 +369,9 @@ fn every_admitted_input_matches_the_rule_base_and_satisfies_a_claim() {
             &context(input.tier, input.reviewer),
         )
         .unwrap();
-        assert!(
-            holds(hypotheses, &step),
-            "claim {claim_id} assumes what the application did for {input:?}"
-        );
-        assert!(
-            holds(conclusion, &step),
-            "claim {claim_id} concludes what the application did for {input:?}"
-        );
-        *exercised.entry(claim_id).or_insert(0) += 1;
+        assert!(holds(&before, &step), "invariant before {input:?}");
+        assert!(holds(&after, &step), "invariant after {input:?}");
+        *exercised.entry(observed.kind).or_insert(0) += 1;
     }
     // Every reason and every verdict is reached from some admitted input.
     assert_eq!(
@@ -404,14 +387,10 @@ fn every_admitted_input_matches_the_rule_base_and_satisfies_a_claim() {
             ("failure", Some(214)),
         ])
     );
-    // Every claim is exercised by some committed decision.
+    // Both kinds of committing decision exercise the invariant.
     assert_eq!(
         exercised.keys().copied().collect::<Vec<_>>(),
-        [
-            BOUNDED_AFTER_ACCEPTED_SCREENING,
-            BOUNDED_AFTER_REINSTATEMENT,
-            BOUNDED_AFTER_BLOCK
-        ]
+        ["accept", "failure"]
     );
 }
 
