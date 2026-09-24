@@ -18,9 +18,9 @@ embedded in ZenoFCIS values.
     macro arguments resolved. A crate directory is also checked for
     confinement. What the check cannot read never leaves a result clean. An
     unreadable directory, a symbolic link to source, or a directory with no
-    Rust source makes the result `unreadable`. A manifest form the check does
-    not recognize, `include!`, or a `#[path]` attribute keeps a crate from
-    being confined.
+    Rust source makes the result `unreadable`. Only a library-only package
+    can be confined: a binary target, a manifest form the check does not
+    recognize, `include!`, or a `#[path]` attribute prevents it.
   - The durable-counter template gains `tests/determinism.rs`, which probes
     all 64 admitted inputs and compares their digests across three
     changed-environment child processes. Planted controls show that the probe

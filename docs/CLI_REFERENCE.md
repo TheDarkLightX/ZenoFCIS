@@ -135,18 +135,21 @@ the network, processes, threads, randomness, hash-map iteration, shared state,
 raw addresses, unsafe code, and foreign code. Floating point and `DefaultHasher`
 are warnings. Each PATH is a Rust file, a directory of them, or a crate
 directory containing `Cargo.toml`. A crate is also checked for confinement:
-unconditional `no_std`, `forbid(unsafe_code)`, no `extern crate std`, no
-source brought in by `include!` or a `#[path]` attribute, and a manifest that
-the check reads completely, with every dependency named as one of the
-library's semantic crates.
+- a library-only package whose root is `src/lib.rs`, with no binary target;
+- unconditional `no_std` and `forbid(unsafe_code)`;
+- no `extern crate std`, and no source brought in by `include!` or a
+  `#[path]` attribute;
+- a manifest that the check reads completely, with every dependency named as
+  one of the library's semantic crates.
 
 The status is `clean` or `confined` (exit 0), `violations` (exit 1), or
-`unreadable` (exit 3). A path the check cannot read or list, or one with no
-Rust source, makes the status `unreadable`. So does a symbolic link to a
-directory or to a Rust file inside a directory it walks. JSON output uses
-schema `zeno-fcis/purity-report/1`. A clean result is checked against the
-rule table; it is not a proof of
-determinism. See [determinism](DETERMINISM.md).
+`unreadable` (exit 3). Only error-level rules decide it, so a clean or
+confined result can include warnings. A path the check cannot read or list,
+or one with no Rust source, makes the status `unreadable`. So does a symbolic
+link to a directory or to a Rust file inside a directory it walks. JSON output
+uses schema `zeno-fcis/purity-report/1`. A clean result is checked against the
+rule table; it is not a proof of determinism. See
+[determinism](DETERMINISM.md).
 
 ## Exit classes
 

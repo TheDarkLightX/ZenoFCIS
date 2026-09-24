@@ -38,8 +38,8 @@ Feature: Report evidence that cannot distinguish system behavior
     And code that keeps state between calls, iterates a hash map, or exposes an address
     When the purity check reads it, including through aliases, glob imports, and macro arguments
     Then each source is reported at its line with its rule
-    And a crate is confined only when it is no_std, forbids unsafe code, and depends only on semantic crates
-    And a renamed dependency, an unrecognized manifest form, include!, or a path attribute keeps a crate from being confined
+    And a crate is confined only when it is a library-only package that is no_std, forbids unsafe code, and depends only on semantic crates
+    And a binary target, a renamed dependency, an unrecognized manifest form, include!, or a path attribute keeps a crate from being confined
     And a directory, link, or file the check cannot read makes the result unreadable, never clean
     And the durable-counter decision code is clean
     When one invocation is executed repeatedly on fresh copies
