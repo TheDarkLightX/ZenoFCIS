@@ -796,11 +796,23 @@ where
     }
 
     /// Evaluates the exact initial state and mints nominal genesis authority.
+    ///
+    /// The initial state is checked against this authority's own schema, not
+    /// only by the schema hash its envelope records; see
+    /// [`Self::admit_invocation`].
     pub fn authorize_genesis(
         &self,
         initial_state: SchemaAdmittedEnvelope,
     ) -> Result<CatalogAuthorizedGenesis<H, P, L, I>, AuthorityError> {
         validate_root_envelope(&self.policy, &initial_state)?;
+        self.policy
+            .catalog
+            .schema()
+            .validate_root(
+                initial_state.value().value(),
+                schema_validation_limits(self.policy.transition_limits),
+            )
+            .map_err(|_| AuthorityError::Mismatch(AuthorityField::Schema))?;
         let initial_root = hash_value::<H>(
             self.policy.state_domain.domain()?,
             initial_state.value().value(),
@@ -837,6 +849,15 @@ where
     }
 
     /// Admits one exact externally supplied invocation.
+    ///
+    /// The command and context are checked against this authority's own
+    /// schema. An envelope's recorded schema hash names the schema its
+    /// constructor validated against, computed with whatever
+    /// [`CommitmentHasher`](zeno_fcis_codec::CommitmentHasher) the caller
+    /// chose, so the hash alone does not show that the value is admissible
+    /// here. The pre-state, and a committing decision's post-state, are
+    /// checked when the decision's artifacts are validated, before it is
+    /// authorized.
     #[allow(clippy::too_many_arguments)]
     pub fn admit_invocation(
         &self,
@@ -1071,10 +1092,7 @@ where
     let replay_id = cursor.take_hash32()?;
     cursor.ensure_consumed()?;
 
-    let validation = ValidationLimits {
-        max_depth: policy.transition_limits.max_state_depth(),
-        max_nodes: policy.transition_limits.max_state_nodes(),
-    };
+    let validation = schema_validation_limits(policy.transition_limits);
     let pre_state = SchemaAdmittedEnvelope::try_new::<H>(
         policy.catalog.schema(),
         pre_state.into_value(),
@@ -2083,7 +2101,24 @@ where
     if context.type_id() != TypeId::new(policy.catalog.profile().context_type().get()) {
         return Err(AuthorityError::Mismatch(AuthorityField::ContextType));
     }
+    let limits = schema_validation_limits(policy.transition_limits);
+    for input in [command, context] {
+        policy
+            .catalog
+            .schema()
+            .validate_value(input.type_id(), input.value().value(), limits)
+            .map_err(|_| AuthorityError::Mismatch(AuthorityField::Schema))?;
+    }
     Ok(())
+}
+
+/// The bounds for checking a value against the authority's schema: the
+/// transition limits' state-validation bounds, as persisted re-admission uses.
+const fn schema_validation_limits(limits: TransitionLimits) -> ValidationLimits {
+    ValidationLimits {
+        max_depth: limits.max_state_depth(),
+        max_nodes: limits.max_state_nodes(),
+    }
 }
 
 fn validate_root_envelope<H, P, L, I>(
@@ -2704,6 +2739,7 @@ mod tests {
 
     use super::*;
     use zeno_fcis_catalog::{CatalogLimits, ReasonDefinition, ReasonDisposition};
+    use zeno_fcis_codec::CommitmentHasher;
     use zeno_fcis_core::BudgetUsed;
     use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
     use zeno_fcis_evidence::EvidenceEnvelope;
@@ -3320,6 +3356,112 @@ mod tests {
         assert_eq!(
             base.body().law_evaluation_hash(),
             base.law_evaluation().evaluation_hash()
+        );
+    }
+
+    /// Commits every preimage to the fixture catalog's schema hash, as a
+    /// caller's own hasher could: an envelope built with it records the
+    /// catalog's schema hash, whatever schema its value was validated against.
+    struct ForgedSchemaHash;
+
+    impl CommitmentHasher for ForgedSchemaHash {
+        const ALGORITHM_ID: &'static str = "test/forged-schema-hash";
+
+        fn hash(_: &[u8]) -> Hash32 {
+            fixture_catalog().schema_hash()
+        }
+    }
+
+    /// The fixture schema with one type widened from bool to every i128.
+    fn widened_schema(widened: u32) -> Schema {
+        let types = [(1, "State"), (2, "Command"), (3, "Context")]
+            .into_iter()
+            .map(|(id, label)| {
+                let kind = if id == widened {
+                    TypeKind::I128 {
+                        min: i128::MIN,
+                        max: i128::MAX,
+                    }
+                } else {
+                    TypeKind::Bool
+                };
+                TypeDef::try_new(TypeId::new(id), label, kind, SchemaLimits::default())
+                    .unwrap_or_else(|error| panic!("type definition: {error}"))
+            })
+            .collect();
+        Schema::try_new(
+            "AuthorityFixture",
+            1,
+            TypeId::new(1),
+            types,
+            SchemaLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("schema: {error}"))
+    }
+
+    /// An input the fixture catalog refuses, in an envelope that records the
+    /// catalog's schema hash.
+    fn forged_input(type_id: u32) -> SchemaAdmittedTypeEnvelope {
+        let envelope = SchemaAdmittedTypeEnvelope::try_new::<ForgedSchemaHash>(
+            &widened_schema(type_id),
+            TypeId::new(type_id),
+            Value::I128(7),
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("forged envelope: {error}"));
+        assert_eq!(envelope.schema_hash(), fixture_catalog().schema_hash());
+        envelope
+    }
+
+    #[test]
+    fn admission_checks_the_command_and_context_against_its_own_schema() {
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        let admit = |command, context| {
+            authority
+                .admit_invocation(
+                    root(&catalog),
+                    command,
+                    context,
+                    hash(60),
+                    hash(61),
+                    hash(62),
+                )
+                .err()
+        };
+        let refused = Some(AuthorityError::Mismatch(AuthorityField::Schema));
+        assert_eq!(admit(forged_input(2), context(&catalog)), refused);
+        assert_eq!(admit(command(&catalog), forged_input(3)), refused);
+        assert_eq!(admit(command(&catalog), context(&catalog)), None);
+    }
+
+    #[test]
+    fn genesis_is_checked_against_its_own_schema() {
+        let catalog = fixture_catalog();
+        let forged = SchemaAdmittedEnvelope::try_new::<ForgedSchemaHash>(
+            &widened_schema(1),
+            Value::I128(7),
+            ValidationLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("forged genesis: {error}"));
+        // Pin the forged value's own root, so that only the schema check can
+        // refuse it.
+        let domain = Domain::new("authority/fixture/state", 1)
+            .unwrap_or_else(|error| panic!("state domain: {error}"));
+        let initial_root = hash_value::<RustCryptoSha256>(domain, forged.value().value())
+            .unwrap_or_else(|error| panic!("initial root: {error}"));
+        let genesis =
+            GenesisPolicyBinding::try_new(initial_root, hash(70), hash(71), hash(72), hash(53))
+                .unwrap_or_else(|error| panic!("genesis policy: {error}"));
+        let authority = accept_authority_with_genesis(&catalog, 53, genesis);
+        assert_eq!(
+            authority.authorize_genesis(forged).err(),
+            Some(AuthorityError::Mismatch(AuthorityField::Schema))
+        );
+        assert!(
+            accept_authority(&catalog, 53)
+                .authorize_genesis(root(&catalog))
+                .is_ok()
         );
     }
 

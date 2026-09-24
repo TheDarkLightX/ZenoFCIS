@@ -6,6 +6,23 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The commit authority checks the command and context of every invocation,
+  and the initial state at genesis, against its own catalog's schema.
+  - Before, it compared only the schema hash each envelope recorded. An
+    envelope's constructor accepts any `CommitmentHasher`, so a caller's own
+    hasher could record the catalog's schema hash for a value validated
+    against a looser schema, with an out-of-range integer or an undeclared
+    variant.
+  - Committed states were not affected: the pre-state and post-state of
+    every transition were already validated against the catalog's schema.
+    The templates' programs and law checkers also convert their inputs to
+    typed values, which refuse such values.
+  - A refused input is `AuthorityError::Mismatch(AuthorityField::Schema)`,
+    and honest inputs are unaffected.
+  - ADR 0003 now lists the check, and assumption (g) of the inductive-claims
+    argument rests on the authority instead of on each application's
+    conversions.
+
 - Add the `agent-treasury-guard` application template for
   `zeno-fcis new --template`. An AI agent proposes swaps for a treasury; the
   proposal is only a command, and the decision is the guard. Whatever the

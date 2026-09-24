@@ -108,10 +108,16 @@ Suppose all of the following hold:
   within the evaluation limits. Otherwise the invariant has no value on some
   committed state. A partial observer could pass the base case and the
   assumption check, and still give `MissingProjection` later.
-- (g) admission refuses a command, context, or state whose enumerated fields
-  hold undeclared variants, and the law checker observes an enumerated field
-  as its variant ID and a bool as 0 or 1. The templates' conformance tests,
-  which read fields by numeric ID, check this binding.
+- (g) the law checker observes an enumerated field as its variant ID and a
+  bool as 0 or 1, and every value it observes is admissible under the
+  authority's schema, which refuses undeclared variants. The authority checks
+  admissibility itself, against its own catalog's schema:
+  - the command and context when it admits an invocation;
+  - the initial state at genesis;
+  - the pre-state and post-state of every transition before it can commit.
+
+  The templates' conformance tests, which read fields by numeric ID, check
+  the observation binding.
 
 Then every state the application commits, as its law checker observes it,
 satisfies the invariant. The argument is by induction over the committed
