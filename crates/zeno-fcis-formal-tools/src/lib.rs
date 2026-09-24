@@ -1274,8 +1274,10 @@ pub enum ObligationScope {
     /// satisfies the assumed laws, and starts in a state satisfying the
     /// invariant, ends in one. The laws stand in for the transition relation,
     /// because the authority refuses every decision that breaks a law enforced
-    /// on it. The base case and the enforcement of the assumed laws are checked
-    /// by the application, not by this obligation.
+    /// on it. The application, not this obligation, checks the rest of the
+    /// argument: its observer reads every path the invariant reads, the base
+    /// case holds on its exact genesis state, and it enforces each assumed law
+    /// on the decisions the claim assumes it on.
     InductiveStepOverLaws,
 }
 
@@ -1308,7 +1310,7 @@ impl ObligationScope {
                 Self::InductiveStepOverLaws,
                 ToolRunStatus::ProposedUnsat | ToolRunStatus::KernelChecked,
             ) => Some(
-                "every transition that satisfies the assumed laws preserves the invariant; it holds on every committed state only when the application also checks the invariant on its exact genesis state and enforces each assumed law on the decisions the claim assumes it on",
+                "every transition that satisfies the assumed laws preserves the invariant; it holds on every committed state only when the application also observes every value the invariant reads, checks the invariant on its exact genesis state, and enforces each assumed law on the decisions the claim assumes it on",
             ),
             (Self::InductiveStepOverLaws, ToolRunStatus::Refuted | ToolRunStatus::Undefined(_)) => {
                 Some(

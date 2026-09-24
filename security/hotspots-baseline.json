@@ -563,17 +563,17 @@
           "lines": [
             834,
             884,
-            2975,
-            3034,
-            3243
+            2977,
+            3036,
+            3245
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             143,
-            3114,
-            3128
+            3116,
+            3130
           ]
         },
         {
@@ -591,9 +591,9 @@
             1050,
             1166,
             1167,
-            2257,
-            2387,
-            2595
+            2259,
+            2389,
+            2597
           ]
         },
         {
@@ -605,8 +605,8 @@
             996,
             1011,
             1014,
-            2849,
-            2855
+            2851,
+            2857
           ]
         },
         {
@@ -615,20 +615,20 @@
             699,
             741,
             966,
-            2783
+            2785
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            2977
+            2979
           ]
         },
         {
           "id": "information-flow-observation",
           "lines": [
-            2421,
-            2506
+            2423,
+            2508
           ]
         },
         {
@@ -637,9 +637,9 @@
             294,
             343,
             543,
-            2722,
-            2745,
-            2751
+            2724,
+            2747,
+            2753
           ]
         },
         {
@@ -652,17 +652,17 @@
             712,
             959,
             1075,
-            1419
+            1421
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            2387,
-            2390,
-            2457,
-            2595,
-            2607
+            2389,
+            2392,
+            2459,
+            2597,
+            2609
           ]
         },
         {
@@ -5173,9 +5173,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3498553,
+    "admitted_bytes": 3498747,
     "admitted_files": 195,
-    "inventory_sha256": "9c05e3adf18510ae93798bc6a547d76ba73dab96e1ef25d53495e8bbdb25857a",
+    "inventory_sha256": "f2e3380f68724ff684a4090627ba7623a1f4d6a9d96f5017fb37d02ef889a9f6",
     "ranked_above_minimum": 157,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
