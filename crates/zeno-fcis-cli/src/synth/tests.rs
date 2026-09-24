@@ -205,6 +205,17 @@ fn runner_retries_a_briefly_busy_executable_then_fails_closed() {
     drop(writer);
     assert_eq!(failure.kind(), std::io::ErrorKind::TimedOut);
     assert!(started.elapsed() < std::time::Duration::from_millis(100));
+
+    // An exhausted budget starts nothing, even for an executable that is not
+    // busy.
+    let failure = runner::spawn_unless_busy(
+        &mut std::process::Command::new(&stand_in),
+        std::time::Instant::now(),
+        std::time::Duration::ZERO,
+    )
+    .map(|_| ())
+    .unwrap_err();
+    assert_eq!(failure.kind(), std::io::ErrorKind::TimedOut);
 }
 
 const COUNTER_PROGRAM: &[u8] =

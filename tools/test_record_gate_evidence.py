@@ -43,11 +43,13 @@ def commit(checkout):
 
 
 class RecorderSourceChecks(unittest.TestCase):
-    def record(self, checkout, *, during_versions=None, during_inventory=None):
+    def record(self, checkout, *, during_versions=None, during_inventory=None, during_gate=None):
         gates = []
 
         def gate(name, command, environment=None):
             gates.append(name)
+            if during_gate:
+                during_gate(checkout)
             return {"name": name, "command": ["MOCKED"], "exit_code": 0,
                     "tests": {"passed": 1, "failed": 0, "ignored": 0}}
 
@@ -95,6 +97,10 @@ class RecorderSourceChecks(unittest.TestCase):
     def test_a_change_during_the_ignored_test_inventory_writes_nothing(self):
         result, record, _ = self.record(Checkout(), during_inventory=modify)
         self.assertEqual((result, record), (2, None))
+
+    def test_a_change_during_a_gate_stops_before_the_next_gate(self):
+        result, record, gates = self.record(Checkout(), during_gate=modify)
+        self.assertEqual((result, record, gates), (2, None, ["atdd"]))
 
     def test_a_new_commit_during_the_run_writes_nothing(self):
         result, record, _ = self.record(Checkout(), during_versions=commit)

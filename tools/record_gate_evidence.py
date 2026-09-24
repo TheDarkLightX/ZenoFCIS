@@ -4,11 +4,13 @@
 The record names the exact commit and tree it tested, the tool versions, each
 command with its exit code and test counts, and every ignored test with the
 step that runs it, if any. Tracked files must match the commit when the run
-starts, and the commit, tree, and tracked files must be unchanged after
-everything is collected, immediately before the record is written; otherwise
-nothing is written. Pinned formal-tool checks run only when their executables
-are supplied through the same environment variables that the formal-tools
-workflow uses.
+starts. The commit, tree, and tracked files are compared with the start after
+every gate and again after everything is collected, immediately before the
+record is written; any difference stops the run and nothing is written. A
+change made and reverted between two checks is not detected, so run the
+recorder in a checkout that nothing else modifies. Pinned formal-tool checks
+run only when their executables are supplied through the same environment
+variables that the formal-tools workflow uses.
 """
 
 from __future__ import annotations
@@ -134,14 +136,17 @@ def main() -> int:
     if changes:
         print("record_gate_evidence: tracked files differ from the commit; commit first", file=sys.stderr)
         return 2
+    gates = [] if args.skip_atdd else [("atdd", ["python3", "tools/atdd.py", "run", "--all"], {})]
+    gates.append(("kernel-laws", [*CARGO, "test", "--manifest-path", "verification/Cargo.toml", "--locked"], {}))
+    gates.append(("kernel-laws-supply-chain", [*CARGO, "deny", "--manifest-path", "verification/Cargo.toml",
+                                               "--config", "deny.toml", "check"], {}))
+    gates.extend(pinned_steps())
     steps = []
-    if not args.skip_atdd:
-        steps.append(run("atdd", ["python3", "tools/atdd.py", "run", "--all"]))
-    steps.append(run("kernel-laws", [*CARGO, "test", "--manifest-path", "verification/Cargo.toml", "--locked"]))
-    steps.append(run("kernel-laws-supply-chain", [*CARGO, "deny", "--manifest-path", "verification/Cargo.toml",
-                                                  "--config", "deny.toml", "check"]))
-    for name, command, environment in pinned_steps():
+    for name, command, environment in gates:
         steps.append(run(name, command, environment))
+        if source_state() != (revision, tree, ""):
+            print(f"record_gate_evidence: the source changed during {name}", file=sys.stderr)
+            return 2
     tools = {
         "rust": version(["rustc", "+1.97.1", "--version"]),
         "python": version(["python3", "--version"]),

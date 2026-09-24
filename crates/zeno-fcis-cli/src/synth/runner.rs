@@ -28,10 +28,10 @@ const MAX_OUTPUT: u64 = 32 * 1024 * 1024;
 /// Linux refuses to execute a file that any process holds open for writing
 /// (`ETXTBSY`). A child that another thread forks while this process writes an
 /// executable inherits that descriptor until it executes its own program, so
-/// the condition clears quickly. No attempt starts after the budget ends: when
-/// the next wait would reach the end, the error has kind `TimedOut`. Every
-/// other error, and a file that stays busy through the last attempt, fails
-/// closed.
+/// the condition clears quickly. No attempt starts after the budget ends,
+/// including the first: an exhausted budget, or a wait that would reach its
+/// end, gives an error of kind `TimedOut`. Every other error, and a file that
+/// stays busy through the last attempt, fails closed.
 #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
 pub(super) fn spawn_unless_busy(
     command: &mut Command,
@@ -40,8 +40,17 @@ pub(super) fn spawn_unless_busy(
 ) -> std::io::Result<std::process::Child> {
     let busy = nix::errno::Errno::ETXTBSY as i32;
     let mut delay = Duration::from_millis(1);
+    let timed_out = || {
+        std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            "the time budget ended while the executable was busy",
+        )
+    };
     let mut retries = 8;
     loop {
+        if started.elapsed() >= budget {
+            return Err(timed_out());
+        }
         let e = match command.spawn() {
             Ok(child) => return Ok(child),
             Err(e) => e,
@@ -50,10 +59,7 @@ pub(super) fn spawn_unless_busy(
             return Err(e);
         }
         if budget.saturating_sub(started.elapsed()) <= delay {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::TimedOut,
-                "the time budget ended while the executable was busy",
-            ));
+            return Err(timed_out());
         }
         std::thread::sleep(delay);
         delay = delay.saturating_mul(2);
