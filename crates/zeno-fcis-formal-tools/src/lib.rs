@@ -2556,10 +2556,12 @@ fn parse_model_values(text: &str) -> BTreeMap<String, i128> {
     while index + 3 < tokens.len() {
         if tokens[index] == "define-fun" && tokens[index + 2] == "Int" {
             let parsed = if tokens[index + 3] == "-" && index + 4 < tokens.len() {
+                // The magnitude of i128::MIN does not fit in i128, so read it
+                // unsigned and subtract it from zero.
                 tokens[index + 4]
-                    .parse::<i128>()
+                    .parse::<u128>()
                     .ok()
-                    .and_then(i128::checked_neg)
+                    .and_then(|magnitude| 0i128.checked_sub_unsigned(magnitude))
             } else {
                 tokens[index + 3].parse::<i128>().ok()
             };
@@ -4782,6 +4784,36 @@ mod tests {
                     .unwrap_or_else(|| unreachable!())
             ),
             Some(&vec![120, 121])
+        );
+    }
+
+    #[test]
+    fn model_values_span_the_whole_i128_range() {
+        let values = parse_model_values(&model(&[
+            ("low", i128::MIN),
+            ("below_zero", -1),
+            ("high", i128::MAX),
+        ]));
+        assert_eq!(values.get("low"), Some(&i128::MIN));
+        assert_eq!(values.get("below_zero"), Some(&-1));
+        assert_eq!(values.get("high"), Some(&i128::MAX));
+        // A value outside i128 is dropped, so its model is never replayed.
+        let beyond = parse_model_values(
+            "sat\n(define-fun low () Int (- 170141183460469231731687303715884105729))\n",
+        );
+        assert_eq!(beyond.get("low"), None);
+        // Decrementing overflows only at the bottom of the range.
+        let decrement = relational_obligation(
+            5,
+            RelExpr::Compare(
+                CompareOp::Less,
+                ValueExpr::Sub(Box::new(pre(100)), Box::new(ValueExpr::Int(1))),
+                pre(100),
+            ),
+        );
+        assert_eq!(
+            replay_model(&decrement, &model(&[("pre_100_t0", i128::MIN)])),
+            ToolRunStatus::Undefined(UndefinedReason::Overflow)
         );
     }
 

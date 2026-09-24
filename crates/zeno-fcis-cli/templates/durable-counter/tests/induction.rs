@@ -2,22 +2,29 @@
 //!
 //! Claim 600 states an invariant, both counters are nonnegative, and assumes
 //! law 501 on accepts and law 502 on committed failures. `zeno-fcis prove`
-//! checks its induction step: every transition that satisfies those laws and
+//! checks its induction step with an SMT solver, whose `unsat` is attested,
+//! not independently checked: every transition that satisfies those laws and
 //! starts in a state satisfying the invariant ends in one. That result says
-//! something about this application only together with the two checks here:
-//! the invariant holds on the exact genesis state, and the law manifest
-//! enforces each assumed law on the decisions the claim assumes it on.
+//! something about this application only together with the checks here:
+//! - the law checker's own observer reads every field the invariant reads,
+//!   and the invariant has a definite value on every admitted state;
+//! - the invariant holds on the exact genesis state, as that observer sees it;
+//! - the law manifest enforces each assumed law on the decisions the claim
+//!   assumes it on.
+//!
 //! A rejection leaves the state unchanged, so it needs no law.
 
-use durable_counter::{authority, create, delivery::Destination, generated::*, profile};
+use durable_counter::{
+    authority, create, delivery::Destination, generated::*, laws::state_observations, profile,
+};
 use std::{
     fs,
     path::PathBuf,
     sync::atomic::{AtomicU64, Ordering},
 };
 use zeno_fcis_spec::{
-    ClaimMode, EvalLimits, EvalOutcome, Observation, ProjectionPath, ProjectionRoot, StableId,
-    TraceStep, evaluate_invariant,
+    ClaimMode, EvalLimits, EvalOutcome, ProjectionRoot, StableId, TraceStep, claim_paths,
+    evaluate_invariant,
 };
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -41,20 +48,45 @@ impl Drop for Temp {
 
 const NEVER_NEGATIVE: u32 = 600;
 
-/// Observes a state under `pre.` paths, the same paths the law checker uses.
+/// Observes a state under `pre.` paths through the law checker's own observer.
 fn observe(state: &CounterState) -> TraceStep {
-    let path = |field: u32| {
-        ProjectionPath::try_new(
-            ProjectionRoot::Pre,
-            vec![StableId::new(100).unwrap(), StableId::new(field).unwrap()],
-        )
-        .unwrap()
-    };
-    TraceStep::try_new(vec![
-        Observation::new(path(110), state.count.0),
-        Observation::new(path(111), state.failures.0),
-    ])
-    .unwrap()
+    TraceStep::try_new(state_observations(ProjectionRoot::Pre, state).to_vec()).unwrap()
+}
+
+#[test]
+fn the_law_checker_observes_every_field_the_invariant_reads() {
+    let project = profile::project();
+    let claim = project
+        .claim(StableId::new(NEVER_NEGATIVE).unwrap())
+        .expect("claim 600 is declared");
+    let sample = observe(&CounterState {
+        count: CounterValue(1),
+        failures: CounterValue(2),
+    });
+    for path in claim_paths(claim) {
+        assert!(
+            sample
+                .observations()
+                .iter()
+                .any(|observation| observation.path() == path),
+            "the observer omits {path:?}"
+        );
+    }
+    // On every admitted state the invariant has a definite value within the
+    // limits the law checker uses: no missing projection, no exhausted limit.
+    for count in 0..=3 {
+        for failures in 0..=3 {
+            let state = CounterState {
+                count: CounterValue(count),
+                failures: CounterValue(failures),
+            };
+            assert_eq!(
+                evaluate_invariant(claim, &observe(&state), EvalLimits::default()),
+                Some(EvalOutcome::True),
+                "count {count}, failures {failures}"
+            );
+        }
+    }
 }
 
 #[test]
