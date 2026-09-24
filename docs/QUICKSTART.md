@@ -55,8 +55,8 @@ committed failures), `order-fulfillment` (idempotent external requests),
 for every input sequence, and a refinement law that ties each tick to it),
 and `agent-treasury-guard` (an AI agent as an untrusted proposer, guarded by
 a budget, a reserve, and a slippage bound, with a synthesized precedence
-core and inductive claims, attested by CVC5 through `prove`, that its laws
-keep those limits). Create one with
+core and inductive claims, attested by CVC5 through `prove`, that its
+action laws keep the reserve and the daily budget). Create one with
 `new DIR --template account-lockout` and start from its README.
 
 Use umbrella feature `authoring` for the pure parser, typed AST, builders,

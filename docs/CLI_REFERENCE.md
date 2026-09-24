@@ -87,7 +87,7 @@ Four more development templates build realistic applications the same way:
   an AI agent as an untrusted proposer of swaps, guarded by a budget, a
   reserve, and a slippage bound; a synthesized core decides the rule
   precedence, inductive claims attested by CVC5 through `prove` state that
-  the action laws keep the treasury within its limits, and requests to
+  the action laws keep the reserve and the daily budget, and requests to
   ZenoDEX are shaped after its `SwapIntent`.
 
 In each, `check --require-substantive --require-resolved-paths` passes, and
