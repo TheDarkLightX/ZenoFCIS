@@ -37,11 +37,14 @@ deterministic checkers judge them. A judgment is carried by a type that only
 the judging code can construct, so later code relies on the type rather than
 on a convention.
 
-Proposers, none of which is trusted to be right:
+Proposers, whose output is checked before anything relies on it:
 
 - project transitions, whether written by hand, generated, or written by an
   LLM;
-- the synthesis search, SMT solvers, and Lean;
+- the synthesis search, when it selects a program;
+- solver models, which are replayed through the interpreter;
+- proof search, meaning the tactics that build a Lean proof, which the Lean
+  kernel then checks;
 - mounted runtimes, such as the ZenoDEX zUSD engines;
 - rows read back from storage.
 
@@ -53,9 +56,23 @@ Judges:
   every applicable project law hold, and its byte-for-byte re-execution of
   persisted transitions;
 - exhaustive checking of finite programs and properties;
+- `zeno-fcis synth verify`, which replays emitted source on every admitted
+  input in its target runtime;
 - replay of solver models through the interpreter;
 - known-answer checks of the hash provider;
 - re-authorization of the complete history when a store reopens.
+
+Trusted components, which a result names in its trusted base instead of
+rechecking:
+
+- the pinned Lean kernel and runtime, the allowed axioms, and the translation
+  from `.zeno` to Lean, for `KernelChecked` results;
+- a solver's `unsat` answer, which is recorded as Attested because nothing
+  rechecks it;
+- the synthesis search's enumeration of candidates, for a "no solution"
+  result;
+- a project's law engine, whose verdicts the authority enforces;
+- the `finite-i64/1` interpreter, the Rust compiler, and the target runtimes.
 
 Judgments carried by types with private constructors:
 
@@ -74,8 +91,7 @@ Effects happen only in the shell, only on authorized values:
 `CommitPlan` records evidence and is never executed.
 
 What each judgment establishes differs: some recompute a result, and some only
-record a component's report. Law verdicts, for example, come from the project's
-law engine, and the authority enforces them without recomputing them.
+record a trusted component's report.
 [Design record 0003](adr/0003-epistemic-status.md) classifies each by level,
 scope, assumptions, and trusted base.
 
