@@ -22,9 +22,9 @@ use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_spec::{
     BackendId, ClaimDecl, ClaimFormula, ClaimMode, CompareOp, EvalLimits, EvalOutcome,
     EvaluationContext, Identifier, IndeterminateReason, LawDecl, MAX_FINITE_HORIZON,
-    MAX_FORMULA_DEPTH, Observation, PredicateProvider, ProjectionPath, ProjectionRoot, RelExpr,
-    StableId, TemporalEvaluation, TemporalFormula, TraceStep, ValueExpr, evaluate_relational,
-    evaluate_temporal, invariant_at,
+    MAX_FORMULA_DEPTH, Observation, PredicateProvider, ProjectSpec, ProjectionPath, ProjectionRoot,
+    RelExpr, StableId, TemporalEvaluation, TemporalFormula, TraceStep, ValueExpr, declared_domain,
+    evaluate_relational, evaluate_temporal, invariant_at,
 };
 
 mod system;
@@ -1223,6 +1223,8 @@ pub struct StepHypotheses {
     every_commit: Box<[LawDecl]>,
     accepts: Box<[LawDecl]>,
     committed_failures: Box<[LawDecl]>,
+    /// The declared domain of every observed enumerated or bool value.
+    domains: BTreeMap<ProjectionPath, Vec<i128>>,
 }
 impl StepHypotheses {
     /// Laws assumed for every committing decision.
@@ -1239,6 +1241,12 @@ impl StepHypotheses {
     #[must_use]
     pub const fn committed_failures(&self) -> &[LawDecl] {
         &self.committed_failures
+    }
+    /// The values each observed enumerated or bool path can take, from its
+    /// declared variants or its bool type.
+    #[must_use]
+    pub const fn domains(&self) -> &BTreeMap<ProjectionPath, Vec<i128>> {
+        &self.domains
     }
     /// Returns true when the step distinguishes accepts from committed failures.
     #[must_use]
@@ -1689,25 +1697,26 @@ pub fn export_smt_with_limits(
 
 /// Exports the induction step of an inductive claim to SMT.
 ///
-/// `laws` must contain every law the claim assumes; other laws are ignored.
-/// The obligation is satisfiable exactly when some assignment makes every
-/// assumed law and the invariant over `pre.` evaluate to true, and the
-/// invariant over `post.` not evaluate to true. Evaluation is strict, so each
-/// part is required to be defined on its own, as the law engine requires of
-/// each law it reports satisfied. An undefined part is never hidden inside a
-/// larger implication.
+/// `spec` is the elaborated project the claim belongs to. It supplies the
+/// assumed laws and the declared domain of every observed enumerated or bool
+/// value. The obligation is satisfiable exactly when some assignment within
+/// those domains makes every assumed law and the invariant over `pre.`
+/// evaluate to true, and the invariant over `post.` not evaluate to true.
+/// Evaluation is strict, so each part is required to be defined on its own,
+/// as the law engine requires of each law it reports satisfied. An undefined
+/// part is never hidden inside a larger implication.
 pub fn export_inductive_smt(
     claim: &ClaimDecl,
-    laws: &[LawDecl],
+    spec: &ProjectSpec,
     backend: ToolBackend,
 ) -> Result<ExportedObligation, ExportError> {
-    export_inductive_smt_with_limits(claim, laws, backend, ExportLimits::default())
+    export_inductive_smt_with_limits(claim, spec, backend, ExportLimits::default())
 }
 
 /// Exports an inductive step within an explicit deterministic resource envelope.
 pub fn export_inductive_smt_with_limits(
     claim: &ClaimDecl,
-    laws: &[LawDecl],
+    spec: &ProjectSpec,
     backend: ToolBackend,
     limits: ExportLimits,
 ) -> Result<ExportedObligation, ExportError> {
@@ -1721,7 +1730,7 @@ pub fn export_inductive_smt_with_limits(
     else {
         return Err(ExportError::UnsupportedMode);
     };
-    let hypotheses = step_hypotheses(claim, laws)?;
+    let mut hypotheses = step_hypotheses(claim, spec.laws())?;
     let after = invariant_at(invariant, ProjectionRoot::Post).ok_or(ExportError::InvalidFormula)?;
     let grouped: Vec<(&LawDecl, Option<i128>)> = hypotheses
         .every_commit
@@ -1788,6 +1797,17 @@ pub fn export_inductive_smt_with_limits(
         let name = smt_path(path, 0);
         source.push_str(&format!("(declare-const {name} Int)\n"));
         source.push_str(&format!("(assert {})\n", smt_i128_range(&name)));
+        if let Some(values) = declared_domain(spec, path) {
+            let members = values
+                .iter()
+                .map(|value| format!("(= {name} {})", smt_int(*value)))
+                .collect::<Vec<_>>();
+            source.push_str(&format!(
+                "; declared domain\n(assert {})\n",
+                smt_or(members)
+            ));
+            hypotheses.domains.insert(path.clone(), values);
+        }
     }
     for (name, arity) in predicates {
         source.push_str(&format!(
@@ -1861,6 +1881,7 @@ fn step_hypotheses(claim: &ClaimDecl, laws: &[LawDecl]) -> Result<StepHypotheses
         every_commit: resolve(assumptions.every_commit())?,
         accepts: resolve(assumptions.accepts())?,
         committed_failures: resolve(assumptions.committed_failures())?,
+        domains: BTreeMap::new(),
     })
 }
 
@@ -2474,6 +2495,14 @@ fn replay_inductive(
         let Some(value) = assignments.get(&smt_path(path, 0)).copied() else {
             return unreplayed;
         };
+        // Admission refuses an undeclared variant, so such a model is no transition.
+        if hypotheses
+            .domains
+            .get(path)
+            .is_some_and(|values| !values.contains(&value))
+        {
+            return unreplayed;
+        }
         observations.push(Observation::new(path.clone(), value));
     }
     let Some(transition) = TraceStep::try_new(observations) else {
@@ -4509,7 +4538,7 @@ mod tests {
         let spec = counter_project(&format!(
             "claim 500 invariant cvc5 inductive assume [{assume}] = {invariant};\n"
         ));
-        export_inductive_smt(&spec.claims()[0], spec.laws(), ToolBackend::Cvc5)
+        export_inductive_smt(&spec.claims()[0], &spec, ToolBackend::Cvc5)
             .unwrap_or_else(|error| panic!("{error:?}"))
     }
 
@@ -4564,16 +4593,25 @@ mod tests {
         let inductive = spec.claim(id(500)).unwrap_or_else(|| unreachable!());
         let relational = spec.claim(id(501)).unwrap_or_else(|| unreachable!());
         let cvc5_only = spec.claim(id(502)).unwrap_or_else(|| unreachable!());
-        assert_eq!(
-            export_inductive_smt(inductive, &[], ToolBackend::Cvc5).map(|_| ()),
-            Err(ExportError::UnknownAssumedLaw(id(401)))
+        // Elaboration refuses an undeclared law; a claim built directly is refused here.
+        let undeclared = ClaimDecl::inductive(
+            id(510),
+            name("undeclared"),
+            vec![BackendId::Cvc5],
+            zeno_fcis_spec::InductiveAssumptions::new(vec![id(499)], Vec::new(), Vec::new()),
+            RelExpr::Bool(true),
         );
         assert_eq!(
-            export_inductive_smt(cvc5_only, spec.laws(), ToolBackend::Z3).map(|_| ()),
+            export_inductive_smt(&undeclared, &spec, ToolBackend::Cvc5).map(|_| ()),
+            Err(ExportError::UnknownAssumedLaw(id(499)))
+        );
+        assert!(export_inductive_smt(inductive, &spec, ToolBackend::Cvc5).is_ok());
+        assert_eq!(
+            export_inductive_smt(cvc5_only, &spec, ToolBackend::Z3).map(|_| ()),
             Err(ExportError::BackendNotSelected)
         );
         assert_eq!(
-            export_inductive_smt(relational, spec.laws(), ToolBackend::Cvc5).map(|_| ()),
+            export_inductive_smt(relational, &spec, ToolBackend::Cvc5).map(|_| ()),
             Err(ExportError::UnsupportedMode)
         );
         // The ordinary exporters never drop the assumed laws of an inductive claim.
@@ -4638,7 +4676,7 @@ mod tests {
         let export = |claim| {
             export_inductive_smt(
                 spec.claim(id(claim)).unwrap_or_else(|| unreachable!()),
-                spec.laws(),
+                &spec,
                 ToolBackend::Cvc5,
             )
             .unwrap_or_else(|error| panic!("{error:?}"))
@@ -4684,6 +4722,66 @@ mod tests {
         assert_eq!(
             replay_model(&accepts_only, &with_kind(3, 0, 1, -1)),
             ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+    }
+
+    /// A counter whose command is an enumeration: 120 increments, 121 resets.
+    fn enum_counter_project(claims: &str) -> zeno_fcis_spec::ProjectSpec {
+        let source = format!(
+            "zeno 1;\nproject 1 enum_counter;\ntype 100 state State;\ntype 101 command Command;\n\
+             type 102 context Context;\ntype 105 int Count;\ntype 106 bool Flag;\n\
+             field 110 100 count 105;\nfield 130 102 allowed 106;\n\
+             variant 120 101 Increment none;\nvariant 121 101 Reset none;\n\
+             reason 200 bad precedence 0;\n\
+             component 300 machine {{ owns 100; reads pre.100; writes post.100; budget steps 10; }}\n\
+             merge [300];\n\
+             law 401 increments = command.101 == 120 -> context.102.130 == 1 && post.100.110 == pre.100.110 + 1;\n\
+             law 402 resets = command.101 == 121 -> post.100.110 == 0;\n{claims}"
+        );
+        let parsed =
+            zeno_fcis_spec::parse_project(&source, zeno_fcis_spec::SourceLimits::default())
+                .unwrap_or_else(|set| panic!("{set}"));
+        zeno_fcis_spec::elaborate_project(parsed, zeno_fcis_spec::ProjectLimits::default())
+            .unwrap_or_else(|set| panic!("{set}"))
+    }
+
+    #[test]
+    fn declared_domains_bound_enumerated_and_bool_observations() {
+        let spec = enum_counter_project(
+            "claim 600 nonnegative cvc5 inductive accept [401, 402] = pre.100.110 >= 0;\n",
+        );
+        let obligation = export_inductive_smt(&spec.claims()[0], &spec, ToolBackend::Cvc5)
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        let source = String::from_utf8_lossy(obligation.source()).into_owned();
+        assert!(source.contains(
+            "; declared domain\n(assert (or (= command_101_t0 120) (= command_101_t0 121)))"
+        ));
+        assert!(source.contains(
+            "; declared domain\n(assert (or (= context_102_130_t0 0) (= context_102_130_t0 1)))"
+        ));
+        // The count is an integer: its range comes from outside project.zeno.
+        assert!(!source.contains("(= pre_100_110_t0 0) (= pre_100_110_t0"));
+        let command = |value: i128, post: i128| {
+            let mut text = model(&[
+                ("pre_100_110_t0", 0),
+                ("command_101_t0", value),
+                ("context_102_130_t0", 1),
+                ("post_100_110_t0", post),
+            ]);
+            text.insert_str(text.len() - 2, "(define-fun zeno_decision_kind () Int 1)\n");
+            text
+        };
+        // Command 0 makes both laws vacuous, but admission never admits it.
+        assert_eq!(
+            replay_model(&obligation, &command(0, -1)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        assert_eq!(
+            obligation.hypotheses().domains().get(
+                &ProjectionPath::try_new(ProjectionRoot::Command, vec![id(101)])
+                    .unwrap_or_else(|| unreachable!())
+            ),
+            Some(&vec![120, 121])
         );
     }
 
@@ -6279,6 +6377,20 @@ mod tests {
         found
     }
 
+    fn grid(a: &[i128], b: &[i128], c: &[i128], d: &[i128]) -> Vec<(i128, i128, i128, i128)> {
+        let mut all = Vec::new();
+        for w in a {
+            for x in b {
+                for y in c {
+                    for z in d {
+                        all.push((*w, *x, *y, *z));
+                    }
+                }
+            }
+        }
+        all
+    }
+
     fn run_status_label(status: &ToolRunStatus) -> String {
         match status {
             ToolRunStatus::Undefined(reason) => format!("undefined:{}", reason.name()),
@@ -6320,7 +6432,7 @@ mod tests {
         let mut verdicts = BTreeMap::new();
         for claim in spec.claims() {
             for config in &solvers {
-                let obligation = export_inductive_smt(claim, spec.laws(), config.backend)
+                let obligation = export_inductive_smt(claim, &spec, config.backend)
                     .unwrap_or_else(|error| panic!("claim {}: {error:?}", claim.id().get()));
                 let expected = exhaustive_step_counterexamples(&obligation);
                 let output = run_smt(config, &config.path, obligation.source())
@@ -6347,6 +6459,72 @@ mod tests {
                 verdicts.insert((claim.id().get(), config.backend.name()), expected);
             }
         }
+        // Declared domains: the enumerated command and the bool flag. Law 403
+        // boxes the count, so enumerating the box and the declared values is
+        // complete.
+        let enumerated = enum_counter_project(
+            "law 403 in_box = pre.100.110 >= 0 && pre.100.110 <= 4 && post.100.110 >= 0 && post.100.110 <= 4;\n\
+             claim 610 nonnegative all inductive assume [403] accept [401, 402] = pre.100.110 >= 0;\n\
+             claim 611 at_most_three all inductive assume [403] accept [401, 402] = pre.100.110 <= 3;\n",
+        );
+        for claim in enumerated.claims() {
+            for config in &solvers {
+                let obligation = export_inductive_smt(claim, &enumerated, config.backend)
+                    .unwrap_or_else(|error| panic!("claim {}: {error:?}", claim.id().get()));
+                let mut expected = BTreeSet::new();
+                for kind in [ACCEPT_KIND, COMMITTED_FAILURE_KIND] {
+                    for (pre, command, allowed, post) in
+                        grid(&[0, 1, 2, 3, 4], &[120, 121], &[0, 1], &[0, 1, 2, 3, 4])
+                    {
+                        let mut text = model(&[
+                            ("pre_100_110_t0", pre),
+                            ("command_101_t0", command),
+                            ("context_102_130_t0", allowed),
+                            ("post_100_110_t0", post),
+                        ]);
+                        text.insert_str(
+                            text.len() - 2,
+                            &format!("(define-fun {DECISION_KIND} () Int {kind})\n"),
+                        );
+                        match replay_model(&obligation, &text) {
+                            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed) => {}
+                            status => {
+                                expected.insert(run_status_label(&status));
+                            }
+                        }
+                    }
+                }
+                let output = run_smt(config, &config.path, obligation.source())
+                    .unwrap_or_else(|error| panic!("claim {}: {error:?}", claim.id().get()));
+                let status = classify(config, output.final_output(), &obligation);
+                let holds = matches!(
+                    (config.backend, &status),
+                    (ToolBackend::Cvc5, ToolRunStatus::ProposedUnsat)
+                        | (
+                            ToolBackend::Z3,
+                            ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
+                        )
+                );
+                if expected.is_empty() {
+                    assert!(
+                        holds,
+                        "claim {} {:?}: {status:?}",
+                        claim.id().get(),
+                        config.backend
+                    );
+                } else {
+                    assert!(
+                        expected.contains(&run_status_label(&status)),
+                        "claim {} {:?}: {status:?} not in {expected:?}",
+                        claim.id().get(),
+                        config.backend
+                    );
+                }
+                verdicts.insert((claim.id().get(), config.backend.name()), expected);
+            }
+        }
+        // Without declared domains, command 0 would refute claim 610.
+        assert!(verdicts[&(610, ToolBackend::Cvc5.name())].is_empty());
         // The collection covers every outcome: holds, refuted, undefined, and both.
         let outcomes: BTreeSet<_> = verdicts.values().cloned().collect();
         assert!(outcomes.contains(&BTreeSet::new()));

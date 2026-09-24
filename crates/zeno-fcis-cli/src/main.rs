@@ -1027,7 +1027,7 @@ fn prove(
             };
             let obligation = match (tool_backend, claim.mode()) {
                 (ToolBackend::Cvc5 | ToolBackend::Z3, ClaimMode::Inductive) => {
-                    export_inductive_smt(claim, spec.laws(), tool_backend)
+                    export_inductive_smt(claim, &spec, tool_backend)
                 }
                 (ToolBackend::Cvc5 | ToolBackend::Z3, _) => export_smt(claim, tool_backend),
                 (ToolBackend::Lean, _) => export_lean(claim),

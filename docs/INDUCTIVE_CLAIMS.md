@@ -60,8 +60,14 @@ The argument has three parts. `prove` checks only the first.
    - the invariant over `pre.`;
    - the invariant restated over `post.` (`invariant_at`), *not* true.
 
-   An unsatisfiable answer means no transition the assumed laws admit leaves
-   the invariant.
+   Each observed value whose type is enumerated, or bool, is also asserted to
+   be one of its declared values: its variants' IDs, or 0 and 1
+   (`declared_domain`). Admission refuses anything else, so this excludes
+   only inputs the application never decides. Integer ranges are supplied by
+   `build.rs`, not by `project.zeno`, so the step does not assume them.
+
+   An unsatisfiable answer means that no transition the assumed laws admit,
+   over declared values, leaves the invariant.
 2. **The base case**, checked by the application. `evaluate_invariant` must
    return `EvalOutcome::True` on the exact genesis state, observed under the
    same paths the law checker uses.
@@ -87,7 +93,11 @@ Suppose all of the following hold:
   the formula evaluates to true on the transition's observations, which is how
   every template's checker works;
 - (f) the application observes the state before and after a step through the
-  same projection paths.
+  same projection paths;
+- (g) admission refuses a command, context, or state whose enumerated fields
+  hold undeclared variants, and the law checker observes an enumerated field
+  as its variant ID and a bool as 0 or 1. The templates' conformance tests,
+  which read fields by numeric ID, check this binding.
 
 Then every state the application commits satisfies the invariant. The proof
 is by induction over the committed history:
@@ -116,7 +126,7 @@ a larger implication.
 
 A counterexample is replayed through the library evaluator before it is
 reported. The model is confirmed only when all of these hold:
-- every observed value is present;
+- every observed value is present, and within its declared domain;
 - every law assumed for the model's decision kind evaluates to true;
 - the invariant over `pre.` evaluates to true;
 - the invariant over `post.` does not.
@@ -150,20 +160,26 @@ and Z3 4.16.0, all run on 2026-09-24:
   comes from the bound law and the program's capacity check, not from the
   action laws.
 - The account-lockout template's lock invariant, the formula of its law 500,
-  assumed only its action laws. The first counterexample was an "accept" with
-  command 0: the action laws never state that an accept is a login or an
-  unlock, because schema admission guarantees it. After that condition was
-  added on a scratch copy, the remaining counterexamples started at times near
-  the top of the i128 range, or at `failed_attempts = 3`. The schema excludes
-  both. That limit is the next item below.
+  assumed only its action laws. Before declared domains, the first
+  counterexample was an "accept" with command 0: the action laws never state
+  that an accept is a login or an unlock, because admission guarantees it.
+  Declared domains now exclude it without changing the laws. The remaining
+  counterexamples start at times near the top of the i128 range, or at
+  `failed_attempts = 3`. The integer ranges in `build.rs` exclude both, which
+  is the first limit below.
+- The compliance-gateway template's strikes invariant, `0 <= strikes <= 3`,
+  with `accept [501, 502] failure [503]`, gave the same command-0
+  counterexample before declared domains. With them, CVC5 proves it from the
+  gateway's own laws.
 
 ## Limits
 
-- **No schema bounds.** Field ranges and variant domains are supplied by
-  `build.rs`, not by `project.zeno`, so the step cannot assume them. An
-  invariant whose proof needs a range must get it from an assumed law, or
-  strengthen itself with the range and prove that it is preserved. Exporting
-  the schema's bounds into the step is the planned next improvement.
+- **No integer ranges.** Variant domains and bools come from `project.zeno`,
+  but integer ranges are supplied by `build.rs`, so the step cannot assume
+  them. An invariant whose proof needs a range must get it from an assumed law,
+  or strengthen itself with the range and prove that it is preserved. Stating
+  scalar bounds in `project.zeno`, or exporting the schema's bounds into the
+  step, is the planned next improvement.
 - **Scopes are not in `.zeno`.** The claim states which decisions each law is
   assumed on, and the application confirms it against its manifest.
 - **No Lean export yet.** Solver results are Attested at most.
@@ -189,6 +205,9 @@ edits were reverted; none is committed.
 | The groups are part of the canonical bytes | `inductive_claims_keep_their_assumed_laws_in_the_canonical_project` |
 | The manifest check refuses accept-only laws in `assume` | `step_assumptions_must_be_enforced_on_the_decisions_they_are_assumed_on` |
 | Inductive invariants are classified by `invariant_substance` | `an_invariant_that_reads_state_is_substantive` |
+| The export asserts declared domains | `declared_domains_bound_enumerated_and_bool_observations` |
+| Replay refuses values outside a declared domain | `declared_domains_bound_enumerated_and_bool_observations` |
+| `declared_domain` reads variants and bools, and nothing else | `declared_domains_come_from_variants_and_bools_only` |
 
 The pinned test `pinned_inductive_steps_agree_with_exhaustive_replay` checks
 the SMT encoding itself. It uses eight claims over a box that the assumed laws
