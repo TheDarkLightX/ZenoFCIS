@@ -111,6 +111,16 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--test", "system_contract", "--locked"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "counter_system_properties")),
     ),
+    "inductive-claims": AcceptanceScenario(
+        "Prove invariants by induction over the laws the authority enforces",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--lib", "--locked", "induction::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--lib", "--locked", "inductive"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--lib", "--locked", "a_split_step_uses_each_decision_kinds_own_laws"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--lib", "--locked", "replay_confirms_models_where_strict_evaluation_has_no_value"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--lib", "--locked", "undefined_results_have_their_own_record_and_name"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-laws", "--lib", "--locked", "step_assumptions_must_be_enforced_on_the_decisions_they_are_assumed_on"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "tool_run_exit")),
+    ),
     "reserved-domains": AcceptanceScenario(
         "Keep project commitment domains out of the library namespace",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-project", "--lib", "--locked", "reserved_domain_tests"),

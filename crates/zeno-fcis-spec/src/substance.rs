@@ -13,8 +13,8 @@
 //! evaluator can report them as indeterminate and fail closed.
 
 use crate::ast::{
-    ClaimDecl, ClaimFormula, CompareOp, LawDecl, ProjectionRoot, RelExpr, TemporalFormula,
-    ValueExpr,
+    ClaimDecl, ClaimFormula, ClaimMode, CompareOp, LawDecl, ProjectionRoot, RelExpr,
+    TemporalFormula, ValueExpr,
 };
 
 /// What an authored law or claim can say about system behavior, judged from
@@ -67,8 +67,28 @@ pub fn law_substance(law: &LawDecl) -> Substance {
 #[must_use]
 pub fn claim_substance(claim: &ClaimDecl) -> Substance {
     match claim.formula() {
+        ClaimFormula::Relational(expr) if matches!(claim.mode(), ClaimMode::Inductive) => {
+            invariant_substance(expr)
+        }
         ClaimFormula::Relational(expr) => relation_substance(expr),
         ClaimFormula::Temporal(formula) => temporal_substance(formula),
+    }
+}
+
+/// Classifies an inductive claim's invariant.
+///
+/// An invariant is asserted of every state the application commits, so, as
+/// with a temporal formula, reading any state observation can distinguish two
+/// behaviors. Only constant invariants and invariants that read nothing are
+/// reported.
+#[must_use]
+pub fn invariant_substance(expr: &RelExpr) -> Substance {
+    if let Some(value) = constant_relation(expr) {
+        Substance::Constant { value }
+    } else if relation_reads(expr, ReadScope::Any) {
+        Substance::MayConstrainTransition
+    } else {
+        Substance::IgnoresTransition
     }
 }
 

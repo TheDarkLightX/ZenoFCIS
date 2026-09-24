@@ -115,7 +115,10 @@ describe the full design.
   - every decision is checked against the project laws before it can be
     published;
   - a finite decision core can be synthesized and verified exhaustively
-    instead of being written by hand.
+    instead of being written by hand;
+  - an [inductive claim](docs/INDUCTIVE_CLAIMS.md) proves an invariant over the
+    full integer range by induction over the laws the authority enforces, for
+    a hand-written program as much as a synthesized one.
 - **Agents** get reproducible, machine-readable feedback:
   - `zeno-fcis describe` and versioned JSON results with stable exit codes;
   - counterexamples to repair against: a synthesis refutation, or a solver

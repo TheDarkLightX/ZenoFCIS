@@ -74,6 +74,8 @@ def pinned_steps() -> list[tuple[str, list[str], dict[str, str]]]:
     if cvc5 and z3:
         steps.append(("pinned-smt-translation", [*formal, "tests::pinned_smt_translation_differential_check",
                                                  "--", "--ignored", "--exact"], {}))
+        steps.append(("pinned-inductive-steps", [*formal, "tests::pinned_inductive_steps_agree_with_exhaustive_replay",
+                                                 "--", "--ignored", "--exact"], {}))
     if cvc5:
         for test in ("system::tests::pinned_system_smt_agrees_with_exhaustive_check",
                      "system::tests::pinned_solver_route_agrees_with_exhaustive_route_on_small_programs"):

@@ -13,6 +13,7 @@ mod ast;
 mod builder;
 mod diagnostic;
 mod elaborate;
+mod induction;
 mod lexer;
 mod logic;
 mod mini_determinator;
@@ -27,6 +28,7 @@ pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
 };
 pub use elaborate::elaborate_project;
+pub use induction::{evaluate_invariant, invariant_at};
 pub use logic::{
     EvalLimits, EvalOutcome, EvaluationContext, IndeterminateReason, NamedPredicate, Observation,
     PredicateProvider, TemporalEvaluation, TraceStep, evaluate_relational, evaluate_temporal,
@@ -38,7 +40,8 @@ pub use mini_determinator::{
 pub use parser::parse_project;
 pub use paths::{PathResolution, claim_paths, law_paths, resolve_path};
 pub use substance::{
-    Substance, claim_substance, law_substance, relation_substance, temporal_substance,
+    Substance, claim_substance, invariant_substance, law_substance, relation_substance,
+    temporal_substance,
 };
 pub use views::{
     DerivedComposition, GeneratedProject, GraphFormat, ObligationKind, UnresolvedObligation,

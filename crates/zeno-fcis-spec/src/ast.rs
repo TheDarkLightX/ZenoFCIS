@@ -814,8 +814,72 @@ impl BackendId {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClaimMode {
     Relational,
-    Finite { horizon: u32 },
+    Finite {
+        horizon: u32,
+    },
     UnboundedProof,
+    /// An invariant over `pre.` state paths. Its induction step is proved
+    /// relative to the laws the claim assumes; see [`ClaimDecl::inductive`].
+    Inductive,
+}
+
+/// The laws an inductive claim's step may assume, grouped by the committing
+/// decisions they are enforced on.
+///
+/// A committing decision is an accept or a committed failure. The step is
+/// proved once for each: an accept may use the laws in `every_commit` and
+/// `accepts`, and a committed failure the laws in `every_commit` and
+/// `committed_failures`. A rejection leaves the state unchanged, so it
+/// preserves any invariant.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct InductiveAssumptions {
+    every_commit: Box<[StableId]>,
+    accepts: Box<[StableId]>,
+    committed_failures: Box<[StableId]>,
+}
+impl InductiveAssumptions {
+    /// Groups assumed laws, keeping each group in declaration order.
+    #[must_use]
+    pub fn new(
+        every_commit: Vec<StableId>,
+        accepts: Vec<StableId>,
+        committed_failures: Vec<StableId>,
+    ) -> Self {
+        Self {
+            every_commit: every_commit.into_boxed_slice(),
+            accepts: accepts.into_boxed_slice(),
+            committed_failures: committed_failures.into_boxed_slice(),
+        }
+    }
+    /// Laws enforced on every committing decision.
+    #[must_use]
+    pub const fn every_commit(&self) -> &[StableId] {
+        &self.every_commit
+    }
+    /// Laws enforced on accepted decisions.
+    #[must_use]
+    pub const fn accepts(&self) -> &[StableId] {
+        &self.accepts
+    }
+    /// Laws enforced on committed failures.
+    #[must_use]
+    pub const fn committed_failures(&self) -> &[StableId] {
+        &self.committed_failures
+    }
+    /// Every assumed law, group by group.
+    pub fn all(&self) -> impl Iterator<Item = &StableId> {
+        self.every_commit
+            .iter()
+            .chain(self.accepts.iter())
+            .chain(self.committed_failures.iter())
+    }
+    /// Returns true when no law is assumed.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.every_commit.is_empty()
+            && self.accepts.is_empty()
+            && self.committed_failures.is_empty()
+    }
 }
 
 /// Formula payload for a named claim.
@@ -864,6 +928,7 @@ pub struct ClaimDecl {
     pub(crate) backends: Box<[BackendId]>,
     pub(crate) mode: ClaimMode,
     pub(crate) formula: ClaimFormula,
+    pub(crate) assumptions: InductiveAssumptions,
 }
 impl ClaimDecl {
     /// Creates a claim. Elaboration validates mode, formula, and backend compatibility.
@@ -881,6 +946,28 @@ impl ClaimDecl {
             backends: backends.into_boxed_slice(),
             mode,
             formula,
+            assumptions: InductiveAssumptions::default(),
+        }
+    }
+    /// Creates an inductive claim. `invariant` reads only `pre.` state paths,
+    /// and `assumptions` names the laws its induction step may assume. A proof
+    /// of the step says something about the application only when each law is
+    /// enforced on the decisions its group names.
+    #[must_use]
+    pub fn inductive(
+        id: StableId,
+        name: Identifier,
+        backends: Vec<BackendId>,
+        assumptions: InductiveAssumptions,
+        invariant: RelExpr,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            backends: backends.into_boxed_slice(),
+            mode: ClaimMode::Inductive,
+            formula: ClaimFormula::Relational(invariant),
+            assumptions,
         }
     }
     /// Returns the identifier.
@@ -907,6 +994,12 @@ impl ClaimDecl {
     #[must_use]
     pub const fn formula(&self) -> &ClaimFormula {
         &self.formula
+    }
+    /// Returns the laws an inductive claim assumes. Every other mode assumes
+    /// none.
+    #[must_use]
+    pub const fn assumptions(&self) -> &InductiveAssumptions {
+        &self.assumptions
     }
 }
 
@@ -1388,6 +1481,19 @@ fn encode_claim(value: &ClaimDecl, out: &mut Vec<u8>) -> Result<(), EncodeError>
             out.extend_from_slice(&horizon.to_be_bytes())
         }
         ClaimMode::UnboundedProof => out.push(2),
+        ClaimMode::Inductive => {
+            out.push(3);
+            for group in [
+                value.assumptions.every_commit(),
+                value.assumptions.accepts(),
+                value.assumptions.committed_failures(),
+            ] {
+                put_length(out, group.len())?;
+                for law in group {
+                    law.encode_to(out)?;
+                }
+            }
+        }
     }
     match &value.formula {
         ClaimFormula::Relational(v) => {

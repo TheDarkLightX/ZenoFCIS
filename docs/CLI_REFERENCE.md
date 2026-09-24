@@ -28,8 +28,15 @@ found. It also reports law and claim paths that name no declared type or
 field ([law path resolution](LAW_PATH_RESOLUTION.md)): human output warns on
 stderr, JSON output adds an `unresolved_paths` object, and
 `--require-resolved-paths` exits 1 with `status: "unresolved-paths"` when any
-are found. `prove` prints a `scope:` line explaining that current obligations
-contain no system model.
+are found. `prove` prints a `scope:` line saying what a result can establish.
+Relational and temporal claims are exported without a system model. An
+[inductive claim](INDUCTIVE_CLAIMS.md) is exported as its induction step over
+the laws it assumes. `prove` names those laws, and says that the application
+must also check the base case and the enforcement of the assumed laws. A
+replayed counterexample prints `replayed counterexample retained`. When the
+claim has no value at the counterexample, because of an overflow, a division
+by zero, or an inexact exact division, the line ends with the reason, and the
+run record's status is `undefined`.
 `generate` replaces each deterministic Rust/manifest file atomically;
 `--check` writes nothing and reports drift. `graph` and `explain` are derived
 diagnostic views. `prove` and `counterexample` use only the separate checked

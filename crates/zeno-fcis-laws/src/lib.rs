@@ -196,6 +196,56 @@ impl DecisionScope {
     const fn covers_committing(self) -> bool {
         self.applies(DecisionKind::Accept) && self.applies(DecisionKind::CommittedFailure)
     }
+
+    /// Returns true when a law with this scope is checked on every decision of
+    /// `decision`'s kind.
+    #[must_use]
+    pub const fn covers(self, decision: DecisionKind) -> bool {
+        self.applies(decision)
+    }
+}
+
+/// The committing decisions an inductive claim assumes a law on.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StepCase {
+    /// Accepts and committed failures alike.
+    EveryCommit,
+    /// Accepted decisions.
+    Accepts,
+    /// Committed failures.
+    CommittedFailures,
+}
+
+impl StepCase {
+    const fn enforced_by(self, scope: DecisionScope) -> bool {
+        match self {
+            Self::EveryCommit => scope.covers_committing(),
+            Self::Accepts => scope.applies(DecisionKind::Accept),
+            Self::CommittedFailures => scope.applies(DecisionKind::CommittedFailure),
+        }
+    }
+}
+
+/// Why an assumed law cannot support an inductive claim's step.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AssumptionGap {
+    /// The manifest defines no law with this identifier.
+    Missing {
+        /// The assumed law.
+        law: SemanticId,
+        /// The decisions it was assumed on.
+        case: StepCase,
+    },
+    /// The manifest defines the law, but does not check it on every decision
+    /// the claim assumes it on.
+    NotEnforced {
+        /// The assumed law.
+        law: SemanticId,
+        /// The decisions it was assumed on.
+        case: StepCase,
+        /// The decisions the manifest checks it on.
+        scope: DecisionScope,
+    },
 }
 
 impl CanonicalEncode for DecisionScope {
@@ -502,6 +552,50 @@ impl LawManifest {
     #[must_use]
     pub const fn definitions(&self) -> &[LawDefinition] {
         &self.definitions
+    }
+
+    /// Checks that this manifest enforces each law an inductive claim assumes
+    /// on the decisions the claim assumes it on.
+    ///
+    /// A proof of an inductive claim's step says something about the
+    /// application only when this passes, together with the base case on the
+    /// exact genesis state. The groups mirror the claim's `assume`, `accept`,
+    /// and `failure` lists, mapped to this manifest's identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns every gap found, in group order.
+    pub fn check_step_assumptions(
+        &self,
+        every_commit: &[SemanticId],
+        accepts: &[SemanticId],
+        committed_failures: &[SemanticId],
+    ) -> Result<(), Vec<AssumptionGap>> {
+        let mut gaps = Vec::new();
+        for (case, group) in [
+            (StepCase::EveryCommit, every_commit),
+            (StepCase::Accepts, accepts),
+            (StepCase::CommittedFailures, committed_failures),
+        ] {
+            for law in group {
+                match self
+                    .definitions
+                    .iter()
+                    .find(|definition| definition.id() == *law)
+                {
+                    None => gaps.push(AssumptionGap::Missing { law: *law, case }),
+                    Some(definition) if !case.enforced_by(definition.scope()) => {
+                        gaps.push(AssumptionGap::NotEnforced {
+                            law: *law,
+                            case,
+                            scope: definition.scope(),
+                        });
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
+        if gaps.is_empty() { Ok(()) } else { Err(gaps) }
     }
 
     /// Computes the exact policy commitment bound by `ProjectProfile`.
@@ -2194,6 +2288,42 @@ mod tests {
             ],
         )
         .unwrap_or_else(|error| panic!("manifest: {error}"))
+    }
+
+    #[test]
+    fn step_assumptions_must_be_enforced_on_the_decisions_they_are_assumed_on() {
+        let manifest = manifest();
+        // 100 and 101 are checked on every committing decision; 103 only on
+        // committed failures; 102 only on rejections.
+        assert_eq!(
+            manifest.check_step_assumptions(&[id(100), id(101)], &[], &[]),
+            Ok(())
+        );
+        assert_eq!(
+            manifest.check_step_assumptions(&[], &[id(100)], &[id(103)]),
+            Ok(())
+        );
+        assert_eq!(
+            manifest.check_step_assumptions(&[id(103)], &[id(102)], &[id(999)]),
+            Err(vec![
+                AssumptionGap::NotEnforced {
+                    law: id(103),
+                    case: StepCase::EveryCommit,
+                    scope: DecisionScope::CommittedFailure,
+                },
+                AssumptionGap::NotEnforced {
+                    law: id(102),
+                    case: StepCase::Accepts,
+                    scope: DecisionScope::Reject,
+                },
+                AssumptionGap::Missing {
+                    law: id(999),
+                    case: StepCase::CommittedFailures,
+                },
+            ])
+        );
+        assert!(DecisionScope::Committing.covers(DecisionKind::CommittedFailure));
+        assert!(!DecisionScope::Accept.covers(DecisionKind::CommittedFailure));
     }
 
     fn schema() -> Schema {

@@ -6,6 +6,37 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Give `zeno-fcis prove` a system model: inductive claims.
+  `claim ID name BACKEND inductive assume [...] accept [...] failure [...] = INVARIANT;`
+  states an invariant over `pre.` state paths and names the laws its induction
+  step may assume, grouped by the committing decisions they are enforced on.
+  - `export_inductive_smt` exports the step. Each assumed law, and the
+    invariant before the step, is asserted as defined and true on its own, and
+    the invariant after the step, rewritten from `pre.` to `post.` by
+    `invariant_at`, as not defined-and-true. Laws assumed only on accepts or
+    only on committed failures are guarded by a decision kind.
+  - Results have the new scope `InductiveStepOverLaws`. Counterexamples are
+    replayed: every assumed law and the invariant before the step must
+    evaluate to true on the model.
+  - Applications check the rest of the argument: `evaluate_invariant` on the
+    exact genesis state, and `LawManifest::check_step_assumptions` against the
+    law manifest. The durable-counter template proves
+    `counters_never_negative` from its action laws alone, and
+    `tests/induction.rs` runs both checks. Adding the claim changes that
+    template's policy identity.
+  - A pinned test requires CVC5 and Z3 to agree with exhaustive replay on
+    eight inductive steps; it runs in the formal-tools workflow and in the
+    gate evidence.
+  - See `docs/INDUCTIVE_CLAIMS.md`, including its limits: the step cannot yet
+    assume schema bounds, and there is no Lean export for it.
+- Report a replayed counterexample at which a claim has no value as
+  `undefined`, with the reason: an overflow, a division by zero, or an
+  inexact exact division. `prove` used to report `ModelReplayFailed` whenever
+  a claim's arithmetic could overflow somewhere in the i128 range, although
+  the solver's model was right. Evaluation is strict, so the claim does not
+  hold there. A guard such as `pre.x <= 3 -> pre.x + 1 <= 4` does not protect
+  the arithmetic after it, and the reason is now visible.
+
 - Add three application templates for `zeno-fcis new --template`:
   - `account-lockout`: failed logins committed as failures, time as a context
     input instead of a clock read, administrator unlocks, and security alerts;

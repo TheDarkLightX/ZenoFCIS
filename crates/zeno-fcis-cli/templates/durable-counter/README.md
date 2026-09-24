@@ -76,6 +76,42 @@ directions, that genesis is exactly zero, and that every admitted state is
 reachable from genesis. Swapping the count and failure bindings in the adapter
 fails these tests. The project's owner accepted the examples on 2026-09-23.
 
+## Prove that the counters never go negative
+
+Claim 600 in `project.zeno` states an invariant, and names the laws its
+induction step may assume:
+
+```text
+claim 600 counters_never_negative all inductive accept [501] failure [502] = pre.100.110 >= 0 && pre.100.111 >= 0;
+```
+
+Law 501 describes an accepted increment, and law 502 a committed failure. The
+authority refuses any decision that breaks the law enforced on its kind, so
+these two laws bound every transition the counter can commit.
+`zeno-fcis prove` checks the step: every transition that satisfies them, and
+starts with both counters nonnegative, ends with both nonnegative. It checks
+this over the full integer range, not only the 16 admitted states. With the
+pinned CVC5:
+
+```sh
+zeno-fcis prove project.zeno --claim 600 --backend cvc5 --tools zeno-fcis.tools.json
+```
+
+It prints `UNSAT proposal retained` and exits 2, as it does for every solver
+result: a solver's `unsat` is attested, not independently checked. Run it on a
+copy, because `prove` keeps its records in `.zeno-fcis/evidence` next to the
+project file.
+
+The step says something about this application only with two more checks,
+which `tests/induction.rs` runs:
+- the invariant holds on the exact genesis state that a new shell stores;
+- the law manifest checks law 501 on accepts and law 502 on committed
+  failures, as the claim assumes.
+
+The same step fails for `count <= 3`: from 3, an accepted increment reaches 4.
+The cap comes from the bound law 500 and the program's capacity check, not
+from the action laws. See the library's guide to inductive claims.
+
 ## Check determinism
 
 `tests/determinism.rs` decides every admitted input eight times through

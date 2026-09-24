@@ -43,11 +43,16 @@ wire COMPONENT.PORT -> COMPONENT.PORT;
 merge [COMPONENT, ...];
 law ID name = RELATIONAL_FORMULA;
 claim ID name BACKEND MODE = FORMULA;
+claim ID name BACKEND inductive [assume [LAW, ...]] [accept [LAW, ...]] [failure [LAW, ...]] = STATE_FORMULA;
 ```
 
 Type kinds are `state`, `command`, `context`, `effect`, `destination`,
 `payload`, `data`, `bool`, and `int`. Backends are `cvc5`, `z3`, `lean`, and
-`all`. Claim modes are `relational`, `finite N`, and `unbounded`.
+`all`. Claim modes are `relational`, `finite N`, `unbounded`, and `inductive`.
+An inductive claim states an invariant over `pre.` state paths, and names the
+laws its induction step may assume. `assume` lists laws enforced on every
+committing decision, `accept` laws enforced on accepts, and `failure` laws
+enforced on committed failures. See [inductive claims](INDUCTIVE_CLAIMS.md).
 
 Component items are:
 
