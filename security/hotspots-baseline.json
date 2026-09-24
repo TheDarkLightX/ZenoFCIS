@@ -965,11 +965,11 @@
             79,
             799,
             918,
-            1521,
-            1698,
-            1710,
-            1786,
-            1911
+            1526,
+            1703,
+            1715,
+            1791,
+            1916
           ]
         },
         {
@@ -980,43 +980,43 @@
             726,
             964,
             978,
-            1366,
-            1367,
-            1368
+            1371,
+            1372,
+            1373
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
             936,
-            1051
+            1056
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            2412
+            2417
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
             212,
-            1319,
-            1545,
-            1546,
-            1692,
-            1802,
-            1980,
-            1990
+            1324,
+            1550,
+            1551,
+            1697,
+            1807,
+            1985,
+            1995
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            1056,
-            1058,
-            1060
+            1061,
+            1063,
+            1065
           ]
         }
       ],
@@ -1487,7 +1487,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1098,
+      "production_lines": 1114,
       "rank": 11,
       "score": 88,
       "signals": [
@@ -1508,7 +1508,7 @@
         {
           "id": "filesystem-read-path",
           "lines": [
-            479
+            480
           ]
         },
         {
@@ -1520,20 +1520,20 @@
         {
           "id": "potential-amplification",
           "lines": [
-            406,
-            485,
-            1049,
-            1067,
-            1243
+            407,
+            486,
+            1050,
+            1068,
+            1260
           ]
         },
         {
           "id": "unsafe-or-ffi",
           "lines": [
-            1119,
-            1141,
-            1153,
-            1165
+            1136,
+            1158,
+            1170,
+            1182
           ]
         }
       ],
@@ -5109,9 +5109,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3288568,
+    "admitted_bytes": 3289766,
     "admitted_files": 173,
-    "inventory_sha256": "9fc1438f5b74c1fd6618726d1dfec166503ae82f734329ffa7057e3920e25099",
+    "inventory_sha256": "0dbca4859d1d61df7645e901b3a462c28352504ef3a07ec209e1181f139a4c5b",
     "ranked_above_minimum": 144,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

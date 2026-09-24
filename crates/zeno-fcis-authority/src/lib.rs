@@ -987,11 +987,16 @@ where
     /// the first decision only if every execution produced identical canonical
     /// bytes.
     ///
-    /// Each copy clones the admitted values, so no execution sees another's
-    /// memory. The program and the project law engine run once per execution,
-    /// and the comparison covers the complete authorized decision: the
-    /// candidate, the law evaluation, and every binding. If the first
-    /// execution fails, its error is returned and nothing is compared.
+    /// Each execution gets its own clone of the admitted values. The program,
+    /// the project law engine, and process-wide state are shared, so state
+    /// kept between calls shows up as a divergence. The program and the law
+    /// engine run once per execution. The compared bytes are the decision's
+    /// canonical encoding. For an acceptance or a committed failure, that is
+    /// the invocation with every binding, plus the authorization body, which
+    /// holds hashes of the law evaluation and of the complete candidate
+    /// bundle. For a rejection, it is the invocation, the law evaluation, the
+    /// reason, the receipt, the footprint, and the resources themselves. If the
+    /// first execution fails, its error is returned and nothing is compared.
     ///
     /// This detects nondeterminism; it cannot rule it out. See
     /// [`DeterminismProbe`] for what agreement shows.

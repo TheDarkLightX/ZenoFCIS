@@ -1,13 +1,14 @@
-//! Checks that the executed application decides every admitted input the same
-//! way on every run.
+//! Checks that the executed application decided every admitted input the same
+//! way in every run this test makes.
 //!
 //! Each input is decided eight times in this process through
 //! `execute_probed`, which withholds a decision whose runs disagree. The whole
 //! corpus is then decided again in child processes started with a changed
 //! environment: a cleared environment, another time zone and locale, a glibc
 //! allocator that fills memory with a pattern, and another working directory.
-//! Each child is a fresh process, so it also gets new hash seeds and new
-//! addresses. Every decision digest must match.
+//! Each child is a fresh process, so it also gets new `HashMap` seeds and,
+//! where address-space layout randomization is enabled, new addresses. Every
+//! decision digest must match.
 //!
 //! Agreement is evidence about these runs only; it does not prove the
 //! application deterministic. `zeno-fcis purity src/program.rs src/laws.rs

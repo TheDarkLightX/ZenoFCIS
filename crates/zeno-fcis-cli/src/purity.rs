@@ -172,6 +172,7 @@ const NONCLAIMS: &[&str] = &[
     "code in files not listed, in generated sources, and in dependencies is not read",
     "a confined crate's dependencies are identified by name; their sources (registry, path, or git) are not checked",
     "method calls are matched by name only for addr, expose_provenance, and expose_addr",
+    "a function converted to an integer, as in `decide as usize`, is not reported",
     "platform-dependent sizes such as usize and size_of are not reported",
 ];
 
@@ -1106,7 +1107,23 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
                 }
             }
         }
-        // The macro's own path, such as `std::println`, is not a call path.
+        // A qualified macro path, such as `core::ptr::addr_of`, is checked
+        // like any other path; a bare name was matched above.
+        if mac.path.segments.len() > 1 {
+            let segments: Vec<String> = mac
+                .path
+                .segments
+                .iter()
+                .map(|segment| segment.ident.to_string())
+                .collect();
+            if let Some(first) = mac.path.segments.first() {
+                self.check_code_path(
+                    &segments,
+                    mac.path.leading_colon.is_some(),
+                    first.ident.span(),
+                );
+            }
+        }
         self.scan_tokens(mac.tokens.clone());
     }
 
@@ -1344,6 +1361,10 @@ mod tests {
             ),
             (
                 "fn f(x: &u8) -> usize { (x as *const u8).addr() }",
+                &["address"],
+            ),
+            (
+                "fn f(x: &u8) -> usize { core::ptr::addr_of!(*x) as usize }",
                 &["address"],
             ),
             ("extern \"C\" { fn g(); }", &["foreign-code"]),

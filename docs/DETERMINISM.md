@@ -44,9 +44,9 @@ nondeterminism or ambient effect it recognizes:
 | `floating-point`, `unstable-hash` (warnings) | `f32` and `f64`, and `DefaultHasher`, whose results can differ between platforms or toolchains |
 
 It resolves `use` aliases, grouped and glob imports, `extern crate` renames,
-and `core::` and `alloc::` paths, and it scans the arguments of macro
-invocations for paths. A local variable named like a crate, such as `rand`, is
-not reported.
+and `core::` and `alloc::` paths. It checks a qualified macro's own path, such
+as `core::ptr::addr_of!`, and scans every macro's arguments for paths. A local
+variable named like a crate, such as `rand`, is not reported.
 
 Point it at decision code: the transition, its adapter, and the law engine.
 Shell code such as `main.rs` or a delivery adapter performs effects by design,
@@ -69,13 +69,16 @@ under `src/`, plus five structural conditions. A crate is *confined* when
 
 A confined crate cannot name `std` at all. That puts the clock, the
 environment, files, the network, threads, and `HashMap` out of reach, and the
-rules cover what `core` still offers, such as atomics and raw pointers.
+rules cover what `core` still offers, such as atomics and raw pointers. Its
+dependencies are named as the library's semantic crates, which
+`tools/check_assurance.py` checks for ambient effects.
 Putting decision code in its own confined crate is the strongest check
 available for hand-written Rust.
 
 The manifest reader accepts the common forms of `[dependencies]`,
 `[dependencies.NAME]`, and their `target` variants, and ignores development
-and build dependencies. It never guesses. A form that could add a dependency,
+and build dependencies. Forms it does not recognize are reported, not
+interpreted. A form that could add a dependency,
 rename one, or move the library root keeps the crate from being confined and
 is reported, including:
 - `package =` renames and `workspace = true` inheritance;
@@ -106,6 +109,9 @@ What it cannot see:
 - It does not read files you do not list, generated sources, or dependencies.
 - It does not know the type of a method's receiver, so it matches only
   `addr`, `expose_provenance`, and `expose_addr` by name.
+- It does not know the type of a cast's operand, so it does not report a
+  function converted to an integer, as in `decide as usize`, which yields its
+  address.
 - It does not report platform-dependent sizes such as `usize` and `size_of`.
 
 Source nested more deeply than the parser's stack allows stops the check with
@@ -117,10 +123,19 @@ proof of determinism.
 ## The determinism probe
 
 `CatalogCommitAuthority::execute_probed(invocation, runs)` executes one
-admitted invocation several times, from 2 to 64, each on a fresh copy. The
-program and the project law engine run every time. It returns the first
-decision only if every execution produced identical canonical bytes: the
-candidate, the law evaluation, and every binding. Otherwise it withholds the
+admitted invocation several times, from 2 to 64. Each execution gets its own
+copy of the admitted values. The program, the law engine, and process-wide
+state are shared, so state kept between calls shows up as a divergence. The
+program and the project law engine run every time.
+
+It returns the first decision only if every execution produced identical
+canonical decision bytes. For an acceptance or a committed failure, those
+bytes hold the invocation with every binding, and hashes of the law
+evaluation and of the complete candidate bundle. For a rejection, they hold
+the law evaluation, reason, and receipt themselves. Equal hashes imply equal
+contents only because SHA-256, the hash of both approved commitment
+providers, is assumed to resist collisions, as it is everywhere else in the
+library. If any execution differs from the first, the probe withholds the
 decision:
 - `ProbeError::Diverged` names the execution that differed;
 - `ProbeError::FailedAfterDecision` reports a later execution that failed.
@@ -143,8 +158,8 @@ template's `tests/determinism.rs` shows how to widen that:
      pattern;
    - another working directory.
 
-   Each child is a fresh process, so it also gets new hash seeds and new
-   addresses.
+   Each child is a fresh process, so it also gets new `HashMap` seeds and,
+   where address-space layout randomization is enabled, new addresses.
 3. Require every child's decision digests to equal the parent's.
 
 ## What each check catches

@@ -8,9 +8,10 @@ embedded in ZenoFCIS values.
 
 - Add determinism checks for hand-written decision code.
   - `CatalogCommitAuthority::execute_probed` executes one invocation 2 to 64
-    times on fresh copies. It returns the first decision only if every
-    execution produced identical canonical bytes, and otherwise withholds it
-    with `ProbeError::Diverged` or `ProbeError::FailedAfterDecision`.
+    times, each on its own copy of the admitted values. It returns the first
+    decision only if every execution produced identical canonical bytes, and
+    otherwise withholds it with `ProbeError::Diverged` or
+    `ProbeError::FailedAfterDecision`.
   - `zeno-fcis purity <PATH>...` parses Rust source and reports clocks,
     environment reads, randomness, hash-map iteration, shared state, raw
     addresses, unsafe code, and other ambient effects, with `use` aliases and
