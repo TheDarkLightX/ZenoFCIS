@@ -1,0 +1,40 @@
+{
+  "status": "bounded source review; not release approval or independent audit",
+  "source_revision": "16286790ded4b4ddcd7c4f889503a96d14057a62",
+  "model_changed": false,
+  "parameters_changed": false,
+  "old_inventory_sha256": "38b2ee5bfba497e71e27ccc855d94cd17f85dbabb3b6bbf3f73fbacaa4cf6862",
+  "new_inventory_sha256": "6274610246a79d628336c327f91e3d7ab9c011af3083efcea0f28f13116ed834",
+  "changed_sources": {
+    "crates/zeno-fcis-authority/src/lib.rs": "818380413bf4977d451e2abd957794c7a86da461f7dfadc1afad0848851c606e",
+    "crates/zeno-fcis-shell-sqlite/src/lib.rs": "888c1a68f4d94ce5b0d162973e970d61dd677e4ca6379b5d906c48742b9fe5ef",
+    "crates/zeno-fcis-shell-sqlite/src/history.rs": "ed8e06fc13a63bc495bd5a1e30fe9bba81dec54434b9daf609024f374cc87d83"
+  },
+  "reviewed_boundaries": [
+    {
+      "path": "crates/zeno-fcis-authority/src/lib.rs",
+      "assessment": "Request binding extraction retains schema checks and original command/full-context hashes; original pre-state admission still precedes request checks. Bindings cannot authorize execution. Four baseline canonical fixtures and rejection-order regressions pass."
+    },
+    {
+      "path": "crates/zeno-fcis-shell-sqlite/src/lib.rs",
+      "assessment": "Read-only schema validation is split from setup pragmas. Existing snapshot/genesis validators remain mandatory; no table or receipt format change. Error variants and test-module additions are intentional."
+    },
+    {
+      "path": "crates/zeno-fcis-shell-sqlite/src/history.rs",
+      "assessment": "Policy, original genesis, exact command/full-context and unique replay identity gate receipt observation. All persisted validation shares one read transaction. Output has no commit or delivery capability; no raw authentication or bundle bytes escape. Full-history scan, current read authorization and rollback freshness remain application obligations."
+    }
+  ],
+  "inventory_changes": "One production source file added. Authority and SQLite signals move with the factored/new methods. New priority-2 history module enters rank 41, shifting lower ranks and displacing the unchanged views module from the top-50 display. No score-model or selection change.",
+  "evidence": [
+    "docs/historical-receipt-validation.json",
+    "crates/zeno-fcis-shell-sqlite/src/tests/history_tests.rs",
+    "crates/zeno-fcis-authority/src/tests/request-binding-vectors.txt"
+  ],
+  "residual_limits": [
+    "No machine-checked SQLite refinement",
+    "Application read authentication and trusted epoch/finality adapters require separate qualification",
+    "Cross-migration replay and rollback resistance remain open",
+    "Unbounded total history scan cost",
+    "Full platform qualification remains in draft PR CI"
+  ]
+}
