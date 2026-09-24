@@ -181,6 +181,33 @@ def builtin_decision_table(domain: str) -> dict:
                 output, int(due_a and output != 1), int(due_b and output != 2),
                 next_pause, next_serve, next_priority]
         return expected
+    if domain == "guard":
+        # The agent-treasury-guard precedence over an action and eleven facts.
+        # Codes: 0 accept, 1..12 the rejection reasons in README order, 13 a
+        # committed failure. Every fact is a 0/1 input.
+        expected = {}
+        for action in range(3):
+            for facts in itertools.product(range(2), repeat=11):
+                (caller_ok, clock_ok, model_ok, price_fresh, swap_pending, intent_current,
+                 settlement_sufficient, within_cap, within_budget, slippage_ok, reserve_ok) = facts
+                if not caller_ok:
+                    code = 1
+                elif not clock_ok:
+                    code = 2
+                elif action == 0:
+                    code = (3 if not model_ok else 4 if not price_fresh else 5 if swap_pending else
+                            9 if not within_cap else 10 if not within_budget else
+                            11 if not slippage_ok else 12 if not reserve_ok else 0)
+                elif not swap_pending:
+                    code = 6
+                elif not intent_current:
+                    code = 7
+                elif action == 1:
+                    code = 8 if not settlement_sufficient else 0
+                else:
+                    code = 13
+                expected[(action, *facts)] = [code]
+        return expected
     return {(a, b): [min(a + b, 3)] for a in range(4) for b in range(4)}
 
 
@@ -210,6 +237,12 @@ def exercise_withdrawal(cli: list[str], app: Path, directory: Path,
                         environment: dict[str, str]) -> dict:
     """The withdrawal-queue example's synthesized controller step."""
     return exercise_synthesized(cli, app, directory, environment, "withdrawal", 384)
+
+
+def exercise_guard(cli: list[str], app: Path, directory: Path,
+                   environment: dict[str, str]) -> dict:
+    """The agent-treasury-guard example's synthesized precedence core."""
+    return exercise_synthesized(cli, app, directory, environment, "guard", 6144)
 
 
 def exercise_synthesized(cli: list[str], app: Path, directory: Path,

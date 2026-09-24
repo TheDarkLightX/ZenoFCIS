@@ -39,15 +39,16 @@ Feature: Adopt the ZenoFCIS core library
     And rejection publishes no state, replay or delivery rows
     And committed failure, exact replay, database reopen and delivery retry preserve the expected state
     And every admitted input matches the finite model and the independent examples through the executed application
-    And the account-lockout, order-fulfillment, inventory-reservation, compliance-gateway, and withdrawal-queue examples each build as isolated packages
+    And the account-lockout, order-fulfillment, inventory-reservation, compliance-gateway, withdrawal-queue, and agent-treasury-guard examples each build as isolated packages
     And each passes its own tests and prints its expected demonstration summary
-    And the inventory-reservation, compliance-gateway, and withdrawal-queue syntheses replay in Rust, Python, and JavaScript against independent oracles
+    And the inventory-reservation, compliance-gateway, withdrawal-queue, and agent-treasury-guard syntheses replay in Rust, Python, and JavaScript against independent oracles
     And the compliance-gateway oracle evaluates its rule base separately from the template's own evaluator
     And the withdrawal-queue controller is re-checked in Rust against its pinned contract, and by OrbitSynthesis's checker when ORBIT_SYNTHESIS_ROOT names a checkout
+    And the agent-treasury-guard demonstration prints the scripted outcome of each of its 23 proposals and answers and ends with no swap outstanding
 
   @atdd-example-templates
   Scenario: Emit example applications whose laws all constrain their transitions
-    Given the account-lockout, order-fulfillment, inventory-reservation, compliance-gateway, and withdrawal-queue templates
+    Given the account-lockout, order-fulfillment, inventory-reservation, compliance-gateway, withdrawal-queue, and agent-treasury-guard templates
     When an adopter creates each one with the CLI
     Then every law formula in each project can constrain some transition and every law path resolves
     And a second creation into the same directory is refused without changing any file
