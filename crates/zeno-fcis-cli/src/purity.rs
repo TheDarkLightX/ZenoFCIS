@@ -783,7 +783,9 @@ fn manifest_dependencies(manifest: &str) -> ManifestDependencies {
                 }
             }
             Table::Library => {
-                if first == "path" {
+                if key.contains('\\') {
+                    refuse("escape sequence in a library key");
+                } else if first == "path" {
                     refuse("library root set by path");
                 }
             }
@@ -1800,6 +1802,43 @@ mod tests {
             let report = scratch.check();
             assert_eq!(report.status(), "clean", "{manifest}: {}", report.render());
             assert!(!report.structures[0].unrecognized_manifest.is_empty());
+        }
+    }
+
+    #[test]
+    fn escaped_library_keys_prevent_confinement() {
+        let scratch = Scratch::new("escaped-library-key");
+        let package = "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n";
+        scratch.write(
+            "src/lib.rs",
+            "#![no_std]\n#![forbid(unsafe_code)]\npub fn answer() -> u8 { 42 }\n",
+        );
+        scratch.write("outside.rs", "fn main() {}\n");
+
+        // Ordinary quoted library keys remain supported.
+        scratch.write(
+            "Cargo.toml",
+            &format!("{package}[lib]\n\"name\" = \"decisions\"\n"),
+        );
+        assert_eq!(scratch.check().status(), "confined");
+
+        // Cargo decodes both escapes to `path`, selecting the unchecked file.
+        for header in ["[lib]", r#"["lib"]"#] {
+            for key in [r#""pa\u0074h""#, r#""\U00000070ath""#] {
+                let manifest = format!("{package}{header}\n{key} = \"outside.rs\"\n");
+                scratch.write("Cargo.toml", &manifest);
+                let report = scratch.check();
+                assert_eq!(report.status(), "clean", "{manifest}: {}", report.render());
+                assert!(!report.structures[0].confined());
+                assert!(
+                    report.structures[0]
+                        .unrecognized_manifest
+                        .iter()
+                        .any(|reason| reason.contains("escape sequence")),
+                    "{manifest}: {}",
+                    report.render()
+                );
+            }
         }
     }
 

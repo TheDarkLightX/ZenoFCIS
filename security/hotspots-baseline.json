@@ -1487,7 +1487,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1159,
+      "production_lines": 1161,
       "rank": 11,
       "score": 88,
       "signals": [
@@ -1523,18 +1523,18 @@
           "lines": [
             418,
             497,
-            1108,
-            1126,
-            1318
+            1110,
+            1128,
+            1320
           ]
         },
         {
           "id": "unsafe-or-ffi",
           "lines": [
-            1194,
-            1216,
-            1228,
-            1240
+            1196,
+            1218,
+            1230,
+            1242
           ]
         }
       ],
@@ -5110,9 +5110,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3295065,
+    "admitted_bytes": 3296715,
     "admitted_files": 173,
-    "inventory_sha256": "d2d6be481e7b86a276ff0d024f833dd87ed4557b5d901991631863f629c53179",
+    "inventory_sha256": "d92d4d7c28309d6774e222c03cb430799d6d44c1b5e821e4edd6fa82619164b9",
     "ranked_above_minimum": 144,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
