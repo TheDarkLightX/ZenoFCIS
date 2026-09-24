@@ -24,7 +24,8 @@ pub enum SchemaLoweringError {
     AuthoredShapeOverride(StableId),
     /// One declaration has both fields and variants.
     AmbiguousShape(StableId),
-    /// A Boolean or signed-integer declaration has incompatible structure.
+    /// A Boolean or signed-integer declaration has incompatible structure, or
+    /// a binding for an `int` with a declared range states other bounds.
     IncompatiblePrimitive(StableId),
     /// A leaf binding supplies a compound shape instead of a scalar.
     UnsupportedLeafShape(StableId),
@@ -86,7 +87,9 @@ impl std::error::Error for SchemaLoweringError {}
 /// Lowers every authored type into a closed schema without choosing leaf semantics.
 ///
 /// Fields and variants preserve their authored IDs, names, and referenced types.
-/// Every type without fields or variants needs exactly one scalar leaf binding.
+/// Every type without fields or variants needs exactly one scalar leaf binding,
+/// except an `int` with a declared range (`in MIN..=MAX`), which lowers to
+/// `I128` with those bounds; a binding for it may only restate them.
 /// `bool` requires `Bool`; `int` requires a bounded `I128`. Other roles permit an
 /// explicitly selected scalar. Compound shapes must be declared in the source.
 /// The schema profile is the exact project name, and incompatible names or IDs
@@ -164,7 +167,14 @@ pub fn lower_schema(
             (None, Some(variants), None) => TypeKind::Sum {
                 variants: variants.into_boxed_slice(),
             },
-            (None, None, None) => return Err(SchemaLoweringError::MissingLeafBinding(id)),
+            // A declared range is the binding: `project.zeno` owns those bounds.
+            (None, None, None) => match ty.range() {
+                Some(range) => TypeKind::I128 {
+                    min: range.min(),
+                    max: range.max(),
+                },
+                None => return Err(SchemaLoweringError::MissingLeafBinding(id)),
+            },
             (None, None, Some(kind)) => match kind {
                 TypeKind::Unit
                 | TypeKind::Bool
@@ -177,6 +187,13 @@ pub fn lower_schema(
         };
         if matches!(ty.kind(), AuthoredKind::Bool) && !matches!(kind, TypeKind::Bool)
             || matches!(ty.kind(), AuthoredKind::Int) && !matches!(kind, TypeKind::I128 { .. })
+        {
+            return Err(SchemaLoweringError::IncompatiblePrimitive(id));
+        }
+        // A binding may restate a declared range, but never change it: the
+        // inductive steps of `zeno-fcis prove` assume the declared bounds.
+        if let (Some(range), TypeKind::I128 { min, max }) = (ty.range(), &kind)
+            && (*min, *max) != (range.min(), range.max())
         {
             return Err(SchemaLoweringError::IncompatiblePrimitive(id));
         }

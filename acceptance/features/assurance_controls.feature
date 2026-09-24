@@ -37,8 +37,13 @@ Feature: Report evidence that cannot distinguish system behavior
     When a solver returns a model
     Then it is confirmed only if every law assumed for its decision kind and the invariant before the step hold on it
     And a model at which a claim has no value is reported as undefined, with the reason
+    And a model with an undeclared variant, a bool other than 0 or 1, or an integer outside its declared range is never confirmed
     And the application checks the invariant on its exact genesis state
     And the law manifest confirms that each assumed law is enforced on the decisions it is assumed on
+    When an int type declares an inclusive range
+    Then the step asserts that range for every observed value of that type, and lowering makes it the schema's bounds and refuses a binding that contradicts it
+    And a half-open, reversed, or non-int range is refused, and a project that declares no range encodes as before
+    And the authority checks every command, context, and initial state against its own schema, whatever hasher built the envelope
 
   @atdd-reserved-domains
   Scenario: Keep project commitment domains out of the library namespace

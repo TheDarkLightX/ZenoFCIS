@@ -64,11 +64,13 @@ The argument has three parts. `prove` checks only the first.
    - the invariant over `pre.`;
    - the invariant restated over `post.` (`invariant_at`), *not* true.
 
-   Each observed value whose type is enumerated, or bool, is also asserted to
-   be one of its declared values: its variants' IDs, or 0 and 1
-   (`declared_domain`). Admission refuses anything else, so this excludes
-   only inputs the application never decides. Integer ranges are supplied by
-   `build.rs`, not by `project.zeno`, so the step does not assume them.
+   Each observed value whose type is enumerated, bool, or an `int` with a
+   declared range is also asserted to lie in its declared domain
+   (`declared_domain`): its variants' IDs, 0 and 1, or the range. The
+   authority refuses anything else, so this excludes only inputs the
+   application never decides. An `int` without a declared range gets its
+   bounds from `build.rs`, which `project.zeno` does not see, so the step
+   assumes only the i128 range for it.
 
    An unsatisfiable answer means that no transition the assumed laws admit,
    over declared values, leaves the invariant.
@@ -108,10 +110,13 @@ Suppose all of the following hold:
   within the evaluation limits. Otherwise the invariant has no value on some
   committed state. A partial observer could pass the base case and the
   assumption check, and still give `MissingProjection` later.
-- (g) the law checker observes an enumerated field as its variant ID and a
-  bool as 0 or 1, and every value it observes is admissible under the
-  authority's schema, which refuses undeclared variants. The authority checks
-  admissibility itself, against its own catalog's schema:
+- (g) the law checker observes an enumerated field as its variant ID, a bool
+  as 0 or 1, and an integer as its value, and every value it observes is
+  admissible under the authority's schema. That schema refuses undeclared
+  variants and integers outside their bounds, and a ranged `int` type's bounds
+  are its declared range, because schema lowering takes them from
+  `project.zeno` and refuses a binding that states others. The authority
+  checks admissibility itself, against its own catalog's schema:
   - the command and context when it admits an invocation;
   - the initial state at genesis;
   - the pre-state and post-state of every transition before it can commit.
@@ -209,12 +214,11 @@ and Z3 4.16.0, all run on 2026-09-24:
 
 ## Limits
 
-- **No integer ranges.** Variant domains and bools come from `project.zeno`,
-  but integer ranges are supplied by `build.rs`, so the step cannot assume
-  them. An invariant whose proof needs a range must get it from an assumed law,
-  or strengthen itself with the range and prove that it is preserved. Stating
-  scalar bounds in `project.zeno`, or exporting the schema's bounds into the
-  step, is the planned next improvement.
+- **Only declared ranges.** The step assumes the ranges `project.zeno`
+  declares (`type ID int name in MIN..=MAX;`). An `int` whose bounds live only
+  in `build.rs` is any i128 to the step, so an invariant whose proof needs its
+  range must declare the range, get it from an assumed law, or strengthen
+  itself with it.
 - **Scopes are not in `.zeno`.** The claim states which decisions each law is
   assumed on, and the application confirms it against its manifest.
 - **No Lean export yet.** Solver results are Attested at most.
@@ -242,14 +246,28 @@ edits were reverted; none is committed.
 | Inductive invariants are classified by `invariant_substance` | `an_invariant_that_reads_state_is_substantive` |
 | The export asserts declared domains | `declared_domains_bound_enumerated_and_bool_observations` |
 | Replay refuses values outside a declared domain | `declared_domains_bound_enumerated_and_bool_observations` |
-| `declared_domain` reads variants and bools, and nothing else | `declared_domains_come_from_variants_and_bools_only` |
+| `declared_domain` reads variants, bools, and declared ranges, and nothing else | `declared_domains_come_from_variants_bools_and_declared_ranges` |
 | Model values down to `i128::MIN` are parsed, so a counterexample there is replayed | `model_values_span_the_whole_i128_range` |
 | In the durable counter, the law checker's observer reads every field the invariant reads (planted by observing `failures` under another path) | `the_law_checker_observes_every_field_the_invariant_reads`, `the_invariant_holds_on_the_exact_genesis_state` |
+| The authority validates the command and context at admission (removed for both, or for either one) | `admission_checks_the_command_and_context_against_its_own_schema`, in `zeno-fcis-authority` |
+| The authority validates the initial state at genesis | `genesis_is_checked_against_its_own_schema`, in `zeno-fcis-authority` |
+| A declared range is part of the canonical bytes (dropped, stored without its upper bound, or its tag given to an unranged type) | `a_declared_range_is_part_of_the_canonical_project` |
+| `declared_domain` returns a declared range, and a range contains exactly its bounds | `declared_domains_come_from_variants_bools_and_declared_ranges` |
+| The parser refuses `..`, a reversed range, and a range on a type other than `int` | `type_ranges_are_inclusive_and_declared_only_on_ints` |
+| Lowering takes a declared range as the binding, and refuses a binding that contradicts it | `a_declared_range_is_the_binding_of_its_int`, in `zeno-fcis-bootstrap` |
+| The export asserts a declared range | `declared_ranges_bound_integer_observations` |
+| Replay refuses a value outside a declared range | `declared_ranges_bound_integer_observations` |
 
 The pinned test `pinned_inductive_steps_agree_with_exhaustive_replay` checks
-the SMT encoding itself. It uses eight claims over a box that the assumed laws
-bound. For each claim, CVC5 and Z3 must agree with an exhaustive replay of
-every transition in the box. The claims cover:
+the SMT encoding itself. For each claim, CVC5 and Z3 must agree with an
+exhaustive replay of every transition in a finite box that holds every
+transition the assumed laws and declared domains admit. It uses:
+- eight claims over a box that the assumed laws bound;
+- two claims over declared variant and bool domains;
+- two claims over a declared integer range, each checked again with the
+  range removed, where one of them holds only because of the range.
+
+The claims cover:
 - a step that holds;
 - a refuted step;
 - a step that is undefined only;

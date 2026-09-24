@@ -33,6 +33,7 @@ zeno 1;
 project ID name;
 namespace ID name;
 type ID KIND name;
+type ID int name in MIN..=MAX;
 field ID OWNER_TYPE name FIELD_TYPE;
 variant ID OWNER_TYPE name PAYLOAD_TYPE|none;
 reason ID name precedence RANK;
@@ -47,7 +48,23 @@ claim ID name BACKEND inductive [assume [LAW, ...]] [accept [LAW, ...]] [failure
 ```
 
 Type kinds are `state`, `command`, `context`, `effect`, `destination`,
-`payload`, `data`, `bool`, and `int`. Backends are `cvc5`, `z3`, `lean`, and
+`payload`, `data`, `bool`, and `int`.
+
+An `int` type may declare its inclusive range, for example
+`type 105 int Attempts in 0..=2;`:
+- each bound is an optional `-` and an unsigned 64-bit decimal integer;
+- `..=` is required, because quantifiers read `..` as half-open;
+- the least value comes first.
+
+The range is part of the project's meaning and of its canonical bytes. A type
+without a range encodes exactly as before. Schema lowering takes a declared
+range as the type's `I128` bounds, and refuses an application binding that
+states other bounds. Inductive steps assume every declared range (see
+[inductive claims](INDUCTIVE_CLAIMS.md)). An `int` without a range still gets
+its bounds from the application's schema binding, which `project.zeno` does
+not see.
+
+Backends are `cvc5`, `z3`, `lean`, and
 `all`. Claim modes are `relational`, `finite N`, `unbounded`, and `inductive`.
 An inductive claim states an invariant over `pre.` state paths, and names the
 laws its induction step may assume. `assume` lists laws enforced on every

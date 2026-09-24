@@ -6,6 +6,21 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Declare the inclusive range of an `int` type in `project.zeno`:
+  `type ID int name in MIN..=MAX;`.
+  - Schema lowering takes a declared range as the type's `I128` bounds, so
+    `build.rs` needs no binding for it. A binding that states other bounds is
+    refused as `SchemaLoweringError::IncompatiblePrimitive`.
+  - Inductive steps assume the declared range of every observed path of that
+    type, and replay refuses a model outside it. Soundness rests on the
+    authority checking every command, context, and state against its schema,
+    whose bounds for that type are the declared range.
+  - `declared_domain` and `StepHypotheses::domains` now return
+    `DeclaredDomain`, either variant values or a range. Both were added since
+    1.1.0 and have not been released.
+  - A project that declares no range keeps its canonical bytes and semantic
+    hash.
+
 - The commit authority checks the command and context of every invocation,
   and the initial state at genesis, against its own catalog's schema.
   - Before, it compared only the schema hash each envelope recorded. An
