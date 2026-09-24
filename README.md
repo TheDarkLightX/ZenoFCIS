@@ -14,6 +14,109 @@ immutable state + command + policy + authenticated context
 
 The semantic kernel treats values, decisions, resource budgets, canonical bytes, and commitments as explicit protocol data. It forbids unsafe Rust and is designed for `no_std + alloc` use without clocks, randomness, networking, filesystems, databases, or executable effect closures.
 
+## Why functional core, imperative shell
+
+Many failures in stateful systems come from deciding and acting in the same
+step. A function reads a clock, updates a row, calls a service, and chooses an
+outcome, and none of that can be replayed or checked afterwards. ZenoFCIS
+separates deciding from acting, then makes the boundary enforceable.
+
+**The core decides.** A transition is a pure, total function from immutable
+inputs to exactly one decision:
+
+- accept, with a candidate;
+- reject, with a reason and no change;
+- commit a failure, with a reason and a candidate.
+
+The candidate is data: an exact patch to the state, the external obligations to
+queue, and the resources used. With no clock, file, network, or randomness in
+the core, the same inputs produce the same bytes. How that is assured depends on
+the code:
+
+- A synthesized finite core is deterministic by construction. Its language has
+  no clock, randomness, input or output, or unordered collection.
+- The library's own semantic crates forbid unsafe Rust and are checked for
+  ambient effects.
+- A hand-written project transition is deterministic by contract. Reopening a
+  SQLite store re-executes every persisted transition and requires identical
+  bytes, so a transition that cannot reproduce its history fails closed. That
+  check detects nondeterminism; it does not prove its absence.
+
+**The shell acts.** Persistence, delivery, and every external operation happen
+outside the core, and only on values the core produced. External work is an
+outbox entry with a stable delivery identity, so a destination can recognize a
+retry and perform the work once.
+
+**Authority is a value, not a code path.** The SQLite shell, the library's
+production port, cannot publish a raw decision. It publishes only a
+`CatalogAuthorizedTransition`, a type that no code outside the library can
+construct. The library mints one only after it:
+
+1. runs the reviewed program itself on the admitted invocation, so no caller
+   can supply the decision;
+2. obtains a verdict on every applicable project law from the deployment's law
+   engine, and requires each law to hold;
+3. binds the result to the exact catalog, hash provider, law set, and
+   deployment.
+
+Reopening a store re-authorizes its entire history.
+
+The strategic shape follows from one rule: **untrusted components propose, and
+small deterministic checkers judge.** Hand-written code, LLM-written code,
+synthesizers, SMT solvers, databases, and mounted runtimes may all propose
+values. Only strict decoders, exhaustive checkers, replay, and the authority
+decide what is admitted. Their verdicts are types that other code cannot forge.
+Not every judge is library code yet. A project's law engine, for example,
+reports each law's verdict, and the authority enforces that verdict without
+recomputing it.
+
+```text
+proposers (untrusted)          judges (small, deterministic)       shell (effects)
+
+application or LLM code  ─┐    canonical decode                    atomic publication
+synthesizer or solver     ├──> schema and catalog admission   ──>  outbox delivery
+mounted runtime or store ─┘    authority execution + law checks    with stable IDs
+                               nominal authorization
+```
+
+The aim is to keep the part a person must review small: the meaning of each
+decision, stated as types, reasons, laws, and claims. Machines check the rest
+against it. Every published decision is checked against the laws, and a finite
+core is checked against its contract on every input. Each result also states
+what it establishes.
+[Design record 0003](docs/adr/0003-epistemic-status.md) classifies every status
+as Identified, Attested, Checked, or Proved, with its scope and trusted base, so
+a passing check is not mistaken for more than it shows. The
+[principles](docs/adr/0002-principles.md) and [architecture](docs/ARCHITECTURE.md)
+describe the full design.
+
+### What this gives developers, LLMs, and agents
+
+- **Developers** test one pure function with plain values. Decisions are data,
+  so tests compare exact bytes and a failure replays from its inputs. Reviewers
+  start from the catalog of reasons and the laws. Generated typed APIs name
+  each state field, so code need not use raw paths, and authoring diagnostics
+  arrive together in one pass.
+- **LLMs** get a small, well-defined target: one function with explicit inputs
+  and outputs and no ambient effects, and checks that give the same answer on
+  every run. The design assumes generated code can be wrong:
+  - generated typed APIs narrow what it needs to write;
+  - every decision is checked against the project laws before it can be
+    published;
+  - a finite decision core can be synthesized and verified exhaustively
+    instead of being written by hand.
+- **Agents** get reproducible, machine-readable feedback:
+  - `zeno-fcis describe` and versioned JSON results with stable exit codes;
+  - counterexamples to repair against: a synthesis refutation, or a solver
+    model replayed through the interpreter;
+  - a closed registry of acceptance commands;
+  - gate evidence stamped with the exact commit it tested.
+
+  Checks also catch work that passes without meaning anything.
+  `zeno-fcis check --require-substantive` refuses laws and claims that no
+  transition outcome can change. `--require-resolved-paths` refuses laws and
+  claims that read fields the schema does not declare.
+
 ## See it run
 
 This is the published CLI running inside a virtual terminal. One command reads
@@ -164,6 +267,50 @@ bind through the existing authority-gated constructors.
 
 The `full` feature is intended for workspace integration and exploration.
 Reusable libraries should select only the features needed at their boundary.
+
+### What synthesized code is guaranteed to do
+
+ZenoFCIS synthesis is not correct by construction in the usual sense, where the
+way a program is built rules out errors. It is correct by exhaustive
+verification. How a program is found does not matter, because every candidate
+is checked against the contract on every input the contract admits.
+
+1. A realizability check confirms that every admitted input has at least one
+   acceptable output, or reports the input that has none.
+2. An untrusted proposer searches a reviewed sketch in a fixed canonical order.
+3. A separate checker runs each candidate on every admitted input. Only a
+   candidate that satisfies the contract everywhere is selected. If none does,
+   the exhausted search is itself a proof that the sketch has no solution.
+4. The emitted Rust, Python, or JavaScript is checked separately, by replaying
+   the complete set of input and output cases in each target runtime.
+
+The guarantee is strong and precise: for every input in the declared finite
+domain, the selected program's output satisfies the contract. It rests on a
+small trusted base, the `finite-i64/1` interpreter and the checker, and not on
+the search. So a heuristic or AI proposer could replace the enumerator without
+weakening the guarantee for a selected program. Only a complete search, however,
+can show that no solution exists.
+
+It is a guarantee relative to the contract, so it has four edges:
+
+- **The contract must say the right thing.** Synthesis moves trust into the
+  specification, and a wrong contract yields a program that is faithfully
+  wrong. The durable-counter template therefore also checks decision examples
+  that were reviewed against its README.
+- **Only the declared domain is covered.** Inputs outside it are refused. Finite
+  synthesis handles up to 65,536 admitted inputs, 64-bit integers, and 16
+  fields on each side of a contract.
+- **The code around the program needs its own check.** In the durable-counter
+  template, `tests/conformance.rs` runs all 64 admitted inputs through the real
+  application: admission, the authority, the adapter that turns outputs into
+  decisions, and the law checker. It compares every decision, reason, state
+  change, and notification with the model.
+- **The target runtimes are trusted.** Replay covers every case in the domain on
+  Rust 1.97.1, Python 3, and Node.js 22.
+
+Properties of a finite transition are checked the same way.
+[System properties](docs/SYSTEM_PROPERTIES.md) are checked on every admitted
+input, with a control that flags a property the declared domains already imply.
 
 ## Implemented workspace
 

@@ -14,6 +14,10 @@ changes:
 - `SystemVerdict` witnesses count as Checked only because models are now
   checked against their declared domains before replay.
 
+Corrected on 2026-09-23: the authorization row said the authority re-executes
+the program and compares. It runs the program itself; only re-authorization of
+a persisted transition re-executes it and compares the bytes.
+
 ## Context
 
 V1 names its results after who produced them or after the tool's own word:
@@ -56,7 +60,7 @@ Three rules apply:
    when the parts fit together.** The parts must cover the same scope, their
    assumptions must be discharged or carried forward, and the step that joins
    them must itself be established. Otherwise the composite has no level until
-   that step is checked. For example, authorization re-executes the program
+   that step is checked. For example, the authority runs the program itself
    (Checked), while law satisfaction comes from the project's law engine
    (Attested). Both concern the same invocation, so "this commit satisfies the
    project laws" is Attested.
@@ -87,7 +91,7 @@ Authorization:
 
 | Type | Claim and scope | Level | Trusted base and assumptions |
 | --- | --- | --- | --- |
-| `CatalogAuthorizedTransition`, `CatalogAuthorizedReject` | The decision is the program's output for this invocation, and its bindings and chain are coherent | Checked | The authority re-executes the program and compares. Trusted: the authority crate and the program's own code. Assumes the program is deterministic. |
+| `CatalogAuthorizedTransition`, `CatalogAuthorizedReject` | The decision is the program's output for this invocation, and its bindings and chain are coherent | Checked | The authority runs the reviewed program itself, so no caller supplies the decision. Persisted transitions are re-executed and compared byte for byte when they are re-authorized. Trusted: the authority crate and the program's own code. Assumes the program is deterministic. |
 | | The project laws hold for this invocation | Attested | `LawStatus` values come from the bound `ProjectLawEngine`, which is trusted. |
 | | The program is the reviewed build | Identified | `CatalogTransitionProgram::transition_build_hash` is reported by the program and only compared with the policy. |
 | `CatalogAuthorizedGenesis` | The initial state passes schema admission | Checked | Library schema validation. |

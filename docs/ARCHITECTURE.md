@@ -30,6 +30,55 @@ effect definitions fail catalog construction.
 A lower ring never imports a higher ring. The semantic kernel is `no_std +
 alloc`, forbids unsafe Rust, and has no ambient I/O.
 
+## Proposers, judges, and effects
+
+The rings implement one rule: untrusted components propose values, and small
+deterministic checkers judge them. A judgment is carried by a type that only
+the judging code can construct, so later code relies on the type rather than
+on a convention.
+
+Proposers, none of which is trusted to be right:
+
+- project transitions, whether written by hand, generated, or written by an
+  LLM;
+- the synthesis search, SMT solvers, and Lean;
+- mounted runtimes, such as the ZenoDEX zUSD engines;
+- rows read back from storage.
+
+Judges:
+
+- ZCVE/1 strict decoding, which accepts only canonical bytes;
+- schema, catalog, and invocation admission;
+- the authority's own execution of the reviewed program, its requirement that
+  every applicable project law hold, and its byte-for-byte re-execution of
+  persisted transitions;
+- exhaustive checking of finite programs and properties;
+- replay of solver models through the interpreter;
+- known-answer checks of the hash provider;
+- re-authorization of the complete history when a store reopens.
+
+Judgments carried by types with private constructors:
+
+- `AdmittedValue` and `AdmittedEnvelope` for canonical, bounded values;
+- `VerifiedProvider` for a hash provider that passed its known answers;
+- `CatalogAuthorizedGenesis`, `CatalogAuthorizedTransition`, and
+  `CatalogAuthorizedAuthenticatedCommit` for publication authority;
+- `VerifiedCompletion` for a checked finite exit plan.
+
+Effects happen only in the shell, only on authorized values:
+
+- atomic publication of state, receipts, and the outbox;
+- delivery of outbox entries under a stable delivery identity, which lets a
+  destination deduplicate retries.
+
+`CommitPlan` records evidence and is never executed.
+
+What each judgment establishes differs: some recompute a result, and some only
+record a component's report. Law verdicts, for example, come from the project's
+law engine, and the authority enforces them without recomputing them.
+[Design record 0003](adr/0003-epistemic-status.md) classifies each by level,
+scope, assumptions, and trusted base.
+
 ## Current nonclaims
 
 The workspace implements all layers above as bounded Rust libraries and

@@ -6,6 +6,15 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Explain in the README why ZenoFCIS separates deciding from acting, how
+  untrusted proposers and small deterministic judges divide the work, what
+  that gives developers, LLMs, and agents, and what synthesized code is
+  guaranteed to do: it is correct by exhaustive verification against its
+  contract, not correct by construction, within four stated limits. The
+  architecture guide gains a matching section. Design record 0003 now says the
+  authority runs the program itself; only re-authorization re-executes and
+  compares.
+
 - Check the time budget before the first process start as well, so an
   exhausted budget starts nothing, in the formal-tools adapter and the
   synthesis runner. The gate evidence recorder also compares the source with
