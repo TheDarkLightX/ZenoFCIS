@@ -62,3 +62,10 @@ Feature: Report evidence that cannot distinguish system behavior
     When each predicate is enumerated over its stated small domain
     Then every case satisfies its law
     And each harness enumerates exactly its stated number of cases
+
+  @atdd-gate-evidence
+  Scenario: Publish gate evidence only for the unchanged committed revision
+    Given a gate evidence recorder whose gates, versions, and git view are fakes
+    When tracked source or the commit changes at any point before the record is written
+    Then no record is written and the recorder fails
+    And a clean run records its exact revision and tree

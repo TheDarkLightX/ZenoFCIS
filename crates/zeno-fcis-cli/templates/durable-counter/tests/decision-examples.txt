@@ -1,8 +1,11 @@
 # Durable-counter decision examples.
 #
-# Written from README.md alone, without reading synthesis.json, the
-# synthesized program, the adapter, or any generated file. Owner review:
-# pending.
+# Provenance: drafted from README.md by an AI agent that had read
+# synthesis.json and the synthesized program earlier in the same working
+# session, so the drafting was not blind to the model. A second, independent
+# reviewer checked all twelve examples against README.md alone on 2026-09-23
+# and accepted them, including denial taking precedence over capacity. Review
+# by the project's owner: pending.
 #
 # Numeric IDs come from project.zeno: state fields 110 count and 111 failures;
 # command variants 120 Increment and 121 RecordFailure; context allowed (1) or

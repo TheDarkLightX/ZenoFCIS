@@ -23,27 +23,42 @@ use std::{
 const MAX_OUTPUT: u64 = 32 * 1024 * 1024;
 
 /// Starts `command`, retrying a bounded number of times while its executable
-/// is busy.
+/// is busy, within the time budget that runs from `started` for `budget`.
 ///
 /// Linux refuses to execute a file that any process holds open for writing
 /// (`ETXTBSY`). A child that another thread forks while this process writes an
 /// executable inherits that descriptor until it executes its own program, so
-/// the condition clears quickly. Every other error, and a file that stays busy
-/// through the last attempt, fails closed.
+/// the condition clears quickly. No attempt starts after the budget ends: when
+/// the next wait would reach the end, the error has kind `TimedOut`. Every
+/// other error, and a file that stays busy through the last attempt, fails
+/// closed.
 #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
-fn spawn_unless_busy(command: &mut Command) -> std::io::Result<std::process::Child> {
+pub(super) fn spawn_unless_busy(
+    command: &mut Command,
+    started: Instant,
+    budget: Duration,
+) -> std::io::Result<std::process::Child> {
     let busy = nix::errno::Errno::ETXTBSY as i32;
     let mut delay = Duration::from_millis(1);
-    for _ in 0..8 {
-        match command.spawn() {
-            Err(e) if e.raw_os_error() == Some(busy) => {
-                std::thread::sleep(delay);
-                delay = delay.saturating_mul(2);
-            }
-            result => return result,
+    let mut retries = 8;
+    loop {
+        let e = match command.spawn() {
+            Ok(child) => return Ok(child),
+            Err(e) => e,
+        };
+        if e.raw_os_error() != Some(busy) || retries == 0 {
+            return Err(e);
         }
+        if budget.saturating_sub(started.elapsed()) <= delay {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "the time budget ended while the executable was busy",
+            ));
+        }
+        std::thread::sleep(delay);
+        delay = delay.saturating_mul(2);
+        retries -= 1;
     }
-    command.spawn()
 }
 #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -512,7 +527,15 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
             }
         }
         command.env("LC_ALL", "C");
-        let mut child = spawn_unless_busy(&mut command).map_err(|e| error("tool-start", e))?;
+        // The operation limit covers starting the process as well as running it.
+        let started = Instant::now();
+        let mut child = spawn_unless_busy(&mut command, started, TIMEOUT).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::TimedOut {
+                error("timeout", "30-second target operation limit")
+            } else {
+                error("tool-start", e)
+            }
+        })?;
         let pid = match i32::try_from(child.id()) {
             Ok(pid) => Pid::from_raw(pid),
             Err(_) => {
@@ -521,7 +544,6 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
                 return Err(error("tool-pid", "PID overflow"));
             }
         };
-        let started = Instant::now();
         // Observe exit without reaping, so the owned group ID cannot be reused
         // before descendants are terminated. Reap only after group cleanup.
         let terminal = loop {

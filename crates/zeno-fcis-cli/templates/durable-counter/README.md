@@ -66,8 +66,10 @@ compares each decision, reason, new state, and notification with:
 
 - the synthesized function, read through the output table documented in the
   test;
-- `tests/decision-examples.txt`, examples written from this README without
-  reading any generated file, keyed by the numeric IDs in `project.zeno`.
+- `tests/decision-examples.txt`, examples keyed by the numeric IDs in
+  `project.zeno` and checked against this README by a reviewer other than
+  their author. The file's header records how they were written and
+  reviewed.
 
 It also checks that schema admission and the finite input domain agree in both
 directions, that genesis is exactly zero, and that every admitted state is

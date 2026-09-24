@@ -130,6 +130,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Check kernel laws exhaustively over small stated domains",
         (("cargo", "+1.97.1", "test", "--manifest-path", "verification/Cargo.toml", "--locked", "holds_on_every_small_input"),),
     ),
+    "gate-evidence": AcceptanceScenario(
+        "Publish gate evidence only for the unchanged committed revision",
+        (("python3", "tools/test_record_gate_evidence.py"),),
+    ),
     "zusd-lane-gaps": AcceptanceScenario(
         "Pin what the zeno language cannot state about the zUSD lane",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--test", "zusd_lane_gaps", "--locked"),),

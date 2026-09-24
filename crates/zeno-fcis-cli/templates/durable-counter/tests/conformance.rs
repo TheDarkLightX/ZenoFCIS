@@ -1,5 +1,6 @@
 //! Checks the executed application against its finite model and against
-//! independently written decision examples.
+//! decision examples drafted from the README and reviewed against it. The
+//! examples file records their provenance.
 //!
 //! Every decision is observed through the running application: schema
 //! admission, the authority, the reviewed adapter in `src/program.rs`, the law
