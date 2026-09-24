@@ -58,42 +58,47 @@ purity: clean (0 errors, 0 warnings) in 3 files
 ```
 
 A directory containing `Cargo.toml` is checked as a crate: every `.rs` file
-under `src/`, plus five structural conditions. A crate is *confined* when
-- its root is unconditionally `#![no_std]`,
-- it has `#![forbid(unsafe_code)]`,
+under `src/`, plus six structural conditions. A crate is *confined* when
+- it is library-only: its root is `src/lib.rs`, and it has no `src/main.rs`,
+  no `src/bin/`, and no `[[bin]]` target;
+- its root is unconditionally `#![no_std]`;
+- it has `#![forbid(unsafe_code)]`;
 - no file declares `extern crate std`, at any depth or inside a macro body;
 - no file names `include` or has a `#[path]` attribute, either of which can
   bring in source from outside `src/`; and
 - the check reads the whole manifest, and every dependency is named as one of
   the library's semantic crates.
 
-A confined crate cannot name `std` at all. That puts the clock, the
+A confined library cannot name `std` directly. That puts the clock, the
 environment, files, the network, threads, and `HashMap` out of reach, and the
 rules cover what `core` still offers, such as atomics and raw pointers. Its
-dependencies are named as the library's semantic crates, which
-`tools/check_assurance.py` checks for ambient effects.
-Putting decision code in its own confined crate is the strongest check
-available for hand-written Rust.
+only other route is its dependencies, which are named as the library's
+semantic crates that `tools/check_assurance.py` checks for ambient effects.
+Putting decision code in its own confined library crate is the strongest
+check available for hand-written Rust.
 
 The manifest reader accepts the common forms of `[dependencies]`,
 `[dependencies.NAME]`, and their `target` variants, and ignores development
-and build dependencies. Forms it does not recognize are reported, not
-interpreted. A form that could add a dependency,
-rename one, or move the library root keeps the crate from being confined and
-is reported, including:
+and build dependencies. It compares names with quotes and spaces removed,
+so `"path"` and `["lib"]` read as `path` and `[lib]`. Forms it does not
+recognize are reported, not interpreted. A form that could add a dependency,
+rename one, or change the package's targets keeps the crate from being
+confined and is reported, including:
 - `package =` renames and `workspace = true` inheritance;
 - `[patch]` and `[replace]`;
-- a `[lib]` `path`;
+- a `[lib]` `path`, `autolib`, and any `[[bin]]` target;
 - escape sequences and multi-line strings in dependency tables;
-- dependencies declared outside a dependency table.
+- dependencies or targets declared outside their tables, such as
+  `lib.path = "..."`.
 
 Dependencies are identified by name: the check does not verify that a
 dependency named `zeno-fcis-core` comes from the library's registry release
 rather than a path or git source.
 
 The result is `clean`, `confined`, `violations` (exit 1), or `unreadable`
-(exit 3). Anything the check could not read makes the result `unreadable`,
-never clean:
+(exit 3). Only error-level rules decide it: warnings are reported, and a
+clean or confined result can include them. Anything the check could not read
+makes the result `unreadable`, never clean:
 - a path it cannot read or list;
 - a directory with no Rust source;
 - a file that is not a regular file or is larger than 16 MiB;
@@ -107,6 +112,8 @@ finding's file, line, column, rule, and subject.
 What it cannot see:
 - It does not expand macros; it scans their tokens for paths.
 - It does not read files you do not list, generated sources, or dependencies.
+- In a crate, it reads only `src/`. Build scripts, tests, examples, and
+  benches are not read.
 - It does not know the type of a method's receiver, so it matches only
   `addr`, `expose_provenance`, and `expose_addr` by name.
 - It does not know the type of a cast's operand, so it does not report a
@@ -125,8 +132,9 @@ proof of determinism.
 `CatalogCommitAuthority::execute_probed(invocation, runs)` executes one
 admitted invocation several times, from 2 to 64. Each execution gets its own
 copy of the admitted values. The program, the law engine, and process-wide
-state are shared, so state kept between calls shows up as a divergence. The
-program and the project law engine run every time.
+state are shared, so state kept between calls shows up as a divergence when
+it changes the compared bytes. The program and the project law engine run
+every time.
 
 It returns the first decision only if every execution produced identical
 canonical decision bytes. For an acceptance or a committed failure, those

@@ -89,9 +89,9 @@ check covers sources that these runs might not exercise:
 zeno-fcis purity src/program.rs src/laws.rs synthesized/transition.rs
 ```
 
-Both are detectors. Agreement shows that these runs matched and that no rule
-fired; it does not prove the application deterministic. See the library's
-determinism guide.
+Both are detectors. Agreement shows that these runs matched and that no
+error-level rule fired; it does not prove the application deterministic. See
+the library's determinism guide.
 
 ## Inspect and replay synthesis
 

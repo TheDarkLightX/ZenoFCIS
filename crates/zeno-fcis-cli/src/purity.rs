@@ -170,6 +170,7 @@ const NONCLAIMS: &[&str] = &[
     "a clean or confined result is checked against this rule table, not a proof of determinism",
     "macros are not expanded; paths inside macro invocations are found by scanning tokens",
     "code in files not listed, in generated sources, and in dependencies is not read",
+    "in a crate, only src/ is read; build scripts, tests, examples, and benches are not",
     "a confined crate's dependencies are identified by name; their sources (registry, path, or git) are not checked",
     "method calls are matched by name only for addr, expose_provenance, and expose_addr",
     "a function converted to an integer, as in `decide as usize`, is not reported",
@@ -217,6 +218,8 @@ pub(crate) struct Structure {
     pub(crate) unrecognized_manifest: Vec<String>,
     /// Places that bring in source the check does not read.
     pub(crate) external_sources: Vec<String>,
+    /// Binary roots Cargo would build, which confinement does not cover.
+    pub(crate) binary_targets: Vec<String>,
 }
 
 impl Structure {
@@ -227,6 +230,7 @@ impl Structure {
             && self.unreviewed_dependencies.is_empty()
             && self.unrecognized_manifest.is_empty()
             && self.external_sources.is_empty()
+            && self.binary_targets.is_empty()
     }
 }
 
@@ -282,6 +286,7 @@ impl Report {
                     "unreviewed_dependencies": structure.unreviewed_dependencies,
                     "unrecognized_manifest": structure.unrecognized_manifest,
                     "external_sources": structure.external_sources,
+                    "binary_targets": structure.binary_targets,
                     "confined": structure.confined(),
                 })
             })
@@ -347,6 +352,12 @@ impl Report {
                 unmet.push(format!(
                     "source outside the checked files: {}",
                     structure.external_sources.join(", ")
+                ));
+            }
+            if !structure.binary_targets.is_empty() {
+                unmet.push(format!(
+                    "binary targets, which confinement does not cover: {}",
+                    structure.binary_targets.join(", ")
                 ));
             }
             if unmet.is_empty() {
@@ -541,21 +552,31 @@ fn check_crate(directory: &Path, report: &mut Report) {
             .push((manifest.display().to_string(), message)),
     }
     let source = directory.join("src");
-    let root = ["lib.rs", "main.rs"]
-        .iter()
-        .map(|name| source.join(name))
-        .find(|path| path.is_file());
+    // Confinement is a claim about the library, so its root must be
+    // `src/lib.rs` and the package must build no binary: Cargo builds
+    // `src/main.rs` and every file in `src/bin/` as one.
+    for binary in ["main.rs", "bin"] {
+        let path = source.join(binary);
+        if fs::symlink_metadata(&path).is_ok() {
+            structure.binary_targets.push(path.display().to_string());
+        }
+    }
+    let root = source.join("lib.rs");
     for file in rust_files(&source, report) {
         let Some((parsed, text)) = check_file(&file, report) else {
             continue;
         };
-        match text.parse::<TokenStream>() {
+        match text
+            .strip_prefix('\u{feff}')
+            .unwrap_or(&text)
+            .parse::<TokenStream>()
+        {
             Ok(tokens) => scan_escapes(&file.display().to_string(), tokens, &mut structure),
             Err(error) => structure
                 .external_sources
                 .push(format!("{}: {error}", file.display())),
         }
-        if root.as_deref() == Some(file.as_path()) {
+        if file == root {
             structure.no_std = parsed.attrs.iter().any(|attribute| {
                 attribute.path().is_ident("no_std") && matches!(attribute.meta, syn::Meta::Path(_))
             });
@@ -646,11 +667,16 @@ fn forbids_unsafe_code(attribute: &syn::Attribute) -> bool {
 /// dependency set was not established.
 ///
 /// The reader accepts the common forms of `[dependencies]`,
-/// `[dependencies.NAME]`, and their `target` variants. A rename, workspace
-/// inheritance, a source patch, a library `path`, an escape sequence, or any
-/// other form that could add a dependency or move the library root is
-/// reported instead of interpreted. Any reported line keeps the crate from
-/// being confined, so text read after one cannot produce a confined result.
+/// `[dependencies.NAME]`, and their `target` variants. Names in headers and
+/// keys are compared without quotes or spaces, so `"path"` is `path`. It
+/// reports instead of interpreting:
+/// - a rename, workspace inheritance, or a source patch;
+/// - a library `path` or `autolib`, and any binary target;
+/// - an escape sequence;
+/// - any other form that could add a dependency or change the targets.
+///
+/// Any reported line keeps the crate from being confined, so text read after
+/// one cannot produce a confined result.
 #[derive(Debug, Default, Eq, PartialEq)]
 struct ManifestDependencies {
     names: Vec<String>,
@@ -673,6 +699,9 @@ enum Table {
 }
 
 fn manifest_dependencies(manifest: &str) -> ManifestDependencies {
+    // Cargo accepts a leading byte-order mark, so it must not hide the first
+    // header.
+    let manifest = manifest.strip_prefix('\u{feff}').unwrap_or(manifest);
     let mut names = BTreeSet::new();
     let mut unrecognized = Vec::new();
     let mut table = Table::Other;
@@ -695,12 +724,12 @@ fn manifest_dependencies(manifest: &str) -> ManifestDependencies {
         }
         if line.starts_with('[') {
             table = match read_header(line) {
-                Some((kind, name)) => {
+                Ok((kind, name)) => {
                     names.extend(name);
                     kind
                 }
-                None => {
-                    refuse("table header not recognized");
+                Err(reason) => {
+                    refuse(reason);
                     Table::Unrecognized
                 }
             };
@@ -726,6 +755,8 @@ fn manifest_dependencies(manifest: &str) -> ManifestDependencies {
         let key = key.trim();
         let value = value.trim();
         let inline_table = value.starts_with('{');
+        let bare_key = bare(key);
+        let first = bare_key.split('.').next().unwrap_or_default();
         match table {
             Table::Dependencies => {
                 let (name, field) = key
@@ -752,15 +783,17 @@ fn manifest_dependencies(manifest: &str) -> ManifestDependencies {
                 }
             }
             Table::Library => {
-                if key == "path" {
+                if first == "path" {
                     refuse("library root set by path");
                 }
             }
             Table::Other => {
-                if key.contains('\\')
-                    || names_runtime_dependencies(key)
-                    || replaces_sources(key)
-                    || (inline_table && (value.contains('\\') || names_runtime_dependencies(value)))
+                if key.contains('\\') || (inline_table && value.contains('\\')) {
+                    refuse("escape sequence in a key or inline table");
+                } else if let Some(reason) = changes_targets_or_sources(first) {
+                    refuse(reason);
+                } else if names_runtime_dependencies(&bare_key)
+                    || (inline_table && names_runtime_dependencies(value))
                 {
                     refuse("dependency declared outside a dependency table");
                 }
@@ -778,34 +811,44 @@ fn manifest_dependencies(manifest: &str) -> ManifestDependencies {
 }
 
 /// Reads one table header. A single-dependency table also returns its
-/// dependency's name. `None` means the header was not recognized.
-fn read_header(line: &str) -> Option<(Table, Option<String>)> {
-    let (inner, rest) = match line.strip_prefix("[[") {
-        Some(array) => array.split_once("]]")?,
-        None => line.strip_prefix('[')?.split_once(']')?,
+/// dependency's name. An error says why the header is refused.
+fn read_header(line: &str) -> Result<(Table, Option<String>), &'static str> {
+    const UNRECOGNIZED: &str = "table header not recognized";
+    let array = line.starts_with("[[");
+    let split = if array {
+        line.strip_prefix("[[")
+            .and_then(|inner| inner.split_once("]]"))
+    } else {
+        line.strip_prefix('[')
+            .and_then(|inner| inner.split_once(']'))
     };
+    let (inner, rest) = split.ok_or(UNRECOGNIZED)?;
     let rest = rest.trim();
-    let header = inner.trim();
-    if !(rest.is_empty() || rest.starts_with('#'))
-        || header.contains('\\')
-        || replaces_sources(header)
-    {
-        return None;
+    if !(rest.is_empty() || rest.starts_with('#')) || inner.contains('\\') {
+        return Err(UNRECOGNIZED);
     }
-    if line.starts_with("[[") {
-        // An array of tables, such as `[[bin]]`, declares no dependency.
-        return (!names_runtime_dependencies(header)).then_some((Table::Other, None));
+    let header = bare(inner);
+    if header == "lib" && !array {
+        return Ok((Table::Library, None));
+    }
+    if let Some(reason) = changes_targets_or_sources(header.split('.').next().unwrap_or_default()) {
+        return Err(reason);
+    }
+    if array {
+        // Tests, examples, and benches are not part of the library.
+        return if names_runtime_dependencies(&header) {
+            Err(UNRECOGNIZED)
+        } else {
+            Ok((Table::Other, None))
+        };
     }
     if header == "dependencies" {
-        return Some((Table::Dependencies, None));
-    }
-    if header == "lib" {
-        return Some((Table::Library, None));
+        return Ok((Table::Dependencies, None));
     }
     // Workspace declarations are not dependencies; a member that inherits
     // one is refused where it does.
     if header == "workspace.dependencies" || header.starts_with("workspace.dependencies.") {
-        return Some((Table::Other, None));
+        return Ok((Table::Other, None));
     }
     let dependency_table = header.strip_prefix("dependencies.").or_else(|| {
         let target = header.strip_prefix("target.")?;
@@ -817,10 +860,21 @@ fn read_header(line: &str) -> Option<(Table, Option<String>)> {
         }
     });
     match dependency_table {
-        Some("") => Some((Table::Dependencies, None)),
-        Some(name) => Some((Table::Dependency, Some(dependency_name(name)?))),
-        None => (!names_runtime_dependencies(header)).then_some((Table::Other, None)),
+        Some("") => Ok((Table::Dependencies, None)),
+        Some(name) => Ok((
+            Table::Dependency,
+            Some(dependency_name(name).ok_or(UNRECOGNIZED)?),
+        )),
+        None if names_runtime_dependencies(&header) => Err(UNRECOGNIZED),
+        None => Ok((Table::Other, None)),
     }
+}
+
+/// Returns a header or key without quotes or spaces, for comparing names.
+fn bare(text: &str) -> String {
+    text.chars()
+        .filter(|character| !matches!(character, '"' | '\'') && !character.is_whitespace())
+        .collect()
 }
 
 /// Returns a dependency key without quotes, if it is a plain crate name.
@@ -866,11 +920,15 @@ fn names_runtime_dependencies(text: &str) -> bool {
     })
 }
 
-/// Returns whether a header or key names `patch` or `replace`, which change
-/// where dependencies come from.
-fn replaces_sources(text: &str) -> bool {
-    let first = text.split('.').next().unwrap_or_default().trim();
-    matches!(first, "patch" | "replace")
+/// Returns why a table or key named `first`, outside `[lib]` itself, changes
+/// the package's targets or where its dependencies come from.
+fn changes_targets_or_sources(first: &str) -> Option<&'static str> {
+    match first {
+        "lib" | "autolib" => Some("library target changed"),
+        "bin" => Some("binary target, which confinement does not cover"),
+        "patch" | "replace" => Some("dependency sources replaced"),
+        _ => None,
+    }
 }
 
 /// Returns the rule that a whole dependency or crate root falls under.
@@ -1489,7 +1547,7 @@ mod tests {
     }
 
     #[test]
-    fn manifest_forms_that_could_hide_a_dependency_are_refused() {
+    fn manifest_forms_that_could_hide_a_dependency_or_add_a_target_are_refused() {
         let refused = [
             "[dependencies]\nzeno-fcis-value = { package = \"evil-clock\", version = \"1\" }",
             "[dependencies]\nzeno-fcis-value = { \"package\" = \"evil-clock\" }",
@@ -1505,9 +1563,23 @@ mod tests {
             "dependencies.evil-clock = \"\"\"\n1\"\"\"",
             "[target.'cfg(unix)']\ndependencies = { evil-clock = \"1\" }",
             "[target]\n'cfg(unix)' = { dependencies = { evil-clock = \"1\" } }",
-            "[\"dependencies\"]\nevil-clock = \"1\"",
             "[patch.crates-io]\nzeno-fcis-value = { path = \"../evil\" }",
+            "[\"patch\".\"crates-io\"]\nzeno-fcis-value = { path = \"../evil\" }",
+            "\"patch\".crates-io.zeno-fcis-value.path = \"../evil\"",
             "[lib]\npath = \"src/other.rs\"",
+            // Found by an independent review of 3e056c8: a quoted key.
+            "[lib]\n\"path\" = \"outside.rs\"",
+            "[lib]\n'path' = \"outside.rs\"",
+            "[\"lib\"]\npath = \"outside.rs\"",
+            "lib.path = \"outside.rs\"",
+            "lib = { path = \"outside.rs\" }",
+            "[package]\nautolib = false",
+            // Found by the same review: a binary target outside `src/`.
+            "[[bin]]\nname = \"helper\"\npath = \"outside.rs\"",
+            "[[\"bin\"]]\nname = \"helper\"",
+            "bin = [{ name = \"helper\", path = \"outside.rs\" }]",
+            // Cargo accepts a leading byte-order mark before the first header.
+            "\u{feff}[lib]\npath = \"outside.rs\"",
             "[package]\ndescription = \"\"\"\nno end",
         ];
         for manifest in refused {
@@ -1516,7 +1588,7 @@ mod tests {
                 "accepted: {manifest}"
             );
         }
-        let recognized: [(&str, &[&str]); 7] = [
+        let recognized: [(&str, &[&str]); 8] = [
             (
                 "[dependencies] # runtime\nevil-clock = \"1\"",
                 &["evil-clock"],
@@ -1537,8 +1609,13 @@ mod tests {
                 "[dev-dependencies]\nproptest = \"1\"\n[build-dependencies]\ncc = \"1\"\n[target.'cfg(unix)'.dev-dependencies]\nlibc = \"0.2\"",
                 &[],
             ),
+            // A quoted header names the same table as a bare one.
+            ("[\"dependencies\"]\nevil-clock = \"1\"", &["evil-clock"]),
             ("[workspace.dependencies]\nrand = \"0.9\"", &[]),
-            ("[[bin]]\nname = \"tool\"\npath = \"src/bin/tool.rs\"", &[]),
+            (
+                "[lib]\nname = \"decisions\"\n[[test]]\nname = \"laws\"\npath = \"tests/laws.rs\"",
+                &[],
+            ),
         ];
         for (manifest, names) in recognized {
             let read = manifest_dependencies(manifest);
@@ -1685,6 +1762,45 @@ mod tests {
         let renamed = with(PURE);
         assert_eq!(renamed.status(), "clean", "{}", renamed.render());
         assert!(!renamed.structures[0].unrecognized_manifest.is_empty());
+    }
+
+    /// The three packages an independent review of 3e056c8 reported as
+    /// falsely confined, each with a `no_std` library in `src/lib.rs`.
+    #[test]
+    fn only_a_library_only_package_can_be_confined() {
+        let scratch = Scratch::new("targets");
+        let package = "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2021\"\n";
+        scratch.write("Cargo.toml", package);
+        scratch.write(
+            "src/lib.rs",
+            "#![no_std]\n#![forbid(unsafe_code)]\npub fn answer() -> u8 { 42 }\n",
+        );
+        scratch.write("outside.rs", "fn main() {}\n");
+        assert_eq!(scratch.check().status(), "confined");
+
+        // A binary built from `src/main.rs` that uses `std`.
+        scratch.write(
+            "src/main.rs",
+            "fn main() { let _ = std::string::String::new(); }\n",
+        );
+        let two_roots = scratch.check();
+        assert_eq!(two_roots.status(), "clean", "{}", two_roots.render());
+        assert_eq!(two_roots.structures[0].binary_targets.len(), 1);
+        fs::remove_file(scratch.0.join("src/main.rs")).unwrap_or_else(|error| panic!("{error}"));
+
+        scratch.write("src/bin/tool.rs", "fn main() {}\n");
+        assert_eq!(scratch.check().status(), "clean");
+        fs::remove_dir_all(scratch.0.join("src/bin")).unwrap_or_else(|error| panic!("{error}"));
+
+        for manifest in [
+            "[lib]\n\"path\" = \"outside.rs\"\n",
+            "[[bin]]\nname = \"helper\"\npath = \"outside.rs\"\n",
+        ] {
+            scratch.write("Cargo.toml", &format!("{package}{manifest}"));
+            let report = scratch.check();
+            assert_eq!(report.status(), "clean", "{manifest}: {}", report.render());
+            assert!(!report.structures[0].unrecognized_manifest.is_empty());
+        }
     }
 
     #[test]
