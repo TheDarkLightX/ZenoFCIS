@@ -49,7 +49,8 @@ class ExampleApplicationTests(unittest.TestCase):
                 with mock.patch.object(application, "exercise_rust_application", return_value=(passed, "")), \
                         mock.patch.dict(application.SYNTHESIZED_EXAMPLES,
                                         {name: mock.Mock(return_value=synthesis)
-                                         for name in application.SYNTHESIZED_EXAMPLES}):
+                                         for name in application.SYNTHESIZED_EXAMPLES}), \
+                        mock.patch("sys.stdout", new_callable=io.StringIO):
                     result = application.exercise_example_application(
                         template, Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
                 self.assertEqual(result["template"], template)
@@ -62,10 +63,83 @@ class ExampleApplicationTests(unittest.TestCase):
                                            return_value=(changed, "")), \
                             mock.patch.dict(application.SYNTHESIZED_EXAMPLES,
                                             {name: mock.Mock(return_value={})
-                                             for name in application.SYNTHESIZED_EXAMPLES}):
+                                             for name in application.SYNTHESIZED_EXAMPLES}), \
+                            mock.patch("sys.stdout", new_callable=io.StringIO):
                         with self.assertRaisesRegex(RuntimeError, "demonstration differs"):
                             application.exercise_example_application(
                                 template, Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+
+
+class OrbitControllerCheckTests(unittest.TestCase):
+    def completed(self, returncode, record):
+        return subprocess.CompletedProcess(args=[], returncode=returncode,
+                                           stdout=json.dumps(record), stderr="")
+
+    def verdicts(self, accepted_exit=0, accepted_record=None, rejected_exit=1, rejected_record=None):
+        if accepted_record is None:
+            accepted_record = {"accepted": True, "checker_sha256": "c" * 64}
+        if rejected_record is None:
+            rejected_record = {"accepted": False, "code": "recurrence_counterexample",
+                               "checker_sha256": "c" * 64}
+
+        def run(command, **_):
+            if "rejected" in command[4]:
+                return self.completed(rejected_exit, rejected_record)
+            return self.completed(accepted_exit, accepted_record)
+        return run
+
+    def test_the_check_reports_not_run_without_an_orbit_root_and_never_a_pass(self):
+        with mock.patch.object(application.subprocess, "run") as run, \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            result = application.check_orbit_controller("withdrawal-queue", Path("app"), {})
+        run.assert_not_called()
+        self.assertEqual(result, {"status": "not run", "reason": "ORBIT_SYNTHESIS_ROOT unset"})
+        self.assertEqual(stdout.getvalue(), "orbit check: not run (ORBIT_SYNTHESIS_ROOT unset)\n")
+        self.assertNotIn("passed", json.dumps(result))
+
+    def test_the_check_requires_every_expected_verdict(self):
+        environment = {"ORBIT_SYNTHESIS_ROOT": "/orbit"}
+        with mock.patch.object(application.subprocess, "run", side_effect=self.verdicts()), \
+                mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            result = application.check_orbit_controller("withdrawal-queue", Path("app"), environment)
+        self.assertEqual(result["status"], "passed")
+        self.assertIn("orbit check: passed", stdout.getvalue())
+        files = application.CONTROLLER_EXAMPLES["withdrawal-queue"]
+        self.assertEqual(sorted(result["verdicts"]), sorted(files["accepted"] + files["rejected"]))
+        wrong = [
+            self.verdicts(accepted_exit=1, accepted_record={"accepted": False, "code": "unsafe_transition"}),
+            self.verdicts(rejected_exit=0, rejected_record={"accepted": True}),
+            self.verdicts(rejected_record={"accepted": False, "code": "unsafe_transition"}),
+            self.verdicts(accepted_exit=2, accepted_record={"accepted": False, "code": "file_error"}),
+        ]
+        for run in wrong:
+            with mock.patch.object(application.subprocess, "run", side_effect=run), \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                with self.assertRaisesRegex(RuntimeError, "expected verdict"):
+                    application.check_orbit_controller("withdrawal-queue", Path("app"), environment)
+
+    def test_example_results_carry_the_orbit_check_only_for_controller_examples(self):
+        summary = application.EXAMPLE_TEMPLATES["withdrawal-queue"]
+        passed = {"status": "passed", "demonstration": json.dumps(summary)}
+        not_run = {"status": "not run", "reason": "ORBIT_SYNTHESIS_ROOT unset"}
+        synthesis = {"status": "passed"}
+        with mock.patch.object(application, "exercise_rust_application", return_value=(passed, "")), \
+                mock.patch.dict(application.SYNTHESIZED_EXAMPLES,
+                                {"withdrawal-queue": mock.Mock(return_value=synthesis)}), \
+                mock.patch.object(application, "check_orbit_controller", return_value=not_run) as check:
+            result = application.exercise_example_application(
+                "withdrawal-queue", Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+        check.assert_called_once_with("withdrawal-queue", Path("app"), {})
+        self.assertEqual(result["orbit_check"], not_run)
+        self.assertEqual(result["synthesis"], synthesis)
+        summary = application.EXAMPLE_TEMPLATES["account-lockout"]
+        passed = {"status": "passed", "demonstration": json.dumps(summary)}
+        with mock.patch.object(application, "exercise_rust_application", return_value=(passed, "")), \
+                mock.patch.object(application, "check_orbit_controller") as check:
+            result = application.exercise_example_application(
+                "account-lockout", Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+        check.assert_not_called()
+        self.assertNotIn("orbit_check", result)
 
 
 class V1PackagedSourceTests(unittest.TestCase):

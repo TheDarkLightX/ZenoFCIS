@@ -159,7 +159,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "crates/zeno-fcis-cli/templates/compliance-gateway/src/program.rs",
           "crates/zeno-fcis-cli/templates/compliance-gateway/src/laws.rs",
           "crates/zeno-fcis-cli/templates/compliance-gateway/src/rules.rs",
-          "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/transition.rs")),
+          "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/transition.rs",
+          "crates/zeno-fcis-cli/templates/withdrawal-queue/src/program.rs",
+          "crates/zeno-fcis-cli/templates/withdrawal-queue/src/laws.rs",
+          "crates/zeno-fcis-cli/templates/withdrawal-queue/src/controller.rs",
+          "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/transition.rs")),
     ),
     "example-templates": AcceptanceScenario(
         "Emit example applications whose laws all constrain their transitions",

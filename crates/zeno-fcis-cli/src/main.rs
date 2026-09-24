@@ -9,6 +9,7 @@ mod order_fulfillment;
 mod prepared_counter;
 mod purity;
 mod synth;
+mod withdrawal_queue;
 
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write as _};
@@ -238,6 +239,7 @@ enum Template {
     OrderFulfillment,
     InventoryReservation,
     ComplianceGateway,
+    WithdrawalQueue,
 }
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
@@ -489,6 +491,7 @@ fn new_project(dir: &Path, template: Template) -> u8 {
         Template::OrderFulfillment => Some(order_fulfillment::FILES),
         Template::InventoryReservation => Some(inventory_reservation::FILES),
         Template::ComplianceGateway => Some(compliance_gateway::FILES),
+        Template::WithdrawalQueue => Some(withdrawal_queue::FILES),
     };
     if let Some(files) = application {
         for (relative, content) in files {
@@ -519,7 +522,8 @@ fn new_project(dir: &Path, template: Template) -> u8 {
         | Template::AccountLockout
         | Template::OrderFulfillment
         | Template::InventoryReservation
-        | Template::ComplianceGateway => unreachable!("application templates return above"),
+        | Template::ComplianceGateway
+        | Template::WithdrawalQueue => unreachable!("application templates return above"),
     };
     if let Err(error) = atomic_create(&dir.join("project.zeno"), source.as_bytes()) {
         return io_error("write project", error);
@@ -1526,6 +1530,7 @@ mod tests {
             ("order-fulfillment", order_fulfillment::FILES),
             ("inventory-reservation", inventory_reservation::FILES),
             ("compliance-gateway", compliance_gateway::FILES),
+            ("withdrawal-queue", withdrawal_queue::FILES),
         ] {
             let mut pending = vec![root.join(directory)];
             let mut on_disk = BTreeSet::new();

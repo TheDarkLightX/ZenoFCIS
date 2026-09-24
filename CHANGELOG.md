@@ -6,6 +6,42 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add the `withdrawal-queue` application template: a vault with two
+  withdrawal lanes whose keeper tick runs a controller step that
+  `zeno-fcis synth` selected from a sketch of a fair policy, checking every
+  hole assignment against the tick rules on all 384 inputs. The table that
+  step defines ships with the vault's contract in OrbitSynthesis's canonical
+  format, with the contract's SHA-256 pin. OrbitSynthesis's checker accepted
+  it for every sequence of requests and alarms, with no fairness assumption:
+  an alarm can delay a withdrawal but never freeze it, and a due lane is
+  paid within 8 ticks. Two rejected strategies ship with it, a fixed
+  priority and one that defers to alarms in must-serve; the checker rejects
+  each with a counterexample cycle.
+  - The law checker's refinement check ties each concrete tick to the model:
+    the contract's transition table must allow the output the decision made
+    and give the plant state it left, and the certified strategy's row must
+    select that output and next memory. The checker reads neither the
+    synthesized step nor, for the contract check, any strategy row.
+  - `tests/controller.rs` re-checks the shipped JSON with an independent
+    Rust implementation of the decision procedure, requires the synthesized
+    step to equal the certified table on every input, the Rust tables to
+    equal the JSON, and both to equal a restatement of the README's rules,
+    and computes the 8-tick response bound. `tests/conformance.rs` explores
+    420 reachable vaults and 3,360 decisions against a reference model
+    written in words, and checks the bound on the running application.
+  - Two inductive claims for `zeno-fcis prove` state that the action laws
+    alone keep the vault solvent and within capacity, law 500's invariant,
+    and the pause within the controller's range, for every integer. Stating
+    them showed where the formulas under-described the tick, so the laws now
+    state the deposit's capacity, positive amounts, an amount leaving a lane
+    exactly when the lane is emptied, and when must-serve is set. CVC5
+    attests both steps; `tests/claims.rs` checks the observer, the exact
+    genesis, and the law manifest.
+  - `tools/check_generated_application.py` replays the synthesis in Rust,
+    Python, and JavaScript against an independent oracle, and runs
+    OrbitSynthesis's checker on the shipped files when `ORBIT_SYNTHESIS_ROOT`
+    names a checkout, otherwise reporting that the check did not run.
+
 - Add the `compliance-gateway` application template for
   `zeno-fcis new --template`: an expert system's transfer-screening rule
   base, `rules.txt`, becomes the synthesis contract, and `zeno-fcis synth`

@@ -148,6 +148,39 @@ def builtin_decision_table(domain: str) -> dict:
                                    [3, available + quantity, reserved, 0])
                         expected[available, reserved, action, quantity] = out
         return expected
+    if domain == "withdrawal":
+        expected = {}
+        for pending_a, pending_b, pause, must_serve, priority_b, arriving_a, arriving_b, alarm in (
+                (a, b, p, m, r, x, y, z) for a in range(2) for b in range(2) for p in range(3)
+                for m in range(2) for r in range(2) for x in range(2) for y in range(2)
+                for z in range(2)):
+            # Rule 6 of the template's README, written from its words: codes
+            # 0 wait, 1 pay lane A, 2 pay lane B; then the next pending flags,
+            # pause, must-serve, and priority.
+            due_a, due_b = pending_a or arriving_a, pending_b or arriving_b
+            if pause > 0:
+                # Paused: nothing is paid; the pause counts down, and ending
+                # with a lane due starts must-serve.
+                output, next_pause = 0, pause - 1
+                next_serve = int(pause == 1 and (due_a or due_b))
+            elif alarm and not must_serve:
+                # An honored alarm pays nothing and pauses two more ticks.
+                output, next_pause, next_serve = 0, 2, 0
+            else:
+                # The priority lane when both are due, the due lane when one
+                # is, nothing when none is; must-serve ends.
+                if due_a and due_b:
+                    output = 2 if priority_b else 1
+                else:
+                    output = 1 if due_a else 2 if due_b else 0
+                next_pause, next_serve = 0, 0
+            # Priority moves to the other lane after a payout.
+            next_priority = 1 if output == 1 else 0 if output == 2 else priority_b
+            expected[pending_a, pending_b, pause, must_serve, priority_b,
+                     arriving_a, arriving_b, alarm] = [
+                output, int(due_a and output != 1), int(due_b and output != 2),
+                next_pause, next_serve, next_priority]
+        return expected
     return {(a, b): [min(a + b, 3)] for a in range(4) for b in range(4)}
 
 
@@ -171,6 +204,12 @@ def exercise_gateway(cli: list[str], app: Path, directory: Path,
     if len(expected) != 720:
         raise RuntimeError("gateway rule base does not span its 720 inputs")
     return exercise_synthesized(cli, app, directory, environment, "gateway", 720, expected)
+
+
+def exercise_withdrawal(cli: list[str], app: Path, directory: Path,
+                        environment: dict[str, str]) -> dict:
+    """The withdrawal-queue example's synthesized controller step."""
+    return exercise_synthesized(cli, app, directory, environment, "withdrawal", 384)
 
 
 def exercise_synthesized(cli: list[str], app: Path, directory: Path,

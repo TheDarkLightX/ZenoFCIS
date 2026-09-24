@@ -197,10 +197,69 @@ EXAMPLE_TEMPLATES = {
         "strikes": 1, "allowed": 1, "held": 3, "blocked": 5,
         "bundles": 10, "pending": 0, "deliveries": 8,
     },
+    "withdrawal-queue": {
+        "status": "passed",
+        "decisions": ["Accept", "Accept", "Reject", "Reject", "Accept", "Reject", "Accept",
+                      "Accept", "Accept", "Accept", "Accept", "Accept", "Accept", "Accept",
+                      "Accept", "Reject"],
+        "balance": 0, "deposited": 4, "paid": 4, "payout_ticks": [4, 8],
+        "bundles": 12, "pending": 0, "deliveries": 2,
+    },
 }
 # Examples whose decision core is synthesized, with the check of that synthesis.
 SYNTHESIZED_EXAMPLES = {"inventory-reservation": check_synthesis.exercise_inventory,
-                        "compliance-gateway": check_synthesis.exercise_gateway}
+                        "compliance-gateway": check_synthesis.exercise_gateway,
+                        "withdrawal-queue": check_synthesis.exercise_withdrawal}
+# Examples whose decision follows a controller checked by OrbitSynthesis: the
+# files its checker reads, and the strategies it must accept and reject.
+CONTROLLER_EXAMPLES = {
+    "withdrawal-queue": {
+        "contract": "controller/contract.json",
+        "pin": "controller/contract.sha256",
+        "accepted": ["controller/strategy.json"],
+        "rejected": ["controller/rejected/fixed-priority.strategy.json",
+                     "controller/rejected/alarm-deferential.strategy.json"],
+    },
+}
+
+
+def check_orbit_controller(template: str, app: Path, environment: dict[str, str]) -> dict:
+    """Runs OrbitSynthesis's checker on the example's controller files.
+
+    It runs only when ORBIT_SYNTHESIS_ROOT names an OrbitSynthesis checkout.
+    Otherwise it reports that it did not run; it never reports a pass it did
+    not observe. The application's own tests re-check the same files in Rust.
+    """
+    root = environment.get("ORBIT_SYNTHESIS_ROOT")
+    if not root:
+        print("orbit check: not run (ORBIT_SYNTHESIS_ROOT unset)")
+        return {"status": "not run", "reason": "ORBIT_SYNTHESIS_ROOT unset"}
+    files = CONTROLLER_EXAMPLES[template]
+    checker = Path(root) / "scripts/check_controller.py"
+    verdicts = {}
+    for expected, strategies in (("accepted", files["accepted"]), ("rejected", files["rejected"])):
+        for strategy in strategies:
+            completed = subprocess.run(
+                [sys.executable, "-B", str(checker), str(app / files["contract"]), str(app / strategy),
+                 "--contract-pin", str(app / files["pin"]), "--json"],
+                cwd=app, env=environment, capture_output=True, text=True, check=False)
+            try:
+                record = json.loads(completed.stdout)
+            except ValueError:
+                record = {}
+            verdict = {"exit": completed.returncode, "accepted": record.get("accepted"),
+                       "code": record.get("code"), "checker_sha256": record.get("checker_sha256")}
+            if expected == "accepted":
+                right = completed.returncode == 0 and verdict["accepted"] is True
+            else:
+                right = (completed.returncode == 1 and verdict["accepted"] is False
+                         and verdict["code"] == "recurrence_counterexample")
+            if not right:
+                raise RuntimeError(f"{template}: OrbitSynthesis did not give the expected verdict on "
+                                   f"{strategy} ({expected}): {completed.stdout}{completed.stderr}")
+            verdicts[strategy] = verdict
+    print(f"orbit check: passed ({len(verdicts)} strategies checked against the pinned contract)")
+    return {"status": "passed", "verdicts": verdicts}
 
 
 def exercise_example_application(template: str, app: Path, directory: Path,
@@ -209,13 +268,17 @@ def exercise_example_application(template: str, app: Path, directory: Path,
     synthesis = None
     if template in SYNTHESIZED_EXAMPLES:
         synthesis = SYNTHESIZED_EXAMPLES[template](cli, app, directory, environment)
+    orbit = None
+    if template in CONTROLLER_EXAMPLES:
+        orbit = check_orbit_controller(template, app, environment)
     result, _ = exercise_rust_application(app, directory, package_roots, version, environment)
     demonstration = json.loads(result["demonstration"])
     expected = EXAMPLE_TEMPLATES[template]
     if any(demonstration.get(key) != value for key, value in expected.items()):
         raise RuntimeError(f"{template} demonstration differs from its expected summary")
     return {**result, "template": template,
-            **({"synthesis": synthesis} if synthesis is not None else {})}
+            **({"synthesis": synthesis} if synthesis is not None else {}),
+            **({"orbit_check": orbit} if orbit is not None else {})}
 
 
 def exercise_prepared_application(app: Path, directory: Path, package_roots: dict[str, Path],
