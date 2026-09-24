@@ -63,12 +63,15 @@ Reopening a store re-authorizes its entire history.
 
 The strategic shape follows from one rule: **untrusted components propose, and
 small deterministic checkers judge.** Hand-written code, LLM-written code,
-synthesizers, SMT solvers, databases, and mounted runtimes may all propose
-values. Only strict decoders, exhaustive checkers, replay, and the authority
-decide what is admitted. Their verdicts are types that other code cannot forge.
-Not every judge is library code yet. A project's law engine, for example,
-reports each law's verdict, and the authority enforces that verdict without
-recomputing it.
+synthesizers, solver models, databases, and mounted runtimes may all propose
+values. Strict decoders, exhaustive checkers, replay, and the authority decide
+what is admitted, and their verdicts are types that other code cannot forge.
+Some results still rest on components that the library trusts rather than
+rechecks:
+
+- a project's law engine, whose verdicts the authority enforces;
+- a solver's `unsat` answer;
+- the pinned Lean kernel and runtime.
 
 ```text
 proposers (untrusted)          judges (small, deterministic)       shell (effects)
@@ -270,10 +273,12 @@ Reusable libraries should select only the features needed at their boundary.
 
 ### What synthesized code is guaranteed to do
 
-**Synthesized code is guaranteed correct in a precise sense: it satisfies its
-contract on every input the contract admits.** That result is a proof, not a
-sample. It is a proof about the contract as written, though, and it assumes that
-a small checker is correct.
+**A synthesized program is guaranteed correct in a precise sense: it satisfies
+its contract on every input the contract admits.** That result is a proof, not a
+sample. It covers the selected program as the library's interpreter runs it.
+Emitted Rust, Python, or JavaScript source carries the same guarantee once
+`zeno-fcis synth verify` passes for that exact source and target. The proof is
+about the contract as written, and it assumes that a small checker is correct.
 
 #### Exhaustive verification, not correct by construction
 
@@ -294,9 +299,11 @@ and in how many inputs they can cover, not in how strong the result is within
 its domain. [Design record 0003](docs/adr/0003-epistemic-status.md) classifies
 a selected program as Proved.
 
-Exhaustive verification checks the final code, not the process that produced
-it. The emitted Rust, Python, and JavaScript are each replayed on
-every case in their own runtime, so an error in code generation is caught too.
+Exhaustive verification checks the final program, not the process that
+produced it. The interpreter checks the selected program itself. Then
+`zeno-fcis synth verify` replays the exact emitted source on every case in its
+target runtime, so an error in code generation is caught too. Until that
+command passes, the emitted source is unverified.
 
 #### How a program is synthesized
 
@@ -306,8 +313,11 @@ every case in their own runtime, so an error in code generation is caught too.
    order.
 3. A separate checker runs each candidate on every admitted input. Only a
    candidate that satisfies the contract everywhere is selected.
-4. The emitted Rust, Python, or JavaScript is replayed on the complete set of
-   input and output cases in each target runtime.
+4. `zeno-fcis synth run` writes the program as Rust, Python, or JavaScript
+   source and reports `runtime_conformance: not-run`. A separate command,
+   `zeno-fcis synth verify`, replays that exact source in its target runtime on
+   every admitted input, and compares each output with the interpreter and the
+   contract.
 
 The guarantee for a selected program rests on the checker, not the search, so
 a heuristic or AI proposer could replace the enumerator without weakening it. A
@@ -319,7 +329,8 @@ before it starts, and that refusal never counts as evidence of no solution.
 #### What is guaranteed, and what it depends on
 
 For every input in the declared finite domain, the selected program's output
-satisfies the contract. Inputs outside the domain are refused rather than
+satisfies the contract. Emitted source has the same property once
+`synth verify` passes for it. Inputs outside the domain are refused rather than
 answered. Finite synthesis handles up to 65,536 admitted inputs, 4,096 possible
 outputs, 16 fields on each side of a contract, 64-bit integers, and 1,000,000
 candidate programs.
@@ -337,13 +348,17 @@ The guarantee depends on four things:
   application: admission, the authority, the adapter that turns outputs into
   decisions, and the law checker. It compares every decision, reason, state
   change, and notification with the model.
-- **The target runtimes are trusted.** Replay covers every case in the domain on
-  Rust 1.97.1, Python 3, and Node.js 22. Production must run the same code on
-  runtimes that behave the same way.
+- **Emitted source needs its own replay, and the target runtimes are trusted.**
+  `synth verify` binds its report to the exact source, the emitter, and the
+  runtime's executable hash and version. It accepts only Rust 1.97.1, Python 3,
+  and Node.js 22. The repository's synthesis check runs it for the
+  durable-counter in all three, on all 64 inputs each. Production must run that
+  same source on runtimes that behave the same way.
 
 In short, a synthesized program is guaranteed to be correct with respect to its
-contract, on every input it accepts, provided the checker is correct. That is
-far stronger than testing, which samples inputs. It is not a promise that the
+contract, on every input it accepts, provided the checker is correct. Emitted
+source shares that guarantee once `synth verify` has passed for it. That is far
+stronger than testing, which samples inputs. It is not a promise that the
 program does what you meant: the proof covers the contract you wrote.
 
 Properties of a finite transition are checked the same way.

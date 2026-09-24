@@ -6,6 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Correct two claim boundaries found by an independent review of 1102d81.
+  First, synthesis guarantees the selected program as the interpreter runs it.
+  `synth run` reports emitted source as `runtime_conformance: not-run`, and
+  emitted Rust, Python, or JavaScript carries the guarantee only once
+  `synth verify` passes for that exact source and target. Second, the README
+  and architecture guide now separate untrusted proposers from trusted
+  components: the pinned Lean kernel and runtime, a solver's unrechecked
+  `unsat` answer, the search's enumeration for a "no solution" result, and a
+  project's law engine.
+
 - Explain in the README how exhaustive verification differs from correctness
   by construction, and why both are proofs. The synthesis section now shows
   what each approach trusts, what a bug in the builder does, and what each can
