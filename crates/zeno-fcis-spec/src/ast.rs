@@ -92,18 +92,72 @@ impl TypeKind {
     }
 }
 
+/// The inclusive range an `int` type declares, written `in MIN..=MAX`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct IntRange {
+    min: i128,
+    max: i128,
+}
+impl IntRange {
+    /// Creates a range, or returns `None` when `min` exceeds `max`.
+    #[must_use]
+    pub const fn try_new(min: i128, max: i128) -> Option<Self> {
+        if min <= max {
+            Some(Self { min, max })
+        } else {
+            None
+        }
+    }
+    /// Returns the least value in the range.
+    #[must_use]
+    pub const fn min(self) -> i128 {
+        self.min
+    }
+    /// Returns the greatest value in the range.
+    #[must_use]
+    pub const fn max(self) -> i128 {
+        self.max
+    }
+    /// Returns true when `value` lies in the range.
+    #[must_use]
+    pub const fn contains(self, value: i128) -> bool {
+        self.min <= value && value <= self.max
+    }
+}
+
 /// One explicit type declaration.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TypeDecl {
     pub(crate) id: StableId,
     pub(crate) kind: TypeKind,
     pub(crate) name: Identifier,
+    pub(crate) range: Option<IntRange>,
 }
 impl TypeDecl {
     /// Creates a type declaration.
     #[must_use]
     pub const fn new(id: StableId, kind: TypeKind, name: Identifier) -> Self {
-        Self { id, kind, name }
+        Self {
+            id,
+            kind,
+            name,
+            range: None,
+        }
+    }
+    /// Declares the inclusive range of an `int` type. Returns `None` for any
+    /// other kind, which has no integer range.
+    #[must_use]
+    pub fn with_range(mut self, range: IntRange) -> Option<Self> {
+        if self.kind != TypeKind::Int {
+            return None;
+        }
+        self.range = Some(range);
+        Some(self)
+    }
+    /// Returns the declared range of an `int` type, if it declares one.
+    #[must_use]
+    pub const fn range(&self) -> Option<IntRange> {
+        self.range
     }
     /// Returns the stable identifier.
     #[must_use]
@@ -1204,9 +1258,21 @@ fn encode_namespace(value: &NamespaceDecl, out: &mut Vec<u8>) -> Result<(), Enco
     value.id.encode_to(out)?;
     value.name.encode_to(out)
 }
+/// The kind tag of an `int` type that declares a range, followed by the
+/// range's bounds. A type without a range keeps its kind's own tag, so a
+/// project that declares no range encodes exactly as before.
+const RANGED_INT_TAG: u8 = 9;
+
 fn encode_type(value: &TypeDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     value.id.encode_to(out)?;
-    out.push(value.kind.tag());
+    match value.range {
+        None => out.push(value.kind.tag()),
+        Some(range) => {
+            out.push(RANGED_INT_TAG);
+            out.extend_from_slice(&range.min.to_be_bytes());
+            out.extend_from_slice(&range.max.to_be_bytes());
+        }
+    }
     value.name.encode_to(out)
 }
 fn encode_field(value: &FieldDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {

@@ -288,3 +288,37 @@ fn schema_checks_still_reject_cycles_invalid_bounds_names_and_resource_limits() 
         ));
     }
 }
+
+#[test]
+fn a_declared_range_is_the_binding_of_its_int() {
+    let ranged = SOURCE.replace("type 103 int Amount;", "type 103 int Amount in 0..=4;");
+    let limits = SchemaLimits::default();
+    let bytes = |schema: Schema| {
+        schema
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("bytes: {error}"))
+    };
+    let lower = |leaves| lower_schema(&project(&ranged), id(100), 7, leaves, limits);
+    // The declared range lowers to the schema that the binding `0..=4` gives
+    // the same type without a declared range.
+    let expected = bytes(
+        lower_schema(&project(SOURCE), id(100), 7, leaves(), limits)
+            .unwrap_or_else(|error| panic!("lower: {error}")),
+    );
+    let unbound = lower(vec![(id(102), TypeKind::Bool)])
+        .unwrap_or_else(|error| panic!("lower without a binding: {error}"));
+    assert_eq!(bytes(unbound), expected);
+    // A binding may restate the declared range, but never change it.
+    let restated = lower(leaves()).unwrap_or_else(|error| panic!("restated: {error}"));
+    assert_eq!(bytes(restated), expected);
+    for changed in [
+        TypeKind::I128 { min: 0, max: 5 },
+        TypeKind::I128 { min: -1, max: 4 },
+        TypeKind::U128 { min: 0, max: 4 },
+    ] {
+        assert_eq!(
+            lower(vec![(id(102), TypeKind::Bool), (id(103), changed)]).err(),
+            Some(SchemaLoweringError::IncompatiblePrimitive(id(103)))
+        );
+    }
+}

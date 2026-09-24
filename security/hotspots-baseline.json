@@ -554,7 +554,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 4070,
+      "production_lines": 4076,
       "rank": 3,
       "score": 95,
       "signals": [
@@ -563,17 +563,17 @@
           "lines": [
             834,
             884,
-            2977,
-            3036,
-            3245
+            2985,
+            3044,
+            3253
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             143,
-            3116,
-            3130
+            3124,
+            3138
           ]
         },
         {
@@ -591,9 +591,9 @@
             1050,
             1166,
             1167,
-            2259,
-            2389,
-            2597
+            2266,
+            2396,
+            2605
           ]
         },
         {
@@ -605,8 +605,8 @@
             996,
             1011,
             1014,
-            2851,
-            2857
+            2859,
+            2865
           ]
         },
         {
@@ -615,20 +615,20 @@
             699,
             741,
             966,
-            2785
+            2793
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            2979
+            2987
           ]
         },
         {
           "id": "information-flow-observation",
           "lines": [
-            2423,
-            2508
+            2430,
+            2516
           ]
         },
         {
@@ -637,9 +637,9 @@
             294,
             343,
             543,
-            2724,
-            2747,
-            2753
+            2732,
+            2755,
+            2761
           ]
         },
         {
@@ -652,17 +652,17 @@
             712,
             959,
             1075,
-            1421
+            1422
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            2389,
-            2392,
-            2459,
-            2597,
-            2609
+            2396,
+            2399,
+            2466,
+            2605,
+            2617
           ]
         },
         {
@@ -5255,9 +5255,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3718858,
+    "admitted_bytes": 3738765,
     "admitted_files": 218,
-    "inventory_sha256": "232ac2e4ef0050b7b097f59968636807307c958e0b5e204ee0417aea9b28f6f8",
+    "inventory_sha256": "c9c2d36f6e256772991c03d1e8d1d595afb98daa8aeb36018f422a6c2e06a63b",
     "ranked_above_minimum": 169,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

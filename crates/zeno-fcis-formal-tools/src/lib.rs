@@ -20,8 +20,8 @@ use serde::{Deserialize, Serialize};
 use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_spec::{
-    BackendId, ClaimDecl, ClaimFormula, ClaimMode, CompareOp, EvalLimits, EvalOutcome,
-    EvaluationContext, Identifier, IndeterminateReason, LawDecl, MAX_FINITE_HORIZON,
+    BackendId, ClaimDecl, ClaimFormula, ClaimMode, CompareOp, DeclaredDomain, EvalLimits,
+    EvalOutcome, EvaluationContext, Identifier, IndeterminateReason, LawDecl, MAX_FINITE_HORIZON,
     MAX_FORMULA_DEPTH, Observation, PredicateProvider, ProjectSpec, ProjectionPath, ProjectionRoot,
     RelExpr, StableId, TemporalEvaluation, TemporalFormula, TraceStep, ValueExpr, declared_domain,
     evaluate_relational, evaluate_temporal, invariant_at,
@@ -1223,8 +1223,9 @@ pub struct StepHypotheses {
     every_commit: Box<[LawDecl]>,
     accepts: Box<[LawDecl]>,
     committed_failures: Box<[LawDecl]>,
-    /// The declared domain of every observed enumerated or bool value.
-    domains: BTreeMap<ProjectionPath, Vec<i128>>,
+    /// The declared domain of every observed enumerated, bool, or ranged
+    /// `int` value.
+    domains: BTreeMap<ProjectionPath, DeclaredDomain>,
 }
 impl StepHypotheses {
     /// Laws assumed for every committing decision.
@@ -1242,10 +1243,10 @@ impl StepHypotheses {
     pub const fn committed_failures(&self) -> &[LawDecl] {
         &self.committed_failures
     }
-    /// The values each observed enumerated or bool path can take, from its
-    /// declared variants or its bool type.
+    /// The values each observed enumerated, bool, or ranged `int` path can
+    /// take, from its declared variants, its bool type, or its declared range.
     #[must_use]
-    pub const fn domains(&self) -> &BTreeMap<ProjectionPath, Vec<i128>> {
+    pub const fn domains(&self) -> &BTreeMap<ProjectionPath, DeclaredDomain> {
         &self.domains
     }
     /// Returns true when the step distinguishes accepts from committed failures.
@@ -1799,16 +1800,22 @@ pub fn export_inductive_smt_with_limits(
         let name = smt_path(path, 0);
         source.push_str(&format!("(declare-const {name} Int)\n"));
         source.push_str(&format!("(assert {})\n", smt_i128_range(&name)));
-        if let Some(values) = declared_domain(spec, path) {
-            let members = values
-                .iter()
-                .map(|value| format!("(= {name} {})", smt_int(*value)))
-                .collect::<Vec<_>>();
-            source.push_str(&format!(
-                "; declared domain\n(assert {})\n",
-                smt_or(members)
-            ));
-            hypotheses.domains.insert(path.clone(), values);
+        if let Some(domain) = declared_domain(spec, path) {
+            let member = match &domain {
+                DeclaredDomain::Values(values) => smt_or(
+                    values
+                        .iter()
+                        .map(|value| format!("(= {name} {})", smt_int(*value)))
+                        .collect(),
+                ),
+                DeclaredDomain::Range(range) => format!(
+                    "(and (<= {} {name}) (<= {name} {}))",
+                    smt_int(range.min()),
+                    smt_int(range.max())
+                ),
+            };
+            source.push_str(&format!("; declared domain\n(assert {member})\n"));
+            hypotheses.domains.insert(path.clone(), domain);
         }
     }
     for (name, arity) in predicates {
@@ -2497,11 +2504,12 @@ fn replay_inductive(
         let Some(value) = assignments.get(&smt_path(path, 0)).copied() else {
             return unreplayed;
         };
-        // Admission refuses an undeclared variant, so such a model is no transition.
+        // The authority refuses an undeclared variant or an integer outside its
+        // declared range, so such a model is no transition.
         if hypotheses
             .domains
             .get(path)
-            .is_some_and(|values| !values.contains(&value))
+            .is_some_and(|domain| !domain.contains(value))
         {
             return unreplayed;
         }
@@ -4785,8 +4793,79 @@ mod tests {
                 &ProjectionPath::try_new(ProjectionRoot::Command, vec![id(101)])
                     .unwrap_or_else(|| unreachable!())
             ),
-            Some(&vec![120, 121])
+            Some(&DeclaredDomain::Values(vec![120, 121]))
         );
+    }
+
+    /// A balance that each accept raises by the command's amount, whose type
+    /// declares `amount_range` (empty for none).
+    fn deposit_project(amount_range: &str, claims: &str) -> zeno_fcis_spec::ProjectSpec {
+        let source = format!(
+            "zeno 1;\nproject 1 deposits;\ntype 100 state State;\ntype 101 command Command;\n\
+             type 102 context Context;\ntype 105 int Balance;\ntype 106 int Amount{amount_range};\n\
+             field 110 100 balance 105;\nfield 120 101 amount 106;\n\
+             reason 200 bad precedence 0;\n\
+             component 300 machine {{ owns 100; reads pre.100; writes post.100; budget steps 10; }}\n\
+             merge [300];\n\
+             law 401 deposits = post.100.110 == pre.100.110 + command.101.120;\n{claims}"
+        );
+        let parsed =
+            zeno_fcis_spec::parse_project(&source, zeno_fcis_spec::SourceLimits::default())
+                .unwrap_or_else(|set| panic!("{set}"));
+        zeno_fcis_spec::elaborate_project(parsed, zeno_fcis_spec::ProjectLimits::default())
+            .unwrap_or_else(|set| panic!("{set}"))
+    }
+
+    #[test]
+    fn declared_ranges_bound_integer_observations() {
+        let claim = "claim 600 bounded cvc5 inductive accept [401] = pre.100.110 <= 5;\n";
+        let spec = deposit_project(" in 0..=2", claim);
+        let obligation = export_inductive_smt(&spec.claims()[0], &spec, ToolBackend::Cvc5)
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        let source = String::from_utf8_lossy(obligation.source()).into_owned();
+        assert!(source.contains(
+            "; declared domain\n(assert (and (<= 0 command_101_120_t0) (<= command_101_120_t0 2)))"
+        ));
+        let amount = ProjectionPath::try_new(ProjectionRoot::Command, vec![id(101), id(120)])
+            .unwrap_or_else(|| unreachable!());
+        let declared = zeno_fcis_spec::IntRange::try_new(0, 2).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            obligation.hypotheses().domains().get(&amount),
+            Some(&DeclaredDomain::Range(declared))
+        );
+        // The balance declares no range: only its type's i128 bound applies.
+        assert_eq!(obligation.hypotheses().domains().len(), 1);
+        let deposit = |pre: i128, amount: i128| {
+            let mut text = model(&[
+                ("pre_100_110_t0", pre),
+                ("command_101_120_t0", amount),
+                ("post_100_110_t0", pre + amount),
+            ]);
+            text.insert_str(text.len() - 2, "(define-fun zeno_decision_kind () Int 1)\n");
+            text
+        };
+        // Inside the declared range, a transition that leaves the invariant
+        // replays as a counterexample.
+        assert_eq!(
+            replay_model(&obligation, &deposit(5, 1)),
+            ToolRunStatus::Refuted
+        );
+        // Outside it, the authority never admits the command, so the model is
+        // no transition.
+        assert_eq!(
+            replay_model(&obligation, &deposit(5, 3)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        assert_eq!(
+            replay_model(&obligation, &deposit(5, -1)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        // Without the range, the same step has no declared domain.
+        let unranged = deposit_project("", claim);
+        let obligation = export_inductive_smt(&unranged.claims()[0], &unranged, ToolBackend::Cvc5)
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        assert!(obligation.hypotheses().domains().is_empty());
+        assert!(!String::from_utf8_lossy(obligation.source()).contains("; declared domain"));
     }
 
     #[test]
@@ -6557,6 +6636,75 @@ mod tests {
                 verdicts.insert((claim.id().get(), config.backend.name()), expected);
             }
         }
+        // Declared ranges: the amount's declared range, not a law, bounds the
+        // command. Law 402 boxes the balance before the step and law 401 fixes
+        // it after, so enumerating the box, amounts around the range, and the
+        // balances they reach is complete. The same claims without the range
+        // are numbered 10 higher.
+        for (range, offset) in [(" in 0..=2", 0), ("", 10)] {
+            let deposits = deposit_project(
+                range,
+                "law 402 in_box = pre.100.110 >= 0 && pre.100.110 <= 6;\n\
+                 claim 620 nonnegative all inductive assume [402, 401] = pre.100.110 >= 0;\n\
+                 claim 621 at_most_six all inductive assume [402, 401] = pre.100.110 <= 6;\n",
+            );
+            for claim in deposits.claims() {
+                for config in &solvers {
+                    let obligation = export_inductive_smt(claim, &deposits, config.backend)
+                        .unwrap_or_else(|error| panic!("claim {}: {error:?}", claim.id().get()));
+                    let mut expected = BTreeSet::new();
+                    for pre in -1..=7 {
+                        for amount in -1..=3 {
+                            for post in -1..=9 {
+                                let text = model(&[
+                                    ("pre_100_110_t0", pre),
+                                    ("command_101_120_t0", amount),
+                                    ("post_100_110_t0", post),
+                                ]);
+                                match replay_model(&obligation, &text) {
+                                    ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed) => {}
+                                    status => {
+                                        expected.insert(run_status_label(&status));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let output = run_smt(config, &config.path, obligation.source())
+                        .unwrap_or_else(|error| panic!("claim {}: {error:?}", claim.id().get()));
+                    let status = classify(config, output.final_output(), &obligation);
+                    let holds = matches!(
+                        (config.backend, &status),
+                        (ToolBackend::Cvc5, ToolRunStatus::ProposedUnsat)
+                            | (
+                                ToolBackend::Z3,
+                                ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
+                            )
+                    );
+                    if expected.is_empty() {
+                        assert!(
+                            holds,
+                            "claim {}{range} {:?}: {status:?}",
+                            claim.id().get(),
+                            config.backend
+                        );
+                    } else {
+                        assert!(
+                            expected.contains(&run_status_label(&status)),
+                            "claim {}{range} {:?}: {status:?} not in {expected:?}",
+                            claim.id().get(),
+                            config.backend
+                        );
+                    }
+                    verdicts.insert((claim.id().get() + offset, config.backend.name()), expected);
+                }
+            }
+        }
+        // The declared range alone makes claim 620 hold: without it, a negative
+        // amount refutes the same step.
+        assert!(verdicts[&(620, ToolBackend::Cvc5.name())].is_empty());
+        assert!(!verdicts[&(630, ToolBackend::Cvc5.name())].is_empty());
+        assert!(!verdicts[&(621, ToolBackend::Cvc5.name())].is_empty());
         // Without declared domains, command 0 would refute claim 610.
         assert!(verdicts[&(610, ToolBackend::Cvc5.name())].is_empty());
         // The collection covers every outcome: holds, refuted, undefined, and both.

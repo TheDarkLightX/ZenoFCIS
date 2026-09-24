@@ -164,8 +164,62 @@ impl Parser {
             }
         };
         let name = self.take_identifier("type.name")?;
+        let declared = TypeDecl::new(id, kind, name);
+        let declared = if self.take_keyword("in") {
+            self.parse_int_range(declared)
+        } else {
+            declared
+        };
         self.expect_symbol(TokenKind::Semicolon, "type");
-        Some(TypeDecl::new(id, kind, name))
+        Some(declared)
+    }
+    /// Parses `MIN..=MAX` after `in` in a type declaration. The bounds are
+    /// inclusive, as in the schema; `..` alone is refused, because quantifiers
+    /// read it as half-open.
+    fn parse_int_range(&mut self, declared: TypeDecl) -> TypeDecl {
+        let Some(min) = self.take_i128("type.range.min") else {
+            return declared;
+        };
+        self.expect_symbol(TokenKind::Range, "type.range");
+        let inclusive = self.take_symbol(&TokenKind::Equal);
+        if !inclusive {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "type.range",
+                "`..=`",
+                self.describe_current(),
+                "type ranges are inclusive: write MIN..=MAX",
+            );
+        }
+        let Some(max) = self.take_i128("type.range.max") else {
+            return declared;
+        };
+        if !inclusive {
+            return declared;
+        }
+        let Some(range) = IntRange::try_new(min, max) else {
+            self.error(
+                DiagnosticCode::InvalidDeclaration,
+                "type.range",
+                "MIN <= MAX",
+                format!("{min}..={max}"),
+                "write the least value first",
+            );
+            return declared;
+        };
+        match declared.clone().with_range(range) {
+            Some(ranged) => ranged,
+            None => {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "type.range",
+                    "int",
+                    format!("{:?}", declared.kind()).to_lowercase(),
+                    "declare a range only on an int type",
+                );
+                declared
+            }
+        }
     }
     fn parse_field(&mut self) -> Option<FieldDecl> {
         let id = self.take_id("field.id")?;

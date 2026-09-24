@@ -38,7 +38,9 @@ pub use mini_determinator::{
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
 };
 pub use parser::parse_project;
-pub use paths::{PathResolution, claim_paths, declared_domain, law_paths, resolve_path};
+pub use paths::{
+    DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
+};
 pub use substance::{
     Substance, claim_substance, invariant_substance, law_substance, relation_substance,
     temporal_substance,

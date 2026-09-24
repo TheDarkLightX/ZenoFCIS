@@ -15,8 +15,8 @@
 use alloc::vec::Vec;
 
 use crate::{
-    ClaimDecl, ClaimFormula, LawDecl, ProjectSpec, ProjectionPath, ProjectionRoot, RelExpr,
-    StableId, TemporalFormula, TypeKind, ValueExpr,
+    ClaimDecl, ClaimFormula, IntRange, LawDecl, ProjectSpec, ProjectionPath, ProjectionRoot,
+    RelExpr, StableId, TemporalFormula, TypeKind, ValueExpr,
 };
 
 /// How one projection path relates to the declared types and fields.
@@ -64,17 +64,41 @@ impl PathResolution {
     }
 }
 
+/// The values an observation can take in every decision the authority
+/// admits, as `project.zeno` declares them.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DeclaredDomain {
+    /// The variant IDs of an enumerated type, in ascending order, or 0 and 1
+    /// for a bool.
+    Values(Vec<i128>),
+    /// The declared range of an `int` type.
+    Range(IntRange),
+}
+impl DeclaredDomain {
+    /// Returns true when `value` lies in the domain.
+    #[must_use]
+    pub fn contains(&self, value: i128) -> bool {
+        match self {
+            Self::Values(values) => values.binary_search(&value).is_ok(),
+            Self::Range(range) => range.contains(value),
+        }
+    }
+}
+
 /// Returns the values an observation at `path` can take in any decision the
 /// authority admits, when `project.zeno` alone determines them: the variant
-/// IDs of an enumerated type, or 0 and 1 for a bool.
+/// IDs of an enumerated type, 0 and 1 for a bool, or the declared range of an
+/// `int` type.
 ///
-/// Admission refuses a command, context, or state whose enumerated fields
-/// hold undeclared variants, and law checkers observe an enumerated field as
-/// its variant ID and a bool as 0 or 1. Returns `None` for an integer, whose
-/// range is supplied outside `project.zeno`, and for a path that does not
-/// resolve to a declared field.
+/// The authority checks every command, context, and state against its schema,
+/// which refuses undeclared variants and integers outside their bounds, and
+/// lowering takes a ranged type's bounds from its declaration. Law checkers
+/// observe an enumerated field as its variant ID, a bool as 0 or 1, and an
+/// integer as its value. Returns `None` for an `int` type without a declared
+/// range, whose bounds are supplied outside `project.zeno`, and for a path
+/// that does not resolve to a declared field.
 #[must_use]
-pub fn declared_domain(spec: &ProjectSpec, path: &ProjectionPath) -> Option<Vec<i128>> {
+pub fn declared_domain(spec: &ProjectSpec, path: &ProjectionPath) -> Option<DeclaredDomain> {
     let leaf = leaf_type(spec, path)?;
     let mut variants: Vec<i128> = spec
         .variants()
@@ -84,12 +108,14 @@ pub fn declared_domain(spec: &ProjectSpec, path: &ProjectionPath) -> Option<Vec<
         .collect();
     if !variants.is_empty() {
         variants.sort_unstable();
-        return Some(variants);
+        return Some(DeclaredDomain::Values(variants));
     }
-    spec.types()
-        .iter()
-        .find(|declared| declared.id() == leaf && declared.kind() == TypeKind::Bool)
-        .map(|_| alloc::vec![0, 1])
+    let declared = spec.types().iter().find(|declared| declared.id() == leaf)?;
+    match (declared.kind(), declared.range()) {
+        (TypeKind::Bool, _) => Some(DeclaredDomain::Values(alloc::vec![0, 1])),
+        (TypeKind::Int, Some(range)) => Some(DeclaredDomain::Range(range)),
+        _ => None,
+    }
 }
 
 /// The declared type of the value at `path`, when every segment resolves.
@@ -227,7 +253,12 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::{ProjectLimits, SourceLimits, elaborate_project, parse_project};
+    use alloc::format;
+
+    use crate::{
+        DiagnosticCode, ProjectLimits, SourceLimits, derive_composition, elaborate_project,
+        parse_project,
+    };
 
     const DECLARATIONS: &str = "zeno 1;\nproject 1 paths;\n\
         type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
@@ -276,11 +307,13 @@ mod tests {
     }
 
     #[test]
-    fn declared_domains_come_from_variants_and_bools_only() {
+    fn declared_domains_come_from_variants_bools_and_declared_ranges() {
         let source = "zeno 1;\nproject 1 domains;\n\
             type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
             type 105 int Count;\ntype 106 bool Flag;\ntype 107 data Mode;\n\
-            field 110 100 count 105;\nfield 111 100 mode 107;\nfield 130 102 admin 106;\n\
+            type 108 int Level in -2..=3;\n\
+            field 110 100 count 105;\nfield 111 100 mode 107;\nfield 112 100 level 108;\n\
+            field 130 102 admin 106;\n\
             variant 151 107 Fast none;\nvariant 150 107 Slow none;\n\
             variant 160 101 Go none;\nvariant 161 101 Stop none;\n\
             reason 200 bad precedence 0;\n\
@@ -294,26 +327,36 @@ mod tests {
             ProjectionPath::try_new(root, segments.iter().map(|value| id(*value)).collect())
                 .unwrap_or_else(|| unreachable!())
         };
+        let values = |values: &[i128]| Some(DeclaredDomain::Values(values.to_vec()));
         // Variant IDs, sorted, whichever state root observes them.
         assert_eq!(
             declared_domain(&spec, &path(ProjectionRoot::Pre, &[100, 111])),
-            Some(vec![150, 151])
+            values(&[150, 151])
         );
         assert_eq!(
             declared_domain(&spec, &path(ProjectionRoot::Post, &[100, 111])),
-            Some(vec![150, 151])
+            values(&[150, 151])
         );
         // A command type with variants is observed as its variant.
         assert_eq!(
             declared_domain(&spec, &path(ProjectionRoot::Command, &[101])),
-            Some(vec![160, 161])
+            values(&[160, 161])
         );
         assert_eq!(
             declared_domain(&spec, &path(ProjectionRoot::Context, &[102, 130])),
-            Some(vec![0, 1])
+            values(&[0, 1])
         );
-        // Integer ranges come from outside project.zeno, and unresolved or
-        // unchecked paths have no declared domain.
+        // A declared range is the domain of its int type, on every root.
+        let level = IntRange::try_new(-2, 3).unwrap_or_else(|| unreachable!());
+        for root in [ProjectionRoot::Pre, ProjectionRoot::Post] {
+            let domain = declared_domain(&spec, &path(root, &[100, 112]));
+            assert_eq!(domain, Some(DeclaredDomain::Range(level)));
+            let domain = domain.unwrap_or_else(|| unreachable!());
+            assert!(domain.contains(-2) && domain.contains(3));
+            assert!(!domain.contains(-3) && !domain.contains(4));
+        }
+        // An int without a declared range has its bounds outside project.zeno,
+        // and unresolved or unchecked paths have no declared domain.
         assert_eq!(
             declared_domain(&spec, &path(ProjectionRoot::Pre, &[100, 110])),
             None
@@ -325,6 +368,100 @@ mod tests {
         assert_eq!(
             declared_domain(&spec, &path(ProjectionRoot::Outbox, &[300])),
             None
+        );
+    }
+
+    /// The diagnostic codes for a project whose type 105 is `declaration`.
+    fn range_codes(declaration: &str) -> Vec<DiagnosticCode> {
+        let source = format!(
+            "zeno 1;\nproject 1 ranges;\n\
+             type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+             {declaration}\nfield 110 100 level 105;\n\
+             variant 160 101 Go none;\nreason 200 bad precedence 0;\n\
+             component 300 machine {{ owns 100; reads pre.100; writes post.100; budget steps 10; }}\n\
+             merge [300];\nlaw 400 ok = post.100.110 >= 0;\n"
+        );
+        let parsed = match parse_project(&source, SourceLimits::default()) {
+            Ok(parsed) => parsed,
+            Err(set) => return set.diagnostics().iter().map(|d| d.code()).collect(),
+        };
+        match elaborate_project(parsed, ProjectLimits::default()) {
+            Ok(_) => Vec::new(),
+            Err(set) => set.diagnostics().iter().map(|d| d.code()).collect(),
+        }
+    }
+
+    #[test]
+    fn type_ranges_are_inclusive_and_declared_only_on_ints() {
+        for accepted in [
+            "type 105 int Level in 0..=2;",
+            "type 105 int Level in -5..=-1;",
+            "type 105 int Level in 7..=7;",
+            "type 105 int Level;",
+        ] {
+            assert_eq!(range_codes(accepted), Vec::new(), "{accepted}");
+        }
+        // Quantifiers read `..` as half-open, so a type range refuses it.
+        assert_eq!(
+            range_codes("type 105 int Level in 0..2;"),
+            vec![DiagnosticCode::ExpectedToken]
+        );
+        assert_eq!(
+            range_codes("type 105 int Level in 3..=1;"),
+            vec![DiagnosticCode::InvalidDeclaration]
+        );
+        assert_eq!(
+            range_codes("type 105 bool Level in 0..=1;"),
+            vec![DiagnosticCode::InvalidDeclaration]
+        );
+    }
+
+    #[test]
+    fn a_declared_range_is_part_of_the_canonical_project() {
+        let commitment = |declaration: &str| {
+            let source = format!(
+                "zeno 1;\nproject 1 ranges;\n\
+                 type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+                 {declaration}\nfield 110 100 level 105;\n\
+                 variant 160 101 Go none;\nreason 200 bad precedence 0;\n\
+                 component 300 machine {{ owns 100; reads pre.100; writes post.100; budget steps 10; }}\n\
+                 merge [300];\nlaw 400 ok = post.100.110 >= 0;\n"
+            );
+            let parsed = parse_project(&source, SourceLimits::default())
+                .unwrap_or_else(|set| panic!("{set}"));
+            elaborate_project(parsed, ProjectLimits::default())
+                .unwrap_or_else(|set| panic!("{set}"))
+                .commitment::<zeno_fcis_crypto::RustCryptoSha256>()
+                .unwrap_or_else(|_| unreachable!())
+        };
+        let unranged = commitment("type 105 int Level;");
+        let ranged = commitment("type 105 int Level in 0..=2;");
+        let wider = commitment("type 105 int Level in 0..=3;");
+        let lower = commitment("type 105 int Level in -1..=2;");
+        assert_ne!(unranged, ranged);
+        assert_ne!(ranged, wider);
+        assert_ne!(ranged, lower);
+        assert_eq!(ranged, commitment("type 105 int Level in 0..=2;"));
+        // A type without a range encodes exactly as before ranges existed:
+        // `zeno-fcis check` printed this semantic program hash for the same
+        // project before the change.
+        let parsed = parse_project(
+            "zeno 1;\nproject 1 ranges;\n\
+             type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+             type 105 int Level;\nfield 110 100 level 105;\n\
+             variant 160 101 Go none;\nreason 200 bad precedence 0;\n\
+             component 300 machine { owns 100; reads pre.100; writes post.100; budget steps 10; }\n\
+             merge [300];\nlaw 400 ok = post.100.110 >= 0;\n",
+            SourceLimits::default(),
+        )
+        .unwrap_or_else(|set| panic!("{set}"));
+        let spec = elaborate_project(parsed, ProjectLimits::default())
+            .unwrap_or_else(|set| panic!("{set}"));
+        let derived = derive_composition::<zeno_fcis_crypto::RustCryptoSha256>(&spec)
+            .unwrap_or_else(|_| unreachable!());
+        assert_eq!(
+            format!("{}", derived.semantic_program_hash()),
+            "05323f93f8a73c03561bea3ef10a94ebc6ae4fdafff35559eef2f190f075b5c8"
         );
     }
 
