@@ -191,6 +191,20 @@ fn runner_retries_a_briefly_busy_executable_then_fails_closed() {
     };
     drop(writer);
     assert_eq!(failure.code, "tool-start", "{}", failure.message);
+
+    // Held past a short budget: no attempt starts after it ends.
+    let writer = hold();
+    let started = std::time::Instant::now();
+    let failure = runner::spawn_unless_busy(
+        &mut std::process::Command::new(&stand_in),
+        started,
+        std::time::Duration::from_millis(1),
+    )
+    .map(|_| ())
+    .unwrap_err();
+    drop(writer);
+    assert_eq!(failure.kind(), std::io::ErrorKind::TimedOut);
+    assert!(started.elapsed() < std::time::Duration::from_millis(100));
 }
 
 const COUNTER_PROGRAM: &[u8] =

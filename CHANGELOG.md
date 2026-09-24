@@ -6,6 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Fix two regressions found by an independent review of 562926d. The busy
+  executable retry in the formal-tools adapter and the synthesis runner no
+  longer outlives the caller's time budget: no attempt starts after it ends,
+  and the result is `Timeout` (a 1 ms budget took 259 ms before). The gate
+  evidence recorder now checks the commit, tree, and tracked files after all
+  collection, immediately before writing, and new tests show that a late
+  change writes nothing. The durable-counter examples' header now states that
+  their author had seen the model artifacts and that a second reviewer
+  accepted them against the README alone.
+
 - Add `tools/record_gate_evidence.py`, which runs the local gates for the
   committed revision and writes a revision-stamped JSON record: tool
   versions, each command's exit code and test counts, the pinned CVC5, Z3 and
@@ -20,8 +30,9 @@ embedded in ZenoFCIS values.
   notification to equal the synthesized program's output read through a
   declared table. It also checks schema admission against the finite input
   domain, genesis, reachability of every admitted state, and twelve examples
-  written from the README (`tests/decision-examples.txt`, awaiting owner
-  review). Swapping two same-type adapter bindings fails these tests.
+  drafted from the README (`tests/decision-examples.txt`). Their author had
+  seen the model artifacts, a second reviewer checked them against the README
+  alone, and owner review is pending. Swapping two same-type adapter bindings fails these tests.
 
 - Retry a process start a bounded number of times, about 250 ms in total, when
   its executable is busy (`ETXTBSY`), in the formal-tools process adapter

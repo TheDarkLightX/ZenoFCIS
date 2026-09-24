@@ -3,10 +3,12 @@
 
 The record names the exact commit and tree it tested, the tool versions, each
 command with its exit code and test counts, and every ignored test with the
-step that runs it, if any. Tracked files must match the commit, so a result
-can never describe uncommitted source. Pinned formal-tool checks run only when
-their executables are supplied through the same environment variables that
-the formal-tools workflow uses.
+step that runs it, if any. Tracked files must match the commit when the run
+starts, and the commit, tree, and tracked files must be unchanged after
+everything is collected, immediately before the record is written; otherwise
+nothing is written. Pinned formal-tool checks run only when their executables
+are supplied through the same environment variables that the formal-tools
+workflow uses.
 """
 
 from __future__ import annotations
@@ -28,6 +30,12 @@ CARGO = ["cargo", "+1.97.1"]
 def git(*args: str) -> str:
     return subprocess.run(["git", *args], cwd=ROOT, check=True, capture_output=True,
                           text=True).stdout.strip()
+
+
+def source_state() -> tuple[str, str, str]:
+    """The commit, its tree, and any tracked-file changes in the checkout."""
+    return (git("rev-parse", "HEAD"), git("rev-parse", "HEAD^{tree}"),
+            git("status", "--porcelain", "--untracked-files=no"))
 
 
 def version(command: list[str]) -> str | None:
@@ -67,7 +75,8 @@ def pinned_steps() -> list[tuple[str, list[str], dict[str, str]]]:
     if cvc5:
         for test in ("system::tests::pinned_system_smt_agrees_with_exhaustive_check",
                      "system::tests::pinned_solver_route_agrees_with_exhaustive_route_on_small_programs"):
-            steps.append((f"pinned-{test.rsplit('::', 1)[1]}", [*formal, test, "--", "--ignored", "--exact"], {}))
+            name = test.rsplit("::", 1)[1].removeprefix("pinned_")
+            steps.append((f"pinned-{name}", [*formal, test, "--", "--ignored", "--exact"], {}))
         steps.append(("pinned-counter-system-smt", [*CARGO, "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis",
                                                     "--locked", "synth::tests::pinned_counter_system_smt_agrees_with_exhaustive_check",
                                                     "--", "--ignored", "--exact"], {}))
@@ -121,10 +130,10 @@ def main() -> int:
     parser.add_argument("--out", type=Path, required=True, help="evidence file to write")
     parser.add_argument("--skip-atdd", action="store_true", help="omit the full acceptance run")
     args = parser.parse_args()
-    if git("status", "--porcelain", "--untracked-files=no"):
+    revision, tree, changes = source_state()
+    if changes:
         print("record_gate_evidence: tracked files differ from the commit; commit first", file=sys.stderr)
         return 2
-    revision, tree = git("rev-parse", "HEAD"), git("rev-parse", "HEAD^{tree}")
     steps = []
     if not args.skip_atdd:
         steps.append(run("atdd", ["python3", "tools/atdd.py", "run", "--all"]))
@@ -133,9 +142,6 @@ def main() -> int:
                                                   "--config", "deny.toml", "check"]))
     for name, command, environment in pinned_steps():
         steps.append(run(name, command, environment))
-    if git("rev-parse", "HEAD") != revision or git("status", "--porcelain", "--untracked-files=no"):
-        print("record_gate_evidence: the source changed during the run", file=sys.stderr)
-        return 2
     tools = {
         "rust": version(["rustc", "+1.97.1", "--version"]),
         "python": version(["python3", "--version"]),
@@ -157,6 +163,11 @@ def main() -> int:
         "ignored_tests": ignored_tests(steps),
         "status": "passed" if passed else "failed",
     }
+    # Everything above read the checkout. Publish only for the source the run
+    # started with, checked after the last read.
+    if source_state() != (revision, tree, ""):
+        print("record_gate_evidence: the source changed during the run", file=sys.stderr)
+        return 2
     args.out.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"record_gate_evidence: {record['status']} for {revision}", file=sys.stderr)
     return 0 if passed else 1

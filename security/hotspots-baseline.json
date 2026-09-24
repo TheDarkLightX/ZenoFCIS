@@ -554,7 +554,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3694,
+      "production_lines": 3703,
       "rank": 3,
       "score": 95,
       "signals": [
@@ -563,17 +563,17 @@
           "lines": [
             833,
             883,
-            2530,
-            2590,
-            2799
+            2544,
+            2603,
+            2812
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             142,
-            2670,
-            2684
+            2683,
+            2697
           ]
         },
         {
@@ -621,7 +621,7 @@
         {
           "id": "host-process-execution",
           "lines": [
-            2532
+            2546
           ]
         },
         {
@@ -2924,68 +2924,70 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 623,
+      "production_lines": 642,
       "rank": 28,
       "score": 79,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            356,
-            436,
-            509,
-            524
+            371,
+            451,
+            524,
+            531
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            450,
-            453,
-            638
+            465,
+            468,
+            660
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            143,
-            157,
-            218,
-            257,
-            359,
-            528,
-            531,
-            621
+            158,
+            172,
+            233,
+            272,
+            374,
+            550,
+            553,
+            643
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            501
+            516
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            91,
-            93,
-            619,
-            621,
-            625,
-            627,
-            629,
-            631
+            106,
+            108,
+            641,
+            643,
+            647,
+            649,
+            651,
+            653
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            95,
-            301,
-            332,
-            369,
-            527,
-            577
+            44,
+            55,
+            110,
+            316,
+            347,
+            384,
+            549,
+            599
           ]
         }
       ],
@@ -4615,49 +4617,49 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 134,
+      "production_lines": 138,
       "rank": 49,
       "score": 71,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            44,
-            61,
-            62,
-            86,
-            144,
-            145,
-            146
+            52,
+            69,
+            70,
+            95,
+            150,
+            151,
+            152
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            160
+            171
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            89,
-            102,
-            106
+            98,
+            111,
+            115
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            29,
-            35,
+            31,
             43,
-            90
+            51,
+            99
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            105
+            114
           ]
         }
       ],
@@ -5072,16 +5074,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3204016,
-    "admitted_files": 171,
-    "inventory_sha256": "652068d055ceaec31bead76de4710c23dcde5382d991628ece7fe41c24657d2f",
-    "ranked_above_minimum": 142,
+    "admitted_bytes": 3210470,
+    "admitted_files": 172,
+    "inventory_sha256": "1fe14f2935bfff6799602b73fb02c6f2207ed4ed2df4f092429c7759b0ba3606",
+    "ranked_above_minimum": 143,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 12,
       "priority-2": 41,
-      "priority-3": 89,
+      "priority-3": 90,
       "priority-4": 12,
       "priority-5": 17
     }

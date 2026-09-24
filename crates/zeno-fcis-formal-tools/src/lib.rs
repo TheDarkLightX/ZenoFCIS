@@ -2493,28 +2493,42 @@ fn run_fixed(
 }
 
 /// Starts `command`, retrying a bounded number of times while its executable
-/// is busy.
+/// is busy, within the caller's time budget.
 ///
 /// Linux refuses to execute a file that any process holds open for writing
 /// (`ETXTBSY`). A child that another thread forks while this process writes a
 /// private executable copy inherits that descriptor until it executes its own
 /// program, so the condition clears quickly. The copy is private and its bytes
-/// are already admitted, so running it later is the same run. Every other
-/// error, and a file that stays busy through the last attempt, fails closed.
+/// are already admitted, so running it later is the same run.
+///
+/// The budget runs from `start` for `budget`. No attempt starts after it ends:
+/// when the next wait would reach the end, the result is `Timeout`. Every other
+/// error, and a file that stays busy through the last attempt, fails closed
+/// with `Io`.
 #[cfg(unix)]
-fn spawn_unless_busy(command: &mut Command) -> std::io::Result<Child> {
+fn spawn_unless_busy(
+    command: &mut Command,
+    start: Instant,
+    budget: Duration,
+) -> Result<Child, ToolFailure> {
     let busy = nix::errno::Errno::ETXTBSY as i32;
     let mut delay = Duration::from_millis(1);
-    for _ in 0..8 {
-        match command.spawn() {
-            Err(error) if error.raw_os_error() == Some(busy) => {
-                thread::sleep(delay);
-                delay = delay.saturating_mul(2);
-            }
-            result => return result,
+    let mut retries = 8;
+    loop {
+        let error = match command.spawn() {
+            Ok(child) => return Ok(child),
+            Err(error) => error,
+        };
+        if error.raw_os_error() != Some(busy) || retries == 0 {
+            return Err(ToolFailure::Io(error.to_string()));
         }
+        if budget.saturating_sub(start.elapsed()) <= delay {
+            return Err(ToolFailure::Timeout);
+        }
+        thread::sleep(delay);
+        delay = delay.saturating_mul(2);
+        retries -= 1;
     }
-    command.spawn()
 }
 
 #[cfg(unix)]
@@ -2542,8 +2556,7 @@ fn run_fixed_unix(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     command.process_group(0);
-    let child =
-        spawn_unless_busy(&mut command).map_err(|error| ToolFailure::Io(error.to_string()))?;
+    let child = spawn_unless_busy(&mut command, start, Duration::from_millis(timeout_ms))?;
     let mut child = ContainedChild::new(child)?;
     let stdout = child
         .child
@@ -4121,6 +4134,21 @@ mod tests {
             "{:?}",
             failure.map(|output| output.status)
         );
+
+        // Regression from the independent review of 562926d: a one-millisecond
+        // budget took 259 ms and failed with `Io`. The retry now stops when the
+        // caller's budget ends.
+        let writer = hold();
+        let started = Instant::now();
+        let failure = run_fixed(&script, &[], None, 1, 4096);
+        let elapsed = started.elapsed();
+        drop(writer);
+        assert!(
+            matches!(failure, Err(ToolFailure::Timeout)),
+            "{:?}",
+            failure.map(|output| output.status)
+        );
+        assert!(elapsed < Duration::from_millis(100), "{elapsed:?}");
         let _ = fs::remove_dir_all(root);
     }
 
