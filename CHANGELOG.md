@@ -27,8 +27,15 @@ embedded in ZenoFCIS values.
   - A pinned test requires CVC5 and Z3 to agree with exhaustive replay on
     eight inductive steps; it runs in the formal-tools workflow and in the
     gate evidence.
+  - Each observed enumerated or bool value is asserted to be one of its
+    declared values (`declared_domain`), which admission guarantees, and
+    replay refuses a model outside them. Action laws written as
+    `command == X -> ...` otherwise leave an undeclared command unconstrained.
+    With this, the compliance-gateway strikes invariant proves from its own
+    laws.
   - See `docs/INDUCTIVE_CLAIMS.md`, including its limits: the step cannot yet
-    assume schema bounds, and there is no Lean export for it.
+    assume integer ranges, which live in `build.rs`, and there is no Lean
+    export for it.
 - Report a replayed counterexample at which a claim has no value as
   `undefined`, with the reason: an overflow, a division by zero, or an
   inexact exact division. `prove` used to report `ModelReplayFailed` whenever

@@ -64,6 +64,51 @@ impl PathResolution {
     }
 }
 
+/// Returns the values an observation at `path` can take in any decision the
+/// authority admits, when `project.zeno` alone determines them: the variant
+/// IDs of an enumerated type, or 0 and 1 for a bool.
+///
+/// Admission refuses a command, context, or state whose enumerated fields
+/// hold undeclared variants, and law checkers observe an enumerated field as
+/// its variant ID and a bool as 0 or 1. Returns `None` for an integer, whose
+/// range is supplied outside `project.zeno`, and for a path that does not
+/// resolve to a declared field.
+#[must_use]
+pub fn declared_domain(spec: &ProjectSpec, path: &ProjectionPath) -> Option<Vec<i128>> {
+    let leaf = leaf_type(spec, path)?;
+    let mut variants: Vec<i128> = spec
+        .variants()
+        .iter()
+        .filter(|variant| variant.owner() == leaf)
+        .map(|variant| i128::from(variant.id().get()))
+        .collect();
+    if !variants.is_empty() {
+        variants.sort_unstable();
+        return Some(variants);
+    }
+    spec.types()
+        .iter()
+        .find(|declared| declared.id() == leaf && declared.kind() == TypeKind::Bool)
+        .map(|_| alloc::vec![0, 1])
+}
+
+/// The declared type of the value at `path`, when every segment resolves.
+fn leaf_type(spec: &ProjectSpec, path: &ProjectionPath) -> Option<StableId> {
+    if resolve_path(spec, path) != PathResolution::Resolved {
+        return None;
+    }
+    let (first, rest) = path.segments().split_first()?;
+    let mut owner = *first;
+    for segment in rest {
+        owner = spec
+            .fields()
+            .iter()
+            .find(|field| field.id() == *segment && field.owner() == owner)?
+            .field_type();
+    }
+    Some(owner)
+}
+
 /// Resolves one projection path against the project's declared types and
 /// fields.
 #[must_use]
@@ -227,6 +272,59 @@ mod tests {
             resolutions
                 .iter()
                 .all(|(_, resolution)| *resolution == PathResolution::Resolved)
+        );
+    }
+
+    #[test]
+    fn declared_domains_come_from_variants_and_bools_only() {
+        let source = "zeno 1;\nproject 1 domains;\n\
+            type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+            type 105 int Count;\ntype 106 bool Flag;\ntype 107 data Mode;\n\
+            field 110 100 count 105;\nfield 111 100 mode 107;\nfield 130 102 admin 106;\n\
+            variant 151 107 Fast none;\nvariant 150 107 Slow none;\n\
+            variant 160 101 Go none;\nvariant 161 101 Stop none;\n\
+            reason 200 bad precedence 0;\n\
+            component 300 machine { owns 100; reads pre.100; writes post.100; budget steps 10; }\n\
+            merge [300];\nlaw 400 ok = post.100.110 >= 0;\n";
+        let parsed =
+            parse_project(source, SourceLimits::default()).unwrap_or_else(|set| panic!("{set}"));
+        let spec = elaborate_project(parsed, ProjectLimits::default())
+            .unwrap_or_else(|set| panic!("{set}"));
+        let path = |root, segments: &[u32]| {
+            ProjectionPath::try_new(root, segments.iter().map(|value| id(*value)).collect())
+                .unwrap_or_else(|| unreachable!())
+        };
+        // Variant IDs, sorted, whichever state root observes them.
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Pre, &[100, 111])),
+            Some(vec![150, 151])
+        );
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Post, &[100, 111])),
+            Some(vec![150, 151])
+        );
+        // A command type with variants is observed as its variant.
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Command, &[101])),
+            Some(vec![160, 161])
+        );
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Context, &[102, 130])),
+            Some(vec![0, 1])
+        );
+        // Integer ranges come from outside project.zeno, and unresolved or
+        // unchecked paths have no declared domain.
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Pre, &[100, 110])),
+            None
+        );
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Pre, &[100, 199])),
+            None
+        );
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Outbox, &[300])),
+            None
         );
     }
 
