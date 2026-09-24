@@ -157,6 +157,7 @@ fn javascript_runner_refuses_an_unqualified_runtime_version() {
 }
 
 #[test]
+#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
 fn runner_retries_a_briefly_busy_executable_then_fails_closed() {
     use std::os::unix::fs::PermissionsExt;
     let temp = runner::Temp::new().unwrap_or_else(|error| panic!("{}", error.message));
