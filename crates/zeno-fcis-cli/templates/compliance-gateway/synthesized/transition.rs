@@ -1,0 +1,150 @@
+// Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.
+#[rustfmt::skip]
+pub fn transition(input: &[i64]) -> Option<[i64; 3]> {
+    if input.len() != 5 { return None; }
+    if !(0_i64..=3_i64).contains(&input[0]) { return None; }
+    if !(0_i64..=3_i64).contains(&input[1]) { return None; }
+    if !(0_i64..=2_i64).contains(&input[2]) { return None; }
+    if !(0_i64..=4_i64).contains(&input[3]) { return None; }
+    if !(0_i64..=2_i64).contains(&input[4]) { return None; }
+    let v0: i64 = input[0];
+    let _ = v0;
+    let v1: i64 = input[1];
+    let _ = v1;
+    let v2: i64 = input[2];
+    let _ = v2;
+    let v3: i64 = input[3];
+    let _ = v3;
+    let v4: i64 = input[4];
+    let _ = v4;
+    let v5: i64 = 3_i64;
+    let _ = v5;
+    let v6: i64 = 2_i64;
+    let _ = v6;
+    let v7: i64 = 1_i64;
+    let _ = v7;
+    let v8: i64 = i64::from(v0 == v5);
+    let _ = v8;
+    let v9: i64 = i64::from(v6 < v3);
+    let _ = v9;
+    let v10: i64 = 2_i64;
+    let _ = v10;
+    let v11: i64 = i64::from(v2 == v10);
+    let _ = v11;
+    let v12: i64 = 1_i64;
+    let _ = v12;
+    let v13: i64 = i64::from(v2 == v12);
+    let _ = v13;
+    let v14: i64 = 0_i64;
+    let _ = v14;
+    let v15: i64 = i64::from(v2 == v14);
+    let _ = v15;
+    let v16: i64 = i64::from(v1 == v14);
+    let _ = v16;
+    let v17: i64 = i64::from(v1 == v12);
+    let _ = v17;
+    let v18: i64 = i64::from(v4 == v10);
+    let _ = v18;
+    let v19: i64 = i64::from(v4 == v12);
+    let _ = v19;
+    let v20: i64 = i64::from(v16 == 1 && v18 == 1);
+    let _ = v20;
+    let v21: i64 = i64::from(v13 == 1 && v9 == 1);
+    let _ = v21;
+    let v22: i64 = i64::from(v16 == 1 && v9 == 1);
+    let _ = v22;
+    let v23: i64 = i64::from(v15 == 1 && v22 == 1);
+    let _ = v23;
+    let v24: i64 = i64::from(v14 < v3);
+    let _ = v24;
+    let v25: i64 = i64::from(v16 == 1 && v24 == 1);
+    let _ = v25;
+    let v26: i64 = i64::from(v17 == 1 && v9 == 1);
+    let _ = v26;
+    let v27: i64 = i64::from(v12 < v0);
+    let _ = v27;
+    let v28: i64 = i64::from(v12 < v3);
+    let _ = v28;
+    let v29: i64 = i64::from(v27 == 1 && v28 == 1);
+    let _ = v29;
+    let v30: i64 = 4_i64;
+    let _ = v30;
+    let v31: i64 = i64::from(v3 == v30);
+    let _ = v31;
+    let v32: i64 = i64::from(v19 == 1 && v31 == 1);
+    let _ = v32;
+    let v33: i64 = 11_i64;
+    let _ = v33;
+    let v34: i64 = 10_i64;
+    let _ = v34;
+    let v35: i64 = if v32 == 1 { v34 } else { v33 };
+    let _ = v35;
+    let v36: i64 = if v32 == 1 { v7 } else { v14 };
+    let _ = v36;
+    let v37: i64 = 9_i64;
+    let _ = v37;
+    let v38: i64 = if v29 == 1 { v37 } else { v35 };
+    let _ = v38;
+    let v39: i64 = if v29 == 1 { v7 } else { v36 };
+    let _ = v39;
+    let v40: i64 = 8_i64;
+    let _ = v40;
+    let v41: i64 = if v26 == 1 { v40 } else { v38 };
+    let _ = v41;
+    let v42: i64 = if v26 == 1 { v7 } else { v39 };
+    let _ = v42;
+    let v43: i64 = 7_i64;
+    let _ = v43;
+    let v44: i64 = if v25 == 1 { v43 } else { v41 };
+    let _ = v44;
+    let v45: i64 = if v25 == 1 { v7 } else { v42 };
+    let _ = v45;
+    let v46: i64 = 6_i64;
+    let _ = v46;
+    let v47: i64 = if v13 == 1 { v46 } else { v44 };
+    let _ = v47;
+    let v48: i64 = if v13 == 1 { v7 } else { v45 };
+    let _ = v48;
+    let v49: i64 = 5_i64;
+    let _ = v49;
+    let v50: i64 = if v18 == 1 { v49 } else { v47 };
+    let _ = v50;
+    let v51: i64 = if v18 == 1 { v7 } else { v48 };
+    let _ = v51;
+    let v52: i64 = if v23 == 1 { v30 } else { v50 };
+    let _ = v52;
+    let v53: i64 = if v23 == 1 { v10 } else { v51 };
+    let _ = v53;
+    let v54: i64 = 3_i64;
+    let _ = v54;
+    let v55: i64 = if v21 == 1 { v54 } else { v52 };
+    let _ = v55;
+    let v56: i64 = if v21 == 1 { v10 } else { v53 };
+    let _ = v56;
+    let v57: i64 = if v20 == 1 { v10 } else { v55 };
+    let _ = v57;
+    let v58: i64 = if v20 == 1 { v10 } else { v56 };
+    let _ = v58;
+    let v59: i64 = if v8 == 1 { v12 } else { v57 };
+    let _ = v59;
+    let v60: i64 = if v8 == 1 { v10 } else { v58 };
+    let _ = v60;
+    let v61: i64 = if v11 == 1 { v14 } else { v59 };
+    let _ = v61;
+    let v62: i64 = if v11 == 1 { v10 } else { v60 };
+    let _ = v62;
+    let v63: i64 = i64::from(v62 == v10);
+    let _ = v63;
+    let v64: i64 = i64::from(v0 < v5);
+    let _ = v64;
+    let v65: i64 = v0.checked_add(v12)?;
+    let _ = v65;
+    let v66: i64 = if v64 == 1 { v65 } else { v5 };
+    let _ = v66;
+    let v67: i64 = if v63 == 1 { v66 } else { v0 };
+    let _ = v67;
+    if !(0_i64..=2_i64).contains(&v62) { return None; }
+    if !(0_i64..=11_i64).contains(&v61) { return None; }
+    if !(0_i64..=3_i64).contains(&v67) { return None; }
+    Some([v62,v61,v67,])
+}

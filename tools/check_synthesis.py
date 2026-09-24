@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
+import operator
 import os
 import subprocess
 import tempfile
@@ -26,8 +28,67 @@ def invoke(cli: list[str], arguments: list[str], cwd: Path, environment: dict[st
     return report
 
 
-def check_vectors(directory: Path, domain: str) -> None:
-    """Independent mathematical oracle, without IR/interpreter helpers."""
+def gateway_decision_table(rules: str) -> dict:
+    """Evaluates a compliance-gateway rule base on every input.
+
+    This is a separate evaluator of rules.txt: it shares nothing with the
+    template's rules_to_synthesis.py, which writes the contract, or with its
+    src/rules.rs, which the law checker and the tests use. The highest-priority
+    matching rule decides, and a tie is a conflict, so the table is refused.
+    """
+    features, rules_read = [], []
+    for line in rules.splitlines():
+        words = line.split()
+        if not words or words[0].startswith("#"):
+            continue
+        if words[0] == "feature":
+            spec = words[2:]
+            if len(spec) == 1 and ".." in spec[0]:
+                low, high = (int(bound) for bound in spec[0].split(".."))
+                features.append((words[1], list(range(low, high + 1)), None))
+            else:
+                features.append((words[1], list(range(len(spec))), spec))
+        elif words[0] == "rule":
+            then = words.index("then")
+            conditions = []
+            if words[5:then] != ["always"]:
+                clause = words[5:then]
+                for start in range(0, len(clause), 4):
+                    feature, op, value = clause[start:start + 3]
+                    position = [name for name, _, _ in features].index(feature)
+                    names = features[position][2]
+                    conditions.append((position, op, names.index(value) if names else int(value)))
+            rules_read.append((int(words[3]), conditions, {"allow": 0, "hold": 1, "block": 2}[words[then + 1]]))
+        else:
+            raise RuntimeError(f"unknown rule base line: {line}")
+    compare = {"==": operator.eq, "!=": operator.ne, "<": operator.lt, "<=": operator.le,
+               ">": operator.gt, ">=": operator.ge}
+    # A block adds one strike up to the top of the strikes range; the other
+    # verdicts keep the strikes.
+    strikes_at = [name for name, _, _ in features].index("strikes")
+    cap = features[strikes_at][1][-1]
+    expected = {}
+    for inputs in itertools.product(*[values for _, values, _ in features]):
+        matching = [(priority, index, verdict) for index, (priority, conditions, verdict) in enumerate(rules_read)
+                    if all(compare[op](inputs[position], value) for position, op, value in conditions)]
+        if not matching:
+            raise RuntimeError(f"rule base leaves {inputs} uncovered")
+        top = max(priority for priority, _, _ in matching)
+        fired = [(index, verdict) for priority, index, verdict in matching if priority == top]
+        if len(fired) != 1:
+            raise RuntimeError(f"rule base conflict on {inputs}: rules {[index for index, _ in fired]}")
+        (index, verdict), strikes = fired[0], inputs[strikes_at]
+        expected[inputs] = [verdict, index, min(strikes + 1, cap) if verdict == 2 else strikes]
+    return expected
+
+
+def check_vectors(directory: Path, domain: str, expected: dict | None = None) -> None:
+    """Independent mathematical oracle, without IR/interpreter helpers.
+
+    `expected` is the complete decision table of a domain whose rules live in
+    the application, such as the gateway's rule base; the other domains' tables
+    are written here.
+    """
     vectors = json.loads((directory / "vectors.json").read_text())["cases"]
     actual = {}
     for case in vectors:
@@ -37,6 +98,14 @@ def check_vectors(directory: Path, domain: str) -> None:
         if inputs in actual:
             raise RuntimeError("duplicate replay input")
         actual[inputs] = case["output"]
+    if expected is None:
+        expected = builtin_decision_table(domain)
+    if actual != expected:
+        raise RuntimeError(f"{domain} differs from independent complete decision table")
+
+
+def builtin_decision_table(domain: str) -> dict:
+    """The complete decision tables of the counter, inventory, and generic domains."""
     if domain == "counter":
         expected = {}
         for count in range(4):
@@ -53,7 +122,8 @@ def check_vectors(directory: Path, domain: str) -> None:
                         else:
                             out = [2, count + 1, failures, 1, count + 1, failures]
                         expected[count, failures, command, allowed] = out
-    elif domain == "inventory":
+        return expected
+    if domain == "inventory":
         expected = {}
         for available in range(6):
             for reserved in range(6):
@@ -77,10 +147,8 @@ def check_vectors(directory: Path, domain: str) -> None:
                             out = ([2, *kept] if available + quantity > 5 else
                                    [3, available + quantity, reserved, 0])
                         expected[available, reserved, action, quantity] = out
-    else:
-        expected = {(a, b): [min(a + b, 3)] for a in range(4) for b in range(4)}
-    if actual != expected:
-        raise RuntimeError(f"{domain} differs from independent complete decision table")
+        return expected
+    return {(a, b): [min(a + b, 3)] for a in range(4) for b in range(4)}
 
 
 def exercise_counter(cli: list[str], app: Path, directory: Path,
@@ -95,22 +163,33 @@ def exercise_inventory(cli: list[str], app: Path, directory: Path,
     return exercise_synthesized(cli, app, directory, environment, "inventory", 432)
 
 
+def exercise_gateway(cli: list[str], app: Path, directory: Path,
+                     environment: dict[str, str]) -> dict:
+    """The compliance-gateway example's synthesized screening step, against
+    a separate evaluation of its rule base."""
+    expected = gateway_decision_table((app / "rules.txt").read_text())
+    if len(expected) != 720:
+        raise RuntimeError("gateway rule base does not span its 720 inputs")
+    return exercise_synthesized(cli, app, directory, environment, "gateway", 720, expected)
+
+
 def exercise_synthesized(cli: list[str], app: Path, directory: Path,
-                         environment: dict[str, str], domain: str, inputs: int) -> dict:
+                         environment: dict[str, str], domain: str, inputs: int,
+                         expected: dict | None = None) -> dict:
     """Checks an application's mounted synthesis and replays it in every target."""
     spec = str(app / "synthesis.json")
     rust = app / "synthesized"
     current = invoke(cli, ["synth", "run", spec, "--out", str(rust), "--check"], directory, environment)
     if current["status"] != "current":
         raise RuntimeError("mounted Rust artifact drifted")
-    check_vectors(rust, domain)
+    check_vectors(rust, domain, expected)
     records = [invoke(cli, ["synth", "verify", spec, "--out", str(rust)], directory, environment)]
     for language in TARGETS:
         if language == "rust":
             continue
         out = directory / f"{domain}-{language}"
         invoke(cli, ["synth", "run", spec, "--target", language, "--out", str(out)], directory, environment)
-        check_vectors(out, domain)
+        check_vectors(out, domain, expected)
         records.append(invoke(cli, ["synth", "verify", spec, "--target", language, "--out", str(out)], directory, environment))
     if any(record["status"] != "passed" or record["inputs_checked"] != inputs for record in records):
         raise RuntimeError("target did not pass complete finite conformance")

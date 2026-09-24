@@ -1950,6 +1950,22 @@ mod tests {
                 "inventory-reservation/transition.rs",
                 include_str!("../templates/inventory-reservation/synthesized/transition.rs"),
             ),
+            (
+                "compliance-gateway/program.rs",
+                include_str!("../templates/compliance-gateway/src/program.rs"),
+            ),
+            (
+                "compliance-gateway/laws.rs",
+                include_str!("../templates/compliance-gateway/src/laws.rs"),
+            ),
+            (
+                "compliance-gateway/rules.rs",
+                include_str!("../templates/compliance-gateway/src/rules.rs"),
+            ),
+            (
+                "compliance-gateway/transition.rs",
+                include_str!("../templates/compliance-gateway/synthesized/transition.rs"),
+            ),
         ] {
             let findings = findings(name, source);
             assert!(findings.is_empty(), "{name}: {findings:?}");

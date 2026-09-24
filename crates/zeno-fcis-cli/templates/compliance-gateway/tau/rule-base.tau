@@ -1,0 +1,47 @@
+# The transfer-screening rule base of rules.txt as a Tau Language
+# specification: a second, independent statement of the same priority ladder,
+# for checking against the decision table in synthesized/vectors.json.
+#
+# Streams, all bitvectors of width 8 (check.py declares them):
+#   i1 strikes, i2 identity_tier, i3 region (0 allowed, 1 restricted,
+#   2 sanctioned), i4 amount_band, i5 counterparty_risk (0 low, 1 medium,
+#   2 high);
+#   o1 verdict (0 allow, 1 hold, 2 block), o2 the rule that fired (its
+#   position in rules.txt), o3 the strikes after the decision.
+#
+# The ladder reads top down: the first guard that holds decides, so a rule
+# stands above every rule of lower priority. The last conjunct gives the
+# strikes after the decision: one more, up to three, after a block.
+#
+# check.py strips these comments, joins the lines, and runs the specification
+# in the Tau REPL once per input of the table. It requires the Tau binary
+# from IDNI, under IDNI's license, so it is never part of the library's gates.
+
+always
+  ( (i3[t] = {2}:bv[8])
+      ? (o1[t] = {2}:bv[8] && o2[t] = {0}:bv[8])
+  : ( (i1[t] = {3}:bv[8])
+      ? (o1[t] = {2}:bv[8] && o2[t] = {1}:bv[8])
+  : ( (i2[t] = {0}:bv[8] && i5[t] = {2}:bv[8])
+      ? (o1[t] = {2}:bv[8] && o2[t] = {2}:bv[8])
+  : ( (i3[t] = {1}:bv[8] && i4[t] >= {3}:bv[8])
+      ? (o1[t] = {2}:bv[8] && o2[t] = {3}:bv[8])
+  : ( (i3[t] = {0}:bv[8] && i2[t] = {0}:bv[8] && i4[t] >= {3}:bv[8])
+      ? (o1[t] = {2}:bv[8] && o2[t] = {4}:bv[8])
+  : ( (i5[t] = {2}:bv[8])
+      ? (o1[t] = {1}:bv[8] && o2[t] = {5}:bv[8])
+  : ( (i3[t] = {1}:bv[8])
+      ? (o1[t] = {1}:bv[8] && o2[t] = {6}:bv[8])
+  : ( (i2[t] = {0}:bv[8] && i4[t] >= {1}:bv[8])
+      ? (o1[t] = {1}:bv[8] && o2[t] = {7}:bv[8])
+  : ( (i2[t] = {1}:bv[8] && i4[t] >= {3}:bv[8])
+      ? (o1[t] = {1}:bv[8] && o2[t] = {8}:bv[8])
+  : ( (i1[t] >= {2}:bv[8] && i4[t] >= {2}:bv[8])
+      ? (o1[t] = {1}:bv[8] && o2[t] = {9}:bv[8])
+  : ( (i5[t] = {1}:bv[8] && i4[t] = {4}:bv[8])
+      ? (o1[t] = {1}:bv[8] && o2[t] = {10}:bv[8])
+  : (o1[t] = {0}:bv[8] && o2[t] = {11}:bv[8])
+  )))))))))) )
+  && ( (o1[t] = {2}:bv[8])
+         ? ( (i1[t] < {3}:bv[8]) ? (o3[t] = i1[t] + {1}:bv[8]) : (o3[t] = {3}:bv[8]) )
+         : (o3[t] = i1[t]) )

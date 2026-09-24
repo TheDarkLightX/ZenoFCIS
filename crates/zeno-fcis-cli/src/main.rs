@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 mod account_lockout;
+mod compliance_gateway;
 mod durable_counter;
 mod inventory_reservation;
 mod order_fulfillment;
@@ -236,6 +237,7 @@ enum Template {
     AccountLockout,
     OrderFulfillment,
     InventoryReservation,
+    ComplianceGateway,
 }
 #[derive(Clone, Copy, Debug, ValueEnum)]
 enum OutputFormat {
@@ -486,6 +488,7 @@ fn new_project(dir: &Path, template: Template) -> u8 {
         Template::AccountLockout => Some(account_lockout::FILES),
         Template::OrderFulfillment => Some(order_fulfillment::FILES),
         Template::InventoryReservation => Some(inventory_reservation::FILES),
+        Template::ComplianceGateway => Some(compliance_gateway::FILES),
     };
     if let Some(files) = application {
         for (relative, content) in files {
@@ -515,7 +518,8 @@ fn new_project(dir: &Path, template: Template) -> u8 {
         | Template::PreparedCounter
         | Template::AccountLockout
         | Template::OrderFulfillment
-        | Template::InventoryReservation => unreachable!("application templates return above"),
+        | Template::InventoryReservation
+        | Template::ComplianceGateway => unreachable!("application templates return above"),
     };
     if let Err(error) = atomic_create(&dir.join("project.zeno"), source.as_bytes()) {
         return io_error("write project", error);
@@ -1521,6 +1525,7 @@ mod tests {
             ("account-lockout", account_lockout::FILES),
             ("order-fulfillment", order_fulfillment::FILES),
             ("inventory-reservation", inventory_reservation::FILES),
+            ("compliance-gateway", compliance_gateway::FILES),
         ] {
             let mut pending = vec![root.join(directory)];
             let mut on_disk = BTreeSet::new();

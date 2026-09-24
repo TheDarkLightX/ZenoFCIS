@@ -1,0 +1,50 @@
+# Decision examples for the compliance-gateway template.
+#
+# Provenance: drafted on 2026-09-24 from the rules in README.md by the AI
+# agent that wrote the program, the rule base, and the law checker, so the
+# drafting was not blind to the code. Review by the project's owner: pending.
+#
+# Numeric IDs come from project.zeno:
+# - state field 120 strikes;
+# - actions (command field 130) 150 Screen and 151 Reinstate;
+# - regions (command field 131) 160 allowed, 161 restricted, 162 sanctioned;
+# - the amount band (command field 132), 0 to 4;
+# - counterparty risks (command field 133) 165 low, 166 medium, 167 high;
+# - the identity tier (context field 140), 0 to 3, and the reviewer flag
+#   (context field 141), 0 or 1;
+# - reasons 200 not_reviewer and 201 no_strikes, and the committed failures
+#   210 sanctioned_region, 211 frozen_account, 212 unverified_high_risk,
+#   213 restricted_large, and 214 unverified_large;
+# - rules 170 to 181, in the order of rules.txt: 170 sanctioned_region,
+#   171 frozen_account, 172 unverified_high_risk, 173 restricted_large,
+#   174 unverified_large, 175 high_risk_counterparty, 176 restricted_region,
+#   177 unverified_transfer, 178 partially_verified_large,
+#   179 repeat_offender, 180 medium_risk_large, 181 default_allow;
+# - review tickets on channel 300 with the rule and the amount band, and
+#   block alerts on channel 301 with the rule and the strikes now on record.
+#
+# pre.120 action region band risk tier reviewer | outcome reason post.120 | notice
+0 150 160 1 165 2 0 | accept - 0 | -
+0 150 161 2 165 2 0 | accept - 0 | 300 176 2
+0 150 162 0 165 3 0 | failure 210 1 | 301 170 1
+1 151 160 0 165 3 0 | reject 200 1 | -
+1 150 160 3 167 0 0 | failure 212 2 | 301 172 2
+2 150 160 2 165 2 0 | accept - 2 | 300 179 2
+2 150 161 4 166 3 0 | failure 213 3 | 301 173 3
+3 150 160 0 165 3 0 | failure 211 3 | 301 171 3
+3 151 160 0 165 3 1 | accept - 0 | -
+0 151 160 0 165 3 1 | reject 201 0 | -
+0 150 160 4 165 0 0 | failure 214 1 | 301 174 1
+0 150 160 4 166 3 0 | accept - 0 | 300 180 4
+0 150 160 2 167 2 0 | accept - 0 | 300 175 2
+0 150 160 1 165 0 0 | accept - 0 | 300 177 1
+0 150 160 3 165 1 0 | accept - 0 | 300 178 3
+0 150 160 0 165 0 0 | accept - 0 | -
+0 150 161 3 167 0 0 | failure 212 1 | 301 172 1
+2 150 162 4 167 0 0 | failure 210 3 | 301 170 3
+3 150 162 4 167 0 1 | failure 210 3 | 301 170 3
+3 151 162 4 167 0 1 | accept - 0 | -
+1 150 161 2 167 2 0 | accept - 1 | 300 175 2
+0 150 160 4 165 2 0 | accept - 0 | -
+2 150 160 1 165 3 0 | accept - 2 | -
+0 150 160 3 166 1 0 | accept - 0 | 300 178 3

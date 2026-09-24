@@ -189,9 +189,18 @@ EXAMPLE_TEMPLATES = {
         "available": 0, "reserved": 2, "restocked": 5, "shipped": 3,
         "bundles": 7, "pending": 0, "deliveries": 2,
     },
+    "compliance-gateway": {
+        "status": "passed",
+        "decisions": ["Accept", "Accept", "CommittedFailure", "Reject", "CommittedFailure",
+                      "Accept", "CommittedFailure", "CommittedFailure", "Accept", "Reject",
+                      "CommittedFailure", "Accept"],
+        "strikes": 1, "allowed": 1, "held": 3, "blocked": 5,
+        "bundles": 10, "pending": 0, "deliveries": 8,
+    },
 }
 # Examples whose decision core is synthesized, with the check of that synthesis.
-SYNTHESIZED_EXAMPLES = {"inventory-reservation": check_synthesis.exercise_inventory}
+SYNTHESIZED_EXAMPLES = {"inventory-reservation": check_synthesis.exercise_inventory,
+                        "compliance-gateway": check_synthesis.exercise_gateway}
 
 
 def exercise_example_application(template: str, app: Path, directory: Path,
