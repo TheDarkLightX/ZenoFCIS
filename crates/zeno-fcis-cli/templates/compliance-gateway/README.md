@@ -15,9 +15,9 @@ with an expert system's rule base. It shows five patterns:
   reviewer reinstates it;
 - notices leave through the outbox: review tickets and block alerts each stay
   pending until the destination acknowledges them;
-- claims for `zeno-fcis prove`: that the changes the laws admit keep the
-  strikes within their bounds, for every integer; CVC5 attests two of the
-  three, and the third meets a limit of the export, reported below.
+- an inductive claim for `zeno-fcis prove`: every change the laws admit
+  keeps the strikes within their bounds, for every integer. CVC5 attests the
+  induction step, and the tests check the rest of the argument.
 
 `src/program.rs` decides a reinstatement by hand and calls the synthesized
 step in `synthesized/transition.rs` for a screening, mapping its output into
@@ -190,17 +190,33 @@ Every decision is checked at run time, before it can be published:
   exact ticket or alert, or the absence of both; the absence of effects; and
   a zero genesis.
 
-Law 500 is also stated as inductive, for `zeno-fcis prove`. Claims 600 to
-602 say that from a standing within its bounds, each change that laws 501 to
-503 admit ends within the bounds, for every integer and not only the schema's
-domain. Each claim's hypotheses are the law's formula verbatim, with the
-action it concerns and the bounds before the decision, and its conclusion is
-law 500's formula verbatim. A claim carries no model of this application, so
-`tests/claims.rs` checks that the hypotheses are the laws, and
-`tests/conformance.rs` checks that every decision the application commits
-satisfies the hypotheses and the conclusion of the claim about its kind. CVC5
-attested claims 600 and 601; claim 602, the one with arithmetic, and every
-Lean run met a limit of the export. The section
+Law 500's bound is also claimed by induction, for `zeno-fcis prove`:
+
+```text
+claim 600 strikes_stay_in_bounds all inductive accept [501, 502] failure [503] = pre.100.120 >= 0 && pre.100.120 <= 3;
+```
+
+The authority refuses every decision that breaks a law enforced on it, so
+laws 501 and 502 bound every accept and law 503 every committed failure. The
+induction step asks whether any transition those laws admit can take a
+standing within the bound outside it. It is checked for every integer, not
+only the schema's domain. The step assumes that each enumerated field holds
+one of its declared variants, as admission guarantees; without that, a
+command that is neither a screening nor a reinstatement would satisfy both
+accept laws vacuously. CVC5 answers `unsat`, which is attested, not
+independently checked.
+
+The step says something about this application only together with
+`tests/claims.rs`, which checks three things:
+- the law checker's own observer, `laws::trace_step`, reads every field the
+  invariant reads, and the invariant evaluates on every admitted standing;
+- the invariant holds on the exact genesis standing that a new shell
+  stores;
+- the law manifest enforces laws 501 and 502 on accepts and law 503 on
+  committed failures, as the claim assumes.
+
+`tests/conformance.rs` also evaluates the invariant before and after every
+decision the application commits. The section
 [How ZenoFCIS built and checked this](#how-zenofcis-built-and-checked-this)
 quotes what each backend reported.
 
@@ -224,15 +240,16 @@ The tests check the running application:
   action, region, amount band, counterparty risk, identity tier, and reviewer
   flag) through admission, the authority, the adapter, the law checker, the
   committed patch, and the outbox, and compares each outcome with the rule
-  base and the reinstatement rules; every committed decision must also
-  satisfy the claim about its kind. It also checks that schema admission
+  base and the reinstatement rules; the invariant of claim 600 must hold
+  before and after every committed decision. It also checks that schema admission
   matches the finite domain in both directions, that genesis is exactly zero
   strikes, that all 4 standings are reachable from it, that the `RuleId`
   variants and the committed-failure reasons match `rules.txt` in name and
   order, and that the 24 examples in `tests/decision-examples.txt` match and
   reach every rule of the rule base.
-- `tests/claims.rs` checks that each claim assumes one law verbatim and
-  concludes law 500 verbatim.
+- `tests/claims.rs` checks claim 600's base case on the exact genesis
+  standing, its law checker's observer, and its assumptions against the law
+  manifest.
 - `tests/laws.rs` gives the law checker decisions a faulty program could
   make, such as a block under the wrong rule, a ticket for the wrong band, a
   held transfer that adds a strike, a reinstatement without a reviewer, or
@@ -277,7 +294,7 @@ observed; long JSON is reduced to the fields named.
 
    ```text
    $ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
-   checked project.zeno: project=1 components=1 claims=3 unresolved_obligations=2 semantic_program_hash=0889774f43ebcb6841c482724544e83bf6b6eb11e0a1dcd0c82d368a1069d9bd
+   checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=5a73209ee4154ebd532bb9cb624921dd96d90e37b1f6671f4cd37267e15f9a36
    ```
 
 2. **Generate the bindings.** `cargo build` runs `build.rs`, which first
@@ -326,7 +343,7 @@ observed; long JSON is reduced to the fields named.
    purity: clean (0 errors, 0 warnings) in 4 files
    ```
 
-7. **Prove the claims.** The solvers and Lean are not part of the default
+7. **Check the induction step.** The solvers and Lean are not part of the default
    gate. They need a tools manifest naming the installed binaries, their
    versions and hashes, and Lean's distribution root and tree hash; the
    library's `docs/FORMAL_TOOLS_RC3.md` gives its schema. The
@@ -341,76 +358,37 @@ observed; long JSON is reduced to the fields named.
    lean 4.30.0 3e0d0d3d801675359f2d4cf9815bfdb417b20b92fdd9d48b3b14c95bbae28bbf
    ```
 
-   CVC5 answered UNSAT for the negation of claims 600 and 601. ZenoFCIS
+   CVC5 answered `unsat` for the induction step of claim 600. ZenoFCIS
    classifies that as a proposal and returns exit code 2, because the proof
-   output is not checked independently: the claim is attested, not
-   kernel-checked.
+   output is not checked independently: the step is attested, not
+   kernel-checked. The scope line says what else the application must check.
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend cvc5 --tools zeno-fcis.tools.json
    cvc5 claim 600: UNSAT proposal retained; proof output was not independently checked
-   cvc5 claim 600 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
-   (exit 2)
-   $ zeno-fcis prove project.zeno --claim 601 --backend cvc5 --tools zeno-fcis.tools.json
-   cvc5 claim 601: UNSAT proposal retained; proof output was not independently checked
-   cvc5 claim 601 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
-   (exit 2)
-   $ zeno-fcis prove project.zeno --claim 602 --backend cvc5 --tools zeno-fcis.tools.json
-   cvc5 claim 602 blocked: ModelReplayFailed
+   cvc5 claim 600 assumes laws [] on every commit, [501, 502] on accepts, [503] on committed failures
+   cvc5 claim 600 scope: every transition that satisfies the assumed laws preserves the invariant; it holds on every committed state only when the application also observes every value the invariant reads, checks the invariant on its exact genesis state, and enforces each assumed law on the decisions the claim assumes it on
    (exit 2)
    ```
 
-   Claim 602 is the one that adds a strike, `post.100.120 == pre.100.120 + 1`.
-   The exported obligation asserts that every arithmetic term stays within
-   i128 as a conjunct of the claim itself, outside the implication, so the
-   solver satisfies the negation with `pre.100.120` at the top of i128, where
-   the hypotheses are false but the sum is undefined. ZenoFCIS then replays
-   that model through its own evaluator, which does not confirm it, and
-   reports the run as blocked: neither refuted nor attested. This is a limit
-   of the export, reported to the library; the claim stays because it states
-   the property, and law 503, the schema bound, and the conformance test
-   check every block the application commits.
-
-   Z3 answered UNSAT for claims 600 and 601 and found the same model for 602.
-   RC3 has no Z3 proof checker, so an UNSAT run is recorded as blocked
-   evidence, with exit code 2.
+   Z3 also answered `unsat`. RC3 has no Z3 proof checker, so the run is
+   recorded as blocked evidence, with exit code 2. There is no Lean export for
+   inductive claims yet, so `--backend lean` selects nothing.
 
    ```text
    $ zeno-fcis prove project.zeno --claim 600 --backend z3 --tools zeno-fcis.tools.json
    z3 claim 600 blocked: UnsupportedEvidence
+   z3 claim 600 assumes laws [] on every commit, [501, 502] on accepts, [503] on committed failures
    (exit 2)
-   $ zeno-fcis prove project.zeno --claim 601 --backend z3 --tools zeno-fcis.tools.json
-   z3 claim 601 blocked: UnsupportedEvidence
-   (exit 2)
-   $ zeno-fcis prove project.zeno --claim 602 --backend z3 --tools zeno-fcis.tools.json
-   z3 claim 602 blocked: ModelReplayFailed
+   $ zeno-fcis prove project.zeno --claim 600 --backend lean --tools zeno-fcis.tools.json
+   claim 600 does not select compatible lean
+   no compatible claim/backend pair was selected
    (exit 2)
    ```
 
-   The claims select `all` backends, but the Lean export takes unbounded
-   claims only and refuses a relational claim as an unsupported mode. So the
-   same three formulas were also tried as unbounded claims for Lean, as
-   `claim 610 always_bounded_after_accepted_screening lean unbounded = always
-   atom(...)` and likewise for 611 and 612. Each run failed after copying the
-   qualified toolchain:
-
-   ```text
-   $ zeno-fcis prove project.zeno --claim 610 --backend lean --tools zeno-fcis.tools.json
-   lean claim 610 failed: Crash(Some(1))
-   (exit 3)
-   ```
-
-   The retained transcript shows why: the generated theorem is proved by a
-   fixed `simp [claim_610, floorDiv, ceilDiv, inI128, i128Min, i128Max]`,
-   which leaves the goal unsolved (`error: unsolved goals`), because these
-   claims need ordering reasoning that `simp` alone does not do. Claims 611
-   and 612 failed the same way. Those three claims are not part of this
-   project, since no pinned backend can check them; this is a limit of the
-   Lean export, reported to the library.
-
-   The scope line is the point of `tests/claims.rs` and the claim check in
-   `tests/conformance.rs`: a claim says nothing about this application until
-   its hypotheses are tied to the laws and to what the program does.
+   The step alone says nothing about this application. `tests/claims.rs`
+   checks the base case, the observer, and the law manifest, which the
+   library's guide to inductive claims requires.
 
 8. **Test the application.** `cargo +1.97.1 test --locked` runs the tests
    listed under [What is checked](#what-is-checked). The library's gate,

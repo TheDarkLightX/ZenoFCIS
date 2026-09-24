@@ -185,7 +185,8 @@ and Z3 4.16.0, all run on 2026-09-24:
 - The compliance-gateway template's strikes invariant, `0 <= strikes <= 3`,
   with `accept [501, 502] failure [503]`, gave the same command-0
   counterexample before declared domains. With them, CVC5 answers `unsat`
-  (attested) from the gateway's own laws.
+  (attested) from the gateway's own laws. The template ships this as its
+  claim 600, with `tests/claims.rs` for the application's checks.
 
 ## Limits
 

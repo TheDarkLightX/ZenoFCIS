@@ -19,11 +19,13 @@ embedded in ZenoFCIS values.
   decides some transfer); a rule base that fails a check fails `cargo build`
   and is refused again when the authority is built, so the application never
   decides under it. The law checker evaluates the rule base itself against
-  every decision, independently of the synthesized step. Three claims state
-  that the strikes invariant is inductive under the changes the laws admit;
-  CVC5 attested two, the third and every Lean attempt met limits of the
-  export that the README reports, and tests tie the hypotheses to the laws
-  and to every decision the application commits. `tools/check_synthesis.py`
+  every decision, independently of the synthesized step. An inductive
+  claim states that the strikes stay within their bounds under every change
+  laws 501 to 503 admit, with each enumerated field bounded to its declared
+  variants. CVC5 attests the induction step. `tests/claims.rs` checks the
+  base case, the law checker's observer, and the law manifest, and the
+  conformance test evaluates the invariant before and after every committed
+  decision. `tools/check_synthesis.py`
   replays the synthesis in Rust, Python, and JavaScript against a separate
   Python evaluation of the same rule base. The template also carries the
   rule base as a Tau Language specification with a local check script; it
