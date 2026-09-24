@@ -18,6 +18,7 @@ FEATURE_ROOT = ROOT / "acceptance" / "features"
 ATDD_TAG = re.compile(r"@atdd-([a-z0-9]+(?:-[a-z0-9]+)*)")
 ATDD_TAG_LINE = re.compile(r"^@atdd-([a-z0-9]+(?:-[a-z0-9]+)*)$")
 SCENARIO = re.compile(r"^\s*Scenario:\s*(\S.*)$")
+PASSED_TESTS = re.compile(r"^test result: ok\. (\d+) passed;", re.MULTILINE)
 OTHER_GHERKIN_DECLARATION = re.compile(
     r"^\s*(?:Feature|Rule|Background|Scenario Outline|Scenario Template|Examples):"
 )
@@ -125,7 +126,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-bootstrap", "--test", "schema_lowering", "--locked", "a_declared_range_is_the_binding_of_its_int"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "_against_its_own_schema"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-laws", "--lib", "--locked", "step_assumptions_must_be_enforced_on_the_decisions_they_are_assumed_on"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "tool_run_exit")),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "exit_classes_are_stable")),
     ),
     "reserved-domains": AcceptanceScenario(
         "Keep project commitment domains out of the library namespace",
@@ -743,6 +744,42 @@ def self_test() -> None:
     if SCENARIOS["minimal-core"].commands != commands_before:
         raise AcceptanceError("feature prose altered a fixed command binding")
 
+    vacuous = "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 9 filtered out\n"
+    two_binaries = (
+        "test result: ok. 2 passed; 0 failed; 0 ignored\n"
+        "test result: ok. 0 passed; 0 failed; 0 ignored\n"
+        "test result: ok. 3 passed; 0 failed; 0 ignored\n"
+    )
+    if passed_tests(vacuous) != 0 or passed_tests(two_binaries) != 5:
+        raise AcceptanceError("self-test miscounted the tests a command passed")
+
+
+def passed_tests(output: str) -> int:
+    """Count the tests cargo reports as passed, over every test binary."""
+
+    return sum(int(count) for count in PASSED_TESTS.findall(output))
+
+
+def run_command(command: tuple[str, ...]) -> None:
+    """Run one fixed command. A test command must pass at least one test,
+    because a filter that matches nothing passes without checking anything."""
+
+    environment = None
+    if command[0:3] == ("cargo", "+1.97.1", "doc"):
+        environment = {**os.environ, "RUSTDOCFLAGS": "-D warnings"}
+    if command[0:3] != ("cargo", "+1.97.1", "test"):
+        subprocess.run(command, cwd=ROOT, check=True, env=environment)
+        return
+    completed = subprocess.run(
+        command, cwd=ROOT, env=environment, stdout=subprocess.PIPE, text=True
+    )
+    sys.stdout.write(completed.stdout)
+    sys.stdout.flush()
+    if completed.returncode != 0:
+        raise subprocess.CalledProcessError(completed.returncode, command)
+    if passed_tests(completed.stdout) == 0:
+        raise AcceptanceError(f"{shlex.join(command)} ran no tests")
+
 
 def run_scenario(scenario_id: str) -> None:
     """Run one scenario's fixed commands without interpreting feature prose."""
@@ -751,10 +788,7 @@ def run_scenario(scenario_id: str) -> None:
     print(f"atdd: RUN {scenario_id}: {scenario.title}", flush=True)
     for command in scenario.commands:
         print(f"atdd: EXEC {shlex.join(command)}", flush=True)
-        environment = None
-        if command[0:3] == ("cargo", "+1.97.1", "doc"):
-            environment = {**os.environ, "RUSTDOCFLAGS": "-D warnings"}
-        subprocess.run(command, cwd=ROOT, check=True, env=environment)
+        run_command(command)
     print(f"atdd: PASS {scenario_id}", flush=True)
 
 
@@ -776,7 +810,7 @@ def main() -> int:
     try:
         if args.command == "self-test":
             self_test()
-            print("atdd: self-test PASS (8 hostile or inert-prose mutations checked)")
+            print("atdd: self-test PASS (8 hostile or inert-prose mutations and the test counter checked)")
             return 0
         found = validate_registry()
         if args.command == "check":
