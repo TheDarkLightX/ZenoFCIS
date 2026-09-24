@@ -270,43 +270,81 @@ Reusable libraries should select only the features needed at their boundary.
 
 ### What synthesized code is guaranteed to do
 
-ZenoFCIS synthesis is not correct by construction in the usual sense, where the
-way a program is built rules out errors. It is correct by exhaustive
-verification. How a program is found does not matter, because every candidate
-is checked against the contract on every input the contract admits.
+**Synthesized code is guaranteed correct in a precise sense: it satisfies its
+contract on every input the contract admits.** That result is a proof, not a
+sample. It is a proof about the contract as written, though, and it assumes that
+a small checker is correct.
+
+#### Exhaustive verification, not correct by construction
+
+A program can be guaranteed to meet its specification in two ways. ZenoFCIS
+synthesis uses the second.
+
+| | Correct by construction | Correct by exhaustive verification |
+| --- | --- | --- |
+| How correctness is shown | Every step that builds the program preserves correctness, so the result must be correct | The program is found by any method, then checked on every input the contract admits |
+| What you trust | The construction rules and the tool that applies them | The checker: the `finite-i64/1` interpreter and its enumeration of inputs |
+| If the builder has a bug | A wrong program can come out with no warning, unless the tool is itself verified | A wrong candidate fails the check and is never selected |
+| What it can cover | Unbounded input domains | Finite domains small enough to enumerate |
+
+Both are proofs. Checking every case of a finite domain is a proof by
+exhaustion: the same kind of proof as showing that a statement holds for the
+numbers 1 to 100 by checking each one. The two differ in where the trust sits
+and in how many inputs they can cover, not in how strong the result is within
+its domain. [Design record 0003](docs/adr/0003-epistemic-status.md) classifies
+a selected program as Proved.
+
+Exhaustive verification checks the final code, not the process that produced
+it. The emitted Rust, Python, and JavaScript are each replayed on
+every case in their own runtime, so an error in code generation is caught too.
+
+#### How a program is synthesized
 
 1. A realizability check confirms that every admitted input has at least one
    acceptable output, or reports the input that has none.
-2. An untrusted proposer searches a reviewed sketch in a fixed canonical order.
+2. A search enumerates the candidates of a reviewed sketch in a fixed canonical
+   order.
 3. A separate checker runs each candidate on every admitted input. Only a
-   candidate that satisfies the contract everywhere is selected. If none does,
-   the exhausted search is itself a proof that the sketch has no solution.
-4. The emitted Rust, Python, or JavaScript is checked separately, by replaying
-   the complete set of input and output cases in each target runtime.
+   candidate that satisfies the contract everywhere is selected.
+4. The emitted Rust, Python, or JavaScript is replayed on the complete set of
+   input and output cases in each target runtime.
 
-The guarantee is strong and precise: for every input in the declared finite
-domain, the selected program's output satisfies the contract. It rests on a
-small trusted base, the `finite-i64/1` interpreter and the checker, and not on
-the search. So a heuristic or AI proposer could replace the enumerator without
-weakening the guarantee for a selected program. Only a complete search, however,
-can show that no solution exists.
+The guarantee for a selected program rests on the checker, not the search, so
+a heuristic or AI proposer could replace the enumerator without weakening it. A
+"no solution" result is different. It is a proof only because the library's
+search covers every candidate in the sketch, so it also trusts that
+enumeration. A search whose budget does not cover every candidate is refused
+before it starts, and that refusal never counts as evidence of no solution.
 
-It is a guarantee relative to the contract, so it has four edges:
+#### What is guaranteed, and what it depends on
 
-- **The contract must say the right thing.** Synthesis moves trust into the
-  specification, and a wrong contract yields a program that is faithfully
-  wrong. The durable-counter template therefore also checks decision examples
-  that were reviewed against its README.
-- **Only the declared domain is covered.** Inputs outside it are refused. Finite
-  synthesis handles up to 65,536 admitted inputs, 64-bit integers, and 16
-  fields on each side of a contract.
+For every input in the declared finite domain, the selected program's output
+satisfies the contract. Inputs outside the domain are refused rather than
+answered. Finite synthesis handles up to 65,536 admitted inputs, 4,096 possible
+outputs, 16 fields on each side of a contract, 64-bit integers, and 1,000,000
+candidate programs.
+
+The guarantee depends on four things:
+
+- **The contract must say what you mean.** The program is proven to match the
+  contract, not your intent, and a wrong contract yields a program that is
+  faithfully wrong. This is the largest risk, so the durable-counter template
+  also checks decision examples that were reviewed against its README.
+- **The checker must be correct.** The interpreter and its enumeration are
+  small and tested, but they have not themselves been formally proven.
 - **The code around the program needs its own check.** In the durable-counter
   template, `tests/conformance.rs` runs all 64 admitted inputs through the real
   application: admission, the authority, the adapter that turns outputs into
   decisions, and the law checker. It compares every decision, reason, state
   change, and notification with the model.
 - **The target runtimes are trusted.** Replay covers every case in the domain on
-  Rust 1.97.1, Python 3, and Node.js 22.
+  Rust 1.97.1, Python 3, and Node.js 22. Production must run the same code on
+  runtimes that behave the same way.
+
+In short, a synthesized program is guaranteed to be correct with respect to its
+contract, on every input it accepts, provided the checker is correct. That is
+far stronger than testing, which samples inputs. It is not a promise that the
+program does what you meant: the proof covers the contract you wrote.
 
 Properties of a finite transition are checked the same way.
 [System properties](docs/SYSTEM_PROPERTIES.md) are checked on every admitted
