@@ -37,10 +37,18 @@ the code:
   no clock, randomness, input or output, or unordered collection.
 - The library's own semantic crates forbid unsafe Rust and are checked for
   ambient effects.
-- A hand-written project transition is deterministic by contract. Reopening a
-  SQLite store re-executes every persisted transition and requires identical
-  bytes, so a transition that cannot reproduce its history fails closed. That
-  check detects nondeterminism; it does not prove its absence.
+- A hand-written project transition is deterministic by contract, and three
+  checks test that contract:
+  - `zeno-fcis purity` reports clocks, environment reads, randomness,
+    hash-map iteration, global state, and the other sources it can see in the
+    decision code;
+  - `execute_probed` runs a decision several times and withholds it if any two
+    runs differ;
+  - reopening a SQLite store re-executes every persisted transition and
+    requires identical bytes.
+
+  These checks detect nondeterminism; they do not prove its absence. See
+  [determinism](docs/DETERMINISM.md).
 
 **The shell acts.** Persistence, delivery, and every external operation happen
 outside the core, and only on values the core produced. External work is an

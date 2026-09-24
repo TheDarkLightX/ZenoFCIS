@@ -172,7 +172,8 @@ answer unchanged.
   its two reject reasons, or swapping the notification fields fails these
   tests. Twelve examples drafted from the template README are checked the same
   way. Their author had seen the model artifacts; a second reviewer checked
-  them against the README alone, and owner review is pending.
+  them against the README alone, and the project's owner accepted them on
+  2026-09-23.
 - A domain-only control that finds a violating tuple does not show that the
   property is the right requirement.
 - Local runs with an unpinned solver are supplemental. The pinned CVC5 run is

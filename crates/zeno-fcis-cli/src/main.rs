@@ -3,6 +3,7 @@
 
 mod durable_counter;
 mod prepared_counter;
+mod purity;
 mod synth;
 
 use std::fs::{self, OpenOptions};
@@ -186,6 +187,14 @@ enum Command {
         #[arg(long, default_value = "zeno-fcis.tools.json")]
         tools: PathBuf,
     },
+    /// Report ambient effects and sources of nondeterminism in Rust decision code.
+    Purity {
+        /// Rust files, directories, or crate directories containing Cargo.toml.
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+        format: OutputFormat,
+    },
     /// List, inspect, inventory, or verify closed formal backend configurations.
     Backend {
         #[command(subcommand)]
@@ -311,6 +320,7 @@ fn run(command: Command) -> u8 {
             true,
         ),
         Command::Doctor { tools } => run_doctor(&tools),
+        Command::Purity { paths, format } => run_purity(&paths, format),
         Command::Backend { command } => backend(command),
     }
 }
@@ -436,6 +446,7 @@ fn describe_effects(path: &[String]) -> Value {
                 true,
                 None,
             ),
+            ["purity"] => (&["rust-source"], &[], false, None),
             ["prove" | "counterexample"] => (
                 &["project", "tools-manifest", "toolchain-files"],
                 &["temporary-files", "retained-evidence"],
@@ -1104,6 +1115,19 @@ fn prove(
         BLOCKED
     } else {
         exit
+    }
+}
+
+fn run_purity(paths: &[PathBuf], format: OutputFormat) -> u8 {
+    let report = purity::check_paths(paths);
+    match format {
+        OutputFormat::Json => print_json(&report.to_json()),
+        OutputFormat::Human => print!("{}", report.render()),
+    }
+    match report.status() {
+        "unreadable" => FAILURE,
+        "violations" => INVALID,
+        _ => OK,
     }
 }
 

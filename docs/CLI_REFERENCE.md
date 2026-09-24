@@ -13,6 +13,7 @@ zeno-fcis explain [project.zeno] [--code CODE] [--format human|json]
 zeno-fcis prove [project.zeno] --claim ID|all --backend cvc5|z3|lean|all [--tools FILE]
 zeno-fcis counterexample [project.zeno] --claim ID --backend cvc5|z3 [--tools FILE]
 zeno-fcis doctor [--tools FILE]
+zeno-fcis purity <PATH>... [--format human|json]
 zeno-fcis backend list
 zeno-fcis backend inspect|verify [--tools FILE]
 zeno-fcis backend inventory-lean ROOT [--format human|json]
@@ -125,6 +126,27 @@ total_bytes <byte-count>
 
 Use `--format json` to print the canonical
 `zeno-fcis/toolchain-inventory/1` record, including every admitted file.
+
+## Purity
+
+`purity` parses Rust source and reports every source of nondeterminism or
+ambient effect it recognizes: clocks, the environment, files, input and output,
+the network, processes, threads, randomness, hash-map iteration, shared state,
+raw addresses, unsafe code, and foreign code. Floating point and `DefaultHasher`
+are warnings. Each PATH is a Rust file, a directory of them, or a crate
+directory containing `Cargo.toml`. A crate is also checked for confinement:
+unconditional `no_std`, `forbid(unsafe_code)`, no `extern crate std`, no
+source brought in by `include!` or a `#[path]` attribute, and a manifest that
+the check reads completely, with every dependency named as one of the
+library's semantic crates.
+
+The status is `clean` or `confined` (exit 0), `violations` (exit 1), or
+`unreadable` (exit 3). A path the check cannot read or list, or one with no
+Rust source, makes the status `unreadable`. So does a symbolic link to a
+directory or to a Rust file inside a directory it walks. JSON output uses
+schema `zeno-fcis/purity-report/1`. A clean result is checked against the
+rule table; it is not a proof of
+determinism. See [determinism](DETERMINISM.md).
 
 ## Exit classes
 

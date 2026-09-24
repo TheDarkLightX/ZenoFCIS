@@ -130,6 +130,16 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Check kernel laws exhaustively over small stated domains",
         (("cargo", "+1.97.1", "test", "--manifest-path", "verification/Cargo.toml", "--locked", "holds_on_every_small_input"),),
     ),
+    "determinism": AcceptanceScenario(
+        "Detect nondeterminism in decision code by static rules and repeated execution",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "purity"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "probe"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--test", "probe_divergence", "--locked"),
+         ("cargo", "+1.97.1", "run", "-q", "-p", "zeno-fcis-cli", "--locked", "--", "purity",
+          "crates/zeno-fcis-cli/templates/durable-counter/src/program.rs",
+          "crates/zeno-fcis-cli/templates/durable-counter/src/laws.rs",
+          "crates/zeno-fcis-cli/templates/durable-counter/synthesized/transition.rs")),
+    ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",
         (("python3", "tools/test_record_gate_evidence.py"),),

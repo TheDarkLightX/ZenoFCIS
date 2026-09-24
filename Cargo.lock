@@ -1299,8 +1299,10 @@ version = "1.1.0"
 dependencies = [
  "clap",
  "nix",
+ "proc-macro2",
  "serde",
  "serde_json",
+ "syn 2.0.119",
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
  "zeno-fcis-formal-tools",

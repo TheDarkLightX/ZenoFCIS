@@ -32,6 +32,21 @@ Feature: Report evidence that cannot distinguish system behavior
     And names outside it and the V1 constructors are unchanged
     And the zUSD patch precondition hash stays byte-identical
 
+  @atdd-determinism
+  Scenario: Detect nondeterminism in decision code by static rules and repeated execution
+    Given decision code that reads a clock, the environment, or randomness
+    And code that keeps state between calls, iterates a hash map, or exposes an address
+    When the purity check reads it, including through aliases, glob imports, and macro arguments
+    Then each source is reported at its line with its rule
+    And a crate is confined only when it is no_std, forbids unsafe code, and depends only on semantic crates
+    And a renamed dependency, an unrecognized manifest form, include!, or a path attribute keeps a crate from being confined
+    And a directory, link, or file the check cannot read makes the result unreadable, never clean
+    And the durable-counter decision code is clean
+    When one invocation is executed repeatedly on fresh copies
+    Then its decision is returned only if every execution produced identical canonical bytes
+    And a program that changes its decision between runs is withheld with the differing run
+    And a probe of a single execution is refused
+
   @atdd-zusd-lane-gaps
   Scenario: Pin what the zeno language cannot state about the zUSD lane
     Given the single-vault zUSD lane written in zeno version 1 from the pinned native semantics

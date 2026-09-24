@@ -982,6 +982,50 @@ where
         }
         Ok(authorization)
     }
+
+    /// Executes one invocation several times, each on a fresh copy, and returns
+    /// the first decision only if every execution produced identical canonical
+    /// bytes.
+    ///
+    /// Each copy clones the admitted values, so no execution sees another's
+    /// memory. The program and the project law engine run once per execution,
+    /// and the comparison covers the complete authorized decision: the
+    /// candidate, the law evaluation, and every binding. If the first
+    /// execution fails, its error is returned and nothing is compared.
+    ///
+    /// This detects nondeterminism; it cannot rule it out. See
+    /// [`DeterminismProbe`] for what agreement shows.
+    pub fn execute_probed(
+        &self,
+        invocation: InvocationWitness<H, P, L, I>,
+        runs: ProbeRuns,
+    ) -> Result<ProbedDecision<H, P, L, I>, ProbeError<P::Error>> {
+        let first = self
+            .execute(invocation.duplicate())
+            .map_err(ProbeError::Execution)?;
+        let reference = decision_bytes(&first).map_err(ProbeError::Encode)?;
+        let first_digest = probe_digest::<H>(&reference).map_err(ProbeError::Encode)?;
+        for run in 1..runs.get() {
+            let decision = self
+                .execute(invocation.duplicate())
+                .map_err(|error| ProbeError::FailedAfterDecision { run, error })?;
+            let bytes = decision_bytes(&decision).map_err(ProbeError::Encode)?;
+            if bytes != reference {
+                return Err(ProbeError::Diverged(DeterminismDivergence {
+                    run,
+                    first: first_digest,
+                    other: probe_digest::<H>(&bytes).map_err(ProbeError::Encode)?,
+                }));
+            }
+        }
+        Ok((
+            first,
+            DeterminismProbe {
+                runs: runs.get(),
+                decision_digest: first_digest,
+            },
+        ))
+    }
 }
 
 struct PersistedInvocation {
@@ -1280,6 +1324,31 @@ where
     #[must_use]
     pub const fn invocation_id(&self) -> Hash32 {
         self.invocation_id
+    }
+}
+
+impl<H, P, L, I> InvocationWitness<H, P, L, I>
+where
+    H: ApprovedCommitmentProvider,
+    P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
+{
+    /// Copies this witness for one probed execution. Only `execute_probed`
+    /// uses it, and it returns at most one decision, as `execute` does.
+    fn duplicate(&self) -> Self {
+        Self {
+            policy_id: self.policy_id,
+            pre_state: self.pre_state.clone(),
+            command: self.command.clone(),
+            context: self.context.clone(),
+            expected: self.expected,
+            pre_root: self.pre_root,
+            principal_hash: self.principal_hash,
+            authentication_evidence_hash: self.authentication_evidence_hash,
+            replay_id: self.replay_id,
+            invocation_id: self.invocation_id,
+            marker: PhantomData,
+        }
     }
 }
 
@@ -2389,6 +2458,163 @@ impl<E: fmt::Display> fmt::Display for CatalogExecutionError<E> {
     }
 }
 
+/// A decision returned by `execute_probed`, with the probe that agreed on it.
+pub type ProbedDecision<H, P, L, I> = (CatalogAuthorizationDecision<H, P, L, I>, DeterminismProbe);
+
+/// Number of executions one determinism probe compares, from two to 64.
+///
+/// A single execution compares nothing, so it is refused.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ProbeRuns(u8);
+
+impl ProbeRuns {
+    /// Fewest executions that compare anything.
+    pub const MIN: u8 = 2;
+    /// Most executions one probe performs.
+    pub const MAX: u8 = 64;
+
+    /// Returns a run count, or `None` outside `MIN..=MAX`.
+    #[must_use]
+    pub const fn try_new(runs: u8) -> Option<Self> {
+        if runs >= Self::MIN && runs <= Self::MAX {
+            Some(Self(runs))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the number of executions.
+    #[must_use]
+    pub const fn get(self) -> u8 {
+        self.0
+    }
+}
+
+/// Repeated executions of one invocation that produced identical decisions.
+///
+/// This is Checked evidence about these executions only. They ran one after
+/// another in one process, so they shared its environment, nearly the same
+/// clock reading, and anything else the process holds. Agreement does not show
+/// that the program is deterministic. Comparing digests from separate
+/// processes, started with different environments, widens what a probe can
+/// detect.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DeterminismProbe {
+    runs: u8,
+    decision_digest: Hash32,
+}
+
+impl DeterminismProbe {
+    /// Returns the number of executions that agreed.
+    #[must_use]
+    pub const fn runs(&self) -> u8 {
+        self.runs
+    }
+
+    /// Returns the commitment to the agreed canonical decision bytes.
+    #[must_use]
+    pub const fn decision_digest(&self) -> Hash32 {
+        self.decision_digest
+    }
+}
+
+/// A later execution of one invocation that produced a different decision.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DeterminismDivergence {
+    run: u8,
+    first: Hash32,
+    other: Hash32,
+}
+
+impl DeterminismDivergence {
+    /// Returns the zero-based execution that differed from the first.
+    #[must_use]
+    pub const fn run(&self) -> u8 {
+        self.run
+    }
+
+    /// Returns the commitment to the first execution's decision.
+    #[must_use]
+    pub const fn first(&self) -> Hash32 {
+        self.first
+    }
+
+    /// Returns the commitment to the differing execution's decision.
+    #[must_use]
+    pub const fn other(&self) -> Hash32 {
+        self.other
+    }
+}
+
+/// Probed execution failure. Every variant withholds the decision.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ProbeError<E> {
+    /// The first execution failed, so nothing was compared.
+    Execution(CatalogExecutionError<E>),
+    /// A decision could not be encoded or committed to.
+    Encode(EncodeError),
+    /// A later execution produced a different decision from the first.
+    Diverged(DeterminismDivergence),
+    /// A later execution failed after the first produced a decision.
+    FailedAfterDecision {
+        /// Zero-based execution that failed.
+        run: u8,
+        /// Its failure.
+        error: CatalogExecutionError<E>,
+    },
+}
+
+impl<E: fmt::Display> fmt::Display for ProbeError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Execution(error) => error.fmt(formatter),
+            Self::Encode(error) => write!(formatter, "probe encoding failed: {error}"),
+            Self::Diverged(divergence) => write!(
+                formatter,
+                "execution {} produced a different decision from execution 0",
+                divergence.run
+            ),
+            Self::FailedAfterDecision { run, error } => write!(
+                formatter,
+                "execution {run} failed after execution 0 produced a decision: {error}"
+            ),
+        }
+    }
+}
+
+/// Encodes one complete authorized decision, tagged by its kind.
+fn decision_bytes<H, P, L, I>(
+    decision: &CatalogAuthorizationDecision<H, P, L, I>,
+) -> Result<Vec<u8>, EncodeError>
+where
+    H: ApprovedCommitmentProvider,
+    P: CatalogTransitionProgram<H>,
+    L: ProjectLawEngine,
+{
+    let mut output = Vec::new();
+    match decision {
+        Decision::Accept(accepted) => {
+            output.push(0);
+            accepted.candidate().encode_to(&mut output)?;
+        }
+        Decision::Reject(rejected) => {
+            output.push(1);
+            rejected.reason().encode_to(&mut output)?;
+        }
+        Decision::CommittedFailure(failed) => {
+            output.push(2);
+            failed.candidate().encode_to(&mut output)?;
+            failed.reason().encode_to(&mut output)?;
+        }
+    }
+    Ok(output)
+}
+
+fn probe_digest<H: ApprovedCommitmentProvider>(bytes: &[u8]) -> Result<Hash32, EncodeError> {
+    commitment::<H>(Domain::new("zeno-fcis/determinism-probe", 1)?, bytes)
+}
+
 /// Nominal pure-shell commit failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AuthorizedShellError {
@@ -3363,5 +3589,62 @@ mod tests {
                 ..
             }) if law_id == semantic_id(1_001)
         ));
+    }
+
+    fn runs(count: u8) -> ProbeRuns {
+        ProbeRuns::try_new(count).unwrap_or_else(|| panic!("run count {count}"))
+    }
+
+    #[test]
+    fn probe_run_counts_must_compare_at_least_two_executions() {
+        assert_eq!(ProbeRuns::try_new(0), None);
+        assert_eq!(ProbeRuns::try_new(1), None);
+        assert_eq!(ProbeRuns::try_new(2).map(ProbeRuns::get), Some(2));
+        assert_eq!(ProbeRuns::try_new(64).map(ProbeRuns::get), Some(64));
+        assert_eq!(ProbeRuns::try_new(65), None);
+    }
+
+    #[test]
+    fn probed_execution_returns_the_decision_that_every_run_agreed_on() {
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        let (decision, probe) = authority
+            .execute_probed(admit(&authority, &catalog, 60, 62), runs(8))
+            .unwrap_or_else(|error| panic!("probed execution: {error}"));
+        assert_eq!(probe.runs(), 8);
+        let Decision::Accept(accepted) = decision else {
+            panic!("fixture program must accept");
+        };
+        // Probing returns exactly the decision a plain execution produces.
+        let plain = accept(&authority, &catalog, 60, 62);
+        let probed_bytes = accepted
+            .candidate()
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("probed bytes: {error}"));
+        let plain_bytes = plain
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("plain bytes: {error}"));
+        assert_eq!(probed_bytes, plain_bytes);
+        // A separate probe of the same invocation commits to the same decision.
+        let (_, again) = authority
+            .execute_probed(admit(&authority, &catalog, 60, 62), runs(2))
+            .unwrap_or_else(|error| panic!("second probe: {error}"));
+        assert_eq!(again.decision_digest(), probe.decision_digest());
+        // A different invocation commits to a different decision.
+        let (_, other) = authority
+            .execute_probed(admit(&authority, &catalog, 60, 63), runs(2))
+            .unwrap_or_else(|error| panic!("other probe: {error}"));
+        assert_ne!(other.decision_digest(), probe.decision_digest());
+    }
+
+    #[test]
+    fn probed_rejections_are_compared_too() {
+        let catalog = fixture_catalog();
+        let authority = reject_authority(&catalog);
+        let (decision, probe) = authority
+            .execute_probed(admit(&authority, &catalog, 60, 62), runs(3))
+            .unwrap_or_else(|error| panic!("probed rejection: {error}"));
+        assert!(matches!(decision, Decision::Reject(_)));
+        assert_eq!(probe.runs(), 3);
     }
 }
