@@ -554,118 +554,121 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3706,
+      "production_lines": 4046,
       "rank": 3,
       "score": 95,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            833,
-            883,
-            2547,
-            2606,
-            2815
+            834,
+            884,
+            2944,
+            3003,
+            3212
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
-            142,
-            2686,
-            2700
+            143,
+            3083,
+            3097
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            245,
-            488
+            246,
+            489
           ]
         },
         {
           "id": "external-verifier-result",
           "lines": [
-            1045,
             1046,
-            1049,
-            1165,
+            1047,
+            1050,
             1166,
-            1932,
-            2062,
-            2172
+            1167,
+            2236,
+            2366,
+            2564
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            887,
-            891,
-            986,
-            995,
-            1010,
-            1013,
-            2421,
-            2427
+            888,
+            892,
+            987,
+            996,
+            1011,
+            1014,
+            2818,
+            2824
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            698,
-            740,
-            965,
-            2355
+            699,
+            741,
+            966,
+            2752
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            2549
+            2946
           ]
         },
         {
           "id": "information-flow-observation",
           "lines": [
-            2093
+            2400,
+            2477
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            293,
-            342,
-            542,
-            2297,
-            2317,
-            2323
+            294,
+            343,
+            543,
+            2691,
+            2714,
+            2720
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            336,
-            584,
-            601,
-            680,
-            711,
-            958,
-            1074,
-            1339
+            337,
+            585,
+            602,
+            681,
+            712,
+            959,
+            1075,
+            1411
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            2062,
-            2172,
-            2184
+            2366,
+            2369,
+            2436,
+            2564,
+            2576
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            342
+            343
           ]
         }
       ],
@@ -847,7 +850,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 1335,
+      "production_lines": 1365,
       "rank": 5,
       "score": 93,
       "signals": [
@@ -860,14 +863,14 @@
         {
           "id": "external-verifier-result",
           "lines": [
-            1236
+            1266
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
             478,
-            1409
+            1439
           ]
         },
         {
@@ -886,7 +889,7 @@
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1348
+            1378
           ]
         },
         {
@@ -897,8 +900,9 @@
             640,
             734,
             884,
-            1271,
-            1331
+            1135,
+            1301,
+            1361
           ]
         }
       ],
@@ -1888,7 +1892,7 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 128,
+      "production_lines": 132,
       "rank": 16,
       "score": 81,
       "signals": [
@@ -5147,9 +5151,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3416253,
-    "admitted_files": 194,
-    "inventory_sha256": "38b2ee5bfba497e71e27ccc855d94cd17f85dbabb3b6bbf3f73fbacaa4cf6862",
+    "admitted_bytes": 3484256,
+    "admitted_files": 195,
+    "inventory_sha256": "17274419c227c33cf5e3d75b67f9f4d9c614515b16ec7e99953834ad5f1532e6",
     "ranked_above_minimum": 156,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
@@ -5157,7 +5161,7 @@
       "priority-1": 13,
       "priority-2": 44,
       "priority-3": 99,
-      "priority-4": 15,
+      "priority-4": 16,
       "priority-5": 23
     }
   }

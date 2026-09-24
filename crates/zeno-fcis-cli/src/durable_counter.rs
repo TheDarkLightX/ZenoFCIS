@@ -62,6 +62,10 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         include_bytes!("../templates/durable-counter/tests/determinism.rs"),
     ),
     (
+        "tests/induction.rs",
+        include_bytes!("../templates/durable-counter/tests/induction.rs"),
+    ),
+    (
         "synthesis.json",
         include_bytes!("../templates/durable-counter/synthesis.json"),
     ),

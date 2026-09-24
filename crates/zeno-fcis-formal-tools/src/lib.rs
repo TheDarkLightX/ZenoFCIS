@@ -21,9 +21,10 @@ use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment}
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_spec::{
     BackendId, ClaimDecl, ClaimFormula, ClaimMode, CompareOp, EvalLimits, EvalOutcome,
-    EvaluationContext, Identifier, MAX_FINITE_HORIZON, MAX_FORMULA_DEPTH, Observation,
-    PredicateProvider, ProjectionPath, ProjectionRoot, RelExpr, StableId, TemporalEvaluation,
-    TemporalFormula, TraceStep, ValueExpr, evaluate_relational, evaluate_temporal,
+    EvaluationContext, Identifier, IndeterminateReason, LawDecl, MAX_FINITE_HORIZON,
+    MAX_FORMULA_DEPTH, Observation, PredicateProvider, ProjectionPath, ProjectionRoot, RelExpr,
+    StableId, TemporalEvaluation, TemporalFormula, TraceStep, ValueExpr, evaluate_relational,
+    evaluate_temporal, invariant_at,
 };
 
 mod system;
@@ -1172,6 +1173,8 @@ pub struct ExportedObligation {
     backend: ToolBackend,
     claim_id: StableId,
     claim: ClaimDecl,
+    /// The laws an inductive claim's step assumes. Empty for every other claim.
+    hypotheses: StepHypotheses,
     source: Vec<u8>,
     source_hash: Hash32,
 }
@@ -1199,9 +1202,55 @@ impl ExportedObligation {
     /// Returns what a result for this obligation can establish about a system.
     #[must_use]
     pub const fn scope(&self) -> ObligationScope {
-        ObligationScope::WithoutSystemModel
+        if matches!(self.claim.mode(), ClaimMode::Inductive) {
+            ObligationScope::InductiveStepOverLaws
+        } else {
+            ObligationScope::WithoutSystemModel
+        }
+    }
+    /// Returns the laws this obligation assumes, empty unless it is an
+    /// inductive step.
+    #[must_use]
+    pub const fn hypotheses(&self) -> &StepHypotheses {
+        &self.hypotheses
     }
 }
+
+/// The laws an inductive step assumes, resolved from the project and grouped
+/// by the committing decisions they are enforced on.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct StepHypotheses {
+    every_commit: Box<[LawDecl]>,
+    accepts: Box<[LawDecl]>,
+    committed_failures: Box<[LawDecl]>,
+}
+impl StepHypotheses {
+    /// Laws assumed for every committing decision.
+    #[must_use]
+    pub const fn every_commit(&self) -> &[LawDecl] {
+        &self.every_commit
+    }
+    /// Laws assumed only when the decision is an accept.
+    #[must_use]
+    pub const fn accepts(&self) -> &[LawDecl] {
+        &self.accepts
+    }
+    /// Laws assumed only when the decision is a committed failure.
+    #[must_use]
+    pub const fn committed_failures(&self) -> &[LawDecl] {
+        &self.committed_failures
+    }
+    /// Returns true when the step distinguishes accepts from committed failures.
+    #[must_use]
+    pub fn splits_decisions(&self) -> bool {
+        !self.accepts.is_empty() || !self.committed_failures.is_empty()
+    }
+}
+
+/// Model value of the decision kind in a split inductive step.
+const ACCEPT_KIND: i128 = 1;
+const COMMITTED_FAILURE_KIND: i128 = 2;
+const DECISION_KIND: &str = "zeno_decision_kind";
 
 /// What an exported obligation can establish about a system.
 #[non_exhaustive]
@@ -1213,6 +1262,13 @@ pub enum ObligationScope {
     /// assignment, independent of any particular system. A counterexample
     /// assigns values that the system may never produce.
     WithoutSystemModel,
+    /// The induction step of an inductive claim: every transition that
+    /// satisfies the assumed laws, and starts in a state satisfying the
+    /// invariant, ends in one. The laws stand in for the transition relation,
+    /// because the authority refuses every decision that breaks a law enforced
+    /// on it. The base case and the enforcement of the assumed laws are checked
+    /// by the application, not by this obligation.
+    InductiveStepOverLaws,
 }
 
 impl ObligationScope {
@@ -1221,6 +1277,7 @@ impl ObligationScope {
     pub const fn code(self) -> &'static str {
         match self {
             Self::WithoutSystemModel => "without-system-model",
+            Self::InductiveStepOverLaws => "inductive-step-over-laws",
         }
     }
 
@@ -1234,9 +1291,22 @@ impl ObligationScope {
             ) => Some(
                 "no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system",
             ),
-            (Self::WithoutSystemModel, ToolRunStatus::Refuted) => Some(
-                "no transition relation constrained the observations, so this counterexample may be unreachable in this system",
+            (Self::WithoutSystemModel, ToolRunStatus::Refuted | ToolRunStatus::Undefined(_)) => {
+                Some(
+                    "no transition relation constrained the observations, so this counterexample may be unreachable in this system",
+                )
+            }
+            (
+                Self::InductiveStepOverLaws,
+                ToolRunStatus::ProposedUnsat | ToolRunStatus::KernelChecked,
+            ) => Some(
+                "every transition that satisfies the assumed laws preserves the invariant; it holds on every committed state only when the application also checks the invariant on its exact genesis state and enforces each assumed law on the decisions the claim assumes it on",
             ),
+            (Self::InductiveStepOverLaws, ToolRunStatus::Refuted | ToolRunStatus::Undefined(_)) => {
+                Some(
+                    "a transition that satisfies the assumed laws breaks the invariant; its starting state may be unreachable, so strengthen the invariant or assume more laws",
+                )
+            }
             _ => None,
         }
     }
@@ -1251,6 +1321,8 @@ pub enum ExportError {
     InvalidFormula,
     ResourceLimit,
     Encode,
+    /// An inductive claim assumes a law that was not supplied.
+    UnknownAssumedLaw(StableId),
 }
 impl From<EncodeError> for ExportError {
     fn from(_: EncodeError) -> Self {
@@ -1322,7 +1394,7 @@ fn preflight_export(
             let width = u64::from(horizon);
             (ExportNode::Temporal(value), width, width)
         }
-        (ExportKind::Smt, ClaimMode::UnboundedProof, _) => {
+        (ExportKind::Smt, ClaimMode::UnboundedProof | ClaimMode::Inductive, _) => {
             return Err(ExportError::UnsupportedMode);
         }
         (ExportKind::Lean, ClaimMode::UnboundedProof, ClaimFormula::Temporal(value)) => {
@@ -1568,7 +1640,9 @@ pub fn export_smt_with_limits(
             }
             (horizon, true, select_trace_length(formulas, &mut budget)?)
         }
-        (ClaimMode::UnboundedProof, _) => return Err(ExportError::UnsupportedMode),
+        (ClaimMode::UnboundedProof | ClaimMode::Inductive, _) => {
+            return Err(ExportError::UnsupportedMode);
+        }
         _ => return Err(ExportError::InvalidFormula),
     };
     let mut paths = BTreeSet::new();
@@ -1611,6 +1685,183 @@ pub fn export_smt_with_limits(
         return Err(ExportError::ResourceLimit);
     }
     exported(backend, claim, source.into_bytes())
+}
+
+/// Exports the induction step of an inductive claim to SMT.
+///
+/// `laws` must contain every law the claim assumes; other laws are ignored.
+/// The obligation is satisfiable exactly when some assignment makes every
+/// assumed law and the invariant over `pre.` evaluate to true, and the
+/// invariant over `post.` not evaluate to true. Evaluation is strict, so each
+/// part is required to be defined on its own, as the law engine requires of
+/// each law it reports satisfied. An undefined part is never hidden inside a
+/// larger implication.
+pub fn export_inductive_smt(
+    claim: &ClaimDecl,
+    laws: &[LawDecl],
+    backend: ToolBackend,
+) -> Result<ExportedObligation, ExportError> {
+    export_inductive_smt_with_limits(claim, laws, backend, ExportLimits::default())
+}
+
+/// Exports an inductive step within an explicit deterministic resource envelope.
+pub fn export_inductive_smt_with_limits(
+    claim: &ClaimDecl,
+    laws: &[LawDecl],
+    backend: ToolBackend,
+    limits: ExportLimits,
+) -> Result<ExportedObligation, ExportError> {
+    if !matches!(backend, ToolBackend::Cvc5 | ToolBackend::Z3)
+        || !claim.backends().contains(&backend.spec_backend())
+    {
+        return Err(ExportError::BackendNotSelected);
+    }
+    let (ClaimMode::Inductive, ClaimFormula::Relational(invariant)) =
+        (claim.mode(), claim.formula())
+    else {
+        return Err(ExportError::UnsupportedMode);
+    };
+    let hypotheses = step_hypotheses(claim, laws)?;
+    let after = invariant_at(invariant, ProjectionRoot::Post).ok_or(ExportError::InvalidFormula)?;
+    let grouped: Vec<(&LawDecl, Option<i128>)> = hypotheses
+        .every_commit
+        .iter()
+        .map(|law| (law, None))
+        .chain(
+            hypotheses
+                .accepts
+                .iter()
+                .map(|law| (law, Some(ACCEPT_KIND))),
+        )
+        .chain(
+            hypotheses
+                .committed_failures
+                .iter()
+                .map(|law| (law, Some(COMMITTED_FAILURE_KIND))),
+        )
+        .collect();
+    let parts: Vec<&RelExpr> = grouped
+        .iter()
+        .map(|(law, _)| law.formula())
+        .chain([invariant, &after])
+        .collect();
+    for part in &parts {
+        let single = ClaimDecl::new(
+            claim.id(),
+            claim.name().clone(),
+            claim.backends().to_vec(),
+            ClaimMode::Relational,
+            ClaimFormula::Relational((*part).clone()),
+        );
+        preflight_export(&single, ExportKind::Smt, limits)?;
+    }
+    let empty_environment = BTreeMap::new();
+    let mut budget = SmtRenderBudget::new(limits);
+    let mut rendered = Vec::with_capacity(parts.len());
+    for part in &parts {
+        rendered.push(render_rel_smt(part, 0, &empty_environment, &mut budget)?);
+    }
+    let mut paths = BTreeSet::new();
+    let mut predicates = BTreeMap::new();
+    for part in &parts {
+        collect_rel(part, &mut paths, &mut predicates);
+    }
+    let ids = |group: &[StableId]| {
+        group
+            .iter()
+            .map(|law| law.get().to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let assumptions = claim.assumptions();
+    let mut source = format!(
+        "; zeno-fcis/smt-inductive-obligation/1\n; claim-id {}\n; every commit: {}\n; accepts: {}\n; committed failures: {}\n(set-logic ALL)\n(set-option :produce-models true)\n",
+        claim.id().get(),
+        ids(assumptions.every_commit()),
+        ids(assumptions.accepts()),
+        ids(assumptions.committed_failures()),
+    );
+    if backend == ToolBackend::Cvc5 {
+        source.push_str("(set-option :produce-proofs true)\n");
+    }
+    for path in &paths {
+        let name = smt_path(path, 0);
+        source.push_str(&format!("(declare-const {name} Int)\n"));
+        source.push_str(&format!("(assert {})\n", smt_i128_range(&name)));
+    }
+    for (name, arity) in predicates {
+        source.push_str(&format!(
+            "(declare-fun pred_{} ({}) Bool)\n",
+            smt_identifier(name.as_str()),
+            vec!["Int"; arity].join(" ")
+        ));
+    }
+    if hypotheses.splits_decisions() {
+        source.push_str(&format!(
+            "; decision kind: {ACCEPT_KIND} accept, {COMMITTED_FAILURE_KIND} committed failure\n(declare-const {DECISION_KIND} Int)\n(assert (or (= {DECISION_KIND} {ACCEPT_KIND}) (= {DECISION_KIND} {COMMITTED_FAILURE_KIND})))\n"
+        ));
+    }
+    let Some((after, before_and_laws)) = rendered.split_last() else {
+        return Err(ExportError::InvalidFormula);
+    };
+    for (index, part) in before_and_laws.iter().enumerate() {
+        let holds = smt_and(vec![part.defined.clone(), part.term.clone()]);
+        let (label, assertion) = match grouped.get(index) {
+            Some((law, None)) => (format!("law {}", law.id().get()), holds),
+            Some((law, Some(kind))) => (
+                format!(
+                    "law {} on {}",
+                    law.id().get(),
+                    if *kind == ACCEPT_KIND {
+                        "accepts"
+                    } else {
+                        "committed failures"
+                    }
+                ),
+                format!("(=> (= {DECISION_KIND} {kind}) {holds})"),
+            ),
+            None => ("invariant before the step".to_owned(), holds),
+        };
+        source.push_str(&format!("; {label}\n(assert {assertion})\n"));
+    }
+    source.push_str(&format!(
+        "; invariant after the step\n(assert (not {}))\n(check-sat)\n",
+        smt_and(vec![after.defined.clone(), after.term.clone()])
+    ));
+    if source.len() > limits.max_source_bytes() {
+        return Err(ExportError::ResourceLimit);
+    }
+    let mut obligation = exported(backend, claim, source.into_bytes())?;
+    obligation.hypotheses = hypotheses;
+    Ok(obligation)
+}
+
+/// Resolves the laws an inductive claim assumes, group by group.
+fn step_hypotheses(claim: &ClaimDecl, laws: &[LawDecl]) -> Result<StepHypotheses, ExportError> {
+    let assumptions = claim.assumptions();
+    if assumptions.is_empty() {
+        return Err(ExportError::InvalidFormula);
+    }
+    let mut seen = BTreeSet::new();
+    let mut resolve = |group: &[StableId]| -> Result<Box<[LawDecl]>, ExportError> {
+        let mut resolved = Vec::with_capacity(group.len());
+        for id in group {
+            if !seen.insert(*id) {
+                return Err(ExportError::InvalidFormula);
+            }
+            let law = laws
+                .iter()
+                .find(|law| law.id() == *id)
+                .ok_or(ExportError::UnknownAssumedLaw(*id))?;
+            resolved.push(law.clone());
+        }
+        Ok(resolved.into_boxed_slice())
+    };
+    Ok(StepHypotheses {
+        every_commit: resolve(assumptions.every_commit())?,
+        accepts: resolve(assumptions.accepts())?,
+        committed_failures: resolve(assumptions.committed_failures())?,
+    })
 }
 
 /// Exports an unbounded temporal obligation to Lean source.
@@ -1677,6 +1928,7 @@ fn exported(
         backend,
         claim_id: claim.id(),
         claim: claim.clone(),
+        hypotheses: StepHypotheses::default(),
         source,
         source_hash,
     })
@@ -1689,8 +1941,55 @@ pub enum ToolRunStatus {
     ProposedUnsat,
     KernelChecked,
     Refuted,
+    /// A replayed model at which the claim has no value. Evaluation is strict,
+    /// so the claim does not hold there, exactly as the solver reported.
+    Undefined(UndefinedReason),
     Blocked(ToolFailure),
     Failed(ToolFailure),
+}
+
+/// Why a claim has no value at a replayed assignment.
+///
+/// These are exactly the failures the SMT encoding models as undefinedness.
+/// Evaluation limits and missing projections or predicates are not modeled,
+/// so a model that reaches one of them is never confirmed by replay.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UndefinedReason {
+    /// An arithmetic result lies outside the i128 range.
+    Overflow,
+    /// A division has a zero divisor.
+    DivisionByZero,
+    /// An exact division leaves a remainder.
+    NonExactDivision,
+}
+
+impl UndefinedReason {
+    /// Returns the stable machine-readable name.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Overflow => "overflow",
+            Self::DivisionByZero => "division_by_zero",
+            Self::NonExactDivision => "non_exact_division",
+        }
+    }
+
+    const fn code(self) -> u8 {
+        match self {
+            Self::Overflow => 1,
+            Self::DivisionByZero => 2,
+            Self::NonExactDivision => 3,
+        }
+    }
+
+    const fn from_indeterminate(reason: IndeterminateReason) -> Option<Self> {
+        match reason {
+            IndeterminateReason::Overflow => Some(Self::Overflow),
+            IndeterminateReason::DivisionByZero => Some(Self::DivisionByZero),
+            IndeterminateReason::NonExactDivision => Some(Self::NonExactDivision),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1871,6 +2170,11 @@ fn status_record(status: &ToolRunStatus) -> Result<Vec<u8>, ToolFailure> {
         ToolRunStatus::Refuted => (3, None),
         ToolRunStatus::Blocked(failure) => (4, Some(failure)),
         ToolRunStatus::Failed(failure) => (5, Some(failure)),
+        ToolRunStatus::Undefined(reason) => {
+            let mut bytes = vec![6];
+            append_record_field(&mut bytes, 1, &[reason.code()])?;
+            return Ok(bytes);
+        }
     };
     let mut bytes = vec![tag];
     if let Some(failure) = failure {
@@ -2061,6 +2365,9 @@ impl PredicateProvider for MissingPredicates {
 
 fn replay_model(obligation: &ExportedObligation, text: &str) -> ToolRunStatus {
     let assignments = parse_model_values(text);
+    if matches!(obligation.claim.mode(), ClaimMode::Inductive) {
+        return replay_inductive(obligation, &assignments);
+    }
     let trace_len = match obligation.claim.mode() {
         ClaimMode::Relational => 1,
         ClaimMode::Finite { horizon } if horizon > 0 => {
@@ -2103,7 +2410,8 @@ fn replay_model(obligation: &ExportedObligation, text: &str) -> ToolRunStatus {
             EvaluationContext::new(&trace[0], &MissingPredicates, EvalLimits::default()),
         ) {
             EvalOutcome::False => ToolRunStatus::Refuted,
-            _ => ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed),
+            EvalOutcome::Indeterminate(reason) => undefined_or_unreplayed(reason),
+            EvalOutcome::True => ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed),
         },
         ClaimFormula::Temporal(formula) => match evaluate_temporal(
             formula,
@@ -2113,8 +2421,92 @@ fn replay_model(obligation: &ExportedObligation, text: &str) -> ToolRunStatus {
             EvalLimits::default(),
         ) {
             TemporalEvaluation::Counterexample { .. } => ToolRunStatus::Refuted,
-            _ => ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed),
+            TemporalEvaluation::Indeterminate(reason) => undefined_or_unreplayed(reason),
+            TemporalEvaluation::Satisfied | TemporalEvaluation::ProofObligation => {
+                ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+            }
         },
+    }
+}
+
+/// Replays a model of an inductive step on one transition. The model is
+/// confirmed only when every assumed law and the invariant before the step
+/// evaluate to true, exactly as the law engine and the induction hypothesis
+/// require, and the invariant after the step does not.
+fn replay_inductive(
+    obligation: &ExportedObligation,
+    assignments: &BTreeMap<String, i128>,
+) -> ToolRunStatus {
+    let unreplayed = ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed);
+    let ClaimFormula::Relational(before) = obligation.claim.formula() else {
+        return unreplayed;
+    };
+    let Some(after) = invariant_at(before, ProjectionRoot::Post) else {
+        return unreplayed;
+    };
+    let hypotheses = &obligation.hypotheses;
+    let case_laws = if hypotheses.splits_decisions() {
+        match assignments.get(DECISION_KIND).copied() {
+            Some(ACCEPT_KIND) => &hypotheses.accepts,
+            Some(COMMITTED_FAILURE_KIND) => &hypotheses.committed_failures,
+            _ => return unreplayed,
+        }
+    } else {
+        &hypotheses.accepts
+    };
+    let mut paths = BTreeSet::new();
+    let mut predicates = BTreeMap::new();
+    for law in hypotheses
+        .every_commit
+        .iter()
+        .chain(hypotheses.accepts.iter())
+        .chain(hypotheses.committed_failures.iter())
+    {
+        collect_rel(law.formula(), &mut paths, &mut predicates);
+    }
+    collect_rel(before, &mut paths, &mut predicates);
+    collect_rel(&after, &mut paths, &mut predicates);
+    if !predicates.is_empty() {
+        return unreplayed;
+    }
+    let mut observations = Vec::with_capacity(paths.len());
+    for path in &paths {
+        let Some(value) = assignments.get(&smt_path(path, 0)).copied() else {
+            return unreplayed;
+        };
+        observations.push(Observation::new(path.clone(), value));
+    }
+    let Some(transition) = TraceStep::try_new(observations) else {
+        return unreplayed;
+    };
+    let evaluate = |formula: &RelExpr| {
+        evaluate_relational(
+            formula,
+            EvaluationContext::new(&transition, &MissingPredicates, EvalLimits::default()),
+        )
+    };
+    let assumptions_hold = hypotheses
+        .every_commit
+        .iter()
+        .chain(case_laws.iter())
+        .all(|law| evaluate(law.formula()) == EvalOutcome::True);
+    if !assumptions_hold || evaluate(before) != EvalOutcome::True {
+        return unreplayed;
+    }
+    match evaluate(&after) {
+        EvalOutcome::False => ToolRunStatus::Refuted,
+        EvalOutcome::Indeterminate(reason) => undefined_or_unreplayed(reason),
+        EvalOutcome::True => unreplayed,
+    }
+}
+
+/// Confirms a model at which strict evaluation has no value, when the reason is
+/// one the SMT encoding models as undefinedness. Any other reason means the
+/// model and the evaluator disagree, so the model is not replayed.
+const fn undefined_or_unreplayed(reason: IndeterminateReason) -> ToolRunStatus {
+    match UndefinedReason::from_indeterminate(reason) {
+        Some(reason) => ToolRunStatus::Undefined(reason),
+        None => ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed),
     }
 }
 
@@ -2207,6 +2599,7 @@ fn run_status_name(status: &ToolRunStatus) -> &'static str {
         ToolRunStatus::ProposedUnsat => "proposed_unsat",
         ToolRunStatus::KernelChecked => "kernel_checked",
         ToolRunStatus::Refuted => "refuted",
+        ToolRunStatus::Undefined(_) => "undefined",
         ToolRunStatus::Blocked(_) => "blocked",
         ToolRunStatus::Failed(_) => "failed",
     }
@@ -2292,6 +2685,7 @@ fn retained_run_files(run: &ToolRun) -> Result<BTreeMap<String, Vec<u8>>, ToolFa
         ToolRunStatus::Blocked(failure) | ToolRunStatus::Failed(failure) => {
             Some(failure_name(failure))
         }
+        ToolRunStatus::Undefined(reason) => Some(reason.name()),
         _ => None,
     };
     let mut metadata = serde_json::to_vec(&Metadata {
@@ -2310,7 +2704,10 @@ fn retained_run_files(run: &ToolRun) -> Result<BTreeMap<String, Vec<u8>>, ToolFa
     .map_err(|error| ToolFailure::Io(error.to_string()))?;
     metadata.push(b'\n');
     files.insert("record.json".to_owned(), metadata);
-    if matches!(run.status, ToolRunStatus::Refuted) {
+    if matches!(
+        run.status,
+        ToolRunStatus::Refuted | ToolRunStatus::Undefined(_)
+    ) {
         let values: Vec<_> = parse_model_values(&String::from_utf8_lossy(run.stdout()))
             .into_iter()
             .map(|(projection, value)| {
@@ -3990,6 +4387,333 @@ mod tests {
         Identifier::try_new(value).unwrap_or_else(|| unreachable!())
     }
 
+    fn pre(field: u32) -> ValueExpr {
+        ValueExpr::Projection(
+            ProjectionPath::try_new(ProjectionRoot::Pre, vec![id(field)])
+                .unwrap_or_else(|| unreachable!()),
+        )
+    }
+
+    fn relational_obligation(claim_id: u32, formula: RelExpr) -> ExportedObligation {
+        let claim = ClaimDecl::new(
+            id(claim_id),
+            name("strict_arithmetic"),
+            vec![BackendId::Cvc5],
+            ClaimMode::Relational,
+            ClaimFormula::Relational(formula),
+        );
+        export_smt(&claim, ToolBackend::Cvc5).unwrap_or_else(|_| unreachable!())
+    }
+
+    fn model(assignments: &[(&str, i128)]) -> String {
+        let mut text = String::from("sat\n(\n");
+        for (variable, value) in assignments {
+            let rendered = if *value < 0 {
+                format!("(- {})", value.unsigned_abs())
+            } else {
+                value.to_string()
+            };
+            text.push_str(&format!("(define-fun {variable} () Int {rendered})\n"));
+        }
+        text.push_str(")\n");
+        text
+    }
+
+    #[test]
+    fn replay_confirms_models_where_strict_evaluation_has_no_value() {
+        let add_one = || ValueExpr::Add(Box::new(pre(100)), Box::new(ValueExpr::Int(1)));
+        // Holds wherever it is defined, and overflows at the top of the i128 range.
+        let increment =
+            relational_obligation(1, RelExpr::Compare(CompareOp::Greater, add_one(), pre(100)));
+        assert_eq!(
+            replay_model(&increment, &model(&[("pre_100_t0", i128::MAX)])),
+            ToolRunStatus::Undefined(UndefinedReason::Overflow)
+        );
+        // A model at which the claim evaluates to true is a solver error, never a verdict.
+        assert_eq!(
+            replay_model(&increment, &model(&[("pre_100_t0", 5)])),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+
+        // Evaluation is strict: a guard does not protect the arithmetic after it.
+        let guarded = relational_obligation(
+            2,
+            RelExpr::Implies(
+                Box::new(RelExpr::Compare(
+                    CompareOp::LessEq,
+                    pre(100),
+                    ValueExpr::Int(3),
+                )),
+                Box::new(RelExpr::Compare(
+                    CompareOp::LessEq,
+                    add_one(),
+                    ValueExpr::Int(4),
+                )),
+            ),
+        );
+        assert_eq!(
+            replay_model(&guarded, &model(&[("pre_100_t0", i128::MAX)])),
+            ToolRunStatus::Undefined(UndefinedReason::Overflow)
+        );
+
+        let quotient = |mode| {
+            RelExpr::Compare(
+                CompareOp::Eq,
+                ValueExpr::Div(mode, Box::new(pre(100)), Box::new(pre(101))),
+                ValueExpr::Int(1),
+            )
+        };
+        let floor = relational_obligation(3, quotient(zeno_fcis_spec::DivisionMode::Floor));
+        assert_eq!(
+            replay_model(&floor, &model(&[("pre_100_t0", 7), ("pre_101_t0", 0)])),
+            ToolRunStatus::Undefined(UndefinedReason::DivisionByZero)
+        );
+        let exact = relational_obligation(4, quotient(zeno_fcis_spec::DivisionMode::Exact));
+        assert_eq!(
+            replay_model(&exact, &model(&[("pre_100_t0", 3), ("pre_101_t0", 2)])),
+            ToolRunStatus::Undefined(UndefinedReason::NonExactDivision)
+        );
+        // An ordinary false evaluation remains a refutation.
+        assert_eq!(
+            replay_model(&floor, &model(&[("pre_100_t0", 4), ("pre_101_t0", 2)])),
+            ToolRunStatus::Refuted
+        );
+        // A model that omits an observed value is never replayed.
+        assert_eq!(
+            replay_model(&floor, &model(&[("pre_100_t0", 4)])),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+    }
+
+    /// A bounded counter: `count` is field 110 of state 100, `amount` is field
+    /// 120 of command 101.
+    fn counter_project(claims: &str) -> zeno_fcis_spec::ProjectSpec {
+        let source = format!(
+            "zeno 1;\nproject 1 counter;\ntype 100 state State;\ntype 101 command Command;\n\
+             type 102 context Context;\ntype 105 int Count;\nfield 110 100 count 105;\n\
+             field 120 101 amount 105;\nreason 200 bad precedence 0;\n\
+             component 300 machine {{ owns 100; reads pre.100; writes post.100; budget steps 10; }}\n\
+             merge [300];\n\
+             law 400 bounded = post.100.110 >= 0 && post.100.110 <= 9;\n\
+             law 401 steps = post.100.110 == pre.100.110 + command.101.120;\n\
+             law 402 small_steps = command.101.120 >= 0 && command.101.120 <= 2;\n{claims}"
+        );
+        let parsed =
+            zeno_fcis_spec::parse_project(&source, zeno_fcis_spec::SourceLimits::default())
+                .unwrap_or_else(|set| panic!("{set}"));
+        zeno_fcis_spec::elaborate_project(parsed, zeno_fcis_spec::ProjectLimits::default())
+            .unwrap_or_else(|set| panic!("{set}"))
+    }
+
+    fn inductive_obligation(assume: &str, invariant: &str) -> ExportedObligation {
+        let spec = counter_project(&format!(
+            "claim 500 invariant cvc5 inductive assume [{assume}] = {invariant};\n"
+        ));
+        export_inductive_smt(&spec.claims()[0], spec.laws(), ToolBackend::Cvc5)
+            .unwrap_or_else(|error| panic!("{error:?}"))
+    }
+
+    fn transition(pre: i128, amount: i128, post: i128) -> String {
+        model(&[
+            ("pre_100_110_t0", pre),
+            ("command_101_120_t0", amount),
+            ("post_100_110_t0", post),
+        ])
+    }
+
+    #[test]
+    fn the_inductive_step_asserts_each_law_and_the_invariant_separately() {
+        let obligation = inductive_obligation("401, 402", "pre.100.110 >= 0");
+        assert_eq!(obligation.scope(), ObligationScope::InductiveStepOverLaws);
+        assert_eq!(
+            obligation
+                .hypotheses()
+                .every_commit()
+                .iter()
+                .map(|law| law.id().get())
+                .collect::<Vec<_>>(),
+            vec![401, 402]
+        );
+        let source = String::from_utf8_lossy(obligation.source()).into_owned();
+        assert!(source.starts_with(
+            "; zeno-fcis/smt-inductive-obligation/1\n; claim-id 500\n; every commit: 401 402\n; accepts: \n; committed failures: \n"
+        ));
+        // Without per-case laws there is no decision kind to choose.
+        assert!(!source.contains(DECISION_KIND));
+        for label in [
+            "; law 401\n(assert ",
+            "; law 402\n(assert ",
+            "; invariant before the step\n(assert ",
+        ] {
+            assert_eq!(source.matches(label).count(), 1, "{label}");
+        }
+        // The only negated assertion is the invariant after the step.
+        assert_eq!(source.matches("(assert (not ").count(), 1);
+        assert!(source.contains("; invariant after the step\n(assert (not (and"));
+        assert!(source.contains("post_100_110_t0"));
+        assert!(source.ends_with("(check-sat)\n"));
+    }
+
+    #[test]
+    fn inductive_export_refuses_what_it_cannot_ground() {
+        let spec = counter_project(
+            "claim 500 invariant all inductive assume [401] = pre.100.110 >= 0;\n\
+             claim 501 single_step cvc5 relational = pre.100.110 >= 0;\n\
+             claim 502 cvc5_only cvc5 inductive assume [401] = pre.100.110 >= 0;\n",
+        );
+        let inductive = spec.claim(id(500)).unwrap_or_else(|| unreachable!());
+        let relational = spec.claim(id(501)).unwrap_or_else(|| unreachable!());
+        let cvc5_only = spec.claim(id(502)).unwrap_or_else(|| unreachable!());
+        assert_eq!(
+            export_inductive_smt(inductive, &[], ToolBackend::Cvc5).map(|_| ()),
+            Err(ExportError::UnknownAssumedLaw(id(401)))
+        );
+        assert_eq!(
+            export_inductive_smt(cvc5_only, spec.laws(), ToolBackend::Z3).map(|_| ()),
+            Err(ExportError::BackendNotSelected)
+        );
+        assert_eq!(
+            export_inductive_smt(relational, spec.laws(), ToolBackend::Cvc5).map(|_| ()),
+            Err(ExportError::UnsupportedMode)
+        );
+        // The ordinary exporters never drop the assumed laws of an inductive claim.
+        assert_eq!(
+            export_smt(inductive, ToolBackend::Cvc5).map(|_| ()),
+            Err(ExportError::UnsupportedMode)
+        );
+        assert_eq!(
+            export_lean(inductive).map(|_| ()),
+            Err(ExportError::UnsupportedMode)
+        );
+    }
+
+    #[test]
+    fn inductive_replay_confirms_only_transitions_the_laws_admit() {
+        let capped = inductive_obligation("401, 402", "pre.100.110 <= 9");
+        // 9 + 1 satisfies both laws and leaves the invariant: a counterexample to induction.
+        assert_eq!(
+            replay_model(&capped, &transition(9, 1, 10)),
+            ToolRunStatus::Refuted
+        );
+        // A model that breaks an assumed law is not a transition the authority commits.
+        assert_eq!(
+            replay_model(&capped, &transition(9, 3, 12)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        assert_eq!(
+            replay_model(&capped, &transition(9, 1, 11)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        // A model whose starting state already breaks the invariant is not a step.
+        assert_eq!(
+            replay_model(&capped, &transition(10, 1, 11)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        // A model whose end state keeps the invariant refutes nothing.
+        assert_eq!(
+            replay_model(&capped, &transition(3, 1, 4)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        // An assumed law that overflows is not satisfied, so it cannot hide in a counterexample.
+        assert_eq!(
+            replay_model(&capped, &transition(i128::MAX, 1, i128::MAX)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        let square = inductive_obligation("401, 402", "pre.100.110 * pre.100.110 >= 0");
+        let root: i128 = 13_043_817_825_332_782_212;
+        assert_eq!(
+            replay_model(&square, &transition(root, 2, root + 2)),
+            ToolRunStatus::Undefined(UndefinedReason::Overflow)
+        );
+    }
+
+    #[test]
+    fn a_split_step_uses_each_decision_kinds_own_laws() {
+        // Law 401 steps accepts up; law 403 resets committed failures to zero.
+        let spec = counter_project(
+            "law 403 reset = post.100.110 == 0;\n\
+             claim 500 split cvc5 inductive assume [402] accept [401] failure [403] = pre.100.110 >= 0;\n\
+             claim 501 accepts_only cvc5 inductive assume [402] accept [401] = pre.100.110 >= 0;\n",
+        );
+        let export = |claim| {
+            export_inductive_smt(
+                spec.claim(id(claim)).unwrap_or_else(|| unreachable!()),
+                spec.laws(),
+                ToolBackend::Cvc5,
+            )
+            .unwrap_or_else(|error| panic!("{error:?}"))
+        };
+        let split = export(500);
+        let source = String::from_utf8_lossy(split.source()).into_owned();
+        assert!(source.contains("(declare-const zeno_decision_kind Int)"));
+        assert!(source.contains("; law 401 on accepts\n(assert (=> (= zeno_decision_kind 1) "));
+        assert!(
+            source
+                .contains("; law 403 on committed failures\n(assert (=> (= zeno_decision_kind 2) ")
+        );
+        assert!(source.contains("; law 402\n(assert (and"));
+        let with_kind = |kind, pre, amount, post| {
+            let mut text = transition(pre, amount, post);
+            text.insert_str(
+                text.len() - 2,
+                &format!("(define-fun zeno_decision_kind () Int {kind})\n"),
+            );
+            text
+        };
+        // An accept that satisfies law 401 cannot leave the invariant, so this is not a model.
+        assert_eq!(
+            replay_model(&split, &with_kind(1, 0, 1, -1)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        // A model without a decision kind is never replayed for a split step.
+        assert_eq!(
+            replay_model(&split, &transition(0, 1, 1)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        // Without failure laws, a committed failure may leave the invariant.
+        let accepts_only = export(501);
+        assert_eq!(
+            replay_model(&accepts_only, &with_kind(2, 0, 1, -1)),
+            ToolRunStatus::Refuted
+        );
+        // The same model as an accept breaks law 401, so it is not replayed.
+        assert_eq!(
+            replay_model(&accepts_only, &with_kind(1, 0, 1, -1)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+        assert_eq!(
+            replay_model(&accepts_only, &with_kind(3, 0, 1, -1)),
+            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed)
+        );
+    }
+
+    #[test]
+    fn undefined_results_have_their_own_record_and_name() {
+        let reasons = [
+            UndefinedReason::Overflow,
+            UndefinedReason::DivisionByZero,
+            UndefinedReason::NonExactDivision,
+        ];
+        let records: BTreeSet<Vec<u8>> = reasons
+            .iter()
+            .map(|reason| {
+                status_record(&ToolRunStatus::Undefined(*reason)).unwrap_or_else(|_| unreachable!())
+            })
+            .collect();
+        assert_eq!(records.len(), reasons.len());
+        let refuted = status_record(&ToolRunStatus::Refuted).unwrap_or_else(|_| unreachable!());
+        assert!(!records.contains(&refuted));
+        assert_eq!(
+            run_status_name(&ToolRunStatus::Undefined(UndefinedReason::Overflow)),
+            "undefined"
+        );
+        assert_eq!(
+            ObligationScope::WithoutSystemModel
+                .meaning(&ToolRunStatus::Undefined(UndefinedReason::Overflow)),
+            ObligationScope::WithoutSystemModel.meaning(&ToolRunStatus::Refuted)
+        );
+    }
+
     fn test_obligation(claim_id: u32) -> ExportedObligation {
         let claim = ClaimDecl::new(
             id(claim_id),
@@ -5519,6 +6243,124 @@ mod tests {
                 .map(hash_hex),
             Some(expected_runtime_hash.to_owned())
         );
+    }
+
+    /// Every counterexample to an inductive step in a box that the assumed
+    /// laws bound, found by replaying each transition in the box. Assignments
+    /// outside the box break an assumed law, so they are never counterexamples.
+    fn exhaustive_step_counterexamples(obligation: &ExportedObligation) -> BTreeSet<String> {
+        let kinds: &[Option<i128>] = if obligation.hypotheses().splits_decisions() {
+            &[Some(ACCEPT_KIND), Some(COMMITTED_FAILURE_KIND)]
+        } else {
+            &[None]
+        };
+        let mut found = BTreeSet::new();
+        for kind in kinds {
+            for pre in 0..=4 {
+                for amount in 0..=2 {
+                    for post in 0..=4 {
+                        let mut text = transition(pre, amount, post);
+                        if let Some(kind) = kind {
+                            text.insert_str(
+                                text.len() - 2,
+                                &format!("(define-fun {DECISION_KIND} () Int {kind})\n"),
+                            );
+                        }
+                        match replay_model(obligation, &text) {
+                            ToolRunStatus::Blocked(ToolFailure::ModelReplayFailed) => {}
+                            status => {
+                                found.insert(run_status_label(&status));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        found
+    }
+
+    fn run_status_label(status: &ToolRunStatus) -> String {
+        match status {
+            ToolRunStatus::Undefined(reason) => format!("undefined:{}", reason.name()),
+            other => run_status_name(other).to_owned(),
+        }
+    }
+
+    #[test]
+    #[ignore = "requires the workflow-pinned CVC5 and Z3 executables"]
+    fn pinned_inductive_steps_agree_with_exhaustive_replay() {
+        let solver = |backend, variable, version: &str| ToolConfig {
+            backend,
+            path: PathBuf::from(std::env::var_os(variable).unwrap_or_else(|| unreachable!())),
+            version: version.to_owned(),
+            sha256: "0".repeat(64),
+            runtime: None,
+            timeout_ms: 60_000,
+            max_output_bytes: 8 * 1024 * 1024,
+            allowed_axioms: Vec::new(),
+        };
+        let solvers = [
+            solver(ToolBackend::Cvc5, "ZENO_FCIS_CVC5", CVC5_VERSION),
+            solver(ToolBackend::Z3, "ZENO_FCIS_Z3", Z3_VERSION),
+        ];
+        // Law 400 bounds every observed value, so the box 0..=4 by 0..=2 by
+        // 0..=4 holds every transition the laws admit.
+        let spec = counter_project(
+            "law 403 reset = post.100.110 == 0;\n\
+             law 404 in_box = pre.100.110 >= 0 && pre.100.110 <= 4 && post.100.110 >= 0 && post.100.110 <= 4;\n\
+             claim 600 nonnegative all inductive assume [404, 402] accept [401] failure [403] = pre.100.110 >= 0;\n\
+             claim 601 at_most_three all inductive assume [404, 402] accept [401] failure [403] = pre.100.110 <= 3;\n\
+             claim 602 not_two all inductive assume [404, 402] accept [401] failure [403] = pre.100.110 != 2;\n\
+             claim 603 doubled all inductive assume [404, 402] accept [401] failure [403] = pre.100.110 * 2 <= 8;\n\
+             claim 604 quotient all inductive assume [404, 402] accept [401] failure [403] = div_floor(pre.100.110, pre.100.110 - 2) >= 0;\n\
+             claim 605 scaled all inductive assume [404, 402] accept [401] failure [403] = pre.100.110 * 10000000000000000000 * 5000000000000000000 >= 0;\n\
+             claim 606 accepts_only all inductive assume [404, 402] accept [401] = pre.100.110 <= 2;\n\
+             claim 607 unsplit all inductive assume [404, 402, 401] = pre.100.110 >= 0;\n",
+        );
+        let mut verdicts = BTreeMap::new();
+        for claim in spec.claims() {
+            for config in &solvers {
+                let obligation = export_inductive_smt(claim, spec.laws(), config.backend)
+                    .unwrap_or_else(|error| panic!("claim {}: {error:?}", claim.id().get()));
+                let expected = exhaustive_step_counterexamples(&obligation);
+                let output = run_smt(config, &config.path, obligation.source())
+                    .unwrap_or_else(|error| panic!("claim {}: {error:?}", claim.id().get()));
+                let status = classify(config, output.final_output(), &obligation);
+                let holds = matches!(
+                    (config.backend, &status),
+                    (ToolBackend::Cvc5, ToolRunStatus::ProposedUnsat)
+                        | (
+                            ToolBackend::Z3,
+                            ToolRunStatus::Blocked(ToolFailure::UnsupportedEvidence)
+                        )
+                );
+                if expected.is_empty() {
+                    assert!(holds, "claim {} {config:?}: {status:?}", claim.id().get());
+                } else {
+                    assert!(
+                        expected.contains(&run_status_label(&status)),
+                        "claim {} {:?}: {status:?} not in {expected:?}",
+                        claim.id().get(),
+                        config.backend
+                    );
+                }
+                verdicts.insert((claim.id().get(), config.backend.name()), expected);
+            }
+        }
+        // The collection covers every outcome: holds, refuted, undefined, and both.
+        let outcomes: BTreeSet<_> = verdicts.values().cloned().collect();
+        assert!(outcomes.contains(&BTreeSet::new()));
+        assert!(
+            outcomes
+                .iter()
+                .any(|set| set.len() == 1 && set.contains("refuted"))
+        );
+        assert!(
+            outcomes
+                .iter()
+                .any(|set| set.len() == 1 && set.contains("undefined:overflow"))
+        );
+        assert!(outcomes.iter().any(|set| set.len() > 1));
     }
 
     #[test]

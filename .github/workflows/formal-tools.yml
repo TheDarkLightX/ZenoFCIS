@@ -112,6 +112,10 @@ jobs:
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
               -p zeno-fcis-formal-tools --locked \
               tests::pinned_smt_translation_differential_check -- --ignored --exact
+          ZENO_FCIS_CVC5="$PWD/$CVC5_BIN" ZENO_FCIS_Z3="$PWD/$Z3_BIN" \
+            cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
+              -p zeno-fcis-formal-tools --locked \
+              tests::pinned_inductive_steps_agree_with_exhaustive_replay -- --ignored --exact
           ZENO_FCIS_CVC5="$PWD/$CVC5_BIN" \
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
               -p zeno-fcis-formal-tools --locked \

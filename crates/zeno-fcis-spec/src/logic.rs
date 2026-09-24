@@ -308,7 +308,7 @@ pub fn evaluate_temporal<P: PredicateProvider + ?Sized>(
     }
     let horizon = match mode {
         ClaimMode::Finite { horizon } => horizon,
-        ClaimMode::Relational => 1,
+        ClaimMode::Relational | ClaimMode::Inductive => 1,
         ClaimMode::UnboundedProof => 0,
     };
     if trace.is_empty() {

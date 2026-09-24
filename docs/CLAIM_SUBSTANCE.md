@@ -24,6 +24,12 @@ claim and return one `Substance`:
 | `ignores-transition` | A single-step formula that reads no post-state, effect, outbox, or event observation, or a temporal formula that reads no observation at all. No transition outcome can change it. |
 | `may-constrain-transition` | Reads an observation that a transition can change. Necessary for a meaningful constraint; not sufficient. |
 
+An inductive claim's invariant is asserted of every state the application
+commits. So, as with a temporal formula, reading any state observation can
+distinguish two behaviors. `invariant_substance` classifies it: constant,
+`ignores-transition` when it reads no observation, and otherwise
+`may-constrain-transition`. `claim_substance` uses it for inductive claims.
+
 `zeno-fcis check` reports the classification of every law and claim:
 
 - Human output prints one `warning:` line on stderr for each formula that is

@@ -443,26 +443,87 @@ impl Parser {
                 horizon: self.take_u32("claim.horizon").unwrap_or(0),
             },
             "unbounded" => ClaimMode::UnboundedProof,
+            "inductive" => ClaimMode::Inductive,
             _ => {
                 self.error(
                     DiagnosticCode::InvalidDeclaration,
                     "claim.mode",
-                    "relational|finite N|unbounded",
+                    "relational|finite N|unbounded|inductive",
                     mode_name.as_str(),
                     "select an explicit claim mode",
                 );
                 ClaimMode::Relational
             }
         };
+        let assumptions = if matches!(mode, ClaimMode::Inductive) {
+            self.parse_inductive_assumptions()
+        } else {
+            InductiveAssumptions::default()
+        };
         self.expect_symbol(TokenKind::Equal, "claim");
-        let formula = match mode {
-            ClaimMode::Relational => ClaimFormula::Relational(self.parse_rel()),
-            ClaimMode::Finite { .. } | ClaimMode::UnboundedProof => {
-                ClaimFormula::Temporal(self.parse_temporal())
+        let claim = match mode {
+            ClaimMode::Relational => ClaimDecl::new(
+                id,
+                name,
+                backends,
+                mode,
+                ClaimFormula::Relational(self.parse_rel()),
+            ),
+            ClaimMode::Inductive => {
+                ClaimDecl::inductive(id, name, backends, assumptions, self.parse_rel())
             }
+            ClaimMode::Finite { .. } | ClaimMode::UnboundedProof => ClaimDecl::new(
+                id,
+                name,
+                backends,
+                mode,
+                ClaimFormula::Temporal(self.parse_temporal()),
+            ),
         };
         self.expect_symbol(TokenKind::Semicolon, "claim");
-        Some(ClaimDecl::new(id, name, backends, mode, formula))
+        Some(claim)
+    }
+
+    /// Parses the groups after an inductive claim's mode, in this order, each
+    /// optional: `assume [...]` for laws enforced on every committing decision,
+    /// `accept [...]` for accepts, and `failure [...]` for committed failures.
+    /// Elaboration checks that at least one law is named, once, and declared.
+    fn parse_inductive_assumptions(&mut self) -> InductiveAssumptions {
+        let mut groups: [Vec<StableId>; 3] = Default::default();
+        let mut present = false;
+        for (index, keyword) in ["assume", "accept", "failure"].into_iter().enumerate() {
+            if self.take_keyword(keyword) {
+                present = true;
+                groups[index] = self.parse_law_list(keyword);
+            }
+        }
+        if !present {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "claim.assume",
+                "assume|accept|failure [LAW_ID, ...]",
+                self.describe_current(),
+                "list the laws the induction step may assume",
+            );
+        }
+        let [every_commit, accepts, committed_failures] = groups;
+        InductiveAssumptions::new(every_commit, accepts, committed_failures)
+    }
+
+    fn parse_law_list(&mut self, keyword: &str) -> Vec<StableId> {
+        let context = alloc::format!("claim.{keyword}");
+        self.expect_symbol(TokenKind::LBracket, &context);
+        let mut laws = Vec::new();
+        while !matches!(self.current().kind, TokenKind::RBracket | TokenKind::Eof) {
+            if let Some(law) = self.take_id("claim.law") {
+                laws.push(law)
+            }
+            if !self.take_symbol(&TokenKind::Comma) {
+                break;
+            }
+        }
+        self.expect_symbol(TokenKind::RBracket, &context);
+        laws
     }
 
     fn parse_rel(&mut self) -> RelExpr {

@@ -20,8 +20,8 @@ use serde_json::{Value, json};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_formal_tools::{
     CVC5_VERSION, LEAN_VERSION, ToolBackend, ToolFailure, ToolRunStatus, Z3_VERSION, doctor,
-    execute_tool, export_lean, export_smt, inspect_lean_toolchain, load_tools_manifest, retain_run,
-    verify_tool,
+    execute_tool, export_inductive_smt, export_lean, export_smt, inspect_lean_toolchain,
+    load_tools_manifest, retain_run, verify_tool,
 };
 use zeno_fcis_spec::{
     ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, PathResolution, ProjectLimits,
@@ -1001,7 +1001,7 @@ fn prove(
         for tool_backend in requested.iter().copied() {
             let compatible = match claim.mode() {
                 ClaimMode::UnboundedProof => tool_backend == ToolBackend::Lean,
-                ClaimMode::Relational | ClaimMode::Finite { .. } => {
+                ClaimMode::Relational | ClaimMode::Finite { .. } | ClaimMode::Inductive => {
                     tool_backend != ToolBackend::Lean
                 }
             } && claim.backends().contains(&tool_backend.spec_backend());
@@ -1025,9 +1025,12 @@ fn prove(
                 exit = exit.max(BLOCKED);
                 continue;
             };
-            let obligation = match tool_backend {
-                ToolBackend::Cvc5 | ToolBackend::Z3 => export_smt(claim, tool_backend),
-                ToolBackend::Lean => export_lean(claim),
+            let obligation = match (tool_backend, claim.mode()) {
+                (ToolBackend::Cvc5 | ToolBackend::Z3, ClaimMode::Inductive) => {
+                    export_inductive_smt(claim, spec.laws(), tool_backend)
+                }
+                (ToolBackend::Cvc5 | ToolBackend::Z3, _) => export_smt(claim, tool_backend),
+                (ToolBackend::Lean, _) => export_lean(claim),
             };
             let obligation = match obligation {
                 Ok(value) => value,
@@ -1097,6 +1100,15 @@ fn prove(
                     );
                     tool_run_exit(run.status(), counterexample)
                 }
+                ToolRunStatus::Undefined(reason) => {
+                    println!(
+                        "{} claim {}: replayed counterexample retained; the claim has no value there ({})",
+                        backend_name(tool_backend),
+                        claim.id().get(),
+                        reason.name()
+                    );
+                    tool_run_exit(run.status(), counterexample)
+                }
                 ToolRunStatus::Blocked(error) => {
                     eprintln!(
                         "{} claim {} blocked: {error:?}",
@@ -1114,6 +1126,24 @@ fn prove(
                     tool_run_exit(run.status(), counterexample)
                 }
             };
+            let assumptions = claim.assumptions();
+            if !assumptions.is_empty() {
+                let list = |group: &[StableId]| {
+                    group
+                        .iter()
+                        .map(|law| law.get().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+                println!(
+                    "{} claim {} assumes laws [{}] on every commit, [{}] on accepts, [{}] on committed failures",
+                    backend_name(tool_backend),
+                    claim.id().get(),
+                    list(assumptions.every_commit()),
+                    list(assumptions.accepts()),
+                    list(assumptions.committed_failures())
+                );
+            }
             if let Some(note) = scope_note {
                 println!(
                     "{} claim {} scope: {note}",
@@ -1375,8 +1405,8 @@ fn tool_run_exit(status: &ToolRunStatus, counterexample: bool) -> u8 {
         ToolRunStatus::ProposedUnsat | ToolRunStatus::Blocked(_) => BLOCKED,
         ToolRunStatus::KernelChecked if counterexample => BLOCKED,
         ToolRunStatus::KernelChecked => OK,
-        ToolRunStatus::Refuted if counterexample => OK,
-        ToolRunStatus::Refuted => INVALID,
+        ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) if counterexample => OK,
+        ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) => INVALID,
         ToolRunStatus::Failed(_) => FAILURE,
     }
 }
@@ -1555,6 +1585,9 @@ mod tests {
         assert_eq!(tool_run_exit(&ToolRunStatus::KernelChecked, false), OK);
         assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, false), INVALID);
         assert_eq!(tool_run_exit(&ToolRunStatus::Refuted, true), OK);
+        let undefined = ToolRunStatus::Undefined(zeno_fcis_formal_tools::UndefinedReason::Overflow);
+        assert_eq!(tool_run_exit(&undefined, false), INVALID);
+        assert_eq!(tool_run_exit(&undefined, true), OK);
     }
 
     #[test]

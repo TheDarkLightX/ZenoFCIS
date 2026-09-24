@@ -10,7 +10,7 @@ Feature: Report evidence that cannot distinguish system behavior
     When each project is checked with and without the substantive requirement
     Then every constant law and claim is reported with its substance code
     And the substantive requirement refuses only the vacuous project
-    And every solver result states that no system model was exported
+    And every solver result for a relational or temporal claim states that no system model was exported
 
   @atdd-system-properties
   Scenario: Check properties against the exact finite transition program
@@ -23,6 +23,22 @@ Feature: Report evidence that cannot distinguish system behavior
     And a solver model outside the declared domains, or one that does not replay, is refused
     And a domain-only model is replayed with its proposed outputs
     And the solver and exhaustive routes agree on a bounded collection of small programs
+
+  @atdd-inductive-claims
+  Scenario: Prove invariants by induction over the laws the authority enforces
+    Given an inductive claim that names the laws its step assumes on every commit, on accepts, and on committed failures
+    When the project is elaborated
+    Then an empty, repeated, or undeclared law, or an invariant that reads more than the pre-state, is refused
+    And the claim's groups are part of the canonical project, and a project without inductive claims encodes as before
+    When the step is exported
+    Then each assumed law and the invariant before the step are asserted as defined and true, each on its own
+    And the invariant after the step is the invariant rewritten from the pre-state to the post-state, asserted as not defined and true
+    And laws assumed only on accepts or only on committed failures are guarded by the decision kind
+    When a solver returns a model
+    Then it is confirmed only if every law assumed for its decision kind and the invariant before the step hold on it
+    And a model at which a claim has no value is reported as undefined, with the reason
+    And the application checks the invariant on its exact genesis state
+    And the law manifest confirms that each assumed law is enforced on the decisions it is assumed on
 
   @atdd-reserved-domains
   Scenario: Keep project commitment domains out of the library namespace

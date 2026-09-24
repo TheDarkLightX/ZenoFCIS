@@ -573,6 +573,7 @@ pub fn elaborate_project(
             );
         }
     }
+    let law_ids: BTreeSet<StableId> = laws.iter().map(LawDecl::id).collect();
     for claim in &mut claims {
         let mut normalized_backends = claim.backends.to_vec();
         normalized_backends.sort_unstable();
@@ -660,6 +661,20 @@ pub fn elaborate_project(
                         limits.max_formula_depth(),
                     );
                 }
+            }
+            (ClaimMode::Inductive, ClaimFormula::Relational(value)) => {
+                let (nodes, depth) = formula_shape_rel(value);
+                formula_nodes = formula_nodes.saturating_add(nodes);
+                if depth > limits.max_formula_depth() {
+                    formula_limit(
+                        &mut diagnostics,
+                        span_for(&spans, 10, claim.id()),
+                        format!("claim.{}", claim.id().get()),
+                        depth,
+                        limits.max_formula_depth(),
+                    );
+                }
+                check_inductive_claim(claim, &law_ids, &spans, &mut diagnostics);
             }
             _ => push(
                 &mut diagnostics,
@@ -829,6 +844,67 @@ fn formula_limit(
         "reduce formula nesting depth",
     );
 }
+/// Checks what an inductive claim's proof rests on: a nonempty list of
+/// distinct, declared laws to assume, and an invariant that reads only `pre.`
+/// state paths, so the step obligation can restate it over `post.`.
+fn check_inductive_claim(
+    claim: &ClaimDecl,
+    law_ids: &BTreeSet<StableId>,
+    spans: &BTreeMap<(u8, u32), SourceSpan>,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let span = span_for(spans, 10, claim.id());
+    let assume = format!("claim.{}.assume", claim.id().get());
+    if claim.assumptions().is_empty() {
+        push(
+            diagnostics,
+            DiagnosticCode::InvalidDeclaration,
+            span,
+            assume.clone(),
+            "one or more law IDs",
+            "an empty list",
+            "name the laws the induction step may assume",
+        );
+    }
+    let mut seen = BTreeSet::new();
+    for law in claim.assumptions().all() {
+        if !seen.insert(*law) {
+            push(
+                diagnostics,
+                DiagnosticCode::DuplicateId,
+                span,
+                assume.clone(),
+                "distinct law IDs",
+                text(law.get()),
+                "list each assumed law once",
+            );
+        } else if !law_ids.contains(law) {
+            push(
+                diagnostics,
+                DiagnosticCode::UnknownReference,
+                span,
+                assume.clone(),
+                "a declared law ID",
+                text(law.get()),
+                "assume only laws this project declares",
+            );
+        }
+    }
+    for path in crate::paths::claim_paths(claim) {
+        if path.root() != ProjectionRoot::Pre {
+            push(
+                diagnostics,
+                DiagnosticCode::InvalidDeclaration,
+                span,
+                format!("claim.{}.formula", claim.id().get()),
+                "pre. state paths only",
+                "a path outside pre.",
+                "state the invariant over pre.; the step obligation restates it over post.",
+            );
+        }
+    }
+}
+
 fn push(
     diagnostics: &mut Vec<Diagnostic>,
     code: DiagnosticCode,
