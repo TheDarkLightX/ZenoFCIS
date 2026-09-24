@@ -94,7 +94,8 @@ Authorization:
 | `CatalogAuthorizedTransition`, `CatalogAuthorizedReject` | The decision is the program's output for this invocation, and its bindings and chain are coherent | Checked | The authority runs the reviewed program itself, so no caller supplies the decision. Persisted transitions are re-executed and compared byte for byte when they are re-authorized. Trusted: the authority crate and the program's own code. Assumes the program is deterministic. |
 | | The project laws hold for this invocation | Attested | `LawStatus` values come from the bound `ProjectLawEngine`, which is trusted. |
 | | The program is the reviewed build | Identified | `CatalogTransitionProgram::transition_build_hash` is reported by the program and only compared with the policy. |
-| `CatalogAuthorizedGenesis` | The initial state passes schema admission | Checked | Library schema validation. |
+| | The command, the context, the pre-state, and a committing decision's post-state are admissible under the authority's schema | Checked | The authority validates them against its own catalog's schema: the command and context at admission, and the pre-state and post-state when it validates the decision's artifacts. It does not rely on the schema hash an envelope records, which the envelope's constructor computes with a caller-chosen hasher. |
+| `CatalogAuthorizedGenesis` | The initial state passes schema admission | Checked | The authority validates the initial state against its own catalog's schema. |
 | | Genesis laws hold | Attested | `ProjectLawEngine::evaluate_genesis`, which is trusted. |
 | `CatalogAuthorizedAuthenticatedCommit` | The projection relation holds for this commit | Attested | A `ProjectionRelationEngine` reports the `ProjectionRelationEvaluation`. |
 | `TransitionResourceReport`, `MachineExecutionReport` | Usage is within the limits | Attested | Limits are checked against a usage figure that the caller supplies. |

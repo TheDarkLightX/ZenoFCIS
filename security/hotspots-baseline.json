@@ -959,7 +959,7 @@
       "path_roles": [
         "nominal-authority"
       ],
-      "production_lines": 2140,
+      "production_lines": 2159,
       "rank": 6,
       "score": 92,
       "signals": [
@@ -967,13 +967,13 @@
           "id": "authority-construction",
           "lines": [
             79,
-            799,
-            918,
-            1527,
-            1704,
-            1716,
-            1792,
-            1917
+            803,
+            939,
+            1545,
+            1722,
+            1734,
+            1810,
+            1935
           ]
         },
         {
@@ -982,45 +982,45 @@
             724,
             725,
             726,
-            964,
-            978,
-            1372,
-            1373,
-            1374
+            985,
+            999,
+            1390,
+            1391,
+            1392
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            936,
-            1057
+            957,
+            1078
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            2418
+            2453
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
             212,
-            1325,
-            1551,
-            1552,
-            1698,
-            1808,
-            1986,
-            1996
+            1343,
+            1569,
+            1570,
+            1716,
+            1826,
+            2004,
+            2014
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            1062,
-            1064,
-            1066
+            1083,
+            1085,
+            1087
           ]
         }
       ],
@@ -5255,9 +5255,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3713069,
+    "admitted_bytes": 3718858,
     "admitted_files": 218,
-    "inventory_sha256": "a19c190b0ccb4e283fc6d8193316777443afaeb22138d679ab1017127b3c95d2",
+    "inventory_sha256": "232ac2e4ef0050b7b097f59968636807307c958e0b5e204ee0417aea9b28f6f8",
     "ranked_above_minimum": 169,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
