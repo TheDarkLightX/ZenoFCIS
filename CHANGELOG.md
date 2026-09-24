@@ -6,6 +6,30 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add the `compliance-gateway` application template for
+  `zeno-fcis new --template`: an expert system's transfer-screening rule
+  base, `rules.txt`, becomes the synthesis contract, and `zeno-fcis synth`
+  selects a decision program that is checked against it on all 720 inputs.
+  Every decision names the rule that fired: a blocked transfer is a committed
+  failure under that rule's reason, with a strike on record and an alert
+  through the outbox; a held transfer queues a review ticket naming the rule;
+  three strikes freeze the account until a reviewer reinstates it. The rule
+  base is checked over all 720 inputs for consistency (no two rules of one
+  priority match the same transfer), totality, and liveness (every rule
+  decides some transfer); a rule base that fails a check fails `cargo build`
+  and is refused again when the authority is built, so the application never
+  decides under it. The law checker evaluates the rule base itself against
+  every decision, independently of the synthesized step. Three claims state
+  that the strikes invariant is inductive under the changes the laws admit;
+  CVC5 attested two, the third and every Lean attempt met limits of the
+  export that the README reports, and tests tie the hypotheses to the laws
+  and to every decision the application commits. `tools/check_synthesis.py`
+  replays the synthesis in Rust, Python, and JavaScript against a separate
+  Python evaluation of the same rule base. The template also carries the
+  rule base as a Tau Language specification with a local check script; it
+  needs IDNI's binary and is not part of any gate. The decision examples
+  await review by the project's owner.
+
 - Give `zeno-fcis prove` a system model: inductive claims.
   `claim ID name BACKEND inductive assume [...] accept [...] failure [...] = INVARIANT;`
   states an invariant over `pre.` state paths and names the laws its induction

@@ -1,0 +1,96 @@
+zeno 1;
+project 1 compliance_gateway;
+namespace 2 compliance;
+// One customer's standing with the transfer-screening gateway. The rule base
+// in rules.txt decides each transfer. A blocked transfer adds a strike, and
+// three strikes freeze the account until a reviewer reinstates it.
+type 100 state Standing;
+type 101 command GatewayCommand;
+type 102 context CallerContext;
+type 103 destination ReviewDesk;
+type 104 payload ReviewTicket;
+type 105 destination ComplianceDesk;
+type 106 payload BlockAlert;
+type 107 int Strikes;
+type 108 int IdentityTier;
+type 109 int AmountBand;
+type 110 bool ReviewerFlag;
+type 111 data GatewayAction;
+type 112 data Region;
+type 113 data CounterpartyRisk;
+type 114 data RuleId;
+field 120 100 strikes 107;
+field 130 101 action 111;
+field 131 101 region 112;
+field 132 101 amount_band 109;
+field 133 101 counterparty_risk 113;
+field 140 102 identity_tier 108;
+field 141 102 reviewer 110;
+field 145 104 ticket_rule 114;
+field 146 104 ticket_amount_band 109;
+field 147 106 alert_rule 114;
+field 148 106 alert_strikes 107;
+variant 150 111 Screen none;
+variant 151 111 Reinstate none;
+variant 160 112 Allowed none;
+variant 161 112 Restricted none;
+variant 162 112 Sanctioned none;
+variant 165 113 Low none;
+variant 166 113 Medium none;
+variant 167 113 High none;
+// One variant per rule of rules.txt, in its order.
+variant 170 114 SanctionedRegion none;
+variant 171 114 FrozenAccount none;
+variant 172 114 UnverifiedHighRisk none;
+variant 173 114 RestrictedLarge none;
+variant 174 114 UnverifiedLarge none;
+variant 175 114 HighRiskCounterparty none;
+variant 176 114 RestrictedRegion none;
+variant 177 114 UnverifiedTransfer none;
+variant 178 114 PartiallyVerifiedLarge none;
+variant 179 114 RepeatOffender none;
+variant 180 114 MediumRiskLarge none;
+variant 181 114 DefaultAllow none;
+reason 200 not_reviewer precedence 0;
+reason 201 no_strikes precedence 1;
+// The committed-failure reasons are the blocking rules of rules.txt, in
+// its order.
+reason 210 sanctioned_region precedence 2;
+reason 211 frozen_account precedence 3;
+reason 212 unverified_high_risk precedence 4;
+reason 213 restricted_large precedence 5;
+reason 214 unverified_large precedence 6;
+channel 300 review_ticket destination 103 payload 104;
+channel 301 block_alert destination 105 payload 106;
+component 400 gateway {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  outbox outbox.301;
+  budget steps 64;
+}
+merge [400];
+// Every strike count from 0 to 3 is a valid standing, so the invariant is
+// the bounds themselves; the laws below constrain each change.
+law 500 strikes_within_bounds = post.100.120 >= 0 && post.100.120 <= 3;
+// An accepted screening, allowed or held, keeps the strikes. Whatever the
+// rule base says, a transfer to a sanctioned region and a transfer from a
+// frozen account are never accepted.
+law 501 accepted_screening_keeps_standing = command.101.130 == 150 -> command.101.131 != 162 && pre.100.120 < 3 && post.100.120 == pre.100.120;
+// Only a reviewer reinstates, only an account with strikes, and reinstating
+// clears them.
+law 502 reinstate_clears_strikes = command.101.130 == 151 -> context.102.141 == 1 && pre.100.120 >= 1 && post.100.120 == 0;
+// Only a screening commits a failure. A blocked transfer adds one strike,
+// and a frozen account stays at three.
+law 503 block_adds_a_strike = command.101.130 == 150 && (pre.100.120 < 3 -> post.100.120 == pre.100.120 + 1) && (pre.100.120 == 3 -> post.100.120 == 3);
+// Law 500 is inductive: from a standing within its bounds, each change that
+// laws 501 to 503 admit ends within the bounds, for every integer and not
+// only the schema's domain. Each claim's hypotheses are the law's formula
+// verbatim, with the action it concerns and the bounds before the decision;
+// tests/claims.rs checks that, and tests/conformance.rs checks that every
+// decision the application commits satisfies one of them.
+claim 600 bounded_after_accepted_screening all relational = pre.100.120 >= 0 && pre.100.120 <= 3 && command.101.130 == 150 && (command.101.130 == 150 -> command.101.131 != 162 && pre.100.120 < 3 && post.100.120 == pre.100.120) -> post.100.120 >= 0 && post.100.120 <= 3;
+claim 601 bounded_after_reinstatement all relational = command.101.130 == 151 && (command.101.130 == 151 -> context.102.141 == 1 && pre.100.120 >= 1 && post.100.120 == 0) -> post.100.120 >= 0 && post.100.120 <= 3;
+claim 602 bounded_after_block all relational = pre.100.120 >= 0 && pre.100.120 <= 3 && (command.101.130 == 150 && (pre.100.120 < 3 -> post.100.120 == pre.100.120 + 1) && (pre.100.120 == 3 -> post.100.120 == 3)) -> post.100.120 >= 0 && post.100.120 <= 3;

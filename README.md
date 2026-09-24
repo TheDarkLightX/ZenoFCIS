@@ -254,11 +254,12 @@ outbox, tests, and a README that states its rules.
 | `account-lockout` | Failed logins committed as failures, time as an input instead of a clock read, authority from the request context, and alerts through the outbox. |
 | `order-fulfillment` | A hand-written state machine that sends idempotent payment and shipping requests and rejects duplicate or late callbacks. |
 | `inventory-reservation` | A decision core synthesized and verified on all 432 inputs, commands with quantities, and a conservation law. |
+| `compliance-gateway` | An expert system's rule base as the synthesis contract, checked on all 720 inputs; every decision names the rule that fired, a rule base with a conflict, a gap, or a dead rule fails the build, and claims for `zeno-fcis prove` state the strikes invariant's inductive steps. |
 | `prepared-counter` | Checked bounded completion and prepared batches with a bounded publication size. |
 
-In the account-lockout, order-fulfillment, and inventory-reservation examples,
-every law formula in `project.zeno` can constrain some transition and reads
-only declared fields (`zeno-fcis check --require-substantive
+In the account-lockout, order-fulfillment, inventory-reservation, and
+compliance-gateway examples, every law formula in `project.zeno` can constrain
+some transition and reads only declared fields (`zeno-fcis check --require-substantive
 --require-resolved-paths` passes). Each also ships decision examples, a
 conformance test through the running application, a determinism probe, and the
 purity command for its decision code. `python3 tools/check_generated_application.py`
@@ -388,9 +389,10 @@ The guarantee depends on four things:
   `synth verify` binds its report to the exact source, the emitter, and the
   runtime's executable hash and version. It accepts only Rust 1.97.1, Python 3,
   and Node.js 22. The repository's synthesis check runs it in all three for
-  the durable-counter template, on all 64 inputs, and for the
-  inventory-reservation template, on all 432. Production must run that same
-  source on runtimes that behave the same way.
+  the durable-counter template, on all 64 inputs, for the
+  inventory-reservation template, on all 432, and for the compliance-gateway
+  template, on all 720. Production must run that same source on runtimes that
+  behave the same way.
 
 In short, a synthesized program is guaranteed to be correct with respect to its
 contract, on every input it accepts, provided the checker is correct. Emitted

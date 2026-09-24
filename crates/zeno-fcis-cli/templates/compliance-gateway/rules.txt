@@ -1,0 +1,54 @@
+# Transfer-screening rule base for the compliance-gateway template.
+#
+# This file is the policy. `synthesis.json` states it as a synthesis contract,
+# `zeno-fcis synth` selects a decision program that satisfies it on every
+# input, and `src/rules.rs` evaluates it directly: in the tests, against that
+# program, and at run time, in the law checker, against every decision.
+#
+# Working memory: every feature is finite. An integer feature names its range,
+# and an enumerated feature lists its values in order.
+#
+#   feature NAME MIN..MAX
+#   feature NAME VALUE VALUE ...
+#
+# One rule per line:
+#
+#   rule NAME priority N when CONDITION [and CONDITION ...] then VERDICT
+#
+# A condition compares one feature with one value: FEATURE OP VALUE, where OP
+# is ==, !=, <, <=, >, or >=. An enumerated feature accepts == and != only.
+# The condition `always` holds for every transfer. VERDICT is allow, hold, or
+# block.
+#
+# Conflict resolution: among the rules whose conditions all hold, the one with
+# the highest priority decides, and the decision names it. Two rules may share
+# a priority only if no transfer matches both. The checker refuses a rule base
+# in which two rules of the same priority match the same transfer, whatever
+# they conclude; one in which some transfer matches no rule; and one with a
+# rule that never decides a transfer, because a higher priority always covers
+# it or its conditions never hold together. A refused rule base fails
+# `cargo build`, with the transfer or the rule that shows the fault.
+#
+# Verdicts: a blocked transfer is a committed failure that adds a strike, up
+# to three; an account with three strikes is frozen until a reviewer
+# reinstates it. A held transfer queues a review ticket. An allowed transfer
+# changes nothing.
+
+feature strikes 0..3
+feature identity_tier 0..3
+feature region allowed restricted sanctioned
+feature amount_band 0..4
+feature counterparty_risk low medium high
+
+rule sanctioned_region        priority 100 when region == sanctioned                                            then block
+rule frozen_account           priority  90 when strikes == 3                                                    then block
+rule unverified_high_risk     priority  85 when identity_tier == 0 and counterparty_risk == high                then block
+rule restricted_large         priority  80 when region == restricted and amount_band >= 3                       then block
+rule unverified_large         priority  80 when region == allowed and identity_tier == 0 and amount_band >= 3   then block
+rule high_risk_counterparty   priority  70 when counterparty_risk == high                                       then hold
+rule restricted_region        priority  60 when region == restricted                                            then hold
+rule unverified_transfer      priority  50 when identity_tier == 0 and amount_band >= 1                         then hold
+rule partially_verified_large priority  40 when identity_tier == 1 and amount_band >= 3                         then hold
+rule repeat_offender          priority  30 when strikes >= 2 and amount_band >= 2                               then hold
+rule medium_risk_large        priority  20 when counterparty_risk == medium and amount_band == 4                then hold
+rule default_allow            priority   0 when always                                                          then allow
