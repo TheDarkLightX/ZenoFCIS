@@ -76,8 +76,8 @@ scope is part of the project's meaning and of its canonical bytes; a law
 without one encodes exactly as before, and its scope is the manifest's alone.
 Elaboration refuses an inductive claim that assumes a law outside its declared
 scope (see [inductive claims](INDUCTIVE_CLAIMS.md)). A declared scope states
-what the manifest should enforce; it does not by itself show that the manifest
-does.
+what the manifest should enforce; `LawManifest::check_declared_scopes`
+checks that the manifest does.
 
 Backends are `cvc5`, `z3`, `lean`, and
 `all`. Claim modes are `relational`, `finite N`, `unbounded`, and `inductive`.

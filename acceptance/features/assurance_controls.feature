@@ -46,6 +46,7 @@ Feature: Report evidence that cannot distinguish system behavior
     And the authority checks every command, context, and initial state against its own schema, whatever hasher built the envelope
     When a law declares the decisions it is enforced on
     Then elaboration refuses a claim that assumes it outside that scope, and a law without a declared scope encodes as before
+    And a law manifest that enforces another scope or genesis applicability than the project declares, or lacks a declared law, is reported
 
   @atdd-reserved-domains
   Scenario: Keep project commitment domains out of the library namespace

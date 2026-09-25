@@ -6,6 +6,20 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- `LawManifest::check_declared_scopes(&ProjectSpec)` checks that a law
+  manifest enforces each law exactly on the decisions `project.zeno` declares
+  for it, and at genesis exactly when the declaration says `, genesis`.
+  - It reports every `ScopeMismatch`: a declared law the manifest does not
+    define, a different scope, or a different genesis applicability. A law
+    without a declared scope is not compared.
+  - An application that runs it before building its authority can rely on
+    elaboration's check of an inductive claim's groups for a claim whose
+    laws all declare their scopes (assumption (c) in
+    docs/INDUCTIVE_CLAIMS.md).
+  - zeno-fcis-laws now depends on zeno-fcis-spec, which depends only on
+    zeno-fcis-codec. The root, site, and external-consumer lockfiles each gain
+    that one edge, and the laws crate still builds for wasm32 without `std`.
+
 - Declare the decisions a law is enforced on in `project.zeno`:
   `law ID name on any|accept|reject|failure|commit[, genesis] = FORMULA;`.
   - `LawDecl::applicability` returns the declared `LawScope` and genesis
