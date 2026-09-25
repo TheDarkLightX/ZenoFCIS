@@ -15,6 +15,28 @@ embedded in ZenoFCIS values.
   identities are unchanged, which a test checks by passing a value built
   through the `zeno_fcis_shell_sqlite` path to a function that takes
   `zeno_fcis_shell::MemoryDestination`.
+- Every application template puts its SQLite shell behind a `sqlite` feature,
+  on by default: `zeno-fcis-shell-sqlite` is optional, and `Shell`, `create`,
+  `invoke`, `journey` (with `prepare` in `prepared-counter`), and the
+  demonstration binary, which declares `required-features`, need it. The core
+  builds without it: the generated bindings, the program, the law checker, the
+  profile, the delivery adapter, whose destination wraps the pure
+  `MemoryDestination`, and `authority()`, so the `Authority` type is the same
+  with and without the shell. `tools/check_generated_application.py` now also
+  runs `cargo clippy --lib --no-default-features --target wasm32-unknown-unknown
+  -- -D warnings` on every generated application, and the `adopter-acceptance`
+  and `release-candidate` workflows install that target. Each template's
+  `Cargo.toml`, `src/lib.rs`, and `src/delivery.rs` changed, so its source
+  hash, and the program, checker, and policy hashes derived from it, changed;
+  the semantic program hash of each `project.zeno` did not.
+- A demo site under `site/`, a workspace of its own like `verification/`: a
+  `cdylib` for `wasm32-unknown-unknown` that runs the account-lockout
+  application's authority, program, and law checker over the library's
+  in-memory reference shell, with the application written by `zeno-fcis new`
+  at build time; a static page; a headless replay, `site/tests/replay.mjs`, of
+  the template's decision examples and README demonstration; and
+  `site/build.py`, which builds and tests everything and requires two builds
+  of the module to be identical. Nothing is published.
 - The `account-lockout` template declares the range of each of its integer
   types in `project.zeno` (`Attempts in 0..=2`, `UnixTime in
   0..=4102444800`, and `LockDeadline in 0..=4102445700`), and its `build.rs`

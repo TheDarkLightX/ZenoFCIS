@@ -10,6 +10,7 @@ pub mod bindings {
 }
 pub mod delivery;
 pub mod laws;
+#[cfg(feature = "sqlite")]
 pub mod prepare;
 #[path = "../profile.rs"]
 pub mod profile;
@@ -20,6 +21,7 @@ use delivery::Destination;
 use generated::{CounterState, CounterValue};
 use laws::{CounterLaws, NoExternalProofs};
 use program::CounterProgram;
+#[cfg(feature = "sqlite")]
 use std::path::Path;
 use zeno_fcis_authority::{
     CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding, StateDomainBinding,
@@ -29,11 +31,15 @@ use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
 use zeno_fcis_laws::{LawLimits, verify_project_laws};
 use zeno_fcis_patch::hash_value;
 use zeno_fcis_schema::ValidationLimits;
-use zeno_fcis_shell_sqlite::{IdempotentDestination, SqliteShell};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell::IdempotentDestination;
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell_sqlite::SqliteShell;
 use zeno_fcis_transition::TransitionLimits;
 
 pub type Authority =
     CatalogCommitAuthority<RustCryptoSha256, CounterProgram, CounterLaws, Destination>;
+#[cfg(feature = "sqlite")]
 pub type Shell = SqliteShell<CounterProgram, CounterLaws, Destination>;
 pub type AppResult<T> = Result<T, String>;
 
@@ -94,6 +100,7 @@ pub fn authority() -> AppResult<Authority> {
 }
 
 /// Creates the exact reviewed genesis. An existing database is rejected by the shell.
+#[cfg(feature = "sqlite")]
 pub fn create(path: &Path, authority: &Authority, destination: Destination) -> AppResult<Shell> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let initial = checked(project.admit_root::<RustCryptoSha256>(
@@ -112,6 +119,7 @@ pub fn create(path: &Path, authority: &Authority, destination: Destination) -> A
 }
 
 /// Runs bounded preparation, exact replay, restart and interrupted delivery.
+#[cfg(feature = "sqlite")]
 pub fn journey(path: &Path) -> AppResult<String> {
     use prepare::{MAX_PUBLICATION_BYTES, PreparedBatch, command};
     use zeno_fcis_authority::AuthorizationDecodeLimits;

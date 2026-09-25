@@ -524,6 +524,13 @@ cargo +1.97.1 test --locked
 cargo +1.97.1 run --locked -- new-treasury.sqlite
 ```
 
+The SQLite shell is the `sqlite` feature, on by default. Without it,
+`cargo +1.97.1 build --no-default-features` builds the core alone: the
+generated bindings, the program, the law checker, the profile, the delivery
+adapter, and `authority()`, with no database; the gate checks that it also
+compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
+binary need the feature.
+
 The demonstration requires a new database path. Its scripted agent proposes
 a good buy, then, while and after it settles, a proposal with a swap
 outstanding, a settlement from the wrong caller, a short settlement, a repeated

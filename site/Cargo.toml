@@ -1,0 +1,68 @@
+# The demo site's workspace: one demo module per example application. It is
+# kept out of the main workspace, like `verification/`, so the generated
+# application and this lockfile never enter the published crates' graph.
+[workspace]
+resolver = "3"
+members = ["demos/account-lockout"]
+# `zeno-fcis new` writes the application here; it is its own workspace root.
+exclude = ["apps"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[workspace.lints.rust]
+# The C ABI needs pointer handling; each demo allows it in one module only.
+unsafe_code = "deny"
+missing_docs = "warn"
+unreachable_pub = "warn"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+# Product names such as SQLite are prose, not code.
+doc_markdown = "allow"
+
+# The generated application pins the library by version, as it would from the
+# registry; every pin resolves to this checkout. The SQLite shell is absent:
+# no demo enables the feature, so the resolver never selects it.
+[patch.crates-io]
+zeno-fcis-authority = { path = "../crates/zeno-fcis-authority" }
+zeno-fcis-bootstrap = { path = "../crates/zeno-fcis-bootstrap" }
+zeno-fcis-catalog = { path = "../crates/zeno-fcis-catalog" }
+zeno-fcis-codec = { path = "../crates/zeno-fcis-codec" }
+zeno-fcis-codegen = { path = "../crates/zeno-fcis-codegen" }
+zeno-fcis-compose = { path = "../crates/zeno-fcis-compose" }
+zeno-fcis-core = { path = "../crates/zeno-fcis-core" }
+zeno-fcis-crypto = { path = "../crates/zeno-fcis-crypto" }
+zeno-fcis-evidence = { path = "../crates/zeno-fcis-evidence" }
+zeno-fcis-laws = { path = "../crates/zeno-fcis-laws" }
+zeno-fcis-patch = { path = "../crates/zeno-fcis-patch" }
+zeno-fcis-plan = { path = "../crates/zeno-fcis-plan" }
+zeno-fcis-project = { path = "../crates/zeno-fcis-project" }
+zeno-fcis-receipt = { path = "../crates/zeno-fcis-receipt" }
+zeno-fcis-refine = { path = "../crates/zeno-fcis-refine" }
+zeno-fcis-schema = { path = "../crates/zeno-fcis-schema" }
+zeno-fcis-shell = { path = "../crates/zeno-fcis-shell" }
+zeno-fcis-spec = { path = "../crates/zeno-fcis-spec" }
+zeno-fcis-transition = { path = "../crates/zeno-fcis-transition" }
+zeno-fcis-value = { path = "../crates/zeno-fcis-value" }
+
+# A small module whose bytes the build compares across two builds.
+[profile.release]
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = 0
+overflow-checks = true
+
+[profile.dev]
+debug = 0
+incremental = false

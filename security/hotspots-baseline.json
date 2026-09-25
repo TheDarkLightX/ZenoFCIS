@@ -2026,29 +2026,29 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 53,
+      "production_lines": 54,
       "rank": 18,
       "score": 81,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            59
+            60
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
             28,
-            37,
-            59
+            38,
+            60
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
             19,
-            61
+            62
           ]
         }
       ],
@@ -2477,21 +2477,21 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 340,
+      "production_lines": 342,
       "rank": 24,
       "score": 81,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            360,
-            361,
+            364,
             365,
-            367,
-            374,
-            375,
-            383,
-            384
+            369,
+            371,
+            378,
+            379,
+            387,
+            388
           ]
         },
         {
@@ -2499,13 +2499,13 @@
           "lines": [
             69,
             75,
-            344
+            348
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            337
+            341
           ]
         },
         {
@@ -2518,24 +2518,24 @@
             80,
             82,
             132,
-            335
+            339
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
             28,
-            252
+            256
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
             61,
-            257,
-            285,
-            301,
-            318
+            261,
+            289,
+            305,
+            322
           ]
         },
         {
@@ -2543,7 +2543,7 @@
           "lines": [
             76,
             115,
-            352
+            356
           ]
         }
       ],
@@ -4893,21 +4893,21 @@
       "path_roles": [
         "workflow"
       ],
-      "production_lines": 36,
+      "production_lines": 38,
       "rank": 50,
       "score": 71,
       "signals": [
         {
           "id": "download-or-install",
           "lines": [
-            37
+            39
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
             23,
-            31
+            33
           ]
         },
         {
@@ -5255,9 +5255,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3742143,
+    "admitted_bytes": 3745212,
     "admitted_files": 218,
-    "inventory_sha256": "59d30607bae7da8c41f5a23630c0b0d7c8f891557254683c1a95df8fbf57396b",
+    "inventory_sha256": "45765d7ddffb32ac4819b82208507f1d6a915e4861108c9f6f6ecf565d552ce3",
     "ranked_above_minimum": 169,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

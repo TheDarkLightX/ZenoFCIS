@@ -8,6 +8,12 @@ publish = false
 # The emitted application is independent of any enclosing workspace.
 [workspace]
 
+# The SQLite shell is optional: the core builds without it, for a host or for
+# wasm32-unknown-unknown.
+[features]
+default = ["sqlite"]
+sqlite = ["dep:zeno-fcis-shell-sqlite"]
+
 [dependencies]
 zeno-fcis-authority = "=1.1.0"
 zeno-fcis-catalog = "=1.1.0"
@@ -22,7 +28,7 @@ zeno-fcis-plan = "=1.1.0"
 zeno-fcis-project = "=1.1.0"
 zeno-fcis-schema = "=1.1.0"
 zeno-fcis-shell = "=1.1.0"
-zeno-fcis-shell-sqlite = "=1.1.0"
+zeno-fcis-shell-sqlite = { version = "=1.1.0", optional = true }
 zeno-fcis-spec = "=1.1.0"
 zeno-fcis-transition = "=1.1.0"
 zeno-fcis-value = "=1.1.0"
@@ -36,6 +42,12 @@ zeno-fcis-laws = "=1.1.0"
 zeno-fcis-project = "=1.1.0"
 zeno-fcis-schema = "=1.1.0"
 zeno-fcis-spec = "=1.1.0"
+
+# The demonstration needs the shell; the library alone builds without it.
+[[bin]]
+name = "account-lockout"
+path = "src/main.rs"
+required-features = ["sqlite"]
 
 [profile.dev]
 debug = 0

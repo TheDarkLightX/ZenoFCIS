@@ -65,7 +65,10 @@ current checkout's schema-lowering and complete-invocation APIs. Run
 `python3 tools/check_generated_application.py` from the repository to compile
 and exercise it as an isolated consumer of this exact source. See the
 [template README](../crates/zeno-fcis-cli/templates/durable-counter/README.md)
-for its bounded semantics and local demonstration limits.
+for its bounded semantics and local demonstration limits. In every application
+template the SQLite shell is the `sqlite` feature, on by default; the core
+builds without it, including for `wasm32-unknown-unknown`, which the same gate
+checks.
 
 Four more development templates build realistic applications the same way:
 - [`account-lockout`](../crates/zeno-fcis-cli/templates/account-lockout/README.md):

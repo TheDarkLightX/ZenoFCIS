@@ -1,0 +1,130 @@
+:root {
+  --paper: #ffffff;
+  --panel: #f5f6f8;
+  --ink: #1b1f24;
+  --muted: #4a5260;
+  --line: #c9cfd8;
+  --link: #0b57a4;
+  --focus: #b3410f;
+  --accept-bg: #dcf1e3;
+  --accept-ink: #0f5a2b;
+  --failure-bg: #fde3d2;
+  --failure-ink: #7a2e04;
+  --reject-bg: #e9e9ef;
+  --reject-ink: #3b3f4b;
+  --refused-bg: #fff2bf;
+  --refused-ink: #5c4300;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14171c;
+    --panel: #1e232b;
+    --ink: #e8ebf0;
+    --muted: #aab3c0;
+    --line: #3c4552;
+    --link: #8ec2ff;
+    --focus: #ffb27d;
+    --accept-bg: #133f26;
+    --accept-ink: #b9f0cc;
+    --failure-bg: #4a2410;
+    --failure-ink: #ffd3ba;
+    --reject-bg: #2c313c;
+    --reject-ink: #d6dae3;
+    --refused-bg: #4a3d0d;
+    --refused-ink: #ffe9a3;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+code, .hash { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; }
+.hash { word-break: break-all; }
+
+a { color: var(--link); }
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.banner, main, footer { max-width: 64rem; margin: 0 auto; padding: 1rem 1.25rem; }
+.banner { padding-top: 2rem; }
+.banner h1 { font-size: 1.8rem; line-height: 1.2; margin: 0 0 0.5rem; }
+.banner p { margin: 0; color: var(--muted); }
+
+h2 { font-size: 1.4rem; margin: 2rem 0 0.75rem; }
+h3 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+.prose p, .prose li { max-width: 70ch; }
+.prose ul { padding-left: 1.25rem; }
+details { margin: 0.75rem 0; }
+summary { cursor: pointer; font-weight: 600; }
+
+.controls {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.controls .help, .panel .help { margin: 0; color: var(--muted); }
+.field label { display: block; font-weight: 600; }
+.field input[type="number"] { width: 12rem; padding: 0.4rem 0.5rem; font: inherit; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); }
+.field input[type="checkbox"] { width: 1.1rem; height: 1.1rem; vertical-align: -0.15rem; margin-right: 0.35rem; }
+.row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+
+button {
+  font: inherit;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--ink); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.status { min-height: 1.5rem; margin: 0.5rem 0 1rem; font-weight: 600; }
+
+.panels { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); margin-bottom: 1rem; }
+.panel { padding: 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; margin: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+
+.outbox, .timeline { list-style: none; margin: 0; padding: 0; }
+.outbox li, .timeline li { padding: 0.6rem 0; border-top: 1px solid var(--line); }
+.outbox li:first-child, .timeline li:first-child { border-top: 0; }
+.empty { color: var(--muted); }
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+.badge.accept { background: var(--accept-bg); color: var(--accept-ink); }
+.badge.failure { background: var(--failure-bg); color: var(--failure-ink); }
+.badge.reject { background: var(--reject-bg); color: var(--reject-ink); }
+.badge.refused { background: var(--refused-bg); color: var(--refused-ink); }
+
+.entry-head { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; align-items: baseline; }
+.entry-head .request { font-weight: 600; }
+.entry-body { margin: 0.35rem 0 0; color: var(--muted); }
+.entry-body .laws { margin: 0.25rem 0 0; padding-left: 1.25rem; }
+.entry-body details { margin: 0.25rem 0 0; }
+.entry-body summary { font-weight: 500; color: var(--muted); }
+.transition { display: block; }
