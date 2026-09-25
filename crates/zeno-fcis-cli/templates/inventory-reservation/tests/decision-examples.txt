@@ -5,7 +5,7 @@
 # so the drafting was not blind to them. A second AI agent, reading only
 # README.md and this file, checked the first 16 examples and suggested the
 # last 4, which test rule order and the accepted side of the capacity limits.
-# Review by the project's owner: pending.
+# Reviewed and accepted by the project's owner on 2026-09-24.
 #
 # Numeric IDs come from project.zeno:
 # - state fields 110 available and 111 reserved;

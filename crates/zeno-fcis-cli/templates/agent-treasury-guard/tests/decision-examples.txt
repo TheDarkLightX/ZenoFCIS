@@ -2,7 +2,7 @@
 #
 # Provenance: drafted on 2026-09-24 from the rules in README.md by the AI
 # agent that wrote the program and law checker, so the drafting was not blind
-# to the code. Review by the project's owner: pending.
+# to the code. Reviewed and accepted by the project's owner on 2026-09-24.
 #
 # Numeric IDs come from project.zeno:
 # - state fields 130 quote (0 to 20), 131 base (0 to 20), 132 spent_today

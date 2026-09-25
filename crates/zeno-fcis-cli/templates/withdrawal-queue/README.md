@@ -91,10 +91,11 @@ The rules apply in this order, and the first that applies decides:
      honored: nothing is paid and `pause` becomes 2, so the alarm's own tick
      and the next two pay nothing;
    - otherwise the controller pays: the priority lane when both lanes are
-     due, the due lane when one is, nothing when none is. After a payout, the
-     paid lane becomes empty with amount 0, `balance` decreases by the paid
+     due, the due lane when one is, nothing when none is. `must_serve`
+     becomes false, whether or not a lane is paid. After a payout, the paid
+     lane becomes empty with amount 0, `balance` decreases by the paid
      amount, one payout request for that lane and amount is queued, and
-     priority moves to the other lane. `must_serve` becomes false.
+     priority moves to the other lane.
 
    In every case an arrived lane that was not paid becomes pending.
 

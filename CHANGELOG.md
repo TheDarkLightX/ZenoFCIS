@@ -147,7 +147,7 @@ embedded in ZenoFCIS values.
     law that now states its rule, a lifecycle test, a determinism probe over
     864 inputs, and clean purity results. The gate, the release packager,
     and the ATDD scenarios cover it with the other examples. The decision
-    examples await review by the project's owner.
+    examples were reviewed and accepted by the project's owner on 2026-09-24.
 
 - Add the `withdrawal-queue` application template: a vault with two
   withdrawal lanes whose keeper tick runs a controller step that
@@ -209,7 +209,7 @@ embedded in ZenoFCIS values.
   Python evaluation of the same rule base. The template also carries the
   rule base as a Tau Language specification with a local check script; it
   needs IDNI's binary and is not part of any gate. The decision examples
-  await review by the project's owner.
+  were reviewed and accepted by the project's owner on 2026-09-24.
 
 - Give `zeno-fcis prove` a system model: inductive claims.
   `claim ID name BACKEND inductive assume [...] accept [...] failure [...] = INVARIANT;`
@@ -269,8 +269,8 @@ embedded in ZenoFCIS values.
   decision examples, a conformance test through the running application,
   direct law-checker tests, a lifecycle test, a determinism probe, and clean
   purity results. During development, every defect planted in a template's
-  program or law checker failed a named test. The decision examples await
-  review by the project's owner.
+  program or law checker failed a named test. The decision examples were
+  reviewed and accepted by the project's owner on 2026-09-24.
   - `tools/check_generated_application.py` and the release packager build and
     test each as an isolated package and compare its demonstration summary.
     `tools/check_synthesis.py` replays the inventory synthesis in Rust, Python,
@@ -368,7 +368,7 @@ embedded in ZenoFCIS values.
   domain, genesis, reachability of every admitted state, and twelve examples
   drafted from the README (`tests/decision-examples.txt`). Their author had
   seen the model artifacts, a second reviewer checked them against the README
-  alone, and owner review is pending. Swapping two same-type adapter bindings fails these tests.
+  alone, and the project's owner accepted them on 2026-09-23. Swapping two same-type adapter bindings fails these tests.
 
 - Retry a process start a bounded number of times, about 250 ms in total, when
   its executable is busy (`ETXTBSY`), in the formal-tools process adapter

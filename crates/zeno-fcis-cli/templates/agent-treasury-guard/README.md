@@ -112,8 +112,8 @@ The rules apply in this order, and the first that applies decides:
     treasury holds, is rejected with `below_reserve` (211).
 13. Otherwise the command is accepted, or commits failure `swap_failed`
     (212), as the table says. `last_seen` becomes `now`. If `now` falls on a
-    later day than `last_seen`, `spent_today` restarts from 0 before a
-    proposal's value is added.
+    later day than `last_seen`, `spent_today` restarts from 0, whatever the
+    command; an accepted proposal then adds its value.
 
 A rejection changes nothing and queues nothing. Requests go to `zenodex` on
 channel 300. A request carries `intent_number` (160, the proposal's tick),

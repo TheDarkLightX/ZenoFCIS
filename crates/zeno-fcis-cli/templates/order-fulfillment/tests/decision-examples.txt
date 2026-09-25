@@ -4,7 +4,7 @@
 # agent that wrote the program and law checker, so the drafting was not blind
 # to the code. A second AI agent, reading only README.md and this file,
 # checked the first version of these examples and suggested the rule-order
-# and boundary cases added since. Review by the project's owner: pending.
+# and boundary cases added since. Reviewed and accepted by the project's owner on 2026-09-24.
 #
 # Numeric IDs come from project.zeno:
 # - state fields 120 status and 121 payment_attempts;
