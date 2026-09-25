@@ -14,6 +14,9 @@ from deploy_check import DeployCheckError, dump_dom, element_text, find_chrome
 
 class BrowserCompletionTests(unittest.TestCase):
     requested_chrome = None
+    # The deadline includes a cold Chrome start, which can exceed five
+    # seconds on a hosted CI runner before it makes the first page request.
+    timeout_ms = 30000
 
     @classmethod
     def setUpClass(cls):
@@ -53,14 +56,14 @@ class BrowserCompletionTests(unittest.TestCase):
 
     def test_waits_for_asynchronous_completion(self):
         with tempfile.TemporaryDirectory(prefix='zeno-browser-ready-') as profile:
-            dom = dump_dom(self.chrome, Path(profile), self.base + '/delayed', timeout_ms=15000)
+            dom = dump_dom(self.chrome, Path(profile), self.base + '/delayed', timeout_ms=self.timeout_ms)
         self.assertEqual(json.loads(element_text(dom, 'results')), {'done': True})
         self.assertIn('/reply', self.requests)
 
     def test_pending_page_fails_at_wall_clock_deadline(self):
         with tempfile.TemporaryDirectory(prefix='zeno-browser-pending-') as profile:
             with self.assertRaisesRegex(DeployCheckError, 'page not ready|timed out waiting for'):
-                dump_dom(self.chrome, Path(profile), self.base + '/pending', timeout_ms=5000)
+                dump_dom(self.chrome, Path(profile), self.base + '/pending', timeout_ms=self.timeout_ms)
         self.assertIn('/pending', self.requests)
 
 
