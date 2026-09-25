@@ -6,6 +6,22 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The demo site is ready for GitHub Pages. `.github/workflows/pages.yml`
+  builds `site/public` with `site/build.py` on a push to `main` or a manual
+  run, and deploys it with `actions/deploy-pages` when the ref is `main`;
+  every action is pinned by commit. The page's scripts are `.js` modules,
+  which `site/package.json` marks as ES modules for Node; the page fetches
+  its module relative to its own script; and each template's README is
+  linked on GitHub rather than copied into the artifact.
+  `site/tests/deploy_check.py` serves the exact artifact from a subpath
+  (`/ZenoFCIS/`) on a server that serves nothing at the root and checks it in
+  headless Chrome: a harness runs the README's demonstration through the
+  served module and its results must match the gate's summary, and the page
+  itself must render its genesis. `tools/check_assurance.py` allows
+  `pages: write` and `id-token: write` in `pages.yml` only, the two scopes
+  the deploy action needs; its self-test shows any other write scope, and
+  those scopes in another workflow, still refused. Nothing is published:
+  merging to `main` is the owner's decision.
 - Add twelve decision examples to three application templates, for rules and
   rule precedences that a blind review of the first 72 examples against the
   READMEs found untested. `compliance-gateway` (now 28): a reinstatement by a

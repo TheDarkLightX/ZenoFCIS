@@ -1,8 +1,8 @@
 // The page: sends each request to the module and renders what the authority
 // returned. Every context value, including the time, comes from the form.
 
-import { instantiate } from "./demo-module.mjs";
-import { DEMONSTRATION } from "./demonstration.mjs";
+import { instantiate } from "./demo-module.js";
+import { DEMONSTRATION } from "./demonstration.js";
 
 const LATEST_TIME = 4102444800;
 const STEP_DELAY_MS = 400;
@@ -175,7 +175,9 @@ element("reset").addEventListener("click", () => {
 element("request").addEventListener("submit", (event) => event.preventDefault());
 
 try {
-  const response = await fetch("account-lockout.wasm");
+  // Relative to this script, not to the document, so the page works from any
+  // path it is served at.
+  const response = await fetch(new URL("account-lockout.wasm", import.meta.url));
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   demo = await instantiate(await response.arrayBuffer());
   reset();

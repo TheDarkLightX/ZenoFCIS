@@ -15,17 +15,19 @@ In order:
 4. The module: a release build for wasm32-unknown-unknown, twice, with the
    application and the demo crate rebuilt from scratch in between (the library
    crates come from the cache), and identical bytes required. The result is
-   copied to site/public/account-lockout.wasm, with the application's README
-   beside it for the page to link.
+   copied to site/public/account-lockout.wasm.
 5. `node site/tests/replay.mjs`.
-6. `node --check` on every script in site/public/: the replay loads only the
-   module loader, so this is what catches a syntax error in the page's own
-   script before a browser does.
+6. `node --check` on every script under site/public/ and site/tests/: the
+   replay loads only the module loader, so this is what catches a syntax
+   error in the page's own script before a browser does.
+7. `site/tests/deploy_check.py`: the exact artifact, served from a subpath,
+   in headless Chrome. `--no-browser` skips it on a machine without Chrome.
 
-Requirements: Rust 1.97.1 with the wasm32-unknown-unknown target, Node 22, and
-python3. CARGO_TARGET_DIR is honoured; the wasm32 artifacts go under its
-wasm32-unknown-unknown/ subdirectory. The module's paths are remapped, so it
-names /zeno-fcis, /target, and /registry instead of local directories.
+Requirements: Rust 1.97.1 with the wasm32-unknown-unknown target, Node 22,
+python3, and Chrome for step 7. CARGO_TARGET_DIR is honoured; the wasm32
+artifacts go under its wasm32-unknown-unknown/ subdirectory. The module's
+paths are remapped, so it names /zeno-fcis, /target, and /registry instead of
+local directories.
 """
 
 from __future__ import annotations
@@ -48,8 +50,6 @@ APP = SITE / "apps" / TEMPLATE
 DEMO = SITE / "demos" / TEMPLATE
 DEMO_CRATE = "zeno-fcis-site-account-lockout"
 MODULE = SITE / "public" / f"{TEMPLATE}.wasm"
-# The template's README, as shipped, for the page to link.
-README = SITE / "public" / f"{TEMPLATE}.README.md"
 TARGET = "wasm32-unknown-unknown"
 
 sys.path.insert(0, str(ROOT / "tools"))
@@ -158,6 +158,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--relock", action="store_true",
                         help="regenerate site/Cargo.lock from the workspace lock before checking it")
+    parser.add_argument("--no-browser", action="store_true",
+                        help="skip the headless-Chrome check of the served artifact")
+    parser.add_argument("--chrome", help="the Chrome binary for that check (default: the first on PATH)")
     args = parser.parse_args()
     environment = dict(os.environ)
     environment.setdefault("CARGO_INCREMENTAL", "0")
@@ -166,12 +169,17 @@ def main() -> None:
     check_site(environment)
     module = reproducible_module(environment)
     MODULE.write_bytes(module)
-    shutil.copyfile(APP / "README.md", README)
     print(f"{MODULE.relative_to(ROOT)}: {len(module)} bytes, sha256 {hashlib.sha256(module).hexdigest()}, "
           "identical across two builds")
     run(["node", str(SITE / "tests" / "replay.mjs")], ROOT, environment)
-    for script in sorted((SITE / "public").glob("*.mjs")):
+    scripts = [*(SITE / "public").glob("*.js"), *(SITE / "tests").glob("**/*.js"), *(SITE / "tests").glob("*.mjs")]
+    for script in sorted(scripts):
         run(["node", "--check", str(script)], ROOT, environment)
+    if args.no_browser:
+        print("site: the browser check was skipped")
+    else:
+        run(["python3", str(SITE / "tests" / "deploy_check.py")] + (["--chrome", args.chrome] if args.chrome else []),
+            ROOT, environment)
     print("site: built and tested")
 
 
