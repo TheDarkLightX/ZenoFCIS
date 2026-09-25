@@ -64,7 +64,9 @@ This makes pure reference and SQLite delivery identities byte-identical.
 `deliver_next` uses the exact owned interpreter instance; it accepts no
 caller-supplied destination.
 `MemoryDestination` is the included deterministic idempotent destination stub
-and rejects delivery-ID collisions.
+and rejects delivery-ID collisions. It, the `IdempotentDestination` contract,
+and `DeliveryCollision` are defined in `zeno-fcis-shell`, the pure reference
+model, and re-exported by this crate.
 
 Schema v5 is explicit in SQLite `user_version`. Each authorization stores a
 positive unique `state_version`, and reopen requires the exact gap-free sequence

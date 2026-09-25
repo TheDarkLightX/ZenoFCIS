@@ -413,7 +413,7 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 1536,
+      "production_lines": 1492,
       "rank": 2,
       "score": 98,
       "signals": [
@@ -425,22 +425,22 @@
             84,
             98,
             212,
-            562,
-            676,
-            1017
+            508,
+            622,
+            963
           ]
         },
         {
           "id": "canonical-commitment",
           "lines": [
-            357,
-            362,
-            564,
-            569,
-            642,
-            672,
-            1020,
-            1193
+            303,
+            308,
+            510,
+            515,
+            588,
+            618,
+            966,
+            1139
           ]
         },
         {
@@ -449,37 +449,37 @@
             78,
             87,
             157,
-            435,
-            567,
-            573,
-            588,
-            703
+            381,
+            513,
+            519,
+            534,
+            649
           ]
         },
         {
           "id": "sql-boundary",
           "lines": [
-            438,
-            448,
-            458,
-            473,
-            491,
-            611,
-            652,
-            675
+            384,
+            394,
+            404,
+            419,
+            437,
+            557,
+            598,
+            621
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            503,
-            636,
-            798,
-            799,
-            1008,
-            1513,
-            1514,
-            1586
+            449,
+            582,
+            744,
+            745,
+            954,
+            1459,
+            1460,
+            1532
           ]
         }
       ],
@@ -5255,9 +5255,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3740666,
+    "admitted_bytes": 3742143,
     "admitted_files": 218,
-    "inventory_sha256": "6787370216423d047e788a8b34c10fa736c0048d3f5589541f0f2860dc848738",
+    "inventory_sha256": "59d30607bae7da8c41f5a23630c0b0d7c8f891557254683c1a95df8fbf57396b",
     "ranked_above_minimum": 169,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

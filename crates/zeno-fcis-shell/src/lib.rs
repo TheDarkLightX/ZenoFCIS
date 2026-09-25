@@ -10,6 +10,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -357,6 +358,74 @@ pub fn acknowledge(
     })
 }
 
+/// Idempotent destination boundary: the contract a delivery adapter refines.
+///
+/// It lives here, in the pure reference model; `zeno-fcis-shell-sqlite`
+/// re-exports it under its previous path.
+pub trait IdempotentDestination {
+    /// Destination-specific failure type.
+    type Error: fmt::Display;
+
+    /// Delivers once by identity and returns the observed exact entry hash.
+    fn deliver(
+        &mut self,
+        delivery_id: Hash32,
+        entry_hash: Hash32,
+        entry: &OutboxEntry,
+    ) -> Result<Hash32, Self::Error>;
+}
+
+/// Deterministic destination stub that rejects identity/content collisions.
+///
+/// It performs no I/O and needs only `alloc`, so it lives here;
+/// `zeno-fcis-shell-sqlite` re-exports it under its previous path.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct MemoryDestination {
+    delivered: BTreeMap<Hash32, Hash32>,
+}
+
+impl MemoryDestination {
+    /// Returns the exact number of distinct delivered identities.
+    #[must_use]
+    pub fn delivered_count(&self) -> usize {
+        self.delivered.len()
+    }
+}
+
+/// Memory-destination collision failure, defined here and re-exported by
+/// `zeno-fcis-shell-sqlite`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct DeliveryCollision;
+
+impl fmt::Display for DeliveryCollision {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("delivery identity already binds different entry content")
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for DeliveryCollision {}
+
+impl IdempotentDestination for MemoryDestination {
+    type Error = DeliveryCollision;
+
+    fn deliver(
+        &mut self,
+        delivery_id: Hash32,
+        entry_hash: Hash32,
+        _: &OutboxEntry,
+    ) -> Result<Hash32, Self::Error> {
+        match self.delivered.get(&delivery_id) {
+            Some(existing) if *existing != entry_hash => Err(DeliveryCollision),
+            Some(existing) => Ok(*existing),
+            None => {
+                self.delivered.insert(delivery_id, entry_hash);
+                Ok(entry_hash)
+            }
+        }
+    }
+}
+
 fn hash_outbox_entry<H: CommitmentHasher>(entry: &OutboxEntry) -> Result<Hash32, ShellError> {
     let domain = Domain::new("zeno-fcis/outbox-entry", 1).map_err(ShellError::Encode)?;
     let bytes = entry.canonical_bytes().map_err(ShellError::Encode)?;
@@ -583,5 +652,23 @@ mod tests {
             pending.entry_hash(),
         );
         assert!(acknowledged.is_ok());
+    }
+
+    #[test]
+    fn memory_destination_delivers_once_by_identity_and_refuses_other_content() {
+        let entry = OutboxEntry::new(0, 1, Value::U128(1), Value::U128(2));
+        let (id, hash, other) = (
+            Hash32::new([1; 32]),
+            Hash32::new([2; 32]),
+            Hash32::new([3; 32]),
+        );
+        let mut destination = MemoryDestination::default();
+        assert_eq!(destination.deliver(id, hash, &entry), Ok(hash));
+        assert_eq!(destination.deliver(id, hash, &entry), Ok(hash));
+        assert_eq!(
+            destination.deliver(id, other, &entry),
+            Err(DeliveryCollision)
+        );
+        assert_eq!(destination.delivered_count(), 1);
     }
 }
