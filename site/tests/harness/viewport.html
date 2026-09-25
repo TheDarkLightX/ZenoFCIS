@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Deploy check viewport harness</title>
+</head>
+<body>
+<p>
+  Loads the page named by <code>?page=</code> in a viewport-sized frame, waits
+  for its load-time demonstration, and prints where the frame is scrolled
+  and where the page's banner is, for <code>site/tests/deploy_check.py</code>.
+  Not part of the site.
+</p>
+<iframe id="page" title="The served page" width="1280" height="800"></iframe>
+<pre id="results">pending</pre>
+<script type="module" src="viewport.js"></script>
+</body>
+</html>
