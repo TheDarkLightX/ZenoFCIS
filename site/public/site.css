@@ -47,7 +47,7 @@ body {
 }
 
 code, .hash { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; }
-.hash { word-break: break-all; }
+.hash { overflow-wrap: anywhere; }
 
 a { color: var(--link); }
 a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {

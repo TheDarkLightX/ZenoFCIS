@@ -66,3 +66,10 @@ The strength of what the template itself checks is stated in its README and
 repeated on the page: laws evaluated at run time on every decision; tests on a
 host over 20 examples and 606 grid inputs; and claim 600's induction step,
 which CVC5 attests with `unsat` and which is not proved.
+
+## Next
+
+A public page should open in a working state: for example, with the README's
+demonstration already decided when the page loads, and labelled as such, so the
+first view shows the judge at work. Publishing waits for the owner's
+confirmation.
