@@ -1,5 +1,7 @@
 // The page: one panel per example, built when its section is opened. Each
-// example's description and module are loaded only then.
+// example's description and module are loaded only then. The section that
+// is open when the page loads also runs its README's demonstration at once,
+// so the first view shows the judge at work.
 
 import { mount } from "./panel.js";
 
@@ -25,9 +27,14 @@ async function open(section) {
   return panel;
 }
 
+async function openOnLoad(section) {
+  const panel = await open(section);
+  if (panel !== null) await panel.runDemonstration({ instant: true, onLoad: true });
+}
+
 for (const section of document.querySelectorAll("details[data-template]")) {
   section.addEventListener("toggle", () => {
     if (section.open) open(section);
   });
-  if (section.open) open(section);
+  if (section.open) openOnLoad(section);
 }

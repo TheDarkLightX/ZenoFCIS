@@ -120,11 +120,13 @@ description, mounts the panel as the page does, runs the README's
 demonstration through it, and prints the results and what the panel
 rendered, which must match the gate's summary, one timeline entry per
 decision, and the proposer's list where the template describes one. The page
-itself must have loaded the module of the panel that is open on load,
-rendered its state, and fetched no other module. A page that loaded from the
-subpath alone is a page whose relative paths hold. (One template per dump,
-because Chrome's virtual-time budget is spent across module rounds: a single
-round finishes within it, several do not.)
+itself must have loaded the module of the section that is open on load, run
+that README's demonstration, said so in its status, rendered one timeline
+entry per decision with the gate's decision on it, and fetched no other
+module. A page that loaded from the subpath alone is a page whose relative
+paths hold. (One template per dump, because Chrome's virtual-time budget is
+spent across module rounds: a single round finishes within it, several do
+not.)
 
 The strength of what each template itself checks is stated in its README and
 repeated in its section of the page, in the README's own scoped words: laws
@@ -151,8 +153,11 @@ owner. The page links each template's README at
 `https://github.com/TheDarkLightX/ZenoFCIS/blob/main/...`; those links resolve
 once this work is on `main`, which is also the only branch Pages deploys from.
 
-## Next
+## Opening in a working state
 
-A page that opens in a working state, with the first section's README
-demonstration already decided when the page loads, and labelled as such, so
-the first view shows the judge at work.
+The section that is open when the page loads, account-lockout, runs its
+README's demonstration at once and labels the result: its status says the
+demonstration was decided in this browser when the page loaded, and the
+timeline holds one entry per decision, so the first view shows the judge at
+work. Every other section resets to its genesis when it is opened, ready for
+the viewer's requests or its own demonstration button.
