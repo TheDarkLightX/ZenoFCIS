@@ -245,7 +245,7 @@ The tests check the running application:
   matches the finite domain in both directions, that genesis is exactly zero
   strikes, that all 4 standings are reachable from it, that the `RuleId`
   variants and the committed-failure reasons match `rules.txt` in name and
-  order, and that the 24 examples in `tests/decision-examples.txt` match and
+  order, and that the 28 examples in `tests/decision-examples.txt` match and
   reach every rule of the rule base.
 - `tests/claims.rs` checks claim 600's base case on the exact genesis
   standing, its law checker's observer, and its assumptions against the law

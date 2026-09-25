@@ -644,7 +644,7 @@ fn decision_examples_match_the_executed_application_and_reach_every_rule() {
         }
         count += 1;
     }
-    assert_eq!(count, 24);
+    assert_eq!(count, 28);
     // Every rule of the rule base decides at least one example.
     assert_eq!(fired, (0..rules.rules().len()).collect());
     assert_eq!(

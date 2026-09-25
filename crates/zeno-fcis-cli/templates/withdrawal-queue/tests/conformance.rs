@@ -436,17 +436,46 @@ fn every_reachable_decision_in_the_grid_matches_the_reference_model() {
     let (graph, decisions) = explored();
     assert_eq!(graph.len(), 420);
     assert_eq!(*decisions, 3360);
-    // Every reachable vault satisfies law 500 and the controller's invariant.
+    // Every reachable vault keeps the balance and the lanes' amounts within
+    // law 500; the must-serve part of the law is checked below.
     for state in graph.keys() {
         assert!(state.balance <= MAX_BALANCE);
         assert!(state.balance >= state.amount_a + state.amount_b);
         assert_eq!(state.lane_a == EMPTY, state.amount_a == 0);
         assert_eq!(state.lane_b == EMPTY, state.amount_b == 0);
-        if state.must_serve {
-            assert_eq!(state.pause, 0);
-            assert!(state.lane_a == PENDING || state.lane_b == PENDING);
+    }
+}
+
+#[test]
+fn must_serve_is_reached_only_with_a_pending_lane_and_every_tick_from_it_pays() {
+    let (graph, _) = explored();
+    let mut vaults = 0;
+    for (state, outcomes) in graph {
+        if !state.must_serve {
+            continue;
+        }
+        vaults += 1;
+        // Only the tick that ends a pause with a lane due sets must-serve,
+        // that lane is pending after the tick, and only a payout empties it.
+        assert_eq!(state.pause, 0, "{state:?}");
+        assert!(
+            state.lane_a == PENDING || state.lane_b == PENDING,
+            "{state:?}"
+        );
+        // So the paying branch never runs in must-serve with nothing due:
+        // every tick from such a vault, with or without the alarm, pays one
+        // lane and ends must-serve.
+        for (((action_id, _, _), _, _), outcome) in outcomes {
+            if *action_id == TICK {
+                assert_eq!(outcome.payouts.len(), 1, "{state:?} {outcome:?}");
+                assert!(!outcome.post.must_serve, "{state:?} {outcome:?}");
+            }
         }
     }
+    // One lane pending and the other empty (14 each way), both pending (16),
+    // or one pending and the other arrived (16 each way), over every amount,
+    // every covering balance, and both priorities.
+    assert_eq!(vaults, 76);
 }
 
 #[test]
@@ -645,7 +674,7 @@ fn decision_examples_match_the_executed_application() {
         covered.insert((expected.kind, expected.reason));
         count += 1;
     }
-    assert_eq!(count, 24);
+    assert_eq!(count, 26);
     assert_eq!(
         covered,
         BTreeSet::from([

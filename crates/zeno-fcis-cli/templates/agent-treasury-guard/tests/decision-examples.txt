@@ -4,6 +4,13 @@
 # agent that wrote the program and law checker, so the drafting was not blind
 # to the code. Reviewed and accepted by the project's owner on 2026-09-24.
 #
+# Examples 25 to 30 were added on 2026-09-25 to cover cases that a blind
+# review of the first 24 against README.md found untested: the reserve and
+# slippage rules on a sell, a price from the future, two rule-order cases,
+# and a failure whose refund is the held amount. An AI agent wrote them from
+# the rules in README.md. Review of these six by the project's owner:
+# pending.
+#
 # Numeric IDs come from project.zeno:
 # - state fields 130 quote (0 to 20), 131 base (0 to 20), 132 spent_today
 #   (0 to 4), 133 last_seen (tick 0 to 11), 134 pending (170 NoSwap,
@@ -55,3 +62,26 @@
 6 1 0 0 170 0 0 | 175 173 3 1 0 0 | 178 1 2 1 180 | reject 210 6 1 0 0 170 0 0 | -
 6 1 4 3 170 0 0 | 175 173 2 2 0 0 | 178 4 1 4 180 | accept - 4 1 2 4 171 2 2 | 4 183 184 2 2 6
 2 6 0 8 170 0 0 | 177 173 1 0 8 0 | 179 9 1 9 180 | reject 205 2 6 0 8 170 0 0 | -
+#
+# 25. A sell of 2 base from a treasury holding 1: the value of 2 is within
+#     the cap and the budget, and min_out 2 is the least minimum at price 1,
+#     so rule 12 decides: below_reserve.
+6 1 0 0 170 0 0 | 175 174 2 2 0 0 | 178 1 1 1 180 | reject 211 6 1 0 0 170 0 0 | -
+# 26. A sell of 1 base at price 2 must keep ceil(1 * 2 * 3 / 4) = 2 quote:
+#     min_out 1 is slippage_too_wide. Example 13 is the same sell with
+#     min_out 2.
+4 3 2 2 170 0 0 | 175 174 1 1 0 0 | 178 3 2 3 180 | reject 210 4 3 2 2 170 0 0 | -
+# 27. A price observed at tick 2, offered at tick 1, is from the future:
+#     stale_price.
+6 1 0 0 170 0 0 | 175 173 1 1 0 0 | 178 1 1 2 180 | reject 203 6 1 0 0 170 0 0 | -
+# 28. An unlisted model with a price two ticks old: rules 3 and 4 both apply,
+#     and rule 3, unapproved_model, decides.
+4 3 2 2 170 0 0 | 175 173 1 1 0 0 | 178 3 1 1 182 | reject 202 4 3 2 2 170 0 0 | -
+# 29. A buy of 3 from 4 quote with min_out 1: the least minimum is 3 and the
+#     buy would leave 1 quote, so rules 11 and 12 both apply, and rule 11,
+#     slippage_too_wide, decides. Example 16 is the same buy with min_out 3.
+4 3 0 4 170 0 0 | 175 173 3 1 0 0 | 178 5 1 5 180 | reject 210 4 3 0 4 170 0 0 | -
+# 30. The pending sell of 3 base fails, reported with the command's amount
+#     field at 1: the refund is the held 3, the budget stays committed, and
+#     the swap is cleared.
+2 3 3 9 172 3 3 | 177 173 1 0 9 0 | 179 10 1 10 180 | failure 212 2 6 3 10 170 0 0 | -
