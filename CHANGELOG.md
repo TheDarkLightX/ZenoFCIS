@@ -10,7 +10,11 @@ embedded in ZenoFCIS values.
   `project.zeno`, exactly as its `profile.rs` binds the law: `on commit,
   genesis` for the state invariant; `on accept`, `on failure`, or `on
   commit` for the action laws; and `on reject` for the counters' rejection
-  law. Laws without a formula (508, 509) stay in `profile.rs`.
+  law. The framework laws without a formula stay in `profile.rs`:
+  `reject_publishes_nothing` (509) in the six templates other than the
+  counters, and `no_committed_failures` (508) in inventory-reservation and
+  withdrawal-queue. In agent-treasury-guard, law 508 has a formula and
+  declares `on failure`.
   - Each `authority()` runs `LawManifest::check_declared_scopes` on its
     manifest and returns the mismatches before it builds the authority.
   - Each template has a test that the shipped manifest passes the check,
