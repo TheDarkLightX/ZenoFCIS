@@ -15,7 +15,7 @@ rust-version = "1.97.1"
 publish = false
 
 [workspace.lints.rust]
-# The C ABI needs pointer handling; only `common/src/abi.rs` allows it.
+# Only the exported symbols allow unsafe attributes; the ABI has no unsafe operations.
 unsafe_code = "deny"
 missing_docs = "warn"
 unreachable_pub = "warn"

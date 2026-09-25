@@ -6,6 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Invocation admission now validates the pre-state against the authority's
+  own schema and validation limits before issuing a witness that permits
+  program execution. Command/context and later artifact checks remain.
+- The browser API is now version 2: bounded scalar requests and replies,
+  private Wasm memory, and a 64-request session limit with reset. The raw
+  pointer and allocate/free interface is removed; modules and loader must be
+  deployed together. Compiled-module tests check exports, boundary handling,
+  capacity, and reset. Existing application decisions and canonical formats
+  are unchanged. The site states each law's actual decision scope.
+
 - Every example application template declares each law's scope in
   `project.zeno`, exactly as its `profile.rs` binds the law: `on commit,
   genesis` for the state invariant; `on accept`, `on failure`, or `on

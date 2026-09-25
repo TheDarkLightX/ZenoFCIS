@@ -959,7 +959,7 @@
       "path_roles": [
         "nominal-authority"
       ],
-      "production_lines": 2159,
+      "production_lines": 2163,
       "rank": 6,
       "score": 92,
       "signals": [
@@ -999,7 +999,7 @@
         {
           "id": "potential-amplification",
           "lines": [
-            2453
+            2457
           ]
         },
         {
@@ -5255,9 +5255,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3772645,
+    "admitted_bytes": 3775748,
     "admitted_files": 219,
-    "inventory_sha256": "5b5fc3ecdb0693a6203f4abf056a33116d19fcd20b79438ae52d1c8ca958e383",
+    "inventory_sha256": "b1f04431d700b429b733dea774e639bdad3e98a1b9fc760ffeaa8b7b4928fd06",
     "ranked_above_minimum": 170,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

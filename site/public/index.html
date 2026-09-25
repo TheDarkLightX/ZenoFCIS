@@ -66,8 +66,9 @@
         <summary>What is checked, and at what strength</summary>
         <ul>
           <li>
-            Laws 500 to 503, written in <code>project.zeno</code>, are evaluated
-            at run time on every decision before it can be published; law 509
+            Laws in <code>project.zeno</code> are evaluated at run time within
+            their declared scopes: 500 on every commit, 501 and 502 on accepts,
+            and 503 on committed failures; law 509
             is the framework's rule that a rejection publishes nothing. The
             panel shows each law's status as the evaluation reports it.
           </li>
@@ -124,7 +125,7 @@
         <ul>
           <li>
             Laws 500 to 506, written in <code>project.zeno</code>, are evaluated
-            at run time on every decision before it can be published: 500 on
+            at run time within their declared scopes: 500 on
             every commit, 501 to 505 on accepts, 506 on committed failures; law
             509 is the framework's rule that a rejection publishes nothing. In
             Rust, because formulas cannot see them: the rejection reason, the
@@ -251,8 +252,9 @@
             nothing with the synthesizer.
           </li>
           <li>
-            Laws 500 to 503 are evaluated at run time on every decision before
-            it can be published; law 509 is the framework's rule that a
+            Laws are evaluated at run time within their declared scopes: 500 on
+            every commit, 501 and 502 on accepts, and 503 on committed failures;
+            law 509 is the framework's rule that a
             rejection publishes nothing. In Rust: the rule base itself, the
             kind of decision and its reason, the exact ticket or alert, the
             absence of effects, and a zero genesis.
@@ -404,8 +406,8 @@
             arithmetic.
           </li>
           <li>
-            Laws 500 to 508 are evaluated at run time on every decision before
-            it can be published: 501 and 502 on every commit, 503 to 507 on
+            Laws are evaluated at run time within their declared scopes:
+            500 to 502 on every commit, 503 to 507 on
             accepts, 508 on committed failures; law 509 is the framework's rule
             that a rejection publishes nothing. In Rust: the rejection reason,
             the exact request, the absence of effects, and the genesis.

@@ -131,7 +131,8 @@ Suppose all of the following hold:
   are its declared range, because schema lowering takes them from
   `project.zeno` and refuses a binding that states others. The authority
   checks admissibility itself, against its own catalog's schema:
-  - the command and context when it admits an invocation;
+  - the pre-state, command and context when it admits an invocation, before
+    the decision program executes;
   - the initial state at genesis;
   - the pre-state and post-state of every transition before it can commit.
 
@@ -283,6 +284,12 @@ edits were reverted; none is committed.
 | Elaboration refuses a law assumed outside its declared scope (the check removed, or `on commit` taken as covering either kind) | `inductive_groups_are_checked_against_declared_law_scopes` |
 | A declared law scope, and its genesis flag, are part of the canonical bytes, and an unscoped law keeps its bytes | `law_scopes_parse_and_are_part_of_the_canonical_project`, `a_declared_range_is_part_of_the_canonical_project` |
 | The manifest check compares each declared scope, its genesis flag, and the law's existence | `a_manifest_must_enforce_the_scopes_its_project_declares`, in `zeno-fcis-laws` |
+
+Separately, the regression
+`admission_checks_pre_state_under_the_authoritys_validation_limits` in
+`zeno-fcis-authority` checks that an otherwise schema-admissible state over
+the authority's node limit is refused before an invocation witness is issued.
+This is an ordinary regression test, not a recorded mutation control.
 
 The pinned test `pinned_inductive_steps_agree_with_exhaustive_replay` checks
 the SMT encoding itself. For each claim, CVC5 and Z3 must agree with an

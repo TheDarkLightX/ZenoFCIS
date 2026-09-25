@@ -111,7 +111,7 @@ impl Application for ComplianceGateway {
 // SAFETY: the `demo_` prefix keeps every exported symbol unique.
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-pub extern "C" fn demo_reset() -> *mut u8 {
+pub extern "C" fn demo_reset() -> u32 {
     zeno_fcis_site_common::abi::reset::<ComplianceGateway>()
 }
 
