@@ -60,9 +60,13 @@ pub fn authority() -> AppResult<Authority> {
         domain,
         initial.value().value(),
     ))?;
+    // The scopes `project.zeno` declares, which `check` and `prove` read,
+    // must be the scopes this authority enforces.
+    let manifest = profile::manifest();
+    checked(manifest.check_declared_scopes(&profile::project()))?;
     let laws = checked(verify_project_laws::<RustCryptoSha256, _, _>(
         project.catalog(),
-        profile::manifest(),
+        manifest,
         profile::source_hash(),
         vec![],
         LawLimits::default(),

@@ -235,19 +235,25 @@ claim 601 budget_never_exceeded all inductive assume [501, 502] accept [505, 507
 Claim 600 states law 500 over the treasury before a decision, and assumes
 the clock and day-accounting laws on every commit, the proposal and
 settlement laws on accepts, and the refund law on committed failures, which
-is where the law manifest enforces them. Claim 601 states the budget's part
+is where the law manifest enforces them. Each law declares that scope in
+`project.zeno`, so elaboration also checks the claims' groups against the
+declared scopes, and `authority()` checks the manifest against them before
+it builds the authority. Claim 601 states the budget's part
 on its own, from five of those laws. For each, CVC5 answers `unsat`: no
 transition that satisfies the assumed laws, with the variant fields over
 their declared values, starts within the invariant and ends outside it, for
 every integer value of every other field. That answer is attested, not
 independently checked, and it says nothing about this application until
-`tests/claims.rs` checks three things:
+`tests/claims.rs` checks four things:
 - the law checker's own observer, `laws::state_observations`, reads every
   field each invariant reads, and each invariant has its stated value on
   every treasury the schema admits;
 - each invariant holds on the exact genesis treasury;
 - the manifest enforces laws 501 and 502 on every commit, 503 to 507 on
-  accepts, and 508 on committed failures, as the claims assume.
+  accepts, and 508 on committed failures, as the claims assume;
+- the manifest enforces each law exactly on the decisions `project.zeno`
+  declares for it, and a manifest that bound law 501 to accepts only, or to
+  the genesis, is reported.
 
 Stating claim 600 found six transitions that the draft's formulas admitted
 and these rules forbid: a buy of 0, which left a pending buy holding 0; a
@@ -309,7 +315,8 @@ committed patch, and the outbox, and is compared with the expected outcome:
   would fail to stage.
 - `tests/claims.rs` connects the claims to the application: claim 600
   restates law 500 exactly; the manifest enforces each assumed law where
-  the claims assume it, and refuses a law assumed outside its scope; the law
+  the claims assume it, refuses a law assumed outside its scope, and
+  enforces each law exactly on the decisions `project.zeno` declares; the law
   checker's observer reads every field each invariant reads, and gives each
   invariant its stated value on all 105,840 treasuries the schema admits at
   one tick, which the invariants do not read; and both invariants hold on
@@ -365,7 +372,7 @@ the pinned solvers, which the gate does not require.
 
    ```text
    $ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
-   checked project.zeno: project=1 components=1 claims=2 unresolved_obligations=2 semantic_program_hash=2b0328797565ece7bd0991d3b487fe1444fa9730afdaffaf6ca1f5a54c43919c
+   checked project.zeno: project=1 components=1 claims=2 unresolved_obligations=2 semantic_program_hash=20c1c5476833ac25dd033b13ec8b8359a96fc622edce9cec201ff5184b3042d9
    ```
 
 2. `cargo +1.97.1 build` ran `build.rs`, which lowered the schema with the

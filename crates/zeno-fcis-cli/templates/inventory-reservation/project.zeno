@@ -38,10 +38,10 @@ component 400 stock {
 merge [400];
 // Every combination of the two fields is a valid state, so the invariant is
 // the bounds themselves; the laws below constrain each movement.
-law 500 stock_within_bounds = post.100.110 >= 0 && post.100.110 <= 5 && post.100.111 >= 0 && post.100.111 <= 5;
+law 500 stock_within_bounds on commit, genesis = post.100.110 >= 0 && post.100.110 <= 5 && post.100.111 >= 0 && post.100.111 <= 5;
 // Units are conserved: reserving and releasing only move units between the
 // two fields, shipping removes exactly the quantity, and restocking adds it.
-law 501 units_conserved = (command.101.120 == 150 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 151 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 152 -> post.100.110 + post.100.111 + command.101.121 == pre.100.110 + pre.100.111) && (command.101.120 == 153 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111 + command.101.121);
+law 501 units_conserved on accept = (command.101.120 == 150 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 151 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 152 -> post.100.110 + post.100.111 + command.101.121 == pre.100.110 + pre.100.111) && (command.101.120 == 153 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111 + command.101.121);
 // Only an authorized operator moves stock, and each action moves exactly its
 // quantity between the fields it names.
-law 502 exact_movement = context.102.130 == 1 && (command.101.120 == 150 -> post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (command.101.120 == 151 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 152 -> post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 153 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 == pre.100.111);
+law 502 exact_movement on accept = context.102.130 == 1 && (command.101.120 == 150 -> post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (command.101.120 == 151 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 152 -> post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 153 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 == pre.100.111);

@@ -94,40 +94,40 @@ merge [400];
 // the swap amounts are held only while a swap is pending: at least 1 unit,
 // with a minimum that is never negative. Claim 600 states the same invariant
 // over the treasury before a decision.
-law 500 treasury_within_limits = post.100.130 >= 2 && post.100.131 >= 0 && post.100.132 >= 0 && post.100.132 <= 4 && (post.100.134 == 170 -> post.100.135 == 0 && post.100.136 == 0) && (post.100.134 != 170 -> post.100.135 >= 1 && post.100.136 >= 0);
+law 500 treasury_within_limits on commit, genesis = post.100.130 >= 2 && post.100.131 >= 0 && post.100.132 >= 0 && post.100.132 <= 4 && (post.100.134 == 170 -> post.100.135 == 0 && post.100.136 == 0) && (post.100.134 != 170 -> post.100.135 >= 1 && post.100.136 >= 0);
 // Every committed decision carries a later tick than the last and records it,
 // so intent numbers, which are proposal ticks, are unique.
-law 501 commits_advance_the_clock = context.102.151 > pre.100.133 && post.100.133 == context.102.151;
+law 501 commits_advance_the_clock on commit = context.102.151 > pre.100.133 && post.100.133 == context.102.151;
 // `spent_today` counts the day's committed quote value: it restarts on a new
 // day (a day is 4 ticks), a buy adds its amount, a sell adds its amount at the
 // oracle price, and a settlement or failure adds nothing.
-law 502 spent_today_counts_the_day = (div_floor(context.102.151, 4) > div_floor(pre.100.133, 4) -> (command.101.140 != 175 -> post.100.132 == 0) && (command.101.140 == 175 && command.101.141 == 173 -> post.100.132 == command.101.142) && (command.101.140 == 175 && command.101.141 == 174 -> post.100.132 == command.101.142 * context.102.152)) && (div_floor(context.102.151, 4) == div_floor(pre.100.133, 4) -> (command.101.140 != 175 -> post.100.132 == pre.100.132) && (command.101.140 == 175 && command.101.141 == 173 -> post.100.132 == pre.100.132 + command.101.142) && (command.101.140 == 175 && command.101.141 == 174 -> post.100.132 == pre.100.132 + command.101.142 * context.102.152));
+law 502 spent_today_counts_the_day on commit = (div_floor(context.102.151, 4) > div_floor(pre.100.133, 4) -> (command.101.140 != 175 -> post.100.132 == 0) && (command.101.140 == 175 && command.101.141 == 173 -> post.100.132 == command.101.142) && (command.101.140 == 175 && command.101.141 == 174 -> post.100.132 == command.101.142 * context.102.152)) && (div_floor(context.102.151, 4) == div_floor(pre.100.133, 4) -> (command.101.140 != 175 -> post.100.132 == pre.100.132) && (command.101.140 == 175 && command.101.141 == 173 -> post.100.132 == pre.100.132 + command.101.142) && (command.101.140 == 175 && command.101.141 == 174 -> post.100.132 == pre.100.132 + command.101.142 * context.102.152));
 // An accepted proposal came from the agent under an approved model with a
 // price at most 1 tick old and no swap outstanding, and leaves one
 // outstanding; an accepted settlement came from the DEX, names the
 // outstanding intent, and leaves none; a failure is never accepted.
-law 503 proposal_and_settlement_authority = (command.101.140 == 175 -> context.102.150 == 178 && context.102.154 == 180 && context.102.153 <= context.102.151 && context.102.151 - context.102.153 <= 1 && pre.100.134 == 170 && post.100.134 != 170) && (command.101.140 == 176 -> context.102.150 == 179 && pre.100.134 != 170 && command.101.144 == pre.100.133 && post.100.134 == 170) && command.101.140 != 177;
+law 503 proposal_and_settlement_authority on accept = (command.101.140 == 175 -> context.102.150 == 178 && context.102.154 == 180 && context.102.153 <= context.102.151 && context.102.151 - context.102.153 <= 1 && pre.100.134 == 170 && post.100.134 != 170) && (command.101.140 == 176 -> context.102.150 == 179 && pre.100.134 != 170 && command.101.144 == pre.100.133 && post.100.134 == 170) && command.101.140 != 177;
 // A settlement delivers at least the outstanding minimum, credits exactly
 // `amount_out` to the bought asset, changes no other balance, and clears the
 // swap.
-law 504 settlement_credits_exactly = command.101.140 == 176 -> command.101.145 >= pre.100.136 && post.100.134 == 170 && post.100.135 == 0 && post.100.136 == 0 && (pre.100.134 == 171 -> post.100.131 == pre.100.131 + command.101.145 && post.100.130 == pre.100.130) && (pre.100.134 == 172 -> post.100.130 == pre.100.130 + command.101.145 && post.100.131 == pre.100.131);
+law 504 settlement_credits_exactly on accept = command.101.140 == 176 -> command.101.145 >= pre.100.136 && post.100.134 == 170 && post.100.135 == 0 && post.100.136 == 0 && (pre.100.134 == 171 -> post.100.131 == pre.100.131 + command.101.145 && post.100.130 == pre.100.130) && (pre.100.134 == 172 -> post.100.130 == pre.100.130 + command.101.145 && post.100.131 == pre.100.131);
 // A proposal sells at least 1 unit, debits exactly its amount from the asset
 // it sells, leaves at least the reserve of 2 quote or a non-negative base,
 // and changes no other balance.
-law 505 proposal_debits_the_sold_asset = command.101.140 == 175 -> command.101.142 >= 1 && (command.101.141 == 173 -> post.100.130 + command.101.142 == pre.100.130 && post.100.130 >= 2 && post.100.131 == pre.100.131) && (command.101.141 == 174 -> post.100.131 + command.101.142 == pre.100.131 && post.100.131 >= 0 && post.100.130 == pre.100.130);
+law 505 proposal_debits_the_sold_asset on accept = command.101.140 == 175 -> command.101.142 >= 1 && (command.101.141 == 173 -> post.100.130 + command.101.142 == pre.100.130 && post.100.130 >= 2 && post.100.131 == pre.100.131) && (command.101.141 == 174 -> post.100.131 + command.101.142 == pre.100.131 && post.100.131 >= 0 && post.100.130 == pre.100.130);
 // The swap the treasury records is the swap the agent proposed: the same
 // direction, amount, and minimum output that the queued request carries.
-law 506 proposal_records_the_swap = command.101.140 == 175 -> post.100.135 == command.101.142 && post.100.136 == command.101.143 && (command.101.141 == 173 -> post.100.134 == 171) && (command.101.141 == 174 -> post.100.134 == 172);
+law 506 proposal_records_the_swap on accept = command.101.140 == 175 -> post.100.135 == command.101.142 && post.100.136 == command.101.143 && (command.101.141 == 173 -> post.100.134 == 171) && (command.101.141 == 174 -> post.100.134 == 172);
 // The swap the treasury records is valued at a positive oracle price, commits
 // at most 3 of quote value, fits the day's budget of 4 together with what the
 // day already committed (law 502 counts it), and its minimum output keeps at
 // least three quarters of the oracle value, rounded up so that rounding never
 // favors the agent. Law 506 ties the recorded swap to the proposal.
-law 507 proposal_within_cap_budget_and_slippage = command.101.140 == 175 -> context.102.152 >= 1 && post.100.132 <= 4 && (command.101.141 == 173 -> post.100.135 <= 3 && post.100.136 >= div_ceil(post.100.135 * 3, 4 * context.102.152)) && (command.101.141 == 174 -> post.100.135 * context.102.152 <= 3 && post.100.136 >= div_ceil(post.100.135 * context.102.152 * 3, 4));
+law 507 proposal_within_cap_budget_and_slippage on accept = command.101.140 == 175 -> context.102.152 >= 1 && post.100.132 <= 4 && (command.101.141 == 173 -> post.100.135 <= 3 && post.100.136 >= div_ceil(post.100.135 * 3, 4 * context.102.152)) && (command.101.141 == 174 -> post.100.135 * context.102.152 <= 3 && post.100.136 >= div_ceil(post.100.135 * context.102.152 * 3, 4));
 // A failure reported by the DEX for the outstanding intent refunds exactly
 // the held amount to the asset it was taken from and clears the swap. The
 // budget is not restored.
-law 508 failure_refunds_the_swap = command.101.140 == 177 && context.102.150 == 179 && pre.100.134 != 170 && command.101.144 == pre.100.133 && post.100.134 == 170 && post.100.135 == 0 && post.100.136 == 0 && (pre.100.134 == 171 -> post.100.130 == pre.100.130 + pre.100.135 && post.100.131 == pre.100.131) && (pre.100.134 == 172 -> post.100.131 == pre.100.131 + pre.100.135 && post.100.130 == pre.100.130);
+law 508 failure_refunds_the_swap on failure = command.101.140 == 177 && context.102.150 == 179 && pre.100.134 != 170 && command.101.144 == pre.100.133 && post.100.134 == 170 && post.100.135 == 0 && post.100.136 == 0 && (pre.100.134 == 171 -> post.100.130 == pre.100.130 + pre.100.135 && post.100.131 == pre.100.131) && (pre.100.134 == 172 -> post.100.131 == pre.100.131 + pre.100.135 && post.100.130 == pre.100.130);
 // The claims below are checked by `zeno-fcis prove` (see the README). Each is
 // an induction step over the laws named in its groups: laws 501 and 502 are
 // enforced on every committing decision, 503 to 507 on accepts, and 508 on

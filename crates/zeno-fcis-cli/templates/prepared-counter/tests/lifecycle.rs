@@ -14,11 +14,16 @@ use std::{
 use zeno_fcis_codec::Domain;
 use zeno_fcis_core::Decision;
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_laws::{
+    DecisionScope, GenesisApplicability, LawDefinition, LawManifest, ScopeMismatch,
+};
 use zeno_fcis_shell_sqlite::CrashPoint;
 use zeno_fcis_synthesis::finite::completion::{
     CompletionLimits, CompletionProblem, find_completion, verify_completion,
 };
 use zeno_fcis_synthesis::finite::{Domain as FiniteDomain, Op, Program};
+
+const ACCEPTED_BATCH: u32 = 501;
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 struct Temp(PathBuf);
@@ -479,4 +484,68 @@ fn complete_restart_replay_and_interrupted_delivery_journey() {
     let path = temp.0.join("state.sqlite");
     assert!(journey(&path).unwrap().contains("\"status\":\"passed\""));
     assert!(journey(&path).is_err());
+}
+
+/// `profile::manifest()` with law 501 bound as `rebind` says, instead of as
+/// `profile.rs` binds it.
+fn rebound(
+    rebind: impl Fn(&LawDefinition) -> (DecisionScope, GenesisApplicability),
+) -> LawManifest {
+    let manifest = profile::manifest();
+    let law = profile::id(ACCEPTED_BATCH);
+    let definitions = manifest
+        .definitions()
+        .iter()
+        .map(|definition| {
+            if definition.id() != law {
+                return definition.clone();
+            }
+            let (scope, genesis) = rebind(definition);
+            LawDefinition::try_new(
+                definition.id(),
+                definition.name().clone(),
+                definition.kind(),
+                scope,
+                genesis,
+                definition.claim_hash(),
+                definition.checker_profile_hash(),
+                definition.evidence_requirement(),
+            )
+            .unwrap()
+        })
+        .collect();
+    LawManifest::try_new(manifest.families().to_vec(), definitions).unwrap()
+}
+
+#[test]
+fn the_manifest_enforces_the_scopes_the_project_declares() {
+    let project = profile::project();
+    // Every law with a formula declares its scope, so each one is compared.
+    assert!(
+        project
+            .laws()
+            .iter()
+            .all(|law| law.applicability().is_some())
+    );
+    assert_eq!(profile::manifest().check_declared_scopes(&project), Ok(()));
+    // Law 501 is declared `on accept`, without `, genesis`: a manifest that
+    // enforced it on every commit, or applied it at genesis, is reported.
+    let law = profile::id(ACCEPTED_BATCH);
+    let elsewhere = rebound(|shipped| (DecisionScope::Committing, shipped.genesis_applicability()));
+    assert_eq!(
+        elsewhere.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Scope {
+            law,
+            declared: DecisionScope::Accept,
+            enforced: DecisionScope::Committing,
+        }])
+    );
+    let at_genesis = rebound(|shipped| (shipped.scope(), GenesisApplicability::Required));
+    assert_eq!(
+        at_genesis.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Genesis {
+            law,
+            declared: false
+        }])
+    );
 }

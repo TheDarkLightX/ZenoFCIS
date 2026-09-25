@@ -74,17 +74,17 @@ component 400 gateway {
 merge [400];
 // Every strike count from 0 to 3 is a valid standing, so the invariant is
 // the bounds themselves; the laws below constrain each change.
-law 500 strikes_within_bounds = post.100.120 >= 0 && post.100.120 <= 3;
+law 500 strikes_within_bounds on commit, genesis = post.100.120 >= 0 && post.100.120 <= 3;
 // An accepted screening, allowed or held, keeps the strikes. Whatever the
 // rule base says, a transfer to a sanctioned region and a transfer from a
 // frozen account are never accepted.
-law 501 accepted_screening_keeps_standing = command.101.130 == 150 -> command.101.131 != 162 && pre.100.120 < 3 && post.100.120 == pre.100.120;
+law 501 accepted_screening_keeps_standing on accept = command.101.130 == 150 -> command.101.131 != 162 && pre.100.120 < 3 && post.100.120 == pre.100.120;
 // Only a reviewer reinstates, only an account with strikes, and reinstating
 // clears them.
-law 502 reinstate_clears_strikes = command.101.130 == 151 -> context.102.141 == 1 && pre.100.120 >= 1 && post.100.120 == 0;
+law 502 reinstate_clears_strikes on accept = command.101.130 == 151 -> context.102.141 == 1 && pre.100.120 >= 1 && post.100.120 == 0;
 // Only a screening commits a failure. A blocked transfer adds one strike,
 // and a frozen account stays at three.
-law 503 block_adds_a_strike = command.101.130 == 150 && (pre.100.120 < 3 -> post.100.120 == pre.100.120 + 1) && (pre.100.120 == 3 -> post.100.120 == 3);
+law 503 block_adds_a_strike on failure = command.101.130 == 150 && (pre.100.120 < 3 -> post.100.120 == pre.100.120 + 1) && (pre.100.120 == 3 -> post.100.120 == 3);
 // Law 500's bound is also claimed by induction, for `zeno-fcis prove`: from a
 // standing within its bounds, every accept that satisfies laws 501 and 502,
 // and every committed failure that satisfies law 503, ends within the bounds,

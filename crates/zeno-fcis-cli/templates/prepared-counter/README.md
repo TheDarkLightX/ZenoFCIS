@@ -18,6 +18,10 @@ command. Nothing is written during preparation.
 root that recurs at another version), and executes ordinary nominal authorization.
 The pure native program independently evaluates the command. The law checker
 evaluates the authored prefix and successor rules and checks the complete outbox.
+Each law in `project.zeno` declares the decisions it is enforced on, and
+`authority()` checks the law manifest against those declarations before it
+builds the authority; `tests/lifecycle.rs` shows a manifest that binds law 501
+to every commit, or to the genesis, reported as a mismatch.
 The prepared state must equal the authorized state. Finally the pure application
 adapter bounds the aggregate canonical command, state, authorization and bundle
 before SQLite receives it. The bundle includes the patch, receipt and outbox.

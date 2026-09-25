@@ -15,7 +15,10 @@
 //! - each invariant holds on the exact genesis vault, as that observer sees
 //!   it;
 //! - the law manifest enforces each assumed law on every committing
-//!   decision.
+//!   decision;
+//! - the law manifest enforces each law exactly on the decisions
+//!   `project.zeno` declares for it, the scopes elaboration checked the
+//!   claim's groups against.
 //!
 //! A rejection leaves the vault unchanged, so it needs no law. This
 //! application never commits a failure, because the law checker refuses
@@ -32,6 +35,9 @@ use withdrawal_queue::{
     laws::state_observations, profile,
 };
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_laws::{
+    DecisionScope, GenesisApplicability, LawDefinition, LawManifest, ScopeMismatch,
+};
 use zeno_fcis_schema::ValidationLimits;
 use zeno_fcis_spec::{
     ClaimDecl, ClaimFormula, ClaimMode, EvalLimits, EvalOutcome, ProjectSpec, ProjectionRoot,
@@ -41,6 +47,7 @@ use zeno_fcis_spec::{
 const VAULT_STAYS_SOLVENT: u32 = 600;
 const PAUSE_STAYS_IN_RANGE: u32 = 601;
 const VAULT_SOLVENT: u32 = 500;
+const FUNDS_CONSERVED: u32 = 501;
 const MAX_BALANCE: i128 = 4;
 const PAUSE_TICKS: i128 = 2;
 /// Every vault the schema admits: five balances, three statuses and five
@@ -322,5 +329,72 @@ fn each_invariant_holds_on_the_exact_genesis_vault() {
             limits
         ),
         Some(EvalOutcome::False)
+    );
+}
+
+/// `profile::manifest()` with law 501 bound as `rebind` says, instead of as
+/// `profile.rs` binds it.
+fn rebound(
+    rebind: impl Fn(&LawDefinition) -> (DecisionScope, GenesisApplicability),
+) -> LawManifest {
+    let manifest = profile::manifest().unwrap();
+    let law = profile::id(FUNDS_CONSERVED).unwrap();
+    let definitions = manifest
+        .definitions()
+        .iter()
+        .map(|definition| {
+            if definition.id() != law {
+                return definition.clone();
+            }
+            let (scope, genesis) = rebind(definition);
+            LawDefinition::try_new(
+                definition.id(),
+                definition.name().clone(),
+                definition.kind(),
+                scope,
+                genesis,
+                definition.claim_hash(),
+                definition.checker_profile_hash(),
+                definition.evidence_requirement(),
+            )
+            .unwrap()
+        })
+        .collect();
+    LawManifest::try_new(manifest.families().to_vec(), definitions).unwrap()
+}
+
+#[test]
+fn the_manifest_enforces_the_scopes_the_project_declares() {
+    let project = profile::project().unwrap();
+    // Every law with a formula declares its scope, so each one is compared.
+    assert!(
+        project
+            .laws()
+            .iter()
+            .all(|law| law.applicability().is_some())
+    );
+    assert_eq!(
+        profile::manifest().unwrap().check_declared_scopes(&project),
+        Ok(())
+    );
+    // Law 501 is declared `on commit`, without `, genesis`: a manifest that
+    // enforced it on accepts only, or applied it at genesis, is reported.
+    let law = profile::id(FUNDS_CONSERVED).unwrap();
+    let elsewhere = rebound(|shipped| (DecisionScope::Accept, shipped.genesis_applicability()));
+    assert_eq!(
+        elsewhere.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Scope {
+            law,
+            declared: DecisionScope::Committing,
+            enforced: DecisionScope::Accept,
+        }])
+    );
+    let at_genesis = rebound(|shipped| (shipped.scope(), GenesisApplicability::Required));
+    assert_eq!(
+        at_genesis.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Genesis {
+            law,
+            declared: false
+        }])
     );
 }

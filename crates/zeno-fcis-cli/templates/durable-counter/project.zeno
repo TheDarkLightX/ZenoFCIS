@@ -25,8 +25,8 @@ component 400 counter {
   budget steps 32;
 }
 merge [400];
-law 500 bounded_state = post.100.110 >= 0 && post.100.110 <= 3 && post.100.111 >= 0 && post.100.111 <= 3;
-law 501 accepted_increment = context.102 == 1 && command.101 == 120 && post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111;
-law 502 committed_failure = context.102 == 1 && command.101 == 121 && post.100.110 == pre.100.110 && post.100.111 == pre.100.111 + 1;
-law 503 reject_no_authority = true;
+law 500 bounded_state on commit, genesis = post.100.110 >= 0 && post.100.110 <= 3 && post.100.111 >= 0 && post.100.111 <= 3;
+law 501 accepted_increment on accept = context.102 == 1 && command.101 == 120 && post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111;
+law 502 committed_failure on failure = context.102 == 1 && command.101 == 121 && post.100.110 == pre.100.110 && post.100.111 == pre.100.111 + 1;
+law 503 reject_no_authority on reject = true;
 claim 600 counters_never_negative all inductive accept [501] failure [502] = pre.100.110 >= 0 && pre.100.111 >= 0;

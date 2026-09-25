@@ -110,6 +110,12 @@ placeholder. As a result, this passes:
 zeno-fcis check project.zeno --require-substantive --require-resolved-paths
 ```
 
+Each law with a formula also declares the decisions it is enforced on: `on
+commit, genesis` for 500, `on accept` for 501 to 505, and `on failure` for
+506. `authority()` checks the law manifest against those declarations before
+it builds the authority, and `tests/laws.rs` shows a manifest that binds law
+501 to every commit, or to the genesis, reported as a mismatch.
+
 The tests check the running application:
 - `tests/conformance.rs` explores the application from genesis and finds 20
   reachable states: exactly the admitted states that satisfy law 500. It runs
