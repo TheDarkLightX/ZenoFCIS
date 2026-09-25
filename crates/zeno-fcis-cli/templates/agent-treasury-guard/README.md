@@ -73,7 +73,7 @@ approved.
 | --- | --- | --- | --- |
 | `ProposeSwap` | 175 | `Agent` | debits `amount` from the sold asset, adds the swap's value to `spent_today`, records the swap as pending, and queues one request |
 | `SwapSettled` | 176 | `Dex` | credits `amount_out` to the bought asset and clears the swap |
-| `SwapFailed` | 177 | `Dex` | commits failure `swap_failed`: refunds `amount` to the sold asset and clears the swap; the budget is not restored |
+| `SwapFailed` | 177 | `Dex` | commits failure `swap_failed`: refunds the held `pending_amount` to the sold asset and clears the swap; the budget is not restored |
 
 A swap's *value* is its `amount` for a buy (the amount of quote it sells) and
 its `amount` times the oracle price for a sell (the amount of base it sells,
@@ -264,7 +264,7 @@ The tests check the running application. Every decision below runs through
 admission, the authority, the adapter and the core, the law checker, the
 committed patch, and the outbox, and is compared with the expected outcome:
 - `tests/conformance.rs` decides 25,094 inputs against a reference model of
-  these rules, and 24 examples from `tests/decision-examples.txt`. On each of
+  these rules, and 30 examples from `tests/decision-examples.txt`. On each of
   the 4,596 decisions among them that commit, it also evaluates the
   invariants of claims 600 and 601 before and after, as the law checker
   observes the transition:

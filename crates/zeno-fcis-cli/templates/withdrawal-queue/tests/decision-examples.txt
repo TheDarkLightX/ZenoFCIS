@@ -5,6 +5,12 @@
 # the drafting was not blind to the code. Reviewed and accepted by the
 # project's owner on 2026-09-24.
 #
+# Examples 25 and 26 were added on 2026-09-25 to cover cases that a blind
+# review of the first 24 against README.md found untested: a deposit that
+# fills the vault exactly, and a request that breaks both the caller rule
+# and the lane rule. An AI agent wrote them from the rules in README.md.
+# Review of these two by the project's owner: pending.
+#
 # Numeric IDs come from project.zeno:
 # - state fields 120 balance, 121 lane_a, 122 amount_a, 123 lane_b,
 #   124 amount_b, 125 pause, 126 must_serve (0 or 1), 127 priority;
@@ -42,3 +48,10 @@
 2 180 0 182 2 0 0 171 162 170 1 193 0 | accept - 0 180 0 180 0 0 0 170 | 300 171 2
 1 180 0 180 0 0 0 171 162 170 1 193 0 | accept - 1 180 0 180 0 0 0 171 | -
 1 180 0 180 0 0 0 170 162 170 1 193 1 | accept - 1 180 0 180 0 2 0 170 | -
+#
+# 25. A deposit of 1 on a balance of 3 fills the vault to its capacity of 4;
+#     rule 4 rejects only a deposit that would go above it.
+3 180 0 180 0 0 0 170 160 170 1 190 0 | accept - 4 180 0 180 0 0 0 170 | -
+# 26. Lane B's owner requests lane A while it is occupied: rules 1 and 2 both
+#     apply, and rule 1, wrong_caller, decides.
+4 181 2 180 0 0 0 170 161 170 1 192 0 | reject 200 4 181 2 180 0 0 0 170 | -

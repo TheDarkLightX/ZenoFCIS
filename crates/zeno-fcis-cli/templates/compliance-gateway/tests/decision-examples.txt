@@ -5,6 +5,12 @@
 # drafting was not blind to the code. Reviewed and accepted by the project's
 # owner on 2026-09-24.
 #
+# Examples 25 to 28 were added on 2026-09-25 to cover cases that a blind
+# review of the first 24 against README.md found untested: a reinstatement
+# that breaks both rejection rules, and three pairs of hold rules that apply
+# together. An AI agent wrote them from the rules in README.md. Review of
+# these four by the project's owner: pending.
+#
 # Numeric IDs come from project.zeno:
 # - state field 120 strikes;
 # - actions (command field 130) 150 Screen and 151 Reinstate;
@@ -49,3 +55,17 @@
 0 150 160 4 165 2 0 | accept - 0 | -
 2 150 160 1 165 3 0 | accept - 2 | -
 0 150 160 3 166 1 0 | accept - 0 | 300 178 3
+#
+# 25. A reinstatement by a non-reviewer of an account with no strikes: rules
+#     1 and 2 both apply, and rule 1, not_reviewer, decides.
+0 151 160 0 165 3 0 | reject 200 0 | -
+# 26. Two strikes, band 4, medium risk, tier 2: repeat_offender (30) and
+#     medium_risk_large (20) both hold, and the higher priority names the
+#     ticket.
+2 150 160 4 166 2 0 | accept - 2 | 300 179 4
+# 27. Tier 1, band 3, high risk: high_risk_counterparty (70) and
+#     partially_verified_large (40) both hold.
+0 150 160 3 167 1 0 | accept - 0 | 300 175 3
+# 28. A restricted region, tier 0, band 1: restricted_region (60) and
+#     unverified_transfer (50) both hold.
+0 150 161 1 165 0 0 | accept - 0 | 300 176 1

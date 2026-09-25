@@ -6,6 +6,28 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add twelve decision examples to three application templates, for rules and
+  rule precedences that a blind review of the first 72 examples against the
+  READMEs found untested. `compliance-gateway` (now 28): a reinstatement by a
+  non-reviewer of an account with no strikes, decided by rule 1, and three
+  pairs of hold rules that apply together, each decided by priority.
+  `withdrawal-queue` (now 26): a deposit that fills the vault to its
+  capacity, and a request that breaks both the caller rule and the lane
+  rule, decided by rule 1. `agent-treasury-guard` (now 30): `below_reserve`
+  and `slippage_too_wide` on a sell, a price from the future, an unapproved
+  model with a stale price, a slippage and a reserve breach together, and a
+  failure whose refund is the held amount, not the command's amount field.
+  Each template's conformance test runs them through the application. The
+  review also noted that no withdrawal-queue example ticks in must-serve
+  with nothing due; that vault is unreachable, and the conformance test's
+  assertion that must-serve is reached only with a pending lane and no pause
+  is now a named test, which also requires every tick from such a vault to
+  pay, and the README says so. The agent-treasury-guard README's
+  `SwapFailed` row now says the refund is the held `pending_amount`, as law
+  508 states and the new example shows; it said "refunds `amount`", which
+  reads as the command's field. An AI agent wrote the examples from the
+  README rules; review of these twelve by the project's owner is pending,
+  and the acceptance of the earlier examples stands.
 - `IdempotentDestination`, `MemoryDestination`, and `DeliveryCollision` move,
   unchanged, from `zeno-fcis-shell-sqlite` to `zeno-fcis-shell`, the pure
   reference model, where the in-memory destination needs only `alloc`. The
@@ -138,7 +160,7 @@ embedded in ZenoFCIS values.
     genesis, and that the manifest enforces each assumed law where the
     claim assumes it.
   - Every law formula is substantive with resolved paths. The template ships
-    24 decision examples, a conformance test that decides 25,094 inputs over
+    30 decision examples, a conformance test that decides 25,094 inputs over
     a scaled finite domain and evaluates both invariants before and after
     each of its 4,596 committed decisions, including a search of every state
     one day can reach that shows no sequence of proposals commits more than
@@ -146,8 +168,9 @@ embedded in ZenoFCIS values.
     breaks only that law and the six counterexamples each refused by the
     law that now states its rule, a lifecycle test, a determinism probe over
     864 inputs, and clean purity results. The gate, the release packager,
-    and the ATDD scenarios cover it with the other examples. The decision
-    examples were reviewed and accepted by the project's owner on 2026-09-24.
+    and the ATDD scenarios cover it with the other examples. The first 24
+    decision examples were reviewed and accepted by the project's owner on
+    2026-09-24; the six added since await review.
 
 - Add the `withdrawal-queue` application template: a vault with two
   withdrawal lanes whose keeper tick runs a controller step that
@@ -208,8 +231,9 @@ embedded in ZenoFCIS values.
   replays the synthesis in Rust, Python, and JavaScript against a separate
   Python evaluation of the same rule base. The template also carries the
   rule base as a Tau Language specification with a local check script; it
-  needs IDNI's binary and is not part of any gate. The decision examples
-  were reviewed and accepted by the project's owner on 2026-09-24.
+  needs IDNI's binary and is not part of any gate. The first 24 decision
+  examples were reviewed and accepted by the project's owner on 2026-09-24;
+  the four added since await review.
 
 - Give `zeno-fcis prove` a system model: inductive claims.
   `claim ID name BACKEND inductive assume [...] accept [...] failure [...] = INVARIANT;`

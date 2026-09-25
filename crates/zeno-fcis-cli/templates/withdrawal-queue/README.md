@@ -99,6 +99,16 @@ The rules apply in this order, and the first that applies decides:
 
    In every case an arrived lane that was not paid becomes pending.
 
+A vault in must-serve with nothing due is not reachable: only the tick that
+ends a pause with a lane due sets `must_serve`, that lane is pending after
+the tick, and no command but a tick empties a lane. The next tick therefore
+finds a lane due, pays, and clears `must_serve`. `tests/conformance.rs`
+checks both statements on every reachable vault: must-serve implies a
+pending lane and no pause, and every tick from such a vault pays. The
+synthesized step still answers the unreachable input, as the rule above
+says, and `tests/controller.rs` checks its answer there, as on the other 383
+inputs, against the certified table.
+
 A rejection changes nothing and queues nothing. Payout requests go to
 `settlement` on channel 300 with the paid lane (field 150) and amount (151).
 The paid amount leaves the balance in the same decision that queues the
@@ -286,8 +296,10 @@ The tests check the running application:
   tables. It also checks 140 decisions with wrong callers and ignored
   fields, that from every reachable vault a lane that is arrived is paid
   within 8 ticks and a pending one within 7 under every path in the grid,
-  24 examples in `tests/decision-examples.txt`, the schema bounds, and that
-  only the empty vault is a valid genesis.
+  that must-serve is reached only with a pending lane and no pause and that
+  every tick from such a vault pays, 26 examples in
+  `tests/decision-examples.txt`, the schema bounds, and that only the empty
+  vault is a valid genesis.
 - `tests/claims.rs` connects the induction steps to the application, as
   described above.
 - `tests/laws.rs` gives the law checker decisions a faulty program could

@@ -915,7 +915,7 @@ fn decision_examples_match_the_executed_application() {
         covered.insert((expected.kind, expected.reason));
         count += 1;
     }
-    assert_eq!(count, 24);
+    assert_eq!(count, 30);
     let mut expected = BTreeSet::from([("accept", None), ("failure", Some(212))]);
     expected.extend((200..=211).map(|reason| ("reject", Some(reason))));
     assert_eq!(covered, expected);
