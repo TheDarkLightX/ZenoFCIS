@@ -97,15 +97,15 @@ async function replay(name, gate) {
 
   same(template.demonstration.map((step) => step.expect), gate.decisions, "the script's expectations against the gate");
   demo.reset();
-  const decisions = template.demonstration.map((step, index) => {
+  const steps = template.demonstration.map((step, index) => {
     const report = demo.step(step.request);
     if (report.error) fail(`demonstration step ${index + 1} refused at ${report.stage}: ${report.error}`);
     laws += checkLaws(report, examples.laws, `demonstration step ${index + 1}`);
-    return report.decision;
+    return { request: step.request, report };
   });
-  same(decisions, gate.decisions, "demonstration decisions");
+  same(steps.map(({ report }) => report.decision), gate.decisions, "demonstration decisions");
   const final = demo.state();
-  const summary = template.summary(final);
+  const summary = template.summary(final, steps);
   same(summary, pick(gate, summary), "demonstration summary");
   same(final.steps, template.demonstration.length, "decisions counted");
 

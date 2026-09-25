@@ -53,7 +53,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
 PUBLIC = SITE / "public"
 COMMON_CRATE = "zeno-fcis-site-common"
-TEMPLATES = ("account-lockout",)
+TEMPLATES = ("account-lockout", "order-fulfillment", "inventory-reservation", "compliance-gateway",
+             "withdrawal-queue", "agent-treasury-guard")
 STAGES = ("generate", "lock", "check", "module", "replay", "scripts", "browser")
 TARGET = "wasm32-unknown-unknown"
 

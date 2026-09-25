@@ -127,22 +127,47 @@ export async function mount(container, template) {
   facts.id = `${template.name}-state`;
   const outbox = node("ol", "outbox", node("li", "empty", "Nothing queued."));
   const timeline = node("ol", "timeline", node("li", "empty", "No decisions yet."));
+
+  // A template may show its scripted proposer on its own: each of its
+  // proposals from the demonstration, with a button that sends it against
+  // the state as it is now.
+  const proposerButtons = [];
+  const proposer = template.proposer ? node("section", "panel proposer",
+    node("h3", null, template.proposer.label),
+    node("p", "help", template.proposer.help),
+    node("ol", "proposals", ...template.demonstration.filter(template.proposer.filter).map((step) => {
+      const button = node("button", "propose", "Send this proposal");
+      button.type = "button";
+      button.disabled = true;
+      button.addEventListener("click", () => {
+        if (!busy) send(step.request, step.note);
+      });
+      proposerButtons.push(button);
+      return node("li", null,
+        node("span", "request", template.describe(step.request)),
+        node("span", "note", `${step.note}: ${KIND_LABELS[step.expect][1].toLowerCase()} in the script`),
+        button);
+    }))) : null;
+
   container.replaceChildren(
     form,
     status,
     node("div", "panels",
       node("section", "panel", node("h3", null, "State"), facts),
       node("section", "panel", node("h3", null, "Outbox"), node("p", "help", template.outbox), outbox)),
+    ...(proposer ? [proposer] : []),
     node("section", "panel",
       node("h3", null, "Decisions"),
       node("p", "help", "Accepted and committed failures are published; rejections change nothing; a request the schema or the authority refuses never becomes a decision."),
       timeline),
   );
 
-  const buttons = [...proposeButtons, demonstrationButton, resetButton];
+  const buttons = [...proposeButtons, ...proposerButtons, demonstrationButton, resetButton];
   let demo = null;
   let busy = false;
   let count = 0;
+  // Every request sent since the last reset, with the module's report.
+  const history = [];
 
   function setBusy(value) {
     busy = value;
@@ -207,6 +232,7 @@ export async function mount(container, template) {
 
   function send(request, note) {
     const report = demo.step(request);
+    history.push({ request, report });
     renderReport(request, report, note);
     renderState(demo.state());
     announce(request, report);
@@ -227,6 +253,7 @@ export async function mount(container, template) {
   function reset() {
     const state = demo.reset();
     count = 0;
+    history.length = 0;
     timeline.replaceChildren(node("li", "empty", "No decisions yet."));
     renderState(state);
     status.textContent = `Reset to the exact genesis: ${template.genesis}.`;
@@ -234,9 +261,9 @@ export async function mount(container, template) {
 
   const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-  // Shows each request in the form, then sends it; `instant` skips the pause
-  // between requests.
-  async function runDemonstration({ instant = false } = {}) {
+  // Shows each request in the form, then sends it. `instant` skips the pause
+  // between requests, and `label` is the status to end with.
+  async function runDemonstration({ instant = false, label = null } = {}) {
     setBusy(true);
     try {
       reset();
@@ -246,9 +273,8 @@ export async function mount(container, template) {
         send(step.request, step.note);
         if (!instant) await delay(STEP_DELAY_MS);
       }
-      status.textContent = instant
-        ? `The README's demonstration, decided in this browser when the page loaded: ${template.demonstration.length} requests. Compare the decisions with the README, or propose your own.`
-        : `The demonstration ran its ${template.demonstration.length} requests; compare the decisions with the README.`;
+      status.textContent = label
+        ?? `The README's demonstration, decided in this browser: ${template.demonstration.length} requests. Compare the decisions with the README, or propose your own.`;
     } finally {
       setBusy(false);
     }
@@ -268,5 +294,5 @@ export async function mount(container, template) {
   demo = await instantiate(await response.arrayBuffer());
   reset();
   setBusy(false);
-  return { reset, runDemonstration, status };
+  return { reset, runDemonstration, history, state: () => demo.state(), status };
 }

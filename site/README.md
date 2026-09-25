@@ -1,12 +1,14 @@
 # ZenoFCIS demo site
 
-A static page that runs the example applications in the browser, each through
-its own commit authority, program, and law checker, compiled to WebAssembly,
-with the library's in-memory reference shell in place of SQLite. It covers one
-example so far, `account-lockout`; every example adds only its request
-mapping and its demonstration script to the shared shape described here.
-Nothing here is published: the Pages workflow deploys only from `main`, and
-merging to `main` is the owner's decision.
+A static page that runs the six example applications in the browser, each
+through its own commit authority, program, and law checker, compiled to
+WebAssembly, with the library's in-memory reference shell in place of SQLite:
+account-lockout, order-fulfillment, inventory-reservation,
+compliance-gateway, withdrawal-queue, and agent-treasury-guard. Every example
+adds only its request mapping, its description, and its examples reader to
+the shared shape described here. Nothing here is published: the Pages
+workflow deploys only from `main`, and merging to `main` is the owner's
+decision.
 
 ## Layout
 
@@ -39,10 +41,11 @@ merging to `main` is the owner's decision.
   context and commands in the README's words, the README's demonstration, and
   the demonstration's end in the gate's fields), and `<template>.wasm`;
   `panel.js` is the shared panel: the forms, the timeline of decisions with
-  the laws evaluated for each, the state, and the outbox; `demo-module.js` is
-  the loader. The built modules land here and are not committed. The page
-  fetches its modules relative to its own scripts, so it works from any path
-  it is served at.
+  the laws evaluated for each, the state, the outbox, and, for a template
+  that describes one, a scripted proposer's list (the treasury guard's
+  agent); `demo-module.js` is the loader. The built modules land here and are
+  not committed. The page fetches its modules relative to its own scripts, so
+  it works from any path it is served at.
 - `tests/replay.mjs`, with `tests/examples.mjs` and
   `tests/templates/<template>.mjs`: the headless check, Node 22 and no browser.
 - `tests/deploy_check.py` and `tests/harness/`: the exact artifact, served
@@ -100,29 +103,39 @@ requests that `tests/templates/<template>.mjs` derives from the README's
 rules, then its request is decided, and the kind, the reason, the state
 after, the entries queued, and the laws evaluated are compared with the
 examples file. An example whose state no sequence of requests reaches is
-named in the output and not replayed; account-lockout has none. It then runs
-the README's demonstration and compares its decisions and its end with the
-gate's expected summary in `tools/check_generated_application.py`, and
-checks that bad input is refused before any decision. Nothing delivers in the
-page, so the entries the gate's shell delivered are the entries left pending
-here.
+named in the output, with the reason, and not replayed: withdrawal-queue's
+example 20 and agent-treasury-guard's example 23 are the two; the templates'
+own conformance tests decide them from the admitted state. It then runs the
+README's demonstration and compares its decisions and its end with the gate's
+expected summary in `tools/check_generated_application.py`, and checks that
+bad input is refused before any decision. Nothing delivers in the page, so
+the entries the gate's shell delivered are the entries left pending here.
 
 `tests/deploy_check.py` serves `site/public` exactly as the workflow uploads
 it, at `/ZenoFCIS/` on a local server that serves nothing at the root, and
 drives headless Chrome over it with `--dump-dom` under a virtual-time budget.
-A harness page, served beside the artifact and not part of it, imports the
-artifact's own loader and each template's description, runs each README's
-demonstration through its served module, and prints the results, which must
-match the gate's summaries; the page itself must have loaded the module of
-the panel that is open on load, rendered its state, and fetched no other
-module. A page that loaded from the subpath alone is a page whose relative
-paths hold.
+A harness page, served beside the artifact and not part of it, is dumped once
+per template: it imports the artifact's own panel and the template's
+description, mounts the panel as the page does, runs the README's
+demonstration through it, and prints the results and what the panel
+rendered, which must match the gate's summary, one timeline entry per
+decision, and the proposer's list where the template describes one. The page
+itself must have loaded the module of the panel that is open on load,
+rendered its state, and fetched no other module. A page that loaded from the
+subpath alone is a page whose relative paths hold. (One template per dump,
+because Chrome's virtual-time budget is spent across module rounds: a single
+round finishes within it, several do not.)
 
 The strength of what each template itself checks is stated in its README and
-repeated in its section of the page. For account-lockout: laws evaluated at
-run time on every decision; tests on a host over 20 examples and 606 grid
-inputs; and claim 600's induction step, which CVC5 attests with `unsat` and
-which is not proved.
+repeated in its section of the page, in the README's own scoped words: laws
+evaluated at run time on every decision; tests on a host, which are
+detectors; a synthesized step selected and exhaustively checked on every
+input of its contract (inventory-reservation, compliance-gateway,
+withdrawal-queue, agent-treasury-guard); a controller table certified by
+OrbitSynthesis's checker for the finite model, not the running application
+by itself (withdrawal-queue); and induction steps that CVC5 attests with
+`unsat`, which is not proved (account-lockout, compliance-gateway,
+withdrawal-queue, agent-treasury-guard).
 
 ## Publishing
 
@@ -140,7 +153,6 @@ once this work is on `main`, which is also the only branch Pages deploys from.
 
 ## Next
 
-The other example applications, each as a demo crate, a description, and an
-examples reader; and a page that opens in a working state, with the first
-section's README demonstration already decided when the page loads, and
-labelled as such, so the first view shows the judge at work.
+A page that opens in a working state, with the first section's README
+demonstration already decided when the page loads, and labelled as such, so
+the first view shows the judge at work.
