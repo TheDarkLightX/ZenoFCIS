@@ -554,7 +554,7 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 3643,
+      "production_lines": 3690,
       "rank": 3,
       "score": 95,
       "signals": [
@@ -564,16 +564,16 @@
             827,
             877,
             2455,
-            2516,
-            2725
+            2525,
+            2776
           ]
         },
         {
           "id": "concurrency-primitive",
           "lines": [
             136,
-            2596,
-            2610
+            2647,
+            2661
           ]
         },
         {
@@ -621,7 +621,8 @@
         {
           "id": "host-process-execution",
           "lines": [
-            2457
+            2457,
+            2552
           ]
         },
         {
@@ -2922,68 +2923,70 @@
       "path_roles": [
         "external-tool-boundary"
       ],
-      "production_lines": 608,
+      "production_lines": 781,
       "rank": 28,
       "score": 79,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            332,
-            412,
-            485,
-            500
+            341,
+            433,
+            595,
+            611
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            426,
-            429,
-            614
+            447,
+            450,
+            762
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            119,
-            133,
-            194,
-            233,
-            335,
-            504,
-            507,
-            597
+            128,
+            142,
+            203,
+            242,
+            344,
+            615,
+            618,
+            745
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            477
+            489,
+            587,
+            693
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            67,
-            69,
-            595,
-            597,
-            601,
-            603,
-            605,
-            607
+            76,
+            78,
+            696,
+            703,
+            711,
+            743,
+            745,
+            749
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            71,
-            277,
-            308,
-            345,
-            503,
-            553
+            80,
+            286,
+            317,
+            354,
+            614,
+            671
           ]
         }
       ],
@@ -3577,6 +3580,7 @@
     },
     {
       "categories": [
+        "authority-access",
         "codegen-build",
         "effects-injection",
         "formal-evidence",
@@ -3601,6 +3605,9 @@
         "CWE-89",
         "CWE-94",
         "CWE-174",
+        "CWE-269",
+        "CWE-284",
+        "CWE-285",
         "CWE-345",
         "CWE-353",
         "CWE-362",
@@ -3618,6 +3625,8 @@
         "CWE-829",
         "CWE-834",
         "CWE-841",
+        "CWE-862",
+        "CWE-863",
         "CWE-1287"
       ],
       "path": "crates/zeno-fcis-cli/src/synth/mod.rs",
@@ -3628,6 +3637,12 @@
       "rank": 36,
       "score": 78,
       "signals": [
+        {
+          "id": "ambient-context",
+          "lines": [
+            162
+          ]
+        },
         {
           "id": "canonical-commitment",
           "lines": [
@@ -5047,16 +5062,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3085323,
-    "admitted_files": 165,
-    "inventory_sha256": "73be4d7b0fd9ba4b9a1b59d748ae07908a7c3564d8862391a74f2edb250968d8",
-    "ranked_above_minimum": 138,
+    "admitted_bytes": 3095929,
+    "admitted_files": 166,
+    "inventory_sha256": "00f14a4632a3497271c39019d075767fcba58c76ff8092b5d47885183c1f08c3",
+    "ranked_above_minimum": 139,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 12,
       "priority-2": 40,
-      "priority-3": 86,
+      "priority-3": 87,
       "priority-4": 11,
       "priority-5": 16
     }

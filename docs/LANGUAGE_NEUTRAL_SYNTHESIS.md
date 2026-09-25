@@ -158,9 +158,36 @@ neither installs a runtime. `--tool PATH` selects an explicit
 compiler/interpreter and is still subject to that version check.
 `synth discover` publishes each target's extension, emitted call ABI, and exact
 conformance invocation, so an agent does not have to guess the harness.
-Automatic target execution currently requires Linux process-group cleanup and
-non-reaping exit observation. Pure emission and the semantic library have no
-such platform dependency.
+Automatic target execution supports Linux (excluding uClibc) and macOS.
+Discovery reports the current host in `runtime_platform`, the supported OS
+families in `runtime_platforms`, and availability in `runtime_supported`.
+Pure emission and the semantic library have no such platform dependency.
+For development and `tools/atdd.py run --all`, put Python 3.10 or newer on
+`PATH` as `python3`; Apple's bundled Python 3.9 cannot run the repository's
+modern type annotations. Runtime conformance still accepts Python 3.
+
+Both execution shells reserve the process-group identity until cleanup, kill
+remaining group members even after a successful target exit, and retain the
+30-second operation limit and 32 MiB limit on each captured output stream.
+Linux observes the target with `waitid(WNOWAIT)` before killing its group and
+reaping it. macOS instead owns a live `/bin/cat` group leader waiting on a held
+stdin pipe; the target joins that group. This permits ordinary `Child::try_wait`
+without group-ID reuse and avoids treating Darwin's zombie-only-group `EPERM`
+as harmless. Cleanup permission errors remain failures. The helper is killed
+and reaped on scope exit, including target-spawn failure. The extra helper and
+pipe avoid a platform-specific non-reaping observer; no unsafe code or new
+dependency is required.
+The macOS formal-tool shell uses the same held-pipe group-leader technique;
+its separate combined-output limit and stdin-delivery timeout remain intact.
+
+This is bounded execution of regenerated pure modules, not a general sandbox:
+processes that deliberately escape their group, host failure, and dynamic
+library integrity remain external premises. This port does not qualify the
+separate Linux-only Lean proof toolchain for macOS. Regression tests cover fast
+normal/signal/error exits, exact stdin, descendant cleanup after parent exit
+and timeout, both output bounds, and inherited tool switches. The synthesis
+portfolio additionally checks Rust, Python and JavaScript conformance and
+negative cases on both OS families in CI.
 
 ## Problem format and semantics
 
