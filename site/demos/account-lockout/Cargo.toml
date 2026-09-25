@@ -12,14 +12,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # The template as `zeno-fcis new` shipped it, without its SQLite shell.
 account-lockout = { path = "../../apps/account-lockout", default-features = false }
-serde_json = "=1.0.151"
-zeno-fcis-authority = "=1.1.0"
-zeno-fcis-codec = "=1.1.0"
-zeno-fcis-core = "=1.1.0"
-zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
-zeno-fcis-laws = "=1.1.0"
-zeno-fcis-schema = "=1.1.0"
-zeno-fcis-shell = "=1.1.0"
+zeno-fcis-site-common = { path = "../../common" }
 
 [lints]
 workspace = true

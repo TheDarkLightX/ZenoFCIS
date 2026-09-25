@@ -358,6 +358,13 @@ name = "zeno-fcis-site-account-lockout"
 version = "0.0.0"
 dependencies = [
  "account-lockout",
+ "zeno-fcis-site-common",
+]
+
+[[package]]
+name = "zeno-fcis-site-common"
+version = "0.0.0"
+dependencies = [
  "serde_json",
  "zeno-fcis-authority",
  "zeno-fcis-codec",
@@ -366,6 +373,8 @@ dependencies = [
  "zeno-fcis-laws",
  "zeno-fcis-schema",
  "zeno-fcis-shell",
+ "zeno-fcis-spec",
+ "zeno-fcis-value",
 ]
 
 [[package]]

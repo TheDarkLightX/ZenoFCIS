@@ -10,8 +10,8 @@
 <header class="banner">
   <h1>ZenoFCIS: a proposer suggests, a judge decides</h1>
   <p>
-    The account-lockout example application, running in this page through its
-    own commit authority, with an in-memory shell in place of SQLite.
+    The example applications, running in this page through their own commit
+    authorities, with an in-memory shell in place of SQLite.
   </p>
 </header>
 
@@ -20,8 +20,7 @@
     <h2 id="about-heading">Proposers, judges, and the shell</h2>
     <p>
       A <strong>proposer</strong> suggests a decision. It may be an AI agent, a
-      synthesized core, or hand-written code; here it is the example's
-      hand-written program.
+      synthesized core, or hand-written code.
     </p>
     <p>
       The <strong>judge</strong> is the commit authority with its laws. It admits
@@ -37,25 +36,27 @@
       publication.
     </p>
     <p>
-      What runs here is the <code>account-lockout</code> template exactly as
-      <code>zeno-fcis new</code> writes it, built for WebAssembly without its
-      SQLite shell. Its authority, program, and law checker are the same source
-      that decides on a server. The page only supplies each request and its
-      context, including the time, and shows what the authority returned.
-      After loading, the page makes no network requests.
+      Each example below is a template exactly as <code>zeno-fcis new</code>
+      writes it, built for WebAssembly without its SQLite shell. Its authority,
+      program, and law checker are the same source that decides on a server.
+      The page only supplies each request and its context, including any time,
+      and shows what the authority returned. An example's module is fetched
+      when its section is opened; after that the page makes no network
+      requests.
     </p>
   </section>
 
-  <section aria-labelledby="lockout-heading" id="account-lockout">
-    <h2 id="lockout-heading">Account lockout</h2>
+  <details class="example" id="account-lockout" data-template="account-lockout" open>
+    <summary><h2>Account lockout</h2></summary>
     <div class="prose">
       <p>
         Three consecutive failed logins lock the account for 900 seconds. A
         failed login is a <em>committed failure</em>: the login fails, but the
         attempt is recorded. Every request carries its time, and the decision
         never reads a clock. Only a request marked <em>admin</em> may unlock.
-        Alerts leave through the outbox. The rules, in the order they apply, are
-        in the template's
+        Alerts leave through the outbox. The proposer is the example's
+        hand-written program. The rules, in the order they apply, are in the
+        template's
         <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/account-lockout/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/account-lockout/README.md</code> in
         the repository).
@@ -98,73 +99,14 @@
         </ul>
       </details>
     </div>
-
-    <form class="controls" id="request" aria-describedby="controls-help">
-      <p id="controls-help" class="help">
-        Set the request's context, then propose a request. Each button sends
-        one command through the authority.
-      </p>
-      <div class="field">
-        <label for="now">Time, in Unix seconds (0 to 4,102,444,800)</label>
-        <div class="row">
-          <input id="now" name="now" type="number" inputmode="numeric" min="0" max="4102444800" step="1" value="1000" required>
-          <button type="button" id="advance">+10 s</button>
-        </div>
-      </div>
-      <div class="field">
-        <label><input id="admin" name="admin" type="checkbox"> Request marked <code>admin</code></label>
-      </div>
-      <div class="row" role="group" aria-label="Propose a request">
-        <button type="button" class="propose" data-command="LoginSucceeded" disabled>Login succeeded</button>
-        <button type="button" class="propose" data-command="LoginFailed" disabled>Login failed</button>
-        <button type="button" class="propose" data-command="AdminUnlock" disabled>Admin unlock</button>
-      </div>
-      <div class="row">
-        <button type="button" id="demonstration" disabled>Run the README's demonstration</button>
-        <button type="button" id="reset" disabled>Reset to genesis</button>
-      </div>
-    </form>
-
-    <p id="status" class="status" role="status" aria-live="polite">Loading the module.</p>
-
-    <div class="panels">
-      <section aria-labelledby="account-heading" class="panel">
-        <h3 id="account-heading">Account</h3>
-        <dl class="facts">
-          <dt><code>failed_attempts</code></dt><dd id="failed-attempts">–</dd>
-          <dt><code>locked_until</code></dt><dd id="locked-until">–</dd>
-          <dt><code>last_seen</code></dt><dd id="last-seen">–</dd>
-          <dt>Committed bundles</dt><dd id="bundles">–</dd>
-          <dt>Decisions</dt><dd id="steps">–</dd>
-          <dt>State root</dt><dd id="root" class="hash">–</dd>
-        </dl>
-      </section>
-      <section aria-labelledby="outbox-heading" class="panel">
-        <h3 id="outbox-heading">Outbox</h3>
-        <p class="help">
-          Alerts to <code>security-team</code>. Nothing delivers in this page,
-          so each stays pending with its delivery identity.
-        </p>
-        <ol id="outbox" class="outbox"><li class="empty">No alerts.</li></ol>
-      </section>
-    </div>
-
-    <section aria-labelledby="timeline-heading" class="panel">
-      <h3 id="timeline-heading">Decisions</h3>
-      <p class="help">
-        Accepted and committed failures are published; rejections change
-        nothing; a request the schema or the authority refuses never becomes a
-        decision.
-      </p>
-      <ol id="timeline" class="timeline"><li class="empty">No decisions yet.</li></ol>
-    </section>
-  </section>
+    <div class="demo">Loading the example.</div>
+  </details>
 </main>
 
 <footer class="prose">
   <p>
     Built from the ZenoFCIS repository with <code>python3 site/build.py</code>,
-    which also replays the template's examples through this module and requires
+    which also replays each template's examples through its module and requires
     two builds of it to be identical.
   </p>
 </footer>

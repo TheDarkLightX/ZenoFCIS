@@ -1,31 +1,50 @@
 # ZenoFCIS demo site
 
-A static page that runs an example application in the browser through its own
-commit authority, program, and law checker, compiled to WebAssembly, with the
-library's in-memory reference shell in place of SQLite. It covers one example,
-`account-lockout`. Nothing here is published: the Pages workflow deploys only
-from `main`, and merging to `main` is the owner's decision.
+A static page that runs the example applications in the browser, each through
+its own commit authority, program, and law checker, compiled to WebAssembly,
+with the library's in-memory reference shell in place of SQLite. It covers one
+example so far, `account-lockout`; every example adds only its request
+mapping and its demonstration script to the shared shape described here.
+Nothing here is published: the Pages workflow deploys only from `main`, and
+merging to `main` is the owner's decision.
 
 ## Layout
 
 - `Cargo.toml`, `Cargo.lock`: a workspace of its own, like `verification/`,
-  so the generated application never enters the published crates' graph. Its
-  `[patch.crates-io]` table resolves the application's version pins to this
+  so the generated applications never enter the published crates' graph. Its
+  `[patch.crates-io]` table resolves each application's version pins to this
   checkout.
 - `package.json`: marks the scripts as ES modules for Node, which runs the
   tests. The page needs no package, and nothing is installed.
-- `apps/account-lockout/`: written by `build.py` with `zeno-fcis new`, not
-  committed, so the page always runs the template as the CLI ships it.
-- `demos/account-lockout/`: the module. `src/demo.rs` follows the template's
-  `invoke` with `AuthorizedShellState` in place of the SQLite shell; `src/abi.rs`
-  is the C ABI (`demo_alloc`, `demo_free`, `demo_reset`, `demo_step`,
-  `demo_state`) and the only code that handles raw pointers.
-- `public/`: the page, and the Pages artifact. `index.html`, `site.css`,
-  `site.js`, the shared loader `demo-module.js`, and `demonstration.js`, the
-  README's scripted requests. The built `account-lockout.wasm` lands here and
-  is not committed. The page fetches its module relative to its own script,
-  so it works from any path it is served at.
-- `tests/replay.mjs`: the headless check, Node 22 and no browser.
+- `common/`: what every module shares. `src/demo.rs` is the step over the
+  library's `AuthorizedShellState`, following each template's `invoke`, and
+  the JSON report; `src/render.rs` names every reported value as
+  `project.zeno` names it (fields, variants, reasons, channels) and every law
+  as the manifest does; `src/request.rs` reads the page's request field by
+  field and refuses what a command does not read; `src/application.rs` is the
+  `Application` trait a demo crate fulfils; `src/abi.rs` is the C ABI
+  (`demo_alloc`, `demo_free`, `demo_step`, `demo_state`), defined once and
+  exported by every module that links the crate, and the only code that
+  handles raw pointers.
+- `apps/<template>/`: written by `build.py` with `zeno-fcis new`, not
+  committed, so the page always runs each template as the CLI ships it.
+- `demos/<template>/`: one crate per example. It names the application's
+  types, its exact genesis, and the mapping from the page's request to the
+  template's typed command and context, in the README's words, and exports
+  the module's `demo_reset`.
+- `public/`: the page, and the Pages artifact. `index.html` holds the landing
+  text and one `<details>` section per example with the README's wording;
+  `site.js` builds a section's panel when the section opens, loading
+  `templates/<template>.js`, the example's description (its state fields, its
+  context and commands in the README's words, the README's demonstration, and
+  the demonstration's end in the gate's fields), and `<template>.wasm`;
+  `panel.js` is the shared panel: the forms, the timeline of decisions with
+  the laws evaluated for each, the state, and the outbox; `demo-module.js` is
+  the loader. The built modules land here and are not committed. The page
+  fetches its modules relative to its own scripts, so it works from any path
+  it is served at.
+- `tests/replay.mjs`, with `tests/examples.mjs` and
+  `tests/templates/<template>.mjs`: the headless check, Node 22 and no browser.
 - `tests/deploy_check.py` and `tests/harness/`: the exact artifact, served
   from a subpath, in headless Chrome.
 - `build.py`: builds and tests everything.
@@ -42,16 +61,17 @@ python3 site/build.py
 python3 -m http.server --directory site/public 8000
 ```
 
-Then open `http://localhost:8000/`. The page fetches the module once; after
-that it makes no network requests. `build.py` runs, in order: the CLI build and
-`zeno-fcis new`; the lock check against the workspace lock (`--relock`
-regenerates `site/Cargo.lock` from it); `cargo fmt --check`, clippy with
-`-D warnings` for the host and for wasm32, and the host tests; two release
-builds of the module, with the application and the demo crate rebuilt from
-scratch in between, which must produce identical bytes;
-`node site/tests/replay.mjs`; `node --check` on every script; and
+Then open `http://localhost:8000/`. `build.py` runs, in order: the CLI build
+and `zeno-fcis new` for every template; the lock check against the workspace
+lock (`--relock` regenerates `site/Cargo.lock` from it); `cargo fmt --check`,
+clippy with `-D warnings` for the host and for wasm32, and the host tests;
+two release builds of each module, with the application and the demo crate
+rebuilt from scratch in between, which must produce identical bytes, and the
+sizes; `node site/tests/replay.mjs`; `node --check` on every script; and
 `site/tests/deploy_check.py`, which needs Chrome (`--no-browser` skips it,
-`--chrome PATH` names the binary).
+`--chrome PATH` names the binary). `--only TEMPLATE` limits the module,
+replay, and browser steps to one template, and `--stage STAGE` runs one step,
+so that a long build can be split into shorter runs.
 
 To view the page from a subpath, as GitHub Pages serves it at
 `https://thedarklightx.github.io/ZenoFCIS/`:
@@ -65,34 +85,44 @@ Then open `http://localhost:8000/ZenoFCIS/`.
 
 ## What the page shows, and what is checked
 
-Each request carries its command and its context (the time and the admin
-flag), which the page supplies; the module reads no clock. A step runs schema
-admission through the generated bindings, `admit_invocation`, `execute`, and,
-for an accept or a committed failure, the commit and the exact replay check,
-as the template's `invoke` does. The report gives the decision kind, the
-reason, each law's status as the law evaluation reports it, the account before
-and after, the alerts queued, and the authorization or rejection identity.
+Each request carries its command and its context, which the page supplies;
+no module reads a clock. A step runs schema admission through the generated
+bindings, `admit_invocation`, `execute`, and, for an accept or a committed
+failure, the commit and the exact replay check, as the template's `invoke`
+does. The report gives the decision kind, the reason, each law's status as
+the law evaluation reports it, the state before and after, the entries it
+queued, and the authorization or rejection identity, every value under the
+name `project.zeno` gives it.
 
-`tests/replay.mjs` replays the template's `tests/decision-examples.txt` (each
-example's account is reached from genesis by requests, then its request is
-decided) and the README's demonstration, and compares every outcome with the
-examples file and with the gate's expected summary in
-`tools/check_generated_application.py`. Nothing delivers in the page, so the
-alerts the gate's shell delivered are the alerts left pending here.
+`tests/replay.mjs` replays, for each template, every example in its
+`tests/decision-examples.txt`: the example's state is reached from genesis by
+requests that `tests/templates/<template>.mjs` derives from the README's
+rules, then its request is decided, and the kind, the reason, the state
+after, the entries queued, and the laws evaluated are compared with the
+examples file. An example whose state no sequence of requests reaches is
+named in the output and not replayed; account-lockout has none. It then runs
+the README's demonstration and compares its decisions and its end with the
+gate's expected summary in `tools/check_generated_application.py`, and
+checks that bad input is refused before any decision. Nothing delivers in the
+page, so the entries the gate's shell delivered are the entries left pending
+here.
 
 `tests/deploy_check.py` serves `site/public` exactly as the workflow uploads
 it, at `/ZenoFCIS/` on a local server that serves nothing at the root, and
 drives headless Chrome over it with `--dump-dom` under a virtual-time budget.
 A harness page, served beside the artifact and not part of it, imports the
-artifact's own loader and demonstration script, runs the demonstration through
-the module, and prints the results, which must match the gate's summary; the
-page itself must have loaded its module and rendered the genesis. A page that
-loaded from the subpath alone is a page whose relative paths hold.
+artifact's own loader and each template's description, runs each README's
+demonstration through its served module, and prints the results, which must
+match the gate's summaries; the page itself must have loaded the module of
+the panel that is open on load, rendered its state, and fetched no other
+module. A page that loaded from the subpath alone is a page whose relative
+paths hold.
 
-The strength of what the template itself checks is stated in its README and
-repeated on the page: laws evaluated at run time on every decision; tests on a
-host over 20 examples and 606 grid inputs; and claim 600's induction step,
-which CVC5 attests with `unsat` and which is not proved.
+The strength of what each template itself checks is stated in its README and
+repeated in its section of the page. For account-lockout: laws evaluated at
+run time on every decision; tests on a host over 20 examples and 606 grid
+inputs; and claim 600's induction step, which CVC5 attests with `unsat` and
+which is not proved.
 
 ## Publishing
 
@@ -110,7 +140,7 @@ once this work is on `main`, which is also the only branch Pages deploys from.
 
 ## Next
 
-A public page should open in a working state: for example, with the README's
-demonstration already decided when the page loads, and labelled as such, so the
-first view shows the judge at work. The other example applications follow the
-same shape.
+The other example applications, each as a demo crate, a description, and an
+examples reader; and a page that opens in a working state, with the first
+section's README demonstration already decided when the page loads, and
+labelled as such, so the first view shows the judge at work.

@@ -4,18 +4,22 @@
 Serves site/public as `actions/upload-pages-artifact` uploads it, at a subpath
 (`/ZenoFCIS/` by default) of a local server that serves nothing at the root,
 and drives headless Chrome over it with `--dump-dom` under a virtual-time
-budget, which lets the page finish its fetches and timers before the DOM is
+budget, which lets a page finish its fetches and timers before the DOM is
 printed:
 
 1. the harness, site/tests/harness/, served beside the artifact: it imports
-   the page's own loader and demonstration script from the artifact, runs the
-   README's demonstration through the module, and prints the results, which
-   must match the gate's expected summary in tools/check_generated_application.py;
-2. the page itself: it must have loaded its module and rendered the genesis.
+   the page's own loader and each template's description from the artifact,
+   runs each README's demonstration through its served module, and prints
+   the results, which must match the gate's expected summaries in
+   tools/check_generated_application.py;
+2. the page itself: the panel that is open when it loads must have loaded
+   its module and rendered its state, and no other panel's module may have
+   been fetched.
 
 A page that loaded from the subpath alone is a page whose relative paths hold.
 
-Usage: python3 site/tests/deploy_check.py [--chrome PATH] [--subpath /ZenoFCIS/]
+Usage: python3 site/tests/deploy_check.py [--chrome PATH] [--subpath /ZenoFCIS/] [TEMPLATE...]
+(default: every module in site/public)
 """
 
 from __future__ import annotations
@@ -109,10 +113,11 @@ def dump_dom(chrome: str, profile: Path, url: str) -> str:
 
 
 def element_text(dom: str, element_id: str) -> str:
-    match = re.search(rf'<[a-z]+[^>]*\sid="{re.escape(element_id)}"[^>]*>(.*?)</[a-z]+>', dom, re.DOTALL)
+    """The text of the element with `element_id`, up to its own closing tag; the elements read here do not nest."""
+    match = re.search(rf'<([a-z]+)[^>]*\sid="{re.escape(element_id)}"[^>]*>(.*?)</\1>', dom, re.DOTALL)
     if match is None:
         raise DeployCheckError(f"no element with id {element_id!r} in the dumped DOM")
-    return html.unescape(re.sub(r"<[^>]+>", "", match.group(1))).strip()
+    return html.unescape(re.sub(r"<[^>]+>", " ", match.group(2))).strip()
 
 
 def require(condition: bool, message: str) -> None:
@@ -120,42 +125,57 @@ def require(condition: bool, message: str) -> None:
         raise DeployCheckError(message)
 
 
-def check_harness(dom: str, subpath: str) -> None:
+def open_panel() -> str:
+    """The one panel the page opens on load, from index.html."""
+    text = (PUBLIC / "index.html").read_text(encoding="utf-8")
+    panels = [match.group(1) for match in re.finditer(r'<details\b([^>]*)>', text) if "data-template=" in match.group(1)]
+    opened = [re.search(r'data-template="([^"]+)"', panel).group(1) for panel in panels if re.search(r"\sopen(?:\s|$)", panel)]
+    require(len(opened) == 1, f"index.html must open exactly one panel on load, not {opened}")
+    return opened[0]
+
+
+def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
     results = json.loads(element_text(dom, "results"))
-    require(results.get("errors") == [], f"the harness reported errors: {results.get('errors')}")
-    expected = gate.EXAMPLE_TEMPLATES["account-lockout"]
-    steps = results["steps"]
-    require([step["decision"] for step in steps] == expected["decisions"],
-            f"demonstration decisions differ from the gate's: {[step['decision'] for step in steps]}")
-    for index, step in enumerate(steps, start=1):
-        require(step["error"] is None, f"demonstration step {index} was refused: {step['error']}")
-        require(all(status == "Satisfied" for _, status in step["laws"]),
-                f"demonstration step {index} evaluated a law as other than Satisfied: {step['laws']}")
-    account = results["state"]
-    require([account["failed_attempts"], account["locked_until"], account["last_seen"]]
-            == [expected["failed_attempts"], expected["locked_until"], expected["last_seen"]],
-            f"the account after the demonstration differs from the gate's: {account}")
-    require(results["bundles"] == expected["bundles"], f"bundles: {results['bundles']}")
-    # Nothing delivers in the page, so the alerts the gate delivered stay pending.
-    require(results["pending"] == expected["deliveries"], f"pending alerts: {results['pending']}")
+    require(results["errors"] == [], f"the harness reported errors: {results['errors']}")
     require(results["base"].endswith(subpath), f"the harness loaded from {results['base']}, not {subpath}")
+    for name in templates:
+        result = results["results"].get(name)
+        require(result is not None, f"{name}: the harness reported nothing")
+        require(result["errors"] == [], f"{name}: the harness reported errors: {result['errors']}")
+        expected = gate.EXAMPLE_TEMPLATES[name]
+        decisions = [step["decision"] for step in result["steps"]]
+        require(decisions == expected["decisions"], f"{name}: demonstration decisions differ from the gate's: {decisions}")
+        for index, step in enumerate(result["steps"], start=1):
+            require(step["error"] is None, f"{name}: demonstration step {index} was refused: {step['error']}")
+            require(all(status == "Satisfied" for _, status in step["laws"]),
+                    f"{name}: demonstration step {index} evaluated a law as other than Satisfied: {step['laws']}")
+        summary = result["summary"]
+        require(summary == {key: expected[key] for key in summary},
+                f"{name}: the demonstration's end differs from the gate's summary: {summary}")
+        require(result["steps_counted"] == len(expected["decisions"]), f"{name}: decisions counted: {result['steps_counted']}")
 
 
-def check_page(dom: str) -> None:
-    status = element_text(dom, "status")
-    require("Reset to the exact genesis" in status, f"the page did not load its module: status {status!r}")
-    require(element_text(dom, "failed-attempts") == "0", "the page did not render the genesis account")
-    require("Reset to genesis" in dom and 'id="reset"' in dom, "the page's controls are missing")
+def check_page(dom: str, first: str) -> None:
+    status = element_text(dom, f"{first}-status")
+    require("Reset to the exact genesis" in status, f"the open panel did not load its module: status {status!r}")
+    state = element_text(dom, f"{first}-state")
+    require("Committed bundles" in state and "State root" in state, f"the open panel did not render its state: {state!r}")
+    require("Reset to genesis" in dom, "the open panel's controls are missing")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--chrome", help="the Chrome or Chromium binary (default: the first found on PATH)")
     parser.add_argument("--subpath", default="/ZenoFCIS/", help="where the artifact is served (default: /ZenoFCIS/)")
+    parser.add_argument("templates", nargs="*", help="the templates to run (default: every module in site/public)")
     args = parser.parse_args()
     subpath = args.subpath if args.subpath.endswith("/") else args.subpath + "/"
     require(subpath.startswith("/") and subpath != "/" and subpath != HARNESS_PREFIX, f"bad subpath {subpath!r}")
-    require((PUBLIC / "account-lockout.wasm").is_file(), "site/public/account-lockout.wasm is missing; run site/build.py")
+    templates = args.templates or sorted(path.stem for path in PUBLIC.glob("*.wasm"))
+    require(bool(templates), "no module in site/public; run site/build.py")
+    for name in templates:
+        require((PUBLIC / f"{name}.wasm").is_file(), f"site/public/{name}.wasm is missing; run site/build.py")
+    first = open_panel()
     chrome = find_chrome(args.chrome)
 
     served: list[tuple[str, int]] = []
@@ -165,23 +185,29 @@ def main() -> None:
     try:
         origin = f"http://127.0.0.1:{server.server_address[1]}"
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-deploy-check-") as profile:
-            check_harness(dump_dom(chrome, Path(profile), f"{origin}{HARNESS_PREFIX}?base={subpath}"), subpath)
-            check_page(dump_dom(chrome, Path(profile), f"{origin}{subpath}"))
+            harness_url = f"{origin}{HARNESS_PREFIX}?base={subpath}&templates={','.join(templates)}"
+            check_harness(dump_dom(chrome, Path(profile), harness_url), subpath, templates)
+            page_start = len(served)
+            check_page(dump_dom(chrome, Path(profile), f"{origin}{subpath}"), first)
     finally:
         server.shutdown()
         server.server_close()
 
-    paths = {path for path, status in served if status == 200}
-    require(f"{subpath}account-lockout.wasm" in paths, f"the module was not fetched from {subpath}: {sorted(paths)}")
-    require(all(path.startswith((subpath, HARNESS_PREFIX)) for path in paths),
-            f"a request outside the subpath succeeded: {sorted(paths)}")
-    print(f"deploy check: PASS: the artifact served from {subpath} ran the demonstration in {Path(chrome).name}; "
-          f"{len(served)} requests, none served outside the subpath")
+    succeeded = {path for path, status in served if status == 200}
+    require(all(path.startswith((subpath, HARNESS_PREFIX)) for path in succeeded),
+            f"a request outside the subpath succeeded: {sorted(succeeded)}")
+    for name in templates:
+        require(f"{subpath}{name}.wasm" in succeeded, f"{name}: the module was not fetched from {subpath}")
+    page_modules = sorted({path for path, status in served[page_start:] if status == 200 and path.endswith(".wasm")})
+    require(page_modules == [f"{subpath}{first}.wasm"],
+            f"the page must fetch the open panel's module and no other, not {page_modules}")
+    print(f"deploy check: PASS: the artifact served from {subpath} ran {len(templates)} demonstration(s) in "
+          f"{Path(chrome).name}; the page fetched only {first}.wasm; {len(served)} requests, none served outside the subpath")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (DeployCheckError, OSError, subprocess.SubprocessError, ValueError, KeyError) as error:
+    except (DeployCheckError, OSError, subprocess.SubprocessError, ValueError, KeyError, AttributeError) as error:
         print(f"deploy check: FAIL: {error}", file=sys.stderr)
         sys.exit(1)
