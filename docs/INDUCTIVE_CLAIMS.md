@@ -186,13 +186,20 @@ and Z3 4.16.0, all run on 2026-09-24:
   comes from the bound law and the program's capacity check, not from the
   action laws.
 - The account-lockout template's lock invariant, the formula of its law 500,
-  assumed only its action laws. Before declared domains, the first
-  counterexample was an "accept" with command 0: the action laws never state
-  that an accept is a login or an unlock, because admission guarantees it.
-  Declared domains now exclude it without changing the laws. The remaining
-  counterexamples start at times near the top of the i128 range, or at
-  `failed_attempts = 3`. The integer ranges in `build.rs` exclude both, which
-  is the first limit below.
+  assumes only its action laws: 501 and 502 on accepts, 503 on committed
+  failures. Before declared domains, the first counterexample was an
+  "accept" with command 0: the action laws never state that an accept is a
+  login or an unlock, because admission guarantees it. Declared domains
+  exclude it without changing the laws. Before declared ranges, the
+  remaining counterexamples started at times near the top of the i128
+  range, where `last_seen + 900` overflows and the invariant has no value,
+  or at `failed_attempts = 3`, from which law 503 constrains only
+  `last_seen`. With `Attempts in 0..=2`, `UnixTime in 0..=4102444800`, and
+  `LockDeadline in 0..=4102445700` declared in `project.zeno`, CVC5 answers
+  `unsat` (attested) from the same laws, and Z3 agrees. Widening `Attempts`
+  to `0..=3` brings the second counterexample back. The template ships the
+  claim as its claim 600, with `tests/claims.rs` for the application's
+  checks; its `build.rs` binds no integer.
 - The compliance-gateway template's strikes invariant, `0 <= strikes <= 3`,
   with `accept [501, 502] failure [503]`, gave the same command-0
   counterexample before declared domains. With them, CVC5 answers `unsat`
@@ -249,6 +256,8 @@ edits were reverted; none is committed.
 | `declared_domain` reads variants, bools, and declared ranges, and nothing else | `declared_domains_come_from_variants_bools_and_declared_ranges` |
 | Model values down to `i128::MIN` are parsed, so a counterexample there is replayed | `model_values_span_the_whole_i128_range` |
 | In the durable counter, the law checker's observer reads every field the invariant reads (planted by observing `failures` under another path) | `the_law_checker_observes_every_field_the_invariant_reads`, `the_invariant_holds_on_the_exact_genesis_state` |
+| In account-lockout, the law checker's observer reads every field the invariant reads (planted by observing `last_seen` under another path) | `the_law_checker_observes_every_field_the_invariant_reads`, `the_invariant_holds_on_the_exact_genesis_account`, and every test that commits a decision, in the template's tests |
+| In account-lockout, a declared range is the range the program and the schema use (planted by widening `Attempts` to `0..=3`, and `UnixTime` by one second) | `the_declared_ranges_are_the_schemas_bounds` and `schema_admission_enforces_the_declared_bounds`, in the template's tests; `prove` also refutes claim 600 from `failed_attempts = 3` |
 | The authority validates the command and context at admission (removed for both, or for either one) | `admission_checks_the_command_and_context_against_its_own_schema`, in `zeno-fcis-authority` |
 | The authority validates the initial state at genesis | `genesis_is_checked_against_its_own_schema`, in `zeno-fcis-authority` |
 | A declared range is part of the canonical bytes (dropped, stored without its upper bound, or its tag given to an unranged type) | `a_declared_range_is_part_of_the_canonical_project` |

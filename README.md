@@ -251,7 +251,7 @@ outbox, tests, and a README that states its rules.
 | Template | What it shows |
 | --- | --- |
 | `durable-counter` | The smallest complete application: a synthesized step, runtime laws, a committed failure, and restart with delivery retry. |
-| `account-lockout` | Failed logins committed as failures, time as an input instead of a clock read, authority from the request context, and alerts through the outbox. |
+| `account-lockout` | Failed logins committed as failures, time as an input instead of a clock read, authority from the request context, alerts through the outbox, and an inductive claim, attested by CVC5 over the integer ranges `project.zeno` declares, that the action laws alone keep the lock invariant. |
 | `order-fulfillment` | A hand-written state machine that sends idempotent payment and shipping requests and rejects duplicate or late callbacks. |
 | `inventory-reservation` | A decision core synthesized and verified on all 432 inputs, commands with quantities, and a conservation law. |
 | `compliance-gateway` | An expert system's rule base as the synthesis contract, checked on all 720 inputs; every decision names the rule that fired, a rule base with a conflict, a gap, or a dead rule fails the build, and claims for `zeno-fcis prove` state the strikes invariant's inductive steps. |

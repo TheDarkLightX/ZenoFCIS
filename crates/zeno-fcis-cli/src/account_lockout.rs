@@ -42,6 +42,10 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         include_bytes!("../templates/account-lockout/src/program.rs"),
     ),
     (
+        "tests/claims.rs",
+        include_bytes!("../templates/account-lockout/tests/claims.rs"),
+    ),
+    (
         "tests/conformance.rs",
         include_bytes!("../templates/account-lockout/tests/conformance.rs"),
     ),

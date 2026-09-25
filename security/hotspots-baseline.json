@@ -3158,47 +3158,47 @@
       ],
       "path": "crates/zeno-fcis-cli/templates/account-lockout/build.rs",
       "path_roles": [],
-      "production_lines": 197,
+      "production_lines": 180,
       "rank": 30,
       "score": 79,
       "signals": [
         {
           "id": "canonical-commitment",
           "lines": [
-            183
+            166
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            179,
-            181,
-            186
+            162,
+            164,
+            169
           ]
         },
         {
           "id": "generated-source",
           "lines": [
-            173
+            156
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            26,
-            58,
-            70,
-            79,
-            100,
-            103,
-            107,
-            121
+            21,
+            41,
+            53,
+            62,
+            83,
+            86,
+            90,
+            104
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            123
+            106
           ]
         }
       ],
@@ -5255,9 +5255,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3740199,
+    "admitted_bytes": 3740666,
     "admitted_files": 218,
-    "inventory_sha256": "99dd9fd886e8cc5e4f0af76c6dacb5a0567fb17a138bb50c89f6c7a023e005f4",
+    "inventory_sha256": "6787370216423d047e788a8b34c10fa736c0048d3f5589541f0f2860dc848738",
     "ranked_above_minimum": 169,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

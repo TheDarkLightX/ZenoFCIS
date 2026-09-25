@@ -6,6 +6,37 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The `account-lockout` template declares the range of each of its integer
+  types in `project.zeno` (`Attempts in 0..=2`, `UnixTime in
+  0..=4102444800`, and `LockDeadline in 0..=4102445700`), and its `build.rs`
+  no longer binds them. It adds claim 600, `lock_state_stays_consistent`:
+  law 500's formula over the account before a decision, assuming laws 501
+  and 502 on accepts and law 503 on committed failures. With the declared
+  ranges, CVC5 1.3.3 answers `unsat` for the induction step, which is
+  attested, not independently checked, and Z3 4.16.0 agrees. Without them,
+  CVC5 finds a login near the top of the i128 range, after which
+  `last_seen + 900` overflows and the invariant has no value, and Z3 a
+  failed login from `failed_attempts` 3, from which law 503 constrains only
+  `last_seen`; the schema admits neither.
+  - `tests/claims.rs` checks that the claim restates law 500 exactly, that
+    the manifest enforces each assumed law where the claim assumes it and
+    refuses a law assumed outside its scope, that the law checker's observer
+    reads every field the invariant reads and gives it its stated value on a
+    grid of 129 admitted accounts across every boundary it compares, that
+    the invariant holds on the exact genesis, and that the declared ranges
+    are the generated schema's bounds and agree with the program's
+    constants. `tests/conformance.rs` evaluates the invariant before and
+    after each of the 295 committed decisions in its grid and the 12
+    committed examples. `tests/laws.rs` adds decisions that only a formula
+    refuses. The law checker observes the account through one
+    `state_observations`, which the tests share.
+  - Twelve planted defects, in the observer, the laws, the ranges, the
+    program, and the checker, each failed a named test; the two weakened
+    laws and the widened `Attempts` range were also refuted by `prove`.
+  - Declaring the ranges and the claim changes the template's canonical
+    project bytes and semantic program hash; the program, the schema's
+    bounds, and the demonstration summary are unchanged.
+
 - Declare the inclusive range of an `int` type in `project.zeno`:
   `type ID int name in MIN..=MAX;`.
   - Schema lowering takes a declared range as the type's `I128` bounds, so

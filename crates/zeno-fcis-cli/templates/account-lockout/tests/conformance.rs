@@ -11,15 +11,23 @@
 //! program, so it catches binding and adapter errors, not a misreading shared
 //! by both. The examples file, once reviewed by the project's owner, is the
 //! check on that.
+//!
+//! On every committed decision, the invariant of claim 600 is evaluated
+//! before and after, through the law checker's own observer.
 
 use account_lockout::{
-    Authority, authority, bindings::GeneratedProject, context, generated::*, profile,
+    Authority, authority, bindings::GeneratedProject, context, generated::*,
+    laws::state_observations, profile,
 };
 use std::collections::BTreeSet;
 use zeno_fcis_codec::Domain;
 use zeno_fcis_core::Decision;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::ValidationLimits;
+use zeno_fcis_spec::{
+    ClaimFormula, EvalLimits, EvalOutcome, EvaluationContext, Identifier, PredicateProvider,
+    ProjectionRoot, RelExpr, StableId, TraceStep, evaluate_relational, invariant_at,
+};
 use zeno_fcis_value::Value;
 
 const EXAMPLES: &str = include_str!("decision-examples.txt");
@@ -28,8 +36,14 @@ const LOGIN_FAILED: u16 = 121;
 const ADMIN_UNLOCK: u16 = 122;
 const LOCKED: u16 = 150;
 const UNLOCKED: u16 = 151;
-/// The latest time a request may carry, as bound in `build.rs`.
+/// The inductive claim in `project.zeno`: law 500 over the account before a
+/// decision.
+const LOCK_STATE_STAYS_CONSISTENT: u32 = 600;
+/// The latest time a request may carry, as `project.zeno` declares it.
 const LAST_TIME: i128 = 4_102_444_800;
+/// The grid's decisions that commit, on each of which the invariant is
+/// evaluated before and after.
+const COMMITTED_GRID_DECISIONS: usize = 295;
 
 /// Fields 110 failed_attempts, 111 locked_until, and 112 last_seen.
 type State = (i128, i128, i128);
@@ -221,6 +235,63 @@ fn model(pre: State, command_id: u16, now: i128, admin: bool) -> Outcome {
     }
 }
 
+struct NoPredicates;
+impl PredicateProvider for NoPredicates {
+    fn evaluate(&self, _: &Identifier, _: &[i128]) -> Option<bool> {
+        None
+    }
+}
+
+/// The invariant of claim 600, over the account before and after a decision.
+/// Its induction step is attested over the declared ranges; the tests
+/// evaluate it on each committed decision's actual transition, as the law
+/// checker observes it.
+struct Invariant {
+    before: RelExpr,
+    after: RelExpr,
+}
+
+impl Invariant {
+    fn load() -> Self {
+        let spec = profile::project();
+        let claim = spec
+            .claim(StableId::new(LOCK_STATE_STAYS_CONSISTENT).unwrap())
+            .expect("claim 600 is declared");
+        let ClaimFormula::Relational(before) = claim.formula() else {
+            panic!("claim 600 states a relational invariant");
+        };
+        let after =
+            invariant_at(before, ProjectionRoot::Post).expect("an invariant over pre. paths");
+        Self {
+            before: before.clone(),
+            after,
+        }
+    }
+
+    /// Checks the invariant before and after a decision that committed, and
+    /// returns whether it did.
+    fn holds_across(&self, pre: State, outcome: &Outcome) -> bool {
+        if outcome.kind == "reject" {
+            return false;
+        }
+        let mut observations = state_observations(ProjectionRoot::Pre, &state(pre)).unwrap();
+        observations
+            .extend(state_observations(ProjectionRoot::Post, &state(outcome.post)).unwrap());
+        let step = TraceStep::try_new(observations).unwrap();
+        for (when, formula) in [("before", &self.before), ("after", &self.after)] {
+            assert_eq!(
+                evaluate_relational(
+                    formula,
+                    EvaluationContext::new(&step, &NoPredicates, EvalLimits::default())
+                ),
+                EvalOutcome::True,
+                "claim 600 {when} {pre:?} {outcome:?}"
+            );
+        }
+        true
+    }
+}
+
 /// Reachable states (law 500 holds), with request times just around each
 /// deadline, every command, and both administrator flags.
 fn grid() -> Vec<(State, u16, i128, bool)> {
@@ -254,15 +325,20 @@ fn grid() -> Vec<(State, u16, i128, bool)> {
 #[test]
 fn every_grid_input_matches_the_reference_model() {
     let authority = authority().unwrap();
+    let invariant = Invariant::load();
     let inputs = grid();
     assert_eq!(inputs.len(), 606);
+    let mut committed = 0;
     for (pre, command_id, now, admin) in inputs {
+        let observed = observe(&authority, pre, command_id, now, admin);
         assert_eq!(
-            observe(&authority, pre, command_id, now, admin),
+            observed,
             model(pre, command_id, now, admin),
             "input {pre:?} command {command_id} now {now} admin {admin}"
         );
+        committed += usize::from(invariant.holds_across(pre, &observed));
     }
+    assert_eq!(committed, COMMITTED_GRID_DECISIONS);
 }
 
 /// Parses `pre.110 pre.111 pre.112 command now admin | outcome reason
@@ -335,23 +411,23 @@ fn parse_example(line: &str) -> ((State, u16, i128, bool), Outcome) {
 #[test]
 fn decision_examples_match_the_executed_application() {
     let authority = authority().unwrap();
+    let invariant = Invariant::load();
     let mut covered = BTreeSet::new();
-    let mut count = 0;
+    let (mut count, mut committed) = (0, 0);
     for line in EXAMPLES
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
     {
         let ((pre, command_id, now, admin), expected) = parse_example(line);
-        assert_eq!(
-            observe(&authority, pre, command_id, now, admin),
-            expected,
-            "example: {line}"
-        );
+        let observed = observe(&authority, pre, command_id, now, admin);
+        assert_eq!(observed, expected, "example: {line}");
         covered.insert((expected.kind, expected.reason));
         count += 1;
+        committed += usize::from(invariant.holds_across(pre, &observed));
     }
     assert_eq!(count, 20);
+    assert_eq!(committed, 12);
     assert_eq!(
         covered,
         BTreeSet::from([

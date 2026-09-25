@@ -56,40 +56,62 @@ fn command_id(command: &AccountCommand) -> i128 {
     }
 }
 
-fn observations(
+/// One observation at a reviewed path. Only a path the library refuses can
+/// fail, which the static IDs here never cause.
+fn observe(
+    root: ProjectionRoot,
+    raw: &[u32],
+    value: i128,
+) -> Result<Observation, LawEngineFailure> {
+    let segments = raw
+        .iter()
+        .map(|id| StableId::new(*id).ok_or(LawEngineFailure::Unsupported))
+        .collect::<Result<Vec<_>, _>>()?;
+    let path = ProjectionPath::try_new(root, segments).ok_or(LawEngineFailure::Unsupported)?;
+    Ok(Observation::new(path, value))
+}
+
+/// Observes one account under `root`, at the numeric IDs of `project.zeno`.
+///
+/// The law checker observes the account before and after every decision
+/// through this one mapping, so an invariant over `pre.` paths, such as
+/// claim 600, reads the same fields at genesis, before a step, and after it,
+/// which the induction in `tests/claims.rs` relies on.
+///
+/// # Errors
+///
+/// `LawEngineFailure::Unsupported` if a projection cannot be formed, which
+/// the static IDs here never cause.
+pub fn state_observations(
+    root: ProjectionRoot,
+    state: &Account,
+) -> Result<Vec<Observation>, LawEngineFailure> {
+    Ok(vec![
+        observe(root, &[100, 110], state.failed_attempts.0)?,
+        observe(root, &[100, 111], state.locked_until.0)?,
+        observe(root, &[100, 112], state.last_seen.0)?,
+    ])
+}
+
+/// The observations the formulas read from one decision.
+fn trace_step(
     pre: &Account,
     post: &Account,
     command: &AccountCommand,
     context: &RequestContext,
-) -> TraceStep {
-    let observe = |root, raw: &[u32], value| {
-        Observation::new(
-            ProjectionPath::try_new(
-                root,
-                raw.iter()
-                    .map(|n| StableId::new(*n).expect("static ID"))
-                    .collect(),
-            )
-            .expect("static path"),
-            value,
-        )
-    };
-    TraceStep::try_new(vec![
-        observe(ProjectionRoot::Pre, &[100, 110], pre.failed_attempts.0),
-        observe(ProjectionRoot::Pre, &[100, 111], pre.locked_until.0),
-        observe(ProjectionRoot::Pre, &[100, 112], pre.last_seen.0),
-        observe(ProjectionRoot::Post, &[100, 110], post.failed_attempts.0),
-        observe(ProjectionRoot::Post, &[100, 111], post.locked_until.0),
-        observe(ProjectionRoot::Post, &[100, 112], post.last_seen.0),
-        observe(ProjectionRoot::Command, &[101], command_id(command)),
-        observe(ProjectionRoot::Context, &[102, 130], context.now.0),
+) -> Result<TraceStep, LawEngineFailure> {
+    let mut step = state_observations(ProjectionRoot::Pre, pre)?;
+    step.extend(state_observations(ProjectionRoot::Post, post)?);
+    step.extend([
+        observe(ProjectionRoot::Command, &[101], command_id(command))?,
+        observe(ProjectionRoot::Context, &[102, 130], context.now.0)?,
         observe(
             ProjectionRoot::Context,
             &[102, 131],
             i128::from(context.admin.0),
-        ),
-    ])
-    .expect("distinct reviewed projections")
+        )?,
+    ]);
+    TraceStep::try_new(step).ok_or(LawEngineFailure::Unsupported)
 }
 
 /// The rejection reason the README requires, or `None` if the input must commit.
@@ -234,7 +256,7 @@ impl ProjectLawEngine for AccountLaws {
         };
         let extra =
             reason_ok && !committed_while_rejectable && delivery_ok && commit.effects().is_empty();
-        let step = observations(&pre, &post, &command, &context);
+        let step = trace_step(&pre, &post, &command, &context)?;
         let bytes = input
             .canonical_bytes()
             .map_err(|_| LawEngineFailure::InvalidOutput)?;
@@ -255,7 +277,7 @@ impl ProjectLawEngine for AccountLaws {
         }
         let state = Account::try_from_value(input.initial_state().clone())
             .map_err(|_| LawEngineFailure::Unsupported)?;
-        let step = observations(
+        let step = trace_step(
             &state,
             &state,
             &AccountCommand::LoginSucceeded,
@@ -263,7 +285,7 @@ impl ProjectLawEngine for AccountLaws {
                 now: UnixTime(0),
                 admin: AdminFlag(false),
             },
-        );
+        )?;
         let bytes = input
             .canonical_bytes()
             .map_err(|_| LawEngineFailure::InvalidOutput)?;

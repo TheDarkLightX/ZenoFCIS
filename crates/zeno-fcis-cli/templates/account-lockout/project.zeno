@@ -8,9 +8,12 @@ type 101 command AccountCommand;
 type 102 context RequestContext;
 type 103 destination AlertDestination;
 type 104 payload SecurityAlert;
-type 105 int Attempts;
-type 106 int UnixTime;
-type 107 int LockDeadline;
+// Each range is the schema's bounds: lowering takes it from here, and the
+// induction step of claim 600 assumes it. Times are Unix seconds through
+// 2100-01-01T00:00:00Z; a deadline is at most one 900-second lock past that.
+type 105 int Attempts in 0..=2;
+type 106 int UnixTime in 0..=4102444800;
+type 107 int LockDeadline in 0..=4102445700;
 type 108 bool AdminFlag;
 type 109 data AlertKind;
 field 110 100 failed_attempts 105;
@@ -50,3 +53,6 @@ law 502 admin_unlock_clears_lock = command.101 == 122 -> context.102.131 == 1 &&
 // A failed login outside a lock is recorded; the third in a row locks the
 // account for 900 seconds and resets the count.
 law 503 failed_login_is_recorded = command.101 == 121 && context.102.130 >= pre.100.112 && context.102.130 >= pre.100.111 && post.100.112 == context.102.130 && (pre.100.110 < 2 -> post.100.110 == pre.100.110 + 1 && post.100.111 == pre.100.111) && (pre.100.110 == 2 -> post.100.110 == 0 && post.100.111 == context.102.130 + 900);
+// Law 500 by induction, for `zeno-fcis prove`: the action laws alone keep
+// every committed account consistent. `tests/claims.rs` checks the rest.
+claim 600 lock_state_stays_consistent all inductive accept [501, 502] failure [503] = pre.100.111 <= pre.100.112 + 900 && (pre.100.111 > pre.100.112 -> pre.100.110 == 0);
