@@ -944,18 +944,108 @@ pub enum ClaimFormula {
     Temporal(TemporalFormula),
 }
 
+/// The decisions a law is enforced on, written `on SCOPE` after its name.
+///
+/// The variants mirror the law manifest's `DecisionScope`, whose runtime
+/// enforcement is what a declared scope describes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LawScope {
+    /// Every decision: `on any`.
+    Always,
+    /// Accepts only: `on accept`.
+    Accept,
+    /// Rejections only: `on reject`.
+    Reject,
+    /// Committed failures only: `on failure`.
+    CommittedFailure,
+    /// Accepts and committed failures: `on commit`.
+    Committing,
+}
+impl LawScope {
+    pub(crate) const fn tag(self) -> u8 {
+        match self {
+            Self::Always => 0,
+            Self::Accept => 1,
+            Self::Reject => 2,
+            Self::CommittedFailure => 3,
+            Self::Committing => 4,
+        }
+    }
+    /// Returns true when the scope includes every accept.
+    #[must_use]
+    pub const fn covers_accepts(self) -> bool {
+        matches!(self, Self::Always | Self::Accept | Self::Committing)
+    }
+    /// Returns true when the scope includes every committed failure.
+    #[must_use]
+    pub const fn covers_committed_failures(self) -> bool {
+        matches!(
+            self,
+            Self::Always | Self::CommittedFailure | Self::Committing
+        )
+    }
+    /// Returns true when the scope includes every committing decision: every
+    /// accept and every committed failure.
+    #[must_use]
+    pub const fn covers_commits(self) -> bool {
+        self.covers_accepts() && self.covers_committed_failures()
+    }
+}
+
+/// Where a law declares it applies: the decisions it is enforced on, and
+/// whether it also constrains the genesis state (`, genesis`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LawApplicability {
+    scope: LawScope,
+    genesis: bool,
+}
+impl LawApplicability {
+    /// Creates an applicability.
+    #[must_use]
+    pub const fn new(scope: LawScope, genesis: bool) -> Self {
+        Self { scope, genesis }
+    }
+    /// Returns the decisions the law is enforced on.
+    #[must_use]
+    pub const fn scope(self) -> LawScope {
+        self.scope
+    }
+    /// Returns true when the law also constrains the genesis state.
+    #[must_use]
+    pub const fn genesis(self) -> bool {
+        self.genesis
+    }
+}
+
 /// Named relational law.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LawDecl {
     pub(crate) id: StableId,
     pub(crate) name: Identifier,
     pub(crate) formula: RelExpr,
+    pub(crate) applicability: Option<LawApplicability>,
 }
 impl LawDecl {
-    /// Creates a law.
+    /// Creates a law that declares no scope; its scope is the law manifest's.
     #[must_use]
     pub const fn new(id: StableId, name: Identifier, formula: RelExpr) -> Self {
-        Self { id, name, formula }
+        Self {
+            id,
+            name,
+            formula,
+            applicability: None,
+        }
+    }
+    /// Declares where the law applies.
+    #[must_use]
+    pub const fn with_applicability(mut self, applicability: LawApplicability) -> Self {
+        self.applicability = Some(applicability);
+        self
+    }
+    /// Returns where the law declares it applies, if it declares a scope.
+    #[must_use]
+    pub const fn applicability(&self) -> Option<LawApplicability> {
+        self.applicability
     }
     /// Returns the identifier.
     #[must_use]
@@ -1528,9 +1618,20 @@ fn encode_temporal(value: &TemporalFormula, out: &mut Vec<u8>) -> Result<(), Enc
         }
     }
 }
+/// The marker before a law's declared scope. It takes the place where the
+/// formula's own tag would start, and no formula tag uses it, so a law without
+/// a declared scope encodes exactly as before, and the encoding stays
+/// unambiguous.
+const SCOPED_LAW_TAG: u8 = 240;
+
 fn encode_law(value: &LawDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {
     value.id.encode_to(out)?;
     value.name.encode_to(out)?;
+    if let Some(applicability) = value.applicability {
+        out.push(SCOPED_LAW_TAG);
+        out.push(applicability.scope.tag());
+        out.push(u8::from(applicability.genesis));
+    }
     encode_rel(&value.formula, out)
 }
 fn encode_claim(value: &ClaimDecl, out: &mut Vec<u8>) -> Result<(), EncodeError> {

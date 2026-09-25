@@ -465,10 +465,55 @@ impl Parser {
     fn parse_law(&mut self) -> Option<LawDecl> {
         let id = self.take_id("law.id")?;
         let name = self.take_identifier("law.name")?;
+        let applicability = if self.take_keyword("on") {
+            self.parse_law_applicability()
+        } else {
+            None
+        };
         self.expect_symbol(TokenKind::Equal, "law");
         let formula = self.parse_rel();
         self.expect_symbol(TokenKind::Semicolon, "law");
-        Some(LawDecl::new(id, name, formula))
+        let law = LawDecl::new(id, name, formula);
+        Some(match applicability {
+            Some(applicability) => law.with_applicability(applicability),
+            None => law,
+        })
+    }
+    /// Parses `SCOPE[, genesis]` after `on` in a law declaration.
+    fn parse_law_applicability(&mut self) -> Option<LawApplicability> {
+        let scope_name = self.take_identifier("law.scope")?;
+        let scope = match scope_name.as_str() {
+            "any" => LawScope::Always,
+            "accept" => LawScope::Accept,
+            "reject" => LawScope::Reject,
+            "failure" => LawScope::CommittedFailure,
+            "commit" => LawScope::Committing,
+            _ => {
+                self.error(
+                    DiagnosticCode::InvalidDeclaration,
+                    "law.scope",
+                    "any|accept|reject|failure|commit",
+                    scope_name.as_str(),
+                    "select the decisions the law is enforced on",
+                );
+                return None;
+            }
+        };
+        let genesis = self.take_symbol(&TokenKind::Comma);
+        if genesis && !self.take_keyword("genesis") {
+            self.error(
+                DiagnosticCode::ExpectedToken,
+                "law.scope",
+                "genesis",
+                self.describe_current(),
+                "write `, genesis` for a law that also constrains the genesis state",
+            );
+            if matches!(self.current().kind, TokenKind::Ident(_)) {
+                self.advance();
+            }
+            return None;
+        }
+        Some(LawApplicability::new(scope, genesis))
     }
     fn parse_claim(&mut self) -> Option<ClaimDecl> {
         let id = self.take_id("claim.id")?;

@@ -574,6 +574,10 @@ pub fn elaborate_project(
         }
     }
     let law_ids: BTreeSet<StableId> = laws.iter().map(LawDecl::id).collect();
+    let law_scopes: BTreeMap<StableId, LawScope> = laws
+        .iter()
+        .filter_map(|law| Some((law.id(), law.applicability()?.scope())))
+        .collect();
     for claim in &mut claims {
         let mut normalized_backends = claim.backends.to_vec();
         normalized_backends.sort_unstable();
@@ -674,7 +678,7 @@ pub fn elaborate_project(
                         limits.max_formula_depth(),
                     );
                 }
-                check_inductive_claim(claim, &law_ids, &spans, &mut diagnostics);
+                check_inductive_claim(claim, &law_ids, &law_scopes, &spans, &mut diagnostics);
             }
             _ => push(
                 &mut diagnostics,
@@ -850,6 +854,7 @@ fn formula_limit(
 fn check_inductive_claim(
     claim: &ClaimDecl,
     law_ids: &BTreeSet<StableId>,
+    law_scopes: &BTreeMap<StableId, LawScope>,
     spans: &BTreeMap<(u8, u32), SourceSpan>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
@@ -890,6 +895,46 @@ fn check_inductive_claim(
             );
         }
     }
+    // A law that declares its scope must be enforced on every decision the
+    // claim assumes it on. A law without a declared scope is checked by the
+    // application against its law manifest instead.
+    let assumptions = claim.assumptions();
+    for (group, laws, covered, wanted) in [
+        (
+            "assume",
+            assumptions.every_commit(),
+            LawScope::covers_commits as fn(LawScope) -> bool,
+            "a law on commit or on any decision",
+        ),
+        (
+            "accept",
+            assumptions.accepts(),
+            LawScope::covers_accepts,
+            "a law on accept, commit, or any decision",
+        ),
+        (
+            "failure",
+            assumptions.committed_failures(),
+            LawScope::covers_committed_failures,
+            "a law on failure, commit, or any decision",
+        ),
+    ] {
+        for law in laws {
+            if let Some(scope) = law_scopes.get(law).copied()
+                && !covered(scope)
+            {
+                push(
+                    diagnostics,
+                    DiagnosticCode::InvalidDeclaration,
+                    span,
+                    format!("claim.{}.{group}", claim.id().get()),
+                    wanted,
+                    format!("law {} on {}", law.get(), scope_keyword(scope)),
+                    "assume a law only on the decisions its declared scope covers",
+                );
+            }
+        }
+    }
     for path in crate::paths::claim_paths(claim) {
         if path.root() != ProjectionRoot::Pre {
             push(
@@ -902,6 +947,17 @@ fn check_inductive_claim(
                 "state the invariant over pre.; the step obligation restates it over post.",
             );
         }
+    }
+}
+
+/// The keyword that declares `scope` in a law.
+const fn scope_keyword(scope: LawScope) -> &'static str {
+    match scope {
+        LawScope::Always => "any",
+        LawScope::Accept => "accept",
+        LawScope::Reject => "reject",
+        LawScope::CommittedFailure => "failure",
+        LawScope::Committing => "commit",
     }
 }
 

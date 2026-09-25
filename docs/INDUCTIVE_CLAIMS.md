@@ -87,6 +87,12 @@ The argument has three parts. `prove` checks only the first.
    the claim assumes it on. Assuming an accept-only law in `assume` is refused,
    for example.
 
+   A law may also declare its scope in `project.zeno` (`law 501 name on
+   accept = ...`). Elaboration then refuses a claim that assumes that law on
+   decisions its declared scope does not cover, before any solver runs. This
+   check is still required: a declared scope says what the manifest should
+   enforce, and only the manifest shows what it does.
+
 The durable-counter template's `tests/induction.rs` runs all of these checks
 against a real shell, its law checker's observer, and its manifest. Its law
 checker observes the state before and after a decision through one function,
@@ -266,6 +272,8 @@ edits were reverted; none is committed.
 | Lowering takes a declared range as the binding, and refuses a binding that contradicts it | `a_declared_range_is_the_binding_of_its_int`, in `zeno-fcis-bootstrap` |
 | The export asserts a declared range | `declared_ranges_bound_integer_observations` |
 | Replay refuses a value outside a declared range | `declared_ranges_bound_integer_observations` |
+| Elaboration refuses a law assumed outside its declared scope (the check removed, or `on commit` taken as covering either kind) | `inductive_groups_are_checked_against_declared_law_scopes` |
+| A declared law scope, and its genesis flag, are part of the canonical bytes, and an unscoped law keeps its bytes | `law_scopes_parse_and_are_part_of_the_canonical_project`, `a_declared_range_is_part_of_the_canonical_project` |
 
 The pinned test `pinned_inductive_steps_agree_with_exhaustive_replay` checks
 the SMT encoding itself. For each claim, CVC5 and Z3 must agree with an

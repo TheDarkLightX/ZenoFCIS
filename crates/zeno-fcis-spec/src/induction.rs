@@ -152,7 +152,7 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::ast::{ProjectSpec, StableId};
+    use crate::ast::{LawScope, ProjectSpec, StableId};
     use crate::diagnostic::DiagnosticCode;
     use crate::logic::{IndeterminateReason, Observation};
     use crate::substance::{Substance, claim_substance};
@@ -189,6 +189,37 @@ mod tests {
 
     fn id(value: u32) -> StableId {
         StableId::new(value).unwrap_or_else(|| unreachable!())
+    }
+
+    /// A project whose laws declare their scopes, one of each kind, and one
+    /// law that declares none.
+    fn scoped_source(claims: &str) -> String {
+        format!(
+            "zeno 1;\nproject 1 scopes;\n\
+             type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+             type 105 int Count;\n\
+             field 110 100 count 105;\nfield 120 101 amount 105;\n\
+             reason 200 bad precedence 0;\n\
+             component 300 machine {{ owns 100; reads pre.100; writes post.100; budget steps 10; }}\n\
+             merge [300];\n\
+             law 400 bounded on commit, genesis = post.100.110 >= 0 && post.100.110 <= 9;\n\
+             law 401 steps on accept = post.100.110 == pre.100.110 + command.101.120;\n\
+             law 402 resets on failure = post.100.110 == 0;\n\
+             law 403 unchanged on reject = post.100.110 == pre.100.110;\n\
+             law 404 anywhere on any = post.100.110 >= 0;\n\
+             law 405 manifest_scoped = post.100.110 <= 9;\n{claims}"
+        )
+    }
+
+    fn scoped_codes(claims: &str) -> Vec<DiagnosticCode> {
+        let parsed = match parse_project(&scoped_source(claims), SourceLimits::default()) {
+            Ok(parsed) => parsed,
+            Err(set) => return set.diagnostics().iter().map(|d| d.code()).collect(),
+        };
+        match elaborate_project(parsed, ProjectLimits::default()) {
+            Ok(_) => Vec::new(),
+            Err(set) => set.diagnostics().iter().map(|d| d.code()).collect(),
+        }
     }
 
     fn count(root: ProjectionRoot) -> ProjectionPath {
@@ -359,5 +390,114 @@ mod tests {
         assert_eq!(substance(501), Substance::Constant { value: true });
         // A single-step claim over the pre-state still says nothing about a transition.
         assert_eq!(substance(502), Substance::IgnoresTransition);
+    }
+
+    #[test]
+    fn inductive_groups_are_checked_against_declared_law_scopes() {
+        let holds = "= pre.100.110 >= 0;\n";
+        // Each law assumed where its declared scope reaches.
+        for claim in [
+            "claim 600 all cvc5 inductive assume [400, 404] accept [401] failure [402] ",
+            "claim 600 commit_on_accepts cvc5 inductive accept [400] ",
+            "claim 600 commit_on_failures cvc5 inductive failure [400] ",
+            "claim 600 any_on_accepts cvc5 inductive accept [404] ",
+        ] {
+            assert_eq!(
+                scoped_codes(&format!("{claim}{holds}")),
+                Vec::new(),
+                "{claim}"
+            );
+        }
+        // A law assumed on decisions its declared scope does not cover.
+        for claim in [
+            "claim 600 accept_on_commits cvc5 inductive assume [401] ",
+            "claim 600 failure_on_commits cvc5 inductive assume [402] ",
+            "claim 600 reject_on_commits cvc5 inductive assume [403] ",
+            "claim 600 failure_on_accepts cvc5 inductive accept [402] ",
+            "claim 600 reject_on_accepts cvc5 inductive accept [403] ",
+            "claim 600 accept_on_failures cvc5 inductive failure [401] ",
+        ] {
+            assert_eq!(
+                scoped_codes(&format!("{claim}{holds}")),
+                vec![DiagnosticCode::InvalidDeclaration],
+                "{claim}"
+            );
+        }
+        // A law without a declared scope is left to the application, which
+        // checks the claim's groups against its law manifest.
+        assert_eq!(
+            scoped_codes(&format!(
+                "claim 600 manifest cvc5 inductive assume [405] {holds}"
+            )),
+            Vec::new()
+        );
+    }
+
+    #[test]
+    fn law_scopes_parse_and_are_part_of_the_canonical_project() {
+        let spec = elaborate_project(
+            parse_project(&scoped_source(""), SourceLimits::default())
+                .unwrap_or_else(|set| panic!("{set}")),
+            ProjectLimits::default(),
+        )
+        .unwrap_or_else(|set| panic!("{set}"));
+        let declared: Vec<_> = spec
+            .laws()
+            .iter()
+            .map(|law| law.applicability().map(|a| (a.scope(), a.genesis())))
+            .collect();
+        assert_eq!(
+            declared,
+            vec![
+                Some((LawScope::Committing, true)),
+                Some((LawScope::Accept, false)),
+                Some((LawScope::CommittedFailure, false)),
+                Some((LawScope::Reject, false)),
+                Some((LawScope::Always, false)),
+                None,
+            ]
+        );
+        // One diagnostic for each malformed scope, and no cascade.
+        let one = |law: &str| {
+            let source = scoped_source(law);
+            match parse_project(&source, SourceLimits::default()) {
+                Ok(_) => Vec::new(),
+                Err(set) => set.diagnostics().iter().map(|d| d.code()).collect(),
+            }
+        };
+        assert_eq!(
+            one("law 406 odd on sometimes = post.100.110 >= 0;\n"),
+            vec![DiagnosticCode::InvalidDeclaration]
+        );
+        assert_eq!(
+            one("law 406 odd on commit, forever = post.100.110 >= 0;\n"),
+            vec![DiagnosticCode::ExpectedToken]
+        );
+        // The declared scope is part of the law's meaning. A law without one
+        // keeps the bytes it had before scopes existed, which the pinned
+        // semantic hash in paths.rs's canonical-project test checks.
+        let commitment = |law: &str| {
+            elaborate_project(
+                parse_project(&format!("{DECLARATIONS}{law}"), SourceLimits::default())
+                    .unwrap_or_else(|set| panic!("{set}")),
+                ProjectLimits::default(),
+            )
+            .unwrap_or_else(|set| panic!("{set}"))
+            .commitment::<zeno_fcis_crypto::RustCryptoSha256>()
+            .unwrap_or_else(|_| unreachable!())
+        };
+        let forms = [
+            "law 402 extra = post.100.110 >= 0;\n",
+            "law 402 extra on commit = post.100.110 >= 0;\n",
+            "law 402 extra on commit, genesis = post.100.110 >= 0;\n",
+            "law 402 extra on accept = post.100.110 >= 0;\n",
+            "law 402 extra on any = post.100.110 >= 0;\n",
+        ];
+        let hashes: Vec<_> = forms.iter().map(|law| commitment(law)).collect();
+        for (i, a) in hashes.iter().enumerate() {
+            for (j, b) in hashes.iter().enumerate() {
+                assert_eq!(a == b, i == j, "{} vs {}", forms[i], forms[j]);
+            }
+        }
     }
 }
