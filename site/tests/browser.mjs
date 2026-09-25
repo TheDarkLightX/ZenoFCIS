@@ -1,5 +1,7 @@
 // Capture only after the demonstration finishes. A virtual-time budget can
 // expire while asynchronous Wasm compilation is still running on a CI host.
+// Prints one JSON line: the document's HTML, and the URL of every request
+// the page made, as the DevTools pipe reported them.
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -17,6 +19,8 @@ if (process.getuid?.() === 0) args.push("--no-sandbox");
 const browser = spawn(chrome, args, { stdio: ["ignore", "ignore", "pipe", "pipe", "pipe"] });
 const pending = new Map();
 const loaded = new Set();
+const requests = [];
+let attached = null;
 let sequence = 0;
 let stopped = null;
 let stderr = "";
@@ -46,6 +50,9 @@ browser.stdio[4].on("data", (chunk) => {
       const message = JSON.parse(raw);
       if (message.method === "Page.lifecycleEvent" && message.params.name === "load") {
         loaded.add(`${message.sessionId}:${message.params.loaderId}`);
+      }
+      if (message.method === "Network.requestWillBeSent" && message.sessionId === attached) {
+        requests.push(message.params.request.url);
       }
       const request = pending.get(message.id);
       if (request) {
@@ -81,8 +88,10 @@ function checkDeadline(last) {
 try {
   const { targetId } = await command("Target.createTarget", { url: "about:blank" });
   const { sessionId } = await command("Target.attachToTarget", { targetId, flatten: true });
+  attached = sessionId;
   await command("Page.enable", {}, sessionId);
   await command("Page.setLifecycleEventsEnabled", { enabled: true }, sessionId);
+  await command("Network.enable", {}, sessionId);
   const navigation = await command("Page.navigate", { url }, sessionId);
   if (navigation.errorText) throw new Error(`navigation failed: ${navigation.errorText}`);
   while (!loaded.has(`${sessionId}:${navigation.loaderId}`)) {
@@ -102,7 +111,7 @@ try {
     if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
     const state = result.result.value;
     if (state.ready) {
-      process.stdout.write(state.html + "\n");
+      process.stdout.write(JSON.stringify({ html: state.html, requests }) + "\n");
       break;
     }
     last = state.label || last;

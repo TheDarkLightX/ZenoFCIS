@@ -6,10 +6,11 @@
 </head>
 <body>
 <p>
-  Loads the page named by <code>?page=</code> in a viewport-sized frame, waits
-  for its load-time demonstration, and prints where the frame is scrolled
-  and where the page's banner is, for <code>site/tests/deploy_check.py</code>.
-  Not part of the site.
+  Loads the page named by <code>?page=</code> in a frame sized by
+  <code>&amp;width=</code> and <code>&amp;height=</code>, waits for its
+  load-time demonstration, and prints where the frame is scrolled, how wide
+  the document is, and where the page's title is, for
+  <code>site/tests/deploy_check.py</code>. Not part of the site.
 </p>
 <iframe id="page" title="The served page" width="1280" height="800"></iframe>
 <pre id="results">pending</pre>

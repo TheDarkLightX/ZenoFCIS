@@ -1,13 +1,14 @@
 // The agent-treasury-guard example, as the page presents it: its state
-// fields, the context and commands in the README's words, and the README's
-// scripted demonstration: the twenty-three messages that the scripted agent
-// and the DEX send in `journey` in the template's src/lib.rs, each with the
-// story the template tells and the decision the guard must reach. No model
-// is called and no network is used: the agent is a fixed list of proposals.
-// The interrupted delivery and the database reopen that follow them need
-// the SQLite shell and are not part of the page.
+// fields with plain labels, the context and commands in the README's words,
+// the reasons in plain words, and the README's scripted demonstration: the
+// twenty-three messages that the scripted agent and the DEX send in
+// `journey` in the template's src/lib.rs, each with the story the template
+// tells and the decision the guard must reach. No model is called and no
+// network is used: the agent is a fixed list of proposals. The interrupted
+// delivery and the database reopen that follow them need the SQLite shell
+// and are not part of the page.
 
-const intent = { name: "intent", label: "Intent number: the tick it was proposed at (0 to 11)", kind: "integer", min: 0, max: 11, initial: 1 };
+const intent = { name: "intent", label: "Intent number", hint: "the tick it was proposed at, 0 to 11", kind: "integer", min: 0, max: 11, initial: 1 };
 
 const context = (caller, now, price, priceTime, model) => ({ caller, now, price, price_time: priceTime, model });
 const propose = (direction, amount, minOut) => ({ command: "ProposeSwap", direction, amount, min_out: minOut });
@@ -19,34 +20,50 @@ const step = (now, caller, model, price, priceTime, command, note, expect) => ({
   note,
 });
 const V2 = "TreasuryAgentV2";
+const WHO = { Agent: "The agent", Dex: "The exchange" };
 
 export const template = {
   name: "agent-treasury-guard",
-  fields: ["quote", "base", "spent_today", "last_seen", "pending", "pending_amount", "pending_min_out"],
-  help: "Set the context the shell would supply (who is calling, the tick, the oracle price and when it was observed, and the model the agent runs), then send the agent's proposal or the DEX's answer. The guard decides what the treasury commits.",
-  context: [
-    { name: "caller", label: "Caller", kind: "choice", options: [["Agent", "Agent"], ["Dex", "DEX"]], initial: "Agent" },
-    { name: "now", label: "Tick now (0 to 11; a day is 4 ticks)", kind: "integer", min: 0, max: 11, initial: 1 },
-    { name: "price", label: "Oracle price, quote per base (1 or 2)", kind: "integer", min: 1, max: 2, initial: 1 },
-    { name: "price_time", label: "Tick the price was observed at", kind: "integer", min: 0, max: 11, initial: 1 },
-    { name: "model", label: "Model the agent runs", kind: "choice", options: [[V2, "TreasuryAgentV2, the approved model"], ["TreasuryAgentV1", "TreasuryAgentV1"], ["UnlistedModel", "UnlistedModel"]], initial: V2 },
+  fields: [
+    { name: "quote", label: "Quote held" },
+    { name: "base", label: "Base held" },
+    { name: "spent_today", label: "Spent today" },
+    { name: "last_seen", label: "Last commit's tick" },
+    { name: "pending", label: "Outstanding swap" },
+    { name: "pending_amount", label: "Outstanding amount" },
+    { name: "pending_min_out", label: "Outstanding minimum" },
   ],
-  commands: [
+  help: "Set the context the shell would supply, then send the agent's proposal or the exchange's answer. The guard decides what the treasury commits.",
+  contextLegend: "The request's context",
+  context: [
+    { name: "caller", label: "Caller", kind: "choice", options: [["Agent", "The agent"], ["Dex", "The exchange (DEX)"]], initial: "Agent" },
+    { name: "now", label: "Tick now", hint: "0 to 11; a day is 4 ticks", kind: "integer", min: 0, max: 11, initial: 1 },
+    { name: "price", label: "Oracle price", hint: "quote per base, 1 or 2", kind: "integer", min: 1, max: 2, initial: 1 },
+    { name: "price_time", label: "Price seen at tick", hint: "0 to 11", kind: "integer", min: 0, max: 11, initial: 1 },
+    { name: "model", label: "Model the agent runs", kind: "choice", options: [[V2, "TreasuryAgentV2 (approved)"], ["TreasuryAgentV1", "TreasuryAgentV1"], ["UnlistedModel", "UnlistedModel"]], initial: V2 },
+  ],
+  groups: [
     {
-      name: "ProposeSwap",
-      label: "Propose the swap",
-      fields: [
-        { name: "direction", label: "Direction", kind: "choice", options: [["BuyBase", "Buy base with quote"], ["SellBase", "Sell base for quote"]], initial: "BuyBase" },
-        { name: "amount", label: "Amount sold (1 to 3)", kind: "integer", min: 1, max: 3, initial: 2 },
-        { name: "min_out", label: "Least amount to receive (0 to 3)", kind: "integer", min: 0, max: 3, initial: 2 },
+      legend: "The agent proposes a swap",
+      commands: [
+        {
+          name: "ProposeSwap",
+          label: "Propose the swap",
+          fields: [
+            { name: "direction", label: "Direction", kind: "choice", options: [["BuyBase", "Buy base with quote"], ["SellBase", "Sell base for quote"]], initial: "BuyBase" },
+            { name: "amount", label: "Amount sold", hint: "1 to 3", kind: "integer", min: 1, max: 3, initial: 2 },
+            { name: "min_out", label: "Least amount to receive", hint: "0 to 3", kind: "integer", min: 0, max: 3, initial: 2 },
+          ],
+        },
       ],
     },
     {
-      name: "SwapSettled",
-      label: "Report the swap settled",
-      fields: [intent, { name: "amount_out", label: "Amount delivered (0 to 3)", kind: "integer", min: 0, max: 3, initial: 2 }],
+      legend: "The exchange replies",
+      commands: [
+        { name: "SwapSettled", label: "Settled", fields: [intent, { name: "amount_out", label: "Amount delivered", hint: "0 to 3", kind: "integer", min: 0, max: 3, initial: 2 }] },
+        { name: "SwapFailed", label: "Failed", fields: [intent] },
+      ],
     },
-    { name: "SwapFailed", label: "Report the swap failed", fields: [intent] },
   ],
   genesis: "6 quote, 1 base, nothing spent, tick 0, no swap outstanding, nothing queued",
   outbox: "Swap requests to zenodex on channel 300 (swap_request), shaped after ZenoDEX's SwapIntent: the intent number, the assets in and out, the amount in, the least amount out, and the deadline. Nothing delivers in this page, so each stays pending with its delivery identity.",
@@ -57,11 +74,34 @@ export const template = {
     help: "The agent is a fixed list of proposals, good and bad, from the template's demonstration; no model is called. Each line shows what the agent proposes and what the guard decided in the script. Send one to see the guard decide it against the treasury as it is now.",
     filter: (step) => step.request.caller === "Agent",
   },
+  // The request in plain words.
   describe: (request) => {
-    const where = `from ${request.caller} at tick ${request.now}, price ${request.price} seen at tick ${request.price_time}${request.model === V2 ? "" : `, model ${request.model}`}`;
-    if (request.command === "ProposeSwap") return `ProposeSwap ${request.direction} ${request.amount} for at least ${request.min_out}, ${where}`;
-    if (request.command === "SwapSettled") return `SwapSettled intent ${request.intent} with ${request.amount_out}, ${where}`;
-    return `SwapFailed intent ${request.intent}, ${where}`;
+    const who = WHO[request.caller] ?? request.caller;
+    const when = `at tick ${request.now}, price ${request.price} seen at tick ${request.price_time}${request.model === V2 ? "" : `, model ${request.model}`}`;
+    if (request.command === "ProposeSwap") {
+      const swap = request.direction === "BuyBase"
+        ? `buy base with ${request.amount} quote, for at least ${request.min_out} base`
+        : `sell ${request.amount} base, for at least ${request.min_out} quote`;
+      return `${who} proposes to ${swap}, ${when}`;
+    }
+    if (request.command === "SwapSettled") return `${who} reports intent ${request.intent} settled, delivering ${request.amount_out}, ${when}`;
+    return `${who} reports intent ${request.intent} failed, ${when}`;
+  },
+  // Each reason the README's rules name, in plain words.
+  reasons: {
+    wrong_caller: "this caller may not send that command",
+    clock_not_advanced: "the tick is not later than the last commit's",
+    unapproved_model: "the model is not approved",
+    stale_price: "the price is from the future, or more than one tick old",
+    swap_outstanding: "a swap is already outstanding",
+    no_swap_outstanding: "no swap is outstanding",
+    stale_callback: "the answer is about an earlier swap, not the outstanding one",
+    short_settlement: "the settlement delivers less than the swap's minimum",
+    over_trade_cap: "the swap is worth more than the per-trade cap of 3",
+    over_daily_budget: "the swap would take the day over its budget of 4",
+    slippage_too_wide: "the minimum keeps less than three quarters of the oracle value",
+    below_reserve: "the treasury would drop below its reserve of 2 quote, or sell more base than it holds",
+    swap_failed: "the exchange reported the swap failed: the held amount is refunded, and the budget is not restored",
   },
   demonstration: [
     // Day 0: a good buy, then answers and proposals the guard refuses.

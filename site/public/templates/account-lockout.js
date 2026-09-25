@@ -1,28 +1,45 @@
-// The account-lockout example, as the page presents it: its state fields,
-// the context and commands in the README's words, and the README's scripted
-// demonstration: the nine requests that `journey` in the template's
-// src/lib.rs makes, with the decision each expects. The interrupted delivery
-// and the database reopen that follow them need the SQLite shell and are
-// not part of the page.
+// The account-lockout example, as the page presents it: its state fields
+// with plain labels, the context and commands in the README's words, the
+// reasons in plain words, and the README's scripted demonstration: the nine
+// requests that `journey` in the template's src/lib.rs makes, with the
+// decision each expects. The interrupted delivery and the database reopen
+// that follow them need the SQLite shell and are not part of the page.
 
 const step = (command, now, admin, expect, note) => ({ request: { command, now, admin }, expect, note });
+const LABELS = { LoginSucceeded: "Login succeeded", LoginFailed: "Login failed", AdminUnlock: "Admin unlock" };
 
 export const template = {
   name: "account-lockout",
-  fields: ["failed_attempts", "locked_until", "last_seen"],
-  help: "Set the request's context, then propose a request. Each button sends one command through the authority.",
-  context: [
-    { name: "now", label: "Time, in Unix seconds (0 to 4,102,444,800)", kind: "integer", min: 0, max: 4102444800, initial: 1000 },
-    { name: "admin", label: "Request marked admin", kind: "flag", initial: false },
+  fields: [
+    { name: "failed_attempts", label: "Failed attempts" },
+    { name: "locked_until", label: "Locked until" },
+    { name: "last_seen", label: "Last decision's time" },
   ],
-  commands: [
-    { name: "LoginSucceeded", label: "Login succeeded", fields: [] },
-    { name: "LoginFailed", label: "Login failed", fields: [] },
-    { name: "AdminUnlock", label: "Admin unlock", fields: [] },
+  help: "Set the request's time and whether it is marked admin, then send the login's result. Each button sends one command through the authority.",
+  contextLegend: "The request's context",
+  context: [
+    { name: "now", label: "Time", hint: "Unix seconds, 0 to 4,102,444,800", kind: "integer", min: 0, max: 4102444800, initial: 1000 },
+    { name: "admin", label: "Marked admin", kind: "flag", initial: false },
+  ],
+  groups: [
+    {
+      legend: "Send a request",
+      commands: [
+        { name: "LoginSucceeded", label: LABELS.LoginSucceeded, fields: [] },
+        { name: "LoginFailed", label: LABELS.LoginFailed, fields: [] },
+        { name: "AdminUnlock", label: LABELS.AdminUnlock, fields: [] },
+      ],
+    },
   ],
   genesis: "every field zero, no bundles, no alerts",
   outbox: "Alerts to security-team on channel 300 (security_alert). Nothing delivers in this page, so each stays pending with its delivery identity.",
-  describe: (request) => `${request.command} at ${request.now}${request.admin ? ", admin" : ""}`,
+  describe: (request) => `${LABELS[request.command] ?? request.command} at ${request.now}${request.admin ? ", marked admin" : ""}`,
+  reasons: {
+    clock_regressed: "the time is earlier than the last decision's",
+    account_locked: "the account is locked",
+    not_admin: "the request is not marked admin",
+    login_failed: "the login failed, and the attempt is recorded",
+  },
   demonstration: [
     step("LoginFailed", 1000, false, "CommittedFailure", "a first failed login is recorded"),
     step("LoginFailed", 1010, false, "CommittedFailure", "a second failure"),
