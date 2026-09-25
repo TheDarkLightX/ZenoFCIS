@@ -227,6 +227,56 @@ fn unlocks_are_checked() {
     assert!(!holds(silent));
 }
 
+/// Decisions that only a formula refuses: the Rust checks accept each one,
+/// because its reason, alert, and effects are right and no rejection rule
+/// applies, so a weakened formula would let it through.
+#[test]
+fn formulas_refuse_what_the_rust_checks_accept() {
+    // Law 501: a login that moves the deadline.
+    assert!(!holds(login(
+        account(2, 0, 1000),
+        account(0, 1910, 1010),
+        1010
+    )));
+    // Law 502: an unlock that keeps the count, or does not record the time.
+    assert!(!holds(unlock(
+        account(2, 0, 1000),
+        account(2, 0, 1100),
+        1100,
+        true
+    )));
+    assert!(!holds(unlock(
+        account(0, 1900, 1000),
+        account(0, 0, 1000),
+        1100,
+        true
+    )));
+    // Law 503: a failure under another command, one that does not record the
+    // time, one that moves the deadline before the third failure, and a
+    // third failure whose lock and alert agree on the wrong length.
+    let mut succeeded = failure(account(0, 0, 1000), account(1, 0, 1010), 1010, vec![]);
+    succeeded.command = AccountCommand::LoginSucceeded;
+    assert!(!holds(succeeded));
+    assert!(!holds(failure(
+        account(0, 0, 1000),
+        account(1, 0, 1000),
+        1010,
+        vec![]
+    )));
+    assert!(!holds(failure(
+        account(0, 0, 1000),
+        account(1, 500, 1010),
+        1010,
+        vec![]
+    )));
+    assert!(!holds(failure(
+        account(2, 0, 1000),
+        account(0, 1909, 1010),
+        1010,
+        vec![alert("security-team", AlertKind::Locked, 1909)]
+    )));
+}
+
 #[test]
 fn rejections_must_carry_the_rule_that_applies() {
     let hash = profile::digest("example/test/reject", b"independent decision view");

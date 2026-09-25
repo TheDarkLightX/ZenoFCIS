@@ -69,8 +69,9 @@ for its bounded semantics and local demonstration limits.
 
 Four more development templates build realistic applications the same way:
 - [`account-lockout`](../crates/zeno-fcis-cli/templates/account-lockout/README.md):
-  failed logins committed as failures, time as a context input, and
-  administrator unlocks;
+  failed logins committed as failures, time as a context input,
+  administrator unlocks, and an inductive claim over the integer ranges
+  `project.zeno` declares;
 - [`order-fulfillment`](../crates/zeno-fcis-cli/templates/order-fulfillment/README.md):
   a state machine with idempotent payment and shipping requests;
 - [`inventory-reservation`](../crates/zeno-fcis-cli/templates/inventory-reservation/README.md):

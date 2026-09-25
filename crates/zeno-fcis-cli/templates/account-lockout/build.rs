@@ -16,14 +16,12 @@ use zeno_fcis_project::{
 use zeno_fcis_schema::{SchemaLimits, TypeId, TypeKind};
 use zeno_fcis_spec::StableId;
 
-/// Latest time a request may carry: 2100-01-01T00:00:00Z in Unix seconds.
-const LAST_TIME: i128 = 4_102_444_800;
-/// Seconds a lock lasts; `project.zeno` states the same number in its laws.
-const LOCK_SECONDS: i128 = 900;
-
 fn main() {
     let project = profile::project();
     let stable = |n| StableId::new(n).expect("static ID");
+    // The integer types bind nothing here: `project.zeno` declares each
+    // range, lowering takes it as the bounds, and a binding that stated other
+    // bounds would be refused.
     let schema = lower_schema(
         &project,
         stable(100),
@@ -36,26 +34,11 @@ fn main() {
                     max_len: 32,
                 },
             ),
-            (stable(105), TypeKind::I128 { min: 0, max: 2 }),
-            (
-                stable(106),
-                TypeKind::I128 {
-                    min: 0,
-                    max: LAST_TIME,
-                },
-            ),
-            (
-                stable(107),
-                TypeKind::I128 {
-                    min: 0,
-                    max: LAST_TIME + LOCK_SECONDS,
-                },
-            ),
             (stable(108), TypeKind::Bool),
         ],
         SchemaLimits::default(),
     )
-    .expect("lower exact authored shapes and reviewed scalar bounds");
+    .expect("lower exact authored shapes, declared ranges, and the reviewed text bound");
     assert!(
         project.effects().is_empty(),
         "new effects require a reviewed program and checker"
