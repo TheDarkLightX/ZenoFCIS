@@ -20,7 +20,8 @@ In order:
    (the library crates come from the cache), and identical bytes required.
    The result is copied to site/public/<template>.wasm, and the sizes are
    printed.
-5. replay: `node site/tests/replay.mjs <template>...`.
+5. replay: compiled ABI bounds/private-memory checks, then
+   `node site/tests/replay.mjs <template>...`.
 6. scripts: `node --check` on every script under site/public/ and
    site/tests/: the replay loads only the module loader, so this is what
    catches a syntax error in the page's own script before a browser does.
@@ -51,6 +52,8 @@ import sys
 import tempfile
 import tomllib
 from pathlib import Path
+
+from wasm import private_module
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
@@ -100,6 +103,13 @@ def generate_application(executable: Path, template: str, environment: dict[str,
     with tempfile.TemporaryDirectory(prefix="zeno-fcis-site-") as directory:
         fresh = Path(directory) / template
         run([str(executable), "new", str(fresh), "--template", template], ROOT, environment)
+        source = ROOT / "crates" / "zeno-fcis-cli" / "templates" / template
+        expected = gate.generated_file_manifest(source)
+        for entry in expected:
+            if entry["path"] == "Cargo.toml.in":
+                entry["path"] = "Cargo.toml"
+        if sorted(expected, key=lambda entry: entry["path"]) != gate.generated_file_manifest(fresh):
+            raise RuntimeError(f"{template}: generated files differ from this checkout's template source")
         if destination.is_dir() and gate.generated_file_manifest(destination) == gate.generated_file_manifest(fresh):
             print(f"{destination.relative_to(ROOT)}: unchanged")
             return
@@ -139,6 +149,7 @@ def check_lock(environment: dict[str, str], relock: bool) -> None:
 
 def check_site(environment: dict[str, str]) -> None:
     for command in (
+        ["python3", str(SITE / "tests" / "test_wasm.py")],
         ["cargo", "+1.97.1", "fmt", "--all", "--", "--check"],
         ["cargo", "+1.97.1", "clippy", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"],
         ["cargo", "+1.97.1", "clippy", "--lib", "--locked", "--offline", "--target", TARGET,
@@ -167,7 +178,8 @@ def build_module(template: str, environment: dict[str, str]) -> bytes:
     crate = demo_crate(template)
     run(["cargo", "+1.97.1", "build", "--release", "--locked", "--offline", "--target", TARGET,
          "-p", crate], SITE, module_environment(environment))
-    return (target_dir(environment) / TARGET / "release" / f"{crate.replace('-', '_')}.wasm").read_bytes()
+    raw = (target_dir(environment) / TARGET / "release" / f"{crate.replace('-', '_')}.wasm").read_bytes()
+    return private_module(raw)
 
 
 def reproducible_module(template: str, environment: dict[str, str]) -> bytes:
@@ -222,6 +234,7 @@ def main() -> None:
                   "identical across two builds")
         report_sizes()
     if "replay" in stages:
+        run(["node", str(SITE / "tests" / "abi.mjs"), *templates], ROOT, environment)
         run(["node", str(SITE / "tests" / "replay.mjs"), *templates], ROOT, environment)
     if "scripts" in stages:
         scripts = [*PUBLIC.glob("**/*.js"), *(SITE / "tests").glob("**/*.js"), *(SITE / "tests").glob("*.mjs")]
@@ -239,6 +252,6 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f"site: FAIL: {error}", file=sys.stderr)
         sys.exit(1)

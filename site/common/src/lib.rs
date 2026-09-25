@@ -7,7 +7,7 @@
 //! shell, which follows each template's `invoke` ([`demo`]); the JSON report,
 //! with every value named as `project.zeno` names it ([`render`]); the reader
 //! of the page's request fields ([`request`]); and the C ABI the page calls
-//! ([`abi`]), the only code that handles raw pointers.
+//! ([`abi`]), which exchanges bounded scalar words and keeps all buffers private.
 //!
 //! The library types a demo crate names in its `Application` impl are
 //! re-exported here, so a demo crate depends on its application and on this

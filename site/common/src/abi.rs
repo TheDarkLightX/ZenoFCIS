@@ -1,134 +1,255 @@
-//! The C ABI the page calls, shared by every module.
+//! Bounded, scalar browser API. See `site/ABI.md` for version 2's protocol.
 //!
-//! Buffers cross the boundary as a pointer and a length. A result is a buffer
-//! that starts with its JSON's length as four little-endian bytes; the caller
-//! reads it, then frees the whole buffer with [`demo_free`]. A refusal is
-//! reported as `{"error": TEXT, "stage": STAGE}`; nothing here panics on any
-//! input. This is the only module that handles raw pointers.
-//!
-//! `demo_alloc`, `demo_free`, `demo_step`, and `demo_state` are defined here
-//! once and exported by every module that links this crate. `demo_reset` is
-//! the one export each module defines itself, as a call to [`reset`] for its
-//! own application.
-
-#![allow(unsafe_code)]
+//! All buffers stay inside Rust, and the published Wasm module keeps its
+//! linear memory private. Calls exchange lengths and little-endian words;
+//! no caller owns an allocation or supplies an address.
 
 use crate::application::Application;
 use crate::demo::{Demo, DemoInstance, Refusal, Stage};
 use serde_json::Value as Json;
-use std::sync::{Mutex, PoisonError};
+use std::io::{self, Write};
+use std::sync::Mutex;
 
-/// The one demo the page drives; `None` until the module's `demo_reset`
-/// builds it.
-static DEMO: Mutex<Option<Box<dyn DemoInstance + Send>>> = Mutex::new(None);
+/// Maximum UTF-8 request size in bytes.
+pub const MAX_REQUEST_BYTES: usize = 4_096;
+/// Maximum serialized response size in bytes.
+pub const MAX_RESPONSE_BYTES: usize = 131_072;
+/// Maximum complete UTF-8 requests delivered to a demo between resets.
+pub const MAX_REQUESTS: u32 = 64;
 
-/// The report when a result's JSON could not be measured in 32 bits.
-const REPORT_TOO_LARGE: &str = r#"{"error":"the report is too large","stage":"input"}"#;
+const REPORT_TOO_LARGE: &[u8] = br#"{"error":"report capacity exceeded; a decision may have executed; reset required","stage":"transport"}"#;
 
-fn with_demo<T>(action: impl FnOnce(&mut Option<Box<dyn DemoInstance + Send>>) -> T) -> T {
-    let mut slot = DEMO.lock().unwrap_or_else(PoisonError::into_inner);
-    action(&mut slot)
+struct Response {
+    bytes: [u8; MAX_RESPONSE_BYTES],
+    len: usize,
+}
+
+impl Write for Response {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let remaining = self.bytes.len() - self.len;
+        if bytes.len() > remaining {
+            return Err(io::Error::other("response capacity exceeded"));
+        }
+        let end = self.len + bytes.len();
+        self.bytes[self.len..end].copy_from_slice(bytes);
+        self.len = end;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+struct Boundary {
+    input: [u8; MAX_REQUEST_BYTES],
+    expected: Option<usize>,
+    written: usize,
+    response: Response,
+    requests: u32,
+    demo: Option<Box<dyn DemoInstance + Send>>,
+}
+
+impl Boundary {
+    // Production uses this only to initialize static storage at compile time.
+    // Tests instantiate a local boundary so they never share mutable sessions.
+    #[allow(clippy::large_stack_arrays)]
+    const fn new() -> Self {
+        Self {
+            input: [0; MAX_REQUEST_BYTES],
+            expected: None,
+            written: 0,
+            response: Response {
+                bytes: [0; MAX_RESPONSE_BYTES],
+                len: 0,
+            },
+            requests: 0,
+            demo: None,
+        }
+    }
+
+    fn restart(&mut self) {
+        self.expected = None;
+        self.written = 0;
+        self.response.len = 0;
+        self.requests = 0;
+        self.demo = None;
+    }
+
+    fn begin(&mut self, length: u32) -> u32 {
+        self.expected = None;
+        self.written = 0;
+        self.response.len = 0;
+        let Ok(length) = usize::try_from(length) else {
+            return 0;
+        };
+        if length == 0 || length > self.input.len() {
+            return 0;
+        }
+        self.expected = Some(length);
+        1
+    }
+
+    fn write(&mut self, word: u32) -> u32 {
+        let Some(expected) = self.expected else {
+            return 0;
+        };
+        if self.written >= expected {
+            self.expected = None;
+            return 0;
+        }
+        let count = (expected - self.written).min(4);
+        self.input[self.written..self.written + count]
+            .copy_from_slice(&word.to_le_bytes()[..count]);
+        self.written += count;
+        1
+    }
+
+    fn respond(&mut self, result: Result<Json, Refusal>) -> u32 {
+        self.response.len = 0;
+        let value = result.unwrap_or_else(|refusal| refusal.to_json());
+        if serde_json::to_writer(&mut self.response, &value).is_err() {
+            // A decision may already have run. Retire the session and report
+            // a transport error, never an input refusal or a claimed rollback.
+            self.demo = None;
+            self.expected = None;
+            self.response.len = 0;
+            if self.response.write_all(REPORT_TOO_LARGE).is_err() {
+                return 0;
+            }
+        }
+        u32::try_from(self.response.len).unwrap_or(0)
+    }
+
+    fn step(&mut self) -> u32 {
+        let result = self.decide();
+        self.respond(result)
+    }
+
+    fn decide(&mut self) -> Result<Json, Refusal> {
+        let length = self
+            .expected
+            .take()
+            .filter(|length| *length == self.written)
+            .ok_or_else(|| input_refusal("provide one complete request before stepping"))?;
+        let input = std::str::from_utf8(&self.input[..length])
+            .map_err(|_| input_refusal("input is not UTF-8"))?;
+        let demo = self.demo.as_mut().ok_or_else(not_built)?;
+        if self.requests >= MAX_REQUESTS {
+            return Err(input_refusal(
+                "session limit reached; reset after 64 requests",
+            ));
+        }
+        self.requests += 1;
+        demo.step(input)
+    }
+
+    fn state(&mut self) -> u32 {
+        self.expected = None;
+        let result = self
+            .demo
+            .as_ref()
+            .ok_or_else(not_built)
+            .and_then(|demo| demo.state());
+        self.respond(result)
+    }
+
+    fn read(&self, offset: u32) -> u32 {
+        let Ok(start) = usize::try_from(offset) else {
+            return 0;
+        };
+        if start >= self.response.len {
+            return 0;
+        }
+        let count = (self.response.len - start).min(4);
+        let mut word = [0; 4];
+        word[..count].copy_from_slice(&self.response.bytes[start..start + count]);
+        u32::from_le_bytes(word)
+    }
+}
+
+static BOUNDARY: Mutex<Boundary> = Mutex::new(Boundary::new());
+
+fn with_boundary(action: impl FnOnce(&mut Boundary) -> u32) -> u32 {
+    // Reentry or poison must not block or resume a possibly partial session.
+    BOUNDARY
+        .try_lock()
+        .map_or(0, |mut boundary| action(&mut boundary))
+}
+
+fn input_refusal(message: &str) -> Refusal {
+    Refusal::new(Stage::Input, message)
 }
 
 fn not_built() -> Refusal {
-    Refusal::new(Stage::Input, "call demo_reset first")
+    input_refusal("call demo_reset first")
 }
 
-/// Leaks a length-prefixed buffer holding the report or the refusal.
-fn respond(result: Result<Json, Refusal>) -> *mut u8 {
-    let text = match result {
-        Ok(report) => report.to_string(),
-        Err(refusal) => refusal.to_json().to_string(),
-    };
-    let text = match u32::try_from(text.len()) {
-        Ok(_) => text,
-        Err(_) => REPORT_TOO_LARGE.to_owned(),
-    };
-    let length = u32::try_from(text.len()).unwrap_or(0);
-    let mut buffer = Vec::with_capacity(4 + text.len());
-    buffer.extend_from_slice(&length.to_le_bytes());
-    buffer.extend_from_slice(text.as_bytes());
-    Box::leak(buffer.into_boxed_slice()).as_mut_ptr()
-}
-
-/// Builds `A`'s demo at its exact genesis, makes it the one the page drives,
-/// and returns its state. Each module's exported `demo_reset` calls this.
+/// Drops the old session, builds `A` at its exact genesis, and returns the
+/// state's JSON byte length. Each module's `demo_reset` calls this.
 #[must_use]
-pub fn reset<A: Application>() -> *mut u8
+pub fn reset<A: Application>() -> u32
 where
     Demo<A>: Send,
 {
-    respond(with_demo(|slot| {
-        let demo = Demo::<A>::new()?;
-        let state = demo.state()?;
-        *slot = Some(Box::new(demo));
-        Ok(state)
-    }))
+    with_boundary(|boundary| {
+        boundary.restart();
+        let result = Demo::<A>::new().and_then(|demo| {
+            let state = demo.state()?;
+            boundary.demo = Some(Box::new(demo));
+            Ok(state)
+        });
+        boundary.respond(result)
+    })
 }
 
-fn step(input: &[u8]) -> Result<Json, Refusal> {
-    let input = std::str::from_utf8(input)
-        .map_err(|error| Refusal::new(Stage::Input, format!("input is not UTF-8: {error}")))?;
-    with_demo(|slot| slot.as_mut().ok_or_else(not_built)?.step(input))
-}
-
-fn state() -> Result<Json, Refusal> {
-    with_demo(|slot| slot.as_ref().ok_or_else(not_built)?.state())
-}
-
-/// Allocates `len` bytes for the caller's input; free them with [`demo_free`].
-/// A zero length yields a null pointer.
-// SAFETY: the `demo_` prefix keeps every exported symbol unique.
+/// Returns the scalar API's version.
+// SAFETY: the demo_ prefix reserves unique exported symbols in each module.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-pub extern "C" fn demo_alloc(len: usize) -> *mut u8 {
-    if len == 0 {
-        return std::ptr::null_mut();
-    }
-    Box::leak(vec![0; len].into_boxed_slice()).as_mut_ptr()
+pub extern "C" fn demo_abi_version() -> u32 {
+    2
 }
 
-/// Frees the `len` bytes at `ptr` that [`demo_alloc`] or a result returned.
-///
-/// # Safety
-///
-/// `ptr` and `len` must be a pair this module handed out, passed back once; a
-/// null pointer or a zero length is ignored.
-// SAFETY: the `demo_` prefix keeps every exported symbol unique.
+/// Starts a request of 1 to 4,096 bytes; returns 1 on success, otherwise 0.
+// SAFETY: the demo_ prefix reserves unique exported symbols in each module.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn demo_free(ptr: *mut u8, len: usize) {
-    if ptr.is_null() || len == 0 {
-        return;
-    }
-    // SAFETY: the caller returns a pointer and a length that this module
-    // leaked from one boxed slice of exactly `len` bytes, and returns it once.
-    drop(unsafe { Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr, len)) });
+pub extern "C" fn demo_begin(length: u32) -> u32 {
+    with_boundary(|boundary| boundary.begin(length))
 }
 
-/// Decides the request in the `len` bytes of JSON at `ptr` and returns the
-/// report.
-///
-/// # Safety
-///
-/// `ptr` must point to `len` bytes that stay readable and unchanged during the
-/// call, such as a buffer from [`demo_alloc`]; a null pointer or a zero
-/// length is an empty input, which is refused.
-// SAFETY: the `demo_` prefix keeps every exported symbol unique.
+/// Appends up to four little-endian bytes; returns 1 on success, otherwise 0.
+// SAFETY: the demo_ prefix reserves unique exported symbols in each module.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn demo_step(ptr: *const u8, len: usize) -> *mut u8 {
-    let input: &[u8] = if ptr.is_null() || len == 0 {
-        &[]
-    } else {
-        // SAFETY: the caller guarantees `len` readable, unchanging bytes at `ptr`.
-        unsafe { std::slice::from_raw_parts(ptr, len) }
-    };
-    respond(step(input))
+pub extern "C" fn demo_write(word: u32) -> u32 {
+    with_boundary(|boundary| boundary.write(word))
 }
 
-/// Returns the current state.
-// SAFETY: the `demo_` prefix keeps every exported symbol unique.
+/// Consumes the completed request and returns the reply's JSON byte length.
+// SAFETY: the demo_ prefix reserves unique exported symbols in each module.
+#[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-pub extern "C" fn demo_state() -> *mut u8 {
-    respond(state())
+pub extern "C" fn demo_step() -> u32 {
+    with_boundary(Boundary::step)
+}
+
+/// Discards pending input and returns the current state's JSON byte length.
+// SAFETY: the demo_ prefix reserves unique exported symbols in each module.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn demo_state() -> u32 {
+    with_boundary(Boundary::state)
+}
+
+/// Reads up to four little-endian response bytes, padded with zeros.
+/// An offset outside the latest reply returns zero.
+// SAFETY: the demo_ prefix reserves unique exported symbols in each module.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "C" fn demo_read(offset: u32) -> u32 {
+    with_boundary(|boundary| boundary.read(offset))
 }
 
 #[cfg(test)]
@@ -137,73 +258,133 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    /// A demo that records what it is asked, in place of an application.
     struct Echo {
         steps: u32,
     }
 
     impl DemoInstance for Echo {
         fn step(&mut self, input: &str) -> Result<Json, Refusal> {
-            if input.is_empty() {
-                return Err(Refusal::new(Stage::Input, "empty"));
-            }
             self.steps += 1;
             Ok(json!({ "input": input, "steps": self.steps }))
         }
-
         fn state(&self) -> Result<Json, Refusal> {
             Ok(json!({ "steps": self.steps }))
         }
     }
 
-    /// Reads a result as the page does, then frees it.
-    fn take(pointer: *mut u8) -> Json {
-        // SAFETY: `pointer` is a result this module leaked: four length bytes
-        // followed by that many bytes of JSON, freed exactly once here.
-        let text = unsafe {
-            let length = u32::from_le_bytes(*pointer.cast::<[u8; 4]>());
-            let bytes = std::slice::from_raw_parts(pointer.add(4), length as usize);
-            let text = String::from_utf8(bytes.to_vec()).unwrap();
-            demo_free(pointer, 4 + length as usize);
-            text
-        };
-        serde_json::from_str(&text).unwrap()
+    fn fresh() -> Boundary {
+        let mut boundary = Boundary::new();
+        boundary.demo = Some(Box::new(Echo { steps: 0 }));
+        boundary
+    }
+
+    fn put(boundary: &mut Boundary, bytes: &[u8]) {
+        assert_eq!(boundary.begin(u32::try_from(bytes.len()).unwrap()), 1);
+        for chunk in bytes.chunks(4) {
+            let mut word = [0; 4];
+            word[..chunk.len()].copy_from_slice(chunk);
+            assert_eq!(boundary.write(u32::from_le_bytes(word)), 1);
+        }
+    }
+
+    fn take(boundary: &Boundary, length: u32) -> Json {
+        let bytes: Vec<_> = (0..length)
+            .step_by(4)
+            .flat_map(|offset| boundary.read(offset).to_le_bytes())
+            .take(length as usize)
+            .collect();
+        serde_json::from_slice(&bytes).unwrap()
     }
 
     #[test]
-    fn the_abi_round_trips_length_prefixed_json_and_refuses_bad_input() {
-        with_demo(|slot| *slot = None);
-        assert_eq!(take(demo_state())["error"], "call demo_reset first");
-        with_demo(|slot| *slot = Some(Box::new(Echo { steps: 0 })));
-        assert_eq!(take(demo_state())["steps"], 0);
-        let input = "{\"command\":\"LoginFailed\"}".as_bytes();
-        let pointer = demo_alloc(input.len());
-        // SAFETY: `pointer` addresses `input.len()` writable bytes from `demo_alloc`,
-        // read once by `demo_step` and freed once after it.
-        let report = unsafe {
-            std::ptr::copy_nonoverlapping(input.as_ptr(), pointer, input.len());
-            let report = take(demo_step(pointer, input.len()));
-            demo_free(pointer, input.len());
-            report
-        };
-        assert_eq!(report["input"], "{\"command\":\"LoginFailed\"}");
-        assert_eq!(report["steps"], 1);
-        // SAFETY: a null pointer with a zero length is documented as empty input.
-        let refused = take(unsafe { demo_step(std::ptr::null(), 0) });
-        assert_eq!(refused, json!({ "error": "empty", "stage": "input" }));
-        let invalid = [0xff_u8];
-        // SAFETY: `invalid` stays readable and unchanged during the call.
-        let refused = take(unsafe { demo_step(invalid.as_ptr(), invalid.len()) });
+    fn requests_are_complete_consumed_once_and_independent_of_previous_bytes() {
+        let mut boundary = fresh();
+        for text in ["abcd", "x", "é", "hello"] {
+            put(&mut boundary, text.as_bytes());
+            let length = boundary.step();
+            assert_eq!(take(&boundary, length)["input"], text);
+            let length = boundary.step();
+            assert!(take(&boundary, length)["error"].is_string());
+        }
+        put(&mut boundary, b"incomplete");
+        assert_eq!(boundary.begin(5), 1);
+        assert_eq!(boundary.write(0), 1);
+        let length = boundary.step();
+        assert!(take(&boundary, length)["error"].is_string());
+        let length = boundary.state();
+        assert_eq!(take(&boundary, length)["steps"], 4);
+    }
+
+    #[test]
+    fn lengths_words_and_utf8_are_checked_before_execution() {
+        let mut boundary = fresh();
+        for length in [0, 4_097, u32::MAX] {
+            assert_eq!(boundary.begin(length), 0);
+            assert_eq!(boundary.write(0), 0);
+        }
+        put(&mut boundary, b"a");
+        assert_eq!(boundary.write(0), 0);
+        let length = boundary.step();
+        assert!(take(&boundary, length)["error"].is_string());
+        put(&mut boundary, &[0xff]);
+        let length = boundary.step();
+        assert_eq!(take(&boundary, length)["error"], "input is not UTF-8");
+        put(&mut boundary, b"discard on state");
+        let length = boundary.state();
+        assert_eq!(take(&boundary, length)["steps"], 0);
+        let length = boundary.step();
+        assert!(take(&boundary, length)["error"].is_string());
+        put(&mut boundary, &[b'a'; MAX_REQUEST_BYTES]);
+        let length = boundary.step();
+        assert_eq!(
+            take(&boundary, length)["input"].as_str().unwrap().len(),
+            MAX_REQUEST_BYTES
+        );
+        assert_eq!(boundary.read(length), 0);
+        assert_eq!(boundary.read(u32::MAX), 0);
+    }
+
+    #[test]
+    fn session_capacity_refuses_before_execution_and_reset_reclaims_it() {
+        let mut boundary = fresh();
+        for _ in 0..MAX_REQUESTS {
+            put(&mut boundary, b"x");
+            boundary.step();
+        }
+        put(&mut boundary, b"x");
+        let length = boundary.step();
         assert!(
-            refused["error"]
+            take(&boundary, length)["error"]
                 .as_str()
                 .unwrap()
-                .starts_with("input is not UTF-8")
+                .contains("session limit")
         );
-        assert_eq!(take(demo_state())["steps"], 1);
-        assert!(demo_alloc(0).is_null());
-        // SAFETY: a null pointer is documented as ignored.
-        unsafe { demo_free(std::ptr::null_mut(), 0) };
-        with_demo(|slot| *slot = None);
+        let length = boundary.state();
+        assert_eq!(take(&boundary, length)["steps"], MAX_REQUESTS);
+        boundary.restart();
+        assert_eq!(boundary.requests, 0);
+        assert_eq!(boundary.read(0), 0);
+        let length = boundary.state();
+        assert_eq!(take(&boundary, length)["error"], "call demo_reset first");
+        boundary.demo = Some(Box::new(Echo { steps: 0 }));
+        put(&mut boundary, b"x");
+        let length = boundary.step();
+        assert_eq!(take(&boundary, length)["steps"], 1);
+    }
+
+    #[test]
+    fn response_capacity_retires_the_session_without_claiming_rollback() {
+        let mut boundary = fresh();
+        let length = boundary.respond(Ok(json!("x".repeat(MAX_RESPONSE_BYTES))));
+        let report = take(&boundary, length);
+        assert_eq!(report["stage"], "transport");
+        assert!(
+            report["error"]
+                .as_str()
+                .unwrap()
+                .contains("may have executed")
+        );
+        assert!(boundary.demo.is_none());
+        assert_eq!(boundary.read(length), 0);
     }
 }

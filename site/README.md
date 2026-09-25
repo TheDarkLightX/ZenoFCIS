@@ -6,9 +6,8 @@ WebAssembly, with the library's in-memory reference shell in place of SQLite:
 account-lockout, order-fulfillment, inventory-reservation,
 compliance-gateway, withdrawal-queue, and agent-treasury-guard. Every example
 adds only its request mapping, its description, and its examples reader to
-the shared shape described here. Nothing here is published: the Pages
-workflow deploys only from `main`, and merging to `main` is the owner's
-decision.
+the shared shape described here. The Pages workflow publishes only from
+`main`, at https://thedarklightx.github.io/ZenoFCIS/.
 
 ## Layout
 
@@ -24,10 +23,13 @@ decision.
   `project.zeno` names it (fields, variants, reasons, channels) and every law
   as the manifest does; `src/request.rs` reads the page's request field by
   field and refuses what a command does not read; `src/application.rs` is the
-  `Application` trait a demo crate fulfils; `src/abi.rs` is the C ABI
-  (`demo_alloc`, `demo_free`, `demo_step`, `demo_state`), defined once and
-  exported by every module that links the crate, and the only code that
-  handles raw pointers.
+  `Application` trait a demo crate fulfils; `src/abi.rs` is the bounded
+  version 2 scalar API described in [ABI.md](ABI.md). Buffers remain owned
+  by Rust, with no exposed pointers, allocation or free calls. Requests are
+  limited to 4,096 bytes, replies to 131,072 bytes, and sessions to 64
+  requests before reset. `wasm.py` keeps linear memory private in the
+  published artifact by removing its export and the address globals, without
+  changing any other section or any function export.
 - `apps/<template>/`: written by `build.py` with `zeno-fcis new`, not
   committed, so the page always runs each template as the CLI ships it.
 - `demos/<template>/`: one crate per example. It names the application's
@@ -46,6 +48,8 @@ decision.
   agent); `demo-module.js` is the loader. The built modules land here and are
   not committed. The page fetches its modules relative to its own scripts, so
   it works from any path it is served at.
+- `tests/abi.mjs`: checks the built modules expose only the safe scalar
+  functions, with private memory, and enforce the request and session bounds.
 - `tests/replay.mjs`, with `tests/examples.mjs` and
   `tests/templates/<template>.mjs`: the headless check, Node 22 and no browser.
 - `tests/deploy_check.py` and `tests/harness/`: the exact artifact, served
@@ -67,12 +71,13 @@ python3 -m http.server --directory site/public 8000
 Then open `http://localhost:8000/`. `build.py` runs, in order:
 `cargo fetch --locked` in the workspace, as the gate does, so that every
 later cargo command runs offline against the reviewed lock; the CLI build
-and `zeno-fcis new` for every template; the lock check against the workspace
+and `zeno-fcis new` for every template, compared byte for byte with the
+source template; the lock check against the workspace
 lock (`--relock` regenerates `site/Cargo.lock` from it); `cargo fmt --check`,
 clippy with `-D warnings` for the host and for wasm32, and the host tests;
 two release builds of each module, with the application and the demo crate
 rebuilt from scratch in between, which must produce identical bytes, and the
-sizes; `node site/tests/replay.mjs`; `node --check` on every script; and
+sizes; the compiled API checks and `node site/tests/replay.mjs`; `node --check` on every script; and
 `site/tests/deploy_check.py`, which needs Chrome (`--no-browser` skips it,
 `--chrome PATH` names the binary). `--only TEMPLATE` limits the module,
 replay, and browser steps to one template, and `--stage STAGE` runs one step,
@@ -134,7 +139,7 @@ not.)
 
 The strength of what each template itself checks is stated in its README and
 repeated in its section of the page, in the README's own scoped words: laws
-evaluated at run time on every decision; tests on a host, which are
+evaluated at run time within their declared decision scopes; tests on a host, which are
 detectors; a synthesized step selected and exhaustively checked on every
 input of its contract (inventory-reservation, compliance-gateway,
 withdrawal-queue, agent-treasury-guard); a controller table certified by

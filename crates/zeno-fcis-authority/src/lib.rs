@@ -850,14 +850,14 @@ where
 
     /// Admits one exact externally supplied invocation.
     ///
-    /// The command and context are checked against this authority's own
+    /// The pre-state, command and context are checked against this authority's own
     /// schema. An envelope's recorded schema hash names the schema its
     /// constructor validated against, computed with whatever
     /// [`CommitmentHasher`](zeno_fcis_codec::CommitmentHasher) the caller
     /// chose, so the hash alone does not show that the value is admissible
-    /// here. The pre-state, and a committing decision's post-state, are
-    /// checked when the decision's artifacts are validated, before it is
-    /// authorized.
+    /// here. No invocation witness is issued until all three values pass,
+    /// before the program can execute. A committing decision's states are
+    /// also checked when its artifacts are validated before authorization.
     #[allow(clippy::too_many_arguments)]
     pub fn admit_invocation(
         &self,
@@ -2102,11 +2102,15 @@ where
         return Err(AuthorityError::Mismatch(AuthorityField::ContextType));
     }
     let limits = schema_validation_limits(policy.transition_limits);
-    for input in [command, context] {
+    for (type_id, value) in [
+        (pre_state.root_type(), pre_state.value().value()),
+        (command.type_id(), command.value().value()),
+        (context.type_id(), context.value().value()),
+    ] {
         policy
             .catalog
             .schema()
-            .validate_value(input.type_id(), input.value().value(), limits)
+            .validate_value(type_id, value, limits)
             .map_err(|_| AuthorityError::Mismatch(AuthorityField::Schema))?;
     }
     Ok(())
@@ -3010,12 +3014,17 @@ mod tests {
     }
 
     fn fixture_catalog() -> ProjectCatalog {
+        fixture_catalog_with_state(TypeKind::Bool)
+    }
+
+    fn fixture_catalog_with_state(state_kind: TypeKind) -> ProjectCatalog {
         let schema = Schema::try_new(
             "AuthorityFixture",
             1,
             TypeId::new(1),
             vec![
-                type_def(1, "State"),
+                TypeDef::try_new(TypeId::new(1), "State", state_kind, SchemaLimits::default())
+                    .unwrap_or_else(|error| panic!("state type: {error}")),
                 type_def(2, "Command"),
                 type_def(3, "Context"),
             ],
@@ -3411,6 +3420,67 @@ mod tests {
         .unwrap_or_else(|error| panic!("forged envelope: {error}"));
         assert_eq!(envelope.schema_hash(), fixture_catalog().schema_hash());
         envelope
+    }
+
+    #[test]
+    fn admission_checks_pre_state_under_the_authoritys_validation_limits() {
+        // Both states are valid under this exact schema. The authority's
+        // tighter node budget admits only the empty vector, before it can
+        // issue the witness required to execute a program.
+        let catalog = fixture_catalog_with_state(TypeKind::Vector {
+            element: TypeId::new(2),
+            min_len: 0,
+            max_len: 1,
+        });
+        let envelope = |items| {
+            SchemaAdmittedEnvelope::try_new::<RustCryptoSha256>(
+                catalog.schema(),
+                Value::vector(items),
+                ValidationLimits::default(),
+            )
+            .unwrap_or_else(|error| panic!("state: {error}"))
+        };
+        let empty = envelope(Vec::new());
+        let domain = Domain::new("authority/fixture/state", 1)
+            .unwrap_or_else(|error| panic!("state domain: {error}"));
+        let initial_root = hash_value::<RustCryptoSha256>(domain, empty.value().value())
+            .unwrap_or_else(|error| panic!("initial root: {error}"));
+        let genesis =
+            GenesisPolicyBinding::try_new(initial_root, hash(70), hash(71), hash(72), hash(53))
+                .unwrap_or_else(|error| panic!("genesis: {error}"));
+        let provider = verify_approved_provider::<RustCryptoSha256>()
+            .unwrap_or_else(|error| panic!("provider: {error}"));
+        let authority: CatalogCommitAuthority<_, _, _, TestInterpreter> =
+            CatalogCommitAuthority::try_new(
+                &catalog,
+                StateDomainBinding::try_new("authority/fixture/state", 1)
+                    .unwrap_or_else(|error| panic!("state domain: {error}")),
+                execution(53),
+                genesis,
+                TransitionLimits::try_new(4, 4, 4, 64, 8, 1)
+                    .unwrap_or_else(|error| panic!("limits: {error}")),
+                &provider,
+                verified_laws(&catalog),
+                AcceptProgram,
+            )
+            .unwrap_or_else(|error| panic!("authority: {error}"));
+        let admit = |state| {
+            authority
+                .admit_invocation(
+                    state,
+                    command(&catalog),
+                    context(&catalog),
+                    hash(60),
+                    hash(61),
+                    hash(62),
+                )
+                .err()
+        };
+        assert_eq!(admit(empty), None);
+        assert_eq!(
+            admit(envelope(vec![Value::Bool(false)])),
+            Some(AuthorityError::Mismatch(AuthorityField::Schema))
+        );
     }
 
     #[test]
