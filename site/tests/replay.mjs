@@ -10,8 +10,8 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { instantiate } from "../public/demo-module.mjs";
-import { DEMONSTRATION } from "../public/demonstration.mjs";
+import { instantiate } from "../public/demo-module.js";
+import { DEMONSTRATION } from "../public/demonstration.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const MODULE = process.argv[2] ?? path.join(ROOT, "site/public/account-lockout.wasm");

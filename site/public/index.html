@@ -55,8 +55,8 @@
         attempt is recorded. Every request carries its time, and the decision
         never reads a clock. Only a request marked <em>admin</em> may unlock.
         Alerts leave through the outbox. The rules, in the order they apply, are
-        in the template's <a href="account-lockout.README.md">README</a>, copied
-        here as shipped
+        in the template's
+        <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/account-lockout/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/account-lockout/README.md</code> in
         the repository).
       </p>
@@ -84,7 +84,8 @@
           </li>
           <li>
             This module is checked by a headless replay
-            (<code>site/tests/replay.mjs</code>) that runs the template's 20
+            (<code>site/tests/replay.mjs</code>, run by
+            <code>site/build.py</code>) that runs the template's 20
             decision examples and the README's demonstration through it and
             compares every outcome with the examples file and with the gate's
             expected summary.
@@ -168,6 +169,6 @@
   </p>
 </footer>
 
-<script type="module" src="site.mjs"></script>
+<script type="module" src="site.js"></script>
 </body>
 </html>

@@ -1,0 +1,67 @@
+name: pages
+
+# Builds the demo site, site/public, and deploys it to GitHub Pages. Every
+# example application runs in the browser through its own commit authority.
+# Only a push to `main`, or a manual run, builds; only `main` deploys.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a running deployment is not cancelled.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Rust with the wasm32 target
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup target add wasm32-unknown-unknown --toolchain 1.97.1
+
+      - name: Install pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: .node-version
+
+      # Generates each application with the CLI, builds every module twice
+      # and requires identical bytes, replays the examples, and checks the
+      # exact artifact under a subpath in headless Chrome.
+      - name: Build and test the site
+        run: python3 site/build.py
+
+      - name: Upload site/public as the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/public
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # The two scopes `actions/deploy-pages` needs, and no other; the build job
+    # keeps `contents: read`.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy the artifact to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

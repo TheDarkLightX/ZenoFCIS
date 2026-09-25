@@ -369,28 +369,38 @@ def check_unsafe_prohibition(member: Path) -> list[str]:
     return []
 
 
+# The Pages deploy job needs exactly these two scopes for `actions/deploy-pages`:
+# `pages` to create the deployment and `id-token` for its OIDC token. No other
+# workflow, and no other scope, may write.
+PAGES_WORKFLOW = ".github/workflows/pages.yml"
+PAGES_DEPLOY_SCOPES = frozenset({"pages", "id-token"})
+
+
+def check_workflow_text(path: str, text: str) -> list[str]:
+    failures: list[str] = []
+    action_pattern = re.compile(r"^\s*uses:\s*([^\s#]+)", re.MULTILINE)
+    write_permission = re.compile(
+        r"^\s*(?:permissions:\s*write-all|([A-Za-z0-9_-]+):\s*write)\s*$", re.MULTILINE
+    )
+    for match in write_permission.finditer(text):
+        if path == PAGES_WORKFLOW and match.group(1) in PAGES_DEPLOY_SCOPES:
+            continue
+        failures.append(f"{path}:{line_number(text, match.start())}: write permission forbidden")
+    for action in action_pattern.findall(text):
+        if action.startswith("./"):
+            continue
+        _, separator, revision = action.rpartition("@")
+        if not separator or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+            failures.append(f"{path}: action must be pinned to a 40-character commit: {action}")
+    return failures
+
+
 def check_workflows() -> list[str]:
     failures: list[str] = []
     workflow_root = ROOT / ".github" / "workflows"
-    action_pattern = re.compile(r"^\s*uses:\s*([^\s#]+)", re.MULTILINE)
-    write_permission = re.compile(
-        r"^\s*(?:permissions:\s*write-all|[A-Za-z0-9_-]+:\s*write)\s*$", re.MULTILINE
-    )
     for path in sorted(workflow_root.glob("*.yml")):
-        text = path.read_text(encoding="utf-8")
-        match = write_permission.search(text)
-        if match is not None:
-            failures.append(
-                f"{path.relative_to(ROOT)}:{line_number(text, match.start())}: write permission forbidden"
-            )
-        for action in action_pattern.findall(text):
-            if action.startswith("./"):
-                continue
-            _, separator, revision = action.rpartition("@")
-            if not separator or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
-                failures.append(
-                    f"{path.relative_to(ROOT)}: action must be pinned to a 40-character commit: {action}"
-                )
+        relative = path.relative_to(ROOT).as_posix()
+        failures.extend(check_workflow_text(relative, path.read_text(encoding="utf-8")))
     return failures
 
 
@@ -414,6 +424,17 @@ def run_self_test() -> list[str]:
     mutant = "Vec::with_capacity(count)"
     if not check_decoder_region_text("self-test-mutant", mutant, requirement):
         failures.append("decoder allocation self-test accepted a raw-count mutant")
+
+    deploy_scopes = "permissions:\n  pages: write\n  id-token: write\n"
+    if check_workflow_text(PAGES_WORKFLOW, deploy_scopes):
+        failures.append("workflow self-test rejected the Pages deploy scopes in pages.yml")
+    for witness in (deploy_scopes + "  contents: write\n", "permissions: write-all\n"):
+        if not check_workflow_text(PAGES_WORKFLOW, witness):
+            failures.append("workflow self-test accepted a write scope beyond the Pages deploy scopes")
+    if not check_workflow_text(".github/workflows/ci.yml", deploy_scopes):
+        failures.append("workflow self-test accepted the Pages deploy scopes outside pages.yml")
+    if not check_workflow_text(PAGES_WORKFLOW, "        uses: actions/deploy-pages@v5\n"):
+        failures.append("workflow self-test accepted an action pinned to a tag")
     return failures
 
 
