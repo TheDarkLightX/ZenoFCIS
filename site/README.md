@@ -64,7 +64,9 @@ python3 site/build.py
 python3 -m http.server --directory site/public 8000
 ```
 
-Then open `http://localhost:8000/`. `build.py` runs, in order: the CLI build
+Then open `http://localhost:8000/`. `build.py` runs, in order:
+`cargo fetch --locked` in the workspace, as the gate does, so that every
+later cargo command runs offline against the reviewed lock; the CLI build
 and `zeno-fcis new` for every template; the lock check against the workspace
 lock (`--relock` regenerates `site/Cargo.lock` from it); `cargo fmt --check`,
 clippy with `-D warnings` for the host and for wasm32, and the host tests;
