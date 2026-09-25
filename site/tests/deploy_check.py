@@ -18,7 +18,11 @@ printed:
 2. the page itself: the panel that is open when it loads must have loaded
    its module, run its README's demonstration, said so in its status, and
    rendered one timeline entry per decision with the gate's decision on it;
-   no other panel's module may have been fetched.
+   no other panel's module may have been fetched;
+3. the page in a viewport-sized frame (site/tests/harness/viewport.html):
+   after the load-time demonstration, the page must not have scrolled
+   itself: its scroll position must be 0 and its banner inside the viewport,
+   on a document taller than the viewport.
 
 A page that loaded from the subpath alone is a page whose relative paths hold.
 
@@ -187,8 +191,23 @@ def check_page(dom: str, first: str) -> None:
             f"the timeline shows {badges}, not the gate's decisions")
 
 
-def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
+def check_viewport(dom: str) -> None:
+    """The served page stayed at its top after deciding its demonstration on load."""
     printed = element_text(dom, "results")
+    try:
+        results = json.loads(printed)
+    except json.JSONDecodeError as error:
+        raise DeployCheckError(f"the viewport harness printed no results, only {printed[:300]!r}") from error
+    require("error" not in results, f"the viewport harness failed: {results.get('error')}")
+    require(results["status"] is not None, "the framed page never said its demonstration was decided on load")
+    require(results["documentHeight"] > results["viewportHeight"],
+            f"the framed page is not taller than its viewport ({results['documentHeight']} against "
+            f"{results['viewportHeight']}), so scrolling cannot be checked")
+    require(results["scrollY"] == 0, f"the page scrolled itself on load: scrollY {results['scrollY']}")
+    banner = results["banner"]
+    require(banner is not None, "the page has no banner heading")
+    require(0 <= banner["top"] and banner["bottom"] <= results["viewportHeight"],
+            f"the banner {banner['text']!r} is outside the viewport: top {banner['top']}, bottom {banner['bottom']}")
 
 
 def main() -> None:
@@ -218,6 +237,8 @@ def main() -> None:
                 check_harness(dump_dom(chrome, Path(profile), harness_url), subpath, [name])
             page_start = len(served)
             check_page(dump_dom(chrome, Path(profile), f"{origin}{subpath}"), first)
+            page_end = len(served)
+            check_viewport(dump_dom(chrome, Path(profile), f"{origin}{HARNESS_PREFIX}viewport.html?page={subpath}"))
     finally:
         server.shutdown()
         server.server_close()
@@ -227,11 +248,12 @@ def main() -> None:
             f"a request outside the subpath succeeded: {sorted(succeeded)}")
     for name in templates:
         require(f"{subpath}{name}.wasm" in succeeded, f"{name}: the module was not fetched from {subpath}")
-    page_modules = sorted({path for path, status in served[page_start:] if status == 200 and path.endswith(".wasm")})
+    page_modules = sorted({path for path, status in served[page_start:page_end] if status == 200 and path.endswith(".wasm")})
     require(page_modules == [f"{subpath}{first}.wasm"],
             f"the page must fetch the open panel's module and no other, not {page_modules}")
     print(f"deploy check: PASS: the artifact served from {subpath} ran {len(templates)} demonstration(s) in "
-          f"{Path(chrome).name}; the page fetched only {first}.wasm; {len(served)} requests, none served outside the subpath")
+          f"{Path(chrome).name}; the page fetched only {first}.wasm and stayed at its top; "
+          f"{len(served)} requests, none served outside the subpath")
 
 
 if __name__ == "__main__":

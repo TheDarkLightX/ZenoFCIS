@@ -140,7 +140,7 @@ export async function mount(container, template) {
       button.type = "button";
       button.disabled = true;
       button.addEventListener("click", () => {
-        if (!busy) send(step.request, step.note);
+        if (!busy) send(step.request, step.note, true);
       });
       proposerButtons.push(button);
       return node("li", null,
@@ -195,7 +195,10 @@ export async function mount(container, template) {
     }
   }
 
-  function renderReport(request, report, note) {
+  // `reveal` scrolls the new entry into view: only for a decision the viewer
+  // caused, never for the demonstration decided when the page loaded, so
+  // the page stays at its top.
+  function renderReport(request, report, note, reveal) {
     if (count === 0) timeline.replaceChildren();
     count += 1;
     const head = node("div", "entry-head");
@@ -218,7 +221,7 @@ export async function mount(container, template) {
     }
     const item = node("li", null, head, body);
     timeline.append(item);
-    item.scrollIntoView({ block: "nearest" });
+    if (reveal) item.scrollIntoView({ block: "nearest" });
   }
 
   function announce(request, report) {
@@ -230,10 +233,10 @@ export async function mount(container, template) {
     }
   }
 
-  function send(request, note) {
+  function send(request, note, reveal) {
     const report = demo.step(request);
     history.push({ request, report });
-    renderReport(request, report, note);
+    renderReport(request, report, note, reveal);
     renderState(demo.state());
     announce(request, report);
     return report;
@@ -247,7 +250,7 @@ export async function mount(container, template) {
       status.textContent = error.message;
       return;
     }
-    send(request);
+    send(request, null, true);
   }
 
   function reset() {
@@ -262,7 +265,8 @@ export async function mount(container, template) {
   const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
   // Shows each request in the form, then sends it. `instant` skips the pause
-  // between requests; `onLoad` says the run happened when the page loaded.
+  // between requests; `onLoad` says the run happened when the page loaded,
+  // which the status then says, and which must not scroll the page.
   async function runDemonstration({ instant = false, onLoad = false } = {}) {
     setBusy(true);
     try {
@@ -270,7 +274,7 @@ export async function mount(container, template) {
       for (const step of template.demonstration) {
         const fields = commands.find(({ command }) => command.name === step.request.command)?.fields ?? [];
         for (const field of [...fields, ...context]) field.write(step.request[field.name]);
-        send(step.request, step.note);
+        send(step.request, step.note, !onLoad);
         if (!instant) await delay(STEP_DELAY_MS);
       }
       status.textContent = `The README's demonstration, decided in this browser${onLoad ? " when the page loaded" : ""}: `

@@ -6,6 +6,16 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The demo site stays at its top after the demonstration decided on load: a
+  timeline entry scrolls into view only when the viewer caused it, by a
+  button or a demonstration they started. `site/tests/deploy_check.py`
+  loads the served page in a viewport-sized frame and requires a scroll
+  position of 0 and the banner inside the viewport once the load-time
+  demonstration is decided. It also drops a stray second definition of
+  `check_harness`, left behind on 2026-09-25, which had shadowed the real
+  one and made the harness assertions no-ops while the page checks stayed
+  live; the assertions run again, and a control shows them catching a
+  changed demonstration.
 - `site/build.py` runs `cargo +1.97.1 fetch --locked` in the workspace
   before its offline cargo commands, as `tools/check_generated_application.py`
   does, so that the Pages workflow builds on a fresh runner with no registry

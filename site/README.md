@@ -125,8 +125,10 @@ decision, and the proposer's list where the template describes one. The page
 itself must have loaded the module of the section that is open on load, run
 that README's demonstration, said so in its status, rendered one timeline
 entry per decision with the gate's decision on it, and fetched no other
-module. A page that loaded from the subpath alone is a page whose relative
-paths hold. (One template per dump, because Chrome's virtual-time budget is
+module; and, loaded in a viewport-sized frame (`tests/harness/viewport.html`),
+it must have stayed at its top with its banner in view, since a timeline
+entry scrolls into view only when the viewer caused it. A page that loaded
+from the subpath alone is a page whose relative paths hold. (One template per dump, because Chrome's virtual-time budget is
 spent across module rounds: a single round finishes within it, several do
 not.)
 
