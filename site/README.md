@@ -120,8 +120,11 @@ the entries the gate's shell delivered are the entries left pending here.
 
 `tests/deploy_check.py` serves `site/public` exactly as the workflow uploads
 it, at `/ZenoFCIS/` on a local server that serves nothing at the root, and
-drives headless Chrome over it with `--dump-dom` under a virtual-time budget.
-A harness page, served beside the artifact and not part of it, is dumped once
+drives headless Chrome through a DevTools pipe, waiting for the demonstration's
+completion state before capturing the DOM, with a 120-second wall-clock timeout.
+This also waits for asynchronous WebAssembly compilation on slower CI hosts.
+The browser runner's tests require a delayed result to complete and a page
+that stays pending to fail. A harness page, served beside the artifact and not part of it, is captured once
 per template: it imports the artifact's own panel and the template's
 description, mounts the panel as the page does, runs the README's
 demonstration through it, and prints the results and what the panel
@@ -133,9 +136,8 @@ entry per decision with the gate's decision on it, and fetched no other
 module; and, loaded in a viewport-sized frame (`tests/harness/viewport.html`),
 it must have stayed at its top with its banner in view, since a timeline
 entry scrolls into view only when the viewer caused it. A page that loaded
-from the subpath alone is a page whose relative paths hold. (One template per dump, because Chrome's virtual-time budget is
-spent across module rounds: a single round finishes within it, several do
-not.)
+from the subpath alone is a page whose relative paths hold. Each template has
+its own browser capture so that a failure identifies the template involved.
 
 The strength of what each template itself checks is stated in its README and
 repeated in its section of the page, in the README's own scoped words: laws
