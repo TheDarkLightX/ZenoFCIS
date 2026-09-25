@@ -1,0 +1,69 @@
+{
+  "status": "development candidate; focused checks pass; full Linux qualification pending",
+  "base_commit": "5f6acb01d59edf95f49ccc67bdbdc078793ab9f9",
+  "source_sha256": {
+    "Cargo.lock": "989dfa51d845a925d03695dea621fabbb44731d9296c2f30fa67f457b0be4c30",
+    "crates/zeno-fcis-authority/src/lib.rs": "818380413bf4977d451e2abd957794c7a86da461f7dfadc1afad0848851c606e",
+    "crates/zeno-fcis-authority/src/tests/request-binding-vectors.txt": "5a9cb7b543c9bb70dd1b9e6ddd14d1132e6088390a276fd0a10030fa80eb7744",
+    "crates/zeno-fcis-shell-sqlite/Cargo.toml": "f5a3218d9aacf629d45c3e5489ba2ff7528e5576168633200660d3431c6f2d30",
+    "crates/zeno-fcis-shell-sqlite/src/lib.rs": "888c1a68f4d94ce5b0d162973e970d61dd677e4ca6379b5d906c48742b9fe5ef",
+    "crates/zeno-fcis-shell-sqlite/src/history.rs": "ed8e06fc13a63bc495bd5a1e30fe9bba81dec54434b9daf609024f374cc87d83",
+    "crates/zeno-fcis-shell-sqlite/src/tests/history_tests.rs": "d569d5a41d9fe4c8d069f1327d6368cae22f7cf42b5f5ee7aa48df3ebc21a9f6",
+    "crates/zeno-fcis-shell-sqlite/src/tests/transaction_tests.rs": "eca639db2a87448be3187fafc46e16a2a618f59982c2d6eff595c72033fe8ea8",
+    "crates/zeno-fcis-cli/src/synth/tests.rs": "8ece3cc5705b708a53e6e53e99467ec6e46c2fdb93868a39cd43a28f6e6bc140"
+  },
+  "checks": {
+    "focused_tests": {
+      "passed": 58,
+      "compile_fail_doctests": 3
+    },
+    "clippy_denied_warnings": "passed",
+    "format": "passed",
+    "rustdoc_denied_warnings": "passed",
+    "authority_host_no_default_features": "passed",
+    "workspace_clippy_all_targets_all_features_denied_warnings": "passed on macOS arm64",
+    "workspace_all_feature_tests": {
+      "status": "failed on macOS arm64",
+      "failures": [
+        "busy_executables_are_retried_briefly_then_fail_closed",
+        "rc3_formal_fail_closed_and_model_replay",
+        "rc3_process_success_kills_descendants_after_collecting_output"
+      ],
+      "baseline_comparison": "First two also fail at unchanged base; descendant-output test passes in the baseline control, so that candidate failure remains unresolved."
+    },
+    "atdd_all": {
+      "status": "blocked on macOS arm64",
+      "runtime": "Python 3.12",
+      "reason": "finite-synthesis execution requires Linux waitid and process-group cleanup; conformance-unknown"
+    }
+  },
+  "mutations": [
+    {
+      "name": "skip-context",
+      "caught_by_test": true,
+      "test_command": "cargo +1.97.1 test --locked -p zeno-fcis-shell-sqlite --lib lookup_matches_complete_original_request_and_policy"
+    },
+    {
+      "name": "skip-lineage",
+      "caught_by_test": true,
+      "test_command": "cargo +1.97.1 test --locked -p zeno-fcis-shell-sqlite --lib different_genesis_never_turns_a_historical_request_into_absence"
+    },
+    {
+      "name": "skip-genesis",
+      "caught_by_test": true,
+      "test_command": "cargo +1.97.1 test --locked -p zeno-fcis-shell-sqlite --lib corrupt_history_never_becomes_a_hit_or_absence"
+    },
+    {
+      "name": "no-read-transaction",
+      "caught_by_test": true,
+      "test_command": "cargo +1.97.1 test --locked -p zeno-fcis-shell-sqlite --lib a_wal_write_after_snapshot_does_not_mix_histories"
+    }
+  ],
+  "not_checked": [
+    "passing full workspace/all-feature and ATDD suites on Linux",
+    "cross-target no_std",
+    "machine-checked SQLite refinement",
+    "application integration and migration",
+    "production finality or rollback resistance"
+  ]
+}

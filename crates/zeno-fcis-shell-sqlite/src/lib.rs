@@ -2,6 +2,9 @@
 
 #![forbid(unsafe_code)]
 
+mod history;
+pub use history::{HistoricalLookup, StoredCommit};
+
 use core::fmt;
 use core::marker::PhantomData;
 use std::collections::BTreeMap;
@@ -943,13 +946,18 @@ fn initialize_schema_for_create(connection: &Connection) -> Result<(), SqliteShe
 }
 
 fn validate_existing_schema(connection: &Connection) -> Result<(), SqliteShellError> {
+    check_existing_schema(connection)?;
+    connection
+        .execute_batch("PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;")
+        .map_err(SqliteShellError::Sqlite)
+}
+
+fn check_existing_schema(connection: &Connection) -> Result<(), SqliteShellError> {
     let (version, existing_tables) = schema_version_and_table_count(connection)?;
     match version {
         0 if existing_tables == 0 => Err(SqliteShellError::UninitializedStore),
         0 => Err(SqliteShellError::LegacySchema),
-        SQLITE_SCHEMA_VERSION if existing_tables == 7 => connection
-            .execute_batch("PRAGMA foreign_keys = ON; PRAGMA synchronous = FULL;")
-            .map_err(SqliteShellError::Sqlite),
+        SQLITE_SCHEMA_VERSION if existing_tables == 7 => Ok(()),
         SQLITE_SCHEMA_VERSION => Err(SqliteShellError::CorruptSchema),
         other => Err(SqliteShellError::UnsupportedSchemaVersion(other)),
     }
@@ -1602,6 +1610,10 @@ pub enum SqliteShellError {
     CorruptSchema,
     /// The database belongs to another authorization policy or state domain.
     PolicyMismatch,
+    /// A historical lookup supplied the reserved zero replay identity.
+    InvalidReplayId,
+    /// The request was originally submitted under another genesis/policy lineage.
+    LineageMismatch,
     /// Stored hash is not exactly 32 bytes.
     InvalidHashLength,
     /// Stored integer cannot be represented by the protocol type.
@@ -1670,6 +1682,8 @@ impl fmt::Display for SqliteShellError {
                 formatter.write_str("SQLite shell authorization policy mismatch")
             }
             Self::InvalidHashLength => formatter.write_str("stored hash length is invalid"),
+            Self::InvalidReplayId => formatter.write_str("replay identity must be nonzero"),
+            Self::LineageMismatch => formatter.write_str("historical request lineage mismatch"),
             Self::IntegerRange => formatter.write_str("stored integer is out of range"),
             Self::VersionOverflow => formatter.write_str("database version overflow"),
             Self::CorruptState => formatter.write_str("stored semantic state is inconsistent"),
@@ -1704,6 +1718,7 @@ impl std::error::Error for SqliteShellError {}
 
 #[cfg(test)]
 mod tests {
+    mod history_tests;
     mod transaction_tests;
 
     use super::*;

@@ -21,6 +21,7 @@ zeno-fcis-plan = { version = "=1.1.0", path = "../zeno-fcis-plan" }
 zeno-fcis-receipt = { version = "=1.1.0", path = "../zeno-fcis-receipt" }
 zeno-fcis-schema = { version = "=1.1.0", path = "../zeno-fcis-schema" }
 zeno-fcis-shell = { version = "=1.1.0", path = "../zeno-fcis-shell" }
+zeno-fcis-transition = { version = "=1.1.0", path = "../zeno-fcis-transition" }
 zeno-fcis-value = { version = "=1.1.0", path = "../zeno-fcis-value" }
 
 [dev-dependencies]
@@ -29,7 +30,6 @@ zeno-fcis-catalog = { version = "=1.1.0", path = "../zeno-fcis-catalog" }
 zeno-fcis-core = { version = "=1.1.0", path = "../zeno-fcis-core" }
 zeno-fcis-evidence = { version = "=1.1.0", path = "../zeno-fcis-evidence" }
 zeno-fcis-project = { version = "=1.1.0", path = "../zeno-fcis-project" }
-zeno-fcis-transition = { version = "=1.1.0", path = "../zeno-fcis-transition" }
 
 [lints]
 workspace = true

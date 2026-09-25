@@ -16,8 +16,16 @@ other.
 
 A property is a closed Boolean relation over a transition's inputs followed by
 its outputs. `zeno_fcis_synthesis::system::Property` holds the relation program
-and the equivalent synthesis `Contract`. The same relation language describes
+and the equivalent relational `Contract`. The same relation language describes
 the transition, its reviewed specification, and its properties.
+
+`Property::try_new` accepts up to 32 combined input and output fields, with
+between 1 and 16 output fields. These are the existing relation-`Program` input
+and transition-`Program` output bounds. A transition with 17 inputs and 9 outputs
+can therefore have a system property. Exact domain order and a single Boolean
+relation result remain mandatory. `Contract::try_new` and `Sketch::try_new`
+retain the narrower synthesis limit of 16 inputs and 16 outputs; obtaining a
+contract from a wider property does not allow a matching synthesis sketch.
 
 `zeno_fcis_synthesis::system::check_system_property` returns one `SystemCheck`:
 
@@ -78,6 +86,12 @@ control is capped at 4,194,304 input and output pairs. Exceeding a cap is an
 error, never a partial result. The SMT scripts are linear in the number of
 program nodes.
 
+The wider system-property constructor does not change these enumeration caps,
+the finite semantic profile, or the canonical program and contract data. Its
+implementation changes the source-bound synthesis checker identity because the
+contract constructor shares a source file with that checker. Retained synthesis
+evidence must therefore be regenerated where an exact checker source is required.
+
 ## Laws
 
 1. An out-of-domain output is a totality failure, because the executed program
@@ -124,9 +138,16 @@ then check:
   property on others. The solver route here uses a reference that answers each
   obligation by enumeration. The pinned CVC5 run repeats the collection and
   requires the same stage.
+- Shapes of 17 inputs plus 9 outputs, 31 plus 1, and 16 plus 16 preserve the last
+  input in the last output. Exhaustive and pinned CVC5 checks agree on these
+  programs and on variants that violate the property or the output domain.
+  The ordinary tests also reject truncated or nonviolating wide models and
+  check unchanged synthesis bounds and enumeration caps. Singleton padding
+  keeps these examples small; they test field handling, not application adequacy.
 
-The last four cases come from an independent review of commit `521b768`. Its
-three probes are kept in `crates/zeno-fcis-formal-tools/tests/system_contract.rs`.
+The model admission, domain-only replay, totality ordering, and 80-case
+comparison come from an independent review of commit `521b768`. Its three
+probes are kept in `crates/zeno-fcis-formal-tools/tests/system_contract.rs`.
 
 ## Controls
 
