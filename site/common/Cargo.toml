@@ -1,0 +1,22 @@
+[package]
+name = "zeno-fcis-site-common"
+description = "What every demo module shares: the step over the in-memory shell, the JSON report, and the C ABI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde_json = "=1.0.151"
+zeno-fcis-authority = "=1.1.0"
+zeno-fcis-codec = "=1.1.0"
+zeno-fcis-core = "=1.1.0"
+zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
+zeno-fcis-laws = "=1.1.0"
+zeno-fcis-schema = "=1.1.0"
+zeno-fcis-shell = "=1.1.0"
+zeno-fcis-spec = "=1.1.0"
+zeno-fcis-value = "=1.1.0"
+
+[lints]
+workspace = true

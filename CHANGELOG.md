@@ -6,6 +6,23 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The demo site has one shape for every example. `site/common/` holds what
+  every module shares: the step over the library's `AuthorizedShellState`,
+  following each template's `invoke`; the JSON report, with every value
+  named as `project.zeno` names it and every law as the manifest does; the
+  reader of the page's request, which refuses a field no command reads; and
+  the C ABI, defined once, exported by every module that links the crate, and
+  the only code that handles raw pointers. A demo crate now names its
+  application's types, its exact genesis, and its request mapping, and
+  exports `demo_reset`. On the page, `panel.js` builds every example's
+  forms, timeline, laws, state, and outbox from `templates/<template>.js`,
+  the example's description in the README's words, loaded when its section
+  opens; `tests/replay.mjs` replays any template's examples, each from a
+  state that `tests/templates/<template>.mjs` reaches from genesis, and its
+  demonstration against the gate's summary; the harness and
+  `site/tests/deploy_check.py` take a list of templates and require the page
+  to fetch only the open section's module. `site/build.py` takes `--only`
+  and `--stage` so that a long build can be split.
 - The demo site is ready for GitHub Pages. `.github/workflows/pages.yml`
   builds `site/public` with `site/build.py` on a push to `main` or a manual
   run, and deploys it with `actions/deploy-pages` when the ref is `main`;
