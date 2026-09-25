@@ -1,0 +1,18 @@
+[package]
+name = "zeno-fcis-site-inventory-reservation"
+description = "The inventory-reservation example's unchanged authority in the browser, over an in-memory shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The template as `zeno-fcis new` shipped it, without its SQLite shell.
+inventory-reservation = { path = "../../apps/inventory-reservation", default-features = false }
+zeno-fcis-site-common = { path = "../../common" }
+
+[lints]
+workspace = true

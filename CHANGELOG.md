@@ -6,6 +6,24 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The demo site runs every example application: order-fulfillment,
+  inventory-reservation, compliance-gateway, withdrawal-queue, and
+  agent-treasury-guard join account-lockout, each as a demo crate that names
+  its application's types, genesis, and request mapping in the README's
+  words; a page description with its state fields, context and command
+  forms, the README's demonstration with a note per step, and the
+  demonstration's end in the gate's fields; a section of the page with the
+  README's own scoped wording of what is checked and at what strength; and
+  an examples reader that reaches each example's state from genesis. The
+  treasury guard's section shows the scripted agent as a proposer, with a
+  button per proposal, including the ones the guard refuses; the withdrawal
+  queue's section says how to raise the alarm and tick. Each section loads
+  its module only when it is opened. `site/tests/replay.mjs` replays every
+  example it can reach from genesis (all but withdrawal-queue's example 20
+  and agent-treasury-guard's example 23, whose states no sequence of
+  requests reaches; it names them) and every demonstration against the
+  gate's summaries, and `site/tests/deploy_check.py` runs all six
+  demonstrations through the served artifact.
 - The demo site has one shape for every example. `site/common/` holds what
   every module shares: the step over the library's `AuthorizedShellState`,
   following each template's `invoke`; the JSON report, with every value

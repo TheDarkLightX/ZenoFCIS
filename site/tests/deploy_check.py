@@ -7,11 +7,14 @@ and drives headless Chrome over it with `--dump-dom` under a virtual-time
 budget, which lets a page finish its fetches and timers before the DOM is
 printed:
 
-1. the harness, site/tests/harness/, served beside the artifact: it imports
-   the page's own loader and each template's description from the artifact,
-   runs each README's demonstration through its served module, and prints
-   the results, which must match the gate's expected summaries in
-   tools/check_generated_application.py;
+1. the harness, site/tests/harness/, served beside the artifact, once per
+   template: it imports the page's own panel and the template's description
+   from the artifact, mounts the panel as the page does, runs the README's
+   demonstration through it, and prints the results and what the panel
+   rendered, which must match the gate's expected summary in
+   tools/check_generated_application.py. One template per dump, because the
+   virtual-time budget is spent across module rounds: a single round
+   finishes within a small budget, several do not;
 2. the page itself: the panel that is open when it loads must have loaded
    its module and rendered its state, and no other panel's module may have
    been fetched.
@@ -51,8 +54,9 @@ CONTENT_TYPES = {
     ".json": "application/json",
 }
 # Chrome prints the DOM once the budget is spent or the page is idle; the
-# budget is virtual time, so timers on the page cost nothing.
-VIRTUAL_TIME_BUDGET_MS = 30_000
+# budget is virtual time, so timers on the page cost nothing, and a budget
+# the page does not use costs nothing either.
+VIRTUAL_TIME_BUDGET_MS = 120_000
 
 sys.path.insert(0, str(ROOT / "tools"))
 import check_generated_application as gate  # noqa: E402
@@ -135,7 +139,11 @@ def open_panel() -> str:
 
 
 def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
-    results = json.loads(element_text(dom, "results"))
+    printed = element_text(dom, "results")
+    try:
+        results = json.loads(printed)
+    except json.JSONDecodeError as error:
+        raise DeployCheckError(f"the harness printed no results, only {printed[:300]!r}") from error
     require(results["errors"] == [], f"the harness reported errors: {results['errors']}")
     require(results["base"].endswith(subpath), f"the harness loaded from {results['base']}, not {subpath}")
     for name in templates:
@@ -153,6 +161,11 @@ def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
         require(summary == {key: expected[key] for key in summary},
                 f"{name}: the demonstration's end differs from the gate's summary: {summary}")
         require(result["steps_counted"] == len(expected["decisions"]), f"{name}: decisions counted: {result['steps_counted']}")
+        require("decided in this browser" in result["status"], f"{name}: the panel's status after the demonstration: {result['status']!r}")
+        require(result["timeline"] == len(expected["decisions"]),
+                f"{name}: the panel rendered {result['timeline']} decisions, not {len(expected['decisions'])}")
+        require(result["proposals"] == result["proposals_described"],
+                f"{name}: the panel listed {result['proposals']} proposals, not {result['proposals_described']}")
 
 
 def check_page(dom: str, first: str) -> None:
@@ -185,8 +198,9 @@ def main() -> None:
     try:
         origin = f"http://127.0.0.1:{server.server_address[1]}"
         with tempfile.TemporaryDirectory(prefix="zeno-fcis-deploy-check-") as profile:
-            harness_url = f"{origin}{HARNESS_PREFIX}?base={subpath}&templates={','.join(templates)}"
-            check_harness(dump_dom(chrome, Path(profile), harness_url), subpath, templates)
+            for name in templates:
+                harness_url = f"{origin}{HARNESS_PREFIX}?base={subpath}&templates={name}"
+                check_harness(dump_dom(chrome, Path(profile), harness_url), subpath, [name])
             page_start = len(served)
             check_page(dump_dom(chrome, Path(profile), f"{origin}{subpath}"), first)
     finally:

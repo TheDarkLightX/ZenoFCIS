@@ -133,6 +133,12 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .entry-head { display: flex; flex-wrap: wrap; gap: 0.25rem 0.5rem; align-items: baseline; }
 .entry-head .request { font-weight: 600; }
 .entry-head .note { color: var(--muted); font-style: italic; }
+
+/* A scripted proposer's list: what it proposes, what happened in the script, and a button to send it now. */
+.proposals { list-style: decimal; margin: 0.5rem 0 0; padding-left: 1.5rem; }
+.proposals li { padding: 0.35rem 0; }
+.proposals .request { display: block; font-weight: 600; }
+.proposals .note { display: block; color: var(--muted); font-style: italic; margin-bottom: 0.25rem; }
 .entry-body { margin: 0.35rem 0 0; color: var(--muted); }
 .entry-body .laws { margin: 0.25rem 0 0; padding-left: 1.25rem; }
 .entry-body details { margin: 0.25rem 0 0; }

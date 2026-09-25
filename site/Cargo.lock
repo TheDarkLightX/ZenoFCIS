@@ -26,6 +26,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-treasury-guard"
+version = "0.0.0"
+dependencies = [
+ "zeno-fcis-authority",
+ "zeno-fcis-bootstrap",
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-evidence",
+ "zeno-fcis-laws",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
+ "zeno-fcis-shell",
+ "zeno-fcis-spec",
+ "zeno-fcis-transition",
+ "zeno-fcis-value",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -39,6 +62,29 @@ name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
+
+[[package]]
+name = "compliance-gateway"
+version = "0.0.0"
+dependencies = [
+ "zeno-fcis-authority",
+ "zeno-fcis-bootstrap",
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-evidence",
+ "zeno-fcis-laws",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
+ "zeno-fcis-shell",
+ "zeno-fcis-spec",
+ "zeno-fcis-transition",
+ "zeno-fcis-value",
+]
 
 [[package]]
 name = "cpufeatures"
@@ -78,6 +124,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "inventory-reservation"
+version = "0.0.0"
+dependencies = [
+ "zeno-fcis-authority",
+ "zeno-fcis-bootstrap",
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-evidence",
+ "zeno-fcis-laws",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
+ "zeno-fcis-shell",
+ "zeno-fcis-spec",
+ "zeno-fcis-transition",
+ "zeno-fcis-value",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -94,6 +163,29 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "order-fulfillment"
+version = "0.0.0"
+dependencies = [
+ "zeno-fcis-authority",
+ "zeno-fcis-bootstrap",
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-evidence",
+ "zeno-fcis-laws",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
+ "zeno-fcis-shell",
+ "zeno-fcis-spec",
+ "zeno-fcis-transition",
+ "zeno-fcis-value",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -188,6 +280,29 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "withdrawal-queue"
+version = "0.0.0"
+dependencies = [
+ "zeno-fcis-authority",
+ "zeno-fcis-bootstrap",
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-evidence",
+ "zeno-fcis-laws",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
+ "zeno-fcis-shell",
+ "zeno-fcis-spec",
+ "zeno-fcis-transition",
+ "zeno-fcis-value",
+]
 
 [[package]]
 name = "zeno-fcis-authority"
@@ -362,6 +477,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeno-fcis-site-agent-treasury-guard"
+version = "0.0.0"
+dependencies = [
+ "agent-treasury-guard",
+ "zeno-fcis-site-common",
+]
+
+[[package]]
 name = "zeno-fcis-site-common"
 version = "0.0.0"
 dependencies = [
@@ -375,6 +498,38 @@ dependencies = [
  "zeno-fcis-shell",
  "zeno-fcis-spec",
  "zeno-fcis-value",
+]
+
+[[package]]
+name = "zeno-fcis-site-compliance-gateway"
+version = "0.0.0"
+dependencies = [
+ "compliance-gateway",
+ "zeno-fcis-site-common",
+]
+
+[[package]]
+name = "zeno-fcis-site-inventory-reservation"
+version = "0.0.0"
+dependencies = [
+ "inventory-reservation",
+ "zeno-fcis-site-common",
+]
+
+[[package]]
+name = "zeno-fcis-site-order-fulfillment"
+version = "0.0.0"
+dependencies = [
+ "order-fulfillment",
+ "zeno-fcis-site-common",
+]
+
+[[package]]
+name = "zeno-fcis-site-withdrawal-queue"
+version = "0.0.0"
+dependencies = [
+ "withdrawal-queue",
+ "zeno-fcis-site-common",
 ]
 
 [[package]]
