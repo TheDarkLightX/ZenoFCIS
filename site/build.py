@@ -218,6 +218,9 @@ def main() -> None:
     templates = tuple(args.only or TEMPLATES)
     environment = dict(os.environ)
     environment.setdefault("CARGO_INCREMENTAL", "0")
+    # The CLI and site are separate Cargo workspaces. Give both one absolute
+    # target directory, including when no caller supplied CARGO_TARGET_DIR.
+    environment["CARGO_TARGET_DIR"] = str(target_dir(environment))
     if "generate" in stages:
         executable = build_cli(environment)
         for template in TEMPLATES:
