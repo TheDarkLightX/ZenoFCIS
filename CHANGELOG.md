@@ -6,6 +6,15 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- `IdempotentDestination`, `MemoryDestination`, and `DeliveryCollision` move,
+  unchanged, from `zeno-fcis-shell-sqlite` to `zeno-fcis-shell`, the pure
+  reference model, where the in-memory destination needs only `alloc`. The
+  `std::error::Error` impl of `DeliveryCollision` is behind `zeno-fcis-shell`'s
+  `std` feature, which `zeno-fcis-shell-sqlite` enables. `zeno-fcis-shell-sqlite`
+  re-exports the three at their previous paths, so existing code and type
+  identities are unchanged, which a test checks by passing a value built
+  through the `zeno_fcis_shell_sqlite` path to a function that takes
+  `zeno_fcis_shell::MemoryDestination`.
 - The `account-lockout` template declares the range of each of its integer
   types in `project.zeno` (`Attempts in 0..=2`, `UnixTime in
   0..=4102444800`, and `LockDeadline in 0..=4102445700`), and its `build.rs`

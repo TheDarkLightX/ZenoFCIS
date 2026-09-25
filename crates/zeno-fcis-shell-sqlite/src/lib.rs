@@ -226,65 +226,11 @@ impl PendingDelivery {
     }
 }
 
-/// Idempotent destination boundary.
-pub trait IdempotentDestination {
-    /// Destination-specific failure type.
-    type Error: fmt::Display;
-
-    /// Delivers once by identity and returns the observed exact entry hash.
-    fn deliver(
-        &mut self,
-        delivery_id: Hash32,
-        entry_hash: Hash32,
-        entry: &OutboxEntry,
-    ) -> Result<Hash32, Self::Error>;
-}
-
-/// Deterministic destination stub that rejects identity/content collisions.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct MemoryDestination {
-    delivered: BTreeMap<Hash32, Hash32>,
-}
-
-impl MemoryDestination {
-    /// Returns the exact number of distinct delivered identities.
-    #[must_use]
-    pub fn delivered_count(&self) -> usize {
-        self.delivered.len()
-    }
-}
-
-/// Memory-destination collision failure.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct DeliveryCollision;
-
-impl fmt::Display for DeliveryCollision {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("delivery identity already binds different entry content")
-    }
-}
-
-impl std::error::Error for DeliveryCollision {}
-
-impl IdempotentDestination for MemoryDestination {
-    type Error = DeliveryCollision;
-
-    fn deliver(
-        &mut self,
-        delivery_id: Hash32,
-        entry_hash: Hash32,
-        _: &OutboxEntry,
-    ) -> Result<Hash32, Self::Error> {
-        match self.delivered.get(&delivery_id) {
-            Some(existing) if *existing != entry_hash => Err(DeliveryCollision),
-            Some(existing) => Ok(*existing),
-            None => {
-                self.delivered.insert(delivery_id, entry_hash);
-                Ok(entry_hash)
-            }
-        }
-    }
-}
+/// The idempotent destination contract, the in-memory destination, and its
+/// collision failure are defined in `zeno_fcis_shell`, the pure reference
+/// model. They are re-exported here, so their previous paths and their type
+/// identities hold.
+pub use zeno_fcis_shell::{DeliveryCollision, IdempotentDestination, MemoryDestination};
 
 /// Concrete SQLite shell pinned to one exact production authorization policy.
 pub struct SqliteShell<P, L, I>
@@ -1704,6 +1650,7 @@ impl std::error::Error for SqliteShellError {}
 
 #[cfg(test)]
 mod tests {
+    mod destination_tests;
     mod transaction_tests;
 
     use super::*;
