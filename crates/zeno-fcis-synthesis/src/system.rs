@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 use crate::finite::{Contract, Domain, Error, Program};
 
 /// A closed Boolean relation over a transition's inputs followed by its
-/// outputs, kept together with the equivalent synthesis [`Contract`].
+/// outputs, kept together with the equivalent relational [`Contract`].
 ///
 /// [`Contract`] does not expose its relation program, so this type retains the
 /// program for encoders such as SMT exporters while [`check_system_property`]
@@ -31,19 +31,25 @@ pub struct Property {
 impl Property {
     /// Validates `relation` as a Boolean relation over `inputs` then `outputs`.
     ///
+    /// Outputs must be nonempty and fit the [`Program`] output bound (16).
+    /// Inputs and outputs together must fit its input bound (32). The public
+    /// synthesis [`Contract::try_new`] retains its separate 16-input bound.
+    ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Contract::try_new`].
+    /// Returns [`Error::Invalid`] with `contract-shape` for an excessive field
+    /// count, empty outputs, mismatched relation domains, or a non-Boolean result.
     pub fn try_new(
         inputs: Vec<Domain>,
         outputs: Vec<Domain>,
         relation: Program,
     ) -> Result<Self, Error> {
-        let contract = Contract::try_new(inputs, outputs, relation.clone())?;
+        let contract = Contract::try_new_system_property(inputs, outputs, relation.clone())?;
         Ok(Self { contract, relation })
     }
 
-    /// Returns the equivalent contract.
+    /// Returns the equivalent relation for checking and canonical commitment.
+    /// Its input count may exceed the synthesis constructor's 16-field limit.
     #[must_use]
     pub const fn contract(&self) -> &Contract {
         &self.contract

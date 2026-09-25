@@ -1,0 +1,32 @@
+{
+  "status": "bounded source review; not release approval or independent audit",
+  "source_revision": "4a4092e9fd59dfd1ad5dba7c9c0a0006f6d26cdb",
+  "model_changed": false,
+  "parameters_changed": false,
+  "old_inventory_sha256": "6274610246a79d628336c327f91e3d7ab9c011af3083efcea0f28f13116ed834",
+  "new_inventory_sha256": "a1f5cff54181c1485d1ee68ad6d11ee88cac13b770b61155e34b595b35f8709b",
+  "changed_sources": {
+    "crates/zeno-fcis-synthesis/src/finite/mod.rs": "ae42bdc1b85b3a22ffb05218a6de66f012f8bbada2b09e23512c9b5fd7106022",
+    "crates/zeno-fcis-synthesis/src/system.rs": "e8b03b8cfc737a5374690f9ac223ab020f4c652dc8953bee79970fa5fdeeb05e",
+    "crates/zeno-fcis-formal-tools/src/system.rs": "3293a6639664400aa47b8a2bcbf1e564d17b87b680ca5d0062c5076a6ea98090"
+  },
+  "reviewed_boundaries": [
+    "System-property relation requires exact domain order, Boolean result, nonempty <=16 outputs and <=32 total fields. Program node/shape bounds remain unchanged.",
+    "Public synthesis Contract and Sketch retain 16-input caps. synthesize rejects wide Property contracts with schema-mismatch before enumeration. Downstream Contract consumers use checked dynamic domains and unchanged resource budgets.",
+    "Existing canonical commitments match three constants generated from unchanged baseline source. Shared finite module changes the source-bound synthesis checker identity intentionally.",
+    "SMT export includes highest input/output fields. Truncated and nonviolating models fail replay. Real pinned CVC5 agrees with exhaustive checking for valid, violating and nontotal wide programs.",
+    "Regenerated durable-counter and inventory-reservation synthesis manifests change only their source-bound certificate commitments. Their canonical programs, generated Rust, vectors, problem definitions, traces and contract hashes remain byte-identical."
+  ],
+  "inventory_changes": "No inventory entries or ranked hotspot cards changed; source-byte hashes and total byte count refreshed.",
+  "evidence": [
+    "crates/zeno-fcis-synthesis/tests/system_shape.rs",
+    "crates/zeno-fcis-formal-tools/src/system.rs",
+    "docs/SYSTEM_PROPERTIES.md"
+  ],
+  "residual_limits": [
+    "Solver UNSAT is not independently certificate-checked",
+    "Wide system properties do not enable wide synthesis",
+    "System relations require input plus output width <=32 even when a transition alone fits Program",
+    "Local full ATDD has a previously recorded macOS runtime qualification limitation"
+  ]
+}
