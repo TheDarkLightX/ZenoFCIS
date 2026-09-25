@@ -262,8 +262,8 @@ export async function mount(container, template) {
   const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
   // Shows each request in the form, then sends it. `instant` skips the pause
-  // between requests, and `label` is the status to end with.
-  async function runDemonstration({ instant = false, label = null } = {}) {
+  // between requests; `onLoad` says the run happened when the page loaded.
+  async function runDemonstration({ instant = false, onLoad = false } = {}) {
     setBusy(true);
     try {
       reset();
@@ -273,8 +273,8 @@ export async function mount(container, template) {
         send(step.request, step.note);
         if (!instant) await delay(STEP_DELAY_MS);
       }
-      status.textContent = label
-        ?? `The README's demonstration, decided in this browser: ${template.demonstration.length} requests. Compare the decisions with the README, or propose your own.`;
+      status.textContent = `The README's demonstration, decided in this browser${onLoad ? " when the page loaded" : ""}: `
+        + `${history.length} requests. Compare the decisions with the README, propose your own, or reset to genesis.`;
     } finally {
       setBusy(false);
     }

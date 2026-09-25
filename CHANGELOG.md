@@ -6,6 +6,13 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The demo site opens in a working state. The section that is open when the
+  page loads runs its README's demonstration at once, in the browser, and
+  labels the result in its status ("decided in this browser when the page
+  loaded"), so the first view shows the judge at work; the other sections
+  reset to their genesis when opened. `site/tests/deploy_check.py` requires
+  that of the served page: the label, the request count, and one timeline
+  entry per decision carrying the gate's decision.
 - The demo site runs every example application: order-fulfillment,
   inventory-reservation, compliance-gateway, withdrawal-queue, and
   agent-treasury-guard join account-lockout, each as a demo crate that names

@@ -16,8 +16,9 @@ printed:
    virtual-time budget is spent across module rounds: a single round
    finishes within a small budget, several do not;
 2. the page itself: the panel that is open when it loads must have loaded
-   its module and rendered its state, and no other panel's module may have
-   been fetched.
+   its module, run its README's demonstration, said so in its status, and
+   rendered one timeline entry per decision with the gate's decision on it;
+   no other panel's module may have been fetched.
 
 A page that loaded from the subpath alone is a page whose relative paths hold.
 
@@ -168,12 +169,26 @@ def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
                 f"{name}: the panel listed {result['proposals']} proposals, not {result['proposals_described']}")
 
 
+BADGES = {"Accept": "Accepted", "CommittedFailure": "Committed failure", "Reject": "Rejected"}
+
+
 def check_page(dom: str, first: str) -> None:
+    """The open section ran its README demonstration when the page loaded, and says so."""
+    expected = gate.EXAMPLE_TEMPLATES[first]
     status = element_text(dom, f"{first}-status")
-    require("Reset to the exact genesis" in status, f"the open panel did not load its module: status {status!r}")
+    require("decided in this browser when the page loaded" in status,
+            f"the open panel did not run its demonstration on load: status {status!r}")
+    require(f": {len(expected['decisions'])} requests" in status, f"the status does not count the requests: {status!r}")
     state = element_text(dom, f"{first}-state")
     require("Committed bundles" in state and "State root" in state, f"the open panel did not render its state: {state!r}")
     require("Reset to genesis" in dom, "the open panel's controls are missing")
+    badges = re.findall(r'<span class="badge [a-z]+">([^<]*)</span>', dom)
+    require(badges == [BADGES[decision] for decision in expected["decisions"]],
+            f"the timeline shows {badges}, not the gate's decisions")
+
+
+def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
+    printed = element_text(dom, "results")
 
 
 def main() -> None:
