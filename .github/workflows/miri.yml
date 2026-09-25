@@ -30,6 +30,7 @@ jobs:
           {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
           {"group": "synthesis-preparation", "packages": "-p zeno-fcis-synthesis", "target": "--test preparation"},
           {"group": "synthesis-search", "packages": "-p zeno-fcis-synthesis", "target": "--test search"},
+          {"group": "synthesis-system-shape", "packages": "-p zeno-fcis-synthesis", "target": "--test system_shape"},
           {"group": "synthesis-completion", "packages": "-p zeno-fcis-synthesis", "target": "--test completion"},
           {"group": "synthesis-graphs-00-to-03", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_00_to_03"},
           {"group": "synthesis-graphs-04-to-07", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_04_to_07"},
