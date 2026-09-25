@@ -248,6 +248,7 @@ def main() -> None:
             print("site: the browser check was skipped")
         else:
             chrome = ["--chrome", args.chrome] if args.chrome else []
+            run(["python3", str(SITE / "tests" / "test_browser.py"), *chrome], ROOT, environment)
             run(["python3", str(SITE / "tests" / "deploy_check.py"), *chrome, *templates], ROOT, environment)
     print(f"site: {', '.join(stage for stage in STAGES if stage in stages)}: done")
 

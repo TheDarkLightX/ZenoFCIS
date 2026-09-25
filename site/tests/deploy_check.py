@@ -3,18 +3,17 @@
 
 Serves site/public as `actions/upload-pages-artifact` uploads it, at a subpath
 (`/ZenoFCIS/` by default) of a local server that serves nothing at the root,
-and drives headless Chrome over it with `--dump-dom` under a virtual-time
-budget, which lets a page finish its fetches and timers before the DOM is
-printed:
+and drives headless Chrome through its DevTools pipe, waiting for the
+demonstration's completion state before reading the DOM, with a wall-clock
+timeout:
 
 1. the harness, site/tests/harness/, served beside the artifact, once per
    template: it imports the page's own panel and the template's description
    from the artifact, mounts the panel as the page does, runs the README's
    demonstration through it, and prints the results and what the panel
    rendered, which must match the gate's expected summary in
-   tools/check_generated_application.py. One template per dump, because the
-   virtual-time budget is spent across module rounds: a single round
-   finishes within a small budget, several do not;
+   tools/check_generated_application.py. One template per browser capture
+   keeps each result and failure attributable to that template;
 2. the page itself: the panel that is open when it loads must have loaded
    its module, run its README's demonstration, said so in its status, and
    rendered one timeline entry per decision with the gate's decision on it;
@@ -35,7 +34,6 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -58,10 +56,7 @@ CONTENT_TYPES = {
     ".wasm": "application/wasm",
     ".json": "application/json",
 }
-# Chrome prints the DOM once the budget is spent or the page is idle; the
-# budget is virtual time, so timers on the page cost nothing, and a budget
-# the page does not use costs nothing either.
-VIRTUAL_TIME_BUDGET_MS = 120_000
+BROWSER_TIMEOUT_MS = 120_000
 
 sys.path.insert(0, str(ROOT / "tools"))
 import check_generated_application as gate  # noqa: E402
@@ -109,13 +104,10 @@ def find_chrome(requested: str | None) -> str:
     raise DeployCheckError("no Chrome binary found; pass --chrome PATH")
 
 
-def dump_dom(chrome: str, profile: Path, url: str) -> str:
-    command = [chrome, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
-               "--disable-extensions", f"--user-data-dir={profile}",
-               f"--virtual-time-budget={VIRTUAL_TIME_BUDGET_MS}", "--dump-dom", url]
-    if os.geteuid() == 0:
-        command.insert(1, "--no-sandbox")
-    result = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False)
+def dump_dom(chrome: str, profile: Path, url: str, timeout_ms: int = BROWSER_TIMEOUT_MS) -> str:
+    command = ["node", str(ROOT / "site" / "tests" / "browser.mjs"), chrome,
+               str(profile), url, str(timeout_ms)]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=timeout_ms / 1000 + 15, check=False)
     if result.returncode != 0 or not result.stdout:
         raise DeployCheckError(f"chrome could not dump {url}: exit {result.returncode}: {result.stderr[-2000:]}")
     return result.stdout
