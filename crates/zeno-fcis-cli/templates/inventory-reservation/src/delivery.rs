@@ -4,7 +4,7 @@
 use std::{cell::RefCell, rc::Rc};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_plan::OutboxEntry;
-use zeno_fcis_shell_sqlite::{DeliveryCollision, IdempotentDestination, MemoryDestination};
+use zeno_fcis_shell::{DeliveryCollision, IdempotentDestination, MemoryDestination};
 
 #[derive(Clone, Default)]
 pub struct Destination(Rc<RefCell<MemoryDestination>>);

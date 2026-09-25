@@ -25,23 +25,31 @@ use generated::{
 };
 use laws::{GatewayLaws, NoExternalProofs};
 use program::GatewayProgram;
+#[cfg(feature = "sqlite")]
 use std::path::Path;
+#[cfg(feature = "sqlite")]
+use zeno_fcis_authority::AuthorizationDecodeLimits;
 use zeno_fcis_authority::{
-    AuthorizationDecodeLimits, CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding,
-    StateDomainBinding,
+    CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding, StateDomainBinding,
 };
-use zeno_fcis_codec::{CanonicalEncode, Domain};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_codec::CanonicalEncode;
+use zeno_fcis_codec::Domain;
+#[cfg(feature = "sqlite")]
 use zeno_fcis_core::Decision;
 use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
 use zeno_fcis_laws::{LawLimits, verify_project_laws};
 use zeno_fcis_patch::hash_value;
 use zeno_fcis_schema::ValidationLimits;
-use zeno_fcis_shell::CommitStatus;
-use zeno_fcis_shell_sqlite::{IdempotentDestination, SqliteShell};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell::{CommitStatus, IdempotentDestination};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell_sqlite::SqliteShell;
 use zeno_fcis_transition::TransitionLimits;
 
 pub type Authority =
     CatalogCommitAuthority<RustCryptoSha256, GatewayProgram, GatewayLaws, Destination>;
+#[cfg(feature = "sqlite")]
 pub type Shell = SqliteShell<GatewayProgram, GatewayLaws, Destination>;
 pub type AppResult<T> = Result<T, String>;
 
@@ -154,6 +162,7 @@ pub fn authority() -> AppResult<Authority> {
 /// # Errors
 ///
 /// The shell's refusal to create the database, rendered as text.
+#[cfg(feature = "sqlite")]
 pub fn create(path: &Path, authority: &Authority, destination: Destination) -> AppResult<Shell> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let initial = checked(
@@ -178,6 +187,7 @@ pub fn create(path: &Path, authority: &Authority, destination: Destination) -> A
 ///
 /// A request the schema does not admit, a decision a law refuses, or a
 /// publication or replay the shell refuses, each rendered as text.
+#[cfg(feature = "sqlite")]
 pub fn invoke(
     shell: &mut Shell,
     authority: &Authority,
@@ -237,6 +247,7 @@ pub fn invoke(
 ///
 /// Any step whose outcome, standing, outbox, or delivery count differs from
 /// the story above, rendered as text.
+#[cfg(feature = "sqlite")]
 pub fn journey(path: &Path) -> AppResult<String> {
     let authority = authority()?;
     let mut destination = Destination::default();

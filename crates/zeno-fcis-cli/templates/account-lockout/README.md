@@ -299,7 +299,11 @@ program, checker, and policy hashes derived from it, changed with it: as the
 note below says, a database created by the previous version cannot be
 carried over without a separately reviewed migration. The program, the
 reference model, the examples, and the schema's bounds are unchanged, and the
-demonstration prints the same summary.
+demonstration prints the same summary. Putting the SQLite shell behind the
+`sqlite` feature then changed `Cargo.toml`, `src/lib.rs`, and `src/delivery.rs`,
+which the source hash also covers, so the source, program, checker, and policy
+hashes changed once more; `project.zeno` did not, so the semantic program hash in step 1
+stands.
 
 ## Run this development candidate
 
@@ -320,6 +324,13 @@ With these development dependencies available in a standalone checkout:
 cargo +1.97.1 test --locked
 cargo +1.97.1 run --locked -- new-account.sqlite
 ```
+
+The SQLite shell is the `sqlite` feature, on by default. Without it,
+`cargo +1.97.1 build --no-default-features` builds the core alone: the
+generated bindings, the program, the law checker, the profile, the delivery
+adapter, and `authority()`, with no database; the gate checks that it also
+compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
+binary need the feature.
 
 The demonstration requires a new database path. It locks the account, refuses
 logins during the lock, a stale clock, and an unlock without `admin`, lets a

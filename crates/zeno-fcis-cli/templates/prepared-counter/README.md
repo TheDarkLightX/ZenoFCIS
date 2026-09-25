@@ -39,3 +39,10 @@ sizes, eligible exits, chunk partitions, cancellation, failed chunks, stale and
 competing operations, capacity rejection, replay and crash recovery. Exit claims
 assume the reviewed allowed context. They do not promise external delivery or
 fair scheduling. No intermediate checkpoint has publication authority.
+
+The SQLite shell is the `sqlite` feature, on by default. Without it,
+`cargo +1.97.1 build --no-default-features` builds the core alone: the
+generated bindings, the program, the law checker, the profile, the delivery
+adapter, and `authority()`, with no database; the gate checks that it also
+compiles for `wasm32-unknown-unknown`. `create`, `journey`, `prepare`, and the demonstration
+binary need the feature.

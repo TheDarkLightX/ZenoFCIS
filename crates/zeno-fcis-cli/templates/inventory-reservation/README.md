@@ -156,6 +156,13 @@ cargo +1.97.1 test --locked
 cargo +1.97.1 run --locked -- new-stock.sqlite
 ```
 
+The SQLite shell is the `sqlite` feature, on by default. Without it,
+`cargo +1.97.1 build --no-default-features` builds the core alone: the
+generated bindings, the program, the law checker, the profile, the delivery
+adapter, and `authority()`, with no database; the gate checks that it also
+compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
+binary need the feature.
+
 The demonstration requires a new database path. It restocks, reserves,
 releases, and ships, meeting every rejection reason along the way. It then
 interrupts shipment delivery, reopens the database, finishes delivery, and

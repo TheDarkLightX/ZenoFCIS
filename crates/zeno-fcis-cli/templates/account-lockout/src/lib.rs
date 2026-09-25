@@ -16,28 +16,36 @@ pub mod program;
 
 use bindings::GeneratedProject;
 use delivery::Destination;
-use generated::{
-    Account, AccountCommand, AdminFlag, Attempts, LockDeadline, RequestContext, UnixTime,
-};
+#[cfg(feature = "sqlite")]
+use generated::AccountCommand;
+use generated::{Account, AdminFlag, Attempts, LockDeadline, RequestContext, UnixTime};
 use laws::{AccountLaws, NoExternalProofs};
 use program::AccountProgram;
+#[cfg(feature = "sqlite")]
 use std::path::Path;
+#[cfg(feature = "sqlite")]
+use zeno_fcis_authority::AuthorizationDecodeLimits;
 use zeno_fcis_authority::{
-    AuthorizationDecodeLimits, CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding,
-    StateDomainBinding,
+    CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding, StateDomainBinding,
 };
-use zeno_fcis_codec::{CanonicalEncode, Domain};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_codec::CanonicalEncode;
+use zeno_fcis_codec::Domain;
+#[cfg(feature = "sqlite")]
 use zeno_fcis_core::Decision;
 use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
 use zeno_fcis_laws::{LawLimits, verify_project_laws};
 use zeno_fcis_patch::hash_value;
 use zeno_fcis_schema::ValidationLimits;
-use zeno_fcis_shell::CommitStatus;
-use zeno_fcis_shell_sqlite::{IdempotentDestination, SqliteShell};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell::{CommitStatus, IdempotentDestination};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell_sqlite::SqliteShell;
 use zeno_fcis_transition::TransitionLimits;
 
 pub type Authority =
     CatalogCommitAuthority<RustCryptoSha256, AccountProgram, AccountLaws, Destination>;
+#[cfg(feature = "sqlite")]
 pub type Shell = SqliteShell<AccountProgram, AccountLaws, Destination>;
 pub type AppResult<T> = Result<T, String>;
 
@@ -112,6 +120,7 @@ pub fn authority() -> AppResult<Authority> {
 }
 
 /// Creates the exact reviewed genesis. An existing database is rejected by the shell.
+#[cfg(feature = "sqlite")]
 pub fn create(path: &Path, authority: &Authority, destination: Destination) -> AppResult<Shell> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let initial = checked(
@@ -130,6 +139,7 @@ pub fn create(path: &Path, authority: &Authority, destination: Destination) -> A
 ///
 /// Local tutorial inputs: a deployment must authenticate the principal and the
 /// context, including the time and the administrator flag, before admission.
+#[cfg(feature = "sqlite")]
 pub fn invoke(
     shell: &mut Shell,
     authority: &Authority,
@@ -183,6 +193,7 @@ pub fn invoke(
 /// interrupts alert delivery, reopens the database, and finishes delivery.
 ///
 /// Returns a JSON summary.
+#[cfg(feature = "sqlite")]
 pub fn journey(path: &Path) -> AppResult<String> {
     let authority = authority()?;
     let mut destination = Destination::default();

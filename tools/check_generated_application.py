@@ -137,6 +137,10 @@ def exercise_rust_application(app: Path, directory: Path, package_roots: dict[st
     commands = [
         ["cargo", "+1.97.1", "fmt", "--all", "--", "--check"],
         ["cargo", "+1.97.1", "clippy", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"],
+        # The core without its SQLite shell must compile for the browser. Clippy
+        # rather than check, so that a half-gated import cannot land as a warning.
+        ["cargo", "+1.97.1", "clippy", "--lib", "--no-default-features", "--locked", "--offline",
+         "--target", "wasm32-unknown-unknown", "--", "-D", "warnings"],
         ["cargo", "+1.97.1", "test", "--locked", "--offline"],
     ]
     test_output = ""

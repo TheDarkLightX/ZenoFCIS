@@ -267,7 +267,10 @@ declared fields (`zeno-fcis check --require-substantive
 conformance test through the running application, a determinism probe, and the
 purity command for its decision code. `python3 tools/check_generated_application.py`
 creates, builds, and tests each template in this table as an isolated package
-against this checkout.
+against this checkout. Each application's core builds without its SQLite
+shell (`cargo build --no-default-features`), including for
+`wasm32-unknown-unknown`, which the same gate checks; `site/` runs the
+account-lockout example in the browser through that build.
 
 ## Authoring and checked synthesis
 

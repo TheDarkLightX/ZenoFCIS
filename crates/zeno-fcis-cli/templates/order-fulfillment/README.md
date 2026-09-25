@@ -164,6 +164,13 @@ cargo +1.97.1 test --locked
 cargo +1.97.1 run --locked -- new-order.sqlite
 ```
 
+The SQLite shell is the `sqlite` feature, on by default. Without it,
+`cargo +1.97.1 build --no-default-features` builds the core alone: the
+generated bindings, the program, the law checker, the profile, the delivery
+adapter, and `authority()`, with no database; the gate checks that it also
+compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
+binary need the feature.
+
 The demonstration requires a new database path. It declines one payment and
 refuses a late capture of it. After a second checkout, it refuses a late
 decline of the first attempt, a capture from the wrong caller, a repeated

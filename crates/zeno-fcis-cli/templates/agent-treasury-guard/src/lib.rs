@@ -25,22 +25,30 @@ use generated::{
 };
 use laws::{GuardLaws, NoExternalProofs};
 use program::GuardProgram;
+#[cfg(feature = "sqlite")]
 use std::path::Path;
+#[cfg(feature = "sqlite")]
+use zeno_fcis_authority::AuthorizationDecodeLimits;
 use zeno_fcis_authority::{
-    AuthorizationDecodeLimits, CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding,
-    StateDomainBinding,
+    CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding, StateDomainBinding,
 };
-use zeno_fcis_codec::{CanonicalEncode, Domain};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_codec::CanonicalEncode;
+use zeno_fcis_codec::Domain;
+#[cfg(feature = "sqlite")]
 use zeno_fcis_core::Decision;
 use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
 use zeno_fcis_laws::{LawLimits, verify_project_laws};
 use zeno_fcis_patch::hash_value;
 use zeno_fcis_schema::ValidationLimits;
-use zeno_fcis_shell::CommitStatus;
-use zeno_fcis_shell_sqlite::{IdempotentDestination, SqliteShell};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell::{CommitStatus, IdempotentDestination};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell_sqlite::SqliteShell;
 use zeno_fcis_transition::TransitionLimits;
 
 pub type Authority = CatalogCommitAuthority<RustCryptoSha256, GuardProgram, GuardLaws, Destination>;
+#[cfg(feature = "sqlite")]
 pub type Shell = SqliteShell<GuardProgram, GuardLaws, Destination>;
 pub type AppResult<T> = Result<T, String>;
 
@@ -219,6 +227,7 @@ pub fn authority() -> AppResult<Authority> {
 /// # Errors
 ///
 /// If the database exists, or the genesis is refused.
+#[cfg(feature = "sqlite")]
 pub fn create(path: &Path, authority: &Authority, destination: Destination) -> AppResult<Shell> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let initial = checked(
@@ -246,6 +255,7 @@ pub fn create(path: &Path, authority: &Authority, destination: Destination) -> A
 ///
 /// If the command or context is not admitted, the authority fails, or the
 /// shell cannot publish or replay the decision.
+#[cfg(feature = "sqlite")]
 pub fn invoke(
     shell: &mut Shell,
     authority: &Authority,
@@ -296,6 +306,7 @@ pub fn invoke(
 /// One step of the scripted agent: the tick, the caller, the model, the
 /// oracle price and its tick, the command, what happens in words, and the
 /// outcome the guard must reach.
+#[cfg(feature = "sqlite")]
 struct Step {
     now: i128,
     caller: Caller,
@@ -310,6 +321,7 @@ struct Step {
 /// A scripted stand-in for the agent over three days. No model is called and
 /// no network is used: a real agent's proposal becomes the same command, and
 /// the shell supplies the context. The script is a table, one line per step.
+#[cfg(feature = "sqlite")]
 #[allow(clippy::too_many_lines)]
 fn script() -> Vec<Step> {
     use Caller::{Agent, Dex};
@@ -572,6 +584,7 @@ fn script() -> Vec<Step> {
 /// # Errors
 ///
 /// If any step ends other than as scripted, or the delivery does not finish.
+#[cfg(feature = "sqlite")]
 pub fn journey(path: &Path) -> AppResult<String> {
     let authority = authority()?;
     let mut destination = Destination::default();

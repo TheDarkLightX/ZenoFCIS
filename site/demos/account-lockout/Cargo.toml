@@ -1,0 +1,25 @@
+[package]
+name = "zeno-fcis-site-account-lockout"
+description = "The account-lockout example's unchanged authority in the browser, over an in-memory shell"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The template as `zeno-fcis new` shipped it, without its SQLite shell.
+account-lockout = { path = "../../apps/account-lockout", default-features = false }
+serde_json = "=1.0.151"
+zeno-fcis-authority = "=1.1.0"
+zeno-fcis-codec = "=1.1.0"
+zeno-fcis-core = "=1.1.0"
+zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
+zeno-fcis-laws = "=1.1.0"
+zeno-fcis-schema = "=1.1.0"
+zeno-fcis-shell = "=1.1.0"
+
+[lints]
+workspace = true
