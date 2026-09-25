@@ -2,8 +2,8 @@
 #
 # Provenance: drafted on 2026-09-24 from the rules in README.md by the AI
 # agent that wrote the program, the controller model, and the law checker, so
-# the drafting was not blind to the code. Review by the project's owner:
-# pending.
+# the drafting was not blind to the code. Reviewed and accepted by the
+# project's owner on 2026-09-24.
 #
 # Numeric IDs come from project.zeno:
 # - state fields 120 balance, 121 lane_a, 122 amount_a, 123 lane_b,
