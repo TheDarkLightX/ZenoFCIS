@@ -36,18 +36,27 @@ the shared shape described here. The Pages workflow publishes only from
   types, its exact genesis, and the mapping from the page's request to the
   template's typed command and context, in the README's words, and exports
   the module's `demo_reset`.
-- `public/`: the page, and the Pages artifact. `index.html` holds the landing
-  text and one `<details>` section per example with the README's wording;
-  `site.js` builds a section's panel when the section opens, loading
-  `templates/<template>.js`, the example's description (its state fields, its
-  context and commands in the README's words, the README's demonstration, and
-  the demonstration's end in the gate's fields), and `<template>.wasm`;
-  `panel.js` is the shared panel: the forms, the timeline of decisions with
-  the laws evaluated for each, the state, the outbox, and, for a template
-  that describes one, a scripted proposer's list (the treasury guard's
-  agent); `demo-module.js` is the loader. The built modules land here and are
-  not committed. The page fetches its modules relative to its own scripts, so
-  it works from any path it is served at.
+- `public/`: the page, and the Pages artifact. `index.html` holds the
+  opening (the title, a diagram of proposer, judge, and shell, and a
+  collapsed "How this page works"), a row of tabs that chooses an example,
+  and one section per example with the README's wording, shown one at a
+  time; `site.js` runs the tabs and builds a section's panel the first time
+  it is chosen, loading `templates/<template>.js`, the example's description
+  (its state fields with plain labels, its context and commands in the
+  README's words grouped as the page shows them, its reasons in plain words,
+  the README's demonstration, and the demonstration's end in the gate's
+  fields), and `<template>.wasm`; `panel.js` is the shared panel: the
+  controls, the latest decision in plain words, the state, the outbox, the
+  history of decisions with a technical record for each (the request as
+  sent, the reason's code, the authorization or rejection hash, the bundle
+  and its replay check, and the laws evaluated with their statuses), and,
+  for a template that describes one, a scripted proposer's list (the
+  treasury guard's agent); `demo-module.js` is the loader. Hashes are shown
+  by their first twelve hex digits, with the full value a button away. The
+  built modules land here and are not committed. The page fetches its
+  modules relative to its own scripts, so it works from any path it is
+  served at, and it loads no font, script, style, or image from another
+  origin.
 - `tests/abi.mjs`: checks the built modules expose only the safe scalar
   functions, with private memory, and enforce the request and session bounds.
 - `tests/replay.mjs`, with `tests/examples.mjs` and
@@ -118,26 +127,40 @@ expected summary in `tools/check_generated_application.py`, and checks that
 bad input is refused before any decision. Nothing delivers in the page, so
 the entries the gate's shell delivered are the entries left pending here.
 
-`tests/deploy_check.py` serves `site/public` exactly as the workflow uploads
-it, at `/ZenoFCIS/` on a local server that serves nothing at the root, and
-drives headless Chrome through a DevTools pipe, waiting for the demonstration's
-completion state before capturing the DOM, with a 120-second wall-clock timeout.
-This also waits for asynchronous WebAssembly compilation on slower CI hosts.
-The browser runner's tests require a delayed result to complete and a page
-that stays pending to fail. A harness page, served beside the artifact and not part of it, is captured once
-per template: it imports the artifact's own panel and the template's
+`tests/deploy_check.py` first reads the page files: `index.html` must show
+exactly one example on load, no page file may load a resource from another
+origin, and every text and background pair the page uses must have WCAG AA
+contrast in both of the stylesheet's themes. It then serves `site/public` exactly
+as the workflow uploads it, at `/ZenoFCIS/` on a local server that serves
+nothing at the root, and drives headless Chrome through a DevTools pipe,
+waiting for the demonstration's completion state before capturing the DOM,
+with a 120-second wall-clock timeout. This also waits for asynchronous
+WebAssembly compilation on slower CI hosts. The browser runner's tests
+require a delayed result to complete and a page that stays pending to fail.
+A harness page, served beside the artifact and not part of it, is captured
+once per template: it imports the artifact's own panel and the template's
 description, mounts the panel as the page does, runs the README's
 demonstration through it, and prints the results and what the panel
-rendered, which must match the gate's summary, one timeline entry per
-decision, and the proposer's list where the template describes one. The page
-itself must have loaded the module of the section that is open on load, run
-that README's demonstration, said so in its status, rendered one timeline
-entry per decision with the gate's decision on it, and fetched no other
-module; and, loaded in a viewport-sized frame (`tests/harness/viewport.html`),
-it must have stayed at its top with its banner in view, since a timeline
-entry scrolls into view only when the viewer caused it. A page that loaded
-from the subpath alone is a page whose relative paths hold. Each template has
-its own browser capture so that a failure identifies the template involved.
+rendered, which must match the gate's summary, one history entry per
+decision, the last decision's verdict in the latest-decision box, the
+module's full value behind every hash the panel shows by its prefix, and the
+proposer's list where the template describes one. The harness then starts
+the panel over, enters each demonstration step into the form, and clicks
+its button: every control must send exactly the request the script sends,
+and reach the script's decision. The page itself must have loaded the module
+of the example shown on load, run that README's demonstration, said so in
+its status, rendered one history entry per decision with the gate's decision
+on it and the last one in its latest-decision box, shown no other example,
+and fetched no other module; and, loaded in a frame of the same origin
+(`tests/harness/viewport.html`) at 1280 by 800 and at a phone's 390 by 844,
+it must have stayed at its top with its title in view, since the latest
+decision scrolls into view only when the viewer caused it, and its document
+must be no wider than the frame. Every request the browser made, as the
+DevTools pipe reports them, must be for the subpath or the harness; Chrome's
+own probe for `/favicon.ico` at the origin's root, which the server refuses,
+is the one exception. A page that loaded from the subpath alone is a page
+whose relative paths hold. Each template has its own browser capture so that
+a failure identifies the template involved.
 
 The strength of what each template itself checks is stated in its README and
 repeated in its section of the page, in the README's own scoped words: laws
@@ -166,9 +189,11 @@ once this work is on `main`, which is also the only branch Pages deploys from.
 
 ## Opening in a working state
 
-The section that is open when the page loads, account-lockout, runs its
+The example shown when the page loads, agent-treasury-guard, runs its
 README's demonstration at once and labels the result: its status says the
-demonstration was decided in this browser when the page loaded, and the
-timeline holds one entry per decision, so the first view shows the judge at
-work. Every other section resets to its genesis when it is opened, ready for
-the viewer's requests or its own demonstration button.
+demonstration was decided in this browser when the page loaded, the
+latest-decision box shows the last decision, and the history holds one entry
+per decision, so the first view shows the judge at work. Every other example
+starts at its genesis when it is first chosen, ready for the viewer's
+requests or its own demonstration button, and keeps its state when the
+viewer chooses another example and comes back.

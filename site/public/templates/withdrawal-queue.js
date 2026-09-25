@@ -1,43 +1,69 @@
-// The withdrawal-queue example, as the page presents it: its state fields,
-// the context and commands in the README's words, and the README's scripted
-// demonstration: the sixteen commands that `journey` in the template's
-// src/lib.rs makes, with the decision each expects. The interrupted delivery
-// and the database reopen that follow them need the SQLite shell and are
-// not part of the page.
+// The withdrawal-queue example, as the page presents it: its state fields
+// with plain labels, the context and commands in the README's words, the
+// reasons in plain words, and the README's scripted demonstration: the
+// sixteen commands that `journey` in the template's src/lib.rs makes, with
+// the decision each expects. The interrupted delivery and the database
+// reopen that follow them need the SQLite shell and are not part of the page.
 
-const amount = { name: "amount", label: "Amount (1 or 2)", kind: "integer", min: 1, max: 2, initial: 2 };
+const amount = { name: "amount", label: "Amount", hint: "1 or 2", kind: "integer", min: 1, max: 2, initial: 2 };
 
 const deposit = (units, caller, expect, note) => ({ request: { command: "Deposit", amount: units, caller, alarm: false }, expect, note });
 const request = (lane, units, caller, expect, note) => ({ request: { command: "RequestWithdrawal", lane, amount: units, caller, alarm: false }, expect, note });
 const tick = (alarm, expect, note) => ({ request: { command: "Tick", caller: "Keeper", alarm }, expect, note });
+const CALLERS = { Operator: "the operator", OwnerA: "the owner of lane A", OwnerB: "the owner of lane B", Keeper: "the keeper" };
 
 export const template = {
   name: "withdrawal-queue",
-  fields: ["balance", "lane_a", "amount_a", "lane_b", "amount_b", "pause", "must_serve", "priority"],
+  fields: [
+    { name: "balance", label: "Balance" },
+    { name: "lane_a", label: "Lane A" },
+    { name: "amount_a", label: "Lane A's amount" },
+    { name: "lane_b", label: "Lane B" },
+    { name: "amount_b", label: "Lane B's amount" },
+    { name: "pause", label: "Pause ticks left" },
+    { name: "must_serve", label: "Must serve" },
+    { name: "priority", label: "Priority lane" },
+  ],
   help: "Deposit as the operator, request a withdrawal as a lane's owner, then tick as the keeper. Raise the alarm and keep ticking: an honored alarm pauses payouts for its own tick and two more, then must-serve pays a due lane whatever the alarm says. A recorded request is paid within 8 ticks: delayed, never frozen.",
+  contextLegend: "The request's context",
   context: [
     { name: "caller", label: "Caller", kind: "choice", options: [["Operator", "Operator"], ["OwnerA", "Owner of lane A"], ["OwnerB", "Owner of lane B"], ["Keeper", "Keeper"]], initial: "Operator" },
     { name: "alarm", label: "Alarm raised", kind: "flag", initial: false },
   ],
-  commands: [
-    { name: "Deposit", label: "Deposit", fields: [amount] },
+  groups: [
     {
-      name: "RequestWithdrawal",
-      label: "Request a withdrawal",
-      fields: [
-        { name: "lane", label: "Lane", kind: "choice", options: [["A", "A"], ["B", "B"]], initial: "A" },
-        amount,
+      legend: "Deposit, or request a withdrawal from a lane",
+      commands: [
+        { name: "Deposit", label: "Deposit", fields: [amount] },
+        {
+          name: "RequestWithdrawal",
+          label: "Request a withdrawal",
+          fields: [
+            { name: "lane", label: "Lane", kind: "choice", options: [["A", "A"], ["B", "B"]], initial: "A" },
+            amount,
+          ],
+        },
       ],
     },
-    { name: "Tick", label: "Tick", fields: [] },
+    {
+      legend: "The keeper's tick",
+      commands: [{ name: "Tick", label: "Tick", fields: [] }],
+    },
   ],
   genesis: "no balance, both lanes empty, no pause, lane A first, nothing queued",
   outbox: "Payout requests to settlement on channel 300 (payout), with the paid lane and amount. Nothing delivers in this page, so each stays pending with its delivery identity.",
   describe: (request) => {
+    const who = CALLERS[request.caller] ?? request.caller;
     const alarm = request.alarm ? ", alarm raised" : "";
-    if (request.command === "Deposit") return `Deposit ${request.amount} from ${request.caller}${alarm}`;
-    if (request.command === "RequestWithdrawal") return `RequestWithdrawal on lane ${request.lane} for ${request.amount} from ${request.caller}${alarm}`;
-    return `Tick from ${request.caller}${alarm}`;
+    if (request.command === "Deposit") return `Deposit ${request.amount}, from ${who}${alarm}`;
+    if (request.command === "RequestWithdrawal") return `Request ${request.amount} from lane ${request.lane}, by ${who}${alarm}`;
+    return `Tick, from ${who}${alarm}`;
+  },
+  reasons: {
+    wrong_caller: "this caller may not send that command",
+    lane_occupied: "the lane already holds a request",
+    insufficient_balance: "the amount exceeds the unreserved balance",
+    over_capacity: "the vault would hold more than 4",
   },
   demonstration: [
     deposit(2, "Operator", "Accept", "the operator deposits 2"),
