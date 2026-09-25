@@ -51,6 +51,8 @@ export const template = {
       ],
     },
   ],
+  // Enumerated values in plain words; the raw value stays in the technical record.
+  values: { status: { Placed: "placed", AwaitingPayment: "awaiting payment", Paid: "paid", Shipped: "shipped", Delivered: "delivered", Cancelled: "cancelled" } },
   genesis: "Placed, with no payment attempt, nothing queued",
   outbox: "Payment requests to payment-provider on channel 300 (payment_request), numbered with the attempt, and shipping requests to carrier on channel 301 (shipping_request). Nothing delivers in this page, so each stays pending with its delivery identity.",
   describe: (request) => `${LABELS[request.command] ?? request.command}${request.callback_attempt === undefined ? "" : ` for attempt ${request.callback_attempt}`}, from ${CALLERS[request.caller] ?? request.caller}`,

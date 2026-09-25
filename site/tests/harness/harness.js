@@ -91,7 +91,8 @@ function checkSession(container, panel, template, describeRefusal) {
   for (const [key, value] of Object.entries(step.request)) {
     if (key === "command") continue;
     const input = container.querySelector(`.controls [name="${key}"]`);
-    if (input.type === "checkbox") input.checked = Boolean(value);
+    if (input === null) problems.push({ missing: key });
+    else if (input.type === "checkbox") input.checked = Boolean(value);
     else input.value = String(value);
   }
   const button = container.querySelector(`.controls button[data-command="${step.request.command}"]`);
@@ -125,6 +126,68 @@ function checkSession(container, panel, template, describeRefusal) {
   return { sent, session: shown, problems };
 }
 
+// A refusal is worded by the stage that refused: input, admission, and
+// authority before any decision, with nothing changed; the commit step after
+// the authority authorized the decision, which may already have been saved;
+// and a reply too large to read after a decision may have executed. The last
+// two never claim a rollback and end the session. Synthetic reports cover
+// every stage; then two requests the module itself refuses, one with a field
+// the command does not read and one with a value outside its range, must
+// render as refused before any decision.
+function checkRefusals(container, panel, template, describeRefusal) {
+  const problems = [];
+  let checked = 0;
+  const expect = (stage, error, tests) => {
+    checked += 1;
+    const described = describeRefusal({ error, stage });
+    const text = `${described.text} ${described.detail ?? ""}`;
+    for (const [name, test] of Object.entries(tests)) {
+      if (!test(text, described)) problems.push({ stage, error, failed: name, text });
+    }
+  };
+  const before = {
+    beforeAnyDecision: (text) => /before any decision/.test(text),
+    nothingChanged: (text) => /[Nn]othing changed/.test(text),
+    continues: (text, described) => described.ends === false,
+  };
+  const after = {
+    notBeforeAnyDecision: (text) => !/before any decision/.test(text),
+    noRollback: (text) => !/rolled back|nothing happened|did not happen|was not executed|nothing changed/i.test(text),
+    startOver: (text) => /[Ss]tart(ing)? over/.test(text),
+    ends: (text, described) => described.ends === true,
+  };
+  expect("input", 'unexpected field "direction"', before);
+  expect("admission", "IntegerRange", before);
+  expect("authority", "InvocationRefused", before);
+  expect("commit", "exact replay was not idempotent", { ...after,
+    afterAuthorized: (text) => /after the authority authorized/.test(text),
+    maySaved: (text) => /may already have been saved/.test(text) });
+  expect("commit", "the shell was consumed by a failed publication; reset the demo", after);
+  expect("transport", "report capacity exceeded; a decision may have executed; reset required", { ...after,
+    mayHaveRun: (text) => /may have (executed|run)/.test(text),
+    cannotShow: (text) => /cannot show/.test(text) });
+  panel.reset();
+  const step = template.demonstration[0];
+  const shown = (report, stage) => {
+    checked += 1;
+    const latest = container.querySelector(".latest").textContent;
+    const state = panel.state();
+    if (report.stage !== stage || !/before any decision/.test(latest) || !/Nothing changed/.test(latest) || state.steps !== 0) {
+      problems.push({ stage, report, latest: latest.slice(0, 200), steps: state.steps });
+    }
+  };
+  shown(panel.send({ ...step.request, unexpected: 1 }), "input");
+  const integers = template.context.filter((field) => field.kind === "integer");
+  const range = template.demonstration
+    .map((candidate) => ({ candidate, field: [...template.groups.flatMap((group) => group.commands)
+      .find((command) => command.name === candidate.request.command)?.fields ?? [], ...integers]
+      .find((field) => field.kind === "integer") }))
+    .find(({ field }) => field !== undefined);
+  if (range) shown(panel.send({ ...range.candidate.request, [range.field.name]: range.field.max + 1 }), "admission");
+  else problems.push({ missing: "no integer field to push out of range" });
+  return { checked, problems };
+}
+
 for (const name of names) {
   try {
     const { mount, describeRefusal } = await import(new URL("panel.js", base));
@@ -151,6 +214,7 @@ for (const name of names) {
       hashes: checkHashes(container, history, state),
       controls: checkControls(container, panel, template),
       session: checkSession(container, panel, template, describeRefusal),
+      refusals: checkRefusals(container, panel, template, describeRefusal),
       errors: [],
     };
   } catch (error) {

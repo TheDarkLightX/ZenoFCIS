@@ -65,6 +65,8 @@ export const template = {
       ],
     },
   ],
+  // Enumerated values in plain words; the raw value stays in the technical record.
+  values: { pending: { NoSwap: "none", PendingBuy: "a buy outstanding", PendingSell: "a sell outstanding" } },
   genesis: "6 quote, 1 base, nothing spent, tick 0, no swap outstanding, nothing queued",
   outbox: "Swap requests to zenodex on channel 300 (swap_request), shaped after ZenoDEX's SwapIntent: the intent number, the assets in and out, the amount in, the least amount out, and the deadline. Nothing delivers in this page, so each stays pending with its delivery identity.",
   // The scripted agent's proposals, shown on their own: the guard refuses

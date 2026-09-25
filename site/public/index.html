@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ZenoFCIS in the browser</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
@@ -77,7 +78,11 @@
           the 64th, "Start over" begins a fresh session at the genesis. Were a
           reply ever too large for the page to read, the page would say that a
           decision may have executed and that starting over is required; it
-          never claims that a decision was undone.
+          never claims that a decision was undone. A request the schema or the
+          authority refuses is refused before any decision and changes
+          nothing; were the commit step ever to fail after a decision was
+          authorized, the page would say that the decision may already have
+          been saved and that starting over is required.
         </p>
         <p>
           The first example's module was fetched and its README's

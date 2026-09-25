@@ -11,6 +11,7 @@ const deposit = (units, caller, expect, note) => ({ request: { command: "Deposit
 const request = (lane, units, caller, expect, note) => ({ request: { command: "RequestWithdrawal", lane, amount: units, caller, alarm: false }, expect, note });
 const tick = (alarm, expect, note) => ({ request: { command: "Tick", caller: "Keeper", alarm }, expect, note });
 const CALLERS = { Operator: "the operator", OwnerA: "the owner of lane A", OwnerB: "the owner of lane B", Keeper: "the keeper" };
+const LANE = { Empty: "empty", Arrived: "a request arrived", Pending: "a request pending" };
 
 export const template = {
   name: "withdrawal-queue",
@@ -50,6 +51,8 @@ export const template = {
       commands: [{ name: "Tick", label: "Tick", fields: [] }],
     },
   ],
+  // Enumerated values in plain words; the raw value stays in the technical record.
+  values: { lane_a: LANE, lane_b: LANE, priority: { A: "lane A", B: "lane B" }, must_serve: { true: "yes", false: "no" } },
   genesis: "no balance, both lanes empty, no pause, lane A first, nothing queued",
   outbox: "Payout requests to settlement on channel 300 (payout), with the paid lane and amount. Nothing delivers in this page, so each stays pending with its delivery identity.",
   describe: (request) => {
