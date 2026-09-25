@@ -43,6 +43,7 @@ component ID name { COMPONENT_ITEMS }
 wire COMPONENT.PORT -> COMPONENT.PORT;
 merge [COMPONENT, ...];
 law ID name = RELATIONAL_FORMULA;
+law ID name on any|accept|reject|failure|commit[, genesis] = RELATIONAL_FORMULA;
 claim ID name BACKEND MODE = FORMULA;
 claim ID name BACKEND inductive [assume [LAW, ...]] [accept [LAW, ...]] [failure [LAW, ...]] = STATE_FORMULA;
 ```
@@ -63,6 +64,20 @@ states other bounds. Inductive steps assume every declared range (see
 [inductive claims](INDUCTIVE_CLAIMS.md)). An `int` without a range still gets
 its bounds from the application's schema binding, which `project.zeno` does
 not see.
+
+A law may declare the decisions its runtime law manifest enforces it on:
+- `on accept`, `on reject`, or `on failure` (committed failures);
+- `on commit`, for accepts and committed failures;
+- `on any`, for every decision.
+
+`, genesis` marks a law that also constrains the genesis state. The scopes
+mirror the manifest's `DecisionScope` and `GenesisApplicability`. A declared
+scope is part of the project's meaning and of its canonical bytes; a law
+without one encodes exactly as before, and its scope is the manifest's alone.
+Elaboration refuses an inductive claim that assumes a law outside its declared
+scope (see [inductive claims](INDUCTIVE_CLAIMS.md)). A declared scope states
+what the manifest should enforce; it does not by itself show that the manifest
+does.
 
 Backends are `cvc5`, `z3`, `lean`, and
 `all`. Claim modes are `relational`, `finite N`, `unbounded`, and `inductive`.

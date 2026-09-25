@@ -44,6 +44,8 @@ Feature: Report evidence that cannot distinguish system behavior
     Then the step asserts that range for every observed value of that type, and lowering makes it the schema's bounds and refuses a binding that contradicts it
     And a half-open, reversed, or non-int range is refused, and a project that declares no range encodes as before
     And the authority checks every command, context, and initial state against its own schema, whatever hasher built the envelope
+    When a law declares the decisions it is enforced on
+    Then elaboration refuses a claim that assumes it outside that scope, and a law without a declared scope encodes as before
 
   @atdd-reserved-domains
   Scenario: Keep project commitment domains out of the library namespace

@@ -6,6 +6,19 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Declare the decisions a law is enforced on in `project.zeno`:
+  `law ID name on any|accept|reject|failure|commit[, genesis] = FORMULA;`.
+  - `LawDecl::applicability` returns the declared `LawScope` and genesis
+    flag, which mirror the law manifest's `DecisionScope` and
+    `GenesisApplicability`.
+  - A declared scope is part of the canonical project. A law without one keeps
+    its bytes; the pinned semantic hash of a project without scopes is
+    unchanged, and so is every shipped project's `check` output.
+  - Elaboration refuses an inductive claim that assumes a law on decisions its
+    declared scope does not cover. `LawManifest::check_step_assumptions` stays
+    required: a declared scope states what the manifest should enforce, not
+    that it does.
+
 - The demo site stays at its top after the demonstration decided on load: a
   timeline entry scrolls into view only when the viewer caused it, by a
   button or a demonstration they started. `site/tests/deploy_check.py`
