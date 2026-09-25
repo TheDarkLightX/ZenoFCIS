@@ -3,7 +3,10 @@
 
 In order:
 
-1. generate: `cargo +1.97.1 build -p zeno-fcis-cli`, then `zeno-fcis new
+1. generate: `cargo +1.97.1 fetch --locked` in the workspace, as the gate
+   does, so that every later cargo command can run offline against the
+   reviewed lock (the site's lock names the same external packages); then
+   `cargo +1.97.1 build -p zeno-fcis-cli`, then `zeno-fcis new
    site/apps/<template> --template <template>` for every template, so that
    the page runs each template exactly as the CLI ships it. An application
    whose files are unchanged is kept as it is.
@@ -86,6 +89,7 @@ def target_dir(environment: dict[str, str]) -> Path:
 
 
 def build_cli(environment: dict[str, str]) -> Path:
+    run(["cargo", "+1.97.1", "fetch", "--locked"], ROOT, environment)
     run(["cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline"], ROOT, environment)
     return target_dir(environment) / "debug" / "zeno-fcis"
 

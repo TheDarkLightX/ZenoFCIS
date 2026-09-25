@@ -6,6 +6,11 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- `site/build.py` runs `cargo +1.97.1 fetch --locked` in the workspace
+  before its offline cargo commands, as `tools/check_generated_application.py`
+  does, so that the Pages workflow builds on a fresh runner with no registry
+  cache; the site's lock names the same external packages as the reviewed
+  workspace lock, which the lock check requires.
 - The demo site opens in a working state. The section that is open when the
   page loads runs its README's demonstration at once, in the browser, and
   labels the result in its status ("decided in this browser when the page
