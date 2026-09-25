@@ -18,6 +18,9 @@ In order:
    copied to site/public/account-lockout.wasm, with the application's README
    beside it for the page to link.
 5. `node site/tests/replay.mjs`.
+6. `node --check` on every script in site/public/: the replay loads only the
+   module loader, so this is what catches a syntax error in the page's own
+   script before a browser does.
 
 Requirements: Rust 1.97.1 with the wasm32-unknown-unknown target, Node 22, and
 python3. CARGO_TARGET_DIR is honoured; the wasm32 artifacts go under its
@@ -167,6 +170,8 @@ def main() -> None:
     print(f"{MODULE.relative_to(ROOT)}: {len(module)} bytes, sha256 {hashlib.sha256(module).hexdigest()}, "
           "identical across two builds")
     run(["node", str(SITE / "tests" / "replay.mjs")], ROOT, environment)
+    for script in sorted((SITE / "public").glob("*.mjs")):
+        run(["node", "--check", str(script)], ROOT, environment)
     print("site: built and tested")
 
 

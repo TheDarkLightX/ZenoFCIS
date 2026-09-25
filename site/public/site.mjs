@@ -56,7 +56,7 @@ function renderState(state) {
   for (const entry of state.outbox) {
     const item = document.createElement("li");
     item.append(text("strong", `${entry.alert_kind}`), ` to ${entry.destination}, alert_until ${entry.alert_until}, channel ${entry.channel}. `);
-    item.append(text("span", `${entry.acknowledged ? "Acknowledged" : "Pending"}; delivery ${short(entry.delivery_id)}`, "hash"));
+    item.append(`${entry.acknowledged ? "Acknowledged" : "Pending"}; delivery `, text("span", short(entry.delivery_id), "hash"));
     outbox.append(item);
   }
 }
@@ -95,10 +95,12 @@ function renderReport(request, report) {
     const details = document.createElement("details");
     details.append(text("summary", `${report.laws.length} law${report.laws.length === 1 ? "" : "s"} evaluated`), laws);
     body.append(details);
-    const identity = report.authorization_id
-      ? `Authorization ${report.authorization_id}`
-      : `Rejection ${report.rejection_id}`;
-    body.append(text("span", identity, "transition hash"));
+    const [identityKind, identityHash] = report.authorization_id
+      ? ["Authorization", report.authorization_id]
+      : ["Rejection", report.rejection_id];
+    const identity = text("span", `${identityKind} `, "transition");
+    identity.append(text("span", identityHash, "hash"));
+    body.append(identity);
   }
   item.append(head, body);
   timeline.append(item);
