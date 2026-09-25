@@ -134,7 +134,10 @@ fn discovery_has_distinct_language_adapters_and_missing_tools_stay_unknown() {
         assert_eq!(failure.code, "tool-missing");
     }
 }
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 #[test]
 fn javascript_runner_refuses_an_unqualified_runtime_version() {
     use std::os::unix::fs::PermissionsExt;

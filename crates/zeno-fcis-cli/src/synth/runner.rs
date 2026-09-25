@@ -10,7 +10,10 @@ use std::{
 };
 use zeno_fcis_synthesis::finite::{Case, Contract};
 
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 use std::{
     ffi::OsStr,
     fs::OpenOptions,
@@ -19,9 +22,15 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 const MAX_OUTPUT: u64 = 32 * 1024 * 1024;
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 const TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(super) struct RunError {
@@ -373,7 +382,10 @@ fn recheck(path: &Path, identity: &Value) -> Result<(), RunError> {
 /// execution. The `NODE_` prefix covers `NODE_OPTIONS` preloads, `NODE_PATH`
 /// resolution, and every analogous Node switch, including later additions.
 /// Dynamic linker and library premises remain outside this scope.
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 const SCRUBBED: [&str; 7] = [
     "RUSTC_BOOTSTRAP",
     "RUSTFLAGS",
@@ -383,7 +395,10 @@ const SCRUBBED: [&str; 7] = [
     "PYTHONPATH",
     "PYTHONHOME",
 ];
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 fn scrubbed(key: &OsStr) -> bool {
     let key = key.as_encoded_bytes();
     key.starts_with(b"NODE_") || SCRUBBED.iter().any(|name| name.as_bytes() == key)
@@ -404,7 +419,13 @@ fn write_source(path: &Path, source: &str) -> Result<(), RunError> {
 pub(super) struct Temp(PathBuf);
 impl Temp {
     /// Owned 0700 directory for tests that need a disposable executable.
-    #[cfg(all(test, target_os = "linux", not(target_env = "uclibc")))]
+    #[cfg(all(
+        test,
+        any(
+            target_os = "macos",
+            all(target_os = "linux", not(target_env = "uclibc"))
+        )
+    ))]
     pub(super) fn path(&self) -> &Path {
         &self.0
     }
@@ -437,17 +458,100 @@ impl Drop for Temp {
 }
 
 fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<Vec<u8>, RunError> {
-    #[cfg(not(all(target_os = "linux", not(target_env = "uclibc"))))]
+    #[cfg(not(any(
+        target_os = "macos",
+        all(target_os = "linux", not(target_env = "uclibc"))
+    )))]
     {
         let _ = (path, args, input, cwd);
         Err(error(
             "unsupported-runtime-platform",
-            "target execution currently requires Linux waitid and process-group cleanup",
+            "target execution requires Linux or macOS process-group cleanup",
         ))
     }
-    #[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+    #[cfg(any(
+        target_os = "macos",
+        all(target_os = "linux", not(target_env = "uclibc"))
+    ))]
+    execute_with_limits(path, args, input, cwd, TIMEOUT, MAX_OUTPUT)
+}
+
+/// Darwin can return EPERM when a group contains only zombies. Keep an owned
+/// live member until cleanup instead of forgiving an ambiguous permission error.
+/// The pipe stays open in Child; if this parent dies, EOF also ends the helper.
+#[cfg(target_os = "macos")]
+struct GroupAnchor(std::process::Child);
+
+#[cfg(target_os = "macos")]
+impl GroupAnchor {
+    fn new(cwd: &Path) -> Result<Self, RunError> {
+        use std::os::unix::process::CommandExt;
+        Command::new("/bin/cat")
+            .env_clear()
+            .current_dir(cwd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .map(Self)
+            .map_err(|e| error("tool-start", e))
+    }
+
+    fn pid(&self) -> Result<i32, RunError> {
+        i32::try_from(self.0.id()).map_err(|_| error("tool-pid", "PID overflow"))
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Drop for GroupAnchor {
+    fn drop(&mut self) {
+        // Also covers failures before the target is spawned. The anchor remains
+        // unreaped until the target group has been signalled by the caller.
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+fn child_exited(child: &mut std::process::Child) -> Result<bool, RunError> {
+    use nix::{
+        sys::wait::{Id, WaitPidFlag, WaitStatus, waitid},
+        unistd::Pid,
+    };
+    let pid = i32::try_from(child.id()).map_err(|_| error("tool-pid", "PID overflow"))?;
+    match waitid(
+        Id::Pid(Pid::from_raw(pid)),
+        WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT,
+    ) {
+        Ok(WaitStatus::StillAlive) => Ok(false),
+        Ok(WaitStatus::Exited(..) | WaitStatus::Signaled(..)) => Ok(true),
+        Ok(_) => Err(error("tool-wait", "unexpected child status")),
+        Err(nix::errno::Errno::EINTR) => Ok(false),
+        Err(err) => Err(error("tool-wait", err)),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn child_exited(child: &mut std::process::Child) -> Result<bool, RunError> {
+    // Reaping the target is safe here: the separate, live group anchor owns
+    // the group identity until cleanup. Child caches the real exit status.
+    child.try_wait().map(|status| status.is_some()).map_err(io)
+}
+
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
+fn execute_with_limits(
+    path: &Path,
+    args: &[OsString],
+    input: &[u8],
+    cwd: &Path,
+    timeout: Duration,
+    max_output: u64,
+) -> Result<Vec<u8>, RunError> {
     {
-        use nix::sys::wait::{Id, WaitPidFlag, WaitStatus, waitid};
         use nix::{
             sys::signal::{Signal, killpg},
             unistd::Pid,
@@ -474,6 +578,12 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
             .create_new(true)
             .open(&stderr)
             .map_err(io)?;
+        #[cfg(target_os = "macos")]
+        let anchor = GroupAnchor::new(cwd)?;
+        #[cfg(target_os = "macos")]
+        let group_id = anchor.pid()?;
+        #[cfg(not(target_os = "macos"))]
+        let group_id = 0;
         let mut command = Command::new(path);
         command
             .args(args)
@@ -481,7 +591,7 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
             .stdin(Stdio::from(File::open(&stdin).map_err(io)?))
             .stdout(Stdio::from(out))
             .stderr(Stdio::from(err))
-            .process_group(0);
+            .process_group(group_id);
         for (key, _) in std::env::vars_os() {
             if scrubbed(&key) {
                 command.env_remove(&key);
@@ -489,6 +599,7 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
         }
         command.env("LC_ALL", "C");
         let mut child = command.spawn().map_err(|e| error("tool-start", e))?;
+        #[cfg(not(target_os = "macos"))]
         let pid = match i32::try_from(child.id()) {
             Ok(pid) => Pid::from_raw(pid),
             Err(_) => {
@@ -498,43 +609,47 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
             }
         };
         let started = Instant::now();
-        // Observe exit without reaping, so the owned group ID cannot be reused
-        // before descendants are terminated. Reap only after group cleanup.
+        // Linux keeps the target unreaped; macOS keeps the anchor unreaped.
+        // In both cases the owned group identity is reserved through cleanup.
         let terminal = loop {
             let too_large = fs::metadata(&stdout)
-                .map(|m| m.len() > MAX_OUTPUT)
+                .map(|m| m.len() > max_output)
                 .unwrap_or(true)
                 || fs::metadata(&stderr)
-                    .map(|m| m.len() > MAX_OUTPUT)
+                    .map(|m| m.len() > max_output)
                     .unwrap_or(true);
             if too_large {
-                break Err(error("output-limit", MAX_OUTPUT));
+                break Err(error("output-limit", max_output));
             }
-            if started.elapsed() > TIMEOUT {
-                break Err(error("timeout", "30-second target operation limit"));
+            if started.elapsed() > timeout {
+                break Err(error(
+                    "timeout",
+                    format!("{timeout:?} target operation limit"),
+                ));
             }
-            match waitid(
-                Id::Pid(pid),
-                WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT,
-            ) {
-                Ok(WaitStatus::StillAlive) => std::thread::sleep(Duration::from_millis(5)),
-                Ok(status) => break Ok(status),
-                Err(err) => break Err(error("tool-wait", err)),
+            match child_exited(&mut child) {
+                Ok(false) => std::thread::sleep(Duration::from_millis(5)),
+                Ok(true) => break Ok(()),
+                Err(err) => break Err(err),
             }
         };
-        let cleanup = killpg(pid, Signal::SIGKILL);
+        #[cfg(target_os = "macos")]
+        let group = Pid::from_raw(group_id);
+        #[cfg(not(target_os = "macos"))]
+        let group = pid;
+        let cleanup = killpg(group, Signal::SIGKILL);
         let _ = child.kill();
         let reaped = child.wait();
-        let status = terminal?;
+        terminal?;
         if let Err(err) = cleanup
             && err != nix::errno::Errno::ESRCH
         {
             return Err(error("tool-cleanup", err));
         }
-        reaped.map_err(io)?;
-        let output = read_output(&stdout, MAX_OUTPUT)?;
-        let diagnostics = read_output(&stderr, MAX_OUTPUT)?;
-        if !matches!(status, WaitStatus::Exited(_, 0)) {
+        let status = reaped.map_err(io)?;
+        let output = read_output(&stdout, max_output)?;
+        let diagnostics = read_output(&stderr, max_output)?;
+        if !status.success() {
             return Err(error(
                 "tool-exit",
                 format!("{status:?}: {}", String::from_utf8_lossy(&diagnostics)),
@@ -544,7 +659,10 @@ fn execute(path: &Path, args: &[OsString], input: &[u8], cwd: &Path) -> Result<V
     }
 }
 
-#[cfg(all(target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", not(target_env = "uclibc"))
+))]
 fn read_output(path: &Path, limit: u64) -> Result<Vec<u8>, RunError> {
     let mut bytes = Vec::new();
     File::open(path)
@@ -558,10 +676,40 @@ fn read_output(path: &Path, limit: u64) -> Result<Vec<u8>, RunError> {
     Ok(bytes)
 }
 
-#[cfg(all(test, target_os = "linux", not(target_env = "uclibc")))]
+#[cfg(all(
+    test,
+    any(
+        target_os = "macos",
+        all(target_os = "linux", not(target_env = "uclibc"))
+    )
+))]
 mod process_tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
+
+    fn assert_not_running(pid: &str) {
+        assert!(pid.bytes().all(|byte| byte.is_ascii_digit()) && !pid.is_empty());
+        for _ in 0..100 {
+            let status = Command::new("/bin/ps")
+                .args(["-o", "stat=", "-p", pid])
+                .output()
+                .unwrap();
+            assert!(status.stderr.is_empty(), "ps failed: {status:?}");
+            if status.status.code() == Some(1) && status.stdout.is_empty() {
+                return;
+            }
+            assert!(status.status.success(), "ps failed: {status:?}");
+            if String::from_utf8(status.stdout)
+                .unwrap()
+                .trim()
+                .starts_with('Z')
+            {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        panic!("descendant {pid} survived process-group cleanup");
+    }
     #[test]
     fn inherited_node_switches_and_toolchain_overrides_cannot_reach_a_child() {
         // A NODE_OPTIONS preload would otherwise change both `node --version`
@@ -621,29 +769,72 @@ mod process_tests {
         )
         .unwrap_or_else(|e| panic!("{}", e.message));
         let pid = std::str::from_utf8(&bytes).unwrap().trim();
-        let mut running = true;
-        for _ in 0..100 {
-            running = fs::read_to_string(format!("/proc/{pid}/stat"))
-                .ok()
-                .is_some_and(|stat| {
-                    stat.rsplit_once(") ")
-                        .is_some_and(|(_, tail)| !tail.starts_with('Z'))
-                });
-            if !running {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(5));
-        }
-        assert!(!running, "descendant survived parent exit");
-        let result = execute(
+        assert_not_running(pid);
+        let result = execute_with_limits(
             Path::new("/bin/sh"),
-            &[
-                "-c".into(),
-                format!("truncate -s {} /proc/self/fd/1", MAX_OUTPUT + 1).into(),
-            ],
+            &["-c".into(), "printf '123456789'".into()],
             b"",
             &temp.0,
+            TIMEOUT,
+            8,
         );
         assert_eq!(result.err().unwrap().code, "output-limit");
+    }
+
+    #[test]
+    fn timeout_kills_parent_and_descendants_and_stderr_is_bounded() {
+        let temp = Temp::new().unwrap_or_else(|e| panic!("{}", e.message));
+        let result = execute_with_limits(
+            Path::new("/bin/sh"),
+            &["-c".into(), "sleep 30 & echo $! > child.pid; wait".into()],
+            b"",
+            &temp.0,
+            Duration::from_millis(250),
+            MAX_OUTPUT,
+        );
+        assert_eq!(result.err().unwrap().code, "timeout");
+        assert_not_running(fs::read_to_string(temp.0.join("child.pid")).unwrap().trim());
+        let result = execute_with_limits(
+            Path::new("/bin/sh"),
+            &["-c".into(), "printf '123456789' >&2".into()],
+            b"",
+            &temp.0,
+            TIMEOUT,
+            8,
+        );
+        assert_eq!(result.err().unwrap().code, "output-limit");
+    }
+
+    #[test]
+    fn fast_exits_preserve_status_and_input_with_group_identity_reserved() {
+        let temp = Temp::new().unwrap_or_else(|e| panic!("{}", e.message));
+        for _ in 0..32 {
+            assert_eq!(
+                execute(Path::new("/bin/cat"), &[], b"exact input\n", &temp.0)
+                    .unwrap_or_else(|e| panic!("{}", e.message)),
+                b"exact input\n"
+            );
+        }
+        for script in ["exit 7", "kill -TERM $$"] {
+            let result = execute(
+                Path::new("/bin/sh"),
+                &["-c".into(), script.into()],
+                b"",
+                &temp.0,
+            );
+            assert_eq!(result.err().unwrap().code, "tool-exit");
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn group_anchor_is_live_until_cleanup_and_reaped_on_drop() {
+        use nix::{errno::Errno, sys::wait::waitpid, unistd::Pid};
+        let temp = Temp::new().unwrap_or_else(|e| panic!("{}", e.message));
+        let mut anchor = GroupAnchor::new(&temp.0).unwrap_or_else(|e| panic!("{}", e.message));
+        let pid = Pid::from_raw(anchor.pid().unwrap_or_else(|e| panic!("{}", e.message)));
+        assert!(anchor.0.try_wait().unwrap().is_none());
+        drop(anchor);
+        assert_eq!(waitpid(pid, None), Err(Errno::ECHILD));
     }
 }

@@ -2466,11 +2466,20 @@ fn run_fixed_unix(
         })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(target_os = "macos")]
+    let anchor = MacProcessGroup::new(working_directory.path())?;
+    #[cfg(target_os = "macos")]
+    command.process_group(anchor.pid()?);
+    #[cfg(not(target_os = "macos"))]
     command.process_group(0);
     let child = command
         .spawn()
         .map_err(|error| ToolFailure::Io(error.to_string()))?;
-    let mut child = ContainedChild::new(child)?;
+    let mut child = ContainedChild::new(
+        child,
+        #[cfg(target_os = "macos")]
+        anchor,
+    )?;
     let stdout = child
         .child
         .stdout
@@ -2531,24 +2540,66 @@ impl Drop for PrivateWorkingDirectory {
     }
 }
 
+// Darwin can reject killpg on a zombie-only group with EPERM. A held stdin
+// pipe keeps this owned group leader live until cleanup, without forgiving
+// permission failures. It also reserves the group identity across try_wait.
+#[cfg(target_os = "macos")]
+struct MacProcessGroup(Child);
+#[cfg(target_os = "macos")]
+impl MacProcessGroup {
+    fn new(cwd: &Path) -> Result<Self, ToolFailure> {
+        use std::os::unix::process::CommandExt as _;
+        Command::new("/bin/cat")
+            .env_clear()
+            .current_dir(cwd)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .map(Self)
+            .map_err(|error| ToolFailure::Io(error.to_string()))
+    }
+    fn pid(&self) -> Result<i32, ToolFailure> {
+        i32::try_from(self.0.id()).map_err(|_| ToolFailure::ProcessContainmentFailed)
+    }
+}
+#[cfg(target_os = "macos")]
+impl Drop for MacProcessGroup {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
 #[cfg(unix)]
 struct ContainedChild {
     child: Child,
     process_group: nix::unistd::Pid,
     armed: bool,
+    #[cfg(target_os = "macos")]
+    _anchor: MacProcessGroup,
 }
 #[cfg(unix)]
 impl ContainedChild {
-    fn new(mut child: Child) -> Result<Self, ToolFailure> {
-        let raw = i32::try_from(child.id()).map_err(|_| {
+    fn new(
+        mut child: Child,
+        #[cfg(target_os = "macos")] anchor: MacProcessGroup,
+    ) -> Result<Self, ToolFailure> {
+        #[cfg(target_os = "macos")]
+        let raw = anchor.pid();
+        #[cfg(not(target_os = "macos"))]
+        let raw = i32::try_from(child.id()).map_err(|_| ToolFailure::ProcessContainmentFailed);
+        let raw = raw.inspect_err(|_| {
             let _ = child.kill();
             let _ = child.wait();
-            ToolFailure::ProcessContainmentFailed
         })?;
         Ok(Self {
             child,
             process_group: nix::unistd::Pid::from_raw(raw),
             armed: true,
+            #[cfg(target_os = "macos")]
+            _anchor: anchor,
         })
     }
 
@@ -5051,6 +5102,45 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn rc3_macos_fast_exit_cleanup_preserves_output_limit_classification() {
+        let executable = std::env::current_exe().unwrap_or_else(|_| unreachable!());
+        for _ in 0..16 {
+            assert_eq!(
+                run_fixed(
+                    &executable,
+                    &[
+                        "--ignored",
+                        "--exact",
+                        "tests::process_helper_output_limit",
+                        "--nocapture"
+                    ],
+                    None,
+                    1_000,
+                    64,
+                )
+                .err(),
+                Some(ToolFailure::OutputLimit)
+            );
+        }
+        let directory = PrivateWorkingDirectory::create().unwrap_or_else(|_| unreachable!());
+        let mut anchor = MacProcessGroup::new(directory.path()).unwrap_or_else(|_| unreachable!());
+        let pid = nix::unistd::Pid::from_raw(anchor.pid().unwrap_or_else(|_| unreachable!()));
+        assert!(
+            anchor
+                .0
+                .try_wait()
+                .unwrap_or_else(|_| unreachable!())
+                .is_none()
+        );
+        drop(anchor);
+        assert_eq!(
+            nix::sys::wait::waitpid(pid, None),
+            Err(nix::errno::Errno::ECHILD)
+        );
+    }
+
     #[test]
     fn rc3_smt_predicate_symbols_are_injective() {
         let claim = |predicate: &str| {
@@ -5556,10 +5646,12 @@ mod tests {
                 .unwrap_or_else(|| panic!("missing helper root")),
         );
         fs::write(
-            root.join("descendant"),
+            root.join("descendant.tmp"),
             format!("{} {}\n", std::process::id(), nix::unistd::getpgrp()),
         )
         .unwrap_or_else(|error| panic!("write descendant identity: {error}"));
+        fs::rename(root.join("descendant.tmp"), root.join("descendant"))
+            .unwrap_or_else(|error| panic!("publish descendant identity: {error}"));
         thread::sleep(Duration::from_secs(30));
     }
 
@@ -5604,8 +5696,12 @@ mod tests {
             std::env::var_os("ZENO_FCIS_SUCCESS_DESCENDANT_ROOT")
                 .unwrap_or_else(|| panic!("missing helper root")),
         );
-        fs::write(root.join("descendant"), std::process::id().to_string())
+        // Publish only after the complete PID is written. The parent uses the
+        // marker as readiness, and successful cleanup may immediately kill us.
+        fs::write(root.join("descendant.tmp"), std::process::id().to_string())
             .unwrap_or_else(|error| panic!("write descendant pid: {error}"));
+        fs::rename(root.join("descendant.tmp"), root.join("descendant"))
+            .unwrap_or_else(|error| panic!("publish descendant pid: {error}"));
         thread::sleep(Duration::from_secs(30));
     }
 
