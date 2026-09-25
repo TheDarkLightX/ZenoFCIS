@@ -76,9 +76,58 @@ function checkControls(container, panel, template) {
   return { checked: template.demonstration.length, mismatches };
 }
 
+// The module's session holds 64 requests. From genesis, one control is
+// clicked until the session has used them all: the panel must then say so
+// near its controls, in the words a visitor needs (the 64 requests, and
+// "Start over"), and send nothing more; a request pushed past that limit
+// must show the module's own refusal in the same words; the wording for a
+// reply the page cannot read must say a decision may have executed and
+// starting over is required, and never claim it was rolled back; and after
+// "Start over" a request must be decided again.
+function checkSession(container, panel, template, describeRefusal) {
+  const problems = [];
+  const step = template.demonstration[0];
+  panel.reset();
+  for (const [key, value] of Object.entries(step.request)) {
+    if (key === "command") continue;
+    const input = container.querySelector(`.controls [name="${key}"]`);
+    if (input.type === "checkbox") input.checked = Boolean(value);
+    else input.value = String(value);
+  }
+  const button = container.querySelector(`.controls button[data-command="${step.request.command}"]`);
+  const sends = [...container.querySelectorAll(".controls button.send, .proposals button.send")];
+  for (let index = 0; index < 64 + 1; index += 1) button.click();
+  const sent = panel.history.length;
+  const message = container.querySelector(".session");
+  const shown = message?.textContent ?? "";
+  const visible = message !== null && !message.hidden && message.getClientRects().length > 0;
+  if (sent !== 64) problems.push({ sent, expected: 64 });
+  if (!visible || !/handled its 64 requests/.test(shown) || !/Start over/.test(shown)) problems.push({ session: shown, visible });
+  if (!sends.every((send) => send.disabled)) problems.push({ sendsEnabled: sends.filter((send) => !send.disabled).length });
+  const pushed = panel.send(step.request);
+  const latest = container.querySelector(".latest").textContent;
+  if (describeRefusal(pushed).kind !== "limit" || !/session limit reached/.test(pushed.error ?? "")
+    || !/handled its 64 requests/.test(latest)) {
+    problems.push({ pushed, latest: latest.slice(0, 200) });
+  }
+  const transport = describeRefusal({ error: "report capacity exceeded; a decision may have executed; reset required", stage: "transport" });
+  if (transport.kind !== "transport" || !/may have executed/.test(transport.text) || !/cannot show/.test(transport.text)
+    || !/[Ss]tarting over is required/.test(transport.text) || /rolled back|did not happen|was not executed/i.test(transport.text)) {
+    problems.push({ transport });
+  }
+  container.querySelector(".controls button.reset").click();
+  const fresh = container.querySelector(".session").textContent;
+  button.click();
+  const decided = panel.history[0]?.report ?? null;
+  if (!/^0 of 64/.test(fresh) || panel.history.length !== 1 || decided?.decision !== step.expect) {
+    problems.push({ afterReset: fresh, decided: decided?.decision ?? decided?.error ?? null, expect: step.expect });
+  }
+  return { sent, session: shown, problems };
+}
+
 for (const name of names) {
   try {
-    const { mount } = await import(new URL("panel.js", base));
+    const { mount, describeRefusal } = await import(new URL("panel.js", base));
     const { template } = await import(new URL(`templates/${name}.js`, base));
     const container = document.createElement("div");
     document.body.append(container);
@@ -101,6 +150,7 @@ for (const name of names) {
       proposals_described: template.proposer ? template.demonstration.filter(template.proposer.filter).length : 0,
       hashes: checkHashes(container, history, state),
       controls: checkControls(container, panel, template),
+      session: checkSession(container, panel, template, describeRefusal),
       errors: [],
     };
   } catch (error) {

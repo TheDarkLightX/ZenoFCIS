@@ -53,6 +53,10 @@ the shared shape described here. The Pages workflow publishes only from
   for a template that describes one, a scripted proposer's list (the
   treasury guard's agent); `demo-module.js` is the loader. Hashes are shown
   by their first twelve hex digits, with the full value a button away. The
+  session's count of the module's 64 requests sits beside the actions; at
+  the limit the panel says so, in the words a visitor needs, and sends
+  nothing more until "Start over"; a reply the page cannot read is worded
+  as a decision that may have executed, with starting over required. The
   built modules land here and are not committed. The page fetches its
   modules relative to its own scripts, so it works from any path it is
   served at, and it loads no font, script, style, or image from another
@@ -147,7 +151,13 @@ module's full value behind every hash the panel shows by its prefix, and the
 proposer's list where the template describes one. The harness then starts
 the panel over, enters each demonstration step into the form, and clicks
 its button: every control must send exactly the request the script sends,
-and reach the script's decision. The page itself must have loaded the module
+and reach the script's decision. It then clicks one control until the
+module's session of 64 requests is used up: the panel must say so beside
+its controls, naming the 64 requests and "Start over", send nothing more,
+show the module's own refusal in the same words for a request pushed past
+the limit, word a reply it cannot read as a decision that may have
+executed with starting over required, and decide a request again after
+"Start over". The page itself must have loaded the module
 of the example shown on load, run that README's demonstration, said so in
 its status, rendered one history entry per decision with the gate's decision
 on it and the last one in its latest-decision box, shown no other example,
