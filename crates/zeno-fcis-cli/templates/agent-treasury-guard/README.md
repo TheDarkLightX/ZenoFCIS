@@ -10,9 +10,14 @@ commands. It shows six patterns:
   commits more than its daily budget, never drops below its reserve, never
   swaps outside the slippage bound against the oracle price, and never has
   more than one swap outstanding;
-- inductive claims for `zeno-fcis prove`: those limits are stated once, as
-  law 500, and CVC5 attests that the action laws alone preserve them across
-  every transition they admit, for every integer;
+- inductive claims for `zeno-fcis prove`: law 500 states the reserve, the
+  non-negative base balance, the daily budget, and the pending swap's
+  bookkeeping as one invariant, and CVC5 attests that the laws claim 600
+  assumes preserve it across every transition they admit, for every integer.
+  Neither the slippage bound nor the limit of one outstanding swap is part
+  of that invariant: law 507 checks the slippage bound on each accepted
+  proposal, and under law 503 a proposal is accepted only when no swap is
+  outstanding;
 - a synthesized decision: a small hand-written adapter computes the guard's
   facts with checked arithmetic, and a core that `zeno-fcis synth` selected
   and checked on every fact tuple decides which rule applies first;
@@ -112,8 +117,8 @@ The rules apply in this order, and the first that applies decides:
     treasury holds, is rejected with `below_reserve` (211).
 13. Otherwise the command is accepted, or commits failure `swap_failed`
     (212), as the table says. `last_seen` becomes `now`. If `now` falls on a
-    later day than `last_seen`, `spent_today` restarts from 0, whatever the
-    command; an accepted proposal then adds its value.
+    later day than the previous `last_seen`, `spent_today` restarts from 0,
+    whatever the command; an accepted proposal then adds its value.
 
 A rejection changes nothing and queues nothing. Requests go to `zenodex` on
 channel 300. A request carries `intent_number` (160, the proposal's tick),
