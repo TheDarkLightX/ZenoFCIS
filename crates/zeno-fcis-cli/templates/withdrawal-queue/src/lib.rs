@@ -104,7 +104,8 @@ pub fn tick() -> VaultCommand {
 /// # Errors
 ///
 /// A reviewed binding, the law manifest, or the hash provider that the
-/// library refuses; the message names the refusal.
+/// library refuses, or a law manifest that does not enforce the scopes
+/// `project.zeno` declares; the message names the refusal.
 pub fn authority() -> AppResult<Authority> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let initial = checked(
@@ -115,9 +116,13 @@ pub fn authority() -> AppResult<Authority> {
         domain,
         initial.value().value(),
     ))?;
+    // The scopes `project.zeno` declares, which `check` and `prove` read,
+    // must be the scopes this authority enforces.
+    let manifest = checked(profile::manifest())?;
+    checked(manifest.check_declared_scopes(&checked(profile::project())?))?;
     let laws = checked(verify_project_laws::<RustCryptoSha256, _, _>(
         project.catalog(),
-        checked(profile::manifest())?,
+        manifest,
         checked(profile::source_hash())?,
         vec![],
         LawLimits::default(),

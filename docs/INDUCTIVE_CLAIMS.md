@@ -95,7 +95,9 @@ The argument has three parts. `prove` checks only the first.
    application runs that check before building its authority, and every law
    a claim assumes declares its scope, elaboration's check establishes what
    `check_step_assumptions` checks. Otherwise the application must run
-   `check_step_assumptions`.
+   `check_step_assumptions`. Every template declares its law scopes, runs
+   `check_declared_scopes` in `authority()`, and keeps its
+   `check_step_assumptions` test.
 
 The durable-counter template's `tests/induction.rs` runs all of these checks
 against a real shell, its law checker's observer, and its manifest. Its law

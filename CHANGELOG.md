@@ -6,6 +6,21 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Every example application template declares each law's scope in
+  `project.zeno`, exactly as its `profile.rs` binds the law: `on commit,
+  genesis` for the state invariant; `on accept`, `on failure`, or `on
+  commit` for the action laws; and `on reject` for the counters' rejection
+  law. Laws without a formula (508, 509) stay in `profile.rs`.
+  - Each `authority()` runs `LawManifest::check_declared_scopes` on its
+    manifest and returns the mismatches before it builds the authority.
+  - Each template has a test that the shipped manifest passes the check,
+    and that a manifest with one law's scope, or its genesis applicability,
+    changed is reported as `Scope` or `Genesis`. The `check_step_assumptions`
+    tests stay.
+  - Every template's semantic program hash changed, and so did its source
+    identity. The decisions, the decision examples, the demonstrations'
+    summaries, and the site's replay did not.
+
 - `LawManifest::check_declared_scopes(&ProjectSpec)` checks that a law
   manifest enforces each law exactly on the decisions `project.zeno` declares
   for it, and at genesis exactly when the declaration says `, genesis`.

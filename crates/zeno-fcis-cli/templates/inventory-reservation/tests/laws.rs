@@ -6,6 +6,8 @@ use zeno_fcis_patch::CanonicalPatch;
 use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan};
 use zeno_fcis_value::Value;
 
+const UNITS_CONSERVED: u32 = 501;
+
 fn stock(available: i128, reserved: i128) -> Stock {
     Stock {
         available: Units(available),
@@ -258,5 +260,69 @@ fn genesis_and_checker_limits_fail_closed() {
     assert_eq!(
         StockLaws::default().evaluate_genesis(&input, limits),
         Err(LawEngineFailure::Incomplete)
+    );
+}
+
+/// `profile::manifest()` with law 501 bound as `rebind` says, instead of as
+/// `profile.rs` binds it.
+fn rebound(
+    rebind: impl Fn(&LawDefinition) -> (DecisionScope, GenesisApplicability),
+) -> LawManifest {
+    let manifest = profile::manifest();
+    let law = profile::id(UNITS_CONSERVED);
+    let definitions = manifest
+        .definitions()
+        .iter()
+        .map(|definition| {
+            if definition.id() != law {
+                return definition.clone();
+            }
+            let (scope, genesis) = rebind(definition);
+            LawDefinition::try_new(
+                definition.id(),
+                definition.name().clone(),
+                definition.kind(),
+                scope,
+                genesis,
+                definition.claim_hash(),
+                definition.checker_profile_hash(),
+                definition.evidence_requirement(),
+            )
+            .unwrap()
+        })
+        .collect();
+    LawManifest::try_new(manifest.families().to_vec(), definitions).unwrap()
+}
+
+#[test]
+fn the_manifest_enforces_the_scopes_the_project_declares() {
+    let project = profile::project();
+    // Every law with a formula declares its scope, so each one is compared.
+    assert!(
+        project
+            .laws()
+            .iter()
+            .all(|law| law.applicability().is_some())
+    );
+    assert_eq!(profile::manifest().check_declared_scopes(&project), Ok(()));
+    // Law 501 is declared `on accept`, without `, genesis`: a manifest that
+    // enforced it on every commit, or applied it at genesis, is reported.
+    let law = profile::id(UNITS_CONSERVED);
+    let elsewhere = rebound(|shipped| (DecisionScope::Committing, shipped.genesis_applicability()));
+    assert_eq!(
+        elsewhere.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Scope {
+            law,
+            declared: DecisionScope::Accept,
+            enforced: DecisionScope::Committing,
+        }])
+    );
+    let at_genesis = rebound(|shipped| (shipped.scope(), GenesisApplicability::Required));
+    assert_eq!(
+        at_genesis.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Genesis {
+            law,
+            declared: false
+        }])
     );
 }

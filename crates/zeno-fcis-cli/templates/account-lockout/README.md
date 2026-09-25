@@ -93,7 +93,10 @@ claim 600 lock_state_stays_consistent all inductive accept [501, 502] failure [5
 
 Claim 600 states law 500 over the account before a decision, and assumes
 laws 501 and 502 on accepts and law 503 on committed failures, which is
-where the law manifest enforces them. An induction step asks whether any
+where the law manifest enforces them. Each law declares that scope in
+`project.zeno`, so elaboration also checks the claim's groups against the
+declared scopes, and `authority()` checks the manifest against them before
+it builds the authority. An induction step asks whether any
 transition the assumed laws admit can take an account that satisfies the
 invariant to one that does not. The step assumes what admission guarantees:
 the command is one of its three variants, `admin` is 0 or 1, and each
@@ -105,6 +108,9 @@ independently checked, and it says nothing about this application until
 - the law manifest enforces laws 501 and 502 on accepts and law 503 on
   committed failures, as the claim assumes, and refuses a law assumed
   outside its scope;
+- the manifest enforces each law exactly on the decisions `project.zeno`
+  declares for it, and a manifest that bound law 501 to every commit, or to
+  the genesis, is reported;
 - the law checker's own observer, `laws::state_observations`, reads every
   field the invariant reads, and on each of 129 admitted accounts, a grid
   across every boundary the invariant compares, the invariant has a definite
@@ -194,7 +200,7 @@ directory.
 
    ```text
    $ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
-   checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=2921c4fda435c50d718a3bfb019693da5a17ca104a1fea31d7a56004e90261d4
+   checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=0dd2278f6e14d63604e8de1951743928d79ccabe0e35be8cd3ca1abc5a22965e
    ```
 
 2. `cargo +1.97.1 build` ran `build.rs`, which lowered the schema from the
@@ -291,19 +297,24 @@ It does not say:
   checks at admission, at genesis, and on every transition.
 
 Policy identity. Declaring the ranges and the claim changed the canonical
-bytes of `project.zeno`, so `check` prints a new semantic program hash: the
+bytes of `project.zeno`, so `check` printed a new semantic program hash: the
 previous version of this template printed
-`dc9109009626bd19beace495618ceadad10aeb2c5c5de5ecbf609dd01f629ff8`, and this
-one prints the hash in step 1. The source hash in `profile.rs`, and the
-program, checker, and policy hashes derived from it, changed with it: as the
-note below says, a database created by the previous version cannot be
-carried over without a separately reviewed migration. The program, the
-reference model, the examples, and the schema's bounds are unchanged, and the
-demonstration prints the same summary. Putting the SQLite shell behind the
-`sqlite` feature then changed `Cargo.toml`, `src/lib.rs`, and `src/delivery.rs`,
-which the source hash also covers, so the source, program, checker, and policy
-hashes changed once more; `project.zeno` did not, so the semantic program hash in step 1
-stands.
+`dc9109009626bd19beace495618ceadad10aeb2c5c5de5ecbf609dd01f629ff8`, and the
+version with them
+`2921c4fda435c50d718a3bfb019693da5a17ca104a1fea31d7a56004e90261d4`. The
+source hash in `profile.rs`, and the program, checker, and policy hashes
+derived from it, changed with it: as the note below says, a database created
+by the previous version cannot be carried over without a separately reviewed
+migration. The program, the reference model, the examples, and the schema's
+bounds are unchanged, and the demonstration prints the same summary. Putting
+the SQLite shell behind the `sqlite` feature then changed `Cargo.toml`,
+`src/lib.rs`, and `src/delivery.rs`, which the source hash also covers, so
+the source, program, checker, and policy hashes changed once more;
+`project.zeno` did not, so the semantic program hash stayed. Declaring each
+law's scope then changed `project.zeno` and `src/lib.rs`, so `check` prints
+the hash in step 1, and the source, program, checker, and policy hashes
+changed again; the decisions, the examples, and the demonstration's summary
+did not.
 
 ## Run this development candidate
 

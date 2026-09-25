@@ -197,8 +197,11 @@ claim 600 strikes_stay_in_bounds all inductive accept [501, 502] failure [503] =
 ```
 
 The authority refuses every decision that breaks a law enforced on it, so
-laws 501 and 502 bound every accept and law 503 every committed failure. The
-induction step asks whether any transition those laws admit can take a
+laws 501 and 502 bound every accept and law 503 every committed failure.
+Each law declares that scope in `project.zeno`, so elaboration also checks
+the claim's groups against the declared scopes, and `authority()` checks the
+manifest against them before it builds the authority. The induction step
+asks whether any transition those laws admit can take a
 standing within the bound outside it. It is checked for every integer, not
 only the schema's domain. The step assumes that each enumerated field holds
 one of its declared variants, as admission guarantees; without that, a
@@ -207,13 +210,16 @@ accept laws vacuously. CVC5 answers `unsat`, which is attested, not
 independently checked.
 
 The step says something about this application only together with
-`tests/claims.rs`, which checks three things:
+`tests/claims.rs`, which checks four things:
 - the law checker's own observer, `laws::trace_step`, reads every field the
   invariant reads, and the invariant evaluates on every admitted standing;
 - the invariant holds on the exact genesis standing that a new shell
   stores;
 - the law manifest enforces laws 501 and 502 on accepts and law 503 on
-  committed failures, as the claim assumes.
+  committed failures, as the claim assumes;
+- the manifest enforces each law exactly on the decisions `project.zeno`
+  declares for it, and a manifest that bound law 501 to every commit, or to
+  the genesis, is reported.
 
 `tests/conformance.rs` also evaluates the invariant before and after every
 decision the application commits. The section
@@ -248,8 +254,8 @@ The tests check the running application:
   order, and that the 28 examples in `tests/decision-examples.txt` match and
   reach every rule of the rule base.
 - `tests/claims.rs` checks claim 600's base case on the exact genesis
-  standing, its law checker's observer, and its assumptions against the law
-  manifest.
+  standing, its law checker's observer, its assumptions against the law
+  manifest, and the manifest against the scopes `project.zeno` declares.
 - `tests/laws.rs` gives the law checker decisions a faulty program could
   make, such as a block under the wrong rule, a ticket for the wrong band, a
   held transfer that adds a strike, a reinstatement without a reviewer, or
@@ -294,7 +300,7 @@ observed; long JSON is reduced to the fields named.
 
    ```text
    $ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
-   checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=5a73209ee4154ebd532bb9cb624921dd96d90e37b1f6671f4cd37267e15f9a36
+   checked project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=e296669471dc86b7701dd1685a4ad0603dedf0bca9235b34a95d465efe13620b
    ```
 
 2. **Generate the bindings.** `cargo build` runs `build.rs`, which first

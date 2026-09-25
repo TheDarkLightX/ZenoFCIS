@@ -10,7 +10,10 @@
 //!   and the invariant has a definite value on every admitted state;
 //! - the invariant holds on the exact genesis state, as that observer sees it;
 //! - the law manifest enforces each assumed law on the decisions the claim
-//!   assumes it on.
+//!   assumes it on;
+//! - the law manifest enforces each law exactly on the decisions
+//!   `project.zeno` declares for it, the scopes elaboration checked the
+//!   claim's groups against.
 //!
 //! A rejection leaves the state unchanged, so it needs no law.
 
@@ -21,6 +24,9 @@ use std::{
     fs,
     path::PathBuf,
     sync::atomic::{AtomicU64, Ordering},
+};
+use zeno_fcis_laws::{
+    DecisionScope, GenesisApplicability, LawDefinition, LawManifest, ScopeMismatch,
 };
 use zeno_fcis_spec::{
     ClaimMode, EvalLimits, EvalOutcome, ProjectionRoot, StableId, TraceStep, claim_paths,
@@ -47,6 +53,7 @@ impl Drop for Temp {
 }
 
 const NEVER_NEGATIVE: u32 = 600;
+const ACCEPTED_INCREMENT: u32 = 501;
 
 /// Observes a state under `pre.` paths through the law checker's own observer.
 fn observe(state: &CounterState) -> TraceStep {
@@ -146,5 +153,69 @@ fn the_manifest_enforces_every_law_the_proof_assumes() {
         profile::manifest()
             .check_step_assumptions(&[profile::id(501)], &[], &[])
             .is_err()
+    );
+}
+
+/// `profile::manifest()` with law 501 bound as `rebind` says, instead of as
+/// `profile.rs` binds it.
+fn rebound(
+    rebind: impl Fn(&LawDefinition) -> (DecisionScope, GenesisApplicability),
+) -> LawManifest {
+    let manifest = profile::manifest();
+    let law = profile::id(ACCEPTED_INCREMENT);
+    let definitions = manifest
+        .definitions()
+        .iter()
+        .map(|definition| {
+            if definition.id() != law {
+                return definition.clone();
+            }
+            let (scope, genesis) = rebind(definition);
+            LawDefinition::try_new(
+                definition.id(),
+                definition.name().clone(),
+                definition.kind(),
+                scope,
+                genesis,
+                definition.claim_hash(),
+                definition.checker_profile_hash(),
+                definition.evidence_requirement(),
+            )
+            .unwrap()
+        })
+        .collect();
+    LawManifest::try_new(manifest.families().to_vec(), definitions).unwrap()
+}
+
+#[test]
+fn the_manifest_enforces_the_scopes_the_project_declares() {
+    let project = profile::project();
+    // Every law with a formula declares its scope, so each one is compared.
+    assert!(
+        project
+            .laws()
+            .iter()
+            .all(|law| law.applicability().is_some())
+    );
+    assert_eq!(profile::manifest().check_declared_scopes(&project), Ok(()));
+    // Law 501 is declared `on accept`, without `, genesis`: a manifest that
+    // enforced it on every commit, or applied it at genesis, is reported.
+    let law = profile::id(ACCEPTED_INCREMENT);
+    let elsewhere = rebound(|shipped| (DecisionScope::Committing, shipped.genesis_applicability()));
+    assert_eq!(
+        elsewhere.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Scope {
+            law,
+            declared: DecisionScope::Accept,
+            enforced: DecisionScope::Committing,
+        }])
+    );
+    let at_genesis = rebound(|shipped| (shipped.scope(), GenesisApplicability::Required));
+    assert_eq!(
+        at_genesis.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Genesis {
+            law,
+            declared: false
+        }])
     );
 }

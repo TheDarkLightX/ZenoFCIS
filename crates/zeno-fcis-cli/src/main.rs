@@ -1572,6 +1572,57 @@ mod tests {
         }
     }
 
+    /// Every application template declares each law's scope in
+    /// `project.zeno`, and its `authority()` checks the law manifest against
+    /// those declarations before it binds the laws. The second point is
+    /// checked here, on the source, because a template's own tests cannot
+    /// see it: the shipped manifest passes the check, so its absence changes
+    /// nothing they observe.
+    #[test]
+    fn every_application_template_checks_its_manifest_against_its_declared_scopes() {
+        for (directory, files) in [
+            ("durable-counter", durable_counter::FILES),
+            ("prepared-counter", prepared_counter::FILES),
+            ("account-lockout", account_lockout::FILES),
+            ("order-fulfillment", order_fulfillment::FILES),
+            ("inventory-reservation", inventory_reservation::FILES),
+            ("compliance-gateway", compliance_gateway::FILES),
+            ("withdrawal-queue", withdrawal_queue::FILES),
+            ("agent-treasury-guard", agent_treasury_guard::FILES),
+        ] {
+            let file = |name: &str| {
+                let (_, content) = files
+                    .iter()
+                    .find(|(file, _)| *file == name)
+                    .unwrap_or_else(|| panic!("{directory}: no {name}"));
+                std::str::from_utf8(content)
+                    .unwrap_or_else(|error| panic!("{directory}/{name}: {error}"))
+            };
+            let parsed = parse_project(file("project.zeno"), SourceLimits::default())
+                .unwrap_or_else(|set| panic!("{directory}: {set}"));
+            let project = elaborate_project(parsed, ProjectLimits::default())
+                .unwrap_or_else(|set| panic!("{directory}: {set}"));
+            for law in project.laws() {
+                assert!(
+                    law.applicability().is_some(),
+                    "{directory}: law {} declares no scope",
+                    law.id().get()
+                );
+            }
+            let authority = file("src/lib.rs");
+            let checked = authority
+                .find(".check_declared_scopes(")
+                .unwrap_or_else(|| panic!("{directory}: authority() does not check the scopes"));
+            let bound = authority
+                .find("verify_project_laws::")
+                .unwrap_or_else(|| panic!("{directory}: authority() does not bind the laws"));
+            assert!(
+                checked < bound,
+                "{directory}: the scopes are checked after the laws are bound"
+            );
+        }
+    }
+
     #[test]
     fn rc3_project_new() {
         let target = std::env::temp_dir().join(format!(

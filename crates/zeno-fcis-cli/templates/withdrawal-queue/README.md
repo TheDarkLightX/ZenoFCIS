@@ -228,7 +228,10 @@ claim 601 pause_stays_in_range all inductive assume [502, 503] = pre.100.125 >= 
 The authority refuses every decision that breaks a law enforced on it, and
 this application never commits a failure, because the law checker refuses
 every one (law 508). So laws 501 to 503 bound every committing decision, and
-each claim assumes them on every commit. An induction step asks whether any
+each claim assumes them on every commit. Each law declares that scope in
+`project.zeno` (`on commit`), so elaboration also checks the claims' groups
+against the declared scopes, and `authority()` checks the manifest against
+them before it builds the authority. An induction step asks whether any
 transition the assumed laws admit can take a vault that satisfies the
 invariant to one that does not. It is checked for every integer, not only
 the schema's domain: the step assumes only that each enumerated field holds
@@ -260,7 +263,10 @@ The steps say something about this application only together with
 - each invariant holds on the exact genesis vault that a new shell stores;
 - the law manifest enforces laws 501, 502, and 503 on every committing
   decision, and refuses the rejection law or an undefined law as a step's
-  assumption.
+  assumption;
+- the manifest enforces each law exactly on the decisions `project.zeno`
+  declares for it, and a manifest that bound law 501 to accepts only, or to
+  the genesis, is reported.
 
 Two more laws have no formula, so `profile.rs` registers them instead of
 `project.zeno` carrying always-true or always-false placeholders:

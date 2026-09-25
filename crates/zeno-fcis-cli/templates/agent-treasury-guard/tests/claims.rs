@@ -19,7 +19,10 @@
 //! - each invariant holds on the exact genesis treasury, as that observer
 //!   sees it;
 //! - the law manifest enforces each assumed law on the decisions the claim
-//!   assumes it on.
+//!   assumes it on;
+//! - the law manifest enforces each law exactly on the decisions
+//!   `project.zeno` declares for it, the scopes elaboration checked the
+//!   claim's groups against.
 //!
 //! A rejection leaves the treasury unchanged, so it needs no law.
 
@@ -33,6 +36,9 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_laws::{
+    DecisionScope, GenesisApplicability, LawDefinition, LawManifest, ScopeMismatch,
+};
 use zeno_fcis_schema::ValidationLimits;
 use zeno_fcis_spec::{
     ClaimDecl, ClaimFormula, ClaimMode, EvalLimits, EvalOutcome, ProjectSpec, ProjectionPath,
@@ -44,6 +50,7 @@ use PendingSwap::{NoSwap, PendingBuy, PendingSell};
 const TREASURY_STAYS_WITHIN_LIMITS: u32 = 600;
 const BUDGET_NEVER_EXCEEDED: u32 = 601;
 const TREASURY_WITHIN_LIMITS: u32 = 500;
+const COMMITS_ADVANCE_THE_CLOCK: u32 = 501;
 const PROPOSAL_AND_SETTLEMENT_AUTHORITY: u32 = 503;
 const FAILURE_REFUNDS_THE_SWAP: u32 = 508;
 const BALANCE_BOUND: i128 = 20;
@@ -333,5 +340,69 @@ fn each_invariant_holds_on_the_exact_genesis_treasury() {
     assert_eq!(
         evaluate(TREASURY_STAYS_WITHIN_LIMITS, &negative_minimum),
         Some(EvalOutcome::False)
+    );
+}
+
+/// `profile::manifest()` with law 501 bound as `rebind` says, instead of as
+/// `profile.rs` binds it.
+fn rebound(
+    rebind: impl Fn(&LawDefinition) -> (DecisionScope, GenesisApplicability),
+) -> LawManifest {
+    let manifest = profile::manifest();
+    let law = profile::id(COMMITS_ADVANCE_THE_CLOCK);
+    let definitions = manifest
+        .definitions()
+        .iter()
+        .map(|definition| {
+            if definition.id() != law {
+                return definition.clone();
+            }
+            let (scope, genesis) = rebind(definition);
+            LawDefinition::try_new(
+                definition.id(),
+                definition.name().clone(),
+                definition.kind(),
+                scope,
+                genesis,
+                definition.claim_hash(),
+                definition.checker_profile_hash(),
+                definition.evidence_requirement(),
+            )
+            .unwrap()
+        })
+        .collect();
+    LawManifest::try_new(manifest.families().to_vec(), definitions).unwrap()
+}
+
+#[test]
+fn the_manifest_enforces_the_scopes_the_project_declares() {
+    let project = profile::project();
+    // Every law with a formula declares its scope, so each one is compared.
+    assert!(
+        project
+            .laws()
+            .iter()
+            .all(|law| law.applicability().is_some())
+    );
+    assert_eq!(profile::manifest().check_declared_scopes(&project), Ok(()));
+    // Law 501 is declared `on commit`, without `, genesis`: a manifest that
+    // enforced it on accepts only, or applied it at genesis, is reported.
+    let law = profile::id(COMMITS_ADVANCE_THE_CLOCK);
+    let elsewhere = rebound(|shipped| (DecisionScope::Accept, shipped.genesis_applicability()));
+    assert_eq!(
+        elsewhere.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Scope {
+            law,
+            declared: DecisionScope::Committing,
+            enforced: DecisionScope::Accept,
+        }])
+    );
+    let at_genesis = rebound(|shipped| (shipped.scope(), GenesisApplicability::Required));
+    assert_eq!(
+        at_genesis.check_declared_scopes(&project),
+        Err(vec![ScopeMismatch::Genesis {
+            law,
+            declared: false
+        }])
     );
 }

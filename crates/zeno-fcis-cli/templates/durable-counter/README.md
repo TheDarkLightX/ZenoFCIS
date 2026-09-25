@@ -117,7 +117,15 @@ which `tests/induction.rs` runs:
 - the invariant holds on the exact genesis state that a new shell stores, as
   that observer sees it;
 - the law manifest checks law 501 on accepts and law 502 on committed
-  failures, as the claim assumes.
+  failures, as the claim assumes;
+- the manifest enforces each law exactly on the decisions `project.zeno`
+  declares for it, and a manifest that bound law 501 to every commit, or to
+  the genesis, is reported.
+
+Each law declares its scope in `project.zeno` (`on commit, genesis`, `on
+accept`, `on failure`, `on reject`), so elaboration also checks the claim's
+groups against the declared scopes, and `authority()` checks the manifest
+against them before it builds the authority.
 
 The same step fails for `count <= 3`: from 3, an accepted increment reaches 4.
 The cap comes from the bound law 500 and the program's capacity check, not
