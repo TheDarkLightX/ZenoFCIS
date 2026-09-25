@@ -400,6 +400,7 @@ dependencies = [
  "zeno-fcis-patch",
  "zeno-fcis-plan",
  "zeno-fcis-project",
+ "zeno-fcis-spec",
  "zeno-fcis-value",
 ]
 

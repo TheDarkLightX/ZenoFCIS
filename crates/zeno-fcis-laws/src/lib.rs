@@ -27,6 +27,7 @@ use zeno_fcis_evidence::{CoverageDeclaration, EvidenceEnvelope, SourceBindings};
 use zeno_fcis_patch::CanonicalPatch;
 use zeno_fcis_plan::{CommitPlan, OutboxPlan};
 use zeno_fcis_project::{ProfileError, RegistryEntry, RegistryKind, SemanticId, StableName};
+use zeno_fcis_spec::{LawScope, ProjectSpec};
 use zeno_fcis_value::Value;
 
 /// Canonical project-law manifest format version.
@@ -246,6 +247,46 @@ pub enum AssumptionGap {
         /// The decisions the manifest checks it on.
         scope: DecisionScope,
     },
+}
+
+/// How a law manifest differs from the scopes its project declares.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum ScopeMismatch {
+    /// The project declares a scope for a law the manifest does not define.
+    Missing {
+        /// The law.
+        law: SemanticId,
+    },
+    /// The manifest enforces the law on other decisions than the project
+    /// declares.
+    Scope {
+        /// The law.
+        law: SemanticId,
+        /// The decisions the project declares.
+        declared: DecisionScope,
+        /// The decisions the manifest checks the law on.
+        enforced: DecisionScope,
+    },
+    /// The manifest applies the law at genesis where the project declares it
+    /// does not, or the reverse.
+    Genesis {
+        /// The law.
+        law: SemanticId,
+        /// Whether the project declares `, genesis` for the law.
+        declared: bool,
+    },
+}
+
+/// The manifest scope a project's declared law scope stands for.
+const fn declared_scope(scope: LawScope) -> DecisionScope {
+    match scope {
+        LawScope::Always => DecisionScope::Always,
+        LawScope::Accept => DecisionScope::Accept,
+        LawScope::Reject => DecisionScope::Reject,
+        LawScope::CommittedFailure => DecisionScope::CommittedFailure,
+        LawScope::Committing => DecisionScope::Committing,
+    }
 }
 
 impl CanonicalEncode for DecisionScope {
@@ -596,6 +637,62 @@ impl LawManifest {
             }
         }
         if gaps.is_empty() { Ok(()) } else { Err(gaps) }
+    }
+
+    /// Checks that this manifest enforces each law exactly on the decisions
+    /// `project.zeno` declares for it (`law ID name on SCOPE`), and at genesis
+    /// exactly when the declaration says `, genesis`. A law without a declared
+    /// scope is not compared.
+    ///
+    /// An application that runs this check before building its authority
+    /// knows the declared scopes, which `check` and `prove` read, are the
+    /// scopes its authority enforces.
+    ///
+    /// # Errors
+    ///
+    /// Returns every mismatch found, in law order.
+    pub fn check_declared_scopes(&self, project: &ProjectSpec) -> Result<(), Vec<ScopeMismatch>> {
+        let mut mismatches = Vec::new();
+        for law in project.laws() {
+            let Some(applicability) = law.applicability() else {
+                continue;
+            };
+            // A stable ID is nonzero, so it is always a semantic ID.
+            let Ok(id) = SemanticId::try_new(law.id().get()) else {
+                continue;
+            };
+            let Some(definition) = self
+                .definitions
+                .iter()
+                .find(|definition| definition.id() == id)
+            else {
+                mismatches.push(ScopeMismatch::Missing { law: id });
+                continue;
+            };
+            let declared = declared_scope(applicability.scope());
+            if definition.scope() != declared {
+                mismatches.push(ScopeMismatch::Scope {
+                    law: id,
+                    declared,
+                    enforced: definition.scope(),
+                });
+            }
+            let at_genesis = matches!(
+                definition.genesis_applicability(),
+                GenesisApplicability::Required
+            );
+            if applicability.genesis() != at_genesis {
+                mismatches.push(ScopeMismatch::Genesis {
+                    law: id,
+                    declared: applicability.genesis(),
+                });
+            }
+        }
+        if mismatches.is_empty() {
+            Ok(())
+        } else {
+            Err(mismatches)
+        }
     }
 
     /// Computes the exact policy commitment bound by `ProjectProfile`.
@@ -2324,6 +2421,60 @@ mod tests {
         );
         assert!(DecisionScope::Committing.covers(DecisionKind::CommittedFailure));
         assert!(!DecisionScope::Accept.covers(DecisionKind::CommittedFailure));
+    }
+
+    /// A project whose laws 100 to 103 declare the scopes `manifest()`
+    /// enforces, plus `extra`.
+    fn declared(extra: &str) -> ProjectSpec {
+        let source = format!(
+            "zeno 1;\nproject 1 scopes;\n\
+             type 10 state State;\ntype 11 command Command;\ntype 12 context Context;\n\
+             type 13 int Count;\nfield 20 10 count 13;\n\
+             reason 30 bad precedence 0;\n\
+             component 40 machine {{ owns 10; reads pre.10; writes post.10; budget steps 10; }}\n\
+             merge [40];\n{extra}"
+        );
+        let parsed =
+            zeno_fcis_spec::parse_project(&source, zeno_fcis_spec::SourceLimits::default())
+                .unwrap_or_else(|set| panic!("{set}"));
+        zeno_fcis_spec::elaborate_project(parsed, zeno_fcis_spec::ProjectLimits::default())
+            .unwrap_or_else(|set| panic!("{set}"))
+    }
+
+    #[test]
+    fn a_manifest_must_enforce_the_scopes_its_project_declares() {
+        let manifest = manifest();
+        let matching = "law 100 state_invariant on commit, genesis = post.10.20 >= 0;\n\
+                        law 101 asset_conservation on commit, genesis = post.10.20 >= 0;\n\
+                        law 102 reject_no_authority on reject = post.10.20 == pre.10.20;\n\
+                        law 103 committed_failure_effects on failure = post.10.20 >= 0;\n";
+        assert_eq!(manifest.check_declared_scopes(&declared(matching)), Ok(()));
+        // A law without a declared scope is not compared.
+        let unscoped = "law 100 state_invariant = post.10.20 >= 0;\n";
+        assert_eq!(manifest.check_declared_scopes(&declared(unscoped)), Ok(()));
+        let differing = "law 100 state_invariant on accept, genesis = post.10.20 >= 0;\n\
+                         law 101 asset_conservation on commit = post.10.20 >= 0;\n\
+                         law 103 committed_failure_effects on failure, genesis = post.10.20 >= 0;\n\
+                         law 104 undefined on any = post.10.20 >= 0;\n";
+        assert_eq!(
+            manifest.check_declared_scopes(&declared(differing)),
+            Err(vec![
+                ScopeMismatch::Scope {
+                    law: id(100),
+                    declared: DecisionScope::Accept,
+                    enforced: DecisionScope::Committing,
+                },
+                ScopeMismatch::Genesis {
+                    law: id(101),
+                    declared: false,
+                },
+                ScopeMismatch::Genesis {
+                    law: id(103),
+                    declared: true,
+                },
+                ScopeMismatch::Missing { law: id(104) },
+            ])
+        );
     }
 
     fn schema() -> Schema {

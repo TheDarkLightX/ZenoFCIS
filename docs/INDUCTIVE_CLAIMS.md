@@ -89,9 +89,13 @@ The argument has three parts. `prove` checks only the first.
 
    A law may also declare its scope in `project.zeno` (`law 501 name on
    accept = ...`). Elaboration then refuses a claim that assumes that law on
-   decisions its declared scope does not cover, before any solver runs. This
-   check is still required: a declared scope says what the manifest should
-   enforce, and only the manifest shows what it does.
+   decisions its declared scope does not cover, before any solver runs. A
+   declared scope says what the manifest should enforce, and
+   `LawManifest::check_declared_scopes` checks that it does. If the
+   application runs that check before building its authority, and every law
+   a claim assumes declares its scope, elaboration's check establishes what
+   `check_step_assumptions` checks. Otherwise the application must run
+   `check_step_assumptions`.
 
 The durable-counter template's `tests/induction.rs` runs all of these checks
 against a real shell, its law checker's observer, and its manifest. Its law
@@ -103,7 +107,9 @@ checker observes the state before and after a decision through one function,
 Suppose all of the following hold:
 - (a) the step is unsatisfiable;
 - (b) the base case passes;
-- (c) the assumption check passes;
+- (c) the assumption check passes; or every law the claim assumes declares
+  its scope, and the application checks its manifest against the declared
+  scopes before building its authority;
 - (d) the authority enforces its manifest: a decision commits only if every
   law whose scope covers its kind is reported satisfied;
 - (e) the application's law checker reports a formula law satisfied only when
@@ -274,6 +280,7 @@ edits were reverted; none is committed.
 | Replay refuses a value outside a declared range | `declared_ranges_bound_integer_observations` |
 | Elaboration refuses a law assumed outside its declared scope (the check removed, or `on commit` taken as covering either kind) | `inductive_groups_are_checked_against_declared_law_scopes` |
 | A declared law scope, and its genesis flag, are part of the canonical bytes, and an unscoped law keeps its bytes | `law_scopes_parse_and_are_part_of_the_canonical_project`, `a_declared_range_is_part_of_the_canonical_project` |
+| The manifest check compares each declared scope, its genesis flag, and the law's existence | `a_manifest_must_enforce_the_scopes_its_project_declares`, in `zeno-fcis-laws` |
 
 The pinned test `pinned_inductive_steps_agree_with_exhaustive_replay` checks
 the SMT encoding itself. For each claim, CVC5 and Z3 must agree with an

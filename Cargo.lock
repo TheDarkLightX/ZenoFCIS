@@ -1443,6 +1443,7 @@ dependencies = [
  "zeno-fcis-project",
  "zeno-fcis-refine",
  "zeno-fcis-schema",
+ "zeno-fcis-spec",
  "zeno-fcis-value",
 ]
 

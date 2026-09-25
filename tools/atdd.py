@@ -126,6 +126,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-bootstrap", "--test", "schema_lowering", "--locked", "a_declared_range_is_the_binding_of_its_int"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "_against_its_own_schema"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-laws", "--lib", "--locked", "step_assumptions_must_be_enforced_on_the_decisions_they_are_assumed_on"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-laws", "--lib", "--locked", "a_manifest_must_enforce_the_scopes_its_project_declares"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "exit_classes_are_stable")),
     ),
     "reserved-domains": AcceptanceScenario(

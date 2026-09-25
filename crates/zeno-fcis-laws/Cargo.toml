@@ -20,6 +20,7 @@ std = [
     "zeno-fcis-patch/std",
     "zeno-fcis-plan/std",
     "zeno-fcis-project/std",
+    "zeno-fcis-spec/std",
     "zeno-fcis-value/std",
 ]
 
@@ -31,6 +32,7 @@ zeno-fcis-evidence = { version = "=1.1.0", path = "../zeno-fcis-evidence", defau
 zeno-fcis-patch = { version = "=1.1.0", path = "../zeno-fcis-patch", default-features = false }
 zeno-fcis-plan = { version = "=1.1.0", path = "../zeno-fcis-plan", default-features = false }
 zeno-fcis-project = { version = "=1.1.0", path = "../zeno-fcis-project", default-features = false }
+zeno-fcis-spec = { version = "=1.1.0", path = "../zeno-fcis-spec", default-features = false }
 zeno-fcis-value = { version = "=1.1.0", path = "../zeno-fcis-value", default-features = false }
 
 [dev-dependencies]
