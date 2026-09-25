@@ -10,6 +10,7 @@ import { instantiate } from "./demo-module.js";
 
 const STEP_DELAY_MS = 400;
 const HASH_PREFIX = 12;
+const PROPOSALS_SHOWN = 3;
 const KIND_LABELS = {
   Accept: ["accept", "Accepted"],
   CommittedFailure: ["failure", "Committed failure"],
@@ -27,6 +28,19 @@ const TRANSPORT_MESSAGE = "The module's reply was too large for the page to read
   + "Starting over is required; it begins a fresh session.";
 const BOUNDARY_MESSAGE = "The module stopped answering. A decision may have executed, and the page cannot "
   + "show it. Start over to begin a fresh session; if that fails, reload the page.";
+// The commit step runs after the authority authorized the decision (see
+// site/common/src/demo.rs): the shell publishes first, then the exact
+// replay is checked. A refusal there comes after the publication.
+const COMMIT_MESSAGE = "The commit step failed after the authority authorized the decision. The decision "
+  + "may already have been saved, and the page cannot show the result. Start over to begin a fresh session.";
+const CONSUMED_MESSAGE = "This session's shell was consumed by an earlier failed commit step, so nothing more "
+  + "can be decided in it. Start over to begin a fresh session.";
+// The stages that refuse before any decision, and what each one checks.
+const BEFORE_DECISION = {
+  input: "the module could not read the page's request",
+  admission: "the schema refused a value",
+  authority: "the authority refused to admit or execute the request",
+};
 
 function node(tag, className, ...children) {
   const created = document.createElement(tag);
@@ -48,17 +62,26 @@ function short(hash) {
   return `${hash.slice(0, HASH_PREFIX)}…`;
 }
 
-// A refused request in plain words: the session limit; a reply the page
-// could not read, after which a decision may have executed and nothing is
-// claimed rolled back; a module that stopped answering; or the schema's or
-// the authority's own refusal, shown as the module words it.
+// A refused request in plain words, by the stage that refused it. Input,
+// admission, and authority refuse before any decision, so nothing changed.
+// The commit step refuses after the authority authorized the decision,
+// which may already have been saved; a reply the page could not read comes
+// after a decision may have executed; a module that stopped answering is
+// worded the same way. None of those three claims a rollback, and each ends
+// the session: only starting over continues. `detail` is the module's own
+// text, shown as secondary text.
 export function describeRefusal(report) {
-  if (report.stage === "transport") return { kind: "transport", label: "Not shown", text: TRANSPORT_MESSAGE };
-  if (report.stage === "boundary") return { kind: "transport", label: "Not shown", text: BOUNDARY_MESSAGE };
-  if (report.stage === "input" && String(report.error).startsWith(LIMIT_ERROR)) {
-    return { kind: "limit", label: "Refused", text: LIMIT_MESSAGE };
+  const stage = report.stage;
+  const error = String(report.error ?? "");
+  if (stage === "transport") return { kind: "transport", label: "Not shown", text: TRANSPORT_MESSAGE, detail: error, ends: true };
+  if (stage === "boundary") return { kind: "transport", label: "Not shown", text: BOUNDARY_MESSAGE, detail: error, ends: true };
+  if (stage === "commit") {
+    const consumed = error.startsWith("the shell was consumed");
+    return { kind: "commit", label: consumed ? "Refused" : "Not shown", text: consumed ? CONSUMED_MESSAGE : COMMIT_MESSAGE, detail: error, ends: true };
   }
-  return { kind: "refused", label: "Refused", text: `Refused at ${report.stage}, before any decision: ${report.error}` };
+  if (stage === "input" && error.startsWith(LIMIT_ERROR)) return { kind: "limit", label: "Refused", text: LIMIT_MESSAGE, detail: error, ends: false };
+  const why = BEFORE_DECISION[stage] ?? `the module refused the request at its ${stage} stage`;
+  return { kind: "refused", label: "Refused", text: `Refused before any decision: ${why}. Nothing changed.`, detail: error, ends: false };
 }
 
 // A hash by its first twelve hex digits, with a button that shows the full
@@ -158,6 +181,10 @@ export async function mount(container, template) {
   const fieldNames = template.fields.map((field) => field.name);
   const labels = new Map(template.fields.map((field) => [field.name, field.label]));
   const label = (key) => labels.get(key) ?? words(key);
+  // An enumerated value in the template's plain words; the raw value stays
+  // in the technical record and beside the state line.
+  const values = template.values ?? {};
+  const plainValue = (key, value) => values[key]?.[String(value)] ?? String(value);
 
   const context = template.context.map(control);
   const commands = [];
@@ -205,13 +232,17 @@ export async function mount(container, template) {
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
 
+  // The latest decision: its verdict and plain lines are the live region;
+  // the hash, whose button reveals the full value, sits outside it so that
+  // revealing does not announce the decision again.
   const latestHeading = node("h3", null, "Latest decision");
   latestHeading.id = `${template.name}-latest-heading`;
   const latestBody = node("div", "latest-body", node("p", "empty", "No decision yet. Send a request, or run the demonstration."));
-  const latest = node("section", "latest", latestHeading, latestBody);
+  latestBody.setAttribute("aria-live", "polite");
+  latestBody.setAttribute("aria-atomic", "true");
+  const latestIdentity = node("div", "latest-identity");
+  const latest = node("section", "latest", latestHeading, latestBody, latestIdentity);
   latest.id = `${template.name}-latest`;
-  latest.setAttribute("aria-live", "polite");
-  latest.setAttribute("aria-atomic", "true");
   latest.setAttribute("aria-labelledby", latestHeading.id);
 
   const facts = node("dl", "facts");
@@ -219,15 +250,21 @@ export async function mount(container, template) {
   const outbox = node("ol", "outbox", node("li", "empty", "Nothing queued."));
   const timeline = node("ol", "timeline", node("li", "empty", "No decisions yet."));
   timeline.id = `${template.name}-timeline`;
+  // The history is collapsed behind its count; every entry stays in the
+  // document.
+  const historySummary = node("summary", null, "No decisions yet");
+  const history = node("details", "history", historySummary,
+    node("p", "help", "Accepted decisions and committed failures are published; a rejection changes nothing; a request the schema or the authority refuses never becomes a decision. Each entry's technical record holds the laws evaluated and the hashes."),
+    timeline);
 
   // A template may show its scripted proposer on its own: each of its
   // proposals from the demonstration, with a button that sends it against
-  // the state as it is now.
+  // the state as it is now. The first few are shown; a button shows the rest.
   const proposerButtons = [];
-  const proposer = template.proposer ? node("section", "panel proposer",
-    node("h3", null, template.proposer.label),
-    node("p", "help", template.proposer.help),
-    node("ol", "proposals", ...template.demonstration.filter(template.proposer.filter).map((step) => {
+  let proposer = null;
+  if (template.proposer) {
+    const proposals = template.demonstration.filter(template.proposer.filter);
+    const items = proposals.map((step, index) => {
       const button = node("button", "send", "Send");
       button.type = "button";
       button.disabled = true;
@@ -235,12 +272,31 @@ export async function mount(container, template) {
         if (!busy) send(step.request, step.note, true);
       });
       proposerButtons.push(button);
-      return node("li", null, node("div", "proposal",
+      const item = node("li", null, node("div", "proposal",
         node("span", "text",
           node("span", "request", template.describe(step.request)),
           node("span", "note", `${step.note}: ${KIND_LABELS[step.expect][1].toLowerCase()} in the script`)),
         button));
-    }))) : null;
+      item.hidden = index >= PROPOSALS_SHOWN;
+      return item;
+    });
+    proposer = node("section", "panel proposer",
+      node("h3", null, template.proposer.label),
+      node("p", "help", template.proposer.help),
+      node("ol", "proposals", ...items));
+    if (items.length > PROPOSALS_SHOWN) {
+      const more = node("button", "more", `Show all ${items.length} proposals`);
+      more.type = "button";
+      more.setAttribute("aria-expanded", "false");
+      more.addEventListener("click", () => {
+        const expand = more.getAttribute("aria-expanded") !== "true";
+        for (const [index, item] of items.entries()) item.hidden = !expand && index >= PROPOSALS_SHOWN;
+        more.textContent = expand ? `Show the first ${PROPOSALS_SHOWN} proposals` : `Show all ${items.length} proposals`;
+        more.setAttribute("aria-expanded", String(expand));
+      });
+      proposer.append(more);
+    }
+  }
 
   container.replaceChildren(
     form,
@@ -250,10 +306,7 @@ export async function mount(container, template) {
       node("section", "panel", node("h3", null, "State"), facts),
       node("section", "panel", node("h3", null, "Outbox"), node("p", "help", template.outbox), outbox)),
     ...(proposer ? [proposer] : []),
-    node("section", "panel",
-      node("h3", null, "Every decision, in order"),
-      node("p", "help", "Accepted decisions and committed failures are published; a rejection changes nothing; a request the schema or the authority refuses never becomes a decision. Each entry's technical record holds the laws evaluated and the hashes."),
-      timeline),
+    node("section", "panel", history),
   );
 
   const sendButtons = [...commands.map(({ button }) => button), ...proposerButtons];
@@ -262,12 +315,12 @@ export async function mount(container, template) {
   let count = 0;
   // Requests this session has sent to the module, which counts them
   // against its limit; `exhausted` once it has used them all, and `broken`
-  // after a reply the page could not read, until the next reset.
+  // after a refusal that ended the session, until the next reset.
   let used = 0;
   let exhausted = false;
   let broken = false;
   // Every request sent since the last reset, with the module's report.
-  const history = [];
+  const sent = [];
 
   function setBusy(value) {
     busy = value;
@@ -287,7 +340,10 @@ export async function mount(container, template) {
   function renderState(state) {
     facts.replaceChildren();
     for (const key of orderedKeys(state.state, fieldNames)) {
-      facts.append(node("dt", null, label(key), " ", node("code", "schema", key)), node("dd", null, String(state.state[key])));
+      const raw = String(state.state[key]);
+      const plain = plainValue(key, raw);
+      facts.append(node("dt", null, label(key), " ", node("code", "schema", key)),
+        node("dd", null, plain, ...(plain === raw ? [] : [" ", node("code", "schema", raw)])));
     }
     facts.append(
       node("dt", null, "Decisions made"), node("dd", null, String(state.steps)),
@@ -313,10 +369,18 @@ export async function mount(container, template) {
     return [node("span", `badge ${className}`, kind), node("span", "request", template.describe(request))];
   }
 
+  function changed(report) {
+    return orderedKeys(report.after, fieldNames)
+      .filter((key) => JSON.stringify(report.before[key]) !== JSON.stringify(report.after[key]));
+  }
+
   // The decision in plain words: the reason, what changed, and what was
-  // queued.
+  // queued; or the refusal, by its stage.
   function plainLines(report) {
-    if (report.error) return [node("p", "reason", describeRefusal(report).text)];
+    if (report.error) {
+      const refusal = describeRefusal(report);
+      return [node("p", "reason", `${refusal.text} `, node("span", "code", refusal.detail))];
+    }
     const lines = [];
     if (report.reason) {
       const plain = template.reasons[report.reason.name] ?? words(report.reason.name ?? report.reason.id);
@@ -326,9 +390,8 @@ export async function mount(container, template) {
       lines.push(node("p", "changes", "Nothing changed, and nothing was queued."));
       return lines;
     }
-    const changes = orderedKeys(report.after, fieldNames)
-      .filter((key) => JSON.stringify(report.before[key]) !== JSON.stringify(report.after[key]))
-      .map((key) => `${label(key)} ${report.before[key]} → ${report.after[key]}`);
+    const changes = changed(report)
+      .map((key) => `${label(key)} ${plainValue(key, report.before[key])} → ${plainValue(key, report.after[key])}`);
     lines.push(node("p", "changes", changes.length === 0 ? "No field changed." : `Changed: ${changes.join("; ")}.`));
     for (const entry of report.outbox) lines.push(node("p", "queued", `Queued ${plainEntry(entry)}.`));
     return lines;
@@ -339,17 +402,20 @@ export async function mount(container, template) {
   }
 
   // The entry's technical record: the request as sent, the reason's code,
-  // the authorization or rejection hash, the bundle and its replay check,
-  // and the laws evaluated with their statuses.
+  // the fields changed with their raw values, the authorization or rejection
+  // hash, the bundle and its replay check, and the laws evaluated with their
+  // statuses.
   function record(request, report) {
     const list = node("dl", "record-facts");
     const fact = (term, ...detail) => list.append(node("dt", null, term), node("dd", null, ...detail));
     fact("Request", node("code", "json", JSON.stringify(request)));
     if (report.error) {
-      fact("Refused at", report.stage);
-      fact("Error", report.error);
+      fact("Stage", report.stage);
+      fact("Module's text", report.error);
     } else {
       if (report.reason) fact("Reason", `${report.reason.id} ${report.reason.name}`);
+      const raw = changed(report).map((key) => `${key} ${report.before[key]} → ${report.after[key]}`);
+      if (raw.length > 0) fact("Fields changed", node("code", "json", raw.join("; ")));
       const [kind, hash] = identity(report);
       fact(kind, node("code", "hash", hash));
       fact("Publication", report.commit
@@ -361,12 +427,12 @@ export async function mount(container, template) {
   }
 
   function renderLatest(request, report) {
-    const lines = [node("div", "verdict", ...verdict(request, report)), ...plainLines(report)];
+    latestBody.replaceChildren(node("div", "verdict", ...verdict(request, report)), ...plainLines(report));
+    latestIdentity.replaceChildren();
     if (!report.error) {
       const [kind, hash] = identity(report);
-      lines.push(node("p", "identity", `${kind} `, hashNode(hash)));
+      latestIdentity.append(node("p", "identity", `${kind} `, hashNode(hash)));
     }
-    latestBody.replaceChildren(...lines);
   }
 
   // `reveal` scrolls the latest decision into view: only for a decision the
@@ -375,6 +441,7 @@ export async function mount(container, template) {
   function renderReport(request, report, note, reveal) {
     if (count === 0) timeline.replaceChildren();
     count += 1;
+    historySummary.textContent = `All ${count} decision${count === 1 ? "" : "s"}, in order`;
     const head = node("div", "entry-head", node("span", "number", `#${count}`), ...verdict(request, report));
     if (note) head.append(node("span", "note", note));
     const body = node("div", "entry-body", ...plainLines(report));
@@ -387,10 +454,9 @@ export async function mount(container, template) {
     if (reveal) latest.scrollIntoView({ block: "nearest" });
   }
 
-  // Sends one request and renders the module's report. After a reply the
-  // page could not read, or a module that stopped answering, the state
-  // stays as it was shown, since the module can no longer report it, and
-  // only starting over continues.
+  // Sends one request and renders the module's report. After a refusal that
+  // ended the session, the state stays as it was shown, since the module can
+  // no longer report it, and only starting over continues.
   function send(request, note, reveal) {
     let report;
     try {
@@ -398,11 +464,11 @@ export async function mount(container, template) {
     } catch (error) {
       report = { error: error.message, stage: "boundary" };
     }
-    history.push({ request, report });
+    sent.push({ request, report });
     const refusal = report.error ? describeRefusal(report) : null;
     if (refusal?.kind !== "limit") used += 1;
     renderReport(request, report, note, reveal);
-    if (refusal?.kind === "transport") {
+    if (refusal?.ends) {
       broken = true;
       status.textContent = refusal.text;
     } else {
@@ -435,9 +501,11 @@ export async function mount(container, template) {
     used = 0;
     exhausted = false;
     broken = false;
-    history.length = 0;
+    sent.length = 0;
     timeline.replaceChildren(node("li", "empty", "No decisions yet."));
+    historySummary.textContent = "No decisions yet";
     latestBody.replaceChildren(node("p", "empty", "No decision yet. Send a request, or run the demonstration."));
+    latestIdentity.replaceChildren();
     renderState(state);
     refreshSession();
     status.textContent = `Started over, at ${genesis}`;
@@ -463,7 +531,7 @@ export async function mount(container, template) {
         }
       }
       status.textContent = `The demonstration from the template's README, decided in this browser${onLoad ? " when the page loaded" : ""}: `
-        + `${history.length} requests. Compare each decision with the README, send your own request, or start over.`;
+        + `${sent.length} requests. Compare each decision with the README, send your own request, or start over.`;
     } finally {
       setBusy(false);
     }
@@ -485,5 +553,5 @@ export async function mount(container, template) {
   status.textContent = `Ready, at ${genesis}`;
   setBusy(false);
   // `send` is for the checks: it pushes a request past the disabled buttons.
-  return { reset, runDemonstration, send: (request) => send(request, null, false), history, state: () => demo.state(), status, latest, session };
+  return { reset, runDemonstration, send: (request) => send(request, null, false), history: sent, state: () => demo.state(), status, latest, session };
 }

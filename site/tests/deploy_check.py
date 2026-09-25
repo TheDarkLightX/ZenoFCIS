@@ -28,8 +28,13 @@ timeout:
    over", send nothing more, show the module's own refusal in the same words
    for a request pushed past the limit, word a reply it cannot read as a
    decision that may have executed with starting over required, and decide
-   a request again after "Start over". One template per browser capture
-   keeps each result and failure attributable to that template;
+   a request again after "Start over". Every refusal is worded by its stage:
+   synthetic reports for input, admission, authority, commit, and transport
+   must read "before any decision" only for the first three, and "Start
+   over" without any claim of a rollback for the commit step and a reply
+   too large to read; and two requests the module itself refuses must render
+   as refused before any decision. One template per browser capture keeps
+   each result and failure attributable to that template;
 2. the page itself: the example shown when it loads must have loaded its
    module, run its README's demonstration, said so in its status, rendered
    one history entry per decision with the gate's decision on it, and shown
@@ -40,8 +45,8 @@ timeout:
    demonstration, the page must not have scrolled itself, its title must be
    inside the viewport, and the document must be no wider than the viewport;
 4. every request the browser made, as the DevTools pipe reports them, must
-   be for the subpath or the harness. The one exception is Chrome's own probe
-   for /favicon.ico at the origin's root, which the server refuses.
+   be for the subpath or the harness; the page and the harness pages declare
+   an inline icon, so Chrome probes no /favicon.ico.
 
 A page that loaded from the subpath alone is a page whose relative paths hold.
 
@@ -84,7 +89,8 @@ BADGES = {"Accept": "Accepted", "CommittedFailure": "Committed failure", "Reject
 BADGE = re.compile(r'<span class="badge [a-z]+">([^<]*)</span>')
 # Tags that fetch what they name, and an absolute URL in the attribute that names it.
 RESOURCE_TAG = re.compile(r"<(?:link|script|img|iframe|source|video|audio|object|embed|use)\b([^>]*)>", re.IGNORECASE)
-ABSOLUTE_URL = re.compile(r"""(?:src|href|data|xlink:href)\s*=\s*["']?\s*(?:[a-z][a-z0-9+.-]*:|//)""", re.IGNORECASE)
+# A `data:` URL loads nothing from anywhere; the page's icon is one.
+ABSOLUTE_URL = re.compile(r"""(?:src|href|data|xlink:href)\s*=\s*["']?\s*(?:(?!data:)[a-z][a-z0-9+.-]*:|//)""", re.IGNORECASE)
 CSS_REMOTE = re.compile(r"""@import|url\(\s*["']?\s*(?:[a-z][a-z0-9+.-]*:|//)""", re.IGNORECASE)
 # The stylesheet's text-on-background pairs, and the WCAG AA minimum for each:
 # 4.5 for text, 3 for a control's border and the focus ring.
@@ -275,6 +281,9 @@ def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
         require(session["problems"] == [] and session["sent"] == 64,
                 f"{name}: the session limit is not shown as the ABI and the page promise, or starting over "
                 f"does not begin a fresh session: {session}")
+        refusals = result["refusals"]
+        require(refusals["problems"] == [] and refusals["checked"] == 8,
+                f"{name}: a refusal is not worded by its stage: {refusals}")
 
 
 def check_page(dom: str, first: str) -> None:
@@ -324,9 +333,9 @@ def check_viewport(dom: str, width: int, height: int) -> None:
 
 
 def check_requests(requests: list[str], origin: str, subpath: str) -> None:
-    """Every request the browser made stayed within the subpath or the harness, but for Chrome's favicon probe."""
+    """Every request the browser made stayed within the subpath or the harness; the inline icon leaves no favicon probe."""
     allowed = (f"{origin}{subpath}", f"{origin}{HARNESS_PREFIX}")
-    outside = sorted({url for url in requests if not url.startswith(allowed) and url != f"{origin}/favicon.ico"})
+    outside = sorted({url for url in requests if not url.startswith(allowed)})
     require(outside == [], f"the browser requested something outside the subpath: {outside}")
 
 

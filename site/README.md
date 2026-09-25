@@ -55,9 +55,18 @@ the shared shape described here. The Pages workflow publishes only from
   by their first twelve hex digits, with the full value a button away. The
   session's count of the module's 64 requests sits beside the actions; at
   the limit the panel says so, in the words a visitor needs, and sends
-  nothing more until "Start over"; a reply the page cannot read is worded
-  as a decision that may have executed, with starting over required. The
-  built modules land here and are not committed. The page fetches its
+  nothing more until "Start over". A refusal is worded by its stage: input,
+  admission, and authority refuse before any decision, and nothing changed;
+  the commit step refuses after the authority authorized the decision,
+  which may already have been saved; a reply the page cannot read comes
+  after a decision may have executed; the last two end the session, with
+  starting over required, and neither claims a rollback. The history is
+  collapsed behind its count, with every entry in the document, and a
+  proposer's list shows its first three with a button for the rest.
+  Enumerated values read in each template's plain words, with the raw value
+  beside the state line and in the technical record. The page and the
+  harness pages declare an inline `data:` icon, so the browser probes no
+  favicon. The built modules land here and are not committed. The page fetches its
   modules relative to its own scripts, so it works from any path it is
   served at, and it loads no font, script, style, or image from another
   origin.
@@ -157,7 +166,13 @@ its controls, naming the 64 requests and "Start over", send nothing more,
 show the module's own refusal in the same words for a request pushed past
 the limit, word a reply it cannot read as a decision that may have
 executed with starting over required, and decide a request again after
-"Start over". The page itself must have loaded the module
+"Start over". Every refusal must be worded by its stage: synthetic reports
+for input, admission, authority, commit, and transport read "before any
+decision" only for the first three, and "Start over" without a claimed
+rollback for the commit step and a reply too large to read; two requests
+the module itself refuses, one with a field the command does not read and
+one with a value outside its range, must render as refused before any
+decision. The page itself must have loaded the module
 of the example shown on load, run that README's demonstration, said so in
 its status, rendered one history entry per decision with the gate's decision
 on it and the last one in its latest-decision box, shown no other example,
@@ -166,9 +181,9 @@ and fetched no other module; and, loaded in a frame of the same origin
 it must have stayed at its top with its title in view, since the latest
 decision scrolls into view only when the viewer caused it, and its document
 must be no wider than the frame. Every request the browser made, as the
-DevTools pipe reports them, must be for the subpath or the harness; Chrome's
-own probe for `/favicon.ico` at the origin's root, which the server refuses,
-is the one exception. A page that loaded from the subpath alone is a page
+DevTools pipe reports them, must be for the subpath or the harness; the
+page and the harness pages declare an inline icon, so Chrome probes no
+`/favicon.ico`. A page that loaded from the subpath alone is a page
 whose relative paths hold. Each template has its own browser capture so that
 a failure identifies the template involved.
 

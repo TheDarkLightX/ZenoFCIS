@@ -6,6 +6,22 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- The demo site's page is redesigned around the examples and their
+  decisions: an opening with a diagram of proposer, judge, and shell; six
+  tabs that show one example in place; grouped controls that send the same
+  requests as before; a latest-decision box in plain words, with the history
+  collapsed behind its count and a technical record for each entry; plain
+  labels and enumerated values, with the schema names and raw values kept;
+  hashes by prefix with the full value a button away; light and dark themes;
+  no resource from another origin. Refusals are worded by stage: before any
+  decision for input, admission, and authority, with nothing changed; after
+  the authority authorized the decision for the commit step, which may
+  already have been saved; and a reply too large to read as a decision that
+  may have executed. The module's 64-request session is counted beside the
+  controls, and "Start over" begins a fresh one. `site/tests/deploy_check.py`
+  checks the example shown on load, the latest decision, every hash, every
+  control's request, the refusal wording, the session limit, two viewport
+  sizes, and every request the browser makes.
 - Invocation admission now validates the pre-state against the authority's
   own schema and validation limits before issuing a witness that permits
   program execution. Command/context and later artifact checks remain.
