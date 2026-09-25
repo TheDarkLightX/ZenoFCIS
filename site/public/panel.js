@@ -15,6 +15,18 @@ const KIND_LABELS = {
   CommittedFailure: ["failure", "Committed failure"],
   Reject: ["reject", "Rejected"],
 };
+// The module's session, from site/ABI.md: 64 complete requests between
+// resets, refused at the input stage after that; and a reply too large for
+// its response buffer, which retires the session after a decision may have
+// executed.
+const SESSION_LIMIT = 64;
+const LIMIT_ERROR = "session limit reached";
+const LIMIT_MESSAGE = `This example has handled its ${SESSION_LIMIT} requests. Start over to begin a fresh session.`;
+const TRANSPORT_MESSAGE = "The module's reply was too large for the page to read. A decision may have "
+  + "executed, and the page cannot show it: the state and history shown are from before this request. "
+  + "Starting over is required; it begins a fresh session.";
+const BOUNDARY_MESSAGE = "The module stopped answering. A decision may have executed, and the page cannot "
+  + "show it. Start over to begin a fresh session; if that fails, reload the page.";
 
 function node(tag, className, ...children) {
   const created = document.createElement(tag);
@@ -34,6 +46,19 @@ function sentence(text) {
 
 function short(hash) {
   return `${hash.slice(0, HASH_PREFIX)}…`;
+}
+
+// A refused request in plain words: the session limit; a reply the page
+// could not read, after which a decision may have executed and nothing is
+// claimed rolled back; a module that stopped answering; or the schema's or
+// the authority's own refusal, shown as the module words it.
+export function describeRefusal(report) {
+  if (report.stage === "transport") return { kind: "transport", label: "Not shown", text: TRANSPORT_MESSAGE };
+  if (report.stage === "boundary") return { kind: "transport", label: "Not shown", text: BOUNDARY_MESSAGE };
+  if (report.stage === "input" && String(report.error).startsWith(LIMIT_ERROR)) {
+    return { kind: "limit", label: "Refused", text: LIMIT_MESSAGE };
+  }
+  return { kind: "refused", label: "Refused", text: `Refused at ${report.stage}, before any decision: ${report.error}` };
 }
 
 // A hash by its first twelve hex digits, with a button that shows the full
@@ -169,7 +194,11 @@ export async function mount(container, template) {
   demonstrationButton.type = "button";
   const resetButton = node("button", "reset", "Start over");
   resetButton.type = "button";
-  form.append(node("div", "actions", demonstrationButton, resetButton));
+  // The session's count, beside the actions: how many of the module's 64
+  // requests this session has used, or that it has used them all.
+  const session = node("p", "session");
+  session.id = `${template.name}-session`;
+  form.append(node("div", "actions", demonstrationButton, resetButton, session));
 
   const status = node("p", "status", "Loading the module.");
   status.id = `${template.name}-status`;
@@ -227,16 +256,32 @@ export async function mount(container, template) {
       timeline),
   );
 
-  const buttons = [...commands.map(({ button }) => button), ...proposerButtons, demonstrationButton, resetButton];
+  const sendButtons = [...commands.map(({ button }) => button), ...proposerButtons];
   let demo = null;
   let busy = false;
   let count = 0;
+  // Requests this session has sent to the module, which counts them
+  // against its limit; `exhausted` once it has used them all, and `broken`
+  // after a reply the page could not read, until the next reset.
+  let used = 0;
+  let exhausted = false;
+  let broken = false;
   // Every request sent since the last reset, with the module's report.
   const history = [];
 
   function setBusy(value) {
     busy = value;
-    for (const button of buttons) button.disabled = value || demo === null;
+    for (const button of sendButtons) button.disabled = value || demo === null || exhausted || broken;
+    demonstrationButton.disabled = value || demo === null;
+    resetButton.disabled = value || demo === null;
+  }
+
+  function refreshSession() {
+    exhausted = exhausted || used >= SESSION_LIMIT;
+    session.classList.toggle("limit", exhausted || broken);
+    session.textContent = broken ? "This session ended. Start over to begin a fresh one."
+      : exhausted ? LIMIT_MESSAGE : `${used} of ${SESSION_LIMIT} requests used in this session.`;
+    setBusy(busy);
   }
 
   function renderState(state) {
@@ -262,14 +307,16 @@ export async function mount(container, template) {
   // The verdict and the request, as the head of the latest box and of each
   // history entry.
   function verdict(request, report) {
-    const [className, kind] = report.error ? ["refused", "Refused"] : KIND_LABELS[report.decision];
+    const [className, kind] = report.error
+      ? [describeRefusal(report).kind, describeRefusal(report).label]
+      : KIND_LABELS[report.decision];
     return [node("span", `badge ${className}`, kind), node("span", "request", template.describe(request))];
   }
 
   // The decision in plain words: the reason, what changed, and what was
   // queued.
   function plainLines(report) {
-    if (report.error) return [node("p", "reason", `Refused at ${report.stage}, before any decision: ${report.error}`)];
+    if (report.error) return [node("p", "reason", describeRefusal(report).text)];
     const lines = [];
     if (report.reason) {
       const plain = template.reasons[report.reason.name] ?? words(report.reason.name ?? report.reason.id);
@@ -340,14 +387,32 @@ export async function mount(container, template) {
     if (reveal) latest.scrollIntoView({ block: "nearest" });
   }
 
+  // Sends one request and renders the module's report. After a reply the
+  // page could not read, or a module that stopped answering, the state
+  // stays as it was shown, since the module can no longer report it, and
+  // only starting over continues.
   function send(request, note, reveal) {
-    const report = demo.step(request);
+    let report;
+    try {
+      report = demo.step(request);
+    } catch (error) {
+      report = { error: error.message, stage: "boundary" };
+    }
     history.push({ request, report });
+    const refusal = report.error ? describeRefusal(report) : null;
+    if (refusal?.kind !== "limit") used += 1;
     renderReport(request, report, note, reveal);
-    renderState(demo.state());
-    // The latest box announces the decision; the status keeps to loading,
-    // the demonstration, starting over, and input errors.
-    if (reveal) status.textContent = "";
+    if (refusal?.kind === "transport") {
+      broken = true;
+      status.textContent = refusal.text;
+    } else {
+      renderState(demo.state());
+      // The latest box announces the decision; the status keeps to loading,
+      // the demonstration, starting over, the session, and input errors.
+      if (reveal) status.textContent = "";
+    }
+    refreshSession();
+    if (exhausted && !broken && (reveal || refusal?.kind === "limit")) status.textContent = LIMIT_MESSAGE;
     return report;
   }
 
@@ -367,10 +432,14 @@ export async function mount(container, template) {
   function reset() {
     const state = demo.reset();
     count = 0;
+    used = 0;
+    exhausted = false;
+    broken = false;
     history.length = 0;
     timeline.replaceChildren(node("li", "empty", "No decisions yet."));
     latestBody.replaceChildren(node("p", "empty", "No decision yet. Send a request, or run the demonstration."));
     renderState(state);
+    refreshSession();
     status.textContent = `Started over, at ${genesis}`;
   }
 
@@ -415,5 +484,6 @@ export async function mount(container, template) {
   reset();
   status.textContent = `Ready, at ${genesis}`;
   setBusy(false);
-  return { reset, runDemonstration, history, state: () => demo.state(), status, latest };
+  // `send` is for the checks: it pushes a request past the disabled buttons.
+  return { reset, runDemonstration, send: (request) => send(request, null, false), history, state: () => demo.state(), status, latest, session };
 }

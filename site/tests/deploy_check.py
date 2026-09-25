@@ -22,9 +22,14 @@ timeout:
    module's full value, and the proposer's list where the template describes
    one. Then, from genesis again, the harness enters each demonstration step
    into the form and clicks its button: every control must send exactly the
-   request the script sends, and reach the script's decision. One template
-   per browser capture keeps each result and failure attributable to that
-   template;
+   request the script sends, and reach the script's decision. Then it clicks
+   one control until the module's session of 64 requests is used up: the
+   panel must say so beside its controls, naming the 64 requests and "Start
+   over", send nothing more, show the module's own refusal in the same words
+   for a request pushed past the limit, word a reply it cannot read as a
+   decision that may have executed with starting over required, and decide
+   a request again after "Start over". One template per browser capture
+   keeps each result and failure attributable to that template;
 2. the page itself: the example shown when it loads must have loaded its
    module, run its README's demonstration, said so in its status, rendered
    one history entry per decision with the gate's decision on it, and shown
@@ -266,6 +271,10 @@ def check_harness(dom: str, subpath: str, templates: list[str]) -> None:
         controls = result["controls"]
         require(controls["mismatches"] == [] and controls["checked"] == len(expected["decisions"]),
                 f"{name}: a control sent a request other than the script's: {controls}")
+        session = result["session"]
+        require(session["problems"] == [] and session["sent"] == 64,
+                f"{name}: the session limit is not shown as the ABI and the page promise, or starting over "
+                f"does not begin a fresh session: {session}")
 
 
 def check_page(dom: str, first: str) -> None:
