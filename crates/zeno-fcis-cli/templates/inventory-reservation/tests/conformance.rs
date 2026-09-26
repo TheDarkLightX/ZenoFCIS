@@ -7,13 +7,13 @@
 //! `project.zeno`, not through the generated name bindings, so a binding that
 //! swapped the two stock fields fails here.
 //!
-//! The model is the synthesized step read through the adapter's output table,
-//! with the operator check in front of it. `tools/check_synthesis.py` compares
-//! the step's complete vectors with an independent restatement of the rules,
+//! The model independently restates the stock and authorization rules.
+//! `tools/check_synthesis.py` compares the step's complete vectors with a
+//! separate restatement of the rules,
 //! and the examples file checks both against the README.
 
 use inventory_reservation::{
-    Authority, authority, bindings::GeneratedProject, generated::*, profile, request, synthesized,
+    Authority, authority, bindings::GeneratedProject, generated::*, profile, request,
 };
 use std::collections::BTreeSet;
 use zeno_fcis_codec::Domain;
@@ -165,8 +165,7 @@ fn observe(
     }
 }
 
-/// The finite model: the operator check, then the synthesized step read
-/// through the output table documented in `src/program.rs`.
+/// The finite model, independently restated from the README's precedence rules.
 fn model(pre: State, action_id: u16, quantity: i128, authorized: bool) -> Outcome {
     let reject = |reason| Outcome {
         kind: "reject",
@@ -177,30 +176,28 @@ fn model(pre: State, action_id: u16, quantity: i128, authorized: bool) -> Outcom
     if !authorized {
         return reject(200);
     }
-    let narrow = |value: i128| i64::try_from(value).unwrap();
-    let output = synthesized::transition(&[
-        narrow(pre.0),
-        narrow(pre.1),
-        i64::from(action_id - 150),
-        narrow(quantity),
-    ])
-    .unwrap();
-    match output[0] {
-        0 => reject(201),
-        1 => reject(202),
-        2 => reject(203),
-        3 => Outcome {
-            kind: "accept",
-            reason: None,
-            post: (i128::from(output[1]), i128::from(output[2])),
-            shipments: if output[3] == 1 {
-                vec![(300, quantity)]
-            } else {
-                assert_eq!(output[3], 0);
-                Vec::new()
-            },
+    let (available, reserved) = pre;
+    let (post, ship) = match action_id {
+        150 if quantity > available => return reject(201),
+        150 if reserved + quantity > 5 => return reject(203),
+        150 => ((available - quantity, reserved + quantity), false),
+        151 | 152 if quantity > reserved => return reject(202),
+        151 if available + quantity > 5 => return reject(203),
+        151 => ((available + quantity, reserved - quantity), false),
+        152 => ((available, reserved - quantity), true),
+        153 if available + quantity > 5 => return reject(203),
+        153 => ((available + quantity, reserved), false),
+        other => panic!("unknown action ID {other}"),
+    };
+    Outcome {
+        kind: "accept",
+        reason: None,
+        post,
+        shipments: if ship {
+            vec![(300, quantity)]
+        } else {
+            Vec::new()
         },
-        other => panic!("unknown decision code {other}"),
     }
 }
 
