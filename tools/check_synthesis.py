@@ -79,7 +79,16 @@ def gateway_decision_table(rules: str) -> dict:
         if len(fired) != 1:
             raise RuntimeError(f"rule base conflict on {inputs}: rules {[index for index, _ in fired]}")
         (index, verdict), strikes = fired[0], inputs[strikes_at]
-        expected[inputs] = [verdict, index, min(strikes + 1, cap) if verdict == 2 else strikes]
+        for action, reviewer in itertools.product(range(2), repeat=2):
+            if action == 0:
+                out = [verdict, index, min(strikes + 1, cap) if verdict == 2 else strikes]
+            elif reviewer == 0:
+                out = [3, len(rules_read) - 1, strikes]
+            elif strikes == 0:
+                out = [4, len(rules_read) - 1, strikes]
+            else:
+                out = [5, len(rules_read) - 1, 0]
+            expected[(*inputs, action, reviewer)] = out
     return expected
 
 
@@ -274,9 +283,9 @@ def exercise_gateway(cli: list[str], app: Path, directory: Path,
     """The compliance-gateway example's synthesized screening step, against
     a separate evaluation of its rule base."""
     expected = gateway_decision_table((app / "rules.txt").read_text())
-    if len(expected) != 720:
-        raise RuntimeError("gateway rule base does not span its 720 inputs")
-    return exercise_synthesized(cli, app, directory, environment, "gateway", 720, expected)
+    if len(expected) != 2880:
+        raise RuntimeError("gateway rules do not span all 2,880 inputs")
+    return exercise_synthesized(cli, app, directory, environment, "gateway", 2880, expected)
 
 
 def exercise_withdrawal(cli: list[str], app: Path, directory: Path,

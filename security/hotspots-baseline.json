@@ -4515,60 +4515,60 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 373,
+      "production_lines": 382,
       "rank": 45,
       "score": 77,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            437
+            446
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            398
+            407
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            335,
-            358,
-            393,
-            399
+            344,
+            367,
+            402,
+            408
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            93,
-            276,
-            342,
-            372,
-            393,
-            394,
-            398
+            102,
+            285,
+            351,
+            381,
+            402,
+            403,
+            407
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
             22,
-            267,
-            370,
-            380,
-            441
+            276,
+            379,
+            389,
+            450
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
             26,
-            93,
-            342,
-            394
+            102,
+            351,
+            403
           ]
         }
       ],
@@ -5256,9 +5256,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3796889,
+    "admitted_bytes": 3798864,
     "admitted_files": 222,
-    "inventory_sha256": "3996145839491aeccf8e46e9113ce111500f4dd317459a7b21c184f5942d3792",
+    "inventory_sha256": "a96d00a7a93bb3f73afb5939c1f88e79556a767a1d26a2e3ed3b4c93288d4b08",
     "ranked_above_minimum": 200,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

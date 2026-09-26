@@ -4,8 +4,8 @@ This local, non-value-moving application screens transfers for one customer
 with an expert system's rule base. It shows five patterns:
 - a rule base as the contract: `rules.txt` holds prioritized rules over
   finite features, `synthesis.json` states them as a relation, and
-  `zeno-fcis synth` selects a decision program that satisfies it on all 720
-  inputs;
+  `zeno-fcis synth` selects a decision program that satisfies it on all 2,880
+  inputs, including both actions and reviewer values;
 - every decision names the rule that fired: a blocked transfer is a committed
   failure under that rule's reason, a held transfer queues a review ticket
   naming it, and a rule base with a conflict, a gap, or a rule that never
@@ -19,9 +19,9 @@ with an expert system's rule base. It shows five patterns:
   keeps the strikes within their bounds, for every integer. CVC5 attests the
   induction step, and the tests check the rest of the argument.
 
-`src/program.rs` decides a reinstatement by hand and calls the synthesized
-step in `synthesized/transition.rs` for a screening, mapping its output into
-typed staging. The law checker in `src/laws.rs` evaluates the formulas in
+`src/program.rs` calls the synthesized step in `synthesized/transition.rs`
+for the complete finite decision, then maps its output into typed staging.
+The law checker in `src/laws.rs` evaluates the formulas in
 `project.zeno` against every decision, evaluates `rules.txt` itself through
 `src/rules.rs`, and refuses any decision that breaks either.
 
@@ -125,19 +125,21 @@ conditions never hold together.
 ## The synthesized step
 
 `synthesis.json` has two parts:
-- a contract, written from `rules.txt` by `rules_to_synthesis.py`: for every
-  standing and transfer, the verdict, the rule, and the strikes after the
-  decision that the highest-priority matching rule requires;
+- a contract, written from `rules.txt` and the reinstatement rules by
+  `rules_to_synthesis.py`: for every standing, transfer, action, and reviewer
+  flag, the decision, rule, and strikes after the decision;
 - a sketch: a hand-written decision program in priority order with three
   holes, the freeze threshold, the boundary of a large amount, and the verdict
-  code of a hold.
+  code of a hold. Its reinstatement branch has no holes.
 
-`zeno-fcis synth run` evaluates hole assignments over all 720 inputs and
+`zeno-fcis synth run` evaluates hole assignments over all 2,880 inputs and
 selects the first that satisfies the contract on every one: freeze at 3
 strikes, large from band 3, and 1 as the code of a hold. The selected program,
 its complete input and output vectors, and the emitted Rust are checked in
-under `synthesized/`. The reinstatement rules sit in `src/program.rs`, in
-front of the step, so the synthesis stays a pure function of the features.
+under `synthesized/`. For reinstatement, the synthesized result has first
+precedence for a missing reviewer, then no strikes, then an accepted reset.
+Its rule field is set to the last rule index as a fixed placeholder; no
+screening rule fires on reinstatement, and the adapter ignores that field.
 
 That selection is exhaustive verification against the contract, for the
 program as the library's interpreter runs it. The emitted Rust carries the same
@@ -155,9 +157,9 @@ zeno-fcis synth verify synthesis.json --target javascript --out javascript-step 
 It is only as right as the contract, and the contract is only as right as its
 derivation from the rule base. Two evaluators of `rules.txt` that share
 nothing with `rules_to_synthesis.py` or the synthesizer check that:
-`tests/rule_base.rs` compares the selected program with `src/rules.rs` on
-every input, and `tools/check_synthesis.py` in the library compares the
-vectors with a separate Python evaluation of the same file. The examples in
+`tests/rule_base.rs` compares the selected program with `src/rules.rs` and
+the reinstatement rules on every input, and `tools/check_synthesis.py` in the
+library compares the vectors with a separate Python evaluation. The examples in
 `tests/decision-examples.txt` check the running application against this
 README.
 
@@ -238,8 +240,9 @@ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
 
 The tests check the running application:
 - `tests/rule_base.rs` checks that the rule base is consistent, total, and
-  live, that the synthesized step agrees with `src/rules.rs` on all 720
-  inputs, that the step refuses inputs outside its domain, and that
+  live, that the synthesized step agrees with `src/rules.rs` and the
+  reinstatement rules on all 2,880 inputs, that the step refuses inputs outside
+  its domain, and that
   conflicting, incomplete, shadowed, and malformed rule bases are refused at
   the line, transfer, or rule that shows the fault.
 - `tests/conformance.rs` runs all 2,880 admitted inputs (every standing,
@@ -315,31 +318,31 @@ observed; long JSON is reduced to the fields named.
 
    ```text
    $ python3 rules_to_synthesis.py rules.txt synthesis.json
-   12 rules; contract 99 nodes, sketch 68 nodes
+   12 rules; contract 87 nodes, sketch 79 nodes
    ```
 
 4. **Synthesize the decision.** The run selected the fourteenth of eighteen
-   hole assignments, the first that satisfies the contract on all 720 inputs;
+   hole assignments, the first that satisfies the contract on all 2,880 inputs;
    `--check` regenerates the artifacts and compares them with the checked-in
    ones.
 
    ```text
    $ zeno-fcis synth run synthesis.json --out synthesized --check
-   {"status":"current","semantic":"complete-finite","runtime_conformance":"not-run", "manifest":{"status":"selected","input_coverage":720,"assignments_evaluated":14,"certificate":"44a075f70f420c6e0056d6a5ac02d00652c991d2a4c99d69057ba3b2cfed8fa3", ...}, ...}
+   {"status":"current","semantic":"complete-finite","runtime_conformance":"not-run", "manifest":{"status":"selected","input_coverage":2880,"assignments_evaluated":14,"certificate":"281b9f68bae317c212da78e9ad64995d54ae0fb35a18815e17460cb1c9396ebc", ...}, ...}
    ```
 
-5. **Replay the emitted source in three languages.** Each target ran all 720
+5. **Replay the emitted source in three languages.** Each target ran all 2,880
    inputs and produced the same output bytes under the same certificate.
 
    ```text
    $ zeno-fcis synth verify synthesis.json --out synthesized --receipt rust-conformance.json
-   {"status":"passed","inputs_checked":720,"certificate":"44a075f7…8fa3","stdout_sha256":"85357250…5b23d","tool":{"version":"rustc 1.97.1 (8bab26f4f 2026-07-14)", ...}, ...}
+   {"status":"passed","inputs_checked":2880,"certificate":"281b9f68…396ebc","stdout_sha256":"098d3146…bf365d","tool":{"version":"rustc 1.97.1 (8bab26f4f 2026-07-14)", ...}, ...}
    $ zeno-fcis synth run synthesis.json --target python --out python-step
    $ zeno-fcis synth verify synthesis.json --target python --out python-step --receipt python-conformance.json
-   {"status":"passed","inputs_checked":720,"certificate":"44a075f7…8fa3","stdout_sha256":"85357250…5b23d","tool":{"version":"Python 3.12.3", ...}, ...}
+   {"status":"passed","inputs_checked":2880,"certificate":"281b9f68…396ebc","stdout_sha256":"098d3146…bf365d","tool":{"version":"Python 3.12.3", ...}, ...}
    $ zeno-fcis synth run synthesis.json --target javascript --out javascript-step
    $ zeno-fcis synth verify synthesis.json --target javascript --out javascript-step --receipt javascript-conformance.json
-   {"status":"passed","inputs_checked":720,"certificate":"44a075f7…8fa3","stdout_sha256":"85357250…5b23d","tool":{"version":"v22.23.1", ...}, ...}
+   {"status":"passed","inputs_checked":2880,"certificate":"281b9f68…396ebc","stdout_sha256":"098d3146…bf365d","tool":{"version":"v22.23.1", ...}, ...}
    ```
 
 6. **Check the decision code statically.**
