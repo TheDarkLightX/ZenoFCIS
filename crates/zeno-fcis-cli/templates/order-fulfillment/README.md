@@ -3,17 +3,21 @@
 This local application follows one order from checkout to delivery. Payment
 and shipping happen in other systems: the order sends them requests through
 the outbox, and their answers come back as commands. It shows three patterns:
-- a hand-written state machine, in which every command is decided from the
-  order's current status;
+- a synthesized finite decision core, which selects a complete decision
+  branch from the order, command, and caller;
 - idempotent external requests: each request is queued once, by the decision
   that moves the order, and carries a number the receiver can use to recognize
   a retry;
 - callbacks that arrive twice or late are rejected and change nothing: the
   order has moved on, or the callback names an older payment attempt.
 
-The decision in `src/program.rs` is written by hand. The law checker in
-`src/laws.rs` evaluates the formulas in `project.zeno` against every decision
-the program makes, and refuses any decision that breaks them.
+`synthesis.json` defines the closed finite decision relation. `zeno-fcis
+synth` selected `synthesized/transition.rs` after checking all 1,728 input
+tuples. `src/program.rs` is a reviewed adapter from the selected branch to
+typed state updates, rejection reasons, and outbox requests. Its executed
+decisions are checked against an independent model for all 1,440 inputs over
+lawful pre-states. The law checker in `src/laws.rs` also evaluates the formulas
+in `project.zeno` against each decision before publication.
 
 `project.zeno` owns record fields, command variants, reason order, channel
 types, and relational formulas. `build.rs` supplies explicit scalar bounds and
@@ -89,6 +93,19 @@ No answer ever comes back inside a decision: the provider's and the carrier's
 answers are new commands.
 
 ## What is checked
+
+Regenerate and check the decision core with:
+
+```sh
+python3 decision_to_synthesis.py --check
+zeno-fcis synth run synthesis.json --out synthesized --check
+zeno-fcis synth verify synthesis.json --out synthesized
+```
+
+The synthesis claim covers the pure branch-selection function and its declared
+finite inputs. The app-level conformance test additionally checks the adapter's
+post-state, reasons, and request plan on every lawful finite input. The
+external payment and carrier systems are outside that claim.
 
 Every decision is checked at run time, before it can be published:
 - law 500: an order awaiting payment, paid, shipped, or delivered has made at

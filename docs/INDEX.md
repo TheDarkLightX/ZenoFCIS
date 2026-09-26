@@ -79,6 +79,7 @@
 - [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md)
 - [Deterministic synthesis](DETERMINISTIC_SYNTHESIS.md)
 - [Language-neutral synthesis and target conformance](LANGUAGE_NEUTRAL_SYNTHESIS.md)
+- [Synthesis-first skill and MCP tools](LLM_SYNTHESIS.md)
 - [Evidence importers](EVIDENCE_IMPORTERS.md)
 - [Mounted ZenoDEX adapter](MOUNTED_ZENODEX_ADAPTER.md)
 - [Mounted ZenoDEX zUSD v1](MOUNTED_ZENODEX_ZUSD_V1.md)

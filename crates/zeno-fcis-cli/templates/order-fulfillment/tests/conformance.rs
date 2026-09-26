@@ -2,7 +2,7 @@
 //! a reference model of the README's rules on every reachable input.
 //!
 //! Every decision runs through the application: schema admission, the
-//! authority, the hand-written program in `src/program.rs`, the law checker,
+//! authority, the synthesized decision and its reviewed adapter, the law checker,
 //! the committed patch, and the outbox plan. Fields are read by the numeric IDs
 //! in `project.zeno`, not through the generated name bindings, so a binding
 //! that swapped two fields or variants fails here.

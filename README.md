@@ -348,6 +348,11 @@ produced it. The interpreter checks the selected program itself. Then
 target runtime, so an error in code generation is caught too. Until that
 command passes, the emitted source is unverified.
 
+Agents building applications can install the repository's
+[synthesis-first skill and MCP tools](docs/LLM_SYNTHESIS.md). They guide
+agents to synthesize a finite pure core when it fits and to check the
+application adapter separately.
+
 #### How a program is synthesized
 
 1. A realizability check confirms that every admitted input has at least one
