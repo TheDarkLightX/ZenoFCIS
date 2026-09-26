@@ -412,7 +412,10 @@ PATH_ROLES: tuple[PathRole, ...] = (
     ),
     PathRole(
         identifier="host-tool",
-        pattern=r"^tools/.+\.py$",
+        pattern=(
+            r"^(?:tools/.+\.py|integrations/mcp/(?!test_)[^/]+\.py|"
+            r"crates/zeno-fcis-cli/templates/[^/]+/[^/]+\.py)$"
+        ),
         components=(
             ("authority", 2),
             ("reachability", 4),
@@ -989,6 +992,14 @@ def is_candidate(relative: str) -> bool:
     if relative.startswith("crates/") and path.suffix == ".rs":
         return "src" in parts or path.name == "build.rs"
     if relative.startswith("tools/") and path.suffix == ".py":
+        return True
+    if relative.startswith("integrations/mcp/") and path.suffix == ".py":
+        return not path.name.startswith("test_")
+    if (
+        relative.startswith("crates/zeno-fcis-cli/templates/")
+        and path.suffix == ".py"
+        and len(parts) == 5
+    ):
         return True
     if relative.startswith(".github/workflows/") and path.suffix in {".yml", ".yaml"}:
         return True

@@ -220,7 +220,8 @@ EXAMPLE_TEMPLATES = {
     },
 }
 # Examples whose decision core is synthesized, with the check of that synthesis.
-SYNTHESIZED_EXAMPLES = {"inventory-reservation": check_synthesis.exercise_inventory,
+SYNTHESIZED_EXAMPLES = {"order-fulfillment": check_synthesis.exercise_order,
+                        "inventory-reservation": check_synthesis.exercise_inventory,
                         "compliance-gateway": check_synthesis.exercise_gateway,
                         "withdrawal-queue": check_synthesis.exercise_withdrawal,
                         "agent-treasury-guard": check_synthesis.exercise_guard}
