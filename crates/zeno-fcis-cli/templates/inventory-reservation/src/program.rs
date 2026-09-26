@@ -1,8 +1,8 @@
 //! Reviewed adapter around the synthesized stock step.
 //!
-//! The operator check happens here. Everything else is decided by
-//! `synthesized::transition`, which was selected by exhaustive verification
-//! against `synthesis.json` over all 432 stock, action, and quantity inputs.
+//! `synthesized::transition` decides authorization, stock movement, rejection,
+//! and shipment selection. It was selected by exhaustive verification against
+//! `synthesis.json` over all 864 admitted inputs.
 //! This adapter maps its output through the table below into typed staging.
 //!
 //! | `output[0]` | Decision |
@@ -11,6 +11,7 @@
 //! | 1 | reject `insufficient_reserved` (202) |
 //! | 2 | reject `over_capacity` (203) |
 //! | 3 | accept: `output[1]` available, `output[2]` reserved, and a shipment request when `output[3]` is 1 |
+//! | 4 | reject `not_authorized` (200) |
 
 use crate::{bindings::*, generated::*, profile, synthesized};
 use zeno_fcis_authority::{CatalogTransitionProgram, ReviewedTransitionInput};
@@ -79,10 +80,6 @@ impl CatalogTransitionProgram<RustCryptoSha256> for StockProgram {
             input.limits(),
         )?;
         transition.observe_context_authorized()?;
-        if !context.authorized.0 {
-            transition.require(false, RejectReasonId::Reason200)?;
-            return Ok(transition.seal()?);
-        }
         let available = transition.read_available()?;
         let reserved = transition.read_reserved()?;
         let domain =
@@ -92,6 +89,7 @@ impl CatalogTransitionProgram<RustCryptoSha256> for StockProgram {
             domain(reserved.0)?,
             action_code(&command.action),
             domain(command.quantity.0)?,
+            i64::from(context.authorized.0),
         ])
         .ok_or(StockProgramError::SynthesisDomain)?;
         match output[0] {
@@ -116,6 +114,9 @@ impl CatalogTransitionProgram<RustCryptoSha256> for StockProgram {
                         },
                     )?;
                 }
+            }
+            4 => {
+                transition.require(false, RejectReasonId::Reason200)?;
             }
             _ => return Err(StockProgramError::SynthesisDomain),
         }

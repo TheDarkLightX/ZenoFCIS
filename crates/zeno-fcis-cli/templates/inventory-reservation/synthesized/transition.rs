@@ -1,11 +1,12 @@
 // Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.
 #[rustfmt::skip]
 pub fn transition(input: &[i64]) -> Option<[i64; 4]> {
-    if input.len() != 4 { return None; }
+    if input.len() != 5 { return None; }
     if !(0_i64..=5_i64).contains(&input[0]) { return None; }
     if !(0_i64..=5_i64).contains(&input[1]) { return None; }
     if !(0_i64..=3_i64).contains(&input[2]) { return None; }
     if !(1_i64..=3_i64).contains(&input[3]) { return None; }
+    if !(0_i64..=1_i64).contains(&input[4]) { return None; }
     let v0: i64 = input[0];
     let _ = v0;
     let v1: i64 = input[1];
@@ -84,9 +85,23 @@ pub fn transition(input: &[i64]) -> Option<[i64; 4]> {
     let _ = v37;
     let v38: i64 = i64::from(v29 == 1 && v11 == 1);
     let _ = v38;
-    if !(0_i64..=3_i64).contains(&v28) { return None; }
-    if !(0_i64..=5_i64).contains(&v36) { return None; }
-    if !(0_i64..=5_i64).contains(&v37) { return None; }
-    if !(0_i64..=1_i64).contains(&v38) { return None; }
-    Some([v28,v36,v37,v38,])
+    let v39: i64 = input[4];
+    let _ = v39;
+    let v40: i64 = 4_i64;
+    let _ = v40;
+    let v41: i64 = i64::from(v39 == 0);
+    let _ = v41;
+    let v42: i64 = if v41 == 1 { v40 } else { v28 };
+    let _ = v42;
+    let v43: i64 = if v41 == 1 { v0 } else { v36 };
+    let _ = v43;
+    let v44: i64 = if v41 == 1 { v1 } else { v37 };
+    let _ = v44;
+    let v45: i64 = i64::from(v39 == 1 && v38 == 1);
+    let _ = v45;
+    if !(0_i64..=4_i64).contains(&v42) { return None; }
+    if !(0_i64..=5_i64).contains(&v43) { return None; }
+    if !(0_i64..=5_i64).contains(&v44) { return None; }
+    if !(0_i64..=1_i64).contains(&v45) { return None; }
+    Some([v42,v43,v44,v45,])
 }
