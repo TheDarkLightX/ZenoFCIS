@@ -22,6 +22,34 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         include_bytes!("../templates/order-fulfillment/profile.rs"),
     ),
     (
+        "decision_to_synthesis.py",
+        include_bytes!("../templates/order-fulfillment/decision_to_synthesis.py"),
+    ),
+    (
+        "synthesis.json",
+        include_bytes!("../templates/order-fulfillment/synthesis.json"),
+    ),
+    (
+        "synthesized/manifest.json",
+        include_bytes!("../templates/order-fulfillment/synthesized/manifest.json"),
+    ),
+    (
+        "synthesized/problem.json",
+        include_bytes!("../templates/order-fulfillment/synthesized/problem.json"),
+    ),
+    (
+        "synthesized/program.zcve",
+        include_bytes!("../templates/order-fulfillment/synthesized/program.zcve"),
+    ),
+    (
+        "synthesized/transition.rs",
+        include_bytes!("../templates/order-fulfillment/synthesized/transition.rs"),
+    ),
+    (
+        "synthesized/vectors.json",
+        include_bytes!("../templates/order-fulfillment/synthesized/vectors.json"),
+    ),
+    (
         "src/delivery.rs",
         include_bytes!("../templates/order-fulfillment/src/delivery.rs"),
     ),

@@ -9,6 +9,7 @@ import json
 import operator
 import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -148,6 +149,41 @@ def builtin_decision_table(domain: str) -> dict:
                                    [3, available + quantity, reserved, 0])
                         expected[available, reserved, action, quantity] = out
         return expected
+    if domain == "order":
+        # Independent reading of order-fulfillment/README.md. The input and
+        # branch codes are the contract ABI; the adapter is checked by the
+        # template's application-level conformance test.
+        expected = {}
+        for action, status, attempts, callback, caller in itertools.product(
+                range(6), range(6), range(4), range(4), range(3)):
+            sender = 0 if action in (0, 5) else 1 if action in (1, 2) else 2
+            permitted = ((action == 0 and status == 0) or
+                         (action in (1, 2) and status == 1) or
+                         (action == 3 and status == 2) or
+                         (action == 4 and status == 3) or
+                         (action == 5 and status in (0, 1)))
+            if caller != sender:
+                branch = 0
+            elif not permitted:
+                branch = 1
+            elif action in (1, 2) and callback != attempts:
+                branch = 2
+            elif action == 0 and attempts == 3:
+                branch = 3
+            elif action == 0:
+                branch = 4
+            elif action == 1:
+                branch = 5
+            elif action == 2:
+                branch = 6
+            elif action == 3:
+                branch = 7
+            elif action == 4:
+                branch = 8
+            else:
+                branch = 9 if status == 0 else 10
+            expected[action, status, attempts, callback, caller] = [branch]
+        return expected
     if domain == "withdrawal":
         expected = {}
         for pending_a, pending_b, pause, must_serve, priority_b, arriving_a, arriving_b, alarm in (
@@ -221,6 +257,13 @@ def exercise_inventory(cli: list[str], app: Path, directory: Path,
                        environment: dict[str, str]) -> dict:
     """The inventory-reservation example's synthesized stock step."""
     return exercise_synthesized(cli, app, directory, environment, "inventory", 432)
+
+
+def exercise_order(cli: list[str], app: Path, directory: Path,
+                   environment: dict[str, str]) -> dict:
+    subprocess.run([sys.executable, str(app / "decision_to_synthesis.py"), "--check"],
+                   cwd=directory, env=environment, check=True, capture_output=True, timeout=30)
+    return exercise_synthesized(cli, app, directory, environment, "order", 1728)
 
 
 def exercise_gateway(cli: list[str], app: Path, directory: Path,
@@ -334,6 +377,7 @@ def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
     subprocess.run(cli + ["new", str(app), "--template", "durable-counter"], cwd=ROOT,
                    env=environment, check=True, stdout=subprocess.PIPE, timeout=120)
     counter = exercise_counter(cli, app, directory, environment)
+    order = exercise_order(cli, ROOT / "crates/zeno-fcis-cli/templates/order-fulfillment", directory, environment)
     generic = []
     for language, extension in TARGETS.items():
         out = directory / f"generic-{language}"
@@ -378,7 +422,7 @@ def check(cli: list[str], directory: Path, environment: dict[str, str]) -> dict:
     if missing["status"] != "conformance-unknown":
         raise RuntimeError("missing compiler did not remain unknown")
     return {"schema": "zeno-fcis/synthesis-validation/1", "status": "passed",
-            "counter": counter, "generic": generic, "integer_boundaries": integer_boundaries,
+            "counter": counter, "order": order, "generic": generic, "integer_boundaries": integer_boundaries,
             "negative_cases": ["source-and-manifest-tampering", "assignment-budget", "work-budget", "unsupported-target", "missing-tool", "receipt-location", "missing-problem", "inherited-node-environment"]}
 
 
@@ -399,7 +443,7 @@ def main() -> None:
         with args.receipt.open("x") as output:
             json.dump(receipt, output, indent=2)
             output.write("\n")
-    print("finite synthesis: Rust, Python and JavaScript passed counter, generic and exact-integer boundary cases; hostile cases rejected")
+    print("finite synthesis: Rust, Python and JavaScript passed counter, order, generic and exact-integer cases; hostile cases rejected")
 
 
 if __name__ == "__main__":

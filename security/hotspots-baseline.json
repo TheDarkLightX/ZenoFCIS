@@ -2477,21 +2477,21 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 342,
+      "production_lines": 343,
       "rank": 24,
       "score": 81,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            364,
             365,
-            369,
-            371,
-            378,
+            366,
+            370,
+            372,
             379,
-            387,
-            388
+            380,
+            388,
+            389
           ]
         },
         {
@@ -2499,13 +2499,13 @@
           "lines": [
             69,
             75,
-            348
+            349
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            341
+            342
           ]
         },
         {
@@ -2518,24 +2518,24 @@
             80,
             82,
             132,
-            339
+            340
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
             28,
-            256
+            257
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
             61,
-            261,
-            289,
-            305,
-            322
+            262,
+            290,
+            306,
+            323
           ]
         },
         {
@@ -2543,7 +2543,7 @@
           "lines": [
             76,
             115,
-            356
+            357
           ]
         }
       ],
@@ -2733,62 +2733,62 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 1426,
+      "production_lines": 1435,
       "rank": 26,
       "score": 81,
       "signals": [
         {
           "id": "cryptographic-verification",
           "lines": [
-            855,
-            1284,
-            1290
+            858,
+            1295,
+            1301
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            1536,
-            1559,
-            1575,
-            1613,
-            1622,
-            1624
+            1547,
+            1570,
+            1586,
+            1624,
+            1633,
+            1635
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            1497,
-            1625
+            1508,
+            1636
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            925
+            928
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            1497
+            1508
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            954,
-            1043,
-            1109
+            957,
+            1054,
+            1120
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            940,
             943,
-            1150
+            946,
+            1161
           ]
         }
       ],
@@ -4515,59 +4515,60 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 331,
+      "production_lines": 370,
       "rank": 45,
       "score": 77,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            390
+            434
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            351
+            395
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            289,
-            312,
-            346,
-            352
+            332,
+            355,
+            390,
+            396
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            92,
-            230,
-            296,
-            326,
-            346,
-            347,
-            351
+            93,
+            273,
+            339,
+            369,
+            390,
+            391,
+            395
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            21,
-            324,
-            334,
-            394
+            22,
+            264,
+            367,
+            377,
+            438
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            25,
-            92,
-            296,
-            347
+            26,
+            93,
+            339,
+            391
           ]
         }
       ],
@@ -4933,11 +4934,11 @@
     "date": "2026-07-31",
     "known_cve_rule": "Use CVSS 4.0, current EPSS, CISA KEV, and SSVC separately. Never substitute EPI for those systems.",
     "semantics": "EPI is an ordinal source-review priority index, not a vulnerability, severity, exploit probability, or release decision.",
-    "sha256": "66c9b96886e0e0ddb00148868aeee17bacb7681f77be0411e3544516c46c1360",
+    "sha256": "a599fd9a0c09fee582d4d18c7ed48952c85c816734d35390f2b5bdb733464be9",
     "version": "epi-1.0.0"
   },
   "parameters": {
-    "minimum_score": 50,
+    "minimum_score": 20,
     "top": 50
   },
   "review_routes": [
@@ -5255,16 +5256,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3775748,
-    "admitted_files": 219,
-    "inventory_sha256": "b1f04431d700b429b733dea774e639bdad3e98a1b9fc760ffeaa8b7b4928fd06",
-    "ranked_above_minimum": 170,
+    "admitted_bytes": 3796647,
+    "admitted_files": 222,
+    "inventory_sha256": "4420b62fe557df9c6136d9e60c8f9b2bb452e1b8a4d5e5f5e955e76496a2cb20",
+    "ranked_above_minimum": 200,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 13,
       "priority-2": 48,
-      "priority-3": 109,
+      "priority-3": 112,
       "priority-4": 18,
       "priority-5": 31
     }
