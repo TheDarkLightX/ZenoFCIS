@@ -1,0 +1,63 @@
+{
+  "abi": {
+    "inputs": [
+      "command.action",
+      "pre.status",
+      "pre.payment_attempts",
+      "command.callback_attempt",
+      "context.caller"
+    ],
+    "outputs": [
+      "decision.branch"
+    ]
+  },
+  "assignments_evaluated": 8,
+  "authority": "none",
+  "certificate": "0cba56e4d77fff3047181761e2278157ee9a2f8611a8216274ae06ec31db7f8f",
+  "contract": "cd72e3d825586e90dd7eda9e651f14b57356c8b871a6f68788b50b4381540536",
+  "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+  "files": [
+    {
+      "bytes": 10075,
+      "path": "problem.json",
+      "sha256": "80edce8d44a0e60ba055857227b6994ed91a3dfca68ca9039965bc24c282a80b"
+    },
+    {
+      "bytes": 4491,
+      "path": "program.zcve",
+      "sha256": "df7ce6d60b045404d266b37e47fb2685263cb9102c78bb3b839b136690e0c02e"
+    },
+    {
+      "bytes": 5384,
+      "path": "transition.rs",
+      "sha256": "3cc8ab90d07c18cebfb9e5a66dc1df0798246de4986596f05a8b3d3334a79059"
+    },
+    {
+      "bytes": 222993,
+      "path": "vectors.json",
+      "sha256": "01dc31de5ea074772d97dc706b2a790eefbf1a24d04ce476c080ac6bfba03944"
+    }
+  ],
+  "first_counterexample": {
+    "input": [
+      0,
+      0,
+      2,
+      0,
+      0
+    ],
+    "output": [
+      3
+    ]
+  },
+  "input_coverage": 1728,
+  "profile": "zeno-fcis/finite-i64/1",
+  "runtime_conformance": "not-run",
+  "schema": "zeno-fcis/synthesis-artifact/1",
+  "status": "selected",
+  "target": {
+    "language": "rust",
+    "revision": 1
+  },
+  "trace": "2a11ef61f47e40b868ebc67731a52ff01fd9ae64d5b868447d8d6784e17c1a51"
+}

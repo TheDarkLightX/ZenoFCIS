@@ -1,4 +1,4 @@
-//! Reviewed, hand-written state machine for one order.
+//! Reviewed adapter around the synthesized finite order decision.
 //!
 //! Each command's context names who sent it. A command is decided from the
 //! order's current status, and a payment provider's callback must name the
@@ -6,7 +6,7 @@
 //! moved on, or names an older attempt, and is rejected instead of acting
 //! twice or on the wrong attempt.
 
-use crate::{bindings::*, generated::*, profile};
+use crate::{bindings::*, generated::*, profile, synthesized};
 use zeno_fcis_authority::{CatalogTransitionProgram, ReviewedTransitionInput};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_core::BudgetUsed;
@@ -14,26 +14,63 @@ use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::ValidationLimits;
 use zeno_fcis_transition::TransitionDecision;
 
-/// Payment attempts an order may start.
-pub const MAX_PAYMENT_ATTEMPTS: i128 = 3;
 /// Where payment requests are delivered.
 pub const PAYMENT_PROVIDER: &str = "payment-provider";
 /// Where shipping requests are delivered.
 pub const CARRIER: &str = "carrier";
 
-/// The only caller allowed to send each action.
-pub fn sender(action: &OrderAction) -> Caller {
+fn action_code(action: &OrderAction) -> i64 {
     match action {
-        OrderAction::Checkout | OrderAction::CancelOrder => Caller::Customer,
-        OrderAction::PaymentCaptured | OrderAction::PaymentDeclined => Caller::PaymentProvider,
-        OrderAction::ParcelDispatched | OrderAction::ParcelDelivered => Caller::Carrier,
+        OrderAction::Checkout => 0,
+        OrderAction::PaymentCaptured => 1,
+        OrderAction::PaymentDeclined => 2,
+        OrderAction::ParcelDispatched => 3,
+        OrderAction::ParcelDelivered => 4,
+        OrderAction::CancelOrder => 5,
+    }
+}
+
+fn status_code(status: &OrderStatus) -> i64 {
+    match status {
+        OrderStatus::Placed => 0,
+        OrderStatus::AwaitingPayment => 1,
+        OrderStatus::Paid => 2,
+        OrderStatus::Shipped => 3,
+        OrderStatus::Delivered => 4,
+        OrderStatus::Cancelled => 5,
+    }
+}
+
+fn caller_code(caller: &Caller) -> i64 {
+    match caller {
+        Caller::Customer => 0,
+        Caller::PaymentProvider => 1,
+        Caller::Carrier => 2,
     }
 }
 
 pub struct OrderProgram;
 
+#[derive(Debug)]
+pub enum OrderProgramError {
+    Project(Box<GeneratedProjectError>),
+    SynthesisDomain,
+}
+
+impl From<GeneratedProjectError> for OrderProgramError {
+    fn from(error: GeneratedProjectError) -> Self {
+        Self::Project(Box::new(error))
+    }
+}
+
+impl From<AdapterError> for OrderProgramError {
+    fn from(error: AdapterError) -> Self {
+        GeneratedProjectError::from(error).into()
+    }
+}
+
 impl CatalogTransitionProgram<RustCryptoSha256> for OrderProgram {
-    type Error = GeneratedProjectError;
+    type Error = OrderProgramError;
 
     fn transition_build_hash(&self) -> Hash32 {
         profile::program_hash()
@@ -60,24 +97,31 @@ impl CatalogTransitionProgram<RustCryptoSha256> for OrderProgram {
             input.limits(),
         )?;
         transition.observe_context_caller()?;
-        if context.caller != sender(&command.action) {
-            transition.require(false, RejectReasonId::Reason200)?;
-            return transition.seal();
-        }
         let status = transition.read_status()?;
         let attempts = transition.read_payment_attempts()?.0;
-        match (&command.action, &status) {
-            (
-                OrderAction::PaymentCaptured | OrderAction::PaymentDeclined,
-                OrderStatus::AwaitingPayment,
-            ) if command.callback_attempt.0 != attempts => {
-                // An answer about an earlier attempt must not settle this one.
+        let output = synthesized::transition(&[
+            action_code(&command.action),
+            status_code(&status),
+            i64::try_from(attempts).map_err(|_| OrderProgramError::SynthesisDomain)?,
+            i64::try_from(command.callback_attempt.0)
+                .map_err(|_| OrderProgramError::SynthesisDomain)?,
+            caller_code(&context.caller),
+        ])
+        .ok_or(OrderProgramError::SynthesisDomain)?;
+        match output[0] {
+            0 => {
+                transition.require(false, RejectReasonId::Reason200)?;
+            }
+            1 => {
+                transition.require(false, RejectReasonId::Reason201)?;
+            }
+            2 => {
                 transition.require(false, RejectReasonId::Reason202)?;
             }
-            (OrderAction::Checkout, OrderStatus::Placed) if attempts == MAX_PAYMENT_ATTEMPTS => {
+            3 => {
                 transition.require(false, RejectReasonId::Reason203)?;
             }
-            (OrderAction::Checkout, OrderStatus::Placed) => {
+            4 => {
                 // Each attempt has its own number, which the provider uses
                 // as the idempotency key for this capture.
                 let attempt = Attempts(attempts + 1);
@@ -92,7 +136,7 @@ impl CatalogTransitionProgram<RustCryptoSha256> for OrderProgram {
                     },
                 )?;
             }
-            (OrderAction::PaymentCaptured, OrderStatus::AwaitingPayment) => {
+            5 => {
                 transition.update_status(&OrderStatus::Paid)?;
                 transition.enqueue_channel_301(
                     0,
@@ -102,22 +146,22 @@ impl CatalogTransitionProgram<RustCryptoSha256> for OrderProgram {
                     },
                 )?;
             }
-            (OrderAction::PaymentDeclined, OrderStatus::AwaitingPayment) => {
+            6 => {
                 // The decline is a fact worth keeping, so it commits as a
                 // failure: the order returns to placed for another attempt.
                 transition.update_status(&OrderStatus::Placed)?;
                 transition.fail_if(true, CommittedFailureReasonId::Reason204)?;
             }
-            (OrderAction::ParcelDispatched, OrderStatus::Paid) => {
+            7 => {
                 transition.update_status(&OrderStatus::Shipped)?;
             }
-            (OrderAction::ParcelDelivered, OrderStatus::Shipped) => {
+            8 => {
                 transition.update_status(&OrderStatus::Delivered)?;
             }
-            (OrderAction::CancelOrder, OrderStatus::Placed) => {
+            9 => {
                 transition.update_status(&OrderStatus::Cancelled)?;
             }
-            (OrderAction::CancelOrder, OrderStatus::AwaitingPayment) => {
+            10 => {
                 // The capture may still be pending at the provider, so the
                 // cancellation voids that exact attempt.
                 transition.update_status(&OrderStatus::Cancelled)?;
@@ -130,10 +174,8 @@ impl CatalogTransitionProgram<RustCryptoSha256> for OrderProgram {
                     },
                 )?;
             }
-            _ => {
-                transition.require(false, RejectReasonId::Reason201)?;
-            }
+            _ => return Err(OrderProgramError::SynthesisDomain),
         }
-        transition.seal()
+        Ok(transition.seal()?)
     }
 }
