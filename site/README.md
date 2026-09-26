@@ -38,7 +38,9 @@ the shared shape described here. The Pages workflow publishes only from
   the module's `demo_reset`.
 - `public/`: the page, and the Pages artifact. `index.html` holds the
   opening (the title, a diagram of proposer, judge, and shell, and a
-  collapsed "How this page works"), a row of tabs that chooses an example,
+  collapsed "How this page works"), a row of tabs that chooses an example
+  and names what computes its decisions (a synthesized core or step, or a
+  LLM-generated program),
   and one section per example with the README's wording, shown one at a
   time; `site.js` runs the tabs and builds a section's panel the first time
   it is chosen, loading `templates/<template>.js`, the example's description
@@ -63,8 +65,10 @@ the shared shape described here. The Pages workflow publishes only from
   starting over required, and neither claims a rollback. The history is
   collapsed behind its count, with every entry in the document, and a
   proposer's list shows its first three with a button for the rest.
-  Enumerated values read in each template's plain words, with the raw value
-  beside the state line and in the technical record. The page and the
+  State fields and enumerated values read in each template's plain words;
+  the schema's names and raw values show on hover in the state panel and
+  in each decision's technical record, and a decision's changes are one
+  chip per field. The page and the
   harness pages declare an inline `data:` icon, so the browser probes no
   favicon. The built modules land here and are not committed. The page fetches its
   modules relative to its own scripts, so it works from any path it is

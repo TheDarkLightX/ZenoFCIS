@@ -70,6 +70,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .masthead, main, footer { max-width: 64rem; margin: 0 auto; padding-left: 1rem; padding-right: 1rem; }
 .prose p, .prose li, .opening p { max-width: 70ch; }
 .prose ul { padding-left: 1.25rem; }
+/* An example's introduction: a lead sentence, then its key points. */
+.prose .lead { font-size: 1.08rem; }
+.prose .points { display: grid; gap: 0.3rem; margin: 0.5rem 0 0.9rem; }
 
 .masthead {
   display: flex;
@@ -124,6 +127,8 @@ summary { cursor: pointer; font-weight: 600; padding: 0.6rem 0; }
 }
 .chooser [role="tab"] .name { font-weight: 700; }
 .chooser [role="tab"] .blurb { color: var(--muted); font-size: 0.92rem; }
+/* What computes the example's decisions: synthesized, or LLM-generated. */
+.chooser [role="tab"] .made { color: var(--muted); font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em; }
 .chooser [role="tab"]:hover { border-color: var(--ink); }
 .chooser [role="tab"][aria-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--tint); }
 
@@ -152,7 +157,7 @@ summary { cursor: pointer; font-weight: 600; padding: 0.6rem 0; }
   border-radius: 8px;
 }
 .group legend { font-weight: 700; padding: 0 0.3rem; }
-.fields { display: grid; gap: 0.6rem 1rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+.fields { display: grid; gap: 0.6rem 1rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); align-items: end; }
 .field label { display: grid; gap: 0.2rem; font-weight: 600; }
 .field .hint { font-weight: 400; font-size: 0.88rem; color: var(--muted); }
 .field input[type="number"], .field select {
@@ -168,6 +173,11 @@ summary { cursor: pointer; font-weight: 600; padding: 0.6rem 0; }
 }
 .field.flag label { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; }
 .field input[type="checkbox"] { width: 1.25rem; height: 1.25rem; margin: 0; }
+/* On phones, number fields sit two to a row; choices and flags keep a row. */
+@media (max-width: 36rem) {
+  .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field.choice, .field.flag { grid-column: 1 / -1; }
+}
 .buttons, .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .actions { align-items: center; }
 /* The session's count, beside the actions; at the limit, the way on. */
@@ -220,8 +230,14 @@ button.reveal::before { content: ""; position: absolute; inset: -0.6rem -0.3rem;
 .latest-identity:empty { display: none; }
 .verdict { display: flex; flex-wrap: wrap; gap: 0.35rem 0.6rem; align-items: baseline; font-size: 1.05rem; }
 .verdict .request { font-weight: 600; }
-.code, .schema { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; }
+.code { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.85em; }
 .empty { color: var(--muted); }
+/* What a decision changed: one chip per field, before → after. */
+.changes { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.35rem 0.5rem; margin: 0.4rem 0 0; }
+.changes-label { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; list-style: none; margin: 0; padding: 0; }
+.chips li { padding: 0.05rem 0.5rem; border: 1px solid var(--line-soft); border-radius: 6px; background: var(--paper); color: var(--ink); font-variant-numeric: tabular-nums; }
+.chips .key { color: var(--muted); }
 
 .panels { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); margin-bottom: 1rem; }
 .panel { padding: 1rem; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--panel); min-width: 0; }

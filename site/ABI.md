@@ -54,5 +54,5 @@ browser checks. These are regression evidence, not a proof of the whole
 application. The safety argument for this interface is Rust-owned bounded
 buffers, checked access and private memory. Browser termination, resource
 exhaustion outside these bounds, and compiler or library defects remain
-outside this argument. Hand-written decisions retain their documented
+outside this argument. LLM-generated decisions retain their documented
 determinism contract.
