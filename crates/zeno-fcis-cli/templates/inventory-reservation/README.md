@@ -5,13 +5,14 @@ available to sell or reserved for an order; shipping sends reserved units out,
 and restocking brings units in. It shows three patterns:
 - a *synthesized* decision core: `synthesis.json` states the rules as a
   relation over every input, and `zeno-fcis synth` selects a program that
-  satisfies it on all 432 of them;
+  satisfies it on all 864 of them, including both authorization values;
 - a conservation law: every accepted decision keeps the count of units
   exactly right;
 - commands with parameters: each command carries an action and a quantity.
 
-`src/program.rs` checks the operator and then calls the synthesized step in
-`synthesized/transition.rs`, mapping its output into typed staging. The law
+`src/program.rs` calls the synthesized step in
+`synthesized/transition.rs` for the complete decision, including authorization,
+then maps its output into typed staging. The law
 checker in `src/laws.rs` evaluates the formulas in `project.zeno` against every
 decision, and refuses any decision that breaks them.
 
@@ -57,16 +58,17 @@ warehouse to send them.
 
 `synthesis.json` has two parts:
 - a contract, which states the rules above as a relation over the stock, the
-  action code, the quantity, and the outputs;
+  action code, the quantity, the authorization flag, and the outputs;
 - a sketch: a decision program with two holes, the stock capacity and the
   decision code for releasing or shipping more than is reserved.
 
-`zeno-fcis synth run` evaluates hole assignments over all 432 inputs and
+`zeno-fcis synth run` evaluates hole assignments over all 864 inputs and
 selects the first that satisfies the contract on every one: capacity 5 and
 code 1, which the adapter maps to `insufficient_reserved`. The selected
 program, its complete input and output vectors, and the emitted Rust are
-checked in under `synthesized/`. The operator check sits in `src/program.rs`,
-in front of the step, so the synthesis stays small.
+checked in under `synthesized/`. Authorization has first precedence: an
+unauthorized command always returns `not_authorized`, the unchanged state,
+and no shipment, even when its stock movement would also fail.
 
 That selection is exhaustive verification against the contract, for the
 program as the library's interpreter runs it. The emitted Rust carries the same
@@ -119,8 +121,8 @@ commit, or to the genesis, reported as a mismatch.
 The tests check the running application:
 - `tests/conformance.rs` runs all 864 admitted inputs through admission, the
   authority, the adapter, the law checker, the committed patch, and the
-  outbox. It compares each outcome with the synthesized step read through the
-  adapter's output table and checks that units are conserved. It also checks
+  outbox. It compares each outcome with a separate model of the README's
+  complete decision rules and checks that units are conserved. It also checks
   that schema admission matches the finite domain in both directions, that
   genesis is exactly empty, that all 36 states are reachable from it, and that
   20 examples in `tests/decision-examples.txt` match.
@@ -140,7 +142,9 @@ zeno-fcis purity src/program.rs src/laws.rs synthesized/transition.rs
 
 All of these are detectors: agreement shows that these runs matched and that
 no error-level rule fired. The conformance test covers every admitted input,
-so for this finite domain it checks every decision the application can make.
+  so for this finite domain it checks every decision the application can make.
+  The 864-input synthesis relation and the application-level model cover the
+  authorization rejection as well as every stock action.
 
 ## Run this development candidate
 
