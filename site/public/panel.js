@@ -339,16 +339,23 @@ export async function mount(container, template) {
 
   function renderState(state) {
     facts.replaceChildren();
+    // Plain labels and values; the schema's own names and raw values are
+    // one hover away here, and shown in each decision's technical record.
     for (const key of orderedKeys(state.state, fieldNames)) {
       const raw = String(state.state[key]);
       const plain = plainValue(key, raw);
-      facts.append(node("dt", null, label(key), " ", node("code", "schema", key)),
-        node("dd", null, plain, ...(plain === raw ? [] : [" ", node("code", "schema", raw)])));
+      const term = node("dt", null, label(key));
+      term.title = key;
+      const value = node("dd", null, plain);
+      if (plain !== raw) value.title = raw;
+      facts.append(term, value);
     }
+    const committed = node("dt", null, "Decisions committed");
+    committed.title = "bundles";
     facts.append(
       node("dt", null, "Decisions made"), node("dd", null, String(state.steps)),
-      node("dt", null, "Decisions committed", " ", node("code", "schema", "bundles")), node("dd", null, String(state.bundles)),
-      node("dt", null, "State fingerprint", " ", node("code", "schema", "state root")), node("dd", null, hashNode(state.root)),
+      committed, node("dd", null, String(state.bundles)),
+      node("dt", null, "State fingerprint (state root)"), node("dd", null, hashNode(state.root)),
     );
     outbox.replaceChildren();
     if (state.outbox.length === 0) outbox.append(node("li", "empty", "Nothing queued."));
@@ -390,9 +397,13 @@ export async function mount(container, template) {
       lines.push(node("p", "changes", "Nothing changed, and nothing was queued."));
       return lines;
     }
-    const changes = changed(report)
-      .map((key) => `${label(key)} ${plainValue(key, report.before[key])} → ${plainValue(key, report.after[key])}`);
-    lines.push(node("p", "changes", changes.length === 0 ? "No field changed." : `Changed: ${changes.join("; ")}.`));
+    // Each changed field as a small chip: its label, then before → after.
+    const changes = changed(report);
+    lines.push(changes.length === 0
+      ? node("p", "changes", "No field changed.")
+      : node("div", "changes", node("span", "changes-label", "Changed"),
+        node("ul", "chips", ...changes.map((key) => node("li", null, node("span", "key", label(key)),
+          ` ${plainValue(key, report.before[key])} → ${plainValue(key, report.after[key])}`)))));
     for (const entry of report.outbox) lines.push(node("p", "queued", `Queued ${plainEntry(entry)}.`));
     return lines;
   }
@@ -530,8 +541,8 @@ export async function mount(container, template) {
           await delay(STEP_DELAY_MS);
         }
       }
-      status.textContent = `The demonstration from the template's README, decided in this browser${onLoad ? " when the page loaded" : ""}: `
-        + `${sent.length} requests. Compare each decision with the README, send your own request, or start over.`;
+      status.textContent = `The README's demonstration, decided in this browser${onLoad ? " when the page loaded" : ""}: `
+        + `${sent.length} requests.`;
     } finally {
       setBusy(false);
     }

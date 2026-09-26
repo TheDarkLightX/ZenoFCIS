@@ -22,7 +22,7 @@
     </p>
     <ol class="flow" aria-label="How a request is decided">
       <li>
-        <span class="step"><span class="role">A proposer suggests</span><span class="what">an AI agent, a synthesized core, or hand-written code</span></span>
+        <span class="step"><span class="role">A proposer suggests</span><span class="what">an AI agent, a synthesized core, or code written by a person or an LLM</span></span>
         <span class="arrow" aria-hidden="true">→</span>
       </li>
       <li>
@@ -34,10 +34,9 @@
       </li>
     </ol>
     <p>
-      Pick an example below. Send it requests, or run its scripted
-      demonstration, and read each decision as the authority returned it: the
-      verdict, the reason, what changed, and what was queued. A decision's
-      technical record holds the laws evaluated and the hashes. The first
+      Pick an example below. Send it requests or run its scripted
+      demonstration, and see each decision as the authority returned it: the
+      verdict, the reason, what changed, and what was queued. The first
       example ran its demonstration as this page loaded.
     </p>
     <details class="how" id="how-this-page-works">
@@ -98,48 +97,59 @@
     <button type="button" role="tab" id="tab-agent-treasury-guard" aria-controls="agent-treasury-guard" aria-selected="true">
       <span class="name">Agent treasury guard</span>
       <span class="blurb">An AI agent proposes trades; the guard decides what the treasury commits.</span>
+      <span class="made">Synthesized decision core</span>
     </button>
     <button type="button" role="tab" id="tab-account-lockout" aria-controls="account-lockout" aria-selected="false" tabindex="-1">
       <span class="name">Account lockout</span>
       <span class="blurb">Three failed logins lock the account; time is an input, and only an admin unlocks.</span>
+      <span class="made">LLM-generated decision program</span>
     </button>
     <button type="button" role="tab" id="tab-order-fulfillment" aria-controls="order-fulfillment" aria-selected="false" tabindex="-1">
       <span class="name">Order fulfillment</span>
       <span class="blurb">One order from checkout to delivery; late and repeated callbacks are refused.</span>
+      <span class="made">LLM-generated state machine</span>
     </button>
     <button type="button" role="tab" id="tab-inventory-reservation" aria-controls="inventory-reservation" aria-selected="false" tabindex="-1">
       <span class="name">Inventory reservation</span>
-      <span class="blurb">Stock reserved, shipped, and restocked by a synthesized decision core.</span>
+      <span class="blurb">Stock reserved, shipped, and restocked; every unit stays counted.</span>
+      <span class="made">Synthesized decision core</span>
     </button>
     <button type="button" role="tab" id="tab-compliance-gateway" aria-controls="compliance-gateway" aria-selected="false" tabindex="-1">
       <span class="name">Compliance gateway</span>
       <span class="blurb">Transfers screened by a rule base; three blocks freeze the account.</span>
+      <span class="made">Synthesized screening step</span>
     </button>
     <button type="button" role="tab" id="tab-withdrawal-queue" aria-controls="withdrawal-queue" aria-selected="false" tabindex="-1">
       <span class="name">Withdrawal queue</span>
       <span class="blurb">Two withdrawal lanes and an alarm that can delay a payout but never trap it.</span>
+      <span class="made">Synthesized tick controller</span>
     </button>
   </div>
 
   <section class="example" id="agent-treasury-guard" data-template="agent-treasury-guard" role="tabpanel" aria-labelledby="tab-agent-treasury-guard">
     <h2>Agent treasury guard</h2>
     <div class="prose">
+      <p class="lead">
+        A treasury that an AI agent trades for. The agent proposes swaps, but
+        each proposal is only a command: the guard decides what the treasury
+        commits.
+      </p>
+      <p>Whatever the agent proposes, the treasury never:</p>
+      <ul class="points">
+        <li>commits more than its daily budget;</li>
+        <li>drops below its reserve;</li>
+        <li>swaps outside the slippage bound against the oracle price;</li>
+        <li>has more than one swap outstanding.</li>
+      </ul>
       <p>
-        A treasury that an AI agent trades for. The agent proposes swaps; each
-        proposal is only a command. The guard's program computes the decision:
-        a small hand-written adapter works out the facts, and a core that
+        A small LLM-generated adapter works out the facts, and a core that
         <code>zeno-fcis synth</code> selected over those facts applies the
         first rule that fits. The authority and its laws then decide whether
-        that decision commits. Whatever the agent proposes, the treasury never
-        commits more than its daily budget, never drops below its reserve,
-        never swaps outside the slippage bound against the oracle price, and
-        never has more than one swap outstanding. Accepted swaps leave through
-        the outbox as requests shaped after ZenoDEX's <code>SwapIntent</code>,
-        and the exchange's settlements and failures come back as commands.
-        Here the agent is scripted: a fixed list of proposals, good and bad,
-        listed below; no model is called. The rules are in the template's
-        <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md">README</a>
-        (<code>crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md</code>).
+        that decision commits. Accepted swaps leave through the outbox as
+        requests shaped after ZenoDEX's <code>SwapIntent</code>; the
+        exchange's settlements and failures come back as commands. Here the
+        agent is scripted, with good and bad proposals, and no model is
+        called. The rules are in the template's <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md">README</a>.
       </p>
       <details>
         <summary>What is checked, and at what strength</summary>
@@ -150,7 +160,7 @@
             verify</code> in Rust, Python, and JavaScript; in the README's
             words, that selection is exhaustive verification against the
             contract, for the program as the library's interpreter runs it. A
-            small hand-written adapter computes the facts with checked
+            small LLM-generated adapter computes the facts with checked
             arithmetic.
           </li>
           <li>
@@ -209,18 +219,17 @@
   <section class="example" id="account-lockout" data-template="account-lockout" role="tabpanel" aria-labelledby="tab-account-lockout" hidden>
     <h2>Account lockout</h2>
     <div class="prose">
-      <p>
-        Three consecutive failed logins lock the account for 900 seconds. A
-        failed login is a <em>committed failure</em>: the login fails, but the
-        attempt is recorded. Every request carries its time, and the decision
-        never reads a clock. Only a request marked <em>admin</em> may unlock.
-        Alerts leave through the outbox. The shell checks the password and
-        sends the result as a command; hand-written rules compute each
-        decision, and the authority and its laws decide whether it commits.
-        The rules, in the order they apply, are in the template's
-        <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/account-lockout/README.md">README</a>
-        (<code>crates/zeno-fcis-cli/templates/account-lockout/README.md</code>).
+      <p class="lead">
+        Three consecutive failed logins lock the account for 900 seconds. Only
+        a request marked <em>admin</em> may unlock it.
       </p>
+      <ul class="points">
+        <li>A failed login is a <em>committed failure</em>: the login fails, but the attempt is recorded.</li>
+        <li>Every request carries its time, and the decision never reads a clock.</li>
+        <li>Alerts leave through the outbox.</li>
+        <li>The shell checks the password and sends the result as a command. LLM-generated rules compute each decision, and the authority and its laws decide whether it commits.</li>
+      </ul>
+      <p>The rules, in the order they apply, are in the template's <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/account-lockout/README.md">README</a>.</p>
       <details>
         <summary>What is checked, and at what strength</summary>
         <ul>
@@ -266,20 +275,17 @@
   <section class="example" id="order-fulfillment" data-template="order-fulfillment" role="tabpanel" aria-labelledby="tab-order-fulfillment" hidden>
     <h2>Order fulfillment</h2>
     <div class="prose">
-      <p>
+      <p class="lead">
         One order from checkout to delivery. Payment and shipping happen in
         other systems: the order sends them requests through the outbox, and
-        their answers come back as commands. Each request is numbered, so a
-        provider can recognize a retry, and a callback that arrives twice or
-        late is rejected and changes nothing. A declined payment is a
-        <em>committed failure</em>: the order returns to <code>Placed</code>
-        and keeps its attempt count. Commands come from the customer, the
-        payment provider, and the carrier; a hand-written state machine
-        computes each decision, and the authority and its laws decide whether
-        it commits. The rules, in the order they apply, are in the template's
-        <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/order-fulfillment/README.md">README</a>
-        (<code>crates/zeno-fcis-cli/templates/order-fulfillment/README.md</code>).
+        their answers come back as commands.
       </p>
+      <ul class="points">
+        <li>Each request is numbered, so a provider can recognize a retry. A callback that arrives twice or late is rejected and changes nothing.</li>
+        <li>A declined payment is a <em>committed failure</em>: the order returns to <code>Placed</code> and keeps its attempt count.</li>
+        <li>Commands come from the customer, the payment provider, and the carrier. An LLM-generated state machine computes each decision, and the authority and its laws decide whether it commits.</li>
+      </ul>
+      <p>The rules, in the order they apply, are in the template's <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/order-fulfillment/README.md">README</a>.</p>
       <details>
         <summary>What is checked, and at what strength</summary>
         <ul>
@@ -323,19 +329,17 @@
   <section class="example" id="inventory-reservation" data-template="inventory-reservation" role="tabpanel" aria-labelledby="tab-inventory-reservation" hidden>
     <h2>Inventory reservation</h2>
     <div class="prose">
-      <p>
-        The stock of one product: units are available to sell or reserved for
+      <p class="lead">
+        The stock of one product. Units are available to sell or reserved for
         an order; shipping sends reserved units out, and restocking brings
-        units in. Commands come from an operator. The decision core is
-        <em>synthesized</em>: <code>synthesis.json</code> states the rules as
-        a relation over every input, and <code>zeno-fcis synth</code> selected
-        a program that satisfies it on all 432 of them; a hand-written check
-        of the operator's authorization runs first, and the authority and its
-        laws decide whether each decision commits. A conservation law keeps
-        the count of units exactly right. The rules are in the template's
-        <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/inventory-reservation/README.md">README</a>
-        (<code>crates/zeno-fcis-cli/templates/inventory-reservation/README.md</code>).
+        units in.
       </p>
+      <ul class="points">
+        <li>Commands come from an operator, and an LLM-generated check of the operator's authorization runs first.</li>
+        <li>The decision core is <em>synthesized</em>: <code>synthesis.json</code> states the rules as a relation over every input, and <code>zeno-fcis synth</code> selected a program that satisfies it on all 432 of them.</li>
+        <li>The authority and its laws decide whether each decision commits, and a conservation law keeps the count of units exactly right.</li>
+      </ul>
+      <p>The rules are in the template's <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/inventory-reservation/README.md">README</a>.</p>
       <details>
         <summary>What is checked, and at what strength</summary>
         <ul>
@@ -386,21 +390,17 @@
   <section class="example" id="compliance-gateway" data-template="compliance-gateway" role="tabpanel" aria-labelledby="tab-compliance-gateway" hidden>
     <h2>Compliance gateway</h2>
     <div class="prose">
-      <p>
+      <p class="lead">
         Transfers screened for one customer by an expert system's rule base:
         <code>rules.txt</code> holds twelve prioritized rules over finite
-        features, and every decision names the rule that fired. A blocked
-        transfer is a <em>committed failure</em> that adds a strike; three
-        strikes freeze the account until a reviewer reinstates it. Review
-        tickets and block alerts leave through the outbox. Commands come from
-        the shell that screens transfers and from reviewers; a step that
-        <code>zeno-fcis synth</code> selected from the rule base computes each
-        screening, the law checker evaluates the rule base itself on every
-        decision as a second check, and the authority and its laws decide
-        whether the decision commits. The rules are in the template's
-        <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/compliance-gateway/README.md">README</a>
-        (<code>crates/zeno-fcis-cli/templates/compliance-gateway/README.md</code>).
+        features, and every decision names the rule that fired.
       </p>
+      <ul class="points">
+        <li>A blocked transfer is a <em>committed failure</em> that adds a strike. Three strikes freeze the account until a reviewer reinstates it.</li>
+        <li>Review tickets and block alerts leave through the outbox.</li>
+        <li>Commands come from the shell that screens transfers and from reviewers. A step that <code>zeno-fcis synth</code> selected from the rule base computes each screening, the law checker evaluates the rule base itself on every decision as a second check, and the authority and its laws decide whether the decision commits.</li>
+      </ul>
+      <p>The rules are in the template's <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/compliance-gateway/README.md">README</a>.</p>
       <details>
         <summary>What is checked, and at what strength</summary>
         <ul>
@@ -461,20 +461,16 @@
   <section class="example" id="withdrawal-queue" data-template="withdrawal-queue" role="tabpanel" aria-labelledby="tab-withdrawal-queue" hidden>
     <h2>Withdrawal queue</h2>
     <div class="prose">
-      <p>
+      <p class="lead">
         One vault with two withdrawal lanes. Each lane's owner requests a
         withdrawal, and a keeper's tick pays at most one lane by following a
-        checked controller. The tick's context carries an alarm; an honored
-        alarm pauses payouts, but every requested withdrawal is still paid:
-        alarms delay, they never freeze. Raise the alarm here and keep
-        ticking to watch it. Commands come from the operator, the lane
-        owners, and the keeper; a controller step that <code>zeno-fcis
-        synth</code> selected computes each tick's decision, hand-written
-        rules compute deposits and requests, and the authority and its laws
-        decide whether each decision commits. The rules are in the template's
-        <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/withdrawal-queue/README.md">README</a>
-        (<code>crates/zeno-fcis-cli/templates/withdrawal-queue/README.md</code>).
+        checked controller.
       </p>
+      <ul class="points">
+        <li>The tick's context carries an alarm. An honored alarm pauses payouts, but every requested withdrawal is still paid: alarms delay, they never freeze. Raise the alarm here and keep ticking to watch it.</li>
+        <li>Commands come from the operator, the lane owners, and the keeper. A controller step that <code>zeno-fcis synth</code> selected computes each tick's decision, LLM-generated rules compute deposits and requests, and the authority and its laws decide whether each decision commits.</li>
+      </ul>
+      <p>The rules are in the template's <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/withdrawal-queue/README.md">README</a>.</p>
       <details>
         <summary>What is checked, and at what strength</summary>
         <ul>
