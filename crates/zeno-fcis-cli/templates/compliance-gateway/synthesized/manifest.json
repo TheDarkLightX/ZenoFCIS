@@ -5,39 +5,41 @@
       "feature.identity_tier",
       "feature.region",
       "feature.amount_band",
-      "feature.counterparty_risk"
+      "feature.counterparty_risk",
+      "command.action.screen_reinstate",
+      "context.reviewer"
     ],
     "outputs": [
-      "decision.allow_hold_block",
+      "decision.allow_hold_block_not_reviewer_no_strikes_reinstated",
       "decision.rule",
       "post.strikes"
     ]
   },
   "assignments_evaluated": 14,
   "authority": "none",
-  "certificate": "44a075f70f420c6e0056d6a5ac02d00652c991d2a4c99d69057ba3b2cfed8fa3",
-  "contract": "e296396faf0375cf2523ca34b0b428578bdea97ef9dcdd0d81ae3b59ef474faa",
+  "certificate": "281b9f68bae317c212da78e9ad64995d54ae0fb35a18815e17460cb1c9396ebc",
+  "contract": "ce14615403f6df1425a6ac3322a00e1e48a60ed720116492d836137530a2356d",
   "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
   "files": [
     {
-      "bytes": 11000,
+      "bytes": 11556,
       "path": "problem.json",
-      "sha256": "e478d24fdbdf519deef39abf62ca39ee6d9ea6d3e1da337f1d55c7f49d2cdc82"
+      "sha256": "d855ee8c955c441e0394837958184b840be2bbb5d940c33abc545c71dd1eaf04"
     },
     {
-      "bytes": 4304,
+      "bytes": 5051,
       "path": "program.zcve",
-      "sha256": "a1c5adfcb05346b9346a2c14681ced211c168eff549e1d7c2303958ce474e64d"
+      "sha256": "9a6814de4ade7ee25cdd8e9f125647851c0afb994fb38d8ba8d928375c40c95b"
     },
     {
-      "bytes": 4685,
+      "bytes": 5494,
       "path": "transition.rs",
-      "sha256": "0251fdfdb83cda37960507bbf66708e5e72aecacb950dfaed5a6efb579bf6d38"
+      "sha256": "ad5a597e2cdf6943db43f7026a9598ab594e3d97efd5f67a06429816cd8debee"
     },
     {
-      "bytes": 108855,
+      "bytes": 499885,
       "path": "vectors.json",
-      "sha256": "7fae13f3e4cb528334b952f880c5db1863526cc65e83eebde57fb6eb7bc72841"
+      "sha256": "bf0a7ec8bb4bd93d752621fe9551b121fe74000059c0539091919dd8510c7cd8"
     }
   ],
   "first_counterexample": {
@@ -46,6 +48,8 @@
       0,
       0,
       1,
+      0,
+      0,
       0
     ],
     "output": [
@@ -54,7 +58,7 @@
       0
     ]
   },
-  "input_coverage": 720,
+  "input_coverage": 2880,
   "profile": "zeno-fcis/finite-i64/1",
   "runtime_conformance": "not-run",
   "schema": "zeno-fcis/synthesis-artifact/1",
@@ -63,5 +67,5 @@
     "language": "rust",
     "revision": 1
   },
-  "trace": "7a92624f7f55fcea1dbf28efbf1f50d58e9006a2df389a785494f587851af7a3"
+  "trace": "26fe0ea6f9026c171357c7bc770c07b123bfb1310633a06cc08593662189eed8"
 }
