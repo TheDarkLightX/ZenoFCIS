@@ -280,8 +280,12 @@ def exercise_order(cli: list[str], app: Path, directory: Path,
 
 def exercise_gateway(cli: list[str], app: Path, directory: Path,
                      environment: dict[str, str]) -> dict:
-    """The compliance-gateway example's synthesized screening step, against
-    a separate evaluation of its rule base."""
+    """Check the gateway's full vector ABI and independent rule evaluation."""
+    preflight = subprocess.run(
+        [sys.executable, str(app / "tau" / "check.py"), "--check-vectors"],
+        cwd=app, env=environment, text=True, capture_output=True, timeout=30)
+    if preflight.returncode != 0:
+        raise RuntimeError(f"gateway Tau vector preflight failed: {preflight.stderr}")
     expected = gateway_decision_table((app / "rules.txt").read_text())
     if len(expected) != 2880:
         raise RuntimeError("gateway rules do not span all 2,880 inputs")

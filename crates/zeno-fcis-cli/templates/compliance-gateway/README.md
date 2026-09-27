@@ -411,25 +411,33 @@ observed; long JSON is reduced to the fields named.
 
 ## A second judge: the rule base in Tau Language
 
-`tau/rule-base.tau` states the priority ladder of `rules.txt` once more, as a
-Tau Language specification over five bitvector input streams, the features,
-and three output streams: the verdict, the rule that fired, and the strikes
-after the decision. `tau/check.py` runs it in the Tau REPL on every input of
-the decision table in `synthesized/vectors.json`, one execution step per
-input, and compares the three outputs with the table. It is a third evaluator
-of the rule base, written by hand from `rules.txt`, with nothing in common
-with `src/rules.rs`, `rules_to_synthesis.py`, or the synthesizer. It needs the
-Tau binary from IDNI (<https://github.com/IDNI/tau-lang>), under IDNI's
-license, so it is never part of the library's gates:
+`tau/rule-base.tau` states the priority ladder of `rules.txt` and the
+reinstatement precedence independently, as a Tau Language specification over
+seven bitvector inputs (five features, action, reviewer) and three outputs
+(decision, screening rule or reinstatement placeholder, post-decision strikes).
+`tau/check.py` checks that the vectors cover the complete 2,880-input domain,
+then can run the specification in the Tau REPL on every vector and compare all
+three outputs. This is a separate hand-written statement of the policy, with
+nothing in common with `src/rules.rs`, `rules_to_synthesis.py`, or the
+synthesizer. The vector coverage preflight runs in the library's gates. Tau
+execution needs the IDNI binary (<https://github.com/IDNI/tau-lang>) under
+IDNI's license and remains optional:
 
 ```sh
+python3 tau/check.py --check-vectors
+python3 tau/check.py --tau PATH/TO/tau --smoke
 python3 tau/check.py --tau PATH/TO/tau --jobs 4
 ```
 
-At the time of writing it had been run to completion only on a six-input
-sample, with Tau 0.7.0-alpha (b647e787): `tau: 6 inputs of the decision
-table, 0 disagreements`, at about half a minute per input after the REPL
-starts. No agreement on the whole table is claimed here.
+`--smoke` runs one input for each of the six decision codes; it is only a
+syntax and wiring check. On 2026-09-27, the full run with Tau 0.7.0-alpha
+(`7625580`, binary SHA-256
+`19794e2579d9ecd3d61b19411375bba7d78bc8c0b4cbd541a75bc48de2d0a79c`)
+reported `tau: 2880 inputs of the decision table, 0 disagreements`. This is
+exhaustive agreement over the admitted finite domain, relative to this
+independent Tau specification; it does not prove that the policy requirements
+are complete or that external inputs are truthful. Tau execution is not part
+of the default gate.
 
 ## Run this development candidate
 
