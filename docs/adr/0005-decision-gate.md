@@ -27,15 +27,14 @@ evidence ([0003](0003-epistemic-status.md)).
 
 ## Decision
 
-The authority must own a gate that computes the *complete* expected decision
-from a canonical contract and the exact admitted invocation. The preferred
-path evaluates the contract and constructs the decision through library-owned
-builders. An optimized or hand-written executor may run only when the gate
-independently computes the expected decision and compares the complete
-normalized result before authorization. A caller cannot provide a Boolean
-"conforms" verdict, expected bytes, or a substitute contract at invocation
-time. A mismatch, missing field, undefined operation, exhausted meter, or
-unknown domain value refuses authorization before any commit or outbox delivery.
+The authority must compute the *complete* decision from a canonical contract
+and the exact admitted invocation. This gate evaluates the contract and
+constructs the decision through library-owned builders. No optimized or
+hand-written executor runs inside this authority path. A caller cannot provide
+a Boolean "conforms" verdict, expected bytes, or a substitute contract at
+invocation time. A missing field, undefined operation, exhausted library meter,
+or unknown domain value refuses authorization before any commit or outbox
+delivery.
 
 The contract must be closed and total over its stated admitted domain. It
 binds, in versioned canonical bytes:
@@ -58,29 +57,34 @@ artifacts; the contract does not invent those hashes.
 
 The gate receives the same `ReviewedTransitionInput` as execution. It admits
 and decodes raw values with the authority's catalog, then evaluates the bound
-contract using a deterministic, metered interpreter. If an input abstraction
-is used, the library computes it from checked expressions over admitted fields;
+contract using a deterministic interpreter with an authority-owned meter and
+state view. The interpreter can read state only through this view; the library
+records actual accesses and charges work as it happens. A caller-supplied
+resource report or footprint never substitutes for these observations. If an
+input abstraction is used, the library computes it from checked expressions
+over admitted fields;
 an arbitrary project callback is not a proved abstraction. A finite proof
 applies to actual invocations only after the abstraction's range and semantic
 preservation are established for all admitted raw inputs. Without that bridge,
 the claim remains scoped to the abstract tuples.
 
-The comparison covers decision class and reason, pre/post state, canonical
-patch, complete effects and outbox, receipt/bundle fields, resource report,
-and observed footprint. The library normalizes both sides through the same
-strict admission and sealing rules and compares their canonical bytes. If any
-authority-bearing field lacks a canonical projection, implementation of this
-gate is blocked until that projection exists. Comparing only state roots,
-branch codes, law verdicts, or hashes supplied by the project is insufficient.
+The gate's constructed result covers decision class and reason, pre/post
+state, canonical patch, complete effects and outbox, receipt/bundle fields,
+library-measured resource use, and observed footprint. Strict admission and
+sealing validate the constructed result before authorization. Persisted
+decisions are separately re-executed and compared during replay. A
+separate executable path cannot be admitted by comparing only its reported
+resources, footprint, state roots, branch codes, or law verdicts.
 
 There is one contract identity in the authority policy, persisted
 authorization, replay record, and audit certificate. The library computes it
 from the actual canonical contract bytes and its evaluator version. A
 project-supplied `transition_build_hash` cannot stand in for this identity.
-For emitted native code or Wasm, the separate artifact identity and exact
-target conformance evidence remain bound to the contract; the gate's
-per-invocation comparison is the runtime backstop, not a substitute for
-artifact provenance.
+Emitted native code and Wasm are outside this gate's authority path. Their
+separate artifact identity and exact-target conformance evidence do not
+authorize runtime use here. A later optimized path needs its own design and
+must use an authority-owned meter and state view for actual execution, as well
+as complete-decision conformance and artifact provenance.
 
 For each declared law, the gate evaluates a library-interpreted predicate on
 the same pre-state, command, context, and complete decision. The initial state
@@ -101,9 +105,9 @@ contract's resolver, remain necessary to challenge that meaning.
 The first implementation should cover one finite template end to end before
 generalizing the language. It must encode the template's reason and outbox
 mapping in the contract, delete the corresponding trusted Rust choice, bind
-the contract at authority construction, and show that a planted change to
-each authority-bearing output is refused at runtime. Inventory reservation is
-a suitable first candidate because its admitted decision domain is finite.
+the contract at authority construction, and compare every constructed output
+with an independent complete-decision model. Inventory reservation is a
+suitable first candidate because its admitted decision domain is finite.
 Order fulfillment follows after its typed reason and outbox mapping is
 expressed. Account lockout needs a checked time-fact abstraction or a larger
 domain/proof route before claiming exhaustive coverage.
@@ -121,10 +125,13 @@ contract checks, template conformance tests, determinism probes, and pinned
 formal-tool runs do not demonstrate the proposed runtime gate. Acceptance for
 the implementation requires all of the following on the exact source head:
 
-- a positive, nontrivial complete decision accepted for every admitted finite
-  input, with an independently authored example corpus;
-- planted mutations to branch, reason, post-state, patch, effect, outbox,
-  footprint, and meter, each refused by the authority gate;
+- a positive, nontrivial complete decision evaluated and matched for every
+  admitted finite input, including rejects, with an independently authored
+  example corpus;
+- planted mutations to the interpreter or builder's branch, reason,
+  post-state, patch, effect, outbox, footprint, and meter, each caught by the
+  independent complete-decision test; attempted out-of-view reads and
+  over-budget execution refused by the authority itself;
 - an out-of-domain/undefined input and an incomplete contract refused closed;
 - a tautological or domain-only property reported as such, never promoted to a
   system guarantee;
