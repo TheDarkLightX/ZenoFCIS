@@ -11,6 +11,7 @@ in place, and its Status section says what changed and why.
 | [0002](0002-principles.md) | Principles for the V2 assurance program | Accepted |
 | [0003](0003-epistemic-status.md) | Epistemic status of evidence and witnesses | Accepted, amended after review |
 | [0004](0004-v2-ledger.md) | V2 ledger of deferred breaking changes | Open |
+| [0005](0005-decision-gate.md) | Library-owned decision gate | Proposed |
 
 Each record has these sections: Status, Context, Decision, Consequences, and
 Evidence. The Evidence section names laws, tests, or commits.
