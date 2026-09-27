@@ -1,5 +1,10 @@
 # Repository Agent Guidance
 
+For any handoff or referenced brief, use
+[`skills/handoff-completion-gate/SKILL.md`](skills/handoff-completion-gate/SKILL.md)
+before editing. Read the complete source, state the definition of done and
+required checks, then inspect every final check before claiming completion.
+
 Choose the smallest understandable design that preserves the required
 assurance, with demonstrated behavior preservation for each simplification.
 
