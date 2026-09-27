@@ -1,4 +1,4 @@
-//! Reviewed adapter around the synthesized finite order decision.
+//! Reviewed adapter around the synthesized finite order decision and successor state.
 //!
 //! Each command's context names who sent it. A command is decided from the
 //! order's current status, and a payment provider's callback must name the
@@ -46,6 +46,18 @@ fn caller_code(caller: &Caller) -> i64 {
         Caller::Customer => 0,
         Caller::PaymentProvider => 1,
         Caller::Carrier => 2,
+    }
+}
+
+fn status_from_code(code: i64) -> Result<OrderStatus, OrderProgramError> {
+    match code {
+        0 => Ok(OrderStatus::Placed),
+        1 => Ok(OrderStatus::AwaitingPayment),
+        2 => Ok(OrderStatus::Paid),
+        3 => Ok(OrderStatus::Shipped),
+        4 => Ok(OrderStatus::Delivered),
+        5 => Ok(OrderStatus::Cancelled),
+        _ => Err(OrderProgramError::SynthesisDomain),
     }
 }
 
@@ -99,15 +111,19 @@ impl CatalogTransitionProgram<RustCryptoSha256> for OrderProgram {
         transition.observe_context_caller()?;
         let status = transition.read_status()?;
         let attempts = transition.read_payment_attempts()?.0;
+        let attempts_i64 =
+            i64::try_from(attempts).map_err(|_| OrderProgramError::SynthesisDomain)?;
         let output = synthesized::transition(&[
             action_code(&command.action),
             status_code(&status),
-            i64::try_from(attempts).map_err(|_| OrderProgramError::SynthesisDomain)?,
+            attempts_i64,
             i64::try_from(command.callback_attempt.0)
                 .map_err(|_| OrderProgramError::SynthesisDomain)?,
             caller_code(&context.caller),
         ])
         .ok_or(OrderProgramError::SynthesisDomain)?;
+        let post_status = status_from_code(output[1])?;
+        let post_attempts = Attempts(i128::from(output[2]));
         match output[0] {
             0 => {
                 transition.require(false, RejectReasonId::Reason200)?;
@@ -121,58 +137,52 @@ impl CatalogTransitionProgram<RustCryptoSha256> for OrderProgram {
             3 => {
                 transition.require(false, RejectReasonId::Reason203)?;
             }
-            4 => {
-                // Each attempt has its own number, which the provider uses
-                // as the idempotency key for this capture.
-                let attempt = Attempts(attempts + 1);
-                transition.update_status(&OrderStatus::AwaitingPayment)?;
-                transition.update_payment_attempts(&attempt)?;
-                transition.enqueue_channel_300(
-                    0,
-                    &PaymentDestination(PAYMENT_PROVIDER.into()),
-                    &PaymentRequest {
-                        request_attempt: attempt,
-                        request_action: PaymentAction::Capture,
-                    },
-                )?;
-            }
-            5 => {
-                transition.update_status(&OrderStatus::Paid)?;
-                transition.enqueue_channel_301(
-                    0,
-                    &CarrierDestination(CARRIER.into()),
-                    &ShippingRequest {
-                        paid_attempt: Attempts(attempts),
-                    },
-                )?;
-            }
-            6 => {
-                // The decline is a fact worth keeping, so it commits as a
-                // failure: the order returns to placed for another attempt.
-                transition.update_status(&OrderStatus::Placed)?;
-                transition.fail_if(true, CommittedFailureReasonId::Reason204)?;
-            }
-            7 => {
-                transition.update_status(&OrderStatus::Shipped)?;
-            }
-            8 => {
-                transition.update_status(&OrderStatus::Delivered)?;
-            }
-            9 => {
-                transition.update_status(&OrderStatus::Cancelled)?;
-            }
-            10 => {
-                // The capture may still be pending at the provider, so the
-                // cancellation voids that exact attempt.
-                transition.update_status(&OrderStatus::Cancelled)?;
-                transition.enqueue_channel_300(
-                    0,
-                    &PaymentDestination(PAYMENT_PROVIDER.into()),
-                    &PaymentRequest {
-                        request_attempt: Attempts(attempts),
-                        request_action: PaymentAction::Void,
-                    },
-                )?;
+            4..=10 => {
+                transition.update_status(&post_status)?;
+                if output[2] != attempts_i64 {
+                    transition.update_payment_attempts(&post_attempts)?;
+                }
+                match output[0] {
+                    4 => {
+                        // The synthesized successor count is this request's
+                        // idempotency number at the provider.
+                        transition.enqueue_channel_300(
+                            0,
+                            &PaymentDestination(PAYMENT_PROVIDER.into()),
+                            &PaymentRequest {
+                                request_attempt: post_attempts,
+                                request_action: PaymentAction::Capture,
+                            },
+                        )?;
+                    }
+                    5 => {
+                        transition.enqueue_channel_301(
+                            0,
+                            &CarrierDestination(CARRIER.into()),
+                            &ShippingRequest {
+                                paid_attempt: post_attempts,
+                            },
+                        )?;
+                    }
+                    6 => {
+                        // The decline is a fact worth keeping, so it commits
+                        // as a failure and reopens checkout.
+                        transition.fail_if(true, CommittedFailureReasonId::Reason204)?;
+                    }
+                    10 => {
+                        // Void the exact attempt that was pending.
+                        transition.enqueue_channel_300(
+                            0,
+                            &PaymentDestination(PAYMENT_PROVIDER.into()),
+                            &PaymentRequest {
+                                request_attempt: post_attempts,
+                                request_action: PaymentAction::Void,
+                            },
+                        )?;
+                    }
+                    7..=9 => {}
+                    _ => return Err(OrderProgramError::SynthesisDomain),
+                }
             }
             _ => return Err(OrderProgramError::SynthesisDomain),
         }

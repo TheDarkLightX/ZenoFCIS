@@ -115,7 +115,7 @@ def check_vectors(directory: Path, domain: str, expected: dict | None = None) ->
 
 
 def builtin_decision_table(domain: str) -> dict:
-    """The complete decision tables of the counter, inventory, and generic domains."""
+    """Independent complete decision tables for the built-in finite examples."""
     if domain == "counter":
         expected = {}
         for count in range(4):
@@ -162,9 +162,9 @@ def builtin_decision_table(domain: str) -> dict:
                             expected[available, reserved, action, quantity, authorized] = out
         return expected
     if domain == "order":
-        # Independent reading of order-fulfillment/README.md. The input and
-        # branch codes are the contract ABI; the adapter is checked by the
-        # template's application-level conformance test.
+        # Independent reading of order-fulfillment/README.md. The output
+        # includes the complete successor state, including rejection's no-op.
+        # The typed outbox adapter is checked by application conformance.
         expected = {}
         for action, status, attempts, callback, caller in itertools.product(
                 range(6), range(6), range(4), range(4), range(3)):
@@ -194,7 +194,12 @@ def builtin_decision_table(domain: str) -> dict:
                 branch = 8
             else:
                 branch = 9 if status == 0 else 10
-            expected[action, status, attempts, callback, caller] = [branch]
+            post_status = {
+                4: 1, 5: 2, 6: 0, 7: 3, 8: 4, 9: 5, 10: 5,
+            }.get(branch, status)
+            post_attempts = attempts + 1 if branch == 4 else attempts
+            expected[action, status, attempts, callback, caller] = [
+                branch, post_status, post_attempts]
         return expected
     if domain == "withdrawal":
         expected = {}

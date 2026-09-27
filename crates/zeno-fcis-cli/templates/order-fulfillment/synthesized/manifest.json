@@ -8,34 +8,36 @@
       "context.caller"
     ],
     "outputs": [
-      "decision.branch"
+      "decision.branch",
+      "post.status",
+      "post.payment_attempts"
     ]
   },
   "assignments_evaluated": 8,
   "authority": "none",
-  "certificate": "0cba56e4d77fff3047181761e2278157ee9a2f8611a8216274ae06ec31db7f8f",
-  "contract": "cd72e3d825586e90dd7eda9e651f14b57356c8b871a6f68788b50b4381540536",
+  "certificate": "d0cfeb4bf55398960b1e5540fc39b4099e7e39cd28a66d43bbad7134df2ce361",
+  "contract": "e17eb3454e1d5b78bb61b446b739778f1e4a8192f757a17ccd8976af2802dee0",
   "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
   "files": [
     {
-      "bytes": 10075,
+      "bytes": 13078,
       "path": "problem.json",
-      "sha256": "80edce8d44a0e60ba055857227b6994ed91a3dfca68ca9039965bc24c282a80b"
+      "sha256": "4738e0729edd28940118b3c44d9255201d9b37111a6ed2b9aaeda0423e31ac61"
     },
     {
-      "bytes": 4491,
+      "bytes": 5861,
       "path": "program.zcve",
-      "sha256": "df7ce6d60b045404d266b37e47fb2685263cb9102c78bb3b839b136690e0c02e"
+      "sha256": "d851d6505725ad19177ddafae4562a78b962b47932d1a4ba41f46681acd11f8b"
     },
     {
-      "bytes": 5384,
+      "bytes": 6776,
       "path": "transition.rs",
-      "sha256": "3cc8ab90d07c18cebfb9e5a66dc1df0798246de4986596f05a8b3d3334a79059"
+      "sha256": "d733b242288e66d3ee14521c0d0a96f296d4191c7f33b70476cae09d47ddb160"
     },
     {
-      "bytes": 222993,
+      "bytes": 261009,
       "path": "vectors.json",
-      "sha256": "01dc31de5ea074772d97dc706b2a790eefbf1a24d04ce476c080ac6bfba03944"
+      "sha256": "fa0bfaf8c53fea7984d3aca0a0625793ed0a7da1d37b8d1d04af53f4827b5bbc"
     }
   ],
   "first_counterexample": {
@@ -47,7 +49,9 @@
       0
     ],
     "output": [
-      3
+      3,
+      0,
+      2
     ]
   },
   "input_coverage": 1728,
@@ -59,5 +63,5 @@
     "language": "rust",
     "revision": 1
   },
-  "trace": "2a11ef61f47e40b868ebc67731a52ff01fd9ae64d5b868447d8d6784e17c1a51"
+  "trace": "84ca0584bfa9987e8672e1ac5eb44019e9ed33e9014484363bb61b137389adaa"
 }

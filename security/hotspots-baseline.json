@@ -4515,52 +4515,52 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 387,
+      "production_lines": 392,
       "rank": 45,
       "score": 77,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            450
+            455
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            411
+            416
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            348,
-            371,
-            406,
-            412
+            353,
+            376,
+            411,
+            417
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
             102,
-            289,
-            355,
-            385,
-            406,
-            407,
-            411
+            294,
+            360,
+            390,
+            411,
+            412,
+            416
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
             22,
-            276,
-            284,
-            383,
-            393,
-            454
+            281,
+            289,
+            388,
+            398,
+            459
           ]
         },
         {
@@ -4568,8 +4568,8 @@
           "lines": [
             26,
             102,
-            355,
-            407
+            360,
+            412
           ]
         }
       ],
@@ -5257,9 +5257,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3799127,
+    "admitted_bytes": 3800783,
     "admitted_files": 222,
-    "inventory_sha256": "224e8e001d35fb11ca94489d501d815a402271cd330f697bfc71b3c32a42803f",
+    "inventory_sha256": "3301827c7118d8ee7b0a72bb1cbfe278dbfe742c91e66618dba39424dfc68878",
     "ranked_above_minimum": 200,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

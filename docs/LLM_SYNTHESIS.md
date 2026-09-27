@@ -23,8 +23,8 @@ LLM. The operator chooses the CLI executable; the tools take only a problem
 path, output path, and a registered target language.
 
 The order-fulfillment template demonstrates the workflow: its 1,728-input
-branch selector is synthesized and checked in all three targets, and its
-executed adapter is compared with an independent full-transition model over
+branch and complete successor state are synthesized and checked in all three
+targets. Its executed adapter is compared with an independent full-transition model over
 all 1,440 lawful state/command/context combinations. Account-lockout still
 uses a hand-written decision: its raw timestamp fields make direct exhaustive
 synthesis exceed this profile's tuple limit. A finite time-fact projection
