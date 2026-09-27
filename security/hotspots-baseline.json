@@ -4515,41 +4515,41 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 382,
+      "production_lines": 387,
       "rank": 45,
       "score": 77,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            446
+            450
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            407
+            411
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            344,
-            367,
-            402,
-            408
+            348,
+            371,
+            406,
+            412
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
             102,
-            285,
-            351,
-            381,
-            402,
-            403,
-            407
+            289,
+            355,
+            385,
+            406,
+            407,
+            411
           ]
         },
         {
@@ -4557,9 +4557,10 @@
           "lines": [
             22,
             276,
-            379,
-            389,
-            450
+            284,
+            383,
+            393,
+            454
           ]
         },
         {
@@ -4567,8 +4568,8 @@
           "lines": [
             26,
             102,
-            351,
-            403
+            355,
+            407
           ]
         }
       ],
@@ -5256,9 +5257,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3798864,
+    "admitted_bytes": 3799127,
     "admitted_files": 222,
-    "inventory_sha256": "a96d00a7a93bb3f73afb5939c1f88e79556a767a1d26a2e3ed3b4c93288d4b08",
+    "inventory_sha256": "224e8e001d35fb11ca94489d501d815a402271cd330f697bfc71b3c32a42803f",
     "ranked_above_minimum": 200,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
