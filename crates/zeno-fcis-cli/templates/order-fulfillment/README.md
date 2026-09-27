@@ -3,8 +3,8 @@
 This local application follows one order from checkout to delivery. Payment
 and shipping happen in other systems: the order sends them requests through
 the outbox, and their answers come back as commands. It shows three patterns:
-- a synthesized finite decision core, which selects a complete decision
-  branch from the order, command, and caller;
+- a synthesized finite decision core, which selects the decision branch and
+  complete successor state from the order, command, and caller;
 - idempotent external requests: each request is queued once, by the decision
   that moves the order, and carries a number the receiver can use to recognize
   a retry;
@@ -13,9 +13,11 @@ the outbox, and their answers come back as commands. It shows three patterns:
 
 `synthesis.json` defines the closed finite decision relation. `zeno-fcis
 synth` selected `synthesized/transition.rs` after checking all 1,728 input
-tuples. `src/program.rs` is a reviewed adapter from the selected branch to
-typed state updates, rejection reasons, and outbox requests. Its executed
-decisions are checked against an independent model for all 1,440 inputs over
+tuples. Its output includes the branch, post-decision status, and post-decision
+payment-attempt count, including the unchanged state on rejection.
+`src/program.rs` is a reviewed adapter from that output to typed state writes,
+rejection reasons, and outbox requests. Its executed decisions are checked
+against an independent model for all 1,440 inputs over
 lawful pre-states. The law checker in `src/laws.rs` also evaluates the formulas
 in `project.zeno` against each decision before publication.
 
@@ -102,10 +104,12 @@ zeno-fcis synth run synthesis.json --out synthesized --check
 zeno-fcis synth verify synthesis.json --out synthesized
 ```
 
-The synthesis claim covers the pure branch-selection function and its declared
-finite inputs. The app-level conformance test additionally checks the adapter's
-post-state, reasons, and request plan on every lawful finite input. The
-external payment and carrier systems are outside that claim.
+The synthesis claim covers branch selection and the complete pure successor
+state on the declared finite inputs. The branch also selects the request kind;
+the synthesized attempt count supplies its request number. The typed mapping
+to reasons and outbox requests remains reviewed adapter code, checked against
+the independent app-level model on every lawful finite input. External payment
+and carrier systems are outside that claim.
 
 Every decision is checked at run time, before it can be published:
 - law 500: an order awaiting payment, paid, shipped, or delivered has made at

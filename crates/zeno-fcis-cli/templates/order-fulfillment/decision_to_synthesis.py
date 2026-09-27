@@ -78,6 +78,19 @@ def decision(g, searching):
                     g.choose(g.neg(valid), g.integer(1), branch))
 
 
+def successor(g, branch):
+    """Complete finite successor state; rejected branches keep the pre-state."""
+    status, attempts = 1, 2
+    is_branch = [g.equal(branch, g.integer(i)) for i in range(11)]
+    post_status = status
+    for code, value in ((4, 1), (5, 2), (6, 0), (7, 3),
+                        (8, 4), (9, 5), (10, 5)):
+        post_status = g.choose(is_branch[code], g.integer(value), post_status)
+    post_attempts = g.choose(is_branch[4],
+                             g.node("add", attempts, g.integer(1)), attempts)
+    return branch, post_status, post_attempts
+
+
 def problem():
     fields = [
         ("command.action", 0, 5), ("pre.status", 0, 5),
@@ -86,16 +99,23 @@ def problem():
     ]
     inputs = [{"name": n, "type": {"kind": "int", "min": a, "max": b}}
               for n, a, b in fields]
-    outputs = [{"name": "decision.branch", "type": {"kind": "int", "min": 0, "max": 10}}]
-    contract = Graph(6)
-    expected = decision(contract, False)
-    contract_root = contract.equal(5, expected)
+    outputs = [
+        {"name": "decision.branch", "type": {"kind": "int", "min": 0, "max": 10}},
+        {"name": "post.status", "type": {"kind": "int", "min": 0, "max": 5}},
+        {"name": "post.payment_attempts", "type": {"kind": "int", "min": 0, "max": 3}},
+    ]
+    contract = Graph(8)
+    expected = successor(contract, decision(contract, False))
+    contract_root = contract.both(
+        contract.both(contract.equal(5, expected[0]),
+                      contract.equal(6, expected[1])),
+        contract.equal(7, expected[2]))
     sketch = Graph(5)
-    selected = decision(sketch, True)
+    selected = successor(sketch, decision(sketch, True))
     return {"schema": "zeno-fcis/synthesis-problem/1",
             "profile": "zeno-fcis/finite-i64/1", "inputs": inputs, "outputs": outputs,
             "contract": {"nodes": contract.nodes, "roots": [contract_root]},
-            "sketch": {"nodes": sketch.nodes, "roots": [selected]}}
+            "sketch": {"nodes": sketch.nodes, "roots": list(selected)}}
 
 
 def main():
