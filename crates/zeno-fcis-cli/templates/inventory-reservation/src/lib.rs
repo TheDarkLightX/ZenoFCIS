@@ -13,8 +13,6 @@ pub mod laws;
 #[path = "../profile.rs"]
 pub mod profile;
 pub mod program;
-#[path = "../synthesized/transition.rs"]
-pub mod synthesized;
 
 use bindings::GeneratedProject;
 use delivery::Destination;

@@ -10,6 +10,7 @@ extern crate alloc;
 
 /// Closed finite relational synthesis and language-neutral execution.
 pub mod finite;
+pub mod finite_runtime;
 /// Exhaustive system properties of finite transition programs.
 pub mod system;
 
