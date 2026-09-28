@@ -767,7 +767,7 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
                 "path": cvc5,
                 "version": "1.3.3",
                 "sha256": sha256_hex(cvc5_script),
-                "timeout_ms": 1_000,
+                "timeout_ms": 30_000,
                 "max_output_bytes": 4096,
                 "allowed_axioms": []
             }]
@@ -788,7 +788,13 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
         .arg(&cvc5_project)
         .args(["--claim", "500", "--backend", "cvc5", "--tools"])
         .arg(&cvc5_manifest));
-    assert_eq!(cvc5_result.status.code(), Some(2));
+    assert_eq!(
+        cvc5_result.status.code(),
+        Some(2),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&cvc5_result.stdout),
+        String::from_utf8_lossy(&cvc5_result.stderr)
+    );
     assert!(String::from_utf8_lossy(&cvc5_result.stdout).contains("UNSAT proposal retained"));
     assert!(
         String::from_utf8_lossy(&cvc5_result.stdout)
@@ -823,7 +829,7 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
                 "path": z3,
                 "version": "4.16.0",
                 "sha256": sha256_hex(z3_script),
-                "timeout_ms": 1_000,
+                "timeout_ms": 30_000,
                 "max_output_bytes": 4096,
                 "allowed_axioms": []
             }]

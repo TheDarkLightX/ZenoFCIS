@@ -1,6 +1,6 @@
 // Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.
 #[rustfmt::skip]
-pub fn transition(input: &[i64]) -> Option<[i64; 1]> {
+pub fn transition(input: &[i64]) -> Option<[i64; 3]> {
     if input.len() != 5 { return None; }
     if !(0_i64..=5_i64).contains(&input[0]) { return None; }
     if !(0_i64..=5_i64).contains(&input[1]) { return None; }
@@ -175,6 +175,48 @@ pub fn transition(input: &[i64]) -> Option<[i64; 1]> {
     let _ = v82;
     let v83: i64 = if v80 == 1 { v5 } else { v82 };
     let _ = v83;
+    let v84: i64 = i64::from(v83 == v5);
+    let _ = v84;
+    let v85: i64 = i64::from(v83 == v7);
+    let _ = v85;
+    let v86: i64 = i64::from(v83 == v9);
+    let _ = v86;
+    let v87: i64 = i64::from(v83 == v11);
+    let _ = v87;
+    let v88: i64 = i64::from(v83 == v13);
+    let _ = v88;
+    let v89: i64 = i64::from(v83 == v15);
+    let _ = v89;
+    let v90: i64 = i64::from(v83 == v71);
+    let _ = v90;
+    let v91: i64 = i64::from(v83 == v69);
+    let _ = v91;
+    let v92: i64 = i64::from(v83 == v67);
+    let _ = v92;
+    let v93: i64 = i64::from(v83 == v64);
+    let _ = v93;
+    let v94: i64 = i64::from(v83 == v65);
+    let _ = v94;
+    let v95: i64 = if v88 == 1 { v7 } else { v1 };
+    let _ = v95;
+    let v96: i64 = if v89 == 1 { v9 } else { v95 };
+    let _ = v96;
+    let v97: i64 = if v90 == 1 { v5 } else { v96 };
+    let _ = v97;
+    let v98: i64 = if v91 == 1 { v11 } else { v97 };
+    let _ = v98;
+    let v99: i64 = if v92 == 1 { v13 } else { v98 };
+    let _ = v99;
+    let v100: i64 = if v93 == 1 { v15 } else { v99 };
+    let _ = v100;
+    let v101: i64 = if v94 == 1 { v15 } else { v100 };
+    let _ = v101;
+    let v102: i64 = v2.checked_add(v7)?;
+    let _ = v102;
+    let v103: i64 = if v88 == 1 { v102 } else { v2 };
+    let _ = v103;
     if !(0_i64..=10_i64).contains(&v83) { return None; }
-    Some([v83,])
+    if !(0_i64..=5_i64).contains(&v101) { return None; }
+    if !(0_i64..=3_i64).contains(&v103) { return None; }
+    Some([v83,v101,v103,])
 }
