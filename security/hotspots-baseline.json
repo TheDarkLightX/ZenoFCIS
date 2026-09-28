@@ -4515,51 +4515,51 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 370,
+      "production_lines": 373,
       "rank": 45,
       "score": 77,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            434
+            437
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            395
+            398
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            332,
-            355,
-            390,
-            396
+            335,
+            358,
+            393,
+            399
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
             93,
-            273,
-            339,
-            369,
-            390,
-            391,
-            395
+            276,
+            342,
+            372,
+            393,
+            394,
+            398
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
             22,
-            264,
-            367,
-            377,
-            438
+            267,
+            370,
+            380,
+            441
           ]
         },
         {
@@ -4567,8 +4567,8 @@
           "lines": [
             26,
             93,
-            339,
-            391
+            342,
+            394
           ]
         }
       ],
@@ -5256,9 +5256,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3796647,
+    "admitted_bytes": 3796889,
     "admitted_files": 222,
-    "inventory_sha256": "4420b62fe557df9c6136d9e60c8f9b2bb452e1b8a4d5e5f5e955e76496a2cb20",
+    "inventory_sha256": "3996145839491aeccf8e46e9113ce111500f4dd317459a7b21c184f5942d3792",
     "ranked_above_minimum": 200,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",

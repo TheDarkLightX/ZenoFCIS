@@ -130,24 +130,27 @@ def builtin_decision_table(domain: str) -> dict:
             for reserved in range(6):
                 for action in range(4):
                     for quantity in range(1, 4):
-                        # Codes: 0 short available, 1 short reserved, 2 over
-                        # capacity, 3 accept; then available, reserved, ship.
-                        kept = [available, reserved, 0]
-                        if action == 0:
-                            out = ([0, *kept] if quantity > available else
-                                   [2, *kept] if reserved + quantity > 5 else
-                                   [3, available - quantity, reserved + quantity, 0])
-                        elif action == 1:
-                            out = ([1, *kept] if quantity > reserved else
-                                   [2, *kept] if available + quantity > 5 else
-                                   [3, available + quantity, reserved - quantity, 0])
-                        elif action == 2:
-                            out = ([1, *kept] if quantity > reserved else
-                                   [3, available, reserved - quantity, 1])
-                        else:
-                            out = ([2, *kept] if available + quantity > 5 else
-                                   [3, available + quantity, reserved, 0])
-                        expected[available, reserved, action, quantity] = out
+                        for authorized in range(2):
+                            # Codes: 0 short available, 1 short reserved,
+                            # 2 over capacity, 3 accept, 4 unauthorized.
+                            kept = [available, reserved, 0]
+                            if not authorized:
+                                out = [4, *kept]
+                            elif action == 0:
+                                out = ([0, *kept] if quantity > available else
+                                       [2, *kept] if reserved + quantity > 5 else
+                                       [3, available - quantity, reserved + quantity, 0])
+                            elif action == 1:
+                                out = ([1, *kept] if quantity > reserved else
+                                       [2, *kept] if available + quantity > 5 else
+                                       [3, available + quantity, reserved - quantity, 0])
+                            elif action == 2:
+                                out = ([1, *kept] if quantity > reserved else
+                                       [3, available, reserved - quantity, 1])
+                            else:
+                                out = ([2, *kept] if available + quantity > 5 else
+                                       [3, available + quantity, reserved, 0])
+                            expected[available, reserved, action, quantity, authorized] = out
         return expected
     if domain == "order":
         # Independent reading of order-fulfillment/README.md. The input and
@@ -256,7 +259,7 @@ def exercise_counter(cli: list[str], app: Path, directory: Path,
 def exercise_inventory(cli: list[str], app: Path, directory: Path,
                        environment: dict[str, str]) -> dict:
     """The inventory-reservation example's synthesized stock step."""
-    return exercise_synthesized(cli, app, directory, environment, "inventory", 432)
+    return exercise_synthesized(cli, app, directory, environment, "inventory", 864)
 
 
 def exercise_order(cli: list[str], app: Path, directory: Path,

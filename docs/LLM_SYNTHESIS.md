@@ -30,6 +30,12 @@ uses a hand-written decision: its raw timestamp fields make direct exhaustive
 synthesis exceed this profile's tuple limit. A finite time-fact projection
 would need its own soundness proof before it could support the same claim.
 
+Inventory-reservation synthesizes the complete finite decision over 864 inputs,
+including authorization precedence, state updates, and shipment selection.
+Its executed adapter is compared with an independent model on every admitted
+input. The proof is relative to the reviewed finite contract and the admitted
+schema; it does not certify external authentication or shipment delivery.
+
 For Codex, install the skill from this checkout with:
 
 ```sh
