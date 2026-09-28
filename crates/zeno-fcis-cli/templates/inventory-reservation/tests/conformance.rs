@@ -2,7 +2,7 @@
 //! decision examples drafted from the README.
 //!
 //! Every decision runs through the application: schema admission, the
-//! authority, the adapter in `src/program.rs`, the law checker, the committed
+//! authority, the library decision interpreter, the law checker, the committed
 //! patch, and the outbox plan. Fields are read by the numeric IDs in
 //! `project.zeno`, not through the generated name bindings, so a binding that
 //! swapped the two stock fields fails here.
@@ -17,10 +17,12 @@ use inventory_reservation::{
 };
 use std::collections::BTreeSet;
 use zeno_fcis_codec::Domain;
-use zeno_fcis_core::Decision;
+use zeno_fcis_compose::{AccessPath, Footprint, PathAtom, PathSet};
+use zeno_fcis_core::{BudgetUsed, Decision, Resource};
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_patch::{PatchOp, PathSegment};
 use zeno_fcis_schema::ValidationLimits;
-use zeno_fcis_value::Value;
+use zeno_fcis_value::{Field, Value};
 
 const EXAMPLES: &str = include_str!("decision-examples.txt");
 const ACTIONS: [u16; 4] = [150, 151, 152, 153];
@@ -84,6 +86,28 @@ fn stock((available, reserved): State) -> Stock {
     }
 }
 
+fn expected_footprint(accept: bool) -> Footprint {
+    let path =
+        |namespace, field| AccessPath::try_new(namespace, vec![PathAtom::Field(field)]).unwrap();
+    Footprint::new(
+        PathSet::try_new(vec![path(100, 110), path(100, 111)]).unwrap(),
+        if accept {
+            PathSet::try_new(vec![path(100, 110), path(100, 111)]).unwrap()
+        } else {
+            PathSet::empty()
+        },
+        PathSet::try_new(vec![path(102, 130)]).unwrap(),
+        PathSet::empty(),
+    )
+}
+
+fn check_meter(used: BudgetUsed, accept: bool, ship: bool) {
+    assert_eq!(used.used(Resource::Read), if accept { 7 } else { 5 });
+    assert_eq!(used.used(Resource::Write), if accept { 2 } else { 0 });
+    assert_eq!(used.used(Resource::Candidate), 1);
+    assert_eq!(used.used(Resource::Effect), u64::from(ship));
+}
+
 /// Runs one command through the application from an admitted pre-state.
 fn observe(
     authority: &Authority,
@@ -133,17 +157,61 @@ fn observe(
         )
         .unwrap();
     let domain = Domain::new("example/inventory-reservation/state", 1).unwrap();
+    let expected = model(pre, action_id, quantity, authorized);
     match authority.execute(witness).unwrap() {
-        Decision::Reject(reject) => Outcome {
-            kind: "reject",
-            reason: Some(reject.reason().rejection().reason_id().get()),
-            post: pre,
-            shipments: Vec::new(),
-        },
+        Decision::Reject(reject) => {
+            let rejection = reject.reason().rejection();
+            assert_eq!(rejection.footprint(), &expected_footprint(false));
+            check_meter(rejection.resources().budget_used(), false, false);
+            Outcome {
+                kind: "reject",
+                reason: Some(rejection.reason_id().get()),
+                post: pre,
+                shipments: Vec::new(),
+            }
+        }
         Decision::Accept(accepted) => {
             let candidate = accepted.into_candidate();
             let bundle = candidate.bundle();
+            assert_eq!(candidate.artifacts().footprint(), &expected_footprint(true));
+            check_meter(
+                candidate.artifacts().resources().budget_used(),
+                true,
+                !expected.shipments.is_empty(),
+            );
             assert!(bundle.commit_plan().effects().is_empty());
+            assert_eq!(bundle.patch().operations().len(), 2);
+            for (operation, (field, value)) in bundle
+                .patch()
+                .operations()
+                .iter()
+                .zip([(110, expected.post.0), (111, expected.post.1)])
+            {
+                match operation {
+                    PatchOp::Update {
+                        path,
+                        value: actual,
+                        ..
+                    } => {
+                        assert_eq!(path.segments(), &[PathSegment::Field(field)]);
+                        assert_eq!(actual, &Value::I128(value));
+                    }
+                    other => panic!("unexpected patch operation: {other:?}"),
+                }
+            }
+            assert_eq!(
+                bundle.outbox_plan().entries().len(),
+                expected.shipments.len()
+            );
+            if let Some(entry) = bundle.outbox_plan().entries().first() {
+                assert_eq!(entry.ordinal(), 0);
+                assert_eq!(entry.destination(), &Value::Text("warehouse".into()));
+                assert_eq!(
+                    entry.payload(),
+                    &Value::record_canonical(vec![Field::new(140, Value::I128(quantity)),])
+                        .unwrap()
+                );
+            }
             let applied = bundle
                 .patch()
                 .apply::<RustCryptoSha256>(&pre_value, domain)

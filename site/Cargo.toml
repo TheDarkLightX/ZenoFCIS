@@ -51,6 +51,7 @@ zeno-fcis-refine = { path = "../crates/zeno-fcis-refine" }
 zeno-fcis-schema = { path = "../crates/zeno-fcis-schema" }
 zeno-fcis-shell = { path = "../crates/zeno-fcis-shell" }
 zeno-fcis-spec = { path = "../crates/zeno-fcis-spec" }
+zeno-fcis-synthesis = { path = "../crates/zeno-fcis-synthesis" }
 zeno-fcis-transition = { path = "../crates/zeno-fcis-transition" }
 zeno-fcis-value = { path = "../crates/zeno-fcis-value" }
 
