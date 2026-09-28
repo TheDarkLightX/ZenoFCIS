@@ -1,11 +1,12 @@
 """Write synthesis.json from rules.txt.
 
-The contract states the rule base as a relation: for every input, the outputs
-are the verdict, the rule, and the strikes after the decision that the
-highest-priority matching rule requires. The sketch is a hand-written decision
-program in priority order with three holes: the freeze threshold, the
-boundary of a large amount, and the verdict code of a hold. `zeno-fcis synth`
-selects the hole values that satisfy the contract on every input.
+The contract states screening and reinstatement as one relation: for every
+input, the outputs are the decision, the rule (a fixed, ignored placeholder
+for reinstatement), and the strikes after the decision. The screening sketch is a
+priority-ordered program with three holes: the freeze threshold, the boundary
+of a large amount, and the verdict code of a hold. Reinstatement has no holes.
+`zeno-fcis synth` selects the hole values that satisfy the contract on every
+input.
 
 After editing rules.txt:
 
@@ -107,32 +108,42 @@ def condition(g, feature_input, op, value):
 
 
 def contract(features, rules):
-    # Environment: the features, then the outputs verdict, rule, post strikes.
+    # Environment: features, action, reviewer, then decision, rule, post strikes.
     n = len(features)
-    g = Graph(n + 3)
+    g = Graph(n + 5)
     strikes = [f[0] for f in features].index("strikes")
-    verdict, rule, post = n, n + 1, n + 2
+    action, reviewer = n, n + 1
+    output_verdict, output_rule, output_post = n + 2, n + 3, n + 4
     cap = features[strikes][2]
     struck = g.node("select", g.node("lt", strikes, g.int(cap)),
                     g.node("add", strikes, g.int(1)), g.int(cap))
     ordered = sorted(enumerate(rules), key=lambda item: -item[1][1])
-    root = g.node("bool", False)
+    verdict, rule = g.int(0), g.int(len(rules) - 1)
     for index, (name, priority, conditions, outcome) in reversed(ordered):
         holds = (g.all_of(*[condition(g, *c) for c in conditions]) if conditions
                  else g.node("bool", True))
-        expected = g.all_of(
-            g.node("eq", verdict, g.int(VERDICT[outcome])),
-            g.node("eq", rule, g.int(index)),
-            g.node("eq", post, struck if outcome == "block" else strikes),
-        )
-        root = g.node("select", holds, expected, root)
+        verdict = g.node("select", holds, g.int(VERDICT[outcome]), verdict)
+        rule = g.node("select", holds, g.int(index), rule)
+    screened_post = g.node("select", g.node("eq", verdict, g.int(2)), struck, strikes)
+    reinstating = g.node("eq", action, g.int(1))
+    reinstate_code = g.node("select", g.node("not", reviewer), g.int(3),
+                           g.node("select", g.node("eq", strikes, g.int(0)),
+                                  g.int(4), g.int(5)))
+    verdict = g.node("select", reinstating, reinstate_code, verdict)
+    rule = g.node("select", reinstating, g.int(len(rules) - 1), rule)
+    post = g.node("select", reinstating,
+                  g.node("select", reviewer, g.int(0), strikes), screened_post)
+    root = g.all_of(g.node("eq", output_verdict, verdict),
+                    g.node("eq", output_rule, rule),
+                    g.node("eq", output_post, post))
     return {"nodes": g.nodes, "roots": [root]}
 
 
-def sketch(features):
+def sketch(features, rules):
     """A priority-ordered decision program for exactly this rule base."""
-    g = Graph(len(features))
+    g = Graph(len(features) + 2)
     strikes, tier, region, band, risk = range(5)
+    action, reviewer = 5, 6
     freeze = g.hole(1, [["int", 2], ["int", 3]])
     large_boundary = g.hole(2, [["int", 1], ["int", 2], ["int", 3]])
     hold = g.hole(3, [["int", 0], ["int", 1], ["int", 2]])
@@ -168,7 +179,16 @@ def sketch(features):
     struck = g.node("select", g.node("lt", strikes, freeze),
                     g.node("add", strikes, g.int(1)), freeze)
     post = g.node("select", blocked, struck, strikes)
-    return {"nodes": g.nodes, "roots": [verdict, rule, post]}
+    reinstating = g.node("eq", action, g.int(1))
+    missing_strikes = g.node("eq", strikes, g.int(0))
+    reinstate_code = g.node("select", g.node("not", reviewer), g.int(3),
+                           g.node("select", missing_strikes, g.int(4), g.int(5)))
+    return {"nodes": g.nodes, "roots": [
+        g.node("select", reinstating, reinstate_code, verdict),
+        g.node("select", reinstating, g.int(len(rules) - 1), rule),
+        g.node("select", reinstating,
+               g.node("select", reviewer, g.int(0), strikes), post),
+    ]}
 
 
 def integer(low, high):
@@ -181,14 +201,18 @@ problem = {
     "schema": "zeno-fcis/synthesis-problem/1",
     "profile": "zeno-fcis/finite-i64/1",
     "inputs": [{"name": f"pre.{name}" if name == "strikes" else f"feature.{name}",
-                "type": integer(low, high)} for name, low, high, _ in features],
+                "type": integer(low, high)} for name, low, high, _ in features] + [
+                    {"name": "command.action.screen_reinstate", "type": integer(0, 1)},
+                    {"name": "context.reviewer", "type": {"kind": "bool"}},
+                ],
     "outputs": [
-        {"name": "decision.allow_hold_block", "type": integer(0, 2)},
+        {"name": "decision.allow_hold_block_not_reviewer_no_strikes_reinstated",
+         "type": integer(0, 5)},
         {"name": "decision.rule", "type": integer(0, len(rules) - 1)},
         {"name": "post.strikes", "type": integer(features[0][1], features[0][2])},
     ],
     "contract": contract(features, rules),
-    "sketch": sketch(features),
+    "sketch": sketch(features, rules),
 }
 with open(sys.argv[2], "w") as output:
     json.dump(problem, output, indent=2)
