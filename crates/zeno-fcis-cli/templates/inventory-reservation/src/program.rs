@@ -1,7 +1,8 @@
 //! Reviewed adapter around the synthesized stock step.
 //!
-//! `synthesized::transition` decides authorization, stock movement, rejection,
-//! and shipment selection. It was selected by exhaustive verification against
+//! The library interpreter evaluates the canonical `program.zcve` artifact to
+//! decide authorization, stock movement, rejection, and shipment selection.
+//! That artifact was selected by exhaustive verification against
 //! `synthesis.json` over all 864 admitted inputs.
 //! This adapter maps its output through the table below into typed staging.
 //!
@@ -13,12 +14,13 @@
 //! | 3 | accept: `output[1]` available, `output[2]` reserved, and a shipment request when `output[3]` is 1 |
 //! | 4 | reject `not_authorized` (200) |
 
-use crate::{bindings::*, generated::*, profile, synthesized};
+use crate::{bindings::*, generated::*, profile};
 use zeno_fcis_authority::{CatalogTransitionProgram, ReviewedTransitionInput};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_core::BudgetUsed;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::ValidationLimits;
+use zeno_fcis_synthesis::finite_runtime::import_program;
 use zeno_fcis_transition::TransitionDecision;
 
 /// Where shipment requests are delivered.
@@ -84,14 +86,17 @@ impl CatalogTransitionProgram<RustCryptoSha256> for StockProgram {
         let reserved = transition.read_reserved()?;
         let domain =
             |value: i128| i64::try_from(value).map_err(|_| StockProgramError::SynthesisDomain);
-        let output = synthesized::transition(&[
-            domain(available.0)?,
-            domain(reserved.0)?,
-            action_code(&command.action),
-            domain(command.quantity.0)?,
-            i64::from(context.authorized.0),
-        ])
-        .ok_or(StockProgramError::SynthesisDomain)?;
+        let program = import_program(include_bytes!("../synthesized/program.zcve"))
+            .map_err(|_| StockProgramError::SynthesisDomain)?;
+        let output = program
+            .evaluate(&[
+                domain(available.0)?,
+                domain(reserved.0)?,
+                action_code(&command.action),
+                domain(command.quantity.0)?,
+                i64::from(context.authorized.0),
+            ])
+            .map_err(|_| StockProgramError::SynthesisDomain)?;
         match output[0] {
             0 => {
                 transition.require(false, RejectReasonId::Reason201)?;

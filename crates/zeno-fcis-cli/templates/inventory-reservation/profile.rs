@@ -9,6 +9,7 @@ use zeno_fcis_laws::{
 };
 use zeno_fcis_project::{SemanticId, StableName};
 use zeno_fcis_spec::{ProjectLimits, ProjectSpec, SourceLimits, elaborate_project, parse_project};
+use zeno_fcis_synthesis::finite_runtime::evaluator_hash;
 
 /// The committed-failure law. This application never commits a failure, so
 /// the law checker refuses any committed failure outright. It has no formula,
@@ -75,9 +76,15 @@ pub fn source_hash() -> Hash32 {
         "example/inventory-reservation/closed-ir",
         include_bytes!("synthesized/program.zcve"),
     );
+    let evaluator = evaluator_hash().expect("static finite evaluator source");
     digest(
         "example/inventory-reservation/source-complete",
-        &[source.as_bytes().as_slice(), program.as_bytes().as_slice()].concat(),
+        &[
+            source.as_bytes().as_slice(),
+            program.as_bytes().as_slice(),
+            evaluator.as_bytes().as_slice(),
+        ]
+        .concat(),
     )
 }
 
