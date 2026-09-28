@@ -142,6 +142,7 @@ dependencies = [
  "zeno-fcis-schema",
  "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
