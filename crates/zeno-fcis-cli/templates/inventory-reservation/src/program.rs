@@ -20,6 +20,7 @@ use zeno_fcis_codec::Hash32;
 use zeno_fcis_core::BudgetUsed;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::ValidationLimits;
+use zeno_fcis_synthesis::finite::{Domain, Program};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 use zeno_fcis_transition::TransitionDecision;
 
@@ -54,6 +55,27 @@ pub fn action_code(action: &StockAction) -> i64 {
     }
 }
 
+fn inventory_program(bytes: &[u8]) -> Result<Program, StockProgramError> {
+    let program = import_program(bytes).map_err(|_| StockProgramError::SynthesisDomain)?;
+    let inputs = [
+        Domain::Int { min: 0, max: 5 },
+        Domain::Int { min: 0, max: 5 },
+        Domain::Int { min: 0, max: 3 },
+        Domain::Int { min: 1, max: 3 },
+        Domain::Bool,
+    ];
+    let outputs = [
+        Domain::Int { min: 0, max: 4 },
+        Domain::Int { min: 0, max: 5 },
+        Domain::Int { min: 0, max: 5 },
+        Domain::Bool,
+    ];
+    if program.inputs() != inputs || program.outputs() != outputs {
+        return Err(StockProgramError::SynthesisDomain);
+    }
+    Ok(program)
+}
+
 impl CatalogTransitionProgram<RustCryptoSha256> for StockProgram {
     type Error = StockProgramError;
 
@@ -86,8 +108,7 @@ impl CatalogTransitionProgram<RustCryptoSha256> for StockProgram {
         let reserved = transition.read_reserved()?;
         let domain =
             |value: i128| i64::try_from(value).map_err(|_| StockProgramError::SynthesisDomain);
-        let program = import_program(include_bytes!("../synthesized/program.zcve"))
-            .map_err(|_| StockProgramError::SynthesisDomain)?;
+        let program = inventory_program(include_bytes!("../synthesized/program.zcve"))?;
         let output = program
             .evaluate(&[
                 domain(available.0)?,
@@ -126,5 +147,45 @@ impl CatalogTransitionProgram<RustCryptoSha256> for StockProgram {
             _ => return Err(StockProgramError::SynthesisDomain),
         }
         Ok(transition.seal()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zeno_fcis_codec::CanonicalEncode;
+    use zeno_fcis_synthesis::finite::Op;
+
+    #[test]
+    fn imported_program_requires_the_complete_inventory_abi() {
+        assert!(inventory_program(include_bytes!("../synthesized/program.zcve")).is_ok());
+        let short = Program::try_new(
+            vec![Domain::Int { min: 0, max: 5 }],
+            vec![Domain::Int { min: 0, max: 5 }],
+            vec![Op::Input(0)],
+            vec![0],
+        )
+        .expect("valid canonical program with incompatible arity");
+        let bytes = short.value().canonical_bytes().expect("canonical bytes");
+        assert!(matches!(
+            inventory_program(&bytes),
+            Err(StockProgramError::SynthesisDomain)
+        ));
+
+        let wrong_output_domain = Program::try_new(
+            vec![Domain::Int { min: 0, max: 5 }; 5],
+            vec![Domain::Int { min: 0, max: 5 }; 4],
+            vec![Op::Input(0)],
+            vec![0; 4],
+        )
+        .expect("valid canonical program with incompatible domains");
+        let bytes = wrong_output_domain
+            .value()
+            .canonical_bytes()
+            .expect("canonical bytes");
+        assert!(matches!(
+            inventory_program(&bytes),
+            Err(StockProgramError::SynthesisDomain)
+        ));
     }
 }
