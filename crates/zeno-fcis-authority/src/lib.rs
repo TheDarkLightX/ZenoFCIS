@@ -10,6 +10,9 @@
 
 extern crate alloc;
 
+/// Library-interpreted finite decisions from a closed canonical plan.
+pub mod finite_decision;
+
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
