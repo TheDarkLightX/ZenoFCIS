@@ -33,15 +33,21 @@
         "min": 1,
         "max": 3
       }
+    },
+    {
+      "name": "context.authorized",
+      "type": {
+        "kind": "bool"
+      }
     }
   ],
   "outputs": [
     {
-      "name": "decision.short_available_short_reserved_full_accept",
+      "name": "decision.short_available_short_reserved_full_accept_unauthorized",
       "type": {
         "kind": "int",
         "min": 0,
-        "max": 3
+        "max": 4
       }
     },
     {
@@ -87,10 +93,6 @@
       ],
       [
         "input",
-        4
-      ],
-      [
-        "input",
         5
       ],
       [
@@ -100,6 +102,10 @@
       [
         "input",
         7
+      ],
+      [
+        "input",
+        8
       ],
       [
         "int",
@@ -363,10 +369,54 @@
         54,
         35,
         58
+      ],
+      [
+        "input",
+        4
+      ],
+      [
+        "int",
+        4
+      ],
+      [
+        "eq",
+        4,
+        61
+      ],
+      [
+        "eq",
+        5,
+        0
+      ],
+      [
+        "eq",
+        6,
+        1
+      ],
+      [
+        "and",
+        62,
+        63
+      ],
+      [
+        "and",
+        65,
+        64
+      ],
+      [
+        "and",
+        66,
+        9
+      ],
+      [
+        "select",
+        60,
+        59,
+        67
       ]
     ],
     "roots": [
-      59
+      68
     ]
   },
   "sketch": {
@@ -597,13 +647,48 @@
         "and",
         29,
         11
+      ],
+      [
+        "input",
+        4
+      ],
+      [
+        "int",
+        4
+      ],
+      [
+        "not",
+        39
+      ],
+      [
+        "select",
+        41,
+        40,
+        28
+      ],
+      [
+        "select",
+        41,
+        0,
+        36
+      ],
+      [
+        "select",
+        41,
+        1,
+        37
+      ],
+      [
+        "and",
+        39,
+        38
       ]
     ],
     "roots": [
-      28,
-      36,
-      37,
-      38
+      42,
+      43,
+      44,
+      45
     ]
   }
 }
