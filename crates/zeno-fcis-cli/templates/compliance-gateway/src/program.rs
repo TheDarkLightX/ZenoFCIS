@@ -1,16 +1,19 @@
 //! Reviewed adapter around the synthesized screening step.
 //!
-//! A reinstatement is decided here. A screening is decided by
-//! `synthesized::transition`, which was selected by exhaustive verification
-//! against `synthesis.json`, the contract written from `rules.txt`, over all
-//! 720 standings and transfer features. This adapter encodes the features,
-//! then maps the step's output through the table below into typed staging.
+//! `synthesized::transition` decides screening and reinstatement. It was
+//! selected by exhaustive verification against `synthesis.json`, the contract
+//! written from `rules.txt` and the reinstatement rules, over all 2,880
+//! admitted inputs. This adapter encodes the inputs, then maps the output
+//! into typed staging.
 //!
 //! | `output[0]` | Decision |
 //! | --- | --- |
 //! | 0 | accept: the transfer is allowed; nothing changes and nothing is queued |
 //! | 1 | accept: the transfer is held; one review ticket names rule `output[1]` |
 //! | 2 | committed failure under the reason of rule `output[1]`: `output[2]` strikes, and one alert |
+//! | 3 | reject `not_reviewer` (200) |
+//! | 4 | reject `no_strikes` (201) |
+//! | 5 | accept reinstatement: `output[2]` strikes |
 
 use crate::{bindings::*, generated::*, profile, synthesized};
 use zeno_fcis_authority::{CatalogTransitionProgram, ReviewedTransitionInput};
@@ -62,6 +65,15 @@ pub fn risk_code(risk: &CounterpartyRisk) -> i64 {
         CounterpartyRisk::Low => 0,
         CounterpartyRisk::Medium => 1,
         CounterpartyRisk::High => 2,
+    }
+}
+
+/// The action code in the finite contract.
+#[must_use]
+pub fn action_code(action: &GatewayAction) -> i64 {
+    match action {
+        GatewayAction::Screen => 0,
+        GatewayAction::Reinstate => 1,
     }
 }
 
@@ -126,63 +138,66 @@ impl CatalogTransitionProgram<RustCryptoSha256> for GatewayProgram {
             input.limits(),
         )?;
         let strikes = transition.read_strikes()?;
-        match command.action {
+        match &command.action {
             GatewayAction::Reinstate => {
                 transition.observe_context_reviewer()?;
-                if !context.reviewer.0 {
-                    transition.require(false, RejectReasonId::Reason200)?;
-                } else if strikes.0 == 0 {
-                    transition.require(false, RejectReasonId::Reason201)?;
-                } else {
-                    transition.update_strikes(&Strikes(0))?;
-                }
             }
             GatewayAction::Screen => {
                 transition.observe_context_identity_tier()?;
-                let domain = |value: i128| {
-                    i64::try_from(value).map_err(|_| GatewayProgramError::SynthesisDomain)
-                };
-                let output = synthesized::transition(&[
-                    domain(strikes.0)?,
-                    domain(context.identity_tier.0)?,
-                    region_code(&command.region),
-                    domain(command.amount_band.0)?,
-                    risk_code(&command.counterparty_risk),
-                ])
-                .ok_or(GatewayProgramError::SynthesisDomain)?;
-                let rule = rule_id(output[1]).ok_or(GatewayProgramError::SynthesisDomain)?;
-                match output[0] {
-                    0 => {}
-                    1 => {
-                        transition.enqueue_channel_300(
-                            0,
-                            &ReviewDesk(REVIEW_QUEUE.into()),
-                            &ReviewTicket {
-                                ticket_rule: rule,
-                                ticket_amount_band: command.amount_band,
-                            },
-                        )?;
-                    }
-                    2 => {
-                        // A blocked transfer is a fact worth keeping: it commits
-                        // as a failure, and the strike stays on record.
-                        let reason =
-                            block_reason(&rule).ok_or(GatewayProgramError::SynthesisDomain)?;
-                        let after = Strikes(i128::from(output[2]));
-                        transition.update_strikes(&after)?;
-                        transition.enqueue_channel_301(
-                            0,
-                            &ComplianceDesk(COMPLIANCE_TEAM.into()),
-                            &BlockAlert {
-                                alert_rule: rule,
-                                alert_strikes: after,
-                            },
-                        )?;
-                        transition.fail_if(true, reason)?;
-                    }
-                    _ => return Err(GatewayProgramError::SynthesisDomain),
-                }
             }
+        }
+        let domain =
+            |value: i128| i64::try_from(value).map_err(|_| GatewayProgramError::SynthesisDomain);
+        let output = synthesized::transition(&[
+            domain(strikes.0)?,
+            domain(context.identity_tier.0)?,
+            region_code(&command.region),
+            domain(command.amount_band.0)?,
+            risk_code(&command.counterparty_risk),
+            action_code(&command.action),
+            i64::from(context.reviewer.0),
+        ])
+        .ok_or(GatewayProgramError::SynthesisDomain)?;
+        match output[0] {
+            0 => {}
+            1 => {
+                let rule = rule_id(output[1]).ok_or(GatewayProgramError::SynthesisDomain)?;
+                transition.enqueue_channel_300(
+                    0,
+                    &ReviewDesk(REVIEW_QUEUE.into()),
+                    &ReviewTicket {
+                        ticket_rule: rule,
+                        ticket_amount_band: command.amount_band,
+                    },
+                )?;
+            }
+            2 => {
+                // A blocked transfer is a fact worth keeping: it commits
+                // as a failure, and the strike stays on record.
+                let rule = rule_id(output[1]).ok_or(GatewayProgramError::SynthesisDomain)?;
+                let reason = block_reason(&rule).ok_or(GatewayProgramError::SynthesisDomain)?;
+                let after = Strikes(i128::from(output[2]));
+                transition.update_strikes(&after)?;
+                transition.enqueue_channel_301(
+                    0,
+                    &ComplianceDesk(COMPLIANCE_TEAM.into()),
+                    &BlockAlert {
+                        alert_rule: rule,
+                        alert_strikes: after,
+                    },
+                )?;
+                transition.fail_if(true, reason)?;
+            }
+            3 => {
+                transition.require(false, RejectReasonId::Reason200)?;
+            }
+            4 => {
+                transition.require(false, RejectReasonId::Reason201)?;
+            }
+            5 => {
+                transition.update_strikes(&Strikes(i128::from(output[2])))?;
+            }
+            _ => return Err(GatewayProgramError::SynthesisDomain),
         }
         Ok(transition.seal()?)
     }

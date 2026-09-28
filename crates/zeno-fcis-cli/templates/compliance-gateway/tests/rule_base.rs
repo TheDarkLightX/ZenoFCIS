@@ -66,20 +66,38 @@ fn every_input_decides_the_same_in_the_rule_base_and_the_synthesized_step() {
     let mut verdicts = [0; 3];
     for input in inputs {
         let fired = base.decide(&input).unwrap();
-        let output = synthesized::transition(&input).unwrap();
         let expected_strikes = match fired.verdict {
             Verdict::Block => struck(input[0]),
             Verdict::Allow | Verdict::Hold => input[0],
         };
-        assert_eq!(
-            output,
-            [
-                fired.verdict.code(),
-                i64::try_from(fired.rule).unwrap(),
-                expected_strikes
-            ],
-            "input {input:?}"
-        );
+        for reviewer in 0..=1 {
+            let mut screening = input.clone();
+            screening.extend([0, reviewer]);
+            assert_eq!(
+                synthesized::transition(&screening),
+                Some([
+                    fired.verdict.code(),
+                    i64::try_from(fired.rule).unwrap(),
+                    expected_strikes
+                ]),
+                "screening {screening:?}"
+            );
+            let mut reinstatement = input.clone();
+            reinstatement.extend([1, reviewer]);
+            let code = if reviewer == 0 {
+                3
+            } else if input[0] == 0 {
+                4
+            } else {
+                5
+            };
+            let post = if code == 5 { 0 } else { input[0] };
+            assert_eq!(
+                synthesized::transition(&reinstatement),
+                Some([code, 11, post]),
+                "reinstatement {reinstatement:?}"
+            );
+        }
         verdicts[usize::try_from(fired.verdict.code()).unwrap()] += 1;
     }
     // Every verdict occurs.
@@ -88,19 +106,21 @@ fn every_input_decides_the_same_in_the_rule_base_and_the_synthesized_step() {
 
 #[test]
 fn the_synthesized_step_refuses_inputs_outside_the_domain() {
-    assert!(synthesized::transition(&[0, 0, 0, 0, 0]).is_some());
+    assert!(synthesized::transition(&[0, 0, 0, 0, 0, 0, 0]).is_some());
     for outside in [
-        [4, 0, 0, 0, 0],
-        [-1, 0, 0, 0, 0],
-        [0, 4, 0, 0, 0],
-        [0, 0, 3, 0, 0],
-        [0, 0, 0, 5, 0],
-        [0, 0, 0, 0, 3],
+        [4, 0, 0, 0, 0, 0, 0],
+        [-1, 0, 0, 0, 0, 0, 0],
+        [0, 4, 0, 0, 0, 0, 0],
+        [0, 0, 3, 0, 0, 0, 0],
+        [0, 0, 0, 5, 0, 0, 0],
+        [0, 0, 0, 0, 3, 0, 0],
+        [0, 0, 0, 0, 0, 2, 0],
+        [0, 0, 0, 0, 0, 0, 2],
     ] {
         assert!(synthesized::transition(&outside).is_none(), "{outside:?}");
     }
-    assert!(synthesized::transition(&[0, 0, 0, 0]).is_none());
     assert!(synthesized::transition(&[0, 0, 0, 0, 0, 0]).is_none());
+    assert!(synthesized::transition(&[0, 0, 0, 0, 0, 0, 0, 0]).is_none());
 }
 
 #[test]
