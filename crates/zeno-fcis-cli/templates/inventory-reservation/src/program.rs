@@ -172,19 +172,41 @@ mod tests {
             Err(StockProgramError::SynthesisDomain)
         ));
 
-        let wrong_output_domain = Program::try_new(
-            vec![Domain::Int { min: 0, max: 5 }; 5],
-            vec![Domain::Int { min: 0, max: 5 }; 4],
-            vec![Op::Input(0)],
-            vec![0; 4],
-        )
-        .expect("valid canonical program with incompatible domains");
-        let bytes = wrong_output_domain
+        let expected_inputs = vec![
+            Domain::Int { min: 0, max: 5 },
+            Domain::Int { min: 0, max: 5 },
+            Domain::Int { min: 0, max: 3 },
+            Domain::Int { min: 1, max: 3 },
+            Domain::Bool,
+        ];
+        let expected_outputs = vec![
+            Domain::Int { min: 0, max: 4 },
+            Domain::Int { min: 0, max: 5 },
+            Domain::Int { min: 0, max: 5 },
+            Domain::Bool,
+        ];
+        let incompatible = |inputs, outputs| {
+            Program::try_new(
+                inputs,
+                outputs,
+                vec![Op::Int(0), Op::Bool(false)],
+                vec![0, 0, 0, 1],
+            )
+            .expect("valid canonical program")
             .value()
             .canonical_bytes()
-            .expect("canonical bytes");
+            .expect("canonical bytes")
+        };
+        let mut wrong_inputs = expected_inputs.clone();
+        wrong_inputs[0] = Domain::Int { min: 0, max: 6 };
         assert!(matches!(
-            inventory_program(&bytes),
+            inventory_program(&incompatible(wrong_inputs, expected_outputs.clone())),
+            Err(StockProgramError::SynthesisDomain)
+        ));
+        let mut wrong_outputs = expected_outputs;
+        wrong_outputs[0] = Domain::Int { min: 0, max: 5 };
+        assert!(matches!(
+            inventory_program(&incompatible(expected_inputs, wrong_outputs)),
             Err(StockProgramError::SynthesisDomain)
         ));
     }
