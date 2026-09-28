@@ -121,7 +121,10 @@ pub fn authority() -> AppResult<Authority> {
         TransitionLimits::default(),
         &checked(verify_approved_provider::<RustCryptoSha256>())?,
         laws,
-        StockProgram,
+        checked(StockProgram::try_new(
+            project.catalog(),
+            profile::decision_contract(),
+        ))?,
     ))
 }
 
