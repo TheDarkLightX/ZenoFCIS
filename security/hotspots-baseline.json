@@ -5302,7 +5302,7 @@
   "scope": {
     "admitted_bytes": 3858267,
     "admitted_files": 228,
-    "inventory_sha256": "154ebb8cde19f7a936d20c31300181b3de0d38dc71ba7deb217dc5afd5997c69",
+    "inventory_sha256": "1aceac6ae4ee87e2b480995c1fe92dff9c92707f9a6fb178638febd1e5db50e6",
     "ranked_above_minimum": 206,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
