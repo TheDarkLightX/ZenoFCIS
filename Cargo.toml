@@ -55,6 +55,7 @@ unsafe_code = "forbid"
 missing_docs = "warn"
 unreachable_pub = "warn"
 unused_must_use = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(verus_keep_ghost)'] }
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
