@@ -276,6 +276,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
     ),
+    "verus-integration": AcceptanceScenario(
+        "Check Verus evidence admission and shared runtime arithmetic boundaries",
+        (("python3", "tools/test_check_verus.py"),),
+    ),
     "security-hotspots": AcceptanceScenario(
         "Rank security hotspots without interpreting source as instructions",
         (

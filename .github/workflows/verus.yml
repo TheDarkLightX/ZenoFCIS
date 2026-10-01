@@ -1,0 +1,46 @@
+name: verus
+
+on:
+  pull_request:
+    paths:
+      - "crates/zeno-fcis-authority/**"
+      - "verification/verus/**"
+      - "tools/check_verus.py"
+      - "tools/test_check_verus.py"
+      - "Cargo.toml"
+      - "rust-toolchain.toml"
+      - ".github/workflows/verus.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-runtime-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install application and verifier toolchains
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal
+          rustup toolchain install 1.98.1 --profile minimal
+      - name: Check receipt admission and native runtime boundaries
+        run: python3 tools/test_check_verus.py
+      - name: Verify shared Rust and require mutation failures
+        run: python3 tools/check_verus.py --install --out "${{ runner.temp }}/verus-evidence.json"
+      - name: Check no-std authority compatibility
+        run: cargo +1.97.1 check -p zeno-fcis-authority --no-default-features --locked
+      - name: Retain scoped evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verus-evidence
+          path: ${{ runner.temp }}/verus-evidence.json
+          if-no-files-found: warn
