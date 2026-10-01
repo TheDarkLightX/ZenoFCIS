@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import struct
 import sys
 import tarfile
 import tempfile
@@ -16,6 +17,74 @@ from check_release_privacy import Scan
 
 
 class PrivacyTests(unittest.TestCase):
+    def test_native_end_record_literal_still_refuses_invalid_zip_inspection(self):
+        native = b"\x7fELF" + bytes(508)
+        literal = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 1, 1, 46, 0, 0)
+        data = native + literal
+        self.assertTrue(zipfile.is_zipfile(io.BytesIO(data)))
+        with self.assertRaises(zipfile.BadZipFile):
+            zipfile.ZipFile(io.BytesIO(data))
+        with self.assertRaises(zipfile.BadZipFile):
+            Scan().inspect("native-program", data)
+        bundle = io.BytesIO()
+        with tarfile.open(fileobj=bundle, mode="w:gz", format=tarfile.USTAR_FORMAT) as archive:
+            member = tarfile.TarInfo("native-program")
+            member.size = len(data)
+            archive.addfile(member, io.BytesIO(data))
+        with self.assertRaises(zipfile.BadZipFile):
+            Scan().inspect("native.tar.gz", bundle.getvalue())
+
+    def test_appended_valid_zip_is_checked_even_in_a_native_program(self):
+        bundle = io.BytesIO(b"\x7fELF" + bytes(508))
+        bundle.seek(0, io.SEEK_END)
+        with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("private.txt", b"synthetic-private-marker")
+        scan = Scan((b"synthetic-private-marker",))
+        scan.inspect("native-program", bundle.getvalue())
+        self.assertEqual(scan.report()["status"], "failed")
+        self.assertTrue(any(finding["source"] == "content" for finding in scan.findings))
+
+    def test_damaged_appended_zip_is_refused_even_in_a_native_program(self):
+        bundle = io.BytesIO(b"\x7fELF" + bytes(508))
+        bundle.seek(0, io.SEEK_END)
+        with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("private.txt", b"synthetic-private-marker")
+        damaged = bundle.getvalue().replace(b"PK\x01\x02", b"BROK", 1)
+        self.assertNotIn(b"synthetic-private-marker", damaged)
+        self.assertTrue(zipfile.is_zipfile(io.BytesIO(damaged)))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "native-program"
+            path.write_bytes(damaged)
+            scan = Scan((b"synthetic-private-marker",))
+            scan.file(path, path.name)
+            report = scan.report()
+            self.assertEqual(report["status"], "failed")
+            self.assertEqual(report["errors"][0]["reason"], "BadZipFile")
+
+    def test_malformed_intended_zip_cannot_use_native_literal_fallback(self):
+        literal = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 1, 1, 46, 0, 0)
+        native = b"\x7fELF" + bytes(508) + literal
+        for name, data in [("invalid.zip", native), ("renamed.bin", b"PK\x03\x04broken"),
+                           ("renamed.bin", b"PK\x05\x06broken"),
+                           ("renamed.bin", b"ordinary bytes" + literal)]:
+            with self.subTest(name=name, prefix=data[:4]):
+                with self.assertRaises((ValueError, zipfile.BadZipFile)):
+                    Scan().inspect(name, data)
+
+    def test_error_categories_are_bounded_and_do_not_echo_private_messages(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "record.bin"
+            path.write_bytes(b"safe")
+            for error, reason in [(ValueError("byte-limit"), "byte-limit"),
+                                  (zipfile.BadZipFile("synthetic-private-marker"), "BadZipFile")]:
+                scan = Scan()
+                with patch.object(scan, "inspect", side_effect=error):
+                    scan.file(path, path.name)
+                report = scan.report()
+                self.assertEqual(report["errors"][0]["reason"], reason)
+                self.assertNotIn("synthetic-private-marker", json.dumps(report))
+
     def test_overlapping_identifiers_do_not_leave_email_fragments_in_locations(self):
         username = b"owner"
         email = b"owner+private@example.invalid"

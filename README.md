@@ -243,9 +243,11 @@ python3 tools/atdd.py run --all
 
 The [Verus verification units](verification/verus/README.md) check shared
 finite-domain arithmetic, structural program admission, and eager scalar
-execution against mathematical contracts. The finite execution unit covers
-20 executable functions, including generated clones, with 34 obligations.
-Canonical import, complete decision construction, metering, laws, genesis and
+execution against mathematical contracts. The owned V2 instruction meter
+also checks exact outcomes and retained usage: its combined unit covers 38
+executable functions, including generated clones, with 57 obligations.
+Operational charge ordering has a separate reviewed body guard. Canonical
+import, protected state views, complete decisions, laws, genesis and
 authority composition remain separate proof obligations. See the
 [V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md) and
 [lessons from Verus and the V2 plan](docs/VERUS_LESSONS_AND_V2_PLAN.md) for the

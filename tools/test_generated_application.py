@@ -394,14 +394,15 @@ class CompilerFlagTests(unittest.TestCase):
     def test_spaced_paths_compile_and_documentation_warnings_remain_errors(self):
         with tempfile.TemporaryDirectory(prefix="zeno fcis compiler flags ") as directory:
             staging = Path(directory).resolve()
-            root = staging / "probe app"
-            root.mkdir()
+            private_home = staging / "private home"
+            root = private_home / "probe app"
+            root.mkdir(parents=True)
             (root / "Cargo.toml").write_text(
                 '[package]\nname = "compiler_flag_probe"\nversion = "0.0.0"\n'
                 'edition = "2024"\n[workspace]\n[dependencies]\n'
                 'probe-dep = { path = "../probe dep" }\n', encoding="utf-8",
             )
-            dependency = staging / "probe dep"
+            dependency = private_home / "probe dep"
             (dependency / "src").mkdir(parents=True)
             (dependency / "Cargo.toml").write_text(
                 '[package]\nname = "probe-dep"\nversion = "0.0.0"\nedition = "2024"\n[workspace]\n',
@@ -412,7 +413,7 @@ class CompilerFlagTests(unittest.TestCase):
             )
             (root / "src").mkdir()
             (root / "src/main.rs").write_text(
-                'fn main() { println!("{}", probe_dep::origin()); }\n', encoding="utf-8",
+                'fn main() { println!("{}\\n{}", file!(), probe_dep::origin()); }\n', encoding="utf-8",
             )
             source = root / "src/lib.rs"
             source.write_text('/// A documented probe.\npub fn probe() {}\n', encoding="utf-8")
@@ -425,9 +426,16 @@ class CompilerFlagTests(unittest.TestCase):
                          "CARGO_BUILD_RUSTC", "CARGO_BUILD_RUSTDOC", "CARGO_BUILD_RUSTC_WRAPPER",
                          "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_TARGET"):
                 inherited[name] = str(staging / "missing-tool")
-            environment = rc_package.remapped_compiler_environment(
-                inherited, staging, "/zeno-fcis-compiler-probe",
-            )
+            with mock.patch.object(Path, "home", return_value=private_home):
+                environment = rc_package.remapped_compiler_environment(
+                    inherited, root, "/zeno-fcis-compiler-probe",
+                )
+                evidence = rc_package.compiler_flag_evidence(environment, root, "<source>")
+            self.assertNotIn(str(private_home), json.dumps(evidence))
+            self.assertEqual(evidence["CARGO_ENCODED_RUSTFLAGS"], [
+                "--remap-path-prefix=<home>=/zeno-fcis-home",
+                "--remap-path-prefix=<source>=/zeno-fcis-compiler-probe",
+            ])
 
             def cargo(*arguments):
                 return subprocess.run(
@@ -444,7 +452,7 @@ class CompilerFlagTests(unittest.TestCase):
             result = cargo("run", "--quiet", "--locked", "--offline")
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertEqual(result.stdout.strip().replace("\\", "/"),
-                             "/zeno-fcis-compiler-probe/probe dep/src/lib.rs")
+                             "src/main.rs\n/zeno-fcis-home/probe dep/src/lib.rs")
             self.assertTrue((root / "build target/doc/compiler_flag_probe/fn.probe.html").is_file())
             source.write_text('/// See [MissingProbeType].\npub fn probe() {}\n', encoding="utf-8")
             result = cargo("doc", "--locked", "--offline", "--no-deps")

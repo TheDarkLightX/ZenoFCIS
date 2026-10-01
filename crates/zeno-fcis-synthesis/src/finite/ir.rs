@@ -100,6 +100,22 @@ impl Program {
         self.evaluate_into(input, &mut values, &mut output)?;
         Ok(output)
     }
+    /// Executes with a fresh library-owned V2 instruction meter.
+    ///
+    /// Returns usage on success and refusal. This convenience adapter delegates
+    /// to the verified `execute_v2` entry point; the adapter itself is not in
+    /// the current Verus proof subject. It grants no transition authority.
+    #[must_use]
+    pub fn execute_v2(&self, input: &[i64], limits: super::V2Limits) -> super::V2ExecutionOutcome {
+        super::execution_v2::execute(
+            &self.inputs,
+            &self.outputs,
+            &self.nodes,
+            &self.roots,
+            input,
+            limits,
+        )
+    }
     /// Evaluates into caller-owned buffers, reusing their existing capacity.
     ///
     /// Both buffers are cleared before use and again on every failure, so a

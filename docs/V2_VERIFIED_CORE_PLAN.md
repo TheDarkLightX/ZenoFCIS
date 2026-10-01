@@ -46,9 +46,9 @@ legal domain merely to make a proof cheaper.
 
 | Order | Actual core component | Required statement | Current frontier |
 | --- | --- | --- | --- |
-| 1 | Shared scalar IR and execution loop | Every instruction and eager prefix match the mathematical semantics; invalid input and traps refuse without exposing partial output | Admission/eager execution unit checked locally: 20 executable functions, 34 obligations; exact-head CI pending |
+| 1 | Shared scalar IR and execution loop | Every instruction and eager prefix match the mathematical semantics; invalid input and traps refuse without exposing partial output | Admission/eager execution unit: 20 executable functions, 34 obligations; all 132 GitHub checks passed at `9882136` |
 | 2 | Schema and canonical admission | Every accepted byte string decodes to exactly its typed value, respects declared ranges and limits, and consumes all bytes | Structural IR admission checked; codec and schema correspondence open |
-| 3 | Library meter and state view | Actual accesses and steps are charged before protected work; exhaustion and overflow cannot mutate authoritative state | Existing budget APIs; mandatory V2 path open |
+| 3 | Library meter and state view | Actual accesses and steps are charged before protected work; exhaustion and overflow cannot mutate authoritative state | Owned V2 instruction meter/result theorem implemented; raw-state view and mandatory route open |
 | 4 | Complete decision construction | Class, reason, successor, patch, effects, outbox and order equal the bound contract | Inventory's 864-case evidence; general proof open |
 | 5 | Laws and genesis | Library evaluates every applicable predicate on the exact invocation and actual initial state | Project-supplied law engine remains; mandatory library checks open |
 | 6 | Authority, identity and replay | Only the bound contract/evaluator can produce authorization; stale input, changed identity, and replay mismatch refuse | 1.x nominal bindings; full V2 route open |
@@ -156,3 +156,60 @@ artifact before folding it into this record.
   gate and exact-head CI remain separate required checks.
 - Mandatory V2 gate, law/genesis enforcement, remaining proof chain and ledger:
   open.
+- First unit committed and pushed in draft PR #114 at `9882136`; full 42/42
+  acceptance and the clean-head 34-obligation/16-mutation gate passed.
+  All 132 GitHub checks passed at that exact head; merge authorization is
+  separate from those results.
+- Owned V2 meter and eager instruction execution implemented. The direct
+  `execute_v2` body is in the proof subject; the `Program` convenience adapter
+  is compared natively and remains an explicit correspondence obligation.
+  The combined subject passes 57 obligations over 38 executable functions
+  (20 retained scalar helpers and 18 additions), 31 specifications/constants
+  and four induction lemmas. These counts overlap the first unit.
+- Native wider-arithmetic comparisons, all 83 synthesis tests and four external
+  API custody refusals passed. Exact-head evidence, full acceptance and review
+  of this second unit are still required.
+- The second unit's development gate passed all 57 obligations and 16 mutation
+  controls. The cached-result reorder still verified all 57 obligations and
+  was refused by the separate operational body inventory as intended.
+  The prior scalar unit retained its 34-obligation/16-mutation pass.
+  No-std compatibility and Clippy passed without implementation lint waivers.
+- Six template certificates were regenerated for the second identity change,
+  independently checked and replayed natively over the same 12,064 inputs.
+  Again only certificates changed; scalar program/vector/source bytes and
+  contract/search identities stayed unchanged.
+
+## Second proof unit: owned V2 meter and instruction attempts
+
+Stage parent: `9882136`. Add a versioned execution unit beside the shared
+evaluator, rather than changing the byte-frozen 1.x `Resource` or `BudgetUsed`.
+The library constructs the meter at zero and returns an opaque usage report;
+the execution API accepts limits and input, never initial usage or a substitute
+report. Production finite programs call this same checked implementation.
+
+One Step is charged immediately before each eager instruction attempt, including
+an unused, unselected or trapping instruction. Exhaustion prevents that attempt.
+A successful graph consumes exactly its node count; a trapped instruction
+consumes its Step. Invalid initial scalar tuples refuse with zero Steps. Charge
+overflow or exhaustion preserves all counters; a later refusal retains charges
+already consumed. Refused execution exposes no partial output.
+
+The mathematical metered-prefix specification pairs the exact eager result with
+all eight resource counters. The proof covers arbitrary inclusive i64 domains,
+malformed references, output failure and limits up to u64::MAX, with no executable
+preconditions. Mutations must challenge charge order, eager attempts, arithmetic
+overflow, retained usage, output cleanup and translated proof coverage.
+
+The final-result/counter theorem alone cannot establish charge-before-work
+ordering: computing a node before charging and caching its result preserves
+those postconditions. The second coverage manifest also fixes translated
+executable bodies, with an explicit successfully verifying reorder negative.
+This guard preserves reviewed source structure; it is separate from the
+extensional theorem and does not prove physical CPU cost or the unfinished
+protected-view implementation. A manifest update requires renewed order review.
+
+This unit does not make the V2 authority mandatory or meter canonical decoding,
+raw-value/schema projection, allocation or hashing. It does not yet implement a
+protected raw-state view, atomic groups of staged operations, law/genesis checks
+or authorization/replay composition. Those remain required follow-on units;
+scalar inputs admitted before execution are not a proof of the raw-state bridge.
