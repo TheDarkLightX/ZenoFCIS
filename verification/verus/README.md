@@ -1,14 +1,17 @@
 # Shared-source Verus verification
 
-Two source units are checked with the pinned verifier. The arithmetic unit
+Three source units are checked with the pinned verifier. The arithmetic unit
 verifies two functions with three obligations and four mutation controls. The
 V2 finite admission/execution unit verifies 20 executable functions with 34
-obligations and 16 mutation controls. Local results, independent review and
+obligations and 16 mutation controls. The V2 metered unit includes those scalar
+helpers plus 18 new executable functions, for 38 bodies and 57 obligations.
+The overlapping units must not be added as independent function counts.
+Local results, independent review and
 exact-head GitHub CI remain distinct evidence.
 
 The units verify actual finite-domain arithmetic and scalar execution used by
 the optional decision-contract interpreter. They keep the Rust 1.97.1 build
-and runs the pinned Verus release with its separate Rust 1.98.1 toolchain.
+and run the pinned Verus release with its separate Rust 1.98.1 toolchain.
 Specifications are enabled only while Verus checks the shared Rust source.
 
 ## Arithmetic unit
@@ -155,3 +158,57 @@ composition remain outside this unit. Rust compilation/erasure, Verus/Z3 and
 the standard library are named assumptions; a source receipt is not a
 source-to-binary proof. See the
 [V2 implementation plan](../../docs/V2_VERIFIED_CORE_PLAN.md) for release closure.
+
+## Owned V2 instruction metering
+
+[metered_execution.rs](metered_execution.rs) imports the same scalar helpers and
+the actual [V2 execution unit](../../crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs).
+Its public `execute_v2` entry point creates a private zero-usage meter from
+policy limits and returns both the complete scalar result and opaque usage.
+Callers cannot construct usage, access the meter, replace the report or supply
+initial consumption. `Program::execute_v2` is a convenience adapter tested
+against that entry; its own body remains outside the current Verus subject.
+The low-level entry specifies scalar execution even for malformed graphs; it
+does not replace structural/type admission or certify a synthesis contract.
+
+The mathematical theorem covers exact success/refusal and all eight counters.
+One Step is consumed for each attempted eager instruction, including unused,
+unselected and trapping nodes. An exhausted charge prevents its instruction;
+earlier charges remain consumed. Invalid initial scalar tuples refuse before
+instruction charges, and output/refusal checks add no Steps. The other seven
+resources remain zero in this unit. Private charge contracts cover every
+resource, exact overflow/exhaustion diagnostics and unchanged counters on a
+failed charge, with no executable preconditions.
+
+Final counters alone cannot establish physical ordering. A controlled mutation
+computes an instruction result before charging but preserves every final
+result/counter, so it still verifies. The reviewed
+[metered coverage manifest](metered-execution.json) additionally fixes all
+translated executable bodies and refuses that reorder. This is separate
+development evidence for the inspected charge-before-node structure, rather
+than an additional theorem about physical execution cost. Updating this body
+manifest requires source and order review; a successful proof is insufficient.
+
+```sh
+python3 tools/test_check_metered_execution.py
+python3 tools/check_metered_execution.py --install --out /tmp/zeno-fcis-metered-evidence.json
+cargo +1.97.1 test -p zeno-fcis-synthesis --test v2_execution --locked
+```
+
+The unit fixes 73 translated records: 38 executable functions including clones,
+31 mathematical functions/constants and four induction lemmas; it checks 57
+obligations. Native tests use independent `i128` instruction arithmetic and
+`u128` charge arithmetic, and sweep quotas, eager traps, machine boundaries,
+malformed references, output order, refusal cleanup and every resource. Four
+external-consumer compile refusals challenge custody of the counters/report.
+Nine behavior mutations must fail verification; seven coverage mutations must
+verify successfully and then be refused, including the charge reorder.
+
+The V2 cost profile is `zeno-fcis/finite-instruction-meter/2`. Its profile bytes
+and all new executable/specification sources join the evaluator identity.
+Finite scalar wire semantics remain unchanged. Allocation, scalar admission,
+root projection, decoding, hashing and schema navigation are not charged by
+this instruction profile. A protected raw-state view, grouped operations,
+complete decisions, laws/genesis and the mandatory V2 authority/replay route
+remain open. A verified private meter is not a proof that every authority
+operation uses it, nor a whole-core or V2 completion claim.
