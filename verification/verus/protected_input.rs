@@ -1,4 +1,4 @@
-//! Checks exactly the production V2 meter and shared eager evaluator bodies.
+//! Direct shared-source V2 protected-record proof dependency closure.
 #![no_std]
 #![forbid(unsafe_code)]
 #![allow(dead_code)]

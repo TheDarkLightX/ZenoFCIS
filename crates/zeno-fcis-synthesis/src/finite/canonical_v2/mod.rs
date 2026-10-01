@@ -7,7 +7,7 @@
 use vstd::prelude::*;
 
 #[cfg(verus_keep_ghost)]
-mod spec;
+pub(super) mod spec;
 
 /// Reads at most 16 bytes as an unsigned big-endian integer.
 ///
