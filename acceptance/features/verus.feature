@@ -28,3 +28,11 @@ Feature: Bind Verus evidence to shared executable Rust
     And failed execution returns usage and exposes no partial result
     And external callers cannot forge counters, replace reports or supply initial usage
     And operational body coverage is required separately from the extensional proof
+
+  @atdd-v2-canonical-byte-readers
+  Scenario: Keep exact V2 integer byte reads over the full offset and width domain
+    Given the actual library big-endian unsigned and signed integer readers
+    When native execution is compared with standard-library integer conversions
+    Then exact values and next offsets agree including both signed extremes
+    And zero width, truncation, excessive width and invalid offsets have precise results
+    And proof coverage requires both functions without narrowing their executable domains

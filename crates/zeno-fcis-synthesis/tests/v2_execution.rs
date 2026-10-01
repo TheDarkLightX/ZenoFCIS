@@ -40,3 +40,31 @@ fn public_program_adapter_matches_checked_entry_and_restarts_usage() {
         }
     }
 }
+
+#[test]
+fn public_byte_readers_preserve_existing_canonical_integer_payloads() {
+    use zeno_fcis_codec::CanonicalEncode;
+    use zeno_fcis_synthesis::finite::canonical_v2::{read_big_endian, read_signed_128};
+    use zeno_fcis_value::Value;
+
+    for value in [i128::MIN, i128::MIN + 1, -1, 0, 1, i128::MAX - 1, i128::MAX] {
+        let encoded = Value::I128(value)
+            .canonical_bytes()
+            .unwrap_or_else(|error| panic!("canonical integer: {error}"));
+        assert_eq!(encoded.len(), 17);
+        assert_eq!(encoded[0], zeno_fcis_value::zcve::TAG_I128);
+        assert_eq!(read_signed_128(&encoded, 1), Some((value, 17)));
+        let payload: [u8; 16] = encoded[1..]
+            .try_into()
+            .unwrap_or_else(|error| panic!("integer payload: {error}"));
+        assert_eq!(
+            read_big_endian(&encoded, 1, 16),
+            Some((u128::from_be_bytes(payload), 17))
+        );
+        for truncated in 0..encoded.len() {
+            assert_eq!(read_signed_128(&encoded[..truncated], 1), None);
+        }
+    }
+    assert_eq!(read_big_endian(&[], 0, 0), Some((0, 0)));
+    assert_eq!(read_big_endian(&[], usize::MAX, 0), None);
+}
