@@ -13,6 +13,10 @@ use zeno_fcis_value::{Value, ValueLimits};
 pub fn evaluator_hash() -> Result<Hash32, SynthesisError> {
     let mut source = Vec::new();
     source.extend_from_slice(include_bytes!("finite/ir.rs"));
+    source.extend_from_slice(include_bytes!("finite/evaluation/mod.rs"));
+    source.extend_from_slice(include_bytes!("finite/evaluation/spec.rs"));
+    source.extend_from_slice(include_bytes!("finite/evaluation/admission/mod.rs"));
+    source.extend_from_slice(include_bytes!("finite/evaluation/admission/spec.rs"));
     source.extend_from_slice(include_bytes!("finite_runtime.rs"));
     crate::hash_bytes("zeno-fcis/finite-runtime-source", &source)
 }
