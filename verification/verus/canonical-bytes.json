@@ -1,0 +1,119 @@
+{
+  "body_covered_functions": [
+    "canonical_bytes::canonical_v2::read_big_endian",
+    "canonical_bytes::canonical_v2::read_signed_128"
+  ],
+  "expected_verified": 9,
+  "format": "zeno-fcis/verus-coverage/1",
+  "functions": {
+    "canonical_bytes::canonical_v2::read_big_endian": {
+      "body_sha256": "9a6d7f1c7cc49c50e421f8e14feb51c8df9a474770687f47439c74d95df89d75",
+      "ensures": 1,
+      "ensures_sha256": "3a0e11937371b4fb396230baf789b709f5dd3aa2914e721c4708fd664749257a",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "3d8807a3c56a03181e25daf00ef33e2164a50c523314378b7db72825f099dadc"
+    },
+    "canonical_bytes::canonical_v2::read_signed_128": {
+      "body_sha256": "5e5b828f0f77fdf80030662db0b08c81b374608e92a745d91c12adc0e4d8daeb",
+      "ensures": 1,
+      "ensures_sha256": "91c63be4ac46818cb14ca421e70fde04153c3baf9f6c04ebce54117cf466f365",
+      "mode": "Exec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "1e8143f634e162902d22efb23097f7bd2cc046a9aec1c880fd94254f356de4d9"
+    },
+    "canonical_bytes::canonical_v2::spec::machine_bound": {
+      "ensures": 1,
+      "ensures_sha256": "2f1a4911971ccdc338476a0f06d5b1a25b3c2ba7e9397425f62f776766b6a161",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "1ff1bc1969416a258121ab33328e577cf50f47c86c227547763b9209ded1cbf2",
+      "signature_sha256": "18257505daa9c241ed9a72bbeff2c3282b3135f238beb79b78c7d18d5116cbf0"
+    },
+    "canonical_bytes::canonical_v2::spec::power": {
+      "body_sha256": "36ba4bf4b94a95e72fcd03ac6115012a4bbc2e96506a24ab567972f2e757946c",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "f828ff96e36d78f4d97797a62684c98d6244497340b01ab97eec8e3d5a852a4b"
+    },
+    "canonical_bytes::canonical_v2::spec::power_monotone": {
+      "ensures": 1,
+      "ensures_sha256": "bc28e517389796ea4254a1eb051a7d31c072b7e634e5a5d44127268a32d7cdc0",
+      "mode": "Proof",
+      "requires": 1,
+      "requires_sha256": "74196a37208f2447c57ee32d78c587b4b7431510f6415e5c719eaf1563736c3e",
+      "signature_sha256": "f24d6149b5cb0af0c59f42fa9c5d08b591d670f89452f04bf04189430a03bd61"
+    },
+    "canonical_bytes::canonical_v2::spec::power_positive": {
+      "ensures": 1,
+      "ensures_sha256": "d7a64e7dcdfe193b59a280f8e4ea4c99fcb078f4fd36dd3c926b911aeeef61ca",
+      "mode": "Proof",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "18257505daa9c241ed9a72bbeff2c3282b3135f238beb79b78c7d18d5116cbf0"
+    },
+    "canonical_bytes::canonical_v2::spec::read_signed": {
+      "body_sha256": "55a57997d94e986913c04c69d8993218a29246474b8997153a1e870c7d99877f",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "adf39a47db8a7ab65863c0f5c5290c6f698479f226ce1f954d545292f2484ace"
+    },
+    "canonical_bytes::canonical_v2::spec::read_unsigned": {
+      "body_sha256": "f9ae29ea9c5ea0ff8c3395fe59f849edbd6086229979cfc77e8bf13daaa1cb71",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "6b9951c80761fb87edbdd8e31664f234c2bd7ea053aee49c6b64141808608999"
+    },
+    "canonical_bytes::canonical_v2::spec::signed": {
+      "body_sha256": "6237290836b753bb969b4f97110e7c3a45d7ae885ec0dd9a6313c4c852abf4c1",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 0,
+      "requires_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "signature_sha256": "1b9544bb846c2f788f1fd9867f1ab0368b5d7dc9081a6e4d01c8c1222587c8f8"
+    },
+    "canonical_bytes::canonical_v2::spec::unsigned": {
+      "body_sha256": "768ee1b59a094797d2f0cc9d4eae81a1e095f5e6aab4fc87039656fb900c018b",
+      "ensures": 0,
+      "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "mode": "Spec",
+      "requires": 2,
+      "requires_sha256": "0feb5479f27c460ee729503fb6ef7de9987db677b625522eed708520eb8db01e",
+      "signature_sha256": "66bdf4cc7d247eade3dd6a8e33afbe574876ecf361373fe127c0042ee924d5e5"
+    },
+    "canonical_bytes::canonical_v2::spec::unsigned_bound": {
+      "ensures": 1,
+      "ensures_sha256": "0109c1b082e2db957192dca055b947d43b58e019c61d38c0d510f1f6406516a6",
+      "mode": "Proof",
+      "requires": 2,
+      "requires_sha256": "b71063407989b0afa0a349a701d9c6b1bf77d11db7aea6a3e67dc51bbd605d0d",
+      "signature_sha256": "75024ba12946ea325787f1947ddf9c38ae9d342dcbebf8b1513d8a345af22c32"
+    }
+  },
+  "namespace": "canonical_bytes::canonical_v2::",
+  "target_functions": [
+    "canonical_bytes::canonical_v2::read_big_endian",
+    "canonical_bytes::canonical_v2::read_signed_128",
+    "canonical_bytes::canonical_v2::spec::machine_bound",
+    "canonical_bytes::canonical_v2::spec::power",
+    "canonical_bytes::canonical_v2::spec::power_monotone",
+    "canonical_bytes::canonical_v2::spec::power_positive",
+    "canonical_bytes::canonical_v2::spec::read_signed",
+    "canonical_bytes::canonical_v2::spec::read_unsigned",
+    "canonical_bytes::canonical_v2::spec::signed",
+    "canonical_bytes::canonical_v2::spec::unsigned",
+    "canonical_bytes::canonical_v2::spec::unsigned_bound"
+  ]
+}

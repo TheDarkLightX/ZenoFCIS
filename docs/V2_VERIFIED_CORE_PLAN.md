@@ -178,6 +178,22 @@ artifact before folding it into this record.
   independently checked and replayed natively over the same 12,064 inputs.
   Again only certificates changed; scalar program/vector/source bytes and
   contract/search identities stayed unchanged.
+- Second unit committed and pushed in draft PR #115 at `f82bd84`. Full 43/43
+  acceptance passed immediately before the commit. Its clean-head meter,
+  scalar and arithmetic gates passed 57/34/3 obligations respectively, zero
+  errors, with 16/16/4 mutation controls. The scalar and meter counts overlap.
+  Independent bounded source review found no blocker. GitHub checks and merge
+  authorization remain separate from these local results.
+- GitHub refused that second head: its Miri matrix omitted the new integration
+  target and release assembly reported an archive inspection failure. The
+  target now passes strict-provenance Miri. A separate reproduced native home-
+  path leak was fixed, and the rebuilt CLI/archive pass the privacy scanner.
+  Repair `e633429` passed 43/43 acceptance immediately before commit. The
+  scanner retains refusal of malformed archives and now emits bounded error
+  categories. Both GitHub release assemblies passed at that exact repair
+  revision; 128 checks passed with four Miri checks still finishing at the
+  recorded observation. The original CI archive cause remains unresolved.
+  No privacy gate was bypassed.
 
 ## Second proof unit: owned V2 meter and instruction attempts
 
@@ -213,3 +229,58 @@ raw-value/schema projection, allocation or hashing. It does not yet implement a
 protected raw-state view, atomic groups of staged operations, law/genesis checks
 or authorization/replay composition. Those remain required follow-on units;
 scalar inputs admitted before execution are not a proof of the raw-state bridge.
+
+## Third proof unit: canonical raw-input boundary
+
+Stage parent: `e633429`; isolated branch `agent/v2-canonical-input-20261001`.
+The retained finite gate reads flat record roots whose leaves are signed i128,
+Boolean, closed Enum or payload-free Sum. Complete successor construction
+currently restricts state leaves to i128. Command and context may use all four
+shapes. Empty per-source records, arbitrary legal field/type/variant IDs and
+permuted variant codes must remain supported; a 16-field limit would incorrectly
+exclude a legal 32-input program. Preserve the existing ZCVE tags and widths.
+
+The first subunit establishes exact big-endian byte reads and signed conversion
+over all byte strings and offsets, including truncation, excessive widths and
+offset overflow. Its actual Rust source will be shared by the subsequent
+private record decoder. Success must return the exact mathematical integer and
+next offset; refusal must be specified precisely. No executable precondition,
+application assumption or opaque external body may hide a decoding obligation.
+Native comparisons must use the independent standard-library conversion, and
+mutations must challenge byte order, bounds, offset, sign and coverage.
+
+The first subunit is implemented in the production `finite::canonical_v2`
+module. Its two public readers have no executable preconditions and use the
+existing canonical integer byte order. The direct shared-source harness passes
+nine obligations: two executable functions, five specifications and four
+induction lemmas. Four independent native tests include every two-byte value,
+all widths/offsets/truncations in the retained patterns, sign-bit boundaries,
+both signed extremes and offsets through usize::MAX. The development gate
+catches nine behavior mutations and five coverage mutations. These are
+dirty-tree results. Bounded independent source review accepted the readers and
+their coverage, and native, Miri, Clippy and no-std checks passed. All six
+templates were freshly synthesized and independently replayed over 12,064
+inputs; only their source-bound certificates changed. Complete acceptance,
+clean-head replay and GitHub results remain required. Both new sources join
+the evaluator identity.
+
+Byte helpers alone do not implement a protected state view. The next subunit
+must bind decoding and field interpretation to the same owned meter as eager
+execution, return opaque usage and actual access observations on refusal, and
+derive the scalar tuple from the complete declared raw domain. Costs and
+refusal order for ingress bytes and protected field accesses must be explicit;
+interpreting payloads before their stated charge is not acceptable.
+
+The current authority witness retains admitted Value envelopes rather than
+original canonical input bytes. Re-encoding those Values and feeding a checked
+parser would add an unproved adapter. A later mandatory byte-based V2 route
+must bind original admitted bytes and its complete schema descriptor directly.
+Catalog descriptor extraction, envelope framing/hashing, complete decisions,
+law/genesis evaluation, authorization and replay remain proof obligations.
+This stage cannot claim to close them merely by proving byte primitives.
+
+The finite-interpreter paper supplied by the owner is assessed in
+[the assurance note](FINITE_INTERPRETER_ASSURANCE.md). Its philosophical
+scope does not reduce the full-core proof obligation: a fixed specification
+and its implementation can be proved over their complete declared domain,
+while requirements, assumptions and future revisions remain explicit.

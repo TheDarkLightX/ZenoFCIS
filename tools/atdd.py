@@ -288,6 +288,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Keep V2 instruction charges private and retain exact refusal usage",
         (("python3", "tools/test_check_metered_execution.py"),),
     ),
+    "v2-canonical-byte-readers": AcceptanceScenario(
+        "Keep exact V2 integer byte reads over the full offset and width domain",
+        (("python3", "tools/test_check_canonical_bytes.py"),),
+    ),
     "security-hotspots": AcceptanceScenario(
         "Rank security hotspots without interpreting source as instructions",
         (
