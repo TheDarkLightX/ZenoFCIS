@@ -1359,15 +1359,15 @@
         "host-tool",
         "release-control"
       ],
-      "production_lines": 1256,
+      "production_lines": 1261,
       "rank": 10,
       "score": 89,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            1172,
-            1197
+            1176,
+            1202
           ]
         },
         {
@@ -1377,10 +1377,10 @@
             611,
             612,
             941,
-            1012,
-            1062,
-            1152,
-            1322
+            1016,
+            1066,
+            1156,
+            1328
           ]
         },
         {
@@ -1429,7 +1429,7 @@
             636,
             935,
             950,
-            1364
+            1371
           ]
         }
       ],
@@ -1962,29 +1962,29 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 130,
+      "production_lines": 131,
       "rank": 17,
       "score": 81,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            44
+            45
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
-            48
+            49
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
             15,
-            60,
-            132,
-            142
+            61,
+            133,
+            143
           ]
         }
       ],
@@ -4601,33 +4601,33 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 207,
+      "production_lines": 214,
       "rank": 46,
       "score": 77,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            183
+            193
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            98
+            101
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            214
+            224
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
             45,
-            205
+            215
           ]
         }
       ],
@@ -5304,9 +5304,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3948364,
+    "admitted_bytes": 3953975,
     "admitted_files": 240,
-    "inventory_sha256": "afd2b5920f86575b5f0113be09a0bf1bb1a32b738d7fe4e7c135c38e6f35a7a7",
+    "inventory_sha256": "c9f08fe7d32e303926f452c7e1537b4bf004d58d2d15688911dd35977627c895",
     "ranked_above_minimum": 213,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
