@@ -7,10 +7,15 @@ use meter::Meter;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+mod input_view;
 mod meter;
 #[cfg(verus_keep_ghost)]
 mod spec;
 
+pub use input_view::{
+    AccessAttempt, Failure as RecordFailure, Field as InputField, Leaf as InputLeaf,
+    Projection as RecordProjection, Variant as InputVariant, project as project_record,
+};
 pub use meter::{Limits, MeterFailure, Resource, Usage, zero_limits};
 
 /// Refusal by scalar execution or the V2 logical meter.
