@@ -4,6 +4,12 @@ Research date: 2026-10-01. Status: design recommendations with an implemented
 shared-source verification pilot; this document does not close the V2
 ledger or establish a proof of the complete runtime.
 
+The V2 follow-up now verifies shared structural admission and eager scalar
+execution: 20 executable functions, 34 obligations, and 16 mutation controls.
+The actual library calls these functions. The
+[implementation plan](V2_VERIFIED_CORE_PLAN.md) tracks the remaining proof chain;
+the baseline assessment below remains historical.
+
 ## Recommendation
 
 Use Verus to establish that executable Rust implements an explicit mathematical
@@ -131,7 +137,12 @@ refusal of several such mechanisms. Imported trusted libraries still matter.
 
 For every proof subject, record the user assumptions and trusted dependencies.
 Run `--no-cheating` for the application-owned proof unit and require an expected
-verification count. Review transitive library specifications, including the
+verification count and a complete translated-contract inventory. Deleting the
+finite evaluator's postcondition still yielded 34 verified obligations in a
+controlled probe. Its gate therefore also binds the translated preconditions,
+postconditions and mathematical specification bodies, and refuses added or
+missing functions. A count alone cannot establish contract coverage.
+Review transitive library specifications, including the
 standard-library interfaces needed by the verified code. Count and hash any
 explicitly accepted exceptions; an LLM must not introduce an assumption just
 to make the verifier return success.
@@ -226,7 +237,7 @@ or future proofs are supported.
 | Priority | Work | Acceptance condition |
 | --- | --- | --- |
 | P0 | Shared-source pilot implemented; qualify it in CI | Proof, ordinary build, boundary negatives, mutation rejection, tool/source receipt |
-| P1 | Verify the finite evaluator's supported operations and evaluation loop | Mathematical semantics match successful results and all error cases; totality and work obligations named |
+| P1 | Shared admission and scalar evaluator verified; compose the remaining interpreter | Exact eager success/refusal and cleanup checked; codec, decision construction and work obligations remain |
 | P1 | Verify inventory's complete decision construction | All 864 existing cases still match independently; reasons, patches, outbox, footprint and claimed meter behavior included |
 | P1 | Complete mandatory V2 authority, law and genesis enforcement | ADR 0005's bypass, replay, mutation, and identity acceptance conditions pass |
 | P2 | Prove canonical decoding/encoding and state-view boundaries | Exact admitted-byte and snapshot properties with specified limits |
@@ -279,8 +290,10 @@ an LLM assertion nor the existence of a receipt grants runtime authority.
 Only claim the checked scope. After a complete verified implementation is
 actually integrated, appropriate wording is: "The named functional core was
 verified against specification X using Verus version Y, under assumptions Z."
-For this pilot, the claim is limited to the two finite-domain arithmetic
-functions. Neither statement promises that the requirements are complete or
+The original pilot covers two finite-domain arithmetic functions. The next
+unit covers structural admission and eager scalar execution, with its scope
+and remaining obligations in the verification record. Neither statement
+promises that the requirements are complete or
 that the whole application, UI, compiler, or shell is correct.
 
 ## Primary sources
