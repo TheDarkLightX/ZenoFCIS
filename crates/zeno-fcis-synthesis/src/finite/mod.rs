@@ -4,6 +4,8 @@
 //! checking and encoded as 0/1 at the language boundary. This profile proves
 //! neither unbounded temporal properties nor adequacy of the reviewed contract.
 
+/// Verified integer byte primitives; schema admission remains a separate stage.
+pub mod canonical_v2;
 /// Finite exit-path search and independent decreasing-rank verification.
 pub mod completion;
 pub mod emit;
