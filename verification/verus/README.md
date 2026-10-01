@@ -1,15 +1,17 @@
-# Verus integration pilot
+# Shared-source Verus verification
 
-Status: both functions pass the pinned verifier with three obligations. The
-ordinary Rust boundary tests pass, and four deliberate mutations are caught.
-The no-std authority build also passes. GitHub CI remains a separate check.
+Two source units are checked with the pinned verifier. The arithmetic unit
+verifies two functions with three obligations and four mutation controls. The
+V2 finite admission/execution unit verifies 20 executable functions with 34
+obligations and 16 mutation controls. Local results, independent review and
+exact-head GitHub CI remain distinct evidence.
 
-The pilot verifies the actual finite-domain arithmetic used by the optional
-decision-contract interpreter. It keeps the application's Rust 1.97.1 build
+The units verify actual finite-domain arithmetic and scalar execution used by
+the optional decision-contract interpreter. They keep the Rust 1.97.1 build
 and runs the pinned Verus release with its separate Rust 1.98.1 toolchain.
 Specifications are enabled only while Verus checks the shared Rust source.
 
-## Definition of done
+## Arithmetic unit
 
 - Check the same function bodies compiled into `zeno-fcis-authority`.
 - Prove exact success and refusal conditions for interval cardinality and
@@ -34,8 +36,8 @@ Specifications are enabled only while Verus checks the shared Rust source.
 5. Mutation checks exercise off-by-one, narrowing/limit, and specification
    omission failures. Integration tests retain complete template behavior.
 
-This verifies two admission calculations. The enumeration loop, decoder,
-complete decision interpreter, resource meter, law engine, genesis, canonical
+This verifies two admission calculations. The input enumeration loop, decoder,
+complete decision construction, resource meter, law engine, genesis, canonical
 encoding, and shell remain separate obligations. Verus/Z3 verification has its
 own trusted base and does not produce ZenoFCIS's Lean `KernelChecked` evidence.
 
@@ -87,3 +89,69 @@ the pinned upstream release and makes no claim about a fork-built verifier.
 
 See [lessons and V2 plan](../../docs/VERUS_LESSONS_AND_V2_PLAN.md) for the
 complete follow-up scope and evidence policy.
+
+## V2 finite admission and eager execution
+
+[finite_execution.rs](finite_execution.rs) imports the actual
+[shared source](../../crates/zeno-fcis-synthesis/src/finite/evaluation/mod.rs).
+The production `Program` constructor, synthesis checks and finite decision
+route call these functions. The proof covers:
+
+- Exact structural refusal and its order: shape and domain bounds, every
+  instruction's type and preceding-node references, then output root kinds.
+- Exact Boolean 0/1 and inclusive integer admission, all ten scalar instruction
+  cases, checked `i64` addition/subtraction, and invalid references.
+- Eager graph evaluation, including unused or unselected nodes, projection in
+  ABI order, and output-domain refusal.
+- Empty scratch and output buffers on every failed evaluation.
+
+No executable function in this unit has a `requires` clause. Mathematical
+sequence recursion and its induction lemmas have their stated ghost premises.
+This does not narrow the actual inputs to make verification succeed. The
+allocation operations use the bundled standard-library specifications;
+allocation cost, failure and platform behavior remain part of the trusted base.
+Loop measures establish the local progress obligations. They do not establish
+the unfinished V2 resource accounting contract.
+
+```sh
+python3 tools/test_check_finite_execution.py
+python3 tools/check_finite_execution.py --install --out /tmp/zeno-fcis-finite-evidence.json
+cargo +1.97.1 test -p zeno-fcis-synthesis --locked
+cargo +1.97.1 check -p zeno-fcis-synthesis --no-default-features --locked
+```
+
+The native harness has nine tests covering instruction and machine boundaries,
+refusal cleanup and 2,753,237 admission comparisons against retained baseline
+`4dd979b`. The baseline oracle is a behavior-preservation control, not a proof
+of application requirements. Existing independent synthesis and inventory
+conformance tests continue to challenge those requirements.
+
+The pinned proof uses `--no-cheating`, whole-unit verification and two verifier
+threads. Twelve incorrect-behavior mutations must fail verification. Four
+coverage controls omit or weaken the final postcondition, narrow its input
+domain, or add an uncontracted function. They must be refused even when Verus
+reports success. Deleting the final postcondition left the original count of
+34 verified obligations intact in a controlled probe.
+
+The gate parses the complete pinned Verus intermediate representation (VIR).
+The reviewed [coverage manifest](finite-execution.json) fixes the inventory,
+translated signatures/preconditions/postconditions, and mathematical
+specification bodies.
+Missing, extra, bodyless, changed or unknown-format entries refuse. Updating
+this manifest changes the reviewed proof specification; it is not an automatic
+repair step. The manifest guard is a development check, not another theorem
+checker. Verus/Z3 establishes the actual contract result.
+
+Both runtime and synthesis identities include all extracted execution,
+admission and specification sources. This intentional V2 identity change does
+not qualify old receipts for the new implementation. The source-bound receipt
+also records the Git revision, dirty state, tool and compiler versions, native
+tests and every mutation result. A dirty-tree receipt is development evidence;
+it must be replayed at the clean committed head for exact-head qualification.
+
+Canonical decoding and schema projection, diagnostic wrappers, complete
+decision construction, meter/state-view enforcement, laws/genesis and authority
+composition remain outside this unit. Rust compilation/erasure, Verus/Z3 and
+the standard library are named assumptions; a source receipt is not a
+source-to-binary proof. See the
+[V2 implementation plan](../../docs/V2_VERIFIED_CORE_PLAN.md) for release closure.

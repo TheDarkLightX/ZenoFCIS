@@ -241,9 +241,13 @@ cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --lo
 python3 tools/atdd.py run --all
 ```
 
-The [Verus pilot](verification/verus/README.md) checks two arithmetic functions
-used by the optional finite decision interpreter against mathematical
-contracts. It does not verify the complete interpreter. See
+The [Verus verification units](verification/verus/README.md) check shared
+finite-domain arithmetic, structural program admission, and eager scalar
+execution against mathematical contracts. The finite execution unit covers
+20 executable functions, including generated clones, with 34 obligations.
+Canonical import, complete decision construction, metering, laws, genesis and
+authority composition remain separate proof obligations. See the
+[V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md) and
 [lessons from Verus and the V2 plan](docs/VERUS_LESSONS_AND_V2_PLAN.md) for the
 integration design and remaining proof obligations.
 
