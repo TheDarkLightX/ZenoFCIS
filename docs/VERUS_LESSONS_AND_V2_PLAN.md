@@ -7,6 +7,10 @@ ledger or establish a proof of the complete runtime.
 The V2 follow-up now verifies shared structural admission and eager scalar
 execution: 20 executable functions, 34 obligations, and 16 mutation controls.
 The actual library calls these functions. The
+owned V2 instruction-meter follow-up checks exact outcomes and all counters in
+a combined 38-function, 57-obligation unit. Its operational body guard is
+separate from the mathematical result/counter theorem; protected raw-state
+access and mandatory authority composition remain open. The
 [implementation plan](V2_VERIFIED_CORE_PLAN.md) tracks the remaining proof chain;
 the baseline assessment below remains historical.
 

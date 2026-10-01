@@ -19,3 +19,12 @@ Feature: Bind Verus evidence to shared executable Rust
     Then all ten instructions, eager traps, refusal order and buffer cleanup agree with the specification
     And the coverage gate rejects missing functions and absent or changed contracts
     And the runtime proof profile declares no narrowed executable preconditions
+
+  @atdd-v2-metered-execution
+  Scenario: Keep V2 instruction charges private and retain exact refusal usage
+    Given the actual library-owned V2 meter and eager scalar interpreter
+    When native execution is compared with independently written wider-arithmetic rules
+    Then unused and trapping instruction attempts consume their steps before refusal
+    And failed execution returns usage and exposes no partial result
+    And external callers cannot forge counters, replace reports or supply initial usage
+    And operational body coverage is required separately from the extensional proof

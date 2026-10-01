@@ -8,6 +8,7 @@
 pub mod completion;
 pub mod emit;
 mod evaluation;
+mod execution_v2;
 mod ir;
 /// Bounded, ordered preparation without publication authority.
 pub mod preparation;
@@ -15,7 +16,15 @@ pub mod preparation;
 #[cfg(test)]
 mod choice_tests;
 
+pub use execution_v2::{
+    Failure as V2ExecutionFailure, Limits as V2Limits, MeterFailure as V2MeterFailure,
+    Outcome as V2ExecutionOutcome, Resource as V2Resource, Usage as V2Usage, execute as execute_v2,
+    zero_limits as v2_zero_limits,
+};
 pub use ir::{Domain, MAX_FIELDS, MAX_NODES, Op, PROFILE, Program};
+
+/// V2 instruction-attempt accounting, separate from the scalar wire profile.
+pub const V2_EXECUTION_PROFILE: &str = "zeno-fcis/finite-instruction-meter/2";
 
 use crate::{
     Assignment, CandidateChecker, CheckResult, Hole, HoleId, SearchBudget, SearchResult,
@@ -619,6 +628,33 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
                 hash_bytes(
                     "zeno-fcis/finite-admission-specification",
                     include_bytes!("evaluation/admission/spec.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-v2-execution-source",
+                    include_bytes!("execution_v2/mod.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-v2-meter-source",
+                    include_bytes!("execution_v2/meter.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-v2-execution-specification",
+                    include_bytes!("execution_v2/spec.rs"),
                 )?
                 .as_bytes()
                 .to_vec()

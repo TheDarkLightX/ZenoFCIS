@@ -284,6 +284,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Preserve complete finite execution and reject missing proof contracts",
         (("python3", "tools/test_check_finite_execution.py"),),
     ),
+    "v2-metered-execution": AcceptanceScenario(
+        "Keep V2 instruction charges private and retain exact refusal usage",
+        (("python3", "tools/test_check_metered_execution.py"),),
+    ),
     "security-hotspots": AcceptanceScenario(
         "Rank security hotspots without interpreting source as instructions",
         (
