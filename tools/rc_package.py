@@ -993,18 +993,22 @@ def compiler_environment(environment: dict[str, str]) -> dict[str, str]:
 def remapped_compiler_environment(
     environment: dict[str, str], source: Path, destination: str,
 ) -> dict[str, str]:
-    """Preserve paths as single Cargo arguments and deny documentation warnings."""
+    """Remap source and dependency home paths without inherited flag overrides."""
     result = compiler_environment(environment)
-    remap = f"--remap-path-prefix={source}={destination}"
-    if "\x1f" in remap or "\0" in remap:
+    # Rust uses the last matching remap. Keep the specific source mapping last
+    # when a normal checkout is itself under the home directory.
+    remaps = [f"--remap-path-prefix={Path.home()}=/zeno-fcis-home",
+              f"--remap-path-prefix={source}={destination}"]
+    if any("\x1f" in remap or "\0" in remap for remap in remaps):
         raise RcError("staging path cannot be encoded as one compiler argument")
-    result["CARGO_ENCODED_RUSTFLAGS"] = remap
-    result["CARGO_ENCODED_RUSTDOCFLAGS"] = "\x1f".join(["-D", "warnings", remap])
+    result["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(remaps)
+    result["CARGO_ENCODED_RUSTDOCFLAGS"] = "\x1f".join(["-D", "warnings", *remaps])
     return result
 
 
 def compiler_flag_evidence(environment: dict[str, str], source: Path, label: str) -> dict[str, list[str]]:
-    return {key: [flag.replace(str(source), label) for flag in environment[key].split("\x1f")]
+    return {key: [flag.replace(str(source), label).replace(str(Path.home()), "<home>")
+                  for flag in environment[key].split("\x1f")]
             for key in ("CARGO_ENCODED_RUSTFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS")}
 
 
@@ -1194,7 +1198,9 @@ def build(output: Path) -> None:
     for directory in (packages_dir, binaries_dir, docs_dir, source_dir):
         directory.mkdir()
     build_target = output / ".cargo-target"
-    build_environment = compiler_environment(dict(os.environ))
+    build_environment = remapped_compiler_environment(
+        dict(os.environ), ROOT, "/zeno-fcis-source",
+    )
     build_environment["CARGO_TARGET_DIR"] = str(build_target)
 
     run(
@@ -1322,6 +1328,7 @@ def build(output: Path) -> None:
         "source_manifest_sha256": sha256(source_manifest),
         "sbom_sha256": sha256(sbom_path),
         "compiler_flags": {
+            "native": compiler_flag_evidence(build_environment, ROOT, "<source>"),
             "packaged_application": packaged_application["compiler_flags"],
             "rustdoc": compiler_flag_evidence(rustdoc_environment, build_target, "<target>"),
         },
