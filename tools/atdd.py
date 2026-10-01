@@ -292,6 +292,13 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Keep exact V2 integer byte reads over the full offset and width domain",
         (("python3", "tools/test_check_canonical_bytes.py"),),
     ),
+    "v2-protected-records": AcceptanceScenario(
+        "Preserve exact protected record projection and retained refusal reports",
+        (
+            ("python3", "tools/test_check_protected_input.py"),
+            ("cargo", "+1.97.1", "test", "--locked", "-p", "zeno-fcis-synthesis", "--test", "v2_protected_input"),
+        ),
+    ),
     "security-hotspots": AcceptanceScenario(
         "Rank security hotspots without interpreting source as instructions",
         (

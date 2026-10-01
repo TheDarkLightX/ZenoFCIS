@@ -47,8 +47,8 @@ legal domain merely to make a proof cheaper.
 | Order | Actual core component | Required statement | Current frontier |
 | --- | --- | --- | --- |
 | 1 | Shared scalar IR and execution loop | Every instruction and eager prefix match the mathematical semantics; invalid input and traps refuse without exposing partial output | Admission/eager execution unit: 20 executable functions, 34 obligations; all 132 GitHub checks passed at `9882136` |
-| 2 | Schema and canonical admission | Every accepted byte string decodes to exactly its typed value, respects declared ranges and limits, and consumes all bytes | Structural IR admission checked; codec and schema correspondence open |
-| 3 | Library meter and state view | Actual accesses and steps are charged before protected work; exhaustion and overflow cannot mutate authoritative state | Owned V2 instruction meter/result theorem implemented; raw-state view and mandatory route open |
+| 2 | Schema and canonical admission | Every accepted byte string decodes to exactly its typed value, respects declared ranges and limits, and consumes all bytes | Integer readers qualified at `f88f1a3`; protected flat-record development proof passes; catalog and envelope correspondence open |
+| 3 | Library meter and state view | Actual accesses and steps are charged before protected work; exhaustion and overflow cannot mutate authoritative state | Owned instruction meter and one-record view implemented; exact result proofs plus separately reviewed source order; multi-record composition and mandatory route open |
 | 4 | Complete decision construction | Class, reason, successor, patch, effects, outbox and order equal the bound contract | Inventory's 864-case evidence; general proof open |
 | 5 | Laws and genesis | Library evaluates every applicable predicate on the exact invocation and actual initial state | Project-supplied law engine remains; mandatory library checks open |
 | 6 | Authority, identity and replay | Only the bound contract/evaluator can produce authorization; stale input, changed identity, and replay mismatch refuse | 1.x nominal bindings; full V2 route open |
@@ -257,12 +257,15 @@ induction lemmas. Four independent native tests include every two-byte value,
 all widths/offsets/truncations in the retained patterns, sign-bit boundaries,
 both signed extremes and offsets through usize::MAX. The development gate
 catches nine behavior mutations and five coverage mutations. These are
-dirty-tree results. Bounded independent source review accepted the readers and
+development results. Bounded independent source review accepted the readers and
 their coverage, and native, Miri, Clippy and no-std checks passed. All six
 templates were freshly synthesized and independently replayed over 12,064
-inputs; only their source-bound certificates changed. Complete acceptance,
-clean-head replay and GitHub results remain required. Both new sources join
-the evaluator identity.
+inputs; only their source-bound certificates changed. The unit was committed
+and pushed in draft PR #116 at `f88f1a3` after 44/44 acceptance. Its clean-head
+byte, meter, scalar and arithmetic gates passed 9/57/34/3 obligations with
+14/16/16/4 mutation controls respectively. All 134 GitHub checks passed at that
+exact head. Merge authorization remains separate. Both new sources join the
+evaluator identity.
 
 Byte helpers alone do not implement a protected state view. The next subunit
 must bind decoding and field interpretation to the same owned meter as eager
@@ -284,3 +287,26 @@ The finite-interpreter paper supplied by the owner is assessed in
 scope does not reduce the full-core proof obligation: a fixed specification
 and its implementation can be proved over their complete declared domain,
 while requirements, assumptions and future revisions remain explicit.
+
+## Fourth proof unit: protected flat-record projection
+
+The bounded stage contract is [V2_PROTECTED_RECORD_STAGE.md](V2_PROTECTED_RECORD_STAGE.md).
+It preserves arbitrary closed-code intervals and map order, reuses the same
+private meter and mathematical integer readers, and distinguishes descriptor
+attempts from physical tracing. Its parent byte-reader unit is qualified at
+`f88f1a3` and pushed. The actual private record implementation and its dependency
+closure pass 98 obligations with zero errors: 59 executable functions, 51
+specifications/constants and 12 induction lemmas. These counts overlap prior
+units. The protected gate passes 23 proof-failing behavior mutations and seven
+verifying coverage controls; the expanded meter gate passes its 16 controls.
+The standalone integer-reader gate retains its nine-obligation/14-control pass.
+
+Independent wire-format and metadata oracles, all 89 synthesis tests, strict
+Clippy and no-std checks passed. Actual strict-provenance Miri passed four
+internal record tests and the public interface test. All six templates were
+freshly synthesized and independently replayed over 12,064 inputs, with only
+their certificates changed. Source review, the full 45-scenario acceptance
+gate, clean-head replay and exact-head GitHub CI remain required. The protected
+record profile and actual source/specification files join the evaluator identity.
+This unit does not close the multi-record, catalog-binding, decision or
+mandatory-authority bridges.

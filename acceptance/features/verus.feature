@@ -36,3 +36,13 @@ Feature: Bind Verus evidence to shared executable Rust
     Then exact values and next offsets agree including both signed extremes
     And zero width, truncation, excessive width and invalid offsets have precise results
     And proof coverage requires both functions without narrowing their executable domains
+
+  @atdd-v2-protected-records
+  Scenario: Preserve exact protected record projection and retained refusal reports
+    Given the checked library decoder and private V2 meter
+    When complete canonical records use arbitrary legal IDs and signed code intervals
+    Then all four closed leaf shapes project to their exact declared scalars
+    And ingress Byte and field Read charges precede their associated raw parsing
+    And refusal retains usage and descriptor requests while exposing no partial scalars
+    And cached parsing before charge is refused by reviewed body coverage separately from the result theorem
+    And safe external callers cannot forge or replace the opaque projection report
