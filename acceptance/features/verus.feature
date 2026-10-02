@@ -46,3 +46,11 @@ Feature: Bind Verus evidence to shared executable Rust
     And refusal retains usage and descriptor requests while exposing no partial scalars
     And cached parsing before charge is refused by reviewed body coverage separately from the result theorem
     And safe external callers cannot forge or replace the opaque projection report
+
+  @atdd-v2-record-execution
+  Scenario: Preserve original source/field ABI binding and shared Read/Byte/Step accounting
+    Given complete original State Command and Context records and exact closed descriptors
+    When the shared production source is compared with independent wire metadata and instruction oracles
+    Then all source and ABI permutations preserve exact values retained counters and source refusal reports
+    And external callers cannot forge outcomes replace usage or supply a private meter
+    And a separate pinned proof gate must verify the complete source closure and reject deliberate faults

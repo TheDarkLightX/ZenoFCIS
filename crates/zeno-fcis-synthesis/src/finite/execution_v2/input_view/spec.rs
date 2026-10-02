@@ -228,3 +228,131 @@ pub(super) open spec fn projection(bytes: Seq<u8>, fields: Seq<Field>, limits: S
     }
 }
 }
+
+// Typing lemmas derived from the actual closed wire and projection models.
+verus! {
+pub proof fn lookup_in_interval(variants: Seq<Variant>, min: i64, max: i64,
+    id: u16, count: nat, code: i64)
+    requires count <= variants.len(), variants_prefix(variants, min, max, count),
+        lookup(variants, id, count) == Some(code),
+    ensures min <= code <= max,
+    decreases count,
+{
+    if count > 0 {
+        match lookup(variants, id, (count - 1) as nat) {
+            Some(previous) => {
+                lookup_in_interval(variants, min, max, id, (count - 1) as nat, previous);
+            },
+            None => {},
+        }
+    }
+}
+pub proof fn scalar_has_declared_type(bytes: Seq<u8>, offset: usize,
+    leaf: super::Leaf, value: i64, end: usize)
+    requires leaf_valid(leaf), scalar(bytes, offset, leaf) == Some((value, end)),
+    ensures match leaf {
+        super::Leaf::Bool => 0 <= value <= 1,
+        super::Leaf::I128 { min, max }
+        | super::Leaf::Enum { min, max, .. }
+        | super::Leaf::Sum { min, max, .. } => min <= value <= max,
+    },
+{
+    match leaf {
+        super::Leaf::Bool => {},
+        super::Leaf::I128 { min, max } => {},
+        super::Leaf::Enum { type_id, min, max, variants }
+        | super::Leaf::Sum { type_id, min, max, variants } => {
+            match integer::read_unsigned(bytes, offset, 1) {
+                None => {},
+                Some((tag, payload)) => {
+                    match integer::read_unsigned(bytes, payload, 4) {
+                        None => {},
+                        Some((raw_type, after_type)) => {
+                            match integer::read_unsigned(bytes, after_type, 2) {
+                                None => {},
+                                Some((raw_id, after_id)) => {
+                                    lookup_in_interval(variants@, min, max,
+                                        raw_id as u16, variants@.len(), value);
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        },
+    }
+}
+}
+
+verus! {
+pub open spec fn leaf_contains(leaf: super::Leaf, value: i64) -> bool {
+    match leaf {
+        super::Leaf::Bool => 0 <= value <= 1,
+        super::Leaf::I128 { min, max }
+        | super::Leaf::Enum { min, max, .. }
+        | super::Leaf::Sum { min, max, .. } => min <= value <= max,
+    }
+}
+pub(super) proof fn prefix_is_typed(bytes: Seq<u8>, fields: Seq<Field>, count: nat,
+    offset: usize, limits: Seq<u64>, used: Seq<u64>, values: Seq<i64>, end: usize)
+    requires count <= fields.len(), schema_prefix(fields, count),
+        limits.len() == 8, used.len() == 8,
+        prefix(bytes, fields, count, offset, limits, used).0 == Ok((values, end)),
+    ensures values.len() == count,
+        forall|j: int| 0 <= j < count ==> leaf_contains(fields[j].leaf, values[j]),
+    decreases count,
+{
+    if count > 0 {
+        let previous = prefix(bytes, fields, (count - 1) as nat, offset, limits, used);
+        match previous.0 {
+            Err(error) => {},
+            Ok((prior, position)) => {
+                prefix_is_typed(bytes, fields, (count - 1) as nat, offset,
+                    limits, used, prior, position);
+                let descriptor = fields[count as int - 1];
+                match field(bytes, position, descriptor) {
+                    None => {},
+                    Some((value, field_end)) => {
+                        match integer::read_unsigned(bytes, position, 2) {
+                            None => {},
+                            Some((id, payload)) => {
+                                scalar_has_declared_type(bytes, payload,
+                                    descriptor.leaf, value, field_end);
+                            },
+                        }
+                        assert(values == prior.push(value));
+                        assert forall|j: int| 0 <= j < count implies
+                            leaf_contains(fields[j].leaf, values[j]) by {
+                            if j < count - 1 {
+                                assert(leaf_contains(fields[j].leaf, prior[j]));
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    }
+}
+pub(super) proof fn projection_is_typed(bytes: Seq<u8>, fields: Seq<Field>,
+    limits: Seq<u64>, used: Seq<u64>, values: Seq<i64>)
+    requires limits.len() == 8, used.len() == 8,
+        projection(bytes, fields, limits, used).0 == Ok(values),
+    ensures values.len() == fields.len(),
+        forall|j: int| 0 <= j < fields.len() ==> leaf_contains(fields[j].leaf, values[j]),
+{
+    let charged = logical::charge(limits, used, Resource::Byte, bytes.len() as u64);
+    match header(bytes, fields.len() as usize) {
+        None => {},
+        Some(offset) => {
+            let projected = prefix(bytes, fields, fields.len(), offset, limits, charged.1);
+            match projected.0 {
+                Err(error) => {},
+                Ok((output, end)) => {
+                    prefix_is_typed(bytes, fields, fields.len(), offset,
+                        limits, charged.1, output, end);
+                },
+            }
+        },
+    }
+}
+}

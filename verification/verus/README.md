@@ -1,17 +1,17 @@
 # Shared-source Verus verification
 
-Five harnesses check actual shared source with the pinned verifier. Arithmetic
+Six harnesses check actual shared source with the pinned verifier. Arithmetic
 has three obligations and four mutation controls; scalar admission/execution
-has 34 and 16; integer byte interpretation has nine and 14. The protected-record
-and metered harnesses now include the same complete dependency closure: 59
-executable bodies and 98 obligations. Their gates run 30 and 16 mutation controls
-respectively. The overlapping harnesses must not be added as independent
+has 34 and 16; integer byte interpretation has nine and 14. The record-execution, protected-record
+and metered harnesses include the same complete dependency closure: 81
+executable bodies and 145 obligations. Their gates run 24, 30 and 16 mutation
+controls respectively. The overlapping harnesses must not be added as independent
 function or obligation counts.
 Local results, independent review and
 exact-head GitHub CI remain distinct evidence.
 
-The units verify finite-domain arithmetic, scalar execution and V2 protected
-record projection. The complete byte-based decision/authority route remains
+The units verify finite-domain arithmetic, scalar execution and V2 original
+record projection/composition. The complete byte-based decision/authority route remains
 under construction. They keep the Rust 1.97.1 build
 and run the pinned Verus release with its separate Rust 1.98.1 toolchain.
 Specifications are enabled only while Verus checks the shared Rust source.
@@ -198,10 +198,11 @@ cargo +1.97.1 test -p zeno-fcis-synthesis --test v2_execution --locked
 ```
 
 The original meter subject had 73 translated records and 57 obligations. Its
-current shared dependency closure also includes the integer readers and record
-projection below: 122 translated records, comprising 59 executable functions
-including clones, 51 mathematical functions/constants and 12 induction lemmas;
-98 obligations. These are overlapping counts. The eight native tests use
+current shared dependency closure also includes the integer readers, record
+projection and multi-record execution below: 182 translated records, comprising
+81 executable functions including clones, 75 mathematical functions/constants
+and 26 ghost proof helpers; 145 verification groups. These are overlapping
+counts. The 14 native tests use
 independent arithmetic and wire-format oracles, and sweep quotas, eager traps,
 machine boundaries, malformed references, output order, refusal cleanup and
 every resource. Four external-consumer compile refusals challenge custody of
@@ -214,8 +215,9 @@ and all new executable/specification sources join the evaluator identity.
 Finite scalar wire semantics remain unchanged. Allocation, scalar admission,
 root projection, hashing and schema navigation are not charged by this
 instruction profile. The separate protected-record profile below charges Byte
-and Read for its bounded record language. Multi-record composition, grouped
-operations, complete decisions, laws/genesis and the mandatory V2 authority/
+and Read for its bounded record language. The record-execution profile below
+composes all three records with scalar execution. Grouped operations, complete
+decisions, laws/genesis and the mandatory V2 authority/
 replay route remain open. A verified private meter is not a proof that every
 authority operation uses it, nor a whole-core or V2 completion claim.
 
@@ -288,8 +290,8 @@ python3 tools/check_protected_input.py --install --out /tmp/zeno-fcis-protected-
 cargo +1.97.1 test -p zeno-fcis-synthesis --test v2_protected_input --locked
 ```
 
-The [coverage manifest](protected-input.json) fixes the same 122-record,
-98-obligation dependency closure described above, with exact contracts,
+The [coverage manifest](protected-input.json) fixes the same 182-record,
+145-obligation dependency closure described above, with exact contracts,
 mathematical specifications and executable bodies. Twenty-three behavior
 mutations must fail verification; seven coverage controls must verify and then
 fail the guard. Native tests compare with independent standard-library byte
@@ -301,9 +303,69 @@ compares actual canonical `Value` encoding with this implementation.
 The `zeno-fcis/finite-protected-record/2` profile and all shared source/specification
 files join the finite evaluator identity. Source-bound template certificates
 must be regenerated rather than relabeled. This unit does not yet prove catalog
-descriptor extraction, state/command/context composition, binding permutations,
-original envelope/hash admission, full decisions, laws/genesis or the mandatory
+descriptor extraction, original envelope/hash admission, full decisions,
+laws/genesis or the mandatory
 V2 authority and replay route. See the
 [stage contract](../../docs/V2_PROTECTED_RECORD_STAGE.md) for the complete bounded
 definition of done. Proof receipts retain the named Verus/Z3, compiler,
 standard-library, allocator and platform assumptions.
+
+
+## V2 original-record execution
+
+[record_execution.rs](record_execution.rs) imports the actual production
+[composable pipeline](../../crates/zeno-fcis-synthesis/src/finite/execution_v2/record_execution.rs).
+`execute_records_v2` borrows original State/Command/Context canonical record
+bytes, complete closed descriptors and the scalar graph. Bindings associate
+each ABI position with an exact (source, field-ID) pair; IDs may repeat across
+sources. Admission requires a bijection onto all declared fields and structural
+equality of each complete scalar domain. Bool remains distinct from Int(0,1).
+No new domain, field-count, dense-ID or variant-order limit is introduced.
+
+The exact transition checks all three schemas before any raw work, then complete
+bindings. It projects State, Command and Context in that fixed order, constructs
+the exact bound scalar tuple, and calls the private eager evaluator with the
+same owned meter. Ghost induction derives tuple domain membership from actual
+wire decoding and complete bindings. The executable helpers remain total for
+malformed metadata, bytes and graphs; their contracts have zero `requires`.
+Every failure returns no partial output while retaining all eight counters and
+source-attempt prefixes. Source labels identify Byte/Header refusals even when
+no Read request was appended. Public outcomes, attempts and meter custody stay
+opaque; compile negatives challenge external forgery and replacement.
+
+```sh
+python3 tools/test_check_record_execution.py
+python3 tools/check_record_execution.py --install --out /tmp/zeno-fcis-record-execution-evidence.json
+cargo +1.97.1 test -p zeno-fcis-synthesis --test v2_record_execution --locked
+```
+
+The reviewed [manifest](record-execution.json) fixes 182 translated records:
+81 executable functions, 75 specifications/constants and 26 ghost proof helpers,
+with 145 obligations. These counts overlap the other two complete harnesses.
+Eighteen mutations must fail the actual proof, including same-typed source
+substitution, wrong scalar positions, incomplete bindings, weakened domains,
+skipped records, meter reset, source mislabeling, dropped prefixes and rollback.
+Six controls must verify and then be refused by the separate inventory,
+including cached record work before metadata. Removing the applied typing
+bridge must fail the proof of scalar admission itself. The inherited protected/instruction gates retain their Byte/Read/Step
+operational-order controls. Logical accounting excludes metadata work,
+allocation and physical CPU/I/O cost; the body guard is not a physical trace.
+
+The direct native closure has 14 tests, including six new composition tests.
+Their independent wire, set-based metadata and wide-arithmetic instruction
+oracles challenge all four leaf shapes over six complete-record source
+permutations and 24 ABI permutations (144 combinations), plus same-typed source
+confusion, malformed metadata/raw records/graphs, quotas, arbitrary initial
+counters and source prefixes, and empty/32/100-field records. A separate public
+test consumes actual canonical Value bytes. Both new source/specification files
+and `zeno-fcis/finite-record-execution/2` join evaluator identity; affected
+certificates are refreshed by synthesis and independent/native replay.
+
+This API does not authenticate context, extract a catalog descriptor or bind
+an envelope hash. It constructs scalar outputs rather than complete decisions.
+Catalog/envelope correspondence, complete successor/patch/reason/effect/outbox
+artifacts, library law/genesis evaluation and mandatory V2 authority/replay
+remain open. See the [stage contract](../../docs/V2_RECORD_EXECUTION_STAGE.md).
+Verus/vstd/Z3, erasure/compiler correspondence, allocation and the platform
+remain named trusted premises; this proof does not become Lean KernelChecked
+or confer release authority.

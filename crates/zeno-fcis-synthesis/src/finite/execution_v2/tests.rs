@@ -20,11 +20,11 @@ fn contains(domain: Domain, value: i64) -> bool {
     }
 }
 
-fn domains_match(domains: &[Domain], values: &[i64]) -> bool {
+pub(super) fn domains_match(domains: &[Domain], values: &[i64]) -> bool {
     domains.len() == values.len() && domains.iter().zip(values).all(|(d, v)| contains(*d, *v))
 }
 
-fn reference_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i64, Failure> {
+pub(super) fn reference_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i64, Failure> {
     let read = |id: u16| {
         values
             .get(usize::from(id))

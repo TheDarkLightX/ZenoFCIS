@@ -47,8 +47,8 @@ legal domain merely to make a proof cheaper.
 | Order | Actual core component | Required statement | Current frontier |
 | --- | --- | --- | --- |
 | 1 | Shared scalar IR and execution loop | Every instruction and eager prefix match the mathematical semantics; invalid input and traps refuse without exposing partial output | Admission/eager execution unit: 20 executable functions, 34 obligations; all 132 GitHub checks passed at `9882136` |
-| 2 | Schema and canonical admission | Every accepted byte string decodes to exactly its typed value, respects declared ranges and limits, and consumes all bytes | Integer readers qualified at `f88f1a3`; protected flat-record development proof passes; catalog and envelope correspondence open |
-| 3 | Library meter and state view | Actual accesses and steps are charged before protected work; exhaustion and overflow cannot mutate authoritative state | Owned instruction meter and one-record view implemented; exact result proofs plus separately reviewed source order; multi-record composition and mandatory route open |
+| 2 | Schema and canonical admission | Every accepted byte string decodes to exactly its typed value, respects declared ranges and limits, and consumes all bytes | Integer readers qualified at `f88f1a3`; protected flat-record unit qualified at `5f88a67`; record-execution development proof passes; catalog and envelope correspondence open |
+| 3 | Library meter and state view | Actual accesses and steps are charged before protected work; exhaustion and overflow cannot mutate authoritative state | Owned meter and exact multi-record/ABI composition implemented; exact result proofs plus separately reviewed source order; mandatory route open |
 | 4 | Complete decision construction | Class, reason, successor, patch, effects, outbox and order equal the bound contract | Inventory's 864-case evidence; general proof open |
 | 5 | Laws and genesis | Library evaluates every applicable predicate on the exact invocation and actual initial state | Project-supplied law engine remains; mandatory library checks open |
 | 6 | Authority, identity and replay | Only the bound contract/evaluator can produce authorization; stale input, changed identity, and replay mismatch refuse | 1.x nominal bindings; full V2 route open |
@@ -310,3 +310,47 @@ gate, clean-head replay and exact-head GitHub CI remain required. The protected
 record profile and actual source/specification files join the evaluator identity.
 This unit does not close the multi-record, catalog-binding, decision or
 mandatory-authority bridges.
+
+
+## Fifth proof unit: original-record execution and typed ABI binding
+
+The parent protected-record unit is qualified at `5f88a67`, pushed in draft
+PR #117 and accepted by GPT-6-Astra at xhigh. All 136 GitHub checks passed at
+that exact head. That is cross-model review by a separate agent with hashed
+source and receipt provenance, not third-party certification or merge authority.
+
+The bounded next-stage contract is [V2_RECORD_EXECUTION_STAGE.md](V2_RECORD_EXECUTION_STAGE.md).
+The actual production pipeline and complete dependency closure pass a
+whole-crate development proof of 145 obligations, with zero errors: 81
+executable functions, 75 specifications/constants and 26 ghost proof helpers.
+Successful typed wire decoding and exact complete bindings derive admitted
+scalar inputs. Exact Source/ID projection prevents same-typed source confusion;
+all three records and eager graph execution reuse the same private meter.
+The implementation preserves full generic IDs, arbitrary closed intervals/maps,
+empty/32/100-field records and defensive malformed-graph behavior.
+
+The new public bounded API returns an opaque result with retained counters and
+source-attempt sequences. A source tag survives Byte/Header failures without
+Read attempts. Metadata admission precedes ingress; a later source refusal
+retains earlier records' usage, and every refusal clears scalar output. The
+private helper additionally preserves arbitrary initial counters and source
+prefixes. Unused fields are still required; no public callback or usage report
+substitutes for this library execution.
+
+Independent native comparisons cover all 144 source/ABI permutations of four
+leaves across the three sources, plus malformed metadata/bytes/graphs, quotas,
+private prefixes and large/empty records. Actual public canonical Value bytes
+also pass. The new 24-control gate distinguishes 18 proof failures from six
+verifying coverage refusals; the 30/16 inherited gates retain their own
+operational-order controls. All three complete harness counts overlap.
+The new sources/profile intentionally refresh evaluator/checker identities.
+Fresh six-template synthesis/replay, strict Clippy/no-std/Miri, complete
+46-scenario acceptance, clean-head replay and Astra review remain required for
+local qualification before push. Exact-head GitHub CI is required after that
+push; current development proof is not release acceptance.
+
+This stage closes the bounded multi-record scalar composition, rather than the
+complete authority route. Next remain catalog extraction/admission and original
+envelope/hash binding, complete decisions, laws/genesis, mandatory V2 authority
+and replay, larger template abstractions, remaining ledger/migration obligations,
+and implementation correspondence under the named compiler/platform base.
