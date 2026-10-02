@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Check owned V2 protected record projection; this is not transition authorization.
+"""Check owned V2 record-to-execution composition; this is not transition authorization.
 
 Verus proves exact outcomes/counters. Reviewed executable-body fingerprints
 separately guard operational charge order, which those postconditions alone
-cannot prove. Neither result closes the raw-state or mandatory-authority bridge.
+cannot prove. Catalog admission and the complete mandatory authority bridge remain open.
 """
 from __future__ import annotations
 
@@ -22,21 +22,21 @@ from check_metered_execution import UNIT_SOURCES as METER_SOURCES
 from verus_coverage import require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
-PROFILE = Path("verification/verus/protected-input.json")
-HARNESS = Path("verification/verus/protected_input.rs")
-SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view.rs")
-SPEC = SUBJECT.parent / "input_view/spec.rs"
+PROFILE = Path("verification/verus/record-execution.json")
+HARNESS = Path("verification/verus/record_execution.rs")
+SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/record_execution.rs")
+SPEC = SUBJECT.parent / "record_execution/spec.rs"
 UNIT_SOURCES = (HARNESS, *METER_SOURCES[1:])
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
            SUBJECT.parent / "input_view/tests.rs", SUBJECT.parent / "record_execution/tests.rs",
-           Path("tools/check_protected_input.py"), Path("tools/test_check_protected_input.py"),
+           Path("tools/check_record_execution.py"), Path("tools/test_check_record_execution.py"),
            Path("tools/check_metered_execution.py"), Path("tools/check_finite_execution.py"),
            Path("tools/check_verus.py"), Path("tools/verus_coverage.py"),
            Path("Cargo.toml"), Path("rust-toolchain.toml"),
            Path("crates/zeno-fcis-synthesis/src/finite/ir.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
-           Path("crates/zeno-fcis-synthesis/tests/v2_protected_input.rs"))
+           Path("crates/zeno-fcis-synthesis/tests/v2_record_execution.rs"))
 
 
 def snapshot() -> dict[str, str]:
@@ -47,7 +47,7 @@ def snapshot() -> dict[str, str]:
 
 
 def entry_contract(source: str, replacement: str) -> str:
-    end = source.index("pub fn project(")
+    end = source.index("pub fn execute(")
     start = source.rindex("#[cfg_attr(verus_keep_ghost, verus_spec(result =>", 0, end)
     return source[:start] + replacement + source[end:]
 
@@ -55,72 +55,48 @@ def entry_contract(source: str, replacement: str) -> str:
 def mutation_sources(source: str, specification: str) -> dict[str, tuple[Path, str, str]]:
     mutations = {}
     for name, before, after in (
-        ("wrong_interval_cardinality", "max as i128 - min as i128 + 1", "max as i128 - min as i128 + 2"),
-        ("ignore_negative_code_bound", "variant.code < min || variant.code > max", "variant.code > max"),
-        ("allow_duplicate_variant_ids", "variants[prior].id == variant.id || variants[prior].code == variant.code",
-         "variants[prior].code == variant.code"),
-        ("allow_duplicate_variant_codes", "variants[prior].id == variant.id || variants[prior].code == variant.code",
-         "variants[prior].id == variant.id"),
-        ("ignore_field_order", "index > 0 && fields[index - 1].id >= fields[index].id", "false"),
-        ("wrong_enum_tag", "if tag != 0x07 {", "if tag != 0x0a {"),
-        ("allow_sum_payload", "if payload != 0 {", "if false {"),
-        ("wrong_type_width", "read_big_endian(bytes, offset, 4)", "read_big_endian(bytes, offset, 3)"),
-        ("wrong_variant_width", "read_big_endian(bytes, after_type, 2)", "read_big_endian(bytes, after_type, 1)"),
-        ("wrong_integer_value", "Some((value as i64, end))", "Some((0, end))"),
-        ("wrong_boolean_value", "Some((1, payload_offset))", "Some((0, payload_offset))"),
-        ("wrong_closed_variant_mapping", "return Some(code);", "return Some(0);"),
-        ("ignore_field_identity", "if id != field.id as u128 {", "if false {"),
-        ("ignore_record_count", "if count != field_count as u128 {", "if false {"),
-        ("wrong_record_tag", "if tag != 0x09 {", "if tag != 0x08 {"),
-        ("omit_ingress_charge", "meter.charge(super::Resource::Byte, bytes.len() as u64)",
-         "meter.charge(super::Resource::Byte, 0)"),
-        ("omit_protected_read_charge", "meter.charge(super::Resource::Read, 1)",
-         "meter.charge(super::Resource::Read, 0)"),
-        ("charge_wrong_read_resource", "meter.charge(super::Resource::Read, 1)",
-         "meter.charge(super::Resource::Step, 1)"),
-        ("wrong_permission_observation", "permitted: charged.is_ok()", "permitted: charged.is_err()"),
-        ("allow_trailing_bytes", "if end != bytes.len() {", "if false {"),
-        ("leak_partial_scalars", "Err(error) => {\n            output.clear();\n            Err(error)",
-         "Err(error) => {\n            Err(error)"),
-        ("rollback_prior_usage", "Err(error) => {\n            output.clear();\n            Err(error)",
-         "Err(error) => {\n            output.clear();\n            meter.used.counters = [0; 8];\n            Err(error)"),
-        ("drop_refused_attempts", "Err(error) => {\n            output.clear();\n            Err(error)",
-         "Err(error) => {\n            output.clear();\n            attempts.clear();\n            Err(error)"),
+        ("substitute_same_typed_source", "Source::State => &decoded.state,", "Source::State => &decoded.command,"),
+        ("substitute_source_descriptor", "Source::State => invocation.state.fields,", "Source::State => invocation.command.fields,"),
+        ("ignore_upper_domain_bound", "a == c && b == d", "a == c"),
+        ("alias_boolean_and_integer_domain", "a == c && b == d,\n        _ => false,", "a == c && b == d,\n        _ => true,"),
+        ("wrong_binding_scalar_position", "Some(scalars[index])", "Some(scalars[0])"),
+        ("allow_unknown_binding", "let index = find_field(descriptor, binding.field)?;", "let index = 0;"),
+        ("allow_duplicate_binding", "if same_source(bindings[prior].source, binding.source)", "if false"),
+        ("omit_context_binding_coverage", "&& covered(invocation.context.fields, Source::Context, bindings)", "&& true"),
+        ("omit_context_schema_admission", "if !input_view::validate_schema(invocation.context.fields) {", "if false {"),
+        ("drop_metadata_refusal_cleanup", "output.clear();\n    metadata(invocation, program.inputs, bindings)?;", "metadata(invocation, program.inputs, bindings)?;"),
+        ("mislabel_record_refusal", "source: Source::Command,\n            refusal,", "source: Source::State,\n            refusal,"),
+        ("decode_wrong_original_record", "        invocation.context.bytes,", "        invocation.command.bytes,"),
+        ("reset_shared_meter_before_execution", "let mut scratch = Vec::new();", "let mut scratch = Vec::new();\n    meter.used.counters = [0; 8];"),
+        ("drop_prior_source_attempt_prefix", "let mut input = Vec::new();", "attempts.state.clear();\n    let mut input = Vec::new();"),
+        ("rollback_record_charges_on_execution_refusal", "Err(error) => Err(Failure::Execution(error)),", "Err(error) => { meter.used.counters = [0; 8]; Err(Failure::Execution(error)) },"),
+        ("misroute_abi_projection", "bound_scalar(invocation, decoded, bindings[index])", "bound_scalar(invocation, decoded, bindings[0])"),
     ):
         mutations[name] = (SUBJECT, once(source, before, after), "proof")
-
-    # These cached parses preserve exact results, usage and attempt records.
-    # They genuinely verify; the separately reviewed body inventory refuses them.
-    cached_header = once(source,
-        "if let Err(error) = meter.charge(super::Resource::Byte, bytes.len() as u64) {",
-        "let cached_header = decode_header(bytes, fields.len());\n"
-        "    if let Err(error) = meter.charge(super::Resource::Byte, bytes.len() as u64) {")
-    cached_header = once(cached_header,
-        "let Some(offset) = decode_header(bytes, fields.len()) else {",
-        "let Some(offset) = cached_header else {")
-    mutations["parse_header_before_ingress"] = (SUBJECT, cached_header, "coverage")
-    cached_field = once(source, "let charged = meter.charge(super::Resource::Read, 1);",
-        "let cached_field = decode_field(bytes, position, &fields[index]);\n"
-        "        let charged = meter.charge(super::Resource::Read, 1);")
-    cached_field = once(cached_field, "match decode_field(bytes, position, &fields[index]) {",
-        "match cached_field {")
-    mutations["parse_field_before_read"] = (SUBJECT, cached_field, "coverage")
-    mutations["weaken_projection_contract"] = (SUBJECT,
-        entry_contract(source, "#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n"),
-        "coverage")
-    mutations["narrow_projection_domain"] = (SUBJECT,
-        once(source, "ensures result.view() == projection(bytes@, fields@, limits.view(),",
-             "requires bytes@.len() > 0,\n    ensures result.view() == projection(bytes@, fields@, limits.view(),"),
-        "coverage")
+    start = source.index("    if let Err(refusal) = input_view::project_into(\n        invocation.context.bytes,")
+    end = source.index("    #[cfg(verus_keep_ghost)]", start)
+    mutations["skip_complete_context_record"] = (SUBJECT,
+        once(source, source[start:end], ""), "proof")
+    # Public custody stays fixed by the translated manifest. The applied typing
+    # bridge is needed to prove scalar admission at the evaluator call.
+    mutations["weaken_public_execution_contract"] = (SUBJECT,
+        entry_contract(source, "#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n"), "coverage")
+    mutations["narrow_public_execution_domain"] = (SUBJECT,
+        once(source, "ensures result.view() == spec::execution(invocation, program, bindings@,",
+             "requires bindings@.len() > 0,\n    ensures result.view() == spec::execution(invocation, program, bindings@,"), "coverage")
     mutations["inject_caller_usage"] = (SUBJECT,
-        once(source, "pub fn project(bytes: &[u8], fields: &[Field], limits: super::Limits)",
-             "pub fn project(bytes: &[u8], fields: &[Field], limits: super::Limits, _supplied: super::Usage)"),
-        "coverage")
-    mutations["change_projection_specification"] = (SPEC,
-        once(specification, "if !schema_valid(fields) {", "let admitted = schema_valid(fields);\n    if !admitted {"),
-        "coverage")
-    mutations["add_uncontracted_projection_work"] = (SUBJECT,
-        source + "\npub fn uncontracted_record_probe() -> u64 { 42 }\n", "coverage")
+        once(source, "    limits: super::Limits,\n) -> Outcome", "    limits: super::Limits,\n    _caller_usage: super::Usage,\n) -> Outcome"), "coverage")
+    mutations["remove_typing_bridge_application"] = (SUBJECT,
+        once(source, "        spec::tuple_is_typed(invocation, program.inputs@, bindings@, spec::decoded(&decoded), bindings@.len());", ""), "proof")
+    mutations["cached_record_before_metadata"] = (SUBJECT,
+        once(source, "    metadata(invocation, program.inputs, bindings)?;",
+             "    let _cached_record = input_view::project(invocation.state.bytes, invocation.state.fields, meter.limits);\n"
+             "    metadata(invocation, program.inputs, bindings)?;"), "coverage")
+    mutations["change_record_execution_specification"] = (SPEC,
+        once(specification, "    match metadata(invocation, program.inputs@, bindings) {",
+             "    let admitted = metadata(invocation, program.inputs@, bindings);\n    match admitted {"), "coverage")
+    mutations["add_uncontracted_record_work"] = (SUBJECT,
+        source + "\npub fn uncontracted_record_execution_probe() -> u64 { 42 }\n", "coverage")
     return mutations
 
 
@@ -131,37 +107,35 @@ def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     verifier.require_success(verifier.run([*rust, "--test", str(HARNESS), "-o", str(tests)], ROOT, environment))
     native = verifier.run([str(tests), "--test-threads=2"], ROOT, environment)
     verifier.require_success(native)
-    library = directory / "libprotected_input.rlib"
-    verifier.require_success(verifier.run([*rust, "--crate-type=rlib", "--crate-name=protected_input",
+    library = directory / "librecord_execution.rlib"
+    verifier.require_success(verifier.run([*rust, "--crate-type=rlib", "--crate-name=record_execution",
                                            str(HARNESS), "-o", str(library)], ROOT, environment))
-    prelude = "use protected_input::execution_v2::{project_record, zero_limits, Resource, RecordProjection};\n"
-    build = "let limits=zero_limits().with_limit(Resource::Byte, 5); let outcome=project_record(&[9,0,0,0,0],&[],limits);"
+    prelude = "use record_execution::execution_v2::{execute_records, zero_limits, Resource, RawRecord, RecordInvocation, ScalarProgram, RecordExecutionOutcome};\n"
+    build = "let bytes=[9,0,0,0,0]; let inv=RecordInvocation { state:RawRecord { bytes:&bytes,fields:&[] }, command:RawRecord { bytes:&bytes,fields:&[] }, context:RawRecord { bytes:&bytes,fields:&[] } }; let program=ScalarProgram { inputs:&[],outputs:&[],nodes:&[],roots:&[] }; let limits=zero_limits().with_limit(Resource::Byte,15); let outcome=execute_records(&inv,&program,&[],limits);"
     specimens = {
         "positive": (prelude + "fn main() { " + build +
-                     " assert_eq!(outcome.usage().used(Resource::Byte),5); assert!(outcome.attempts().is_empty());"
-                     " assert_eq!(outcome.into_parts().0, Ok(vec![])); }", None),
-        "forge_projection": (prelude + "fn main() { " + build +
-                     " let usage=outcome.usage(); let _=RecordProjection { result: Ok(vec![123]), usage, attempts: vec![] }; }", "E0451"),
-        "replace_attempts": (prelude + "fn main() { " + build +
-                     " let mut changed=outcome; changed.attempts=vec![]; }", "E0616"),
-        "caller_initial_usage": (prelude + "fn main() { " + build +
-                     " let _=project_record(&[],&[],limits,outcome.usage()); }", "E0061"),
-        "private_projection": ("fn main() { let _ = protected_input::execution_v2::input_view::project_into; }", "E0603"),
+                     " assert_eq!(outcome.usage().used(Resource::Byte),15); assert_eq!(outcome.into_parts().0,Ok(vec![])); }", None),
+        "forge_outcome": (prelude + "fn main() { " + build +
+                     " let usage=outcome.usage(); let attempts=outcome.into_parts().2; let _=RecordExecutionOutcome { result:Ok(vec![123]),usage,attempts }; }", "E0451"),
+        "replace_usage": (prelude + "fn main() { " + build + " let mut changed=outcome; changed.usage=changed.usage(); }", "E0616"),
+        "replace_attempts": (prelude + "fn main() { " + build + " let attempts=outcome.into_parts().2; let _=attempts.state; }", "E0616"),
+        "caller_initial_usage": (prelude + "fn main() { " + build + " let _=execute_records(&inv,&program,&[],limits,outcome.usage()); }", "E0061"),
+        "private_execution": ("fn main() { let _=record_execution::execution_v2::record_execution::execute_into; }", "E0603"),
+        "private_meter": ("fn main() { let _=record_execution::execution_v2::meter::new; }", "E0603"),
     }
     outcomes = {}
     for name, (source, error_code) in specimens.items():
         path = directory / f"consumer_{name}.rs"
         path.write_text(source)
-        process = verifier.run([*rust, "--extern", f"protected_input={library}", str(path),
+        process = verifier.run([*rust, "--extern", f"record_execution={library}", str(path),
                                 "-o", str(directory / f"consumer_{name}")], ROOT, environment)
         if error_code is None:
             verifier.require_success(process)
+            verifier.require_success(verifier.run([str(directory / f"consumer_{name}")], ROOT, environment))
         elif process.returncode == 0 or error_code not in process.stderr:
-            raise RuntimeError(f"protected API negative {name} did not refuse for {error_code}")
+            raise RuntimeError(f"record execution API negative {name} did not refuse for {error_code}")
         outcomes[name] = {"exit_code": process.returncode, "expected_error": error_code}
     return {"test_output": native.stdout.strip(), "api_consumers": outcomes}
-
-
 def check(cache: Path, install: bool) -> dict:
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("this proof profile requires qualified Linux x86-64 tools")
@@ -177,7 +151,7 @@ def check(cache: Path, install: bool) -> dict:
                "--no-external-by-default", "--num-threads", "2", "--output-json", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
-    with tempfile.TemporaryDirectory(prefix="zeno-fcis-input-proof-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="zeno-fcis-record-proof-") as temporary:
         directory = Path(temporary)
         positive_command = [*command, "--log-dir", str(directory / "positive"), str(HARNESS)]
         positive = verifier.run(positive_command, ROOT, environment)
@@ -187,7 +161,7 @@ def check(cache: Path, install: bool) -> dict:
             raise RuntimeError("metered proof report lacks pinned tools or complete obligation coverage")
         coverage = require_coverage((directory / "positive/crate.vir").read_text(), profile)
         native = native_checks(directory, pin, environment)
-        print("V2 input: exact proof coverage and native/API boundaries passed", flush=True)
+        print("V2 record execution: exact proof coverage and native/API boundaries passed", flush=True)
         for name, (path, changed, expected) in mutation_sources((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text()).items():
             specimen = directory / name
             for unit in UNIT_SOURCES:
@@ -213,19 +187,19 @@ def check(cache: Path, install: bool) -> dict:
                               "coverage_refusal": coverage_error})
             if not killed:
                 raise RuntimeError(f"mutation {name} survived or failed for an unrelated reason")
-            print(f"V2 input: caught {name} ({expected})", flush=True)
+            print(f"V2 record execution: caught {name} ({expected})", flush=True)
     verifier.verify_tool_files(tools, pin)
     if before != snapshot():
         raise RuntimeError("meter proof or integration source changed during verification")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()
-    return {"schema": "zeno-fcis/protected-input-evidence/1", "status": "passed",
+    return {"schema": "zeno-fcis/record-execution-evidence/1", "status": "passed",
             "revision": revision, "working_tree_dirty": bool(dirty), "source_sha256": before,
             "toolchain": pin, "command": positive_command, "exit_code": positive.returncode,
             "verus_report": report, "translated_function_coverage": coverage,
-            "operational_order_evidence": "reviewed body inventory; cached header/field parsing before charge verifies but is refused",
+            "operational_order_evidence": "reviewed complete body inventory; inherited Byte/Read/Step order controls remain separate",
             "native": native, "mutations": mutations,
-            "scope": "complete canonical flat-record projection, exact retained logical counters and descriptor-based attempts",
+            "scope": "complete original State/Command/Context projection, exact source/field ABI ordering, typed tuple and eager execution with one meter",
             "trusted_base": ["reviewed specifications and operational body manifest", "Verus translation/erasure and bundled vstd/Z3",
                              "Rust compilers", "standard library/allocation", "host platform"],
             "unproved": ["catalog descriptor extraction/admission", "original-envelope framing/hash admission",
@@ -242,10 +216,10 @@ def main() -> int:
     try:
         receipt = check(args.cache.resolve(), args.install)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
-        receipt = {"schema": "zeno-fcis/protected-input-evidence/1", "status": "failed", "error": str(error)}
+        receipt = {"schema": "zeno-fcis/record-execution-evidence/1", "status": "failed", "error": str(error)}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
-    print(f"V2 input: {receipt['status']}; receipt: {args.out}")
+    print(f"V2 record execution: {receipt['status']}; receipt: {args.out}")
     if receipt["status"] != "passed":
         print(receipt["error"])
         return 1

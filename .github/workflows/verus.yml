@@ -16,6 +16,8 @@ on:
       - "tools/test_check_canonical_bytes.py"
       - "tools/check_protected_input.py"
       - "tools/test_check_protected_input.py"
+      - "tools/check_record_execution.py"
+      - "tools/test_check_record_execution.py"
       - "tools/verus_coverage.py"
       - "Cargo.toml"
       - "rust-toolchain.toml"
@@ -48,6 +50,7 @@ jobs:
           python3 tools/test_check_metered_execution.py
           python3 tools/test_check_canonical_bytes.py
           python3 tools/test_check_protected_input.py
+          python3 tools/test_check_record_execution.py
       - name: Verify shared Rust and require mutation failures
         run: python3 tools/check_verus.py --install --out "${{ runner.temp }}/verus-evidence.json"
       - name: Verify finite admission and execution with contract coverage
@@ -58,6 +61,8 @@ jobs:
         run: python3 tools/check_canonical_bytes.py --out "${{ runner.temp }}/canonical-byte-evidence.json"
       - name: Verify protected record projection and retained access reports
         run: python3 tools/check_protected_input.py --out "${{ runner.temp }}/protected-input-evidence.json"
+      - name: Verify original records, exact ABI binding and shared metered execution
+        run: python3 tools/check_record_execution.py --out "${{ runner.temp }}/record-execution-evidence.json"
       - name: Check no-std authority compatibility
         run: cargo +1.97.1 check -p zeno-fcis-authority -p zeno-fcis-synthesis --no-default-features --locked
       - name: Retain scoped evidence
@@ -71,4 +76,5 @@ jobs:
             ${{ runner.temp }}/metered-execution-evidence.json
             ${{ runner.temp }}/canonical-byte-evidence.json
             ${{ runner.temp }}/protected-input-evidence.json
+            ${{ runner.temp }}/record-execution-evidence.json
           if-no-files-found: warn

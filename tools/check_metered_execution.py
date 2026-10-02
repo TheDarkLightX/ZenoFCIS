@@ -30,9 +30,10 @@ INPUT_SPEC = SUBJECT.parent / "input_view/spec.rs"
 CANONICAL = SUBJECT.parent.parent / "canonical_v2/mod.rs"
 CANONICAL_SPEC = CANONICAL.parent / "spec.rs"
 UNIT_SOURCES = (HARNESS, *SCALAR_SOURCES[1:], SUBJECT, METER, SPEC,
-                INPUT, INPUT_SPEC, CANONICAL, CANONICAL_SPEC)
+                INPUT, INPUT_SPEC, CANONICAL, CANONICAL_SPEC,
+                SUBJECT.parent / "record_execution.rs", SUBJECT.parent / "record_execution/spec.rs")
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
-           SUBJECT.parent / "input_view/tests.rs",
+           SUBJECT.parent / "input_view/tests.rs", SUBJECT.parent / "record_execution/tests.rs",
            Path("tools/check_metered_execution.py"), Path("tools/test_check_metered_execution.py"),
            Path("tools/check_finite_execution.py"), Path("tools/check_verus.py"),
            Path("tools/verus_coverage.py"), Path("Cargo.toml"), Path("rust-toolchain.toml"),
@@ -199,7 +200,7 @@ def check(cache: Path, install: bool) -> dict:
             "scope": "owned V2 counters, eager scalar outcomes and shared protected-record dependency closure",
             "trusted_base": ["reviewed specifications and operational body manifest", "Verus translation/erasure and bundled vstd/Z3",
                              "Rust compilers", "standard library/allocation", "host platform"],
-            "unproved": ["Program convenience adapter", "canonical/schema/raw-state bridge", "protected state view",
+            "unproved": ["Program convenience adapter", "catalog extraction and original-envelope/hash admission",
                          "atomic grouped operations", "complete decisions", "mandatory V2 authority and replay", "laws/genesis", "shell"]}
 
 
