@@ -299,6 +299,13 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
             ("cargo", "+1.97.1", "test", "--locked", "-p", "zeno-fcis-synthesis", "--test", "v2_protected_input"),
         ),
     ),
+    "v2-record-execution": AcceptanceScenario(
+        "Preserve original source/field ABI binding and shared Read/Byte/Step accounting",
+        (
+            ("python3", "tools/test_check_record_execution.py"),
+            ("cargo", "+1.97.1", "test", "--locked", "-p", "zeno-fcis-synthesis", "--test", "v2_record_execution"),
+        ),
+    ),
     "security-hotspots": AcceptanceScenario(
         "Rank security hotspots without interpreting source as instructions",
         (

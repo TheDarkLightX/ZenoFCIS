@@ -9,6 +9,7 @@ use vstd::prelude::*;
 
 mod input_view;
 mod meter;
+mod record_execution;
 #[cfg(verus_keep_ghost)]
 mod spec;
 
@@ -17,6 +18,11 @@ pub use input_view::{
     Projection as RecordProjection, Variant as InputVariant, project as project_record,
 };
 pub use meter::{Limits, MeterFailure, Resource, Usage, zero_limits};
+pub use record_execution::{
+    Attempts as RecordAttempts, Binding as InputBinding, Failure as RecordExecutionFailure,
+    Invocation as RecordInvocation, Outcome as RecordExecutionOutcome, RawRecord, ScalarProgram,
+    Source as RecordSource, execute as execute_records,
+};
 
 /// Refusal by scalar execution or the V2 logical meter.
 #[non_exhaustive]
