@@ -1,0 +1,11 @@
+{
+  "cases": 100,
+  "comparison": "All outputs, emitted program structures/checksums, status, complete valid/invalid observations, fallback choices, controls and config; timing/solver-log durations excluded.",
+  "first_full_result_sha256": "7d83d18380c1768b582689d7ddb34664482d1e7223ea1bbbac99187a3a49aff2",
+  "first_gate_ms": 11395.188875,
+  "passed": true,
+  "repeat_full_result_sha256": "187b549de89813acbe9d887c086b68c13e159957ea6b1e7c200b64ec6ca12bab",
+  "repeat_gate_ms": 1368.451708,
+  "stable_evidence_sha256": "155803e7dc1755882c8108ff801a6a27e6465b80e3cf21646dcd71ba09e2bcd2",
+  "variants": 400
+}

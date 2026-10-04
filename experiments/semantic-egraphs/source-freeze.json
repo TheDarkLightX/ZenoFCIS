@@ -1,0 +1,17 @@
+{
+  "files_sha256": {
+    "Cargo.lock": "9a29f681c7b629986227616a06780c730eb92b4fa13191a14da07759a386b836",
+    "Cargo.toml": "630b1fe86f1f07742a74f50149e9d3d5088758a4a3c9450a51b776044ef25e9d",
+    "PROTOCOL.md": "aef63241c015b16c0641ba58d116a6b8a2c7f9c0e4af31f515d77fe859645f5f",
+    "analyze.py": "6e7a796555fae231f8c36d54fdc7eadae23a698cb21f5e2967276acbf05b4bc2",
+    "corpus.json": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18",
+    "corpus.py": "482d84367cef82f00cb952e707fec7fcd94df15a0b64e9df98360fef67e3cc9e",
+    "proof/BooleanSignatures.lean": "d4b6aeeed147e2d6f769342cabe4cda491f96006205f49d1014836a9c4a9af6c",
+    "registration.json": "393f02da3a4a4db6f17e7a14e98c4adb4dff752409f204667d468806010236fa",
+    "src/boolean.rs": "c104941b2d393d61dc3796e70e97d859f751ed534e494470e0f139544902a45f",
+    "src/evaluation.rs": "edda8b083cdc91bfb76b6998a7789979a166d5132a95cce0cb5de2867d628851",
+    "src/main.rs": "f58c61aef3966f2cc562e87b10c4726823f214c1fa53af692aa435be25e08e71",
+    "src/optimizer.rs": "2db10ea9331ab714ce3abffbc01edc63a30155a6b93cbfd0ce7b7d5be1304aca"
+  },
+  "recorded_before_main_benchmark_utc": "2026-10-04T01:33:50.860379+00:00"
+}

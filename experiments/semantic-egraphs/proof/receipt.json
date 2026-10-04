@@ -1,0 +1,84 @@
+{
+  "kind": "kernel-checked-finite-boolean-model",
+  "created_utc": "2026-10-04T01:15:18.205654+00:00",
+  "replay_exit_code": 0,
+  "replay_command": "bash proof/replay.sh /path/to/matching/mathlib-project",
+  "lean": {
+    "version": "4.30.0-rc2",
+    "commit": "3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc",
+    "platform": "arm64-apple-darwin24.6.0",
+    "binary_sha256": "b48bc5ab229bd8b320a224b87e20fc428dba6fa8a1c054bd4fa6def846e19997"
+  },
+  "mathlib": {
+    "revision": "9977002c3c9492b622fb469b0d18acc7e73aed3e",
+    "checkout_clean": true,
+    "dependency_manifest_sha256": "ee46ff2ffb5b9a2e8dce718129d2ba07b8cc42a3cd05bbdef69c033c3e17e5f6"
+  },
+  "files_sha256": {
+    "BooleanSignatures.lean": "d4b6aeeed147e2d6f769342cabe4cda491f96006205f49d1014836a9c4a9af6c",
+    "README.md": "6d742025affe896ecacd34e9f409c05d4fa4f3056e8a368717df2fa82cc5e52f",
+    "replay.sh": "150b20d8ff2fa02bd3ea61dc4a98eb940e9b3aa7e2053fcdd04c3b5d012e207d",
+    "replay.log": "09750faa6a728f441beb2d90b02cdf4c8442822981c360df2bb72f291b9381cb",
+    "replay-wrapper.log": "85c11a273eeb0c854262386abc191a1c0b826b17f70f8ee631450e8fbe927230"
+  },
+  "axiom_dependencies": {
+    "BooleanSignatures.boolValuation_card": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "BooleanSignatures.boolean_function_card": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "BooleanSignatures.boolean_multi_output_card": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "BooleanSignatures.boolean_signature_complete": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ],
+    "BooleanSignatures.pure_context_congruence": [
+      "propext"
+    ],
+    "BooleanSignatures.factoring_sound": [
+      "propext"
+    ],
+    "BooleanSignatures.checked_boolean_candidate_preserves": [
+      "propext",
+      "Classical.choice",
+      "Quot.sound"
+    ]
+  },
+  "trust_scan": {
+    "pattern": "\\b(sorry|admit|axiom|unsafe|native_decide)\\b",
+    "source_matches": 0,
+    "nonstandard_axioms": []
+  },
+  "checked_scope": [
+    "Boolean input valuations have cardinality 2^n",
+    "Total single/multi-output Boolean function-space cardinality",
+    "A complete fixed enumeration makes exact signatures complete for pointwise observation equality",
+    "Equality is a congruence for pure Boolean single-hole expression contexts, including total conditionals",
+    "Distributive factoring preserves pure Boolean expression evaluation",
+    "Signature-equality candidate acceptance preserves every admitted-input observation, including ordered outputs or exact errors"
+  ],
+  "assumptions": [
+    "The supplied enumeration covers every input and is shared between signature computations",
+    "The supplied observation function includes all behavior claimed to be preserved",
+    "Observation equality is exact",
+    "Pure expression congruence excludes trapping arithmetic and other nonextensional behavior",
+    "The specialized output vector has a fixed ABI width and order"
+  ],
+  "not_checked": [
+    "Rust enumeration, evaluator, analysis, union, hash-collision handling, lowering, or gate refinement",
+    "Preservation of arbitrary eager checked-i64 programs through local Boolean rewrites",
+    "CBC correctness, extraction optimality, e-graph termination, or actual cost improvement",
+    "Tau quantifier elimination, weak omega categoricity for arbitrary formula theories, or temporal synthesis",
+    "Out-of-domain input rejection without the separate same-schema obligation"
+  ]
+}

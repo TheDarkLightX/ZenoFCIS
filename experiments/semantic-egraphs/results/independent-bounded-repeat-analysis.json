@@ -1,0 +1,1311 @@
+{
+  "aggregate_nodes": {
+    "local_baseline": 895,
+    "raw": 1506,
+    "rewrite_egg": 854,
+    "semantic_egg": 816
+  },
+  "cases": 100,
+  "comparisons": {
+    "local_vs_raw": {
+      "candidate": "local_baseline",
+      "candidate_nodes": 895,
+      "node_delta_distribution": {
+        "frequency": {
+          "-1": 12,
+          "-10": 1,
+          "-11": 2,
+          "-12": 2,
+          "-16": 1,
+          "-18": 1,
+          "-2": 11,
+          "-22": 1,
+          "-24": 1,
+          "-25": 1,
+          "-3": 13,
+          "-31": 1,
+          "-33": 2,
+          "-4": 11,
+          "-5": 2,
+          "-6": 14,
+          "-7": 2,
+          "-8": 7,
+          "-9": 8,
+          "0": 7
+        },
+        "maximum": 0,
+        "median": -4.0,
+        "minimum": -33,
+        "sum": -611
+      },
+      "reference": "raw",
+      "reference_nodes": 1506,
+      "regressions": 0,
+      "strict_wins": 93,
+      "ties": 7,
+      "winning_case_ids": [
+        "small_gate-01",
+        "small_gate-02",
+        "small_gate-03",
+        "small_gate-04",
+        "small_gate-05",
+        "small_gate-06",
+        "distributed_factoring-00",
+        "distributed_factoring-01",
+        "distributed_factoring-02",
+        "distributed_factoring-03",
+        "distributed_factoring-04",
+        "distributed_factoring-05",
+        "distributed_factoring-06",
+        "distributed_factoring-07",
+        "distributed_factoring-08",
+        "distributed_factoring-09",
+        "distributed_factoring-10",
+        "distributed_factoring-11",
+        "distributed_factoring-12",
+        "distributed_factoring-13",
+        "distributed_factoring-14",
+        "distributed_factoring-15",
+        "distributed_factoring-16",
+        "distributed_factoring-17",
+        "absorption_complement-00",
+        "absorption_complement-01",
+        "absorption_complement-02",
+        "absorption_complement-03",
+        "absorption_complement-04",
+        "absorption_complement-05",
+        "absorption_complement-06",
+        "absorption_complement-07",
+        "absorption_complement-08",
+        "absorption_complement-09",
+        "absorption_complement-10",
+        "absorption_complement-11",
+        "absorption_complement-12",
+        "absorption_complement-14",
+        "absorption_complement-15",
+        "absorption_complement-16",
+        "absorption_complement-17",
+        "mixed_ite_demorgan-00",
+        "mixed_ite_demorgan-01",
+        "mixed_ite_demorgan-02",
+        "mixed_ite_demorgan-04",
+        "mixed_ite_demorgan-06",
+        "mixed_ite_demorgan-07",
+        "mixed_ite_demorgan-08",
+        "mixed_ite_demorgan-10",
+        "mixed_ite_demorgan-11",
+        "mixed_ite_demorgan-12",
+        "mixed_ite_demorgan-13",
+        "mixed_ite_demorgan-14",
+        "mixed_ite_demorgan-16",
+        "mixed_ite_demorgan-17",
+        "shared_guards-00",
+        "shared_guards-01",
+        "shared_guards-02",
+        "shared_guards-03",
+        "shared_guards-04",
+        "shared_guards-05",
+        "shared_guards-06",
+        "shared_guards-07",
+        "shared_guards-08",
+        "shared_guards-09",
+        "shared_guards-10",
+        "shared_guards-11",
+        "shared_guards-12",
+        "shared_guards-13",
+        "shared_guards-14",
+        "shared_guards-15",
+        "shared_guards-16",
+        "shared_guards-17",
+        "balanced_general-00",
+        "balanced_general-01",
+        "balanced_general-02",
+        "balanced_general-03",
+        "balanced_general-04",
+        "balanced_general-05",
+        "balanced_general-06",
+        "balanced_general-07",
+        "balanced_general-08",
+        "balanced_general-09",
+        "balanced_general-10",
+        "balanced_general-11",
+        "balanced_general-12",
+        "balanced_general-13",
+        "balanced_general-14",
+        "balanced_general-15",
+        "balanced_general-16",
+        "balanced_general-17",
+        "balanced_general-18",
+        "balanced_general-19"
+      ],
+      "winning_families": [
+        "absorption_complement",
+        "balanced_general",
+        "distributed_factoring",
+        "mixed_ite_demorgan",
+        "shared_guards",
+        "small_gate"
+      ]
+    },
+    "rewrite_vs_local": {
+      "candidate": "rewrite_egg",
+      "candidate_nodes": 854,
+      "node_delta_distribution": {
+        "frequency": {
+          "-1": 6,
+          "-11": 1,
+          "-17": 1,
+          "-2": 2,
+          "-3": 1,
+          "-4": 1,
+          "-6": 1,
+          "0": 80,
+          "1": 4,
+          "2": 3
+        },
+        "maximum": 2,
+        "median": 0.0,
+        "minimum": -17,
+        "sum": -41
+      },
+      "reference": "local_baseline",
+      "reference_nodes": 895,
+      "regressions": 7,
+      "strict_wins": 13,
+      "ties": 80,
+      "winning_case_ids": [
+        "absorption_complement-13",
+        "shared_guards-02",
+        "shared_guards-05",
+        "shared_guards-08",
+        "shared_guards-11",
+        "shared_guards-14",
+        "shared_guards-17",
+        "balanced_general-03",
+        "balanced_general-07",
+        "balanced_general-08",
+        "balanced_general-11",
+        "balanced_general-13",
+        "balanced_general-16"
+      ],
+      "winning_families": [
+        "absorption_complement",
+        "balanced_general",
+        "shared_guards"
+      ]
+    },
+    "semantic_vs_local": {
+      "candidate": "semantic_egg",
+      "candidate_nodes": 816,
+      "node_delta_distribution": {
+        "frequency": {
+          "-1": 7,
+          "-17": 2,
+          "-2": 1,
+          "-3": 2,
+          "-4": 1,
+          "-5": 1,
+          "-6": 3,
+          "-7": 1,
+          "0": 78,
+          "1": 4
+        },
+        "maximum": 1,
+        "median": 0.0,
+        "minimum": -17,
+        "sum": -79
+      },
+      "reference": "local_baseline",
+      "reference_nodes": 895,
+      "regressions": 4,
+      "strict_wins": 18,
+      "ties": 78,
+      "winning_case_ids": [
+        "absorption_complement-13",
+        "shared_guards-02",
+        "shared_guards-05",
+        "shared_guards-08",
+        "shared_guards-11",
+        "shared_guards-14",
+        "shared_guards-17",
+        "balanced_general-00",
+        "balanced_general-02",
+        "balanced_general-03",
+        "balanced_general-05",
+        "balanced_general-07",
+        "balanced_general-08",
+        "balanced_general-11",
+        "balanced_general-13",
+        "balanced_general-14",
+        "balanced_general-16",
+        "balanced_general-17"
+      ],
+      "winning_families": [
+        "absorption_complement",
+        "balanced_general",
+        "shared_guards"
+      ]
+    },
+    "semantic_vs_rewrite": {
+      "candidate": "semantic_egg",
+      "candidate_nodes": 816,
+      "node_delta_distribution": {
+        "frequency": {
+          "-1": 1,
+          "-2": 4,
+          "-3": 4,
+          "-4": 1,
+          "-6": 1,
+          "-7": 1,
+          "0": 88
+        },
+        "maximum": 0,
+        "median": 0.0,
+        "minimum": -7,
+        "sum": -38
+      },
+      "reference": "rewrite_egg",
+      "reference_nodes": 854,
+      "regressions": 0,
+      "strict_wins": 12,
+      "ties": 88,
+      "winning_case_ids": [
+        "mixed_ite_demorgan-11",
+        "mixed_ite_demorgan-17",
+        "balanced_general-00",
+        "balanced_general-02",
+        "balanced_general-05",
+        "balanced_general-07",
+        "balanced_general-08",
+        "balanced_general-11",
+        "balanced_general-14",
+        "balanced_general-16",
+        "balanced_general-17",
+        "balanced_general-19"
+      ],
+      "winning_families": [
+        "balanced_general",
+        "mixed_ite_demorgan"
+      ]
+    }
+  },
+  "controls": [
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "ok": [
+              0
+            ]
+          }
+        },
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            1
+          ],
+          "source": {
+            "ok": [
+              1
+            ]
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -9223372036854775808
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -1
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            9223372036854775807
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "altered_truth_function",
+      "mismatches": [
+        {
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            0
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "ok": [
+              0
+            ]
+          }
+        },
+        {
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            1
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "ok": [
+              1
+            ]
+          }
+        }
+      ],
+      "passed": true,
+      "scope_error": null,
+      "scope_rejected": false
+    },
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "ok": [
+              0
+            ]
+          }
+        },
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            1
+          ],
+          "source": {
+            "ok": [
+              1
+            ]
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -9223372036854775808
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -1
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            9223372036854775807
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "non_boolean_region",
+      "mismatches": [
+        {
+          "kind": "interface_changed"
+        }
+      ],
+      "passed": true,
+      "scope_error": "Optimizer accepts only declared Bool inputs and outputs",
+      "scope_rejected": true
+    },
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [],
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "eager_dead_add_overflow",
+      "mismatches": [
+        {
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "error": "Arithmetic"
+          }
+        }
+      ],
+      "passed": true,
+      "scope_error": "Optimizer rejects arithmetic/comparison operations, including dead nodes and Select arms",
+      "scope_rejected": true
+    },
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            1
+          ],
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -9223372036854775808
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -1
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            9223372036854775807
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "eager_select_arm_overflow",
+      "mismatches": [
+        {
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            0
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            1
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "error": "Arithmetic"
+          }
+        }
+      ],
+      "passed": true,
+      "scope_error": "Optimizer rejects arithmetic/comparison operations, including dead nodes and Select arms",
+      "scope_rejected": true
+    },
+    {
+      "checks": [
+        {
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "expected_outcome": "input_rejected",
+      "id": "invalid_input_shape",
+      "mismatches": [],
+      "passed": true
+    },
+    {
+      "checks": [
+        {
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "expected_outcome": "input_rejected",
+      "id": "invalid_input_domain",
+      "mismatches": [],
+      "passed": true
+    }
+  ],
+  "corpus_sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18",
+  "extraction_solver_statuses": {
+    "rewrite_egg": {
+      "optimal": 100
+    },
+    "semantic_egg": {
+      "optimal": 100
+    }
+  },
+  "families": [
+    {
+      "aggregate_nodes": {
+        "local_baseline": 18,
+        "raw": 34,
+        "rewrite_egg": 18,
+        "semantic_egg": 18
+      },
+      "cases": 8,
+      "family": "small_gate",
+      "semantic_vs_local": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 18,
+        "node_delta_distribution": {
+          "frequency": {
+            "0": 8
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": 0,
+          "sum": 0
+        },
+        "reference": "local_baseline",
+        "reference_nodes": 18,
+        "regressions": 0,
+        "strict_wins": 0,
+        "ties": 8,
+        "winning_case_ids": [],
+        "winning_families": []
+      },
+      "semantic_vs_rewrite": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 18,
+        "node_delta_distribution": {
+          "frequency": {
+            "0": 8
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": 0,
+          "sum": 0
+        },
+        "reference": "rewrite_egg",
+        "reference_nodes": 18,
+        "regressions": 0,
+        "strict_wins": 0,
+        "ties": 8,
+        "winning_case_ids": [],
+        "winning_families": []
+      }
+    },
+    {
+      "aggregate_nodes": {
+        "local_baseline": 169,
+        "raw": 217,
+        "rewrite_egg": 170,
+        "semantic_egg": 170
+      },
+      "cases": 18,
+      "family": "distributed_factoring",
+      "semantic_vs_local": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 170,
+        "node_delta_distribution": {
+          "frequency": {
+            "0": 17,
+            "1": 1
+          },
+          "maximum": 1,
+          "median": 0.0,
+          "minimum": 0,
+          "sum": 1
+        },
+        "reference": "local_baseline",
+        "reference_nodes": 169,
+        "regressions": 1,
+        "strict_wins": 0,
+        "ties": 17,
+        "winning_case_ids": [],
+        "winning_families": []
+      },
+      "semantic_vs_rewrite": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 170,
+        "node_delta_distribution": {
+          "frequency": {
+            "0": 18
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": 0,
+          "sum": 0
+        },
+        "reference": "rewrite_egg",
+        "reference_nodes": 170,
+        "regressions": 0,
+        "strict_wins": 0,
+        "ties": 18,
+        "winning_case_ids": [],
+        "winning_families": []
+      }
+    },
+    {
+      "aggregate_nodes": {
+        "local_baseline": 48,
+        "raw": 159,
+        "rewrite_egg": 42,
+        "semantic_egg": 42
+      },
+      "cases": 18,
+      "family": "absorption_complement",
+      "semantic_vs_local": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 42,
+        "node_delta_distribution": {
+          "frequency": {
+            "-6": 1,
+            "0": 17
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": -6,
+          "sum": -6
+        },
+        "reference": "local_baseline",
+        "reference_nodes": 48,
+        "regressions": 0,
+        "strict_wins": 1,
+        "ties": 17,
+        "winning_case_ids": [
+          "absorption_complement-13"
+        ],
+        "winning_families": [
+          "absorption_complement"
+        ]
+      },
+      "semantic_vs_rewrite": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 42,
+        "node_delta_distribution": {
+          "frequency": {
+            "0": 18
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": 0,
+          "sum": 0
+        },
+        "reference": "rewrite_egg",
+        "reference_nodes": 42,
+        "regressions": 0,
+        "strict_wins": 0,
+        "ties": 18,
+        "winning_case_ids": [],
+        "winning_families": []
+      }
+    },
+    {
+      "aggregate_nodes": {
+        "local_baseline": 120,
+        "raw": 157,
+        "rewrite_egg": 124,
+        "semantic_egg": 120
+      },
+      "cases": 18,
+      "family": "mixed_ite_demorgan",
+      "semantic_vs_local": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 120,
+        "node_delta_distribution": {
+          "frequency": {
+            "0": 18
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": 0,
+          "sum": 0
+        },
+        "reference": "local_baseline",
+        "reference_nodes": 120,
+        "regressions": 0,
+        "strict_wins": 0,
+        "ties": 18,
+        "winning_case_ids": [],
+        "winning_families": []
+      },
+      "semantic_vs_rewrite": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 120,
+        "node_delta_distribution": {
+          "frequency": {
+            "-2": 2,
+            "0": 16
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": -2,
+          "sum": -4
+        },
+        "reference": "rewrite_egg",
+        "reference_nodes": 124,
+        "regressions": 0,
+        "strict_wins": 2,
+        "ties": 16,
+        "winning_case_ids": [
+          "mixed_ite_demorgan-11",
+          "mixed_ite_demorgan-17"
+        ],
+        "winning_families": [
+          "mixed_ite_demorgan"
+        ]
+      }
+    },
+    {
+      "aggregate_nodes": {
+        "local_baseline": 246,
+        "raw": 357,
+        "rewrite_egg": 243,
+        "semantic_egg": 243
+      },
+      "cases": 18,
+      "family": "shared_guards",
+      "semantic_vs_local": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 243,
+        "node_delta_distribution": {
+          "frequency": {
+            "-1": 6,
+            "0": 9,
+            "1": 3
+          },
+          "maximum": 1,
+          "median": 0.0,
+          "minimum": -1,
+          "sum": -3
+        },
+        "reference": "local_baseline",
+        "reference_nodes": 246,
+        "regressions": 3,
+        "strict_wins": 6,
+        "ties": 9,
+        "winning_case_ids": [
+          "shared_guards-02",
+          "shared_guards-05",
+          "shared_guards-08",
+          "shared_guards-11",
+          "shared_guards-14",
+          "shared_guards-17"
+        ],
+        "winning_families": [
+          "shared_guards"
+        ]
+      },
+      "semantic_vs_rewrite": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 243,
+        "node_delta_distribution": {
+          "frequency": {
+            "0": 18
+          },
+          "maximum": 0,
+          "median": 0.0,
+          "minimum": 0,
+          "sum": 0
+        },
+        "reference": "rewrite_egg",
+        "reference_nodes": 243,
+        "regressions": 0,
+        "strict_wins": 0,
+        "ties": 18,
+        "winning_case_ids": [],
+        "winning_families": []
+      }
+    },
+    {
+      "aggregate_nodes": {
+        "local_baseline": 294,
+        "raw": 582,
+        "rewrite_egg": 257,
+        "semantic_egg": 223
+      },
+      "cases": 20,
+      "family": "balanced_general",
+      "semantic_vs_local": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 223,
+        "node_delta_distribution": {
+          "frequency": {
+            "-1": 1,
+            "-17": 2,
+            "-2": 1,
+            "-3": 2,
+            "-4": 1,
+            "-5": 1,
+            "-6": 2,
+            "-7": 1,
+            "0": 9
+          },
+          "maximum": 0,
+          "median": -1.5,
+          "minimum": -17,
+          "sum": -71
+        },
+        "reference": "local_baseline",
+        "reference_nodes": 294,
+        "regressions": 0,
+        "strict_wins": 11,
+        "ties": 9,
+        "winning_case_ids": [
+          "balanced_general-00",
+          "balanced_general-02",
+          "balanced_general-03",
+          "balanced_general-05",
+          "balanced_general-07",
+          "balanced_general-08",
+          "balanced_general-11",
+          "balanced_general-13",
+          "balanced_general-14",
+          "balanced_general-16",
+          "balanced_general-17"
+        ],
+        "winning_families": [
+          "balanced_general"
+        ]
+      },
+      "semantic_vs_rewrite": {
+        "candidate": "semantic_egg",
+        "candidate_nodes": 223,
+        "node_delta_distribution": {
+          "frequency": {
+            "-1": 1,
+            "-2": 2,
+            "-3": 4,
+            "-4": 1,
+            "-6": 1,
+            "-7": 1,
+            "0": 10
+          },
+          "maximum": 0,
+          "median": -0.5,
+          "minimum": -7,
+          "sum": -34
+        },
+        "reference": "rewrite_egg",
+        "reference_nodes": 257,
+        "regressions": 0,
+        "strict_wins": 10,
+        "ties": 10,
+        "winning_case_ids": [
+          "balanced_general-00",
+          "balanced_general-02",
+          "balanced_general-05",
+          "balanced_general-07",
+          "balanced_general-08",
+          "balanced_general-11",
+          "balanced_general-14",
+          "balanced_general-16",
+          "balanced_general-17",
+          "balanced_general-19"
+        ],
+        "winning_families": [
+          "balanced_general"
+        ]
+      }
+    }
+  ],
+  "fixed_cost_criterion_met": true,
+  "independent_checks_passed": true,
+  "initial_search_configuration": {
+    "iterations": 6,
+    "lp_seconds": 2.0,
+    "node_limit": 5000
+  },
+  "initial_search_configuration_unchanged": false,
+  "limitations": [
+    "No arithmetic/error-producing expression, authoritative state, effects, shell behavior, temporal or weak-omega equivalence is established by this corpus.",
+    "This is a deterministic synthetic sample, not an application distribution or an optimum-extraction theorem.",
+    "Recorded solver optimality applies to the extraction surrogate, not necessarily actual shared FCIS-basis node count.",
+    "Rust timings are component observations; baseline outputs were precomputed in Python, so lowering time alone omits local optimization overhead.",
+    "Fewer modeled DAG instructions need not imply faster generated code or lower protocol-visible logical budgets."
+  ],
+  "observed_search_configuration": {
+    "iterations": 3,
+    "lp_seconds": 30.0,
+    "node_limit": 1000,
+    "rewrite_rules": 33,
+    "seeded_leaves": "true,false,and every declared vi in ascending index order",
+    "tree_ablation": false
+  },
+  "preregistered_success": false,
+  "protected_selection": {
+    "aggregate_nodes": 812,
+    "chosen_variants": {
+      "local_baseline": 82,
+      "semantic_egg": 18
+    },
+    "complete": true,
+    "receipt_cases_checked": 100
+  },
+  "schema_version": 1,
+  "scope": "Complete finite Bool domains per frozen case, exact output order and duplicate roots, eager Boolean FCIS basis only.",
+  "separate_python_baseline_timings": {
+    "cases": 100,
+    "measurement": "Python baseline optimization only; excludes parse, truth-table verification, and Rust lowering. Descriptive cross-language timing, not an algorithmic speed ratio.",
+    "median_case_ms": 0.1462705,
+    "python_version": "3.9.6",
+    "repetitions": 3,
+    "sha256": "d98c0b986b6afaca25249ea52fe2ff097c6b8ee8858d8220024bf57f0e192f4b",
+    "sum_case_medians_ms": 59.83404499999999
+  },
+  "success_rule": {
+    "all_variants_valid": true,
+    "minimum_semantic_strict_case_wins": 10,
+    "minimum_semantic_winning_families": 2,
+    "no_tool_failures": true,
+    "semantic_aggregate_nodes_strictly_less_than_local": true
+  },
+  "timing_component_definitions": {
+    "evaluation": "Candidate parsing/lowering, admission, complete finite checks, and receipt serialization.",
+    "extraction": "Extractor construction, solving, and expression reconstruction; the LP budget limits solving only.",
+    "saturation": "E-graph construction, bounded rewrite search, and final semantic unions where enabled.",
+    "total": "This variant's complete Rust proposal/check interval; excludes the separately precomputed Python baseline search."
+  },
+  "timings": {
+    "local_baseline": {
+      "evaluation": {
+        "maximum_ms": 0.347583,
+        "median_ms": 0.111813,
+        "minimum_ms": 0.03725,
+        "samples": 100,
+        "sum_ms": 13.080454999999999
+      },
+      "total": {
+        "maximum_ms": 0.347667,
+        "median_ms": 0.1118545,
+        "minimum_ms": 0.037292,
+        "samples": 100,
+        "sum_ms": 13.088202999999998
+      }
+    },
+    "raw": {
+      "evaluation": {
+        "maximum_ms": 0.347167,
+        "median_ms": 0.1218335,
+        "minimum_ms": 0.0425,
+        "samples": 100,
+        "sum_ms": 13.963587999999998
+      },
+      "total": {
+        "maximum_ms": 0.347209,
+        "median_ms": 0.121896,
+        "minimum_ms": 0.042584,
+        "samples": 100,
+        "sum_ms": 13.973543
+      }
+    },
+    "rewrite_egg": {
+      "evaluation": {
+        "maximum_ms": 0.376625,
+        "median_ms": 0.121229,
+        "minimum_ms": 0.041458999999999996,
+        "samples": 100,
+        "sum_ms": 14.263918000000002
+      },
+      "extraction": {
+        "maximum_ms": 17.275624999999998,
+        "median_ms": 1.4242085,
+        "minimum_ms": 0.376625,
+        "samples": 100,
+        "sum_ms": 296.835538
+      },
+      "saturation": {
+        "maximum_ms": 200.152,
+        "median_ms": 0.1254375,
+        "minimum_ms": 0.088333,
+        "samples": 100,
+        "sum_ms": 213.91291800000005
+      },
+      "total": {
+        "maximum_ms": 201.166125,
+        "median_ms": 1.8189165,
+        "minimum_ms": 0.515625,
+        "samples": 100,
+        "sum_ms": 525.288456
+      }
+    },
+    "semantic_egg": {
+      "evaluation": {
+        "maximum_ms": 0.384292,
+        "median_ms": 0.1227705,
+        "minimum_ms": 0.043458000000000004,
+        "samples": 100,
+        "sum_ms": 14.162995999999996
+      },
+      "extraction": {
+        "maximum_ms": 115.349166,
+        "median_ms": 1.3466875,
+        "minimum_ms": 0.36025,
+        "samples": 100,
+        "sum_ms": 746.876961
+      },
+      "saturation": {
+        "maximum_ms": 0.872708,
+        "median_ms": 0.127146,
+        "minimum_ms": 0.08675,
+        "samples": 100,
+        "sum_ms": 16.366004000000004
+      },
+      "total": {
+        "maximum_ms": 116.050416,
+        "median_ms": 1.7,
+        "minimum_ms": 0.503084,
+        "samples": 100,
+        "sum_ms": 777.6818749999999
+      }
+    }
+  }
+}

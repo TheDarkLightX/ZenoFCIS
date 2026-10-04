@@ -1,0 +1,10 @@
+Lean (version 4.30.0-rc2, arm64-apple-darwin24.6.0, commit 3dc1a088b6d2d8eafe25a7cd7ec7b58d731bd7cc, Release)
+Mathlib: 9977002c3c9492b622fb469b0d18acc7e73aed3e
+'BooleanSignatures.boolValuation_card' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.boolean_function_card' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.boolean_multi_output_card' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.boolean_signature_complete' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.pure_context_congruence' depends on axioms: [propext]
+'BooleanSignatures.factoring_sound' depends on axioms: [propext]
+'BooleanSignatures.checked_boolean_candidate_preserves' depends on axioms: [propext, Classical.choice, Quot.sound]
+Seven theorem closures checked; only standard Lean foundations are used.

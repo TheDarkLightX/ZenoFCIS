@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "working_directory": "experiments/semantic-egraphs",
+  "command_scope": "Portable equivalents of executed commands, from the experiment directory; focused harness checks only, not the benchmark.",
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "check",
+        "--locked",
+        "--manifest-path",
+        "Cargo.toml"
+      ],
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "test",
+        "--locked",
+        "--manifest-path",
+        "Cargo.toml"
+      ],
+      "exit_code": 0,
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "tests": [
+        "optimizer::tests::positive_status_required_and_limits_never_accepted",
+        "evaluation::tests::lowered_or_matches_independent_boolean_evaluation",
+        "evaluation::tests::every_negative_control_rejects_the_unsafe_change"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.97.1",
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        "Cargo.toml"
+      ],
+      "exit_code": 0
+    }
+  ],
+  "tools": {
+    "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)",
+    "cbc_pkg_config": "2.10.13",
+    "good_lp_locked": "1.15.3"
+  },
+  "egg_head": "12997cd15a123156abd726155363701f13358040",
+  "vendor_tracked_files_unchanged": true,
+  "source_sha256": {
+    "Cargo.toml": "630b1fe86f1f07742a74f50149e9d3d5088758a4a3c9450a51b776044ef25e9d",
+    "Cargo.lock": "9a29f681c7b629986227616a06780c730eb92b4fa13191a14da07759a386b836",
+    "src/main.rs": "f58c61aef3966f2cc562e87b10c4726823f214c1fa53af692aa435be25e08e71",
+    "src/boolean.rs": "c104941b2d393d61dc3796e70e97d859f751ed534e494470e0f139544902a45f",
+    "src/evaluation.rs": "edda8b083cdc91bfb76b6998a7789979a166d5132a95cce0cb5de2867d628851",
+    "src/optimizer.rs": "2db10ea9331ab714ce3abffbc01edc63a30155a6b93cbfd0ce7b7d5be1304aca",
+    "vendor/egg/src/lp_extract.rs": "d2c46b50b7870a147bf8b2fb075ea430c4292c53e52f8e5e1bb318ec292b5556"
+  },
+  "release_binary_sha256": "9b98beba532f90716596f98c6ecd6c5e17be23a8f0d98496e7e0d301eed01b92",
+  "warnings": [
+    {
+      "file": "vendor/egg/src/extract.rs",
+      "line": 263,
+      "kind": "deprecated IndexSet::remove",
+      "scope": "Pre-existing code in unchanged pinned dependency; ordinary tree-extractor queue maintenance."
+    }
+  ],
+  "negative_control_scope": "Changed truth function, nonBoolean region, eager dead Add overflow, eager unselected Select-arm Add overflow, invalid input shape and invalid input domain; these are expected rejections.",
+  "limits": "Focused tests validate gates, lowering/interpreter parity and status classification. They do not establish benchmark success, Rust formal verification or globally minimum emitted FCIS cost."
+}

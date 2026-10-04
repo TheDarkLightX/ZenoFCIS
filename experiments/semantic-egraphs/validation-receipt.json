@@ -1,0 +1,75 @@
+{
+  "aggregate_nodes": {
+    "local_baseline": 895,
+    "raw": 1506,
+    "rewrite_egg": 854,
+    "semantic_egg": 816
+  },
+  "amended_fixed_cost_criterion_met": true,
+  "analyzer_self_test": {
+    "fixture_results_are_experiment_results": false,
+    "negative_mutations_rejected": 13
+  },
+  "existing_finite_module_tests": {
+    "command": "cargo +1.97.1 test --locked -p zeno-fcis-synthesis --lib finite::",
+    "failed": 0,
+    "passed": 7
+  },
+  "experiment_scope": "Offline total Boolean FCIS Program regions; synthetic100case corpus.",
+  "final_config": {
+    "iterations": 3,
+    "lp_seconds": 30,
+    "node_limit": 1000
+  },
+  "focused_harness_tests": {
+    "failed": 0,
+    "passed": 3,
+    "receipt": "results/rust-harness-validation.json"
+  },
+  "lean": {
+    "receipt": "proof/receipt.json",
+    "scope": "Kernel-checked mathematical signatures/congruence/acceptance model, not Rust refinement/lowering/CBC or resource identities.",
+    "source_sha256": "d4b6aeeed147e2d6f769342cabe4cda491f96006205f49d1014836a9c4a9af6c"
+  },
+  "limitations": [
+    "Original2s configuration failed12extractions; larger30s configuration failed1; both retained.",
+    "Final3iteration/1000threshold search was chosen after failures and is exploratory.",
+    "Nodecounts do not establish application runtime speedup; optimization timing ordering reverses between runs.",
+    "No proof of implementation, global cost optimality, canonical identity or resource-accounting preservation, or Tau integration."
+  ],
+  "original_registered_protocol_passed": false,
+  "paper": {
+    "author": "Dana Edwards",
+    "final_checked_utc": "2026-10-04T03:38:25.588111+00:00",
+    "native_latex_compiler": "success",
+    "source": "paper.tex",
+    "source_sha256": "972536ba0043a6b90e5c97348dab0156aa9ff818796301776c71998bf0eb9462"
+  },
+  "protected_selection_nodes": 812,
+  "recorded_utc": "2026-10-04T01:58:34.625505+00:00",
+  "repeat_programs_and_observations_identical": true,
+  "repeat_search_snapshot_metadata_identical": true,
+  "semantic_vs_local": {
+    "regressions": 4,
+    "strict_wins": 18,
+    "ties": 78,
+    "winning_families": [
+      "absorption_complement",
+      "balanced_general",
+      "shared_guards"
+    ]
+  },
+  "semantic_vs_rewrite": {
+    "regressions": 0,
+    "strict_wins": 12,
+    "ties": 88
+  },
+  "successful_run_checks": {
+    "admitted_candidate_input_comparisons": 12544,
+    "cases": 100,
+    "invalid_input_probes": 8176,
+    "negative_controls_passed": 6,
+    "positive_solver_optimal_statuses": 200,
+    "variants": 400
+  }
+}
