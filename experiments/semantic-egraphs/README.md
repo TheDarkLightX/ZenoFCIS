@@ -5,7 +5,7 @@ produce smaller shared ZenoFCIS programs than a strong local simplifier and the
 same e-graph using rewrite rules alone. It is a standalone experiment directory
 inside a pinned ZenoFCIS source checkout. It changes no production crate.
 
-The [paper draft](paper.tex), authored by Dana Edwards, reports the successful
+The [paper draft (PDF)](paper.pdf), authored by Dana Edwards, reports the successful
 amended search and both retained failed configurations. The [independent
 results](results/independent-bounded-analysis.md) report 816 semantic-proposal
 instructions against 895 local-baseline instructions, with 18 wins, 78 ties,
@@ -26,7 +26,7 @@ The Cargo manifest uses the vendored egg source and the surrounding
 `zeno-fcis-synthesis` crate. Retain the experiment's `Cargo.lock` when reproducing
 the run. The optional proof instructions and scope are in [proof/README.md](proof/README.md).
 
-The source, results, and paper draft are available on the
+The experiment source, results, and paper PDF are available on the
 [`research/semantic-egraphs` branch](https://github.com/TheDarkLightX/ZenoFCIS/tree/research/semantic-egraphs/experiments/semantic-egraphs).
 To obtain the complete source layout in a new directory:
 

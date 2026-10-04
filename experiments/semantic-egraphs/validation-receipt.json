@@ -40,10 +40,21 @@
   "original_registered_protocol_passed": false,
   "paper": {
     "author": "Dana Edwards",
+    "compilation_input": {
+      "sha256": "972536ba0043a6b90e5c97348dab0156aa9ff818796301776c71998bf0eb9462",
+      "url": "https://raw.githubusercontent.com/TheDarkLightX/ZenoFCIS/4018b37ee1b6683de388ffbf2c45a34b787b8a48/experiments/semantic-egraphs/paper.tex"
+    },
     "final_checked_utc": "2026-10-04T03:38:25.588111+00:00",
     "native_latex_compiler": "success",
-    "source": "paper.tex",
-    "source_sha256": "972536ba0043a6b90e5c97348dab0156aa9ff818796301776c71998bf0eb9462"
+    "pdf": "paper.pdf",
+    "pdf_compiler": {
+      "producer": "pdfTeX-1.40.17",
+      "service": "https://latexonline.cc",
+      "version_banner": "This is pdfTeX, Version 3.14159265-2.6-1.40.17 (TeX Live 2016/Debian) kpathsea version 6.2.2"
+    },
+    "pdf_pages": 7,
+    "pdf_sha256": "66eed2d2c7ede6745bb3f4ae7c72fc5a18e5fc8351817087f5d690520620b7d2",
+    "pdf_verified_utc": "2026-10-04T03:53:25.127830+00:00"
   },
   "protected_selection_nodes": 812,
   "recorded_utc": "2026-10-04T01:58:34.625505+00:00",
