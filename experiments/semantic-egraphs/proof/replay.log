@@ -1,0 +1,7 @@
+'BooleanSignatures.boolValuation_card' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.boolean_function_card' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.boolean_multi_output_card' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.boolean_signature_complete' depends on axioms: [propext, Classical.choice, Quot.sound]
+'BooleanSignatures.pure_context_congruence' depends on axioms: [propext]
+'BooleanSignatures.factoring_sound' depends on axioms: [propext]
+'BooleanSignatures.checked_boolean_candidate_preserves' depends on axioms: [propext, Classical.choice, Quot.sound]

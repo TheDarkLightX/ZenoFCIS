@@ -1,0 +1,15 @@
+{
+  "all_cases_retained": true,
+  "amendment_sha256": "f11405a5980661b206eeac6bf3bbfb4c200634a026cf5f65e3796638bbe0a309",
+  "budget": {
+    "emergency_saturation_watchdog_seconds": 600,
+    "iterations": 3,
+    "lp_seconds": 30,
+    "node_limit": 1000
+  },
+  "corpus_sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18",
+  "criterion_unchanged": true,
+  "interpretation": "Exploratory resource revision; prior failures retained; no original-protocol success claim.",
+  "previous_result_sha256": "6bffe4cc5fff7cb53b6eaf6205e8c5752421664994ca3713af61b080a9c60737",
+  "recorded_before_third_full_run_utc": "2026-10-04T01:41:12.544870+00:00"
+}

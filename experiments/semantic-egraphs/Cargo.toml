@@ -1,0 +1,24 @@
+[package]
+name = "semantic-egraph-experiment"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[workspace]
+
+[dependencies]
+egg = { path = "vendor/egg", features = ["lp", "deterministic"] }
+zeno-fcis-synthesis = { path = "../../crates/zeno-fcis-synthesis" }
+good_lp = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+log = "0.4"
+
+[profile.release]
+overflow-checks = true
+
+[[bin]]
+name = "semantic-egraphs"
+path = "src/main.rs"

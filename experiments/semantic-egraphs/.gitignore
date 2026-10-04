@@ -1,0 +1,5 @@
+/target/
+/vendor/egg/
+/.private/
+!/Cargo.lock
+.DS_Store

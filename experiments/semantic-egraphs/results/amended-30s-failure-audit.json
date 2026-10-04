@@ -1,0 +1,3338 @@
+{
+  "accepted_checks": [
+    {
+      "case": "small_gate-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "small_gate-01",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-01",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-01",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-01",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "small_gate-02",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-02",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-02",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-02",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "small_gate-03",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-03",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-03",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-03",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "small_gate-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "small_gate-05",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-05",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-05",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-05",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "small_gate-06",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-06",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-06",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-06",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "small_gate-07",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "small_gate-07",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "small_gate-07",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "small_gate-07",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "distributed_factoring-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "distributed_factoring-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "distributed_factoring-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "distributed_factoring-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "absorption_complement-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "absorption_complement-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "absorption_complement-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "absorption_complement-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-00",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-01",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-02",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-03",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-04",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-05",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-06",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-07",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-08",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-12",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-13",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-14",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-15",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-16",
+      "invalid_tuples": 14,
+      "semantic_checks_passed": true,
+      "valid_tuples": 8,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "mixed_ite_demorgan-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "mixed_ite_demorgan-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "mixed_ite_demorgan-17",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "shared_guards-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "shared_guards-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "shared_guards-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "shared_guards-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-00",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-01",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-02",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-03",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-04",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-05",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-06",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-07",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-08",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-09",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-10",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-11",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-12",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-13",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-14",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-15",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-17",
+      "invalid_tuples": 26,
+      "semantic_checks_passed": true,
+      "valid_tuples": 64,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-18",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-18",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-18",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-18",
+      "invalid_tuples": 18,
+      "semantic_checks_passed": true,
+      "valid_tuples": 16,
+      "variant": "semantic_egg"
+    },
+    {
+      "case": "balanced_general-19",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "local_baseline"
+    },
+    {
+      "case": "balanced_general-19",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "raw"
+    },
+    {
+      "case": "balanced_general-19",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "rewrite_egg"
+    },
+    {
+      "case": "balanced_general-19",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    }
+  ],
+  "accepted_variants_independently_checked": 399,
+  "classification_counts": {
+    "time_limit_decodable_incumbent": 1
+  },
+  "config": {
+    "iterations": 6,
+    "lp_seconds": 30.0,
+    "node_limit": 5000,
+    "rewrite_rules": 33,
+    "seeded_leaves": "true,false,and every declared vi in ascending index order",
+    "tree_ablation": false
+  },
+  "controls": [
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "ok": [
+              0
+            ]
+          }
+        },
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            1
+          ],
+          "source": {
+            "ok": [
+              1
+            ]
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -9223372036854775808
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -1
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            9223372036854775807
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "altered_truth_function",
+      "mismatches": [
+        {
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            0
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "ok": [
+              0
+            ]
+          }
+        },
+        {
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            1
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "ok": [
+              1
+            ]
+          }
+        }
+      ],
+      "passed": true,
+      "scope_error": null,
+      "scope_rejected": false
+    },
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "ok": [
+              0
+            ]
+          }
+        },
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            1
+          ],
+          "source": {
+            "ok": [
+              1
+            ]
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -9223372036854775808
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -1
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            9223372036854775807
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "non_boolean_region",
+      "mismatches": [
+        {
+          "kind": "interface_changed"
+        }
+      ],
+      "passed": true,
+      "scope_error": "Optimizer accepts only declared Bool inputs and outputs",
+      "scope_rejected": true
+    },
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [],
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "eager_dead_add_overflow",
+      "mismatches": [
+        {
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "error": "Arithmetic"
+          }
+        }
+      ],
+      "passed": true,
+      "scope_error": "Optimizer rejects arithmetic/comparison operations, including dead nodes and Select arms",
+      "scope_rejected": true
+    },
+    {
+      "checks": [
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            0
+          ],
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "admitted": true,
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            1
+          ],
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -9223372036854775808
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            -1
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        },
+        {
+          "admitted": false,
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            9223372036854775807
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "evaluation_rejected": true,
+      "expected_outcome": "rejected",
+      "id": "eager_select_arm_overflow",
+      "mismatches": [
+        {
+          "candidate": {
+            "ok": [
+              0
+            ]
+          },
+          "input": [
+            0
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "error": "Arithmetic"
+          }
+        },
+        {
+          "candidate": {
+            "ok": [
+              1
+            ]
+          },
+          "input": [
+            1
+          ],
+          "kind": "evaluation_mismatch",
+          "source": {
+            "error": "Arithmetic"
+          }
+        }
+      ],
+      "passed": true,
+      "scope_error": "Optimizer rejects arithmetic/comparison operations, including dead nodes and Select arms",
+      "scope_rejected": true
+    },
+    {
+      "checks": [
+        {
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            0,
+            0
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "expected_outcome": "input_rejected",
+      "id": "invalid_input_shape",
+      "mismatches": [],
+      "passed": true
+    },
+    {
+      "checks": [
+        {
+          "candidate": {
+            "error": "Invalid(\"input-domain\")"
+          },
+          "input": [
+            2
+          ],
+          "source": {
+            "error": "Invalid(\"input-domain\")"
+          }
+        }
+      ],
+      "expected_outcome": "input_rejected",
+      "id": "invalid_input_domain",
+      "mismatches": [],
+      "passed": true
+    }
+  ],
+  "corpus_sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18",
+  "failed_cases": 1,
+  "failed_variants": [
+    {
+      "case": "balanced_general-16",
+      "classification": "time_limit_decodable_incumbent",
+      "error": "LP status time_limit is extraction failure under registered protocol",
+      "family": "balanced_general",
+      "solver_status": "time_limit",
+      "status": "error",
+      "variant": "semantic_egg"
+    }
+  ],
+  "negative_controls_all_reported_passed": true,
+  "preregistered_success": false,
+  "reason": "The registered no-tool-failures condition failed. No valid complete aggregate comparison is reported.",
+  "registered_run_passed": false,
+  "result_sha256": "6bffe4cc5fff7cb53b6eaf6205e8c5752421664994ca3713af61b080a9c60737",
+  "retained_rejected_incumbents_semantically_checked": [
+    {
+      "case": "balanced_general-16",
+      "invalid_tuples": 22,
+      "semantic_checks_passed": true,
+      "valid_tuples": 32,
+      "variant": "semantic_egg"
+    }
+  ],
+  "schema_version": 1,
+  "scope": "Accepted candidates and retained decodable incumbents are checked independently over each entire declared Boolean domain, including exact output order and serialized FCIS programs. Recorded invalid-input observations are checked against the declared probe set, not all infinitely many invalid tuples. Negative-control pass flags and receipts are preserved; this audit does not re-execute their source programs.",
+  "variant_status_counts": {
+    "local_baseline/accepted": 100,
+    "raw/accepted": 100,
+    "rewrite_egg/accepted": 100,
+    "semantic_egg/accepted": 99,
+    "semantic_egg/error": 1
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "calibration_cases": [
+    "small_gate-04",
+    "shared_guards-01",
+    "balanced_general-04"
+  ],
+  "calibration_result_sha256": "efbda611f148f1a037eea5c7d61bed7efbc1fbaeb1676f9a43f0fd609b8abced",
+  "calibration_sha256": "f618a68310daba28d3e1ec66a9382cef7a747301842a2fb50c0c9c7f3ecee38f",
+  "cases": 100,
+  "corpus_sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18",
+  "egg_commit": "12997cd15a123156abd726155363701f13358040",
+  "emergency_saturation_watchdog_seconds": 600,
+  "environment": {
+    "cbc": "2.10.13",
+    "memory_gb": 128,
+    "os": "macOS 26.6.2 (25G83)",
+    "processor": "Apple M3 Max, 16 cores (12 performance, 4 efficiency)",
+    "python": "3.9.6",
+    "rust": "1.97.1 (8bab26f4f 2026-07-14)"
+  },
+  "final_search_budget": {
+    "iterations": 6,
+    "lp_seconds": 2,
+    "node_limit": 5000
+  },
+  "initial_search_budget": {
+    "iterations": 6,
+    "lp_seconds": 2,
+    "node_limit": 5000
+  },
+  "node_budget_policy": "Threshold checked between rewrite batches; overshoot retained and reported.",
+  "protocol_finalized_before_main_benchmark_utc": "2026-10-04T01:33:50.859400+00:00",
+  "protocol_sha256": "aef63241c015b16c0641ba58d116a6b8a2c7f9c0e4af31f515d77fe859645f5f",
+  "recorded_before_main_benchmark_utc": "2026-10-04T01:13:04.031903+00:00",
+  "success_rule": {
+    "all_variants_valid": true,
+    "minimum_semantic_strict_case_wins": 10,
+    "minimum_semantic_winning_families": 2,
+    "no_tool_failures": true,
+    "semantic_aggregate_nodes_strictly_less_than_local": true
+  },
+  "zenofcis_commit": "cb1366cddc5c813f9977b377f541e64bcf94035c"
+}

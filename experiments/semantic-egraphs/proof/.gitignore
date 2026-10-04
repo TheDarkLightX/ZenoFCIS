@@ -1,0 +1,2 @@
+# Local draft diagnostics may contain dependency-workspace paths.
+replay-attempt-*.log

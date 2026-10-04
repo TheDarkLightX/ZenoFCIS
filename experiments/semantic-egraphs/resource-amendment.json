@@ -1,0 +1,23 @@
+{
+  "all_cases_retained": true,
+  "amendment_sha256": "2f29179a7cc84d97ebdb3164e75e36e07d7f787a21021b31567e9612785fbb53",
+  "budget": {
+    "emergency_saturation_watchdog_seconds": 600,
+    "iterations": 6,
+    "lp_seconds": 30,
+    "node_limit": 5000
+  },
+  "corpus_sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18",
+  "criterion_unchanged": true,
+  "files_sha256": {
+    "Cargo.lock": "9a29f681c7b629986227616a06780c730eb92b4fa13191a14da07759a386b836",
+    "analyze.py": "43421ee9ba507fec570b4b2d9e9249b4ff5b4122b7c92025c7519858aa9448ef",
+    "src/boolean.rs": "c104941b2d393d61dc3796e70e97d859f751ed534e494470e0f139544902a45f",
+    "src/evaluation.rs": "edda8b083cdc91bfb76b6998a7789979a166d5132a95cce0cb5de2867d628851",
+    "src/main.rs": "f58c61aef3966f2cc562e87b10c4726823f214c1fa53af692aa435be25e08e71",
+    "src/optimizer.rs": "2db10ea9331ab714ce3abffbc01edc63a30155a6b93cbfd0ce7b7d5be1304aca"
+  },
+  "initial_result_sha256": "00c25cfbb6c398a1709ef7a1aed1f00909dff20b236a398e6fbe21da7e703dd1",
+  "reason": "Initial2s study had12 solver time-limit failures; all retained. Increase solver resource only.",
+  "recorded_before_second_full_run_utc": "2026-10-04T01:37:06.770947+00:00"
+}

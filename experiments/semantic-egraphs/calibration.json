@@ -1,0 +1,98 @@
+{
+  "baseline": {
+    "max_steps": 1024,
+    "oracle_used_for_proposals": false,
+    "policy": "global greedy lexicographic descent of (exact shared FCIS node count, spelling length, output spellings)"
+  },
+  "cases": [
+    {
+      "baseline_fcis_nodes": 8,
+      "baseline_outputs": [
+        "(and (or v1 v2) v0)"
+      ],
+      "baseline_steps": 2,
+      "family": "small_gate",
+      "id": "small_gate-04",
+      "nvars": 3,
+      "outputs": [
+        "(or (and v0 v1) (and v0 v2))"
+      ],
+      "raw_fcis_nodes": 9,
+      "truth_signatures": [
+        "00010101"
+      ]
+    },
+    {
+      "baseline_fcis_nodes": 15,
+      "baseline_outputs": [
+        "(and (or v0 v4) (or v3 v1))",
+        "(and (or v0 v4) (or v3 v1))",
+        "(ite (or v3 v1) v0 v4)",
+        "(and (and (not v3) (not v1)) (not v0))"
+      ],
+      "baseline_steps": 4,
+      "family": "shared_guards",
+      "id": "shared_guards-01",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (or v3 v1) v0) (and (or v3 v1) v4))",
+        "(and (or v3 v1) (or v0 v4))",
+        "(ite (or v3 v1) v0 v4)",
+        "(not (or (or v3 v1) v0))"
+      ],
+      "raw_fcis_nodes": 24,
+      "truth_signatures": [
+        "00010001010101010011001111111111",
+        "00010001010101010011001111111111",
+        "00010001010101011101110101010101",
+        "10001000000000001000100000000000"
+      ]
+    },
+    {
+      "baseline_fcis_nodes": 17,
+      "baseline_outputs": [
+        "true",
+        "(and (and (or (not v1) (or v0 v4)) v2) v3)"
+      ],
+      "baseline_steps": 9,
+      "family": "balanced_general",
+      "id": "balanced_general-04",
+      "nvars": 5,
+      "outputs": [
+        "(ite (or (or false true) (ite false v2 v3)) (or (and v4 v3) (or true v2)) (or (or v3 false) (or true v0)))",
+        "(and (or (not v1) (or v0 v4)) (ite (or v1 true) (and v3 v2) (or v4 v1)))"
+      ],
+      "raw_fcis_nodes": 50,
+      "truth_signatures": [
+        "11111111111111111111111111111111",
+        "00000000000011010000000000001111"
+      ]
+    }
+  ],
+  "generation": {
+    "families": {
+      "absorption_complement": 18,
+      "balanced_general": 20,
+      "distributed_factoring": 18,
+      "mixed_ite_demorgan": 18,
+      "shared_guards": 18,
+      "small_gate": 8
+    },
+    "general_depths": [
+      3,
+      4
+    ],
+    "ordering": "fixed family order, then generator index; no result-dependent filtering"
+  },
+  "purpose": "Calibration only: small factoring gate and largest raw shared/general cases selected before optimizer results.",
+  "schema_version": 1,
+  "seed": 20261003,
+  "semantic_scope": "Total Boolean expressions on declared Bool inputs; eager FCIS lowering, not arithmetic/effects/temporal equivalence.",
+  "success_rule": {
+    "all_variants_valid": true,
+    "minimum_semantic_strict_case_wins": 10,
+    "minimum_semantic_winning_families": 2,
+    "no_tool_failures": true,
+    "semantic_aggregate_nodes_strictly_less_than_local": true
+  }
+}

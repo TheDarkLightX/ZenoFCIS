@@ -1,0 +1,1009 @@
+{
+  "cases": [
+    {
+      "id": "small_gate-00",
+      "median_ms": 0.003333,
+      "samples_ms": [
+        0.007625,
+        0.003333,
+        0.002458
+      ],
+      "steps": 0
+    },
+    {
+      "id": "small_gate-01",
+      "median_ms": 0.01575,
+      "samples_ms": [
+        0.0235,
+        0.01575,
+        0.014083
+      ],
+      "steps": 1
+    },
+    {
+      "id": "small_gate-02",
+      "median_ms": 0.015083,
+      "samples_ms": [
+        0.016375,
+        0.014792,
+        0.015083
+      ],
+      "steps": 1
+    },
+    {
+      "id": "small_gate-03",
+      "median_ms": 0.010292,
+      "samples_ms": [
+        0.012083,
+        0.010292,
+        0.01
+      ],
+      "steps": 1
+    },
+    {
+      "id": "small_gate-04",
+      "median_ms": 0.062958,
+      "samples_ms": [
+        0.09925,
+        0.062958,
+        0.060875
+      ],
+      "steps": 2
+    },
+    {
+      "id": "small_gate-05",
+      "median_ms": 0.018875,
+      "samples_ms": [
+        0.02,
+        0.018875,
+        0.017958
+      ],
+      "steps": 1
+    },
+    {
+      "id": "small_gate-06",
+      "median_ms": 0.020541,
+      "samples_ms": [
+        0.024959,
+        0.020541,
+        0.018459
+      ],
+      "steps": 1
+    },
+    {
+      "id": "small_gate-07",
+      "median_ms": 0.012084,
+      "samples_ms": [
+        0.013167,
+        0.012084,
+        0.011792
+      ],
+      "steps": 0
+    },
+    {
+      "id": "distributed_factoring-00",
+      "median_ms": 0.09,
+      "samples_ms": [
+        0.412542,
+        0.09,
+        0.088084
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-01",
+      "median_ms": 0.091375,
+      "samples_ms": [
+        0.091375,
+        0.089458,
+        0.142209
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-02",
+      "median_ms": 0.057708,
+      "samples_ms": [
+        0.058583,
+        0.057708,
+        0.057542
+      ],
+      "steps": 2
+    },
+    {
+      "id": "distributed_factoring-03",
+      "median_ms": 0.066125,
+      "samples_ms": [
+        0.066125,
+        0.066459,
+        0.064791
+      ],
+      "steps": 2
+    },
+    {
+      "id": "distributed_factoring-04",
+      "median_ms": 0.173667,
+      "samples_ms": [
+        0.167292,
+        0.222458,
+        0.173667
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-05",
+      "median_ms": 0.174042,
+      "samples_ms": [
+        0.174042,
+        0.173667,
+        0.235458
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-06",
+      "median_ms": 0.0865,
+      "samples_ms": [
+        0.085625,
+        0.091959,
+        0.0865
+      ],
+      "steps": 2
+    },
+    {
+      "id": "distributed_factoring-07",
+      "median_ms": 0.07775,
+      "samples_ms": [
+        0.080333,
+        0.07775,
+        0.075834
+      ],
+      "steps": 2
+    },
+    {
+      "id": "distributed_factoring-08",
+      "median_ms": 0.124791,
+      "samples_ms": [
+        0.124791,
+        0.110042,
+        0.195459
+      ],
+      "steps": 2
+    },
+    {
+      "id": "distributed_factoring-09",
+      "median_ms": 0.143459,
+      "samples_ms": [
+        0.143459,
+        0.145667,
+        0.142
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-10",
+      "median_ms": 0.145625,
+      "samples_ms": [
+        0.145625,
+        0.143167,
+        0.231125
+      ],
+      "steps": 2
+    },
+    {
+      "id": "distributed_factoring-11",
+      "median_ms": 0.155583,
+      "samples_ms": [
+        0.16725,
+        0.155583,
+        0.153958
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-12",
+      "median_ms": 0.12625,
+      "samples_ms": [
+        0.122208,
+        0.12625,
+        0.135583
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-13",
+      "median_ms": 0.122084,
+      "samples_ms": [
+        0.211458,
+        0.120208,
+        0.122084
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-14",
+      "median_ms": 0.138958,
+      "samples_ms": [
+        0.143875,
+        0.138666,
+        0.138958
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-15",
+      "median_ms": 0.152208,
+      "samples_ms": [
+        0.250084,
+        0.152084,
+        0.152208
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-16",
+      "median_ms": 0.216833,
+      "samples_ms": [
+        0.216833,
+        0.205709,
+        0.298792
+      ],
+      "steps": 3
+    },
+    {
+      "id": "distributed_factoring-17",
+      "median_ms": 0.204542,
+      "samples_ms": [
+        0.205,
+        0.204542,
+        0.199125
+      ],
+      "steps": 4
+    },
+    {
+      "id": "absorption_complement-00",
+      "median_ms": 0.023792,
+      "samples_ms": [
+        0.023792,
+        0.02125,
+        0.110042
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-01",
+      "median_ms": 0.026334,
+      "samples_ms": [
+        0.028,
+        0.026334,
+        0.025375
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-02",
+      "median_ms": 0.019583,
+      "samples_ms": [
+        0.020084,
+        0.019583,
+        0.016791
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-03",
+      "median_ms": 0.016083,
+      "samples_ms": [
+        0.017,
+        0.016083,
+        0.015375
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-04",
+      "median_ms": 0.093292,
+      "samples_ms": [
+        0.093292,
+        0.088792,
+        0.144084
+      ],
+      "steps": 3
+    },
+    {
+      "id": "absorption_complement-05",
+      "median_ms": 0.089667,
+      "samples_ms": [
+        0.089667,
+        0.088208,
+        0.0925
+      ],
+      "steps": 3
+    },
+    {
+      "id": "absorption_complement-06",
+      "median_ms": 0.030333,
+      "samples_ms": [
+        0.031209,
+        0.030333,
+        0.029
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-07",
+      "median_ms": 0.022541,
+      "samples_ms": [
+        0.023166,
+        0.0225,
+        0.022541
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-08",
+      "median_ms": 0.028083,
+      "samples_ms": [
+        0.096125,
+        0.028083,
+        0.027125
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-09",
+      "median_ms": 0.026791,
+      "samples_ms": [
+        0.02775,
+        0.026791,
+        0.026708
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-10",
+      "median_ms": 0.090208,
+      "samples_ms": [
+        0.090208,
+        0.088917,
+        0.092709
+      ],
+      "steps": 3
+    },
+    {
+      "id": "absorption_complement-11",
+      "median_ms": 0.121792,
+      "samples_ms": [
+        0.19825,
+        0.121792,
+        0.115958
+      ],
+      "steps": 3
+    },
+    {
+      "id": "absorption_complement-12",
+      "median_ms": 0.065583,
+      "samples_ms": [
+        0.066667,
+        0.063208,
+        0.065583
+      ],
+      "steps": 2
+    },
+    {
+      "id": "absorption_complement-13",
+      "median_ms": 0.096125,
+      "samples_ms": [
+        0.098417,
+        0.096125,
+        0.094375
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-14",
+      "median_ms": 0.052709,
+      "samples_ms": [
+        0.149167,
+        0.052709,
+        0.051542
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-15",
+      "median_ms": 0.049375,
+      "samples_ms": [
+        0.049958,
+        0.0485,
+        0.049375
+      ],
+      "steps": 1
+    },
+    {
+      "id": "absorption_complement-16",
+      "median_ms": 0.201583,
+      "samples_ms": [
+        0.186917,
+        0.201583,
+        0.297209
+      ],
+      "steps": 4
+    },
+    {
+      "id": "absorption_complement-17",
+      "median_ms": 0.195125,
+      "samples_ms": [
+        0.184167,
+        0.195125,
+        0.199375
+      ],
+      "steps": 3
+    },
+    {
+      "id": "mixed_ite_demorgan-00",
+      "median_ms": 0.031458,
+      "samples_ms": [
+        0.034375,
+        0.029167,
+        0.031458
+      ],
+      "steps": 1
+    },
+    {
+      "id": "mixed_ite_demorgan-01",
+      "median_ms": 0.016542,
+      "samples_ms": [
+        0.132625,
+        0.016542,
+        0.016208
+      ],
+      "steps": 1
+    },
+    {
+      "id": "mixed_ite_demorgan-02",
+      "median_ms": 0.035083,
+      "samples_ms": [
+        0.036333,
+        0.035083,
+        0.034458
+      ],
+      "steps": 1
+    },
+    {
+      "id": "mixed_ite_demorgan-03",
+      "median_ms": 0.035292,
+      "samples_ms": [
+        0.035292,
+        0.032958,
+        0.040041
+      ],
+      "steps": 1
+    },
+    {
+      "id": "mixed_ite_demorgan-04",
+      "median_ms": 0.026333,
+      "samples_ms": [
+        0.026417,
+        0.026333,
+        0.025458
+      ],
+      "steps": 1
+    },
+    {
+      "id": "mixed_ite_demorgan-05",
+      "median_ms": 0.105542,
+      "samples_ms": [
+        0.105542,
+        0.193792,
+        0.09675
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-06",
+      "median_ms": 0.022542,
+      "samples_ms": [
+        0.023334,
+        0.022542,
+        0.022208
+      ],
+      "steps": 1
+    },
+    {
+      "id": "mixed_ite_demorgan-07",
+      "median_ms": 0.065792,
+      "samples_ms": [
+        0.067125,
+        0.065792,
+        0.063666
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-08",
+      "median_ms": 0.097917,
+      "samples_ms": [
+        0.097917,
+        0.185334,
+        0.095667
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-09",
+      "median_ms": 0.107,
+      "samples_ms": [
+        0.108458,
+        0.107,
+        0.104167
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-10",
+      "median_ms": 0.181458,
+      "samples_ms": [
+        0.183083,
+        0.180542,
+        0.181458
+      ],
+      "steps": 4
+    },
+    {
+      "id": "mixed_ite_demorgan-11",
+      "median_ms": 0.185167,
+      "samples_ms": [
+        0.185167,
+        0.187125,
+        0.182334
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-12",
+      "median_ms": 0.042125,
+      "samples_ms": [
+        0.044542,
+        0.042125,
+        0.041167
+      ],
+      "steps": 1
+    },
+    {
+      "id": "mixed_ite_demorgan-13",
+      "median_ms": 0.081708,
+      "samples_ms": [
+        0.081708,
+        0.19775,
+        0.0785
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-14",
+      "median_ms": 0.146916,
+      "samples_ms": [
+        0.148375,
+        0.146916,
+        0.144875
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-15",
+      "median_ms": 0.154334,
+      "samples_ms": [
+        0.156958,
+        0.154334,
+        0.153208
+      ],
+      "steps": 2
+    },
+    {
+      "id": "mixed_ite_demorgan-16",
+      "median_ms": 0.379375,
+      "samples_ms": [
+        0.5045,
+        0.379375,
+        0.365334
+      ],
+      "steps": 5
+    },
+    {
+      "id": "mixed_ite_demorgan-17",
+      "median_ms": 0.200167,
+      "samples_ms": [
+        0.359667,
+        0.200167,
+        0.19725
+      ],
+      "steps": 2
+    },
+    {
+      "id": "shared_guards-00",
+      "median_ms": 0.476375,
+      "samples_ms": [
+        0.425542,
+        0.476375,
+        0.609459
+      ],
+      "steps": 2
+    },
+    {
+      "id": "shared_guards-01",
+      "median_ms": 0.928417,
+      "samples_ms": [
+        0.928417,
+        1.03,
+        0.8655
+      ],
+      "steps": 4
+    },
+    {
+      "id": "shared_guards-02",
+      "median_ms": 0.816958,
+      "samples_ms": [
+        0.816958,
+        0.886958,
+        0.738667
+      ],
+      "steps": 3
+    },
+    {
+      "id": "shared_guards-03",
+      "median_ms": 0.480584,
+      "samples_ms": [
+        0.477041,
+        0.608208,
+        0.480584
+      ],
+      "steps": 3
+    },
+    {
+      "id": "shared_guards-04",
+      "median_ms": 0.444417,
+      "samples_ms": [
+        0.466666,
+        0.444417,
+        0.424708
+      ],
+      "steps": 2
+    },
+    {
+      "id": "shared_guards-05",
+      "median_ms": 0.193625,
+      "samples_ms": [
+        0.339292,
+        0.184916,
+        0.193625
+      ],
+      "steps": 1
+    },
+    {
+      "id": "shared_guards-06",
+      "median_ms": 0.618625,
+      "samples_ms": [
+        0.593583,
+        0.618625,
+        0.776209
+      ],
+      "steps": 3
+    },
+    {
+      "id": "shared_guards-07",
+      "median_ms": 0.721083,
+      "samples_ms": [
+        0.721083,
+        0.716208,
+        0.85475
+      ],
+      "steps": 4
+    },
+    {
+      "id": "shared_guards-08",
+      "median_ms": 0.531958,
+      "samples_ms": [
+        0.531958,
+        0.522208,
+        0.566541
+      ],
+      "steps": 2
+    },
+    {
+      "id": "shared_guards-09",
+      "median_ms": 0.686041,
+      "samples_ms": [
+        0.811709,
+        0.686041,
+        0.654
+      ],
+      "steps": 4
+    },
+    {
+      "id": "shared_guards-10",
+      "median_ms": 0.455875,
+      "samples_ms": [
+        0.604375,
+        0.453459,
+        0.455875
+      ],
+      "steps": 2
+    },
+    {
+      "id": "shared_guards-11",
+      "median_ms": 0.491584,
+      "samples_ms": [
+        0.491584,
+        0.481959,
+        0.634417
+      ],
+      "steps": 3
+    },
+    {
+      "id": "shared_guards-12",
+      "median_ms": 0.430875,
+      "samples_ms": [
+        0.426291,
+        0.430875,
+        0.438583
+      ],
+      "steps": 2
+    },
+    {
+      "id": "shared_guards-13",
+      "median_ms": 0.745625,
+      "samples_ms": [
+        0.86825,
+        0.745625,
+        0.722042
+      ],
+      "steps": 4
+    },
+    {
+      "id": "shared_guards-14",
+      "median_ms": 0.751625,
+      "samples_ms": [
+        0.940833,
+        0.734083,
+        0.751625
+      ],
+      "steps": 3
+    },
+    {
+      "id": "shared_guards-15",
+      "median_ms": 0.380042,
+      "samples_ms": [
+        0.358333,
+        0.512292,
+        0.380042
+      ],
+      "steps": 2
+    },
+    {
+      "id": "shared_guards-16",
+      "median_ms": 0.653542,
+      "samples_ms": [
+        0.653542,
+        0.6325,
+        0.800417
+      ],
+      "steps": 3
+    },
+    {
+      "id": "shared_guards-17",
+      "median_ms": 0.356917,
+      "samples_ms": [
+        0.360375,
+        0.356917,
+        0.35325
+      ],
+      "steps": 2
+    },
+    {
+      "id": "balanced_general-00",
+      "median_ms": 1.166792,
+      "samples_ms": [
+        1.229167,
+        1.020417,
+        1.166792
+      ],
+      "steps": 6
+    },
+    {
+      "id": "balanced_general-01",
+      "median_ms": 1.968958,
+      "samples_ms": [
+        2.046166,
+        1.898083,
+        1.968958
+      ],
+      "steps": 8
+    },
+    {
+      "id": "balanced_general-02",
+      "median_ms": 1.348708,
+      "samples_ms": [
+        1.362958,
+        1.348708,
+        1.212959
+      ],
+      "steps": 6
+    },
+    {
+      "id": "balanced_general-03",
+      "median_ms": 5.223125,
+      "samples_ms": [
+        5.445083,
+        5.223125,
+        4.764375
+      ],
+      "steps": 11
+    },
+    {
+      "id": "balanced_general-04",
+      "median_ms": 4.520875,
+      "samples_ms": [
+        4.520875,
+        4.495333,
+        4.59625
+      ],
+      "steps": 9
+    },
+    {
+      "id": "balanced_general-05",
+      "median_ms": 3.772292,
+      "samples_ms": [
+        3.772292,
+        3.630958,
+        3.842667
+      ],
+      "steps": 9
+    },
+    {
+      "id": "balanced_general-06",
+      "median_ms": 0.132875,
+      "samples_ms": [
+        0.137333,
+        0.132708,
+        0.132875
+      ],
+      "steps": 3
+    },
+    {
+      "id": "balanced_general-07",
+      "median_ms": 1.760292,
+      "samples_ms": [
+        1.760292,
+        1.85,
+        1.449875
+      ],
+      "steps": 8
+    },
+    {
+      "id": "balanced_general-08",
+      "median_ms": 1.189959,
+      "samples_ms": [
+        1.352583,
+        1.189959,
+        1.001541
+      ],
+      "steps": 7
+    },
+    {
+      "id": "balanced_general-09",
+      "median_ms": 2.035167,
+      "samples_ms": [
+        1.963541,
+        2.035167,
+        2.137333
+      ],
+      "steps": 8
+    },
+    {
+      "id": "balanced_general-10",
+      "median_ms": 0.467083,
+      "samples_ms": [
+        0.459625,
+        0.467083,
+        0.686
+      ],
+      "steps": 6
+    },
+    {
+      "id": "balanced_general-11",
+      "median_ms": 5.963625,
+      "samples_ms": [
+        5.78425,
+        5.963625,
+        6.042167
+      ],
+      "steps": 10
+    },
+    {
+      "id": "balanced_general-12",
+      "median_ms": 1.263917,
+      "samples_ms": [
+        1.385375,
+        1.263917,
+        1.09775
+      ],
+      "steps": 7
+    },
+    {
+      "id": "balanced_general-13",
+      "median_ms": 1.491667,
+      "samples_ms": [
+        1.580833,
+        1.240291,
+        1.491667
+      ],
+      "steps": 4
+    },
+    {
+      "id": "balanced_general-14",
+      "median_ms": 0.34375,
+      "samples_ms": [
+        0.34375,
+        0.349916,
+        0.321541
+      ],
+      "steps": 4
+    },
+    {
+      "id": "balanced_general-15",
+      "median_ms": 4.239584,
+      "samples_ms": [
+        4.239584,
+        4.300667,
+        4.06075
+      ],
+      "steps": 12
+    },
+    {
+      "id": "balanced_general-16",
+      "median_ms": 3.055958,
+      "samples_ms": [
+        3.055958,
+        3.210625,
+        3.0415
+      ],
+      "steps": 7
+    },
+    {
+      "id": "balanced_general-17",
+      "median_ms": 1.54125,
+      "samples_ms": [
+        1.54125,
+        1.844541,
+        1.514208
+      ],
+      "steps": 7
+    },
+    {
+      "id": "balanced_general-18",
+      "median_ms": 0.023042,
+      "samples_ms": [
+        0.020917,
+        0.277166,
+        0.023042
+      ],
+      "steps": 1
+    },
+    {
+      "id": "balanced_general-19",
+      "median_ms": 2.490792,
+      "samples_ms": [
+        2.254,
+        2.490792,
+        2.4915
+      ],
+      "steps": 9
+    }
+  ],
+  "measurement": "Python baseline optimization only; excludes parse, truth-table verification, and Rust lowering. Descriptive cross-language timing, not an algorithmic speed ratio.",
+  "median_case_ms": 0.1462705,
+  "python_version": "3.9.6",
+  "repetitions": 3,
+  "sum_case_medians_ms": 59.83404499999999
+}
