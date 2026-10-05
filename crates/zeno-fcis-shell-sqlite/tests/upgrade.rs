@@ -14,8 +14,11 @@ use zeno_fcis_codec::{CanonicalEncode, Envelope, Hash32};
 use zeno_fcis_shell::{CommitStatus, MemoryDestination};
 use zeno_fcis_shell_sqlite::{
     CrashPoint,
-    v2::{Error, Lineage, Opened, Store, Superseded, V2SqliteShell, V9Store, upgrade},
+    v2::{Error, Lineage, Opened, Store, Superseded, V2SqliteShell, V9Store, equivalence, upgrade},
 };
+
+/// The default comparison cap, as `Lineage::bind` sets it.
+const DEFAULT_CAP: u64 = equivalence::DEFAULT_MAX_INPUT_TUPLES;
 use zeno_fcis_synthesis::finite::{
     V2Resource, V2ScalarProgram,
     canonical_v2::schema as s,
@@ -145,19 +148,24 @@ const READS_STEP_USAGE: &[l::Op<'static>] = &[
     l::Op::Not(2),
 ];
 
+/// A copy of `law` with another identifier.
+fn law_as<'a>(law: &l::Law<'a>, id: u32) -> l::Law<'a> {
+    l::Law {
+        id,
+        kind: law.kind,
+        scope: law.scope,
+        genesis: law.genesis,
+        program: l::Program {
+            nodes: law.program.nodes,
+            root: law.program.root,
+        },
+    }
+}
+
 /// `laws` with one more law, 777, that reads the Step usage.
 fn with_usage_law<'a>(laws: &[l::Law<'a>]) -> Vec<l::Law<'a>> {
     laws.iter()
-        .map(|law| l::Law {
-            id: law.id,
-            kind: law.kind,
-            scope: law.scope,
-            genesis: law.genesis,
-            program: l::Program {
-                nodes: law.program.nodes,
-                root: law.program.root,
-            },
-        })
+        .map(|law| law_as(law, law.id))
         .chain(std::iter::once(l::Law {
             id: 777,
             kind: l::Kind::FeeAndRounding,
@@ -171,10 +179,29 @@ fn with_usage_law<'a>(laws: &[l::Law<'a>]) -> Vec<l::Law<'a>> {
         .collect()
 }
 
-const HELD: upgrade::Premises = upgrade::Premises {
-    step_limits_never_bind: true,
-    step_usage_unobserved: true,
-};
+/// `laws` with law 991 renumbered 992: the same decision-conformance
+/// predicate under another identifier.
+fn without_law_991<'a>(laws: &[l::Law<'a>]) -> Vec<l::Law<'a>> {
+    laws.iter()
+        .map(|law| law_as(law, if law.id == 991 { 992 } else { law.id }))
+        .collect()
+}
+
+/// The size of the withdrawal queue's scalar input domain: every tuple the
+/// shell compares for its adoption.
+const TUPLES: u64 = 1_296_000;
+
+/// The refusal names `expected` as the missing premise.
+#[track_caller]
+fn missing_premise(refusal: &Error, expected: fn(&upgrade::Premise) -> bool) {
+    assert!(
+        matches!(
+            refusal,
+            Error::Upgrade(upgrade::Refusal::Genesis { missing, .. }) if expected(missing)
+        ),
+        "{refusal:?}"
+    );
+}
 
 fn same_program<'a>(descriptor: &c::Descriptor<'a>) -> V2ScalarProgram<'a> {
     V2ScalarProgram {
@@ -465,22 +492,26 @@ fn an_adoption_is_a_program_successor_and_nothing_else_is() {
         assert!(ok(upgrade::program_successor(v1, &changed_step)));
         assert!(ok(upgrade::program_successor(v2, &changed_step)));
         // A program succession needs the adoption receipts between the two.
+        let cap = DEFAULT_CAP;
         assert!(matches!(
-            upgrade::Successor::establish(v1, v2, &[]),
+            upgrade::Successor::establish(v1, v2, &[], cap),
             Err(Error::Lineage)
         ));
         let receipts = [Hash32::new([7; 32])];
-        let successor = ok(upgrade::Successor::establish(v1, v2, &receipts))
-            .unwrap_or_else(|| panic!("version 2 succeeds version 1"));
-        assert_eq!(successor.receipts(), receipts);
-        assert_eq!(successor.premises(), HELD);
-        assert!(ok(upgrade::Successor::establish(v1, &changed_law, &receipts)).is_none());
-        let premises = |from: &BoundCatalog<'_>, to: &BoundCatalog<'_>| {
-            ok(upgrade::Successor::establish(from, to, &receipts))
-                .unwrap_or_else(|| panic!("a program successor"))
-                .premises()
+        let establish = |from: &BoundCatalog<'_>, to: &BoundCatalog<'_>| {
+            ok(upgrade::Successor::establish(from, to, &receipts, cap))
+                .map(|successor| successor.premises().tuples())
         };
-        assert_eq!(premises(v1, &changed_step), HELD);
+        // The adoption establishes all five premises, comparing the two
+        // programs on every input tuple, in either direction.
+        let successor = ok(upgrade::Successor::establish(v1, v2, &receipts, cap))
+            .unwrap_or_else(|missing| panic!("version 2 succeeds version 1: {missing:?}"));
+        assert_eq!(successor.receipts(), receipts);
+        assert_eq!(successor.premises().tuples(), TUPLES);
+        assert_eq!(establish(v2, v1), Ok(TUPLES));
+        assert_eq!(establish(v1, &changed_law), Err(upgrade::Premise::Policy));
+        assert_eq!(establish(v1, &changed_read), Err(upgrade::Premise::Policy));
+        assert_eq!(establish(v1, &changed_step), Ok(TUPLES));
         // A Step limit below one Step per program and law node could bind.
         let base = contract.descriptor();
         let nodes = base.program.nodes.len()
@@ -498,15 +529,16 @@ fn an_adoption_is_a_program_successor_and_nothing_else_is() {
         let tight_limit = variant_catalog(&tight, &tight_policy);
         assert!(ok(upgrade::program_successor(v1, &tight_limit)));
         assert_eq!(
-            premises(v1, &tight_limit),
-            upgrade::Premises {
-                step_limits_never_bind: false,
-                ..HELD
-            }
+            establish(v1, &tight_limit),
+            Err(upgrade::Premise::StepLimits)
+        );
+        assert_eq!(
+            establish(&tight_limit, v2),
+            Err(upgrade::Premise::StepLimits)
         );
         // Both versions with a law that reads the Step usage, which the
-        // program change alters: still a program successor, but not with
-        // every premise.
+        // program change alters: the policy comparison holds, premise 5 does
+        // not.
         let old_contract = adopted::v1::Contract::new();
         let old_base = old_contract.descriptor();
         let old_laws = with_usage_law(old_base.laws);
@@ -533,11 +565,18 @@ fn an_adoption_is_a_program_successor_and_nothing_else_is() {
         );
         assert!(ok(upgrade::program_successor(&old_catalog, &new_catalog)));
         assert_eq!(
-            premises(&old_catalog, &new_catalog),
-            upgrade::Premises {
-                step_usage_unobserved: false,
-                ..HELD
-            }
+            establish(&old_catalog, &new_catalog),
+            Err(upgrade::Premise::StepUsage)
+        );
+        // A comparison above the cap establishes nothing.
+        assert_eq!(
+            ok(upgrade::Successor::establish(v1, v2, &receipts, TUPLES - 1)).map(|_| ()),
+            Err(upgrade::Premise::Equivalence(
+                equivalence::Unestablished::DomainTooLarge {
+                    size: Some(u128::from(TUPLES)),
+                    cap: TUPLES - 1
+                }
+            ))
         );
     });
 }
@@ -583,7 +622,12 @@ fn a_store_away_from_genesis_upgrades_to_a_program_successor_and_keeps_its_deliv
         let (mut db, receipt) = ok(store.upgrade());
         assert_eq!(receipt.kind(), upgrade::Kind::ProgramSuccessor);
         assert_eq!(receipt.kind().tag(), "program-successor");
-        assert_eq!(receipt.premises(), Some(HELD));
+        // The shell enumerated both programs on every input tuple.
+        assert_eq!(lineage.comparisons(), 1);
+        assert_eq!(
+            receipt.premises().map(upgrade::Premises::tuples),
+            Some(TUPLES)
+        );
         assert_eq!(receipt.ordinal(), 1);
         assert_eq!(receipt.version(), 3);
         assert_eq!(receipt.from_identity(), v1.identity());
@@ -728,7 +772,10 @@ fn another_contract_upgrades_only_through_its_genesis_laws() {
         assert!(
             matches!(
                 refusal,
-                Error::Upgrade(upgrade::Refusal::Genesis(Some(authority::Refusal::Core(_))))
+                Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Policy,
+                    refusal: Some(authority::Refusal::Core(_))
+                })
             ),
             "{refusal:?}"
         );
@@ -751,7 +798,10 @@ fn another_contract_upgrades_only_through_its_genesis_laws() {
         assert!(
             matches!(
                 refusal,
-                Error::Upgrade(upgrade::Refusal::Genesis(Some(authority::Refusal::Core(_))))
+                Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Policy,
+                    refusal: Some(authority::Refusal::Core(_))
+                })
             ),
             "{refusal:?}"
         );
@@ -914,11 +964,19 @@ fn forged_or_altered_upgrade_records_are_refused() {
         relabelled.extend_from_slice(&record[b"ZFCISV2-SUCCESSOR\0".len()..]);
         // The same record claiming a premise failed: the premises byte follows
         // the magic, the ordinal, the sequence, both framed identities and the
-        // admission's length.
+        // admission's length; the tuple count follows it.
         let premises_at = 18 + 8 + 8 + 8 + v1.identity().len() + 8 + v2.identity().len() + 8;
-        assert_eq!(record[premises_at], 0b111);
+        assert_eq!(record[premises_at], 0b1_1111);
         let mut understated = record.clone();
-        understated[premises_at] = 0b101;
+        understated[premises_at] = 0b1_0111;
+        let tuples_at = premises_at + 1;
+        assert_eq!(
+            record[tuples_at..tuples_at + 8],
+            TUPLES.to_be_bytes(),
+            "the record binds the tuples compared"
+        );
+        let mut fewer = record.clone();
+        fewer[tuples_at + 7] ^= 1;
         for (alteration, parameter, under_lineage, alone) in [
             (
                 "UPDATE v2_upgrades SET record=x'00'",
@@ -977,6 +1035,12 @@ fn forged_or_altered_upgrade_records_are_refused() {
             (
                 "UPDATE v2_upgrades SET record=?1",
                 Some(understated.clone()),
+                "History",
+                "Identity",
+            ),
+            (
+                "UPDATE v2_upgrades SET record=?1",
+                Some(fewer.clone()),
                 "History",
                 "Identity",
             ),
@@ -1043,11 +1107,28 @@ fn forged_or_altered_upgrade_records_are_refused() {
 
 /// The chain shows that each segment is valid under the version it names,
 /// not who recorded it: a record computed outside the shell, with the same
-/// pure decision and made-up receipt digests, is accepted. Detecting that
-/// needs a tip held outside the file.
+/// pure decision and the lineage's own receipt digests, is accepted.
+/// Detecting that needs a tip held outside the file. The same record with
+/// made-up digests is refused: the audit takes the digests from the lineage,
+/// never from the store.
 #[test]
 fn a_correctly_recomputed_record_is_accepted_without_authorization() {
     with_lineage(|catalogs, lineage| {
+        let declared = [Hash32::new(digest(adopted::ADOPTION_RECEIPTS[0]))];
+        let made_up = [Hash32::new([0xee; 32])];
+        for (receipts, accepted) in [(&made_up, false), (&declared, true)] {
+            recompute_record_outside_the_shell(catalogs, lineage, receipts, accepted);
+        }
+    });
+}
+
+fn recompute_record_outside_the_shell(
+    catalogs: &[&BoundCatalog<'_>],
+    lineage: &Lineage<'_, '_>,
+    receipts: &[Hash32],
+    accepted: bool,
+) {
+    {
         let (v1, v2) = (&lineage.authorities()[0], &lineage.authorities()[1]);
         let file = StoreFile::new();
         drop(store_under(&file.0, v1, 3));
@@ -1058,13 +1139,13 @@ fn a_correctly_recomputed_record_is_accepted_without_authorization() {
                 [],
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
             ));
-        let made_up = [Hash32::new([0xee; 32])];
         let successor = ok(upgrade::Successor::establish(
             catalogs[0],
             catalogs[1],
-            &made_up,
+            receipts,
+            DEFAULT_CAP,
         ))
-        .unwrap_or_else(|| panic!("a program successor"));
+        .unwrap_or_else(|missing| panic!("a program successor: {missing:?}"));
         let hash = |bytes: &[u8]| Hash32::new(ok(bytes.try_into()));
         let plan = ok(upgrade::decide(&upgrade::Facts {
             ordinal: 1,
@@ -1095,10 +1176,19 @@ fn a_correctly_recomputed_record_is_accepted_without_authorization() {
             [plan.chain().as_bytes().as_slice()],
         ));
         drop(external);
-        let mut db = current(ok(lineage.open(&file.0)));
-        ok(db.audit());
-        assert_eq!(ok(db.snapshot()).upgrades(), 1);
-    });
+        if accepted {
+            let mut db = current(ok(lineage.open(&file.0)));
+            ok(db.audit());
+            assert_eq!(ok(db.snapshot()).upgrades(), 1);
+        } else {
+            // The record is exact under the digests it stores, so the shell
+            // reports the digests the lineage does not declare, not damage.
+            assert!(matches!(
+                lineage.open(&file.0),
+                Err(Error::Succession(upgrade::Unsupported::Receipts))
+            ));
+        }
+    }
 }
 
 #[test]
@@ -1337,10 +1427,13 @@ fn a_repeated_identity_never_strands_a_store() {
         let operator = context(OPERATOR, false);
         ok(db.commit(key(70), publication(v1, &paid, &deposit, &operator)));
         drop(db);
-        // [A, B, A]: the same store is current too.
+        // [A, B, A]: the same store is current too. The lineage declares the
+        // adoption's own digest between A and B, which a store upgraded from
+        // A to B records.
+        let adoption = digest(adopted::ADOPTION_RECEIPTS[0]);
         let reverting = ok(Lineage::bind(
             &[catalogs[0], catalogs[1], catalogs[0]],
-            &[[1; 32], [2; 32]],
+            &[adoption, [2; 32]],
         ));
         let mut db = current(ok(reverting.open(&file.0)));
         ok(db.audit());
@@ -1362,62 +1455,186 @@ fn a_repeated_identity_never_strands_a_store() {
         assert_eq!(ok(db.snapshot()).upgrades(), 2);
         drop(db);
         current(ok(reverting.open(&file.0)));
+        // A lineage that declares another digest for the first adoption does
+        // not audit the store.
+        let misdeclared = ok(Lineage::bind(
+            &[catalogs[0], catalogs[1], catalogs[0]],
+            &[[1; 32], [2; 32]],
+        ));
+        assert!(matches!(
+            misdeclared.open(&file.0),
+            Err(Error::Succession(upgrade::Unsupported::Receipts))
+        ));
     });
 }
 
-/// Versions 1 and 2, each with law 777, which reads the Step usage, bound as
-/// a lineage: a program succession without every premise.
-fn with_reading_lineage(test: impl FnOnce(&Lineage<'_, '_>)) {
+/// Versions 1 and 2 with their laws and required lists changed alike by
+/// `laws_of` and `required_of`, bound as a lineage with the adoption's
+/// receipt digest: the policy comparison still holds.
+fn with_variant_lineage(
+    laws_of: for<'a> fn(&[l::Law<'a>]) -> Vec<l::Law<'a>>,
+    required_of: fn(&[u32]) -> Vec<u32>,
+    test: impl FnOnce(&Lineage<'_, '_>),
+) {
     let old_contract = adopted::v1::Contract::new();
     let old_base = old_contract.descriptor();
-    let old_laws = with_usage_law(old_base.laws);
-    let mut old_required = old_base.required.to_vec();
-    old_required.push(777);
-    let old_reading = c::Descriptor {
+    let old_laws = laws_of(old_base.laws);
+    let old_required = required_of(old_base.required);
+    let old_variant = c::Descriptor {
         laws: &old_laws,
         required: &old_required,
         ..old_contract.descriptor()
     };
     let contract = adopted::Contract::new();
     let base = contract.descriptor();
-    let new_laws = with_usage_law(base.laws);
-    let mut new_required = base.required.to_vec();
-    new_required.push(777);
-    let new_reading = c::Descriptor {
+    let new_laws = laws_of(base.laws);
+    let new_required = required_of(base.required);
+    let new_variant = c::Descriptor {
         laws: &new_laws,
         required: &new_required,
         ..contract.descriptor()
     };
-    let (old_policy, new_policy) = (variant_policy(&old_reading), variant_policy(&new_reading));
+    let (old_policy, new_policy) = (variant_policy(&old_variant), variant_policy(&new_variant));
     let (old_catalog, new_catalog) = (
-        variant_catalog(&old_reading, &old_policy),
-        variant_catalog(&new_reading, &new_policy),
+        variant_catalog(&old_variant, &old_policy),
+        variant_catalog(&new_variant, &new_policy),
     );
+    assert!(ok(upgrade::program_successor(&old_catalog, &new_catalog)));
     test(&ok(Lineage::bind(
         &[&old_catalog, &new_catalog],
-        &[[5; 32]],
+        &[digest(adopted::ADOPTION_RECEIPTS[0])],
     )));
 }
 
+/// A program succession whose `missing` premise does not hold is refused
+/// away from genesis, naming the premise and writing nothing; at the declared
+/// genesis state the new contract's genesis laws admit the store instead,
+/// and the record is a genesis admission that audits.
+#[track_caller]
+fn refused_away_from_genesis_and_admitted_at_genesis(
+    lineage: &Lineage<'_, '_>,
+    missing: fn(&upgrade::Premise) -> bool,
+) {
+    let old = &lineage.authorities()[0];
+    let file = StoreFile::new();
+    drop(store_under(&file.0, old, 3));
+    let rows = stored_rows(&file.0);
+    let bytes = ok(fs::read(&file.0));
+    let refusal = refused(superseded(ok(lineage.open(&file.0))).upgrade());
+    missing_premise(&refusal, missing);
+    assert!(
+        matches!(
+            refusal,
+            Error::Upgrade(upgrade::Refusal::Genesis {
+                refusal: Some(authority::Refusal::Core(_)),
+                ..
+            })
+        ),
+        "{refusal:?}"
+    );
+    assert_eq!(stored_rows(&file.0), rows);
+    assert_eq!(ok(fs::read(&file.0)), bytes);
+    // Still at version 1, and it still audits.
+    ok(superseded(ok(lineage.open(&file.0))).audit());
+
+    let file = StoreFile::new();
+    drop(store_under(&file.0, old, 6));
+    let (mut db, receipt) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+    assert_eq!(receipt.kind(), upgrade::Kind::GenesisAdmission);
+    assert_eq!(receipt.premises(), None);
+    assert!(receipt.receipts().is_empty());
+    ok(db.audit());
+    drop(db);
+    current(ok(lineage.open(&file.0)));
+}
+
+/// Replaces the former acceptance of a succession whose fifth premise
+/// failed: a law that reads the Step usage, which the program change alters,
+/// takes the genesis route.
 #[test]
-fn an_upgrade_records_a_premise_that_failed() {
-    with_reading_lineage(|lineage| {
-        let old = &lineage.authorities()[0];
+fn a_law_that_reads_step_usage_takes_the_genesis_route() {
+    with_variant_lineage(
+        with_usage_law,
+        |required| {
+            let mut required = required.to_vec();
+            required.push(777);
+            required
+        },
+        |lineage| {
+            refused_away_from_genesis_and_admitted_at_genesis(lineage, |missing| {
+                *missing == upgrade::Premise::StepUsage
+            });
+        },
+    );
+}
+
+/// Without law 991, or with it declared but not required, premise 2 is
+/// missing and the succession takes the genesis route.
+#[test]
+fn a_missing_or_unrequired_law_991_takes_the_genesis_route() {
+    with_variant_lineage(
+        without_law_991,
+        |required| {
+            required
+                .iter()
+                .map(|id| if *id == 991 { 992 } else { *id })
+                .collect()
+        },
+        |lineage| {
+            refused_away_from_genesis_and_admitted_at_genesis(lineage, |missing| {
+                *missing == upgrade::Premise::DecisionLaw
+            });
+        },
+    );
+    with_variant_lineage(
+        |laws| laws.iter().map(|law| law_as(law, law.id)).collect(),
+        |required| required.iter().copied().filter(|id| *id != 991).collect(),
+        |lineage| {
+            refused_away_from_genesis_and_admitted_at_genesis(lineage, |missing| {
+                *missing == upgrade::Premise::DecisionLaw
+            });
+        },
+    );
+}
+
+/// A domain above the lineage's comparison cap establishes no succession:
+/// the upgrade away from genesis is refused with no write, and a store
+/// upgraded under the default cap does not audit under the lower one.
+#[test]
+fn a_domain_above_the_comparison_cap_is_refused_and_does_not_audit() {
+    with_lineage(|catalogs, lineage| {
+        let receipt = digest(adopted::ADOPTION_RECEIPTS[0]);
+        let capped = ok(Lineage::bind_with_cap(catalogs, &[receipt], TUPLES - 1));
+        assert_eq!(capped.max_input_tuples(), TUPLES - 1);
+        assert_eq!(lineage.max_input_tuples(), DEFAULT_CAP);
+        let too_large = |missing: &upgrade::Premise| {
+            *missing
+                == upgrade::Premise::Equivalence(equivalence::Unestablished::DomainTooLarge {
+                    size: Some(u128::from(TUPLES)),
+                    cap: TUPLES - 1,
+                })
+        };
+        refused_away_from_genesis_and_admitted_at_genesis(&capped, too_large);
+        // Exactly the domain's size is enough.
+        let exact = ok(Lineage::bind_with_cap(catalogs, &[receipt], TUPLES));
+        let v1 = &lineage.authorities()[0];
         let file = StoreFile::new();
-        drop(store_under(&file.0, old, 3));
-        let (mut db, receipt) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
-        // The laws are still identical, so the upgrade is a program
-        // successor; the record states that a law reads the Step usage.
-        assert_eq!(receipt.kind(), upgrade::Kind::ProgramSuccessor);
-        let premises = receipt
-            .premises()
-            .unwrap_or_else(|| panic!("a program successor's premises"));
-        assert!(premises.step_limits_never_bind);
-        assert!(!premises.step_usage_unobserved);
-        assert!(!premises.all());
-        ok(db.audit());
-        drop(db);
+        drop(store_under(&file.0, v1, 3));
+        let (_, upgraded) = ok(superseded(ok(exact.open(&file.0))).upgrade());
+        assert_eq!(upgraded.kind(), upgrade::Kind::ProgramSuccessor);
+        assert_eq!(
+            upgraded.premises().map(upgrade::Premises::tuples),
+            Some(TUPLES)
+        );
+        let bytes = ok(fs::read(&file.0));
         current(ok(lineage.open(&file.0)));
+        assert!(matches!(
+            capped.open(&file.0),
+            Err(Error::Succession(upgrade::Unsupported::Premise(
+                upgrade::Premise::Equivalence(_)
+            )))
+        ));
+        assert_eq!(ok(fs::read(&file.0)), bytes);
     });
 }
 
@@ -1433,7 +1650,10 @@ fn an_upgraded_store_takes_every_further_command_as_version_one_does() {
         let mut old = store_under(&kept.0, v1, 3);
         drop(store_under(&upgraded.0, v1, 3));
         let (mut new, receipt) = ok(superseded(ok(lineage.open(&upgraded.0))).upgrade());
-        assert_eq!(receipt.premises(), Some(HELD));
+        assert_eq!(
+            receipt.premises().map(upgrade::Premises::tuples),
+            Some(TUPLES)
+        );
         let commands = [
             (command(DEPOSIT, LANE_A, 2), context(OPERATOR, false)),
             (command(REQUEST, LANE_B, 2), context(OWNER_B, false)),
@@ -1479,5 +1699,327 @@ fn an_upgraded_store_takes_every_further_command_as_version_one_does() {
         assert_eq!(old_head.state(), new_head.state());
         assert_eq!(old_head.version(), new_head.version());
         assert_eq!(old_head.pending(), new_head.pending());
+    });
+}
+
+/// Version 2 with only its Step limit set to `limit`: the same program,
+/// schemas, branches and laws.
+fn step_limited<'a>(contract: &'a adopted::Contract, limit: u64) -> c::Descriptor<'a> {
+    let base = contract.descriptor();
+    c::Descriptor {
+        limits: base.limits.with_limit(V2Resource::Step, limit),
+        program: same_program(&base),
+        ..contract.descriptor()
+    }
+}
+
+/// Version 2's nodes with the decision output's selection arms swapped: the
+/// same input and output domains, a different decision on some tuple.
+fn swapped_decision(program: &V2ScalarProgram<'_>) -> Vec<zeno_fcis_synthesis::finite::Op> {
+    use zeno_fcis_synthesis::finite::Op;
+    let mut nodes = program.nodes.to_vec();
+    let root = usize::from(program.roots[0]);
+    let Op::Select(condition, then, otherwise) = nodes[root] else {
+        panic!("the decision output is a selection");
+    };
+    assert_ne!(then, otherwise);
+    nodes[root] = Op::Select(condition, otherwise, then);
+    nodes
+}
+
+/// Reproduction: a successor that differs only by a Step limit of zero
+/// cannot evaluate anything, so it must not be admitted away from genesis.
+#[test]
+fn a_step_limit_of_zero_is_refused_away_from_genesis_with_no_write() {
+    with_lineage(|catalogs, _| {
+        let contract = adopted::Contract::new();
+        let zero = step_limited(&contract, 0);
+        let policy = variant_policy(&zero);
+        let zero_catalog = variant_catalog(&zero, &policy);
+        let receipt = digest(adopted::ADOPTION_RECEIPTS[0]);
+        let lineage = ok(Lineage::bind(&[catalogs[0], &zero_catalog], &[receipt]));
+        let v1 = &lineage.authorities()[0];
+        let file = StoreFile::new();
+        drop(store_under(&file.0, v1, 3));
+        let rows = stored_rows(&file.0);
+        let bytes = ok(fs::read(&file.0));
+        let result = superseded(ok(lineage.open(&file.0)))
+            .upgrade()
+            .map(|(_, receipt)| receipt);
+        assert!(
+            matches!(
+                result,
+                Err(Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::StepLimits,
+                    refusal: Some(_),
+                }))
+            ),
+            "a Step limit of zero was admitted: {result:?}"
+        );
+        assert_eq!(stored_rows(&file.0), rows);
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+    });
+}
+
+/// Reproduction: a successor with the same policy shape whose program decides
+/// differently on some input tuple must not be admitted away from genesis.
+#[test]
+fn a_program_that_decides_differently_is_refused_with_no_write() {
+    with_lineage(|catalogs, _| {
+        let contract = adopted::Contract::new();
+        let base = contract.descriptor();
+        let nodes = swapped_decision(&base.program);
+        let differing = c::Descriptor {
+            program: V2ScalarProgram {
+                nodes: &nodes,
+                ..same_program(&base)
+            },
+            ..contract.descriptor()
+        };
+        let policy = variant_policy(&differing);
+        let differing_catalog = variant_catalog(&differing, &policy);
+        assert!(ok(upgrade::program_successor(
+            catalogs[0],
+            &differing_catalog
+        )));
+        let receipt = digest(adopted::ADOPTION_RECEIPTS[0]);
+        let lineage = ok(Lineage::bind(
+            &[catalogs[0], &differing_catalog],
+            &[receipt],
+        ));
+        let v1 = &lineage.authorities()[0];
+        let file = StoreFile::new();
+        drop(store_under(&file.0, v1, 3));
+        let rows = stored_rows(&file.0);
+        let bytes = ok(fs::read(&file.0));
+        let result = superseded(ok(lineage.open(&file.0)))
+            .upgrade()
+            .map(|(_, receipt)| receipt);
+        assert!(
+            matches!(
+                result,
+                Err(Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Equivalence(
+                        equivalence::Unestablished::Counterexample { .. }
+                    ),
+                    refusal: Some(_),
+                }))
+            ),
+            "a differing program was admitted: {result:?}"
+        );
+        assert_eq!(stored_rows(&file.0), rows);
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+    });
+}
+
+/// Reproduction: the audit binds the stored receipt digests to the lineage's
+/// declared ones. A store upgraded under the adoption's lineage does not
+/// audit under a lineage with the same catalogs and another digest, and the
+/// refused open leaves the file byte for byte as it was.
+#[test]
+fn another_lineage_with_the_same_catalogs_and_other_digests_does_not_audit_the_store() {
+    with_lineage(|catalogs, lineage| {
+        let v1 = &lineage.authorities()[0];
+        let file = StoreFile::new();
+        drop(store_under(&file.0, v1, 3));
+        drop(ok(superseded(ok(lineage.open(&file.0))).upgrade()));
+        let mut db = current(ok(lineage.open(&file.0)));
+        ok(db.audit());
+        drop(db);
+        let bytes = ok(fs::read(&file.0));
+        let other = ok(Lineage::bind(catalogs, &[[0xab; 32]]));
+        assert_eq!(
+            other.authorities()[1].identity(),
+            lineage.authorities()[1].identity()
+        );
+        let opened = other.open(&file.0).map(|_| ());
+        assert!(
+            matches!(
+                opened,
+                Err(Error::Succession(upgrade::Unsupported::Receipts))
+            ),
+            "another lineage's digests audited the store: {opened:?}"
+        );
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+    });
+}
+
+/// One bound lineage compares two decision programs at most once, however
+/// many opens and audits use it; another lineage value compares again.
+#[test]
+fn one_lineage_compares_two_programs_once_and_another_compares_again() {
+    fn shared<T: Send + Sync>(_: &T) {}
+    with_lineage(|catalogs, lineage| {
+        shared(lineage);
+        let v1 = &lineage.authorities()[0];
+        let file = StoreFile::new();
+        drop(store_under(&file.0, v1, 3));
+        assert_eq!(lineage.comparisons(), 0);
+        let (mut db, receipt) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+        assert_eq!(
+            receipt.premises().map(upgrade::Premises::tuples),
+            Some(TUPLES)
+        );
+        assert_eq!(lineage.comparisons(), 1);
+        ok(db.audit());
+        drop(db);
+        for _ in 0..2 {
+            let mut db = current(ok(lineage.open(&file.0)));
+            ok(db.audit());
+        }
+        assert_eq!(lineage.comparisons(), 1);
+        let receipt = digest(adopted::ADOPTION_RECEIPTS[0]);
+        let another = ok(Lineage::bind(catalogs, &[receipt]));
+        assert_eq!(another.comparisons(), 0);
+        let mut db = current(ok(another.open(&file.0)));
+        ok(db.audit());
+        assert_eq!(another.comparisons(), 1);
+        assert_eq!(lineage.comparisons(), 1);
+    });
+}
+
+/// A successor whose decision program is the same, here one that changes
+/// only its Step limit, establishes the equivalence premise without
+/// enumerating its domain, and still records every tuple.
+#[test]
+fn identical_programs_establish_equivalence_without_enumeration() {
+    with_lineage(|catalogs, lineage| {
+        let contract = adopted::Contract::new();
+        let base = contract.descriptor();
+        let raised = step_limited(&contract, base.limits.limit(V2Resource::Step) + 1);
+        let policy = variant_policy(&raised);
+        let raised_catalog = variant_catalog(&raised, &policy);
+        let stepped = ok(Lineage::bind(&[catalogs[1], &raised_catalog], &[[3; 32]]));
+        let v2 = &lineage.authorities()[1];
+        let file = StoreFile::new();
+        let initial = genesis_state();
+        let mut db = ok(V2SqliteShell::create(&file.0, v2, genesis(v2, &initial)));
+        let deposit = command(DEPOSIT, LANE_A, 2);
+        ok(db.commit(
+            key(1),
+            publication(v2, &initial, &deposit, &context(OPERATOR, false)),
+        ));
+        drop(db);
+        let (mut db, receipt) = ok(superseded(ok(stepped.open(&file.0))).upgrade());
+        assert_eq!(receipt.kind(), upgrade::Kind::ProgramSuccessor);
+        assert_eq!(
+            receipt.premises().map(upgrade::Premises::tuples),
+            Some(TUPLES)
+        );
+        ok(db.audit());
+        assert_eq!(stepped.comparisons(), 0);
+    });
+}
+
+/// Every comparison an upgrade needs runs before its transaction begins:
+/// interrupted just before the transaction, the lineage has already
+/// compared the programs, and the upgrade that follows compares nothing
+/// more. (`Lineage::establish` also asserts, in debug builds, that no
+/// transaction is open whenever a comparison could start.)
+#[test]
+fn no_comparison_runs_inside_the_upgrade_transaction() {
+    with_lineage(|_, lineage| {
+        let v1 = &lineage.authorities()[0];
+        let file = StoreFile::new();
+        drop(store_under(&file.0, v1, 3));
+        let bytes = ok(fs::read(&file.0));
+        assert!(matches!(
+            superseded(ok(lineage.open(&file.0)))
+                .upgrade_with_crash(Some(CrashPoint::BeforeTransaction)),
+            Err(Error::InjectedCrash(CrashPoint::BeforeTransaction))
+        ));
+        assert_eq!(lineage.comparisons(), 1);
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+        let (mut db, receipt) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+        assert_eq!(receipt.kind(), upgrade::Kind::ProgramSuccessor);
+        ok(db.audit());
+        assert_eq!(lineage.comparisons(), 1);
+    });
+}
+
+/// A full open compares the programs before it takes the write lock, so
+/// another connection commits to the store meanwhile, and the open then
+/// audits that commit too. Under the lock, the second connection would wait
+/// out its busy timeout, shorter than a debug comparison, and fail.
+#[test]
+fn a_second_connection_commits_while_the_first_compares() {
+    use std::sync::atomic::AtomicBool;
+    with_lineage(|catalogs, lineage| {
+        let (v1, v2) = (&lineage.authorities()[0], &lineage.authorities()[1]);
+        let file = StoreFile::new();
+        drop(store_under(&file.0, v1, 3));
+        let (mut db, _) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+        let checkpoint = ok(db.audit());
+        drop(db);
+        let receipt = digest(adopted::ADOPTION_RECEIPTS[0]);
+        let fresh = ok(Lineage::bind(catalogs, &[receipt]));
+        let opened = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            let first = scope.spawn(|| {
+                let mut db = current(ok(fresh.open(&file.0)));
+                opened.store(true, Ordering::SeqCst);
+                ok(db.snapshot()).version()
+            });
+            let second = scope.spawn(|| {
+                let Store::Current(mut db) = ok(lineage.open_at_checkpoint(&file.0, &checkpoint))
+                else {
+                    panic!("the upgraded store is current");
+                };
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                let paid = paid_state();
+                let deposit = command(DEPOSIT, LANE_A, 1);
+                let operator = context(OPERATOR, false);
+                let committed = ok(db.commit(key(80), publication(v2, &paid, &deposit, &operator)));
+                (committed.version(), opened.load(Ordering::SeqCst))
+            });
+            let (version, first_had_opened) = second
+                .join()
+                .unwrap_or_else(|_| panic!("the second connection panicked"));
+            assert_eq!(version, 4);
+            assert!(
+                !first_had_opened,
+                "the first open finished before the second connection wrote"
+            );
+            let seen = first
+                .join()
+                .unwrap_or_else(|_| panic!("the first connection panicked"));
+            assert_eq!(seen, 4, "the open audited the concurrent commit");
+        });
+        assert_eq!(fresh.comparisons(), 1);
+    });
+}
+
+/// A checkpoint open establishes nothing beforehand. When its tail holds a
+/// program-successor record the lineage has not compared yet, the first
+/// transaction ends with nothing written, the pair is compared with no
+/// transaction open, and the open runs again and succeeds.
+#[test]
+fn a_checkpoint_open_compares_a_missing_pair_outside_its_transaction_and_retries() {
+    with_lineage(|catalogs, lineage| {
+        let v1 = &lineage.authorities()[0];
+        let file = StoreFile::new();
+        let mut db = store_under(&file.0, v1, 3);
+        // Taken at the head before the upgrade, which is recorded at that
+        // same head, so the upgrade record is in the checkpoint's tail.
+        let head = ok(db.checkpoint());
+        drop(db);
+        drop(ok(superseded(ok(lineage.open(&file.0))).upgrade()));
+        let bytes = ok(fs::read(&file.0));
+        let receipt = digest(adopted::ADOPTION_RECEIPTS[0]);
+        let fresh = ok(Lineage::bind(catalogs, &[receipt]));
+        let Store::Current(mut resumed) = ok(fresh.open_at_checkpoint(&file.0, &head)) else {
+            panic!("the upgraded store is current");
+        };
+        assert_eq!(fresh.comparisons(), 1);
+        assert_eq!(ok(resumed.snapshot()).upgrades(), 1);
+        drop(resumed);
+        assert_eq!(ok(fs::read(&file.0)), bytes);
+        // A checkpoint taken after the upgrade leaves nothing to compare.
+        let mut db = current(ok(lineage.open(&file.0)));
+        let after = ok(db.audit());
+        drop(db);
+        let other = ok(Lineage::bind(catalogs, &[receipt]));
+        drop(ok(other.open_at_checkpoint(&file.0, &after)));
+        assert_eq!(other.comparisons(), 0);
     });
 }

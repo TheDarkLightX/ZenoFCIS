@@ -86,7 +86,10 @@ with the same state schema. A store's segments are its genesis contract and
 one more per record, each identified by the full Authority identity stored
 with it. `v2::Lineage::bind(catalogs, receipts)` binds an application's
 lineage from its checked catalogs, oldest first, with the SHA-256 of the
-adoption receipt between each version and the next. The segments must appear
+adoption receipt between each version and the next, and a cap on the input
+tuples one comparison of two decision programs may enumerate: by default
+100,000,000, the default of `zeno-fcis transform check`, or another value
+through `Lineage::bind_with_cap`. The segments must appear
 in the lineage in order; a store may skip a version it never ran. Each
 segment takes the earliest version that fits, which a lineage that grows at
 its end never changes. `Lineage::open` audits the store and returns a typed
@@ -102,41 +105,52 @@ order, differing canonical state schema bytes, equal identities, and a state
 the new contract does not admit. The record's magic is its kind tag, and the
 new contract admits the state in one of two ways:
 
-- `program-successor`. The shell computes the new contract's canonical policy
-  with the library's serializer after replacing its decision program's
-  instructions and roots and its Step limit with the old contract's. If that
-  is byte for byte the old policy, the schemas, framing, channel links,
-  bindings, branches, reasons, laws and every other limit are unchanged. The
-  state at the head was admitted under those same laws, so it is admitted at
-  any state with no genesis evaluation. Every adoption produces such a
-  successor. The record also states which further premises held (below) and
-  binds the digests of the adoption receipts, which `generate contract`
-  replayed; the shell replays no receipt.
-- `genesis-admission`. Any other contract must admit the state through the
-  library's genesis evaluation, so its genesis-applicable laws must hold on
-  it. A generated contract's initial-condition law 990 admits only the
-  declared genesis state, so such a contract upgrades only stores at that
-  state. A refusal carries the library's reason.
+- `program-successor`, only when the shell itself establishes all five
+  premises below from the two versions' bound catalogs
+  (`v2::upgrade::Successor::establish`). The upgrade is then admitted at any
+  state with no genesis evaluation.
+- `genesis-admission`, whenever a premise is missing. The new contract must
+  admit the state through the library's genesis evaluation, so its
+  genesis-applicable laws must hold on it. A generated contract's
+  initial-condition law 990 admits only the declared genesis state, so such a
+  contract upgrades only stores at that state. A refusal names the first
+  missing premise and carries the library's reason, and writes nothing.
 
-A program successor and the version it supersedes have the same reachable
-states when five premises hold:
+The premises, as the shell establishes them, in the order it checks them:
 
-1. Their canonical policies are byte-identical except for the decision
-   program's instructions and roots and the Step limit, so the genesis
-   literals, the laws and the case table are identical. The shell checks this
-   at the upgrade and again at every audit.
-2. The identical laws include generated law 991, which pins every committed
-   decision to the case table. Generation checks this for every adoption.
-3. Each adoption receipt is F3 `Equivalent`: on every tuple of the full
-   declared input domain the two programs give identical outputs or identical
-   failures, under a declared Step limit that never binds. `generate contract`
-   replays every receipt.
-4. Neither version's Step limit binds. Steps are charged only for program
-   instruction attempts and law nodes. The shell checks that each limit covers
-   one Step for every program node and every law node; generation checks that
-   each program's largest measured usage plus every law node fits its limit.
-5. No law observes Step usage, the one meter reading a program change can
-   alter. The shell checks this; generated laws cannot observe usage.
+- Premise 1, policy. The shell computes the new contract's canonical policy with the
+   library's serializer after replacing its decision program's instructions
+   and roots and its Step limit with the old contract's, and requires it to
+   be byte for byte the old policy. The schemas, framing, channel links,
+   bindings, branches, reasons, genesis literals, laws, required law list,
+   every other limit and the program's input and output domains are then
+   identical.
+- Premise 2, decision law. Each contract declares law 991 with kind
+   `DecisionConformance`, scope `Always` and not at genesis, and lists it as
+   required. This is the generator's own test for law 991, plus the required
+   list. It does not show what the law's predicate says: the shell has no
+   case table, so it cannot check that the predicate encodes one. Because the
+   laws are identical by premise 1, both versions evaluate the same predicate
+   on every decision.
+- Premise 4, Step limits. Each contract's Step limit covers one Step for every program
+   node and every law node, the most one evaluation can charge, so neither
+   limit can refuse a decision.
+- Premise 5, Step usage. No law of either contract observes Step usage, the one meter
+   reading a program change can alter.
+- Premise 3, equivalence, checked last because it is the costly one. The shell
+   compares the two decision programs itself, with `v2::equivalence::compare`,
+   on every tuple of the ordered product of their declared input domains,
+   through the library evaluator at the full budget of 256 Steps, so no Step
+   refusal can mask a difference. Each tuple must give identical output
+   tuples or the identical evaluator failure. The domain's size is computed
+   with checked arithmetic; above the lineage's cap the premise is not
+   established. This is the predicate of `zeno-fcis transform check` (F3)
+   without its declared Step limit, which premise 4 replaces; a test in the
+   CLI crate compiles the module and checks that both give the same verdict
+   on F3's known answers, the 32 benchmark cases, planted defects and the
+   withdrawal-queue adoption. For the withdrawal queue the shell compares the
+   two programs on 1,296,000 input tuples. It is an exhaustive finite
+   comparison by a tested checker, not a formal proof.
 
 Under these premises the two versions admit the same genesis states and
 commit the same decisions, with the same successor states, from the same
@@ -144,21 +158,24 @@ states, so they reach the same states. An upgrade at any reachable state
 therefore keeps every property of reachable states: every law, every proved
 inductive claim and the meaning of every decision example, not only the laws
 evaluated on the current state. It does not keep the sealed Step usage. When
-the receipt reports that usage differs, the usage observations sealed into
-each publication change, and every sealed subject embeds the new contract
-identity, so an adoption is a versioned change. The record's premises byte
-states whether premises 4 and 5 held; premise 1 defines the kind, and premises
-2 and 3 rest on the generation of the build that recorded the upgrade. When a
-recorded premise did not hold, the record still shows that the laws are
-unchanged, so every later commit passes them, but not that the reachable
-states are.
+the programs' usage differs, the usage observations sealed into each
+publication change, and every sealed subject embeds the new contract
+identity, so an adoption is a versioned change.
+
+The adoption receipt digests are provenance, not evidence. The shell replays
+no receipt: it establishes equivalence itself. A program-successor record
+stores the digests the upgrading lineage declares for the adoptions it
+spans, and an audit requires them to be, value for value, the digests the
+auditing lineage declares; a lineage with the same catalogs and other
+digests does not audit the store. They name which `transform` receipts the
+application's generation replayed.
 
 The records are
 
 ```text
 "ZFCISV2-SUCCESSOR\0" || ordinal:u64be || head_sequence:u64be
   || frame(from_identity) || frame(identity)
-  || frame(premises:u8 || receipt_digests)
+  || frame(premises:u8 || tuples:u64be || receipt_digests)
   || frame(state_root) || frame(previous_chain)
 
 "ZFCISV2-UPGRADE\0" || ordinal:u64be || head_sequence:u64be
@@ -166,10 +183,11 @@ The records are
   || frame(state_root) || frame(previous_chain)
 ```
 
-where `premises` sets bit 0 for the policy comparison, bit 1 when both Step
-limits cover every node and bit 2 when no law observes Step usage, and
-`receipt_digests` concatenates the 32-byte SHA-256 of each adoption receipt
-between the two versions, oldest first. The new chain tip is
+where `premises` is `0x1f`, bits 0 to 4 for premises 1 to 5, all set because
+a record exists only when all five held; `tuples` is the number of input
+tuples the shell compared; and `receipt_digests` concatenates the 32-byte
+SHA-256 of each adoption receipt between the two versions, oldest first. The
+new chain tip is
 `HashV2Chain(record)`. Certificates begin with `ZFCISV2-CERT\0`, and the three
 magics first differ at byte 8, so the preimage sets are disjoint under one
 domain. The row stores the ordinal, the head sequence, the identity, the
@@ -180,9 +198,44 @@ certificate extends the upgrade link. Replay walks events in order: the
 commits of a segment under that segment's Authority, then every record at the
 head it was taken at, recomputed from the stored fields and re-checked by its
 kind. A genesis admission replays its genesis publication over the state at
-that head; a program successor re-derives the policy comparison and its
-premises from the two versions' catalogs and needs one receipt digest per
-adoption it spans.
+that head. A program successor establishes all five premises again from the
+auditing lineage's catalogs under its cap, exactly as the upgrade did,
+including the full comparison of the two programs, and requires the stored
+digests to be that lineage's. When either fails, the store may still be
+intact, so the open ends with `Error::Succession`, not `Error::History`. It
+carries `upgrade::Unsupported::Receipts` for a record that is exact under
+the digests it stores but names other digests than the lineage declares, or
+`upgrade::Unsupported::Premise` with the premise the lineage's own catalogs
+do not establish, such as a domain above its comparison cap. A record that
+does not match its own stored digests is still `Error::History`. Nothing is
+written.
+
+The cost is plain. Every process that upgrades a store, or fully opens a
+store that holds a program-successor record, compares the two programs once
+on every input tuple of their domain. A bound `Lineage` keeps each pair's
+outcome, failures included, in memory only, so its later opens and audits
+compare nothing again; another `Lineage` value, as in another process,
+compares again, and nothing is ever kept in the store. Two programs with
+identical instructions and roots, as when only the Step limit changes, are
+equal without enumeration; there is no other shortcut, such as sampling or
+skipped inputs. For the withdrawal queue's 1,296,000 tuples, one comparison
+took about 3 seconds in a release build of a generated application and
+about 4 seconds in a debug build, whose manifest optimises
+`zeno-fcis-synthesis`, measured on a shared machine. A checkpoint open
+compares only for records after its checkpoint, usually none. Enumeration
+runs on one thread; parallel enumeration is planned, not built.
+
+No comparison runs while a write transaction is open. What a comparison
+establishes depends only on two catalogs, so an upgrade or a full open first
+finds the pairs it needs with plain reads and establishes them. Its
+immediate transaction then re-reads the store, as before, and only looks the
+pairs up. If another connection changed the store in between so that a pair
+is missing, the attempt writes nothing, the pair is established with no
+transaction open, and the attempt runs again, at most once per lineage
+version; beyond that the operation ends with `Error::Unsettled`. The write
+lock is therefore held about as long as before comparisons existed: tens of
+milliseconds for an upgrade or an open of the withdrawal queue in the
+measurements.
 Pending deliveries keep their certificate-bound IDs and order, and are
 recomputed under their own segment's Authority before delivery.
 
@@ -200,7 +253,7 @@ replaces the marker. The earlier checkpoint then opens as
 The chain shows that every segment is valid under the lineage version it
 names. It does not show who recorded an upgrade. Records and certificates are
 unkeyed SHA-256, so anyone who can write the file can append a correctly
-recomputed record, with any receipt digests, or roll the store back to an
+recomputed record, with the lineage's receipt digests, or roll the store back to an
 earlier valid head. Detecting that needs a tip held outside the file, such as
 an `UpgradeReceipt` or a private checkpoint.
 

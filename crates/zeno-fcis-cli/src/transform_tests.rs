@@ -19,6 +19,12 @@ use zeno_fcis_synthesis::finite_runtime::import_program;
 #[path = "../templates/withdrawal-queue/src/v2_contract.rs"]
 mod withdrawal_contract;
 
+/// The shell's own exhaustive comparison, which a program-successor store
+/// upgrade runs; compiled here so that it is checked against this checker.
+#[allow(dead_code, unreachable_pub)]
+#[path = "../../zeno-fcis-shell-sqlite/src/v2/equivalence.rs"]
+mod shell_equivalence;
+
 const GENEROUS: Limits = Limits {
     steps: DEFAULT_STEP_LIMIT,
     input_tuples: DEFAULT_MAX_INPUT_TUPLES,
@@ -1245,4 +1251,234 @@ fn planted_candidate_over_the_step_limit_is_inconclusive() {
         check(&original, &longer, limits(16)),
         boundary([0, 16], 17, usage([16, 17], 16, false))
     );
+}
+
+/// One comparison's outcome, as both this checker and the shell's
+/// comparison report it, at the full Step budget so that no Step limit binds.
+#[derive(Debug, Eq, PartialEq)]
+enum Verdict {
+    Equal { tuples: u64 },
+    Counterexample { ordinal: u64 },
+    DomainTooLarge { size: Option<u128> },
+    InputAbi,
+    OutputAbi,
+    EmptyInputDomain { position: usize },
+}
+
+/// This checker's verdict; `None` when the library refuses a program, which
+/// a bound catalog never holds.
+fn checker_verdict(original: &[u8], candidate: &[u8], cap: u64) -> Option<Verdict> {
+    let limits = Limits {
+        steps: FULL_BUDGET,
+        input_tuples: cap,
+    };
+    Some(match check(original, candidate, limits) {
+        Ok(equivalence) => Verdict::Equal {
+            tuples: equivalence.inputs_checked,
+        },
+        Err(Rejection::Counterexample(found)) => Verdict::Counterexample {
+            ordinal: found.ordinal,
+        },
+        Err(Rejection::Inconclusive(Inconclusive::DomainTooLarge { size, .. })) => {
+            Verdict::DomainTooLarge { size }
+        }
+        Err(Rejection::Refused(Refusal::InputAbi { .. })) => Verdict::InputAbi,
+        Err(Rejection::Refused(Refusal::OutputAbi { .. })) => Verdict::OutputAbi,
+        Err(Rejection::Refused(Refusal::EmptyInputDomain { position })) => {
+            Verdict::EmptyInputDomain { position }
+        }
+        Err(Rejection::Refused(Refusal::NotAdmitted { .. })) => return None,
+        Err(other) => panic!("no full-budget comparison ends so: {other:?}"),
+    })
+}
+
+fn scalar(program: &Program) -> zeno_fcis_synthesis::finite::V2ScalarProgram<'_> {
+    zeno_fcis_synthesis::finite::V2ScalarProgram {
+        inputs: program.inputs(),
+        outputs: program.outputs(),
+        nodes: program.nodes(),
+        roots: program.roots(),
+    }
+}
+
+/// The shell's verdict over the same two admitted programs.
+fn shell_verdict(original: &[u8], candidate: &[u8], cap: u64) -> Option<Verdict> {
+    use shell_equivalence::Unestablished;
+    let (original, candidate) = (
+        import_program(original).ok()?,
+        import_program(candidate).ok()?,
+    );
+    Some(
+        match shell_equivalence::compare(&scalar(&original), &scalar(&candidate), cap) {
+            Ok(equal) => Verdict::Equal {
+                tuples: equal.tuples(),
+            },
+            Err(Unestablished::Counterexample { ordinal }) => Verdict::Counterexample { ordinal },
+            Err(Unestablished::DomainTooLarge {
+                size,
+                cap: reported,
+            }) => {
+                assert_eq!(reported, cap);
+                Verdict::DomainTooLarge { size }
+            }
+            Err(Unestablished::InputAbi) => Verdict::InputAbi,
+            Err(Unestablished::OutputAbi) => Verdict::OutputAbi,
+            Err(Unestablished::EmptyInputDomain { position }) => {
+                Verdict::EmptyInputDomain { position }
+            }
+            Err(other) => panic!("the shell's comparison did not complete: {other:?}"),
+        },
+    )
+}
+
+/// Both verdicts, which must agree.
+#[track_caller]
+fn agreed(original: &[u8], candidate: &[u8], cap: u64) -> Option<Verdict> {
+    let checker = checker_verdict(original, candidate, cap);
+    assert_eq!(shell_verdict(original, candidate, cap), checker);
+    checker
+}
+
+#[test]
+fn the_shells_comparison_agrees_with_the_checker_on_the_known_answers_and_benchmarks() {
+    let directory = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/transform-check/1"
+    );
+    let read = |name: &str| {
+        std::fs::read(format!("{directory}/{name}"))
+            .unwrap_or_else(|error| panic!("{name}: {error}"))
+    };
+    let vectors = parse(&read("vectors.json"));
+    let vectors = vectors["vectors"]
+        .as_array()
+        .unwrap_or_else(|| panic!("vectors"));
+    let mut seen = Vec::new();
+    for vector in vectors {
+        let name = |key: &str| vector[key].as_str().unwrap_or_else(|| panic!("{key}"));
+        let cap = vector["max_input_tuples"]
+            .as_u64()
+            .unwrap_or_else(|| panic!("cap"));
+        let verdict = agreed(&read(name("original")), &read(name("candidate")), cap);
+        seen.push((name("name").to_owned(), verdict));
+    }
+    // Every kind of outcome the vectors pin, apart from a binding Step
+    // limit, which a full-budget comparison never meets.
+    let kinds: Vec<_> = seen
+        .iter()
+        .map(|(name, verdict)| (name.as_str(), verdict.as_ref().map(std::mem::discriminant)))
+        .collect();
+    for (name, verdict) in &seen {
+        assert!(verdict.is_some(), "{name}: the library refused a program");
+    }
+    for expected in [
+        Verdict::Equal { tuples: 0 },
+        Verdict::Counterexample { ordinal: 0 },
+        Verdict::DomainTooLarge { size: None },
+        Verdict::OutputAbi,
+    ] {
+        let kind = std::mem::discriminant(&expected);
+        assert!(
+            kinds.iter().any(|(_, found)| *found == Some(kind)),
+            "no vector gives {expected:?}: {seen:?}"
+        );
+    }
+
+    let fixtures = parse(include_bytes!("../../../docs/benchmarks/cases.json"));
+    let cases = fixtures["cases"]
+        .as_array()
+        .unwrap_or_else(|| panic!("cases"));
+    let (mut equal, mut different) = (0, 0);
+    for case in cases {
+        let inputs = fixture_domains(&case["input_domains"]);
+        let outputs = fixture_domains(&case["output_domains"]);
+        let original = fixture_program(&inputs, &outputs, &case["original"]);
+        let candidate = fixture_program(&inputs, &outputs, &case["candidate"]);
+        match agreed(&original, &candidate, DEFAULT_MAX_INPUT_TUPLES) {
+            Some(Verdict::Equal { .. }) => equal += 1,
+            Some(Verdict::Counterexample { .. }) => different += 1,
+            other => panic!("{}: {other:?}", case["id"]),
+        }
+    }
+    assert_eq!((equal, different), (21, 11));
+}
+
+#[test]
+fn the_shells_comparison_agrees_with_the_checker_on_planted_defects() {
+    // Planted defects on the withdrawal kernel and controller artifacts.
+    let (original, candidate) = kernel();
+    let (original, candidate) = (encode(&original), encode(&candidate));
+    assert!(matches!(
+        agreed(&original, &candidate, DEFAULT_MAX_INPUT_TUPLES),
+        Some(Verdict::Equal { .. })
+    ));
+    assert!(matches!(
+        agreed(&original, &swapped_kernel(), DEFAULT_MAX_INPUT_TUPLES),
+        Some(Verdict::Counterexample { .. })
+    ));
+    // One tuple above the cap, and exactly at it.
+    let Some(Verdict::Equal { tuples }) = agreed(&original, &candidate, DEFAULT_MAX_INPUT_TUPLES)
+    else {
+        panic!("the kernel pair is equal");
+    };
+    assert_eq!(
+        agreed(&original, &candidate, tuples - 1),
+        Some(Verdict::DomainTooLarge {
+            size: Some(u128::from(tuples))
+        })
+    );
+    assert_eq!(
+        agreed(&original, &candidate, tuples),
+        Some(Verdict::Equal { tuples })
+    );
+    // Each node of the controller candidate in turn replaced by a constant
+    // of its own kind, where the library still admits the program.
+    let base = import(artifact("retained-controller-candidate"));
+    let original = artifact("retained-controller-original");
+    let (mut compared, mut differing) = (0, 0);
+    for index in 0..base.nodes().len() {
+        for constant in [Op::Bool(false), Op::Bool(true), Op::Int(0), Op::Int(1)] {
+            let mut nodes = base.nodes().to_vec();
+            nodes[index] = constant;
+            let Ok(planted) = Program::try_new(
+                base.inputs().to_vec(),
+                base.outputs().to_vec(),
+                nodes,
+                base.roots().to_vec(),
+            ) else {
+                continue;
+            };
+            let verdict = agreed(original, &encode(&planted), DEFAULT_MAX_INPUT_TUPLES);
+            compared += 1;
+            differing += usize::from(matches!(verdict, Some(Verdict::Counterexample { .. })));
+        }
+    }
+    assert!(compared > 0 && differing > 0, "{compared} {differing}");
+    eprintln!("planted controller candidates: {compared} compared, {differing} differing");
+}
+
+/// The committed adoption: the withdrawal queue's version 1 program and the
+/// adopted 100-node candidate, on all 1,296,000 tuples, and the candidate
+/// with its decision output's selection arms swapped.
+#[test]
+fn the_shells_comparison_agrees_with_the_checker_on_the_adoption_fixture() {
+    let original = artifact("current-decision-scalars-original");
+    let candidate =
+        include_bytes!("../tests/fixtures/withdrawal-queue-adopted/v2/adoptions/1/program.zcve");
+    assert_eq!(
+        agreed(original, candidate, DEFAULT_MAX_INPUT_TUPLES),
+        Some(Verdict::Equal { tuples: 1_296_000 })
+    );
+    let adopted = import(candidate);
+    let mut nodes = adopted.nodes().to_vec();
+    let root = usize::from(adopted.roots()[0]);
+    let Op::Select(condition, then, otherwise) = nodes[root] else {
+        panic!("the decision output is a selection");
+    };
+    nodes[root] = Op::Select(condition, otherwise, then);
+    let swapped = rebuild(&adopted, nodes, adopted.roots().to_vec());
+    assert!(matches!(
+        agreed(original, &swapped, DEFAULT_MAX_INPUT_TUPLES),
+        Some(Verdict::Counterexample { .. })
+    ));
 }

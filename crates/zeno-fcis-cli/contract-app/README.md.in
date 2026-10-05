@@ -76,11 +76,15 @@ catalogs of every version, which these commands use on an existing database:
   store runs, whichever version of this application that is.
 - `cargo run -- --upgrade DATABASE_PATH` records the checked upgrade to this
   build's version. An adopted version differs from the one it replaced only
-  in its decision program and Step limit, so a store at any state upgrades,
-  and the chained record binds both identities and the adoption receipts'
-  digests and states which premises held. Under those premises the two
-  versions reach the same states, so every law and proved inductive claim
-  still holds; only the sealed Step usage can change. Pending outbox entries keep their IDs and order. A refusal writes
+  in its decision program and Step limit. The store's shell checks the five
+  premises of a program succession itself, including a comparison of the
+  two decision programs on every input tuple, so a store at any state
+  upgrades, and the chained record binds both identities, the number of
+  tuples compared and the adoption receipts' digests. Under those premises
+  the two versions reach the same states, so every law and proved inductive
+  claim still holds; only the sealed Step usage can change. When a premise
+  is missing, the refusal names it, and only a store whose state the new
+  version's genesis laws admit upgrades. Pending outbox entries keep their IDs and order. A refusal writes
   nothing. A store that runs an earlier version commits and delivers nothing
   until it is upgraded.
 - `cargo run -- --deliver DATABASE_PATH` delivers the pending outbox entries

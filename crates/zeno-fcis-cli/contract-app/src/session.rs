@@ -59,8 +59,10 @@ pub struct Upgraded {
     /// How the new version admitted the store's state: `program-successor`
     /// or `genesis-admission`.
     pub kind: &'static str,
-    /// For a program successor, the premises the store's record states, in
-    /// addition to the policy comparison that makes it one.
+    /// For a program successor, the evidence that the store's shell
+    /// established all five premises, including the number of input tuples
+    /// on which it compared the two decision programs; `None` for a genesis
+    /// admission.
     pub premises: Option<upgrade::Premises>,
     /// Position among the store's upgrades, from 1.
     pub ordinal: u64,
@@ -90,8 +92,8 @@ impl Upgraded {
             || "null".to_owned(),
             |premises| {
                 format!(
-                    "{{\"policy_differs_only_in_program_and_step_limit\":true,\"step_limits_never_bind\":{},\"step_usage_unobserved\":{}}}",
-                    premises.step_limits_never_bind, premises.step_usage_unobserved
+                    "{{\"policy_differs_only_in_program_and_step_limit\":true,\"decision_law_991_required\":true,\"programs_equal_on_input_tuples\":{},\"step_limits_never_bind\":true,\"step_usage_unobserved\":true}}",
+                    premises.tuples()
                 )
             },
         );
@@ -222,15 +224,17 @@ pub fn audit(path: &Path) -> AppResult<Head> {
 }
 
 /// Records the checked upgrade of the store at `path` to this application's
-/// contract version. A version adopted from the store's version admits any
-/// state; another contract must admit the current state through its genesis
-/// laws.
+/// contract version. When the store's shell establishes every premise of a
+/// program succession, including its own comparison of the two decision
+/// programs on every input tuple, the upgrade is admitted at any state;
+/// otherwise the new contract must admit the current state through its
+/// genesis laws.
 ///
 /// # Errors
 /// Returns the store's refusal: a store already at this version, a
-/// different state schema, the new contract's genesis laws refusing the
-/// current state, a schema that needs `--migrate`, or failed replay. A
-/// refusal writes nothing.
+/// different state schema, a missing premise with the new contract's genesis
+/// laws refusing the current state, a schema that needs `--migrate`, or
+/// failed replay. A refusal writes nothing.
 pub fn upgrade(path: &Path) -> AppResult<Upgraded> {
     with_lineage(|lineage| match lineage.open(path).map_err(store)? {
         Opened::V10(Store::Superseded(superseded)) => {

@@ -11,8 +11,10 @@ Two stores run contract version 1, the withdrawal-queue template's contract:
 
 An application built from the adopted withdrawal-queue contract (version 2,
 the 100-node candidate) then audits each store at version 1 and upgrades it
-with `--upgrade`. Version 2 is a program successor, so the store away from
-genesis upgrades too. It delivers the pending payout with `--deliver` under
+with `--upgrade`. The store's shell establishes every premise of a program
+succession itself, comparing the two decision programs on every input tuple,
+so the store away from genesis upgrades too; the number of tuples it reports
+must be the adoption receipt's own count. It delivers the pending payout with `--deliver` under
 the ID that version 1's commit bound, exactly once, and refuses a second
 upgrade and a migration. The version 1 build then refuses the upgraded store.
 Dependencies resolve exactly as in check_generated_application.py: only the
@@ -38,9 +40,19 @@ ROOT = applications.ROOT
 TEMPLATE = ROOT / "crates/zeno-fcis-cli/templates/withdrawal-queue"
 FIXTURE = ROOT / "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted"
 EXPECTED_JOURNEY = {"status": "passed", "bundles": 12, "pending": 0, "deliveries": 2, "balance": 0}
-# The premises a program-successor record states beyond its policy comparison.
-PREMISES = {"policy_differs_only_in_program_and_step_limit": True,
+
+
+def premises(tuples: int) -> dict:
+    """The premises a program-successor upgrade reports: all five, with the
+    number of input tuples on which the shell compared the two programs."""
+    return {"policy_differs_only_in_program_and_step_limit": True,
+            "decision_law_991_required": True, "programs_equal_on_input_tuples": tuples,
             "step_limits_never_bind": True, "step_usage_unobserved": True}
+
+
+def receipt_tuples(receipt: Path) -> int:
+    """The input tuples an adoption's `transform` receipt says F3 checked."""
+    return json.loads(receipt.read_text())["inputs_checked"]
 # A deposit of 2, lane A's request for 2, and the tick that pays it: the state
 # ends with an empty vault and priority on lane B, away from genesis.
 SESSION = """\
@@ -122,6 +134,7 @@ def check(directory: Path) -> dict:
     version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
     receipts = [adoption["receipt_sha256"] for adoption in
                 json.loads((FIXTURE / "v2/policy.json").read_text())["adoptions"]]
+    held = premises(receipt_tuples(FIXTURE / "v2/adoptions/1/receipt.json"))
 
     # Version 1 through the template application: a store at genesis.
     template = directory / "withdrawal-queue"
@@ -166,7 +179,7 @@ def check(directory: Path) -> dict:
     # A store at version 1 delivers nothing through this build until it is upgraded.
     expect_refusal(run_app(adopted, ["--deliver", str(away)]), "upgrade it", "deliver before upgrade")
     upgraded = report(run_app(adopted, ["--upgrade", str(away)]), "upgrade away from genesis")
-    expect(upgraded, {"status": "upgraded", "kind": "program-successor", "premises": PREMISES,
+    expect(upgraded, {"status": "upgraded", "kind": "program-successor", "premises": held,
                       "ordinal": 1, "at_commit": 3, "receipts": receipts, "contract_version": 2,
                       "commits": 3, "pending": 1, "upgrades": 1}, "upgrade away from genesis")
     audited = report(run_app(adopted, ["--audit", str(away)]), "audit after upgrade")
@@ -190,7 +203,7 @@ def check(directory: Path) -> dict:
     expect(genesis_audit, {"contract_version": 1, "commits": 12, "pending": 0, "upgrades": 0},
            "audit at genesis")
     genesis_upgrade = report(run_app(adopted, ["--upgrade", str(at_genesis)]), "upgrade at genesis")
-    expect(genesis_upgrade, {"kind": "program-successor", "premises": PREMISES, "at_commit": 12,
+    expect(genesis_upgrade, {"kind": "program-successor", "premises": held, "at_commit": 12,
                              "contract_version": 2, "pending": 0, "upgrades": 1}, "upgrade at genesis")
     expect_refusal(run_app(template, [str(at_genesis)]), "Schema", "the template over the upgraded store")
     return {"schema": "zeno-fcis/contract-upgrade-check/2", "status": "passed", "authority": "none",
