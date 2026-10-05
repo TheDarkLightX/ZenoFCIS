@@ -6,6 +6,32 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add `zeno-fcis optimize --program P [--strategy FILE] [--candidate-out OUT]
+  [--receipt OUT] [--max-input-tuples N]`: an in-house e-graph optimizer
+  (union-find, hash-consing, congruence rebuild; no new dependency) that
+  proposes smaller equivalent finite scalar programs, and the transform checker
+  that judges every one of them in-process over the full declared domain. The
+  optimizer is an untrusted proposer: a candidate is reported as accepted only
+  with the checker's receipt, which `transform replay` reproduces. Classes
+  carry exact signatures with trap poison for domains of at most 64 tuples
+  and conservative interval bounds otherwise; classes merge only when their
+  signatures and trap behavior agree, every `Add` or `Sub` that may overflow
+  is kept, and arithmetic is rewritten only by constant folding that never
+  folds a possible trap. Strategies are small versioned JSON documents in a
+  closed grammar (phases `boolean`, `semantic-merge`, `select`, `fold`,
+  `share`; bounded rounds, node, class and rewrite limits; extractor `tree` or
+  `dag-greedy`); unknown keys are refused and no user-supplied code runs. The
+  fixed default strategy, version 1, reaches the recorded 7-node
+  withdrawal-queue Boolean kernel from 16 nodes, a 46-node retained
+  controller from 69 (the recorded hand candidate has 60) and a 100-node
+  current decision graph from 106 over all 1,296,000 tuples, and on the
+  sixteen Boolean benchmark seeds matches or beats every recorded candidate
+  while leaving minimal originals unchanged. The report states the termination
+  bounds: phases and rounds run, e-node and class counts, and any limit hit.
+  Exit codes follow `transform`: improved 0, no checked improvement or a
+  domain above the cap 2, refusals 1, I/O failure 3. Nothing is adopted into
+  an application; the result is a bounded search, not a minimality claim.
+  Pure code in the CLI crate; `Cargo.lock` and the verified core are unchanged.
 - Add `zeno-fcis transform check --original P --candidate C [--receipt OUT]`
   and `zeno-fcis transform replay --receipt R --original P --candidate C`.
   Both programs must pass the library importer's full admission and have the

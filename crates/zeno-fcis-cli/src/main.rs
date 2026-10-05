@@ -8,6 +8,8 @@ mod contract;
 mod contract_files;
 mod durable_counter;
 mod inventory_reservation;
+mod optimize;
+mod optimize_command;
 mod order_fulfillment;
 mod prepared_counter;
 mod purity;
@@ -128,6 +130,11 @@ enum Command {
     Transform {
         #[command(subcommand)]
         command: transform_command::Command,
+    },
+    /// Search for a smaller equivalent finite scalar program; every candidate is checked on every input tuple.
+    Optimize {
+        #[command(flatten)]
+        arguments: optimize_command::Arguments,
     },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
@@ -317,6 +324,7 @@ fn run(command: Command) -> u8 {
         Command::Describe { command } => describe(&command),
         Command::Synth { command } => synth::run(command),
         Command::Transform { command } => transform_command::run(command),
+        Command::Optimize { arguments } => optimize_command::run(arguments),
         Command::New {
             dir,
             template,
@@ -509,6 +517,12 @@ fn describe_effects(path: &[String]) -> Value {
                     "candidate-program",
                 ],
                 &[],
+                false,
+                None,
+            ),
+            ["optimize"] => (
+                &["original-program", "optional-strategy"],
+                &["optional-candidate-program", "optional-equivalence-receipt"],
                 false,
                 None,
             ),

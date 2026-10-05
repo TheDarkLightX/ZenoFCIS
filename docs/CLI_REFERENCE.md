@@ -21,6 +21,7 @@ zeno-fcis backend inspect|verify [--tools FILE]
 zeno-fcis backend inventory-lean ROOT [--format human|json]
 zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--max-input-tuples N] [--receipt OUT]
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
+zeno-fcis optimize --program FILE [--strategy FILE] [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
@@ -305,6 +306,125 @@ adopting a candidate whose `usage_preserved` is false changes the
 application's sealed observations and would be a new contract version. This
 command does not adopt candidates, and a receipt grants no application or
 publication authority.
+
+## Checked optimizer
+
+`optimize` searches for a smaller program equivalent to a canonical finite
+scalar program and hands every candidate to the transform checker. The
+optimizer is an untrusted proposer: nothing it believes about a candidate
+counts, and a candidate is reported as accepted only when `transform check`'s
+pure checker, run in-process over the full declared input domain, accepted it.
+The command reads the program (at most 64 KiB), optionally a strategy file (at
+most 64 KiB), writes the best accepted candidate and its receipt when asked,
+and prints one JSON report. It adopts nothing into any application.
+
+The engine is an in-house e-graph: a union-find over classes, hash-consed
+e-nodes and congruence rebuilding over the existing ten instructions, with no
+new dependency. Each class carries its scalar kind, interval bounds and, when
+the declared domain has at most 64 input tuples (six Boolean inputs), its
+exact signature: the value on every tuple in the checker's enumeration order,
+with poison at the tuples where an earlier `Add` or `Sub` has already trapped.
+Two classes merge only when their signatures are identical, poison included.
+Beyond 64 tuples the annotations are conservative: rules merge only classes
+that no possible trap can poison, while congruence and commutativity merge
+the same computation on the same operands. Every `Add` or `Sub` that may
+overflow on a tuple whose operands are defined is pinned: no rule removes,
+merges away or folds it, and extraction emits it whether or not an output
+uses it. Arithmetic is otherwise rewritten only by constant folding, and a
+pinned instruction is never a constant.
+
+A strategy is a small versioned JSON document in a closed grammar; unknown or
+duplicate keys, wrong types and out-of-range values are refused, and no
+user-supplied code runs. Phase names come from a closed set:
+
+| Phase | What it does |
+| --- | --- |
+| `boolean` | Algebraic rules over `And`, `Not`, `Eq`, `Lt` and the Or form `Select(a, a, b)`: involution, idempotence, identity, annihilation, complement, absorption, De Morgan's Or recognition, Or commutation, factoring both ways, mux recognition and sharing-directed associativity. |
+| `select` | `Select` simplification for both kinds: equal arms, constant or negated conditions, Boolean identities, and the condition's known value inside its arms. |
+| `fold` | Constant folding from exact signatures or interval bounds, for never-poisoned classes only. |
+| `share` | Common-subexpression sharing modulo commutativity of `And` and `Eq`; structural sharing of identical instructions is inherent to the e-graph. |
+| `semantic-merge` | Merges classes with identical exact signatures, then adds single instructions over existing classes whose signature an existing class already has (Not, And, Eq, Lt and Select), so extraction can use them. Skipped, and reported as such, above 64 tuples. |
+
+```json
+{
+  "schema": "zeno-fcis/optimize-strategy/1",
+  "phases": [{"phase": "boolean", "rounds": 3}, {"phase": "select", "rounds": 2}],
+  "limits": {"max_enodes": 20000, "max_classes": 10000,
+             "max_rewrites_per_round": 10000, "max_extraction_rounds": 8},
+  "extractor": "dag-greedy"
+}
+```
+
+| Key | Meaning and range |
+| --- | --- |
+| `schema` | Required; exactly `zeno-fcis/optimize-strategy/1`. |
+| `phases` | Required; 1 to 16 objects, each `{"phase": NAME, "rounds": 1..=8}` with `NAME` from the table above. A round collects every match against the current graph, applies the rewrites and rebuilds; a phase stops early when a round changes nothing. |
+| `limits` | Optional object; each entry is optional and defaults to the value shown, with range 1 to 100000: `max_enodes` (e-nodes ever created, retired duplicates included), `max_classes` (live classes), `max_rewrites_per_round` (rewrites proposed or completions attempted in one round), `max_extraction_rounds` (improvement rounds of `dag-greedy`). A phase that reaches a limit stops and names it. |
+| `extractor` | Optional; `dag-greedy` (default) or `tree`. |
+
+Without `--strategy` the fixed default strategy, version 1, runs: `fold` 1,
+`share` 1, `boolean` 3, `select` 3, `semantic-merge` 2, `boolean` 2, `select`
+2, `fold` 1, with the limits above and `dag-greedy`. After every phase a
+candidate is extracted, re-encoded canonically and judged, so an early
+phase's candidate survives a later phase that finds nothing better.
+
+Extraction is a deterministic DAG cost search with no solver. Cost is the
+pair (instruction count, canonical byte length); the byte length is exact per
+instruction because the encoding is fixed-width (39 bytes for a leaf or
+`Not`, 56 for a binary instruction, 73 for `Select`). The `tree` extractor
+picks the cheapest tree per class bottom up, with pinned classes forced to
+their pinned instruction. `dag-greedy` starts from that choice and tries, class
+by class in a fixed order, every alternative e-node, keeping a switch only when
+the whole shared candidate becomes strictly cheaper and never when it would
+close a cycle. Instructions are emitted in a stable topological order, earliest
+original position first.
+
+Each extracted candidate is screened before judging: it must be componentwise
+no larger than the original in instructions and bytes, strictly smaller in at
+least one, not byte-identical to the original or an earlier candidate, and not
+worse than the incumbent on (instructions, bytes). Then `transform check` runs
+it over the full domain at the full Step budget with the default declared Step
+limit of 256, which never binds. The best accepted candidate wins by
+(instructions, bytes, largest Step usage, canonical bytes). Step usage is
+reported from the receipt and never compared for equivalence.
+
+Results use schema `zeno-fcis/optimize-result/1`. Every result has a `detail`
+object; once the program and strategy are read, the report also carries
+`original_sha256`, `strategy_sha256` and the checker `limits`. A searched
+result's `detail` reports the original's size, the domain size and whether
+signatures were exact, the strategy, the termination bounds (`search`: phases
+requested and run, per-phase rounds requested and run, saturation, the limit
+hit if any, rewrites, nodes added, merges accepted and refused, e-node and
+class counts), every candidate with its verdict (`accepted`,
+`accepted-not-better`, `counterexample`, `inconclusive`, `refused`,
+`not-smaller`, `duplicate`, `not-better-than-incumbent`, `unextractable`), and
+`best` with the candidate's digest, sizes, largest Step usage and its complete
+transform receipt.
+
+| Status | Exit | Meaning |
+| --- | ---: | --- |
+| `improved` | 0 | An accepted candidate is smaller than the original. `--candidate-out` and `--receipt` were created when given. |
+| `no-checked-improvement` | 2 | The search ended within its bounds without an accepted smaller candidate; the original stands. Nothing is written. |
+| `inconclusive` | 2 | The domain exceeds `--max-input-tuples` (default 100,000,000); no candidate could be judged, so nothing was searched. |
+| `refused` | 1 | The original failed the library importer, exceeds 64 KiB, or has an empty input domain. |
+| `invalid-strategy` | 1 | The strategy is not a document of the closed grammar, or exceeds 64 KiB. |
+| `output-exists` | 1 | A `--candidate-out` or `--receipt` path already exists, as a file or a link; nothing was searched. |
+| `io-error` | 3 | A file could not be read, is not a regular file, or an output could not be created. |
+
+The written receipt is the checker's `zeno-fcis/transform-receipt/1` for the
+original and the written candidate; `transform replay` reproduces it byte for
+byte. The same program and strategy give byte-identical output. On the
+recorded withdrawal-queue artifacts the default strategy reaches the 7-node
+Boolean kernel (from 16) and a 46-node retained controller (from 69; the
+recorded hand candidate has 60), each accepted with a receipt, and the
+106-node current decision graph reaches 100 nodes with every one of its
+1,296,000 tuples checked; on the sixteen Boolean benchmark seeds it matches or
+beats every recorded candidate and leaves the minimal originals unchanged.
+These are results of a bounded search,
+not minimality claims: signatures are exact only up to 64 tuples, larger
+domains get algebraic rules under conservative trap bounds, and an accepted
+candidate changes Step usage, so adopting one into an application remains a
+separate reviewed step that this command does not perform.
 
 ## Bounded completion in 1.1.0
 
