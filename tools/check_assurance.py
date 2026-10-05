@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Iterator
 
 from resolved_purity import ResolvedChecker, ResolutionError
+from workflow_contexts import check_contexts
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -331,6 +332,7 @@ def check_workflow_text(path: str, text: str) -> list[str]:
         _, separator, revision = action.rpartition("@")
         if not separator or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
             failures.append(f"{path}: action must be pinned to a 40-character commit: {action}")
+    failures.extend(check_contexts(path, text))
     return failures
 
 
@@ -671,6 +673,42 @@ def run_self_test(checker: ResolvedChecker | None = None) -> list[str]:
         failures.append("workflow self-test accepted the Pages deploy scopes outside pages.yml")
     if not check_workflow_text(PAGES_WORKFLOW, "        uses: actions/deploy-pages@v5\n"):
         failures.append("workflow self-test accepted an action pinned to a tag")
+    failures.extend(check_workflow_context_self_test())
+    return failures
+
+
+# GitHub rejects a whole workflow file, so none of its jobs run, when a key
+# names a context it does not allow. Each witness pairs a refused form with the
+# accepted form that carries the same value.
+WORKFLOW_CONTEXT_WITNESSES = (
+    ("job-level env reads runner",
+     "jobs:\n  gate:\n    env:\n      OUT: ${{ runner.temp }}/out\n    steps:\n      - run: true\n",
+     "jobs:\n  gate:\n    steps:\n      - env:\n          OUT: ${{ runner.temp }}/out\n        run: true\n"),
+    ("job condition reads steps",
+     "jobs:\n  gate:\n    if: steps.a.outcome == 'success'\n",
+     "jobs:\n  gate:\n    steps:\n      - if: steps.a.outcome == 'success'\n        run: true\n"),
+    ("workflow env reads matrix",
+     "env:\n  GROUP: ${{ matrix.group }}\n",
+     "jobs:\n  gate:\n    env:\n      GROUP: ${{ matrix.group }}\n"),
+    ("job name calls hashFiles",
+     "jobs:\n  gate:\n    name: ${{ hashFiles('Cargo.lock') }}\n",
+     "jobs:\n  gate:\n    steps:\n      - name: ${{ hashFiles('Cargo.lock') }}\n        run: true\n"),
+    ("action reference is an expression",
+     "jobs:\n  gate:\n    steps:\n      - uses: ${{ github.action }}\n",
+     "jobs:\n  gate:\n    steps:\n      - with:\n          ref: ${{ github.sha }}\n        uses: ./local\n"),
+    ("run block comment reads an unknown context",
+     "jobs:\n  gate:\n    steps:\n      - run: |\n          true\n          # ${{ unknown.value }}\n",
+     "jobs:\n  gate:\n    steps:\n      - run: |\n          true\n          # ${{ runner.temp }}\n"),
+)
+
+
+def check_workflow_context_self_test() -> list[str]:
+    failures: list[str] = []
+    for name, refused, accepted in WORKFLOW_CONTEXT_WITNESSES:
+        if not check_contexts("self-test.yml", refused):
+            failures.append(f"workflow context self-test accepted: {name}")
+        if check_contexts("self-test.yml", accepted):
+            failures.append(f"workflow context self-test refused the valid form of: {name}")
     return failures
 
 

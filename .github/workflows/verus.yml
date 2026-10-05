@@ -20,6 +20,7 @@ on:
       - "rust-toolchain.toml"
       - ".cargo/**"
       - ".github/workflows/verus.yml"
+      - ".github/actions/fetch-locked-crates/**"
   push:
     branches: [main]
   workflow_dispatch:
@@ -61,8 +62,6 @@ jobs:
       PYTHONDONTWRITEBYTECODE: "1"
       PYTHONPATH: tools
       GATE_SCRIPT: ${{ matrix.script }}
-      EVIDENCE_DIRECTORY: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}
-      GATE_OUTPUT: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}/${{ matrix.output }}
     steps:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -73,7 +72,12 @@ jobs:
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component clippy
           rustup toolchain install 1.98.1 --profile minimal
-      - name: Prepare the pinned verifier and locked native dependencies
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
+      - name: Prepare the pinned verifier and the evidence directory
+        # `runner` is a step context; GitHub rejects it in job-level env.
+        env:
+          EVIDENCE_DIRECTORY: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}
         run: |
           python3 - <<'PY'
           import json
@@ -82,18 +86,19 @@ jobs:
           pin = json.loads((check_verus.ROOT / check_verus.PIN).read_text())
           check_verus.prepare_tools(Path.home() / '.cache/zeno-fcis/verus', pin, True)
           PY
-          cargo +1.97.1 fetch --locked
           mkdir -p "$EVIDENCE_DIRECTORY"
       - name: Check gate admission and failure controls
         run: python3 "tools/test_${GATE_SCRIPT}"
       - name: Require the complete exact-source proof and control suite
+        env:
+          GATE_OUTPUT: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}/${{ matrix.output }}
         run: python3 "tools/${GATE_SCRIPT}" --out "$GATE_OUTPUT"
       - name: Retain source, commands, diagnostics and receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verus-${{ matrix.gate }}-evidence
-          path: ${{ env.EVIDENCE_DIRECTORY }}
+          path: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}
           if-no-files-found: warn
           include-hidden-files: true
 

@@ -21,6 +21,12 @@ ROOT = Path(__file__).resolve().parents[1]
 DEMO = ROOT / "demos" / "mini-determinator-qemu"
 DEFAULT_OUTPUT = ROOT / "docs" / "assets" / "marketing"
 TOOLCHAIN = "nightly-2026-07-21"
+# The guest target is soft-float. By default sha2 also compiles its SSE SHA-NI
+# path behind runtime detection, which the pinned nightly cannot lower for
+# x86_64-unknown-none under LTO ("Do not know how to split the result of this
+# operator"). The portable backend computes the same digests.
+GUEST_RUSTFLAGS = "CARGO_TARGET_X86_64_UNKNOWN_NONE_RUSTFLAGS"
+GUEST_SHA2_BACKEND = '--cfg sha2_backend="soft"'
 START_MARKER = "ZENOFCIS_QEMU_DEMO/1"
 END_MARKER = "QEMU_DEMO_COMPLETE"
 FRAMEBUFFER_PATTERN = re.compile(r"FRAMEBUFFER=([1-9][0-9]*)x([1-9][0-9]*)")
@@ -138,6 +144,9 @@ def build_image() -> Path:
         "--quiet",
     ]
     environment = os.environ.copy()
+    environment[GUEST_RUSTFLAGS] = " ".join(
+        flags for flags in (environment.get(GUEST_RUSTFLAGS, "").strip(), GUEST_SHA2_BACKEND) if flags
+    )
     target_dir = environment.pop("CARGO_TARGET_DIR", None)
     if target_dir is not None:
         # The bootloader invokes cargo install from its build script. Forward
