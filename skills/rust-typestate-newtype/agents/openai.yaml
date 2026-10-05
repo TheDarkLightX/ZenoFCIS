@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rust Typestate and Checked Newtypes"
+  short_description: "Encode validated values and legal workflow transitions"
+  default_prompt: "Use $rust-typestate-newtype to simplify this Rust workflow while preserving its invariants."
