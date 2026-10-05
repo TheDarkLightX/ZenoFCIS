@@ -2227,60 +2227,54 @@ impl Contract {
                     Op::Input(6),
                     Op::Not(51),
                     Op::And(50, 52),
-                    Op::Not(47),
-                    Op::Not(53),
-                    Op::And(54, 55),
-                    Op::Not(56),
+                    Op::Select(47, 47, 53),
                     Op::And(22, 25),
                     Op::Input(7),
                     Op::Int(171),
-                    Op::Eq(59, 60),
-                    Op::Select(61, 37, 28),
+                    Op::Eq(56, 57),
+                    Op::Select(58, 37, 28),
                     Op::Select(25, 37, 18),
-                    Op::Select(22, 28, 63),
-                    Op::Select(58, 62, 64),
-                    Op::Select(57, 18, 65),
-                    Op::Eq(66, 18),
+                    Op::Select(22, 28, 60),
+                    Op::Select(55, 59, 61),
+                    Op::Select(54, 18, 62),
+                    Op::Eq(63, 18),
                     Op::Int(7),
-                    Op::Eq(66, 28),
+                    Op::Eq(63, 28),
                     Op::Int(8),
                     Op::Int(9),
-                    Op::Select(69, 70, 71),
-                    Op::Select(67, 68, 72),
-                    Op::Select(6, 45, 73),
-                    Op::Select(43, 44, 74),
-                    Op::Select(3, 39, 75),
-                    Op::Select(41, 42, 76),
-                    Op::Select(36, 37, 77),
-                    Op::Select(27, 28, 78),
-                    Op::Select(17, 18, 79),
-                    Op::Not(69),
-                    Op::And(22, 81),
+                    Op::Select(66, 67, 68),
+                    Op::Select(64, 65, 69),
+                    Op::Select(6, 45, 70),
+                    Op::Select(43, 44, 71),
+                    Op::Select(3, 39, 72),
+                    Op::Select(41, 42, 73),
+                    Op::Select(36, 37, 74),
+                    Op::Select(27, 28, 75),
+                    Op::Select(17, 18, 76),
+                    Op::Not(66),
+                    Op::And(22, 78),
                     Op::Int(182),
-                    Op::Select(82, 83, 20),
-                    Op::Eq(66, 37),
-                    Op::Not(85),
-                    Op::And(25, 86),
-                    Op::Select(87, 83, 20),
+                    Op::Select(79, 80, 20),
+                    Op::Eq(63, 37),
+                    Op::Not(82),
+                    Op::And(25, 83),
+                    Op::Select(84, 80, 20),
                     Op::Sub(46, 28),
                     Op::Select(53, 37, 18),
-                    Op::Select(47, 89, 90),
+                    Op::Select(47, 86, 87),
                     Op::Eq(46, 28),
-                    Op::Not(22),
-                    Op::Not(25),
-                    Op::And(93, 94),
-                    Op::Not(95),
-                    Op::And(92, 96),
+                    Op::Select(22, 22, 25),
+                    Op::And(89, 90),
                     Op::Bool(false),
-                    Op::And(51, 67),
-                    Op::And(99, 96),
-                    Op::Select(53, 98, 100),
-                    Op::Select(47, 97, 101),
-                    Op::Select(85, 8, 59),
-                    Op::Select(69, 60, 103),
+                    Op::And(51, 64),
+                    Op::And(93, 90),
+                    Op::Select(53, 92, 94),
+                    Op::Select(47, 91, 95),
+                    Op::Select(82, 8, 56),
+                    Op::Select(66, 57, 97),
                     Op::Sub(30, 33),
                 ],
-                roots: &[80, 38, 84, 88, 91, 102, 104, 32, 105],
+                roots: &[77, 38, 81, 85, 88, 96, 98, 32, 99],
             },
             bindings: &[
                 c::Binding {
@@ -2385,7 +2379,7 @@ impl Contract {
                 .with_limit(Resource::Byte, 320)
                 .with_limit(Resource::WitnessByte, 0)
                 .with_limit(Resource::Depth, 0)
-                .with_limit(Resource::Step, 1080),
+                .with_limit(Resource::Step, 1074),
         }
     }
 }
@@ -2428,15 +2422,21 @@ pub fn checked_authority<'a>(
     authority::bind(&catalog).map_err(BindFailure::Authority)
 }
 /// Position in this application's contract lineage: 1 before any adoption.
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
+/// Contract version 1, superseded by adoption 1 in v2/policy.json.
+#[path = "v2_contract_v1.rs"]
+pub mod v1;
 /// Every contract version's checked catalog, oldest first and this one last,
 /// for a store upgrade or a lineage open. Each binding checks that version's
 /// complete retained schema and policy bytes.
 pub fn with_lineage<R>(
     f: impl FnOnce(&[&catalog::BoundCatalog<'_>]) -> R,
 ) -> Result<R, catalog::Failure> {
+    let contract_1 = v1::Contract::new();
+    let descriptor_1 = contract_1.descriptor();
+    let catalog_1 = v1::checked_catalog(&descriptor_1)?;
     let contract = Contract::new();
     let descriptor = contract.descriptor();
     let catalog = checked_catalog(&descriptor)?;
-    Ok(f(&[&catalog]))
+    Ok(f(&[&catalog_1, &catalog]))
 }

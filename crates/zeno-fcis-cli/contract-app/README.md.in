@@ -23,6 +23,28 @@ is the current state is published, committed and replayed, and the outbox is
 delivered across a reopen of the database. `cargo run -- NEW_DATABASE_PATH`
 runs the same session and prints its summary.
 
+## Contract versions
+
+`zeno-fcis contract adopt . --candidate C.zcve --receipt R.json --usage
+new-version` adopts a checked replacement for the decision program as the
+next contract version: the rules record the candidate and its `transform`
+receipt under `adoptions`, both are kept under `v2/adoptions/N/`, and the
+superseded version stays beside the current one as `src/v2_contract_vN.rs`
+and `v2/policy_vN.zcve`. `src/v2_contract.rs` states `VERSION` and offers
+`with_lineage`, the checked catalogs of every version, which these commands
+use on an existing database:
+
+- `cargo run -- --audit DATABASE_PATH` replays each history segment under
+  the version that published it and prints the head.
+- `cargo run -- --upgrade DATABASE_PATH` records the checked upgrade to this
+  build's version: the state schema must be the same, the new contract's
+  genesis laws must admit the current state, and the chained record binds
+  both identities. Pending outbox entries keep their IDs and order. A
+  refusal writes nothing.
+- `cargo run -- --migrate DATABASE_PATH` converts a database created before
+  upgrades were recorded (SQLite schema v9) to the current schema after a
+  complete audit. Nothing else is migrated implicitly.
+
 These checks cover the listed examples and the laws in `project.zeno`, which
 the Authority enforces on every decision. They do not show that the rules
 match intent beyond those examples and laws.

@@ -11,7 +11,7 @@ use zeno_fcis_synthesis::finite::{
 /// Exact actual original schema bytes.
 pub const ORIGINAL_SCHEMA: &[u8] = include_bytes!("../v2/schema.zcve");
 /// Complete reviewed library-encoded policy.
-pub const ORIGINAL_POLICY: &[u8] = include_bytes!("../v2/policy.zcve");
+pub const ORIGINAL_POLICY: &[u8] = include_bytes!("../v2/policy_v1.zcve");
 /// Complete original named schema description.
 pub const DESCRIPTION: s::Description<'static> = s::Description {
     profile: b"withdrawal_queue",

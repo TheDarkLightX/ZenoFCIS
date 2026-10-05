@@ -1,9 +1,11 @@
 # V2 durable publication refinement
 
-This development stage connects the library-owned V2 Authority to SQLite schema
-v7. It is not a proof of SQLite, the operating system, SHA-256, a remote
-destination or the full V2 release. The actual implementation lives in
-`crates/zeno-fcis-shell-sqlite/src/v2.rs`.
+This development stage connects the library-owned V2 Authority to SQLite
+schema v10 (v7 added the hash chain and checkpoints, v9 compact publications,
+v10 the chained contract upgrade records). It is not a proof of SQLite, the
+operating system, SHA-256, a remote destination or the full V2 release. The
+actual implementation lives in `crates/zeno-fcis-shell-sqlite/src/v2.rs`, with
+the pure upgrade decision in `src/v2/upgrade.rs`.
 
 ## Object and obligations
 
@@ -73,6 +75,52 @@ cannot create a checkpoint capability.
 Schema opening compares the actual table/index/trigger definitions with the
 library's fixed schema. Legacy schema v5 is explicitly refused. No unreviewed
 automatic rewrite or reinterpretation of old certificates occurs.
+
+## Contract upgrades and the lineage
+
+Schema v10 adds `v2_upgrades`: chained records that move a store from the
+contract its current history segment ran to another contract with the same
+state schema. A store's segments are its genesis contract and one more per
+record, each identified by the full Authority identity stored with it. A handle
+is bound to a lineage of Authorities, oldest first; the segments must appear
+in that lineage in order (a store may skip a version it never ran), and for
+`open_lineage` the last segment must be the lineage's last member.
+`V2SqliteShell::open` is the one-member case for stores that never upgraded.
+
+`V2SqliteShell::upgrade(path, catalogs)` takes the application's whole lineage
+as checked catalogs, binds their Authorities through the library, fully audits
+the store, and asks the pure `v2::upgrade::decide` for the record. The decision
+refuses, in order, differing canonical state schema bytes, equal identities,
+and a current state the new contract's genesis publication does not admit; the
+publication comes from the library's genesis evaluation, so the new contract's
+genesis-flagged laws must hold on the state. The record is
+
+```text
+"ZFCISV2-UPGRADE\0" || ordinal:u64be || head_sequence:u64be
+  || frame(from_identity) || frame(identity) || frame(genesis_publication)
+  || frame(state_root) || frame(previous_chain)
+```
+
+and the new chain tip is `HashV2Chain(record)`; certificates begin with
+`ZFCISV2-CERT\0`, so the two preimage sets are disjoint under one domain. The
+row stores the ordinal, the head sequence, the identity, the compact genesis
+publication, the root, the previous chain, the record and the chain; the head
+row's chain moves to the new tip while its sequence, state and root stay. The
+next commit's certificate extends the upgrade link. Replay walks events in
+order: the commits of a segment under that segment's Authority, then every
+record at the head it was taken at, recomputed from the stored fields and the
+Authority it names, including `replay_genesis_publication` over the state at
+that head. Pending deliveries keep their certificate-bound IDs and order, and
+are recomputed under their own segment's Authority before delivery.
+Checkpoints taken before or after an upgrade at the same head are told apart by
+the chain link they carry.
+
+A v9 store is exactly the previous shell's catalog; `open`, `open_lineage` and
+`upgrade` refuse it as `Schema(9)`. `migrate_v9(path, lineage)` adds the table
+and sets version 10 in one transaction after a complete audit under the member
+whose identity created the store; any other schema, or a store under none of
+the members, refuses and writes nothing. No data is migrated: a changed state
+schema is outside this upgrade.
 
 ## Qualification still required
 

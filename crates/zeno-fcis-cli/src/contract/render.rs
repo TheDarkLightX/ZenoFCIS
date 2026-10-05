@@ -37,12 +37,35 @@ use zeno_fcis_synthesis::finite::{
 };
 ";
 
+/// `{policy}` is the policy file the version includes.
 const ORIGINALS: &str = "\
 /// Exact actual original schema bytes.
 pub const ORIGINAL_SCHEMA: &[u8] = include_bytes!(\"../v2/schema.zcve\");
 /// Complete reviewed library-encoded policy.
-pub const ORIGINAL_POLICY: &[u8] = include_bytes!(\"../v2/policy.zcve\");
+pub const ORIGINAL_POLICY: &[u8] = include_bytes!(\"{policy}\");
 ";
+
+const LINEAGE_DOC: &str = "\
+/// Every contract version's checked catalog, oldest first and this one last,
+/// for a store upgrade or a lineage open. Each binding checks that version's
+/// complete retained schema and policy bytes.
+pub fn with_lineage<R>(
+    f: impl FnOnce(&[&catalog::BoundCatalog<'_>]) -> R,
+) -> Result<R, catalog::Failure> {
+";
+
+/// Which version of a contract to render and where it sits in the lineage.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Options<'a> {
+    /// The policy file relative to `src/`: `../v2/policy.zcve` for the
+    /// current version, `../v2/policy_v{k}.zcve` for superseded version `k`.
+    pub(super) policy: &'a str,
+    /// Position in the lineage, from 1.
+    pub(super) version: u32,
+    /// Superseded versions the rendered file declares as modules `v1`..;
+    /// zero for a superseded version, which is a leaf.
+    pub(super) previous: u32,
+}
 
 const BINDING: &str = "\
 /// Ordered refusal at checked catalog or private Authority construction.
@@ -63,7 +86,10 @@ pub fn checked_authority<'a>(
 }
 ";
 
-pub(super) fn source(contract: &Contract<'_>) -> Result<String, ContractError> {
+pub(super) fn source(
+    contract: &Contract<'_>,
+    options: Options<'_>,
+) -> Result<String, ContractError> {
     let declarations = contract.declarations;
     let mut text = String::from(HEADER);
     let any_variants = declarations
@@ -75,7 +101,7 @@ pub(super) fn source(contract: &Contract<'_>) -> Result<String, ContractError> {
     } else {
         IMPORTS
     });
-    text.push_str(ORIGINALS);
+    text.push_str(&ORIGINALS.replace("{policy}", options.policy));
     item(
         &mut text,
         Some("Complete original named schema description."),
@@ -189,7 +215,49 @@ pub(super) fn source(contract: &Contract<'_>) -> Result<String, ContractError> {
          descriptor,\n        &FRAMING,\n        CHANNEL_ROOTS,\n    )\n}}\n"
     );
     text.push_str(BINDING);
+    lineage(&mut text, options)?;
     Ok(text)
+}
+
+/// The version number, the superseded versions as modules and `with_lineage`.
+fn lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError> {
+    let _ = write!(
+        text,
+        "/// Position in this application's contract lineage: 1 before any adoption.\n\
+         pub const VERSION: u32 = {};\n",
+        options.version
+    );
+    for version in 1..=options.previous {
+        let _ = write!(
+            text,
+            "/// Contract version {version}, superseded by adoption {version} in v2/policy.json.\n\
+             #[path = \"v2_contract_v{version}.rs\"]\n\
+             pub mod v{version};\n"
+        );
+    }
+    text.push_str(LINEAGE_DOC);
+    let mut catalogs = Vec::new();
+    for version in 1..=options.previous {
+        let _ = write!(
+            text,
+            "    let contract_{version} = v{version}::Contract::new();\n    \
+             let descriptor_{version} = contract_{version}.descriptor();\n    \
+             let catalog_{version} = v{version}::checked_catalog(&descriptor_{version})?;\n"
+        );
+        catalogs.push(Syntax::reference(Syntax::path(format!(
+            "catalog_{version}"
+        ))));
+    }
+    text.push_str(
+        "    let contract = Contract::new();\n    \
+         let descriptor = contract.descriptor();\n    \
+         let catalog = checked_catalog(&descriptor)?;\n",
+    );
+    catalogs.push(Syntax::reference(Syntax::path("catalog")));
+    let result = Syntax::call("Ok", vec![Syntax::call("f", vec![Syntax::slice(catalogs)])]);
+    let tail = statement(4, &result).ok_or_else(|| unrenderable("with_lineage"))?;
+    let _ = writeln!(text, "    {tail}\n}}");
+    Ok(())
 }
 
 fn item(

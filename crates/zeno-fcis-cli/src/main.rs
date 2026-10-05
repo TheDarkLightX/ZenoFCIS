@@ -5,6 +5,7 @@ mod account_lockout;
 mod agent_treasury_guard;
 mod compliance_gateway;
 mod contract;
+mod contract_adopt;
 mod contract_files;
 mod durable_counter;
 mod inventory_reservation;
@@ -117,6 +118,15 @@ struct Cli {
     command: Command,
 }
 
+/// The `contract` group: F2's advisory review and F6's checked adoption.
+#[derive(Subcommand)]
+enum ContractCommand {
+    #[command(flatten)]
+    Review(review_command::Command),
+    #[command(flatten)]
+    Adopt(contract_adopt::Command),
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Describe commands, arguments, defaults, and effects as JSON without reading projects.
@@ -145,10 +155,10 @@ enum Command {
         #[command(subcommand)]
         command: loop_command::Command,
     },
-    /// Review an application's contract against its input domain, its decision examples and rule mutants; advisory only.
+    /// Review an application's contract (advisory) or adopt a checked candidate program into its lineage.
     Contract {
         #[command(subcommand)]
-        command: review_command::Command,
+        command: ContractCommand,
     },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
@@ -340,7 +350,10 @@ fn run(command: Command) -> u8 {
         Command::Transform { command } => transform_command::run(command),
         Command::Optimize { arguments } => optimize_command::run(arguments),
         Command::Loop { command } => loop_command::run(command),
-        Command::Contract { command } => review_command::run(command),
+        Command::Contract { command } => match command {
+            ContractCommand::Review(command) => review_command::run(command),
+            ContractCommand::Adopt(command) => contract_adopt::run(command),
+        },
         Command::New {
             dir,
             template,
@@ -587,6 +600,20 @@ fn describe_effects(path: &[String]) -> Value {
                 &["generated-artifacts"],
                 false,
                 Some("--check"),
+            ),
+            ["contract", "adopt"] => (
+                &[
+                    "application-contract",
+                    "candidate-program",
+                    "equivalence-receipt",
+                ],
+                &[
+                    "application-contract",
+                    "adopted-artifacts",
+                    "generated-artifacts",
+                ],
+                false,
+                None,
             ),
             ["backend", "inspect"] => (&["tools-manifest"], &[], false, None),
             ["backend", "inventory-lean"] => (&["toolchain-files"], &[], false, None),
