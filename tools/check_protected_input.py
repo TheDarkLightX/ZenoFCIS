@@ -16,6 +16,8 @@ import subprocess
 import tempfile
 import zipfile
 
+from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
+from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import once
 from check_metered_execution import UNIT_SOURCES as METER_SOURCES
@@ -27,8 +29,10 @@ HARNESS = Path("verification/verus/protected_input.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view.rs")
 SPEC = SUBJECT.parent / "input_view/spec.rs"
 UNIT_SOURCES = (HARNESS, *METER_SOURCES[1:])
+
+UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
-           SUBJECT.parent / "input_view/tests.rs", SUBJECT.parent / "record_execution/tests.rs",
+           SUBJECT.parent / "input_view/tests.rs", SUBJECT.parent / "composition/record_tests.rs",
            Path("tools/check_protected_input.py"), Path("tools/test_check_protected_input.py"),
            Path("tools/check_metered_execution.py"), Path("tools/check_finite_execution.py"),
            Path("tools/check_verus.py"), Path("tools/verus_coverage.py"),
@@ -37,6 +41,11 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
            Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
            Path("crates/zeno-fcis-synthesis/tests/v2_protected_input.rs"))
+
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
+                                Path("verification/verus/authority_v2_sources.json"))))
+
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
 
 
 def snapshot() -> dict[str, str]:
@@ -66,7 +75,10 @@ def mutation_sources(source: str, specification: str) -> dict[str, tuple[Path, s
         ("allow_sum_payload", "if payload != 0 {", "if false {"),
         ("wrong_type_width", "read_big_endian(bytes, offset, 4)", "read_big_endian(bytes, offset, 3)"),
         ("wrong_variant_width", "read_big_endian(bytes, after_type, 2)", "read_big_endian(bytes, after_type, 1)"),
-        ("wrong_integer_value", "Some((value as i64, end))", "Some((0, end))"),
+        ("wrong_integer_value", "value > *max as i128 { return None; } Some((value as i64, end))",
+         "value > *max as i128 { return None; } Some((0, end))"),
+        ("wrong_unsigned_value", "value > i64::MAX as u128 { return None; } Some((value as i64, end))",
+         "value > i64::MAX as u128 { return None; } Some((0, end))"),
         ("wrong_boolean_value", "Some((1, payload_offset))", "Some((0, payload_offset))"),
         ("wrong_closed_variant_mapping", "return Some(code);", "return Some(0);"),
         ("ignore_field_identity", "if id != field.id as u128 {", "if false {"),
@@ -127,6 +139,7 @@ def mutation_sources(source: str, specification: str) -> dict[str, tuple[Path, s
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     rust = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024",
             "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)"]
+    rust += native_dependency_args(ROOT, directory, environment)
     tests = directory / "native-tests"
     verifier.require_success(verifier.run([*rust, "--test", str(HARNESS), "-o", str(tests)], ROOT, environment))
     native = verifier.run([str(tests), "--test-threads=2"], ROOT, environment)
@@ -174,7 +187,7 @@ def check(cache: Path, install: bool) -> dict:
                    if not key.startswith(("VERUS_", "VARGO_")) and key not in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")}
     environment.update(RUSTUP_TOOLCHAIN=pin["rust_toolchain"], VERUS_Z3_PATH=str(tools / "z3"))
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024", "--no-cheating",
-               "--no-external-by-default", "--num-threads", "2", "--output-json", "--log", "vir",
+               "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
     with tempfile.TemporaryDirectory(prefix="zeno-fcis-input-proof-") as temporary:
@@ -194,6 +207,7 @@ def check(cache: Path, install: bool) -> dict:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
+            adjust_specimen_source_lengths(specimen)
             mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"), str(HARNESS)], specimen, environment)
             result = json.loads(mutant.stdout).get("verification-results", {})
             coverage_error = None

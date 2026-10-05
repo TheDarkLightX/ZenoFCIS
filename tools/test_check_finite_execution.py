@@ -32,6 +32,13 @@ class TranslatedCoverage(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     coverage.parse_vir(changed)
 
+    def test_source_identity_log_capacity_remains_bounded(self):
+        # Embedded complete source arrays can exceed the old eight-MiB bound.
+        comment = ";;" + "x" * (8 * 1024 * 1024) + "\n"
+        self.assertEqual(coverage.parse_vir(comment + "(A)"), [["A"]])
+        with self.assertRaisesRegex(ValueError, "size limit"):
+            coverage.parse_vir(" " * (coverage.MAX_VIR_CHARACTERS + 1))
+
     def test_refuses_omitted_weakened_or_narrowed_contracts(self):
         for changed in (
             FUNCTION.replace(":ensure ((> Const (Constant Bool true)))", ":ensure ()"),

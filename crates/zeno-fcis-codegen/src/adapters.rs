@@ -84,7 +84,7 @@ fn render_unit(output: &mut String, name: &str) {
     let _ = writeln!(output, "impl {name} {{");
     let _ = writeln!(
         output,
-        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{ Ok(Value::Unit) }}"
+        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{ Ok(Value::unit()) }}"
     );
     let _ = writeln!(
         output,
@@ -92,7 +92,7 @@ fn render_unit(output: &mut String, name: &str) {
     );
     let _ = writeln!(
         output,
-        "        match value {{ Value::Unit => Ok(Self), _ => Err(AdapterError::TypeMismatch) }}"
+        "        match value.view() {{ zeno_fcis_value::ValueRef::Unit => Ok(Self), _ => Err(AdapterError::TypeMismatch) }}"
     );
     let _ = writeln!(output, "    }}");
     let _ = writeln!(output, "}}\n");
@@ -104,7 +104,7 @@ fn render_bool(output: &mut String, name: &str) {
     let _ = writeln!(output, "impl {name} {{");
     let _ = writeln!(
         output,
-        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{ Ok(Value::Bool(self.0)) }}"
+        "    pub fn to_value(&self) -> Result<Value, AdapterError> {{ Ok(Value::boolean(self.0)) }}"
     );
     let _ = writeln!(
         output,
@@ -112,7 +112,7 @@ fn render_bool(output: &mut String, name: &str) {
     );
     let _ = writeln!(
         output,
-        "        match value {{ Value::Bool(v) => Ok(Self(v)), _ => Err(AdapterError::TypeMismatch) }}"
+        "        match value.view() {{ zeno_fcis_value::ValueRef::Bool(v) => Ok(Self(v)), _ => Err(AdapterError::TypeMismatch) }}"
     );
     let _ = writeln!(output, "    }}");
     let _ = writeln!(output, "}}\n");
@@ -132,20 +132,20 @@ fn render_u128(output: &mut String, name: &str, min: u128, max: u128) {
         output,
         "        if self.0 < Self::MIN || self.0 > Self::MAX {{ return Err(AdapterError::IntegerRange); }}"
     );
-    let _ = writeln!(output, "        Ok(Value::U128(self.0))");
+    let _ = writeln!(output, "        Ok(Value::unsigned(self.0))");
     let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
+    let _ = writeln!(output, "        match value.view() {{");
     let _ = writeln!(
         output,
-        "            Value::U128(v) if v >= Self::MIN && v <= Self::MAX => Ok(Self(v)),"
+        "            zeno_fcis_value::ValueRef::U128(v) if v >= Self::MIN && v <= Self::MAX => Ok(Self(v)),"
     );
     let _ = writeln!(
         output,
-        "            Value::U128(_) => Err(AdapterError::IntegerRange),"
+        "            zeno_fcis_value::ValueRef::U128(_) => Err(AdapterError::IntegerRange),"
     );
     let _ = writeln!(output, "            _ => Err(AdapterError::TypeMismatch),");
     let _ = writeln!(output, "        }}");
@@ -167,20 +167,20 @@ fn render_i128(output: &mut String, name: &str, min: i128, max: i128) {
         output,
         "        if self.0 < Self::MIN || self.0 > Self::MAX {{ return Err(AdapterError::IntegerRange); }}"
     );
-    let _ = writeln!(output, "        Ok(Value::I128(self.0))");
+    let _ = writeln!(output, "        Ok(Value::signed(self.0))");
     let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
+    let _ = writeln!(output, "        match value.view() {{");
     let _ = writeln!(
         output,
-        "            Value::I128(v) if v >= Self::MIN && v <= Self::MAX => Ok(Self(v)),"
+        "            zeno_fcis_value::ValueRef::I128(v) if v >= Self::MIN && v <= Self::MAX => Ok(Self(v)),"
     );
     let _ = writeln!(
         output,
-        "            Value::I128(_) => Err(AdapterError::IntegerRange),"
+        "            zeno_fcis_value::ValueRef::I128(_) => Err(AdapterError::IntegerRange),"
     );
     let _ = writeln!(output, "            _ => Err(AdapterError::TypeMismatch),");
     let _ = writeln!(output, "        }}");
@@ -206,14 +206,20 @@ fn render_bytes(output: &mut String, name: &str, min_len: u32, max_len: u32) {
         output,
         "        if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
     );
-    let _ = writeln!(output, "        Ok(Value::Bytes(self.0.clone()))");
+    let _ = writeln!(
+        output,
+        "        Ok(Value::bytes_with_limits(self.0.to_vec(), zeno_fcis_value::ValueLimits {{ max_payload_bytes: u64::from(Self::MAX_LEN), ..zeno_fcis_value::ValueLimits::default() }})?)"
+    );
     let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
-    let _ = writeln!(output, "            Value::Bytes(b) => {{");
+    let _ = writeln!(output, "        match value.view() {{");
+    let _ = writeln!(
+        output,
+        "            zeno_fcis_value::ValueRef::Bytes(b) => {{"
+    );
     let _ = writeln!(
         output,
         "                let len = u32::try_from(b.len()).map_err(|_| AdapterError::Length)?;"
@@ -222,7 +228,7 @@ fn render_bytes(output: &mut String, name: &str, min_len: u32, max_len: u32) {
         output,
         "                if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
     );
-    let _ = writeln!(output, "                Ok(Self(b))");
+    let _ = writeln!(output, "                Ok(Self(b.into()))");
     let _ = writeln!(output, "            }}");
     let _ = writeln!(output, "            _ => Err(AdapterError::TypeMismatch),");
     let _ = writeln!(output, "        }}");
@@ -252,14 +258,20 @@ fn render_text(output: &mut String, name: &str, min_len: u32, max_len: u32) {
         output,
         "        if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
     );
-    let _ = writeln!(output, "        Ok(Value::Text(self.0.clone()))");
+    let _ = writeln!(
+        output,
+        "        Ok(Value::text_ascii_with_limits(self.0.clone().into_string(), zeno_fcis_value::ValueLimits {{ max_payload_bytes: u64::from(Self::MAX_LEN), ..zeno_fcis_value::ValueLimits::default() }})?)"
+    );
     let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
-    let _ = writeln!(output, "            Value::Text(t) => {{");
+    let _ = writeln!(output, "        match value.view() {{");
+    let _ = writeln!(
+        output,
+        "            zeno_fcis_value::ValueRef::Text(t) => {{"
+    );
     let _ = writeln!(
         output,
         "                if !t.is_ascii() {{ return Err(AdapterError::NonAsciiText); }}"
@@ -272,7 +284,7 @@ fn render_text(output: &mut String, name: &str, min_len: u32, max_len: u32) {
         output,
         "                if len < Self::MIN_LEN || len > Self::MAX_LEN {{ return Err(AdapterError::Length); }}"
     );
-    let _ = writeln!(output, "                Ok(Self(t))");
+    let _ = writeln!(output, "                Ok(Self(t.into()))");
     let _ = writeln!(output, "            }}");
     let _ = writeln!(output, "            _ => Err(AdapterError::TypeMismatch),");
     let _ = writeln!(output, "        }}");
@@ -306,7 +318,7 @@ fn render_enum(
         let vconst = variant_const_name(name, variant.name().as_str());
         let _ = writeln!(
             output,
-            "            Self::{vname} => Value::Enum {{ type_id: {type_const}, variant: {vconst} }},"
+            "            Self::{vname} => Value::enumeration({type_const}, {vconst}),"
         );
     }
     let _ = writeln!(output, "        }})");
@@ -315,10 +327,10 @@ fn render_enum(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
+    let _ = writeln!(output, "        match value.view() {{");
     let _ = writeln!(
         output,
-        "            Value::Enum {{ type_id, variant }} if type_id == {type_const} => match variant {{"
+        "            zeno_fcis_value::ValueRef::Enum {{ type_id, variant }} if type_id == {type_const} => match variant {{"
     );
     for variant in variants {
         let vname = variant.name().as_str();
@@ -332,7 +344,7 @@ fn render_enum(
     let _ = writeln!(output, "            }},");
     let _ = writeln!(
         output,
-        "            Value::Enum {{ .. }} => Err(AdapterError::TypeMismatch),"
+        "            zeno_fcis_value::ValueRef::Enum {{ .. }} => Err(AdapterError::TypeMismatch),"
     );
     let _ = writeln!(output, "            _ => Err(AdapterError::TypeMismatch),");
     let _ = writeln!(output, "        }}");
@@ -371,14 +383,17 @@ fn render_tuple(
             "        items.push(self.field_{index}.to_value()?);"
         );
     }
-    let _ = writeln!(output, "        Ok(Value::tuple(items))");
+    let _ = writeln!(output, "        Ok(Value::tuple(items)?)");
     let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
-    let _ = writeln!(output, "            Value::Tuple(items) => {{");
+    let _ = writeln!(output, "        match value.view() {{");
+    let _ = writeln!(
+        output,
+        "            zeno_fcis_value::ValueRef::Tuple(items) => {{"
+    );
     let _ = writeln!(
         output,
         "                if items.len() != {count} {{ return Err(AdapterError::RecordShape); }}",
@@ -446,8 +461,11 @@ fn render_record(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
-    let _ = writeln!(output, "            Value::Record(fields) => {{");
+    let _ = writeln!(output, "        match value.view() {{");
+    let _ = writeln!(
+        output,
+        "            zeno_fcis_value::ValueRef::Record(fields) => {{"
+    );
     let _ = writeln!(
         output,
         "                if fields.len() != {count} {{ return Err(AdapterError::RecordShape); }}",
@@ -455,7 +473,7 @@ fn render_record(
     );
     let _ = writeln!(
         output,
-        "                let mut iter = fields.into_vec().into_iter();"
+        "                let mut iter = fields.iter().cloned();"
     );
     for field in fields {
         let fname = rust_name(field.name().as_str())?;
@@ -542,13 +560,13 @@ fn render_sum(
             None => {
                 let _ = writeln!(
                     output,
-                    "            Self::{vname} => Value::Sum {{ type_id: {type_const}, variant: {vconst}, payload: None }},"
+                    "            Self::{vname} => Value::sum({type_const}, {vconst}, None),"
                 );
             }
             Some(_) => {
                 let _ = writeln!(
                     output,
-                    "            Self::{vname}(p) => Value::Sum {{ type_id: {type_const}, variant: {vconst}, payload: Some(alloc::boxed::Box::new(p.to_value()?)) }},"
+                    "            Self::{vname}(p) => Value::sum({type_const}, {vconst}, Some(p.to_value()?)),"
                 );
             }
         }
@@ -559,10 +577,10 @@ fn render_sum(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
+    let _ = writeln!(output, "        match value.view() {{");
     let _ = writeln!(
         output,
-        "            Value::Sum {{ type_id, variant, payload }} if type_id == {type_const} => match variant {{"
+        "            zeno_fcis_value::ValueRef::Sum {{ type_id, variant, payload }} if type_id == {type_const} => match variant {{"
     );
     for variant in variants {
         let vname = variant.name().as_str();
@@ -578,7 +596,7 @@ fn render_sum(
                 let payload_name = resolve_type_name(schema, payload);
                 let _ = writeln!(
                     output,
-                    "                {vconst} => match payload {{ None => Err(AdapterError::MissingPayload), Some(p) => Ok(Self::{vname}({payload_name}::try_from_value(*p)?)) }},"
+                    "                {vconst} => match payload {{ None => Err(AdapterError::MissingPayload), Some(p) => Ok(Self::{vname}({payload_name}::try_from_value(p.clone())?)) }},"
                 );
             }
         }
@@ -590,7 +608,7 @@ fn render_sum(
     let _ = writeln!(output, "            }},");
     let _ = writeln!(
         output,
-        "            Value::Sum {{ .. }} => Err(AdapterError::TypeMismatch),"
+        "            zeno_fcis_value::ValueRef::Sum {{ .. }} => Err(AdapterError::TypeMismatch),"
     );
     let _ = writeln!(output, "            _ => Err(AdapterError::TypeMismatch),");
     let _ = writeln!(output, "        }}");
@@ -631,14 +649,17 @@ fn render_vector(
         output,
         "        let items: Result<Vec<Value>, _> = self.0.iter().map(|x| x.to_value()).collect();"
     );
-    let _ = writeln!(output, "        Ok(Value::vector(items?))");
+    let _ = writeln!(output, "        Ok(Value::vector(items?)?)");
     let _ = writeln!(output, "    }}");
     let _ = writeln!(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
-    let _ = writeln!(output, "            Value::Vector(items) => {{");
+    let _ = writeln!(output, "        match value.view() {{");
+    let _ = writeln!(
+        output,
+        "            zeno_fcis_value::ValueRef::Vector(items) => {{"
+    );
     let _ = writeln!(
         output,
         "                let len = u32::try_from(items.len()).map_err(|_| AdapterError::Length)?;"
@@ -717,8 +738,11 @@ fn render_map(
         output,
         "    pub fn try_from_value(value: Value) -> Result<Self, AdapterError> {{"
     );
-    let _ = writeln!(output, "        match value {{");
-    let _ = writeln!(output, "            Value::Map(entries) => {{");
+    let _ = writeln!(output, "        match value.view() {{");
+    let _ = writeln!(
+        output,
+        "            zeno_fcis_value::ValueRef::Map(entries) => {{"
+    );
     let _ = writeln!(
         output,
         "                let len = u32::try_from(entries.len()).map_err(|_| AdapterError::Length)?;"

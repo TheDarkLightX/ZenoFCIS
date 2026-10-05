@@ -148,6 +148,7 @@ impl GeneratedBundle {
 
 /// Deterministic source-generation failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CodegenError {
     /// A requested module name was not a bounded lower-snake identifier.
     InvalidModuleName,

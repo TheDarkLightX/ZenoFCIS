@@ -39,6 +39,7 @@ verus! {
 pub open spec fn leaf_valid(leaf: super::Leaf) -> bool {
     match leaf {
         super::Leaf::I128 { min, max } => min <= max,
+        super::Leaf::U128 { min, max } => min <= max && max <= i64::MAX as u128,
         super::Leaf::Bool => true,
         super::Leaf::Enum { min, max, variants, .. }
         | super::Leaf::Sum { min, max, variants, .. } => variants_valid(variants@, min, max),
@@ -121,6 +122,10 @@ pub open spec fn scalar(bytes: Seq<u8>, offset: usize, leaf: super::Leaf)
     match integer::read_unsigned(bytes, offset, 1) {
         None => None,
         Some((tag, payload_offset)) => match leaf {
+            super::Leaf::U128 { min, max } => if tag != 0x03 { None }
+                else { match integer::read_unsigned(bytes, payload_offset, 16) {
+                    None => None, Some((v, end)) => if v < min || v > max || v > i64::MAX as u128 { None } else { Some((v as i64, end)) }
+                } },
             super::Leaf::I128 { min, max } => if tag != 0x04 { None }
             else {
                 match integer::read_signed(bytes, payload_offset) {
@@ -252,6 +257,7 @@ pub proof fn scalar_has_declared_type(bytes: Seq<u8>, offset: usize,
     requires leaf_valid(leaf), scalar(bytes, offset, leaf) == Some((value, end)),
     ensures match leaf {
         super::Leaf::Bool => 0 <= value <= 1,
+        super::Leaf::U128 { min, max } => 0 <= value && min <= value as u128 <= max && min as i64 <= value <= max as i64,
         super::Leaf::I128 { min, max }
         | super::Leaf::Enum { min, max, .. }
         | super::Leaf::Sum { min, max, .. } => min <= value <= max,
@@ -259,6 +265,7 @@ pub proof fn scalar_has_declared_type(bytes: Seq<u8>, offset: usize,
 {
     match leaf {
         super::Leaf::Bool => {},
+        super::Leaf::U128 { min, max } => {},
         super::Leaf::I128 { min, max } => {},
         super::Leaf::Enum { type_id, min, max, variants }
         | super::Leaf::Sum { type_id, min, max, variants } => {
@@ -288,6 +295,7 @@ verus! {
 pub open spec fn leaf_contains(leaf: super::Leaf, value: i64) -> bool {
     match leaf {
         super::Leaf::Bool => 0 <= value <= 1,
+        super::Leaf::U128 { min, max } => 0 <= value && min <= value as u128 <= max && min as i64 <= value <= max as i64,
         super::Leaf::I128 { min, max }
         | super::Leaf::Enum { min, max, .. }
         | super::Leaf::Sum { min, max, .. } => min <= value <= max,

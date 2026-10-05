@@ -9,23 +9,10 @@ use zeno_fcis_value::{Field, Value};
 #[test]
 fn actual_canonical_records_preserve_closed_mapping_and_opaque_usage() {
     let record = Value::record_canonical(vec![
-        Field::new(0, Value::I128(i64::MIN as i128)),
-        Field::new(7, Value::Bool(true)),
-        Field::new(
-            32,
-            Value::Enum {
-                type_id: u32::MAX,
-                variant: u16::MAX,
-            },
-        ),
-        Field::new(
-            u16::MAX,
-            Value::Sum {
-                type_id: 0,
-                variant: 7,
-                payload: None,
-            },
-        ),
+        Field::new(0, Value::signed(i64::MIN as i128)),
+        Field::new(7, Value::boolean(true)),
+        Field::new(32, Value::enumeration(u32::MAX, u16::MAX)),
+        Field::new(u16::MAX, Value::sum(0, 7, None)),
     ])
     .unwrap_or_else(|error| panic!("canonical record: {error}"));
     let bytes = record

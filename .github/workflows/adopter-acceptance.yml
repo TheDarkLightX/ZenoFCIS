@@ -44,5 +44,8 @@ jobs:
       - name: Check exact BDD to ATDD registry
         run: python3 tools/atdd.py check
 
+      - name: Provision the locked historical verification dependencies
+        run: cargo +1.97.1 fetch --manifest-path verification/Cargo.toml --locked
+
       - name: Run complete adopter acceptance portfolio
         run: python3 tools/atdd.py run --all

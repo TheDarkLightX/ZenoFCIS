@@ -6,15 +6,9 @@ use super::Failure;
 use super::meter::{MeterFailure, Resource};
 use vstd::prelude::*;
 
-verus! {
+pub use crate::resource::resource_index;
 
-pub open spec fn resource_index(resource: Resource) -> usize {
-    match resource {
-        Resource::Read => 0, Resource::Write => 1, Resource::Candidate => 2,
-        Resource::Effect => 3, Resource::Byte => 4, Resource::WitnessByte => 5,
-        Resource::Depth => 6, Resource::Step => 7,
-    }
-}
+verus! {
 
 pub(super) open spec fn charge(
     limits: Seq<u64>, used: Seq<u64>, resource: Resource, amount: u64,

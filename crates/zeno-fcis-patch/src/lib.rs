@@ -17,7 +17,7 @@ use zeno_fcis_codec::{
     CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain, EncodeError, Hash32,
     commitment, decode_value,
 };
-use zeno_fcis_value::{Field, MapEntry, Value, ValueError};
+use zeno_fcis_value::{Field, MapEntry, Value, ValueError, ValueRef};
 
 const PATH_TAG_FIELD: u8 = 0;
 const PATH_TAG_TUPLE: u8 = 1;
@@ -109,8 +109,9 @@ impl ValuePath {
     }
 }
 
-impl CanonicalEncode for ValuePath {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValuePath {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_length(output, self.segments.len())?;
         for segment in &self.segments {
             match segment {
@@ -134,6 +135,13 @@ impl CanonicalEncode for ValuePath {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -183,8 +191,9 @@ impl PatchOp {
     }
 }
 
-impl CanonicalEncode for PatchOp {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl PatchOp {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Insert {
                 path,
@@ -222,6 +231,13 @@ impl CanonicalEncode for PatchOp {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -351,8 +367,9 @@ impl CanonicalPatch {
     }
 }
 
-impl CanonicalEncode for CanonicalPatch {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CanonicalPatch {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.state_type.to_be_bytes());
         output.extend_from_slice(self.expected_pre_root.as_bytes());
         put_length(output, self.operations.len())?;
@@ -360,6 +377,13 @@ impl CanonicalEncode for CanonicalPatch {
             put_blob(output, &operation.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -664,7 +688,7 @@ pub fn hash_value<H: CommitmentHasher>(
 
 /// Computes the protocol-defined old-value commitment used by update and deletion preconditions.
 pub fn hash_precondition_value<H: CommitmentHasher>(value: &Value) -> Result<Hash32, PatchError> {
-    let domain = Domain::new("zeno-fcis/value", 1).map_err(PatchError::Encode)?;
+    let domain = zeno_fcis_codec::domains::VALUE;
     hash_value::<H>(domain, value)
 }
 
@@ -709,24 +733,24 @@ fn lookup<'a>(value: &'a Value, segments: &[PathSegment]) -> Result<&'a Value, P
     let Some((first, rest)) = segments.split_first() else {
         return Ok(value);
     };
-    match (first, value) {
-        (PathSegment::Field(id), Value::Record(fields)) => {
+    match (first, value.view()) {
+        (PathSegment::Field(id), ValueRef::Record(fields)) => {
             let index = fields
                 .binary_search_by_key(id, Field::id)
                 .map_err(|_| PatchError::PathNotFound)?;
             lookup(fields[index].value(), rest)
         }
-        (PathSegment::TupleIndex(index), Value::Tuple(items))
-        | (PathSegment::VectorIndex(index), Value::Vector(items)) => {
+        (PathSegment::TupleIndex(index), ValueRef::Tuple(items))
+        | (PathSegment::VectorIndex(index), ValueRef::Vector(items)) => {
             let index = usize::try_from(*index).map_err(|_| PatchError::IndexOverflow)?;
             let child = items.get(index).ok_or(PatchError::PathNotFound)?;
             lookup(child, rest)
         }
-        (PathSegment::SumPayload, Value::Sum { payload, .. }) => {
-            let child = payload.as_deref().ok_or(PatchError::PathNotFound)?;
+        (PathSegment::SumPayload, ValueRef::Sum { payload, .. }) => {
+            let child = payload.ok_or(PatchError::PathNotFound)?;
             lookup(child, rest)
         }
-        (PathSegment::MapKey(encoded_key), Value::Map(entries)) => {
+        (PathSegment::MapKey(encoded_key), ValueRef::Map(entries)) => {
             let index = entries
                 .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
                 .map_err(|_| PatchError::PathNotFound)?;
@@ -744,8 +768,8 @@ fn replace_at(
     let Some((first, rest)) = segments.split_first() else {
         return Ok(replacement);
     };
-    match (first, value) {
-        (PathSegment::Field(id), Value::Record(fields)) => {
+    match (first, value.view()) {
+        (PathSegment::Field(id), ValueRef::Record(fields)) => {
             let index = fields
                 .binary_search_by_key(id, Field::id)
                 .map_err(|_| PatchError::PathNotFound)?;
@@ -754,39 +778,35 @@ fn replace_at(
             next[index] = Field::new(*id, child);
             Value::record_canonical(next).map_err(PatchError::InvalidValue)
         }
-        (PathSegment::TupleIndex(index), Value::Tuple(items)) => {
+        (PathSegment::TupleIndex(index), ValueRef::Tuple(items)) => {
             let index = usize::try_from(*index).map_err(|_| PatchError::IndexOverflow)?;
             let mut next = items.to_vec();
             let current = next.get(index).ok_or(PatchError::PathNotFound)?;
             let child = replace_at(current, rest, replacement)?;
             next[index] = child;
-            Ok(Value::Tuple(next.into_boxed_slice()))
+            Value::tuple(next).map_err(PatchError::InvalidValue)
         }
-        (PathSegment::VectorIndex(index), Value::Vector(items)) => {
+        (PathSegment::VectorIndex(index), ValueRef::Vector(items)) => {
             let index = usize::try_from(*index).map_err(|_| PatchError::IndexOverflow)?;
             let mut next = items.to_vec();
             let current = next.get(index).ok_or(PatchError::PathNotFound)?;
             let child = replace_at(current, rest, replacement)?;
             next[index] = child;
-            Ok(Value::Vector(next.into_boxed_slice()))
+            Value::vector(next).map_err(PatchError::InvalidValue)
         }
         (
             PathSegment::SumPayload,
-            Value::Sum {
+            ValueRef::Sum {
                 type_id,
                 variant,
                 payload,
             },
         ) => {
-            let current = payload.as_deref().ok_or(PatchError::PathNotFound)?;
+            let current = payload.ok_or(PatchError::PathNotFound)?;
             let child = replace_at(current, rest, replacement)?;
-            Ok(Value::Sum {
-                type_id: *type_id,
-                variant: *variant,
-                payload: Some(Box::new(child)),
-            })
+            Ok(Value::sum(type_id, variant, Some(child)))
         }
-        (PathSegment::MapKey(encoded_key), Value::Map(entries)) => {
+        (PathSegment::MapKey(encoded_key), ValueRef::Map(entries)) => {
             let index = entries
                 .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
                 .map_err(|_| PatchError::PathNotFound)?;
@@ -810,8 +830,8 @@ fn insert_at(
         return Err(PatchError::InsertAtRoot);
     };
     if rest.is_empty() {
-        return match (first, value) {
-            (PathSegment::Field(id), Value::Record(fields)) => {
+        return match (first, value.view()) {
+            (PathSegment::Field(id), ValueRef::Record(fields)) => {
                 let mut next = fields.to_vec();
                 match next.binary_search_by_key(id, Field::id) {
                     Ok(_) => Err(PatchError::ExpectedAbsent),
@@ -821,7 +841,7 @@ fn insert_at(
                     }
                 }
             }
-            (PathSegment::MapKey(encoded_key), Value::Map(entries)) => {
+            (PathSegment::MapKey(encoded_key), ValueRef::Map(entries)) => {
                 let key = map_key.ok_or(PatchError::MissingMapKey)?;
                 let mut next = entries.to_vec();
                 match next.binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref())) {
@@ -841,8 +861,8 @@ fn insert_at(
         };
     }
 
-    match (first, value) {
-        (PathSegment::Field(id), Value::Record(fields)) => {
+    match (first, value.view()) {
+        (PathSegment::Field(id), ValueRef::Record(fields)) => {
             let index = fields
                 .binary_search_by_key(id, Field::id)
                 .map_err(|_| PatchError::PathNotFound)?;
@@ -851,39 +871,35 @@ fn insert_at(
             next[index] = Field::new(*id, child);
             Value::record_canonical(next).map_err(PatchError::InvalidValue)
         }
-        (PathSegment::TupleIndex(index), Value::Tuple(items)) => {
+        (PathSegment::TupleIndex(index), ValueRef::Tuple(items)) => {
             let index = usize::try_from(*index).map_err(|_| PatchError::IndexOverflow)?;
             let mut next = items.to_vec();
             let current = next.get(index).ok_or(PatchError::PathNotFound)?;
             let child = insert_at(current, rest, map_key, inserted)?;
             next[index] = child;
-            Ok(Value::Tuple(next.into_boxed_slice()))
+            Value::tuple(next).map_err(PatchError::InvalidValue)
         }
-        (PathSegment::VectorIndex(index), Value::Vector(items)) => {
+        (PathSegment::VectorIndex(index), ValueRef::Vector(items)) => {
             let index = usize::try_from(*index).map_err(|_| PatchError::IndexOverflow)?;
             let mut next = items.to_vec();
             let current = next.get(index).ok_or(PatchError::PathNotFound)?;
             let child = insert_at(current, rest, map_key, inserted)?;
             next[index] = child;
-            Ok(Value::Vector(next.into_boxed_slice()))
+            Value::vector(next).map_err(PatchError::InvalidValue)
         }
         (
             PathSegment::SumPayload,
-            Value::Sum {
+            ValueRef::Sum {
                 type_id,
                 variant,
                 payload,
             },
         ) => {
-            let current = payload.as_deref().ok_or(PatchError::PathNotFound)?;
+            let current = payload.ok_or(PatchError::PathNotFound)?;
             let child = insert_at(current, rest, map_key, inserted)?;
-            Ok(Value::Sum {
-                type_id: *type_id,
-                variant: *variant,
-                payload: Some(Box::new(child)),
-            })
+            Ok(Value::sum(type_id, variant, Some(child)))
         }
-        (PathSegment::MapKey(encoded_key), Value::Map(entries)) => {
+        (PathSegment::MapKey(encoded_key), ValueRef::Map(entries)) => {
             let index = entries
                 .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
                 .map_err(|_| PatchError::PathNotFound)?;
@@ -902,8 +918,8 @@ fn delete_at(value: &Value, segments: &[PathSegment]) -> Result<Value, PatchErro
         return Err(PatchError::DeleteRoot);
     };
     if rest.is_empty() {
-        return match (first, value) {
-            (PathSegment::Field(id), Value::Record(fields)) => {
+        return match (first, value.view()) {
+            (PathSegment::Field(id), ValueRef::Record(fields)) => {
                 let mut next = fields.to_vec();
                 let index = next
                     .binary_search_by_key(id, Field::id)
@@ -911,7 +927,7 @@ fn delete_at(value: &Value, segments: &[PathSegment]) -> Result<Value, PatchErro
                 next.remove(index);
                 Value::record_canonical(next).map_err(PatchError::InvalidValue)
             }
-            (PathSegment::MapKey(encoded_key), Value::Map(entries)) => {
+            (PathSegment::MapKey(encoded_key), ValueRef::Map(entries)) => {
                 let mut next = entries.to_vec();
                 let index = next
                     .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
@@ -923,8 +939,8 @@ fn delete_at(value: &Value, segments: &[PathSegment]) -> Result<Value, PatchErro
         };
     }
 
-    match (first, value) {
-        (PathSegment::Field(id), Value::Record(fields)) => {
+    match (first, value.view()) {
+        (PathSegment::Field(id), ValueRef::Record(fields)) => {
             let index = fields
                 .binary_search_by_key(id, Field::id)
                 .map_err(|_| PatchError::PathNotFound)?;
@@ -933,39 +949,35 @@ fn delete_at(value: &Value, segments: &[PathSegment]) -> Result<Value, PatchErro
             next[index] = Field::new(*id, child);
             Value::record_canonical(next).map_err(PatchError::InvalidValue)
         }
-        (PathSegment::TupleIndex(index), Value::Tuple(items)) => {
+        (PathSegment::TupleIndex(index), ValueRef::Tuple(items)) => {
             let index = usize::try_from(*index).map_err(|_| PatchError::IndexOverflow)?;
             let mut next = items.to_vec();
             let current = next.get(index).ok_or(PatchError::PathNotFound)?;
             let child = delete_at(current, rest)?;
             next[index] = child;
-            Ok(Value::Tuple(next.into_boxed_slice()))
+            Value::tuple(next).map_err(PatchError::InvalidValue)
         }
-        (PathSegment::VectorIndex(index), Value::Vector(items)) => {
+        (PathSegment::VectorIndex(index), ValueRef::Vector(items)) => {
             let index = usize::try_from(*index).map_err(|_| PatchError::IndexOverflow)?;
             let mut next = items.to_vec();
             let current = next.get(index).ok_or(PatchError::PathNotFound)?;
             let child = delete_at(current, rest)?;
             next[index] = child;
-            Ok(Value::Vector(next.into_boxed_slice()))
+            Value::vector(next).map_err(PatchError::InvalidValue)
         }
         (
             PathSegment::SumPayload,
-            Value::Sum {
+            ValueRef::Sum {
                 type_id,
                 variant,
                 payload,
             },
         ) => {
-            let current = payload.as_deref().ok_or(PatchError::PathNotFound)?;
+            let current = payload.ok_or(PatchError::PathNotFound)?;
             let child = delete_at(current, rest)?;
-            Ok(Value::Sum {
-                type_id: *type_id,
-                variant: *variant,
-                payload: Some(Box::new(child)),
-            })
+            Ok(Value::sum(type_id, variant, Some(child)))
         }
-        (PathSegment::MapKey(encoded_key), Value::Map(entries)) => {
+        (PathSegment::MapKey(encoded_key), ValueRef::Map(entries)) => {
             let index = entries
                 .binary_search_by(|entry| entry.encoded_key().cmp(encoded_key.as_ref()))
                 .map_err(|_| PatchError::PathNotFound)?;
@@ -993,6 +1005,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 
 /// Strict canonical patch decoding failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum PatchDecodeError {
     /// Complete input exceeds the declared byte limit.
     InputLimit {
@@ -1122,6 +1135,7 @@ impl core::error::Error for PatchDecodeError {}
 
 /// Patch construction or application failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum PatchError {
     /// Canonical encoding failed.
     Encode(EncodeError),
@@ -1211,20 +1225,7 @@ mod tests {
     use super::*;
     use alloc::vec;
 
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test/fold/v1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                let slot = index % 32;
-                output[slot] = output[slot].wrapping_add(byte);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
     fn state_domain() -> Domain<'static> {
         match Domain::new("test/state", 1) {
@@ -1274,7 +1275,7 @@ mod tests {
 
     #[test]
     fn update_checks_pre_root_and_old_value() {
-        let state = match Value::record_canonical(vec![Field::new(1, Value::U128(7))]) {
+        let state = match Value::record_canonical(vec![Field::new(1, Value::unsigned(7))]) {
             Ok(state) => state,
             Err(error) => panic!("invalid state: {error}"),
         };
@@ -1282,7 +1283,7 @@ mod tests {
             Ok(root) => root,
             Err(error) => panic!("hash failed: {error}"),
         };
-        let old_hash = match hash_precondition_value::<TestHasher>(&Value::U128(7)) {
+        let old_hash = match hash_precondition_value::<TestHasher>(&Value::unsigned(7)) {
             Ok(root) => root,
             Err(error) => panic!("hash failed: {error}"),
         };
@@ -1292,7 +1293,7 @@ mod tests {
             vec![PatchOp::Update {
                 path: ValuePath::new(vec![PathSegment::Field(1)]),
                 expected_old_hash: old_hash,
-                value: Value::U128(8),
+                value: Value::unsigned(8),
             }],
         );
         assert!(patch.is_ok());
@@ -1304,13 +1305,14 @@ mod tests {
     fn value_at_resolves_nested_paths_without_mutation() {
         let state = Value::record_canonical(vec![Field::new(
             1,
-            Value::Tuple(vec![Value::Bool(false), Value::U128(7)].into_boxed_slice()),
+            Value::tuple(vec![Value::boolean(false), Value::unsigned(7)])
+                .unwrap_or_else(|error| panic!("tuple rejected: {error}")),
         )])
         .unwrap_or_else(|error| panic!("invalid state: {error}"));
         let original = state.clone();
         let path = ValuePath::new(vec![PathSegment::Field(1), PathSegment::TupleIndex(1)]);
 
-        assert_eq!(value_at(&state, &path), Ok(&Value::U128(7)));
+        assert_eq!(value_at(&state, &path), Ok(&Value::unsigned(7)));
         assert_eq!(state, original);
     }
 
@@ -1323,12 +1325,12 @@ mod tests {
                 PatchOp::Update {
                     path: ValuePath::new(vec![PathSegment::Field(1)]),
                     expected_old_hash: Hash32::ZERO,
-                    value: Value::U128(1),
+                    value: Value::unsigned(1),
                 },
                 PatchOp::Update {
                     path: ValuePath::new(vec![PathSegment::Field(1), PathSegment::Field(2)]),
                     expected_old_hash: Hash32::ZERO,
-                    value: Value::U128(2),
+                    value: Value::unsigned(2),
                 },
             ],
         );
@@ -1344,17 +1346,17 @@ mod tests {
                 PatchOp::Update {
                     path: ValuePath::new(vec![PathSegment::Field(1)]),
                     expected_old_hash: Hash32::ZERO,
-                    value: Value::U128(1),
+                    value: Value::unsigned(1),
                 },
                 PatchOp::Update {
                     path: ValuePath::new(vec![PathSegment::Field(0), PathSegment::Field(0)]),
                     expected_old_hash: Hash32::ZERO,
-                    value: Value::U128(2),
+                    value: Value::unsigned(2),
                 },
                 PatchOp::Update {
                     path: ValuePath::new(vec![PathSegment::Field(1), PathSegment::Field(0)]),
                     expected_old_hash: Hash32::ZERO,
-                    value: Value::U128(3),
+                    value: Value::unsigned(3),
                 },
             ],
         );
@@ -1363,7 +1365,8 @@ mod tests {
 
     #[test]
     fn record_insert_and_delete_are_pure() {
-        let state = Value::Record(Vec::<Field>::new().into_boxed_slice());
+        let state = Value::record_canonical(Vec::<Field>::new())
+            .unwrap_or_else(|error| panic!("record rejected: {error}"));
         let pre_root = hash_value::<TestHasher>(state_domain(), &state).unwrap_or(Hash32::ZERO);
         let insert = CanonicalPatch::try_new(
             1,
@@ -1371,18 +1374,22 @@ mod tests {
             vec![PatchOp::Insert {
                 path: ValuePath::new(vec![PathSegment::Field(1)]),
                 map_key: None,
-                value: Value::U128(9),
+                value: Value::unsigned(9),
             }],
         );
         assert!(insert.is_ok());
         let inserted = insert.and_then(|value| value.apply::<TestHasher>(&state, state_domain()));
         assert!(inserted.is_ok());
-        assert_eq!(state, Value::Record(Vec::<Field>::new().into_boxed_slice()));
+        assert_eq!(
+            state,
+            Value::record_canonical(Vec::<Field>::new())
+                .unwrap_or_else(|error| panic!("record rejected: {error}"))
+        );
     }
 
     #[test]
     fn strict_decoder_round_trips_and_accepts_exact_outer_limits() {
-        let (patch, bytes) = canonical_patch_bytes(vec![field_update(1, Value::U128(8))]);
+        let (patch, bytes) = canonical_patch_bytes(vec![field_update(1, Value::unsigned(8))]);
         let byte_count = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         let limits = PatchDecodeLimits {
             max_input_bytes: byte_count,
@@ -1456,7 +1463,8 @@ mod tests {
         let operation = PatchOp::Update {
             path: ValuePath::new(vec![PathSegment::Field(1), PathSegment::TupleIndex(0)]),
             expected_old_hash: Hash32::ZERO,
-            value: Value::Bytes(vec![1_u8, 2].into_boxed_slice()),
+            value: Value::bytes(vec![1_u8, 2])
+                .unwrap_or_else(|error| panic!("bytes rejected: {error}")),
         };
         let (_, bytes) = canonical_patch_bytes(vec![operation]);
         let limits = PatchDecodeLimits {
@@ -1510,7 +1518,7 @@ mod tests {
 
     #[test]
     fn strict_decoder_validates_canonical_map_keys_and_their_exact_bound() {
-        let key = Value::U128(7);
+        let key = Value::unsigned(7);
         let encoded_key = match key.canonical_bytes() {
             Ok(bytes) => bytes,
             Err(error) => panic!("key encoding failed: {error}"),
@@ -1520,7 +1528,7 @@ mod tests {
                 encoded_key.clone().into_boxed_slice(),
             )]),
             map_key: Some(key),
-            value: Value::Bool(true),
+            value: Value::boolean(true),
         };
         let (_, bytes) = canonical_patch_bytes(vec![operation]);
         let key_bytes = u64::try_from(encoded_key.len()).unwrap_or(u64::MAX);
@@ -1548,8 +1556,8 @@ mod tests {
     #[test]
     fn strict_decoder_rejects_noncanonical_order_overlap_and_key_mismatch() {
         let reversed = encode_patch_unchecked(&[
-            field_update(2, Value::U128(2)),
-            field_update(1, Value::U128(1)),
+            field_update(2, Value::unsigned(2)),
+            field_update(1, Value::unsigned(1)),
         ]);
         assert_eq!(
             decode_canonical_patch(&reversed, PatchDecodeLimits::default()),
@@ -1557,11 +1565,11 @@ mod tests {
         );
 
         let overlapping = encode_patch_unchecked(&[
-            field_update(1, Value::U128(1)),
+            field_update(1, Value::unsigned(1)),
             PatchOp::Update {
                 path: ValuePath::new(vec![PathSegment::Field(1), PathSegment::Field(2)]),
                 expected_old_hash: Hash32::ZERO,
-                value: Value::U128(2),
+                value: Value::unsigned(2),
             },
         ]);
         assert_eq!(
@@ -1569,7 +1577,7 @@ mod tests {
             Err(PatchDecodeError::Patch(PatchError::OverlappingPaths))
         );
 
-        let encoded_path_key = match Value::U128(1).canonical_bytes() {
+        let encoded_path_key = match Value::unsigned(1).canonical_bytes() {
             Ok(bytes) => bytes,
             Err(error) => panic!("key encoding failed: {error}"),
         };
@@ -1577,8 +1585,8 @@ mod tests {
             path: ValuePath::new(vec![PathSegment::MapKey(
                 encoded_path_key.into_boxed_slice(),
             )]),
-            map_key: Some(Value::U128(2)),
-            value: Value::Bool(true),
+            map_key: Some(Value::unsigned(2)),
+            value: Value::boolean(true),
         }]);
         assert_eq!(
             decode_canonical_patch(&mismatched, PatchDecodeLimits::default()),
@@ -1590,7 +1598,8 @@ mod tests {
     fn strict_decoder_propagates_nested_zcve_limits() {
         let (_, bytes) = canonical_patch_bytes(vec![field_update(
             1,
-            Value::Vector(vec![Value::Unit, Value::Unit].into_boxed_slice()),
+            Value::vector(vec![Value::unit(), Value::unit()])
+                .unwrap_or_else(|error| panic!("vector rejected: {error}")),
         )]);
         let mut limits = PatchDecodeLimits::default();
         limits.value.value.max_collection_len = 1;
@@ -1606,7 +1615,7 @@ mod tests {
 
     #[test]
     fn strict_decoder_rejects_malformed_tags_flags_trailing_bytes_and_truncation() {
-        let (_, update_bytes) = canonical_patch_bytes(vec![field_update(1, Value::U128(8))]);
+        let (_, update_bytes) = canonical_patch_bytes(vec![field_update(1, Value::unsigned(8))]);
 
         let mut unknown_operation = update_bytes.clone();
         let Some(operation_tag) = unknown_operation.get_mut(44) else {
@@ -1636,7 +1645,7 @@ mod tests {
         let insert = PatchOp::Insert {
             path: insert_path,
             map_key: None,
-            value: Value::Bool(true),
+            value: Value::boolean(true),
         };
         let (_, mut invalid_flag) = canonical_patch_bytes(vec![insert]);
         let flag_offset = 44_usize

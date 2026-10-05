@@ -97,15 +97,19 @@ pub(crate) fn render(schema: &Schema, schema_hash: Hash32) -> Result<String, Cod
     output.push_str(
         "        let envelope = SchemaAdmittedEnvelope::try_new::<H>(&schema, value, limits)?;\n",
     );
+    output.push_str("        Self::validate_schema_hash(envelope.schema_hash())?;\n");
+    output.push_str("        Ok(envelope)\n");
+    output.push_str("    }\n\n");
+    output.push_str("    fn validate_schema_hash(actual: Hash32) -> Result<(), AdapterError> {\n");
     writeln!(
         output,
-        "        if envelope.schema_hash() != {} {{",
+        "        if actual != {} {{",
         render_hash(schema_hash)
     )
     .map_err(|_| CodegenError::LengthOverflow)?;
     output.push_str("            return Err(AdapterError::SchemaHashMismatch);\n");
     output.push_str("        }\n");
-    output.push_str("        Ok(envelope)\n");
+    output.push_str("        Ok(())\n");
     output.push_str("    }\n");
     output.push_str("}\n\n");
 

@@ -1,6 +1,5 @@
 use compliance_gateway::{
-    authority, context, create, delivery::Destination, generated::*, invoke, journey, reinstate,
-    screen,
+    authority, context, create, generated::*, invoke, journey, reinstate, screen,
 };
 use std::{
     fs,
@@ -51,9 +50,10 @@ fn complete_gateway_journey() {
 fn a_frozen_account_survives_a_restart() {
     let temp = Temp::new();
     let path = temp.0.join("gateway.sqlite");
-    let authority = authority().unwrap();
-    let destination = Destination::default();
-    let mut shell = create(&path, &authority, destination.clone()).unwrap();
+    let contract = compliance_gateway::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let mut shell = create(&path, &authority).unwrap();
     for n in 0..3 {
         assert_eq!(
             invoke(
@@ -69,12 +69,7 @@ fn a_frozen_account_survives_a_restart() {
     }
     drop(shell);
     // Reopening re-executes every persisted decision before admitting new ones.
-    let mut shell = compliance_gateway::Shell::open_existing(
-        &path,
-        &authority,
-        authority.bind_delivery_interpreter(destination),
-    )
-    .unwrap();
+    let mut shell = compliance_gateway::Shell::open(&path, &authority).unwrap();
     // Frozen: even a small, low-risk transfer from a verified customer is
     // blocked, and the strikes stay at three.
     let small = || screen(Region::Allowed, 0, CounterpartyRisk::Low);
@@ -84,12 +79,12 @@ fn a_frozen_account_survives_a_restart() {
     );
     let snapshot = shell.snapshot().unwrap();
     assert_eq!(
-        Standing::try_from_value(snapshot.state().clone()).unwrap(),
+        compliance_gateway::decode_state(snapshot.state()).unwrap(),
         Standing {
             strikes: Strikes(3)
         }
     );
-    assert_eq!(snapshot.pending_outbox(), 4);
+    assert_eq!(snapshot.pending(), 4);
     assert_eq!(
         invoke(
             &mut shell,
@@ -106,9 +101,9 @@ fn a_frozen_account_survives_a_restart() {
         "Accept"
     );
     let snapshot = shell.snapshot().unwrap();
-    assert_eq!(snapshot.bundle_count(), 6);
+    assert_eq!(snapshot.version(), 6);
     assert_eq!(
-        Standing::try_from_value(snapshot.state().clone()).unwrap(),
+        compliance_gateway::decode_state(snapshot.state()).unwrap(),
         Standing {
             strikes: Strikes(0)
         }
@@ -118,13 +113,10 @@ fn a_frozen_account_survives_a_restart() {
 #[test]
 fn rejections_leave_standing_and_outbox_unchanged() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let mut shell = create(
-        &temp.0.join("gateway.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = compliance_gateway::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let mut shell = create(&temp.0.join("gateway.sqlite"), &authority).unwrap();
     assert_eq!(
         invoke(
             &mut shell,
@@ -137,7 +129,7 @@ fn rejections_leave_standing_and_outbox_unchanged() {
         "CommittedFailure"
     );
     let before = shell.snapshot().unwrap();
-    assert_eq!(before.pending_outbox(), 1);
+    assert_eq!(before.pending(), 1);
     assert_eq!(
         invoke(
             &mut shell,

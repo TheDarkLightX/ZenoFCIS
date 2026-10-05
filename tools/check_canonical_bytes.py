@@ -8,6 +8,7 @@ This unit does not implement a protected view or authorize a transition.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -16,6 +17,8 @@ import subprocess
 import tempfile
 import zipfile
 
+from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
+from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import once
 from verus_coverage import require_coverage
@@ -25,15 +28,23 @@ PROFILE = Path("verification/verus/canonical-bytes.json")
 HARNESS = Path("verification/verus/canonical_bytes.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/canonical_v2/mod.rs")
 SPEC = SUBJECT.parent / "spec.rs"
-UNIT_SOURCES = (HARNESS, SUBJECT, SPEC)
+ADMISSION = SUBJECT.parent / "schema/admission.rs"
+UNIT_SOURCES = (HARNESS, Path("verification/verus/canonical_bytes_tests.rs"),
+                *sorted(path.relative_to(ROOT) for path in (ROOT / SUBJECT.parent).rglob("*.rs")))
+
+UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
-           Path("verification/verus/canonical_bytes_tests.rs"),
            Path("tools/check_canonical_bytes.py"), Path("tools/test_check_canonical_bytes.py"),
            Path("tools/verus_coverage.py"), Path("tools/check_verus.py"),
            Path("tools/check_finite_execution.py"), Path("Cargo.toml"),
            Path("rust-toolchain.toml"), Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
            Path("crates/zeno-fcis-synthesis/tests/v2_execution.rs"))
+
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
+                                Path("verification/verus/authority_v2_sources.json"))))
+
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
 
 
 def snapshot() -> dict[str, str]:
@@ -70,7 +81,20 @@ def mutation_sources(source: str, spec: str) -> dict[str, tuple[Path, str, str]]
          "    requires bytes@.len() >= 16,\n"
          "    ensures result == spec::read_signed(bytes@, offset),\n))]\n"),
     ):
-        mutations[name] = (SUBJECT, signed_contract(source, replacement), "coverage")
+        # The schema reader consumes this postcondition. Removing it now
+        # fails caller proofs, so retain these as explicit contract controls.
+        mutations[name] = (SUBJECT, signed_contract(source, replacement), "proof_contract")
+    admission = (ROOT / ADMISSION).read_text()
+    end = admission.index("    pub fn original(&self)")
+    start = admission.rindex("    #[cfg_attr(verus_keep_ghost, verus_spec(result =>", 0, end)
+    for name, replacement in (
+        ("omit_unused_getter_contract", ""),
+        ("weaken_unused_getter_contract", "    #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n"),
+        ("narrow_unused_getter_domain", "    #[cfg_attr(verus_keep_ghost, verus_spec(result =>\n"
+         "        requires self.view().0.len() > 0,\n"
+         "        ensures result@ == self.view().0,\n    ))]\n"),
+    ):
+        mutations[name] = (ADMISSION, admission[:start] + replacement + admission[end:], "coverage")
     mutations["change_signed_specification"] = (SPEC,
         once(spec, "value as int - (u128::MAX as int + 1)",
              "value as int - u128::MAX as int - 1"), "coverage")
@@ -84,13 +108,14 @@ def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
                "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)",
                str(HARNESS), "-o", str(executable)]
+    command += native_dependency_args(ROOT, directory, environment)
     verifier.require_success(verifier.run(command, ROOT, environment))
     result = verifier.run([str(executable)], ROOT, environment)
     verifier.require_success(result)
     return {"command": command, "exit_code": result.returncode, "test_output": result.stdout}
 
 
-def check(cache: Path, install: bool) -> dict:
+def check(cache: Path, install: bool, retained_directory: Path | None = None) -> dict:
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("this byte proof profile requires qualified Linux x86-64 tools")
     pin = json.loads((ROOT / verifier.PIN).read_text())
@@ -105,13 +130,18 @@ def check(cache: Path, install: bool) -> dict:
     environment["RUSTUP_TOOLCHAIN"] = pin["rust_toolchain"]
     environment["VERUS_Z3_PATH"] = str(tools / "z3")
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024",
-               "--no-cheating", "--no-external-by-default", "--num-threads", "2", "--output-json",
+               "--no-cheating", "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json",
                "--log", "vir", "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
-    with tempfile.TemporaryDirectory(prefix="zeno-fcis-byte-proof-") as temporary:
+    context = (nullcontext(str(retained_directory)) if retained_directory is not None
+               else tempfile.TemporaryDirectory(prefix="zeno-fcis-byte-proof-"))
+    with context as temporary:
         directory = Path(temporary)
+        (directory / "source_sha256.json").write_text(json.dumps(before, indent=2, sort_keys=True) + "\n")
         positive_command = [*command, "--log-dir", str(directory / "positive"), str(HARNESS)]
         positive = verifier.run(positive_command, ROOT, environment)
+        (directory / "positive.json").write_text(positive.stdout)
+        (directory / "positive.stderr").write_text(positive.stderr)
         verifier.require_success(positive)
         report = json.loads(positive.stdout)
         if not verifier.accepted(report, report_pin):
@@ -126,14 +156,17 @@ def check(cache: Path, install: bool) -> dict:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed if unit == path else (ROOT / unit).read_text())
+            adjust_specimen_source_lengths(specimen)
             mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"),
                                    str(specimen / HARNESS)], ROOT, environment)
+            (specimen / "verus.json").write_text(mutant.stdout)
+            (specimen / "verus.stderr").write_text(mutant.stderr)
             try:
                 result = json.loads(mutant.stdout).get("verification-results", {})
             except ValueError:
                 result = {}
             refusal = None
-            if expected == "proof":
+            if expected in ("proof", "proof_contract"):
                 killed = (mutant.returncode != 0 and result.get("errors", 0) > 0
                           and result.get("encountered-vir-error") is False)
             else:
@@ -145,8 +178,10 @@ def check(cache: Path, install: bool) -> dict:
                 killed = (mutant.returncode == 0 and result.get("success") is True
                           and result.get("errors") == 0 and refusal is not None)
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
+                              "changed_source": str(path), "changed_sha256": verifier.digest(specimen / path),
                               "exit_code": mutant.returncode, "verification_results": result,
-                              "coverage_refusal": refusal})
+                              "coverage_refusal": refusal, "logs": str(specimen)})
+            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
             if not killed:
                 raise RuntimeError(f"byte mutation {name} survived or failed for an unrelated reason")
             print(f"V2 bytes: caught {name} ({expected})", flush=True)
@@ -160,7 +195,7 @@ def check(cache: Path, install: bool) -> dict:
             "toolchain": pin, "command": positive_command, "exit_code": positive.returncode,
             "verus_report": report, "translated_function_coverage": coverage,
             "native": native, "mutations": mutations,
-            "scope": "exact unsigned base-256 and signed i128 interpretation on arbitrary slices and offsets",
+            "scope": "exact unsigned base-256 and signed i128 interpretation; full current canonical module dependency coverage",
             "trusted_base": ["reviewed specifications and translated coverage manifest",
                              "Verus translation/erasure and bundled vstd/Z3", "Rust compilers",
                              "standard library", "host platform"],
@@ -175,17 +210,20 @@ def main() -> int:
     parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    directory = Path(tempfile.mkdtemp(prefix="canonical-byte-run-", dir=args.out.parent))
     try:
-        receipt = check(args.cache.resolve(), args.install)
+        receipt = check(args.cache.resolve(), args.install, directory)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
         receipt = {"schema": "zeno-fcis/canonical-byte-evidence/1", "status": "failed", "error": str(error)}
+    receipt["logs"] = str(directory)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     print(f"V2 bytes: {receipt['status']}; receipt: {args.out}")
     if receipt["status"] != "passed":
         print(receipt["error"])
         return 1
-    print(f"9 obligations; {len(receipt['mutations'])} mutations caught")
+    print(f"{receipt['verus_report']['verification-results']['verified']} obligations; {len(receipt['mutations'])} mutations caught")
     return 0
 
 

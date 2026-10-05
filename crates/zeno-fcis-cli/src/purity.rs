@@ -1,9 +1,9 @@
 //! Static check for ambient effects and nondeterminism in Rust decision code.
 //!
-//! Each file is parsed with `syn`. `use` and `extern crate` aliases are
-//! resolved within the file, and every path, macro, item, and literal is
-//! compared with a fixed rule table. Paths inside macro invocations are found
-//! by scanning the macro's tokens. A directory containing `Cargo.toml` is
+//! The normal V2 route parses bounded source bytes with `syn`, follows declared
+//! native modules and lexical bindings, and resolves imports and type aliases
+//! before applying its rule table. Unsupported expansion or resolution refuses.
+//! A directory containing `Cargo.toml` is
 //! checked as a crate: every `.rs` file under `src/`, plus the structural
 //! conditions that confine it (unconditional `no_std`, `forbid(unsafe_code)`,
 //! no `extern crate std`, no source brought in from outside the checked
@@ -12,11 +12,14 @@
 //!
 //! The check reports what it can see, and reports as unreadable what it could
 //! not read, so an unread file never leaves a result clean. It does not
-//! expand macros, follow calls into other files or dependencies, or know the
-//! type of a method's receiver. A clean or confined result is Checked against
+//! perform compiler macro expansion, follow arbitrary calls into dependencies,
+//! or infer the type of a method's receiver. A clean or confined result is Checked against
 //! this rule table; it is never a proof of determinism.
+//! The original file-wide scanner remains a private test/reference path.
 
-use std::collections::{BTreeMap, BTreeSet};
+#[cfg(test)]
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -24,7 +27,15 @@ use std::path::{Path, PathBuf};
 use proc_macro2::{Delimiter, Spacing, Span, TokenStream, TokenTree};
 use serde_json::{Value, json};
 use syn::ext::IdentExt;
+#[cfg(test)]
 use syn::visit::{self, Visit};
+
+#[path = "purity_resolution.rs"]
+mod resolution;
+
+#[cfg(test)]
+#[path = "purity_resolution_tests.rs"]
+mod resolution_tests;
 
 pub(crate) const SCHEMA: &str = "zeno-fcis/purity-report/1";
 
@@ -125,6 +136,7 @@ const WARNING_PATH_RULES: &[(&str, &[&str])] = &[
 ];
 
 /// Macros that perform an effect or keep state, by rule.
+#[cfg(test)]
 const MACRO_RULES: &[(&str, &[&str])] = &[
     ("io", &["print", "println", "eprint", "eprintln", "dbg"]),
     ("shared-state", &["thread_local", "lazy_static"]),
@@ -175,6 +187,22 @@ const NONCLAIMS: &[&str] = &[
     "method calls are matched by name only for addr, expose_provenance, and expose_addr",
     "a function converted to an integer, as in `decide as usize`, is not reported",
     "platform-dependent sizes such as usize and size_of are not reported",
+];
+
+const RESOLVED_NONCLAIMS: &[&str] = &[
+    "scoped source resolution and rule detection are not compiler name/type resolution or proof of determinism",
+    "unknown user/procedural macro expansion and unresolved or ambiguous bindings refuse",
+    "bare macro definitions use declaration-order textual inheritance; ordinary namespaces keep module boundaries",
+    "unsupported Cargo target closure or absence of an established readable package root refuses",
+    "builtin attributes require exact names; rustfmt::skip requires supported package context and an unshadowed lexical qualifier",
+    "compiler tool identity retains declared runtime target/feature alternatives; unknown manifest context or lexical lookup refuses",
+    "standalone source inputs use the declared default compiler prelude; undeclared caller-injected extern crates are outside that profile",
+    "generic alias targets use lexical parameter scopes; substitutions and associated types are not inferred",
+    "feature/target cfg alternatives are retained unless the named native profile decides them",
+    "external dependency implementations and immutable include data remain named assumptions",
+    "receiver types, arbitrary call targets, target sizes and function-to-integer casts are not inferred",
+    "Cargo compilation remains necessary to reject invalid syntax, privacy violations and type mismatches",
+    "build scripts, integration tests, examples and benches are outside the native source closure",
 ];
 
 /// How much one finding matters.
@@ -241,6 +269,21 @@ pub(crate) struct Report {
     pub(crate) findings: Vec<Finding>,
     pub(crate) structures: Vec<Structure>,
     pub(crate) unreadable: Vec<(String, String)>,
+    /// Present only for the V2 scoped resolved-use route.
+    pub(crate) resolution: Option<ResolutionSummary>,
+}
+
+/// The declared scope of a resolved-use source inspection.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ResolutionSummary {
+    pub(crate) active_files: Vec<String>,
+    pub(crate) skipped_cfg: Vec<String>,
+}
+
+/// A syntax tree parsed from the same bounded bytes as the structural check.
+struct ParsedSource {
+    path: PathBuf,
+    syntax: syn::File,
 }
 
 impl Report {
@@ -297,7 +340,7 @@ impl Report {
             .map(|(file, message)| json!({"file": file, "message": message}))
             .collect();
         json!({
-            "schema": SCHEMA,
+            "schema": if self.resolution.is_some() { "zeno-fcis/purity-report/2" } else { SCHEMA },
             "status": self.status(),
             "files_checked": self.files.len(),
             "errors": self.errors(),
@@ -305,12 +348,36 @@ impl Report {
             "findings": findings,
             "crates": structures,
             "unreadable": unreadable,
-            "nonclaims": NONCLAIMS,
+            "nonclaims": if self.resolution.is_some() { RESOLVED_NONCLAIMS } else { NONCLAIMS },
+            "resolution": self.resolution.as_ref().map(|summary| json!({
+                "profile": "native-production; test/verus/verus_keep_ghost disabled; unknown cfg retains possible bodies",
+                "compiler_tool_identity": {
+                    "profile": "declared package namespaces or dependency-free standalone default extern prelude",
+                    "package_context": "closest enclosing readable supported Cargo.toml; unknown or unreadable context refuses",
+                    "excluded_compiler_overrides": [
+                        "undeclared caller-injected --extern bindings",
+                        "RUSTFLAGS or CARGO_ENCODED_RUSTFLAGS compiler namespace overrides",
+                        ".cargo configuration compiler namespace overrides",
+                    ],
+                },
+                "active_files": summary.active_files,
+                "skipped_cfg": summary.skipped_cfg,
+                "nonclaims": [
+                    "source-level scoped import/module/type-alias resolution, not whole compiler name or type resolution",
+                    "unknown user/procedural macro expansion and unresolved or ambiguous bindings refuse",
+                    "feature/target cfg alternatives are conservatively included unless the declared native policy determines them",
+                    "external dependency implementations and immutable include data remain named assumptions",
+                    "absence of a detected rule match is not proof of determinism",
+                ],
+            })),
         })
     }
 
     pub(crate) fn render(&self) -> String {
         let mut output = String::new();
+        if self.resolution.is_some() {
+            output.push_str("purity scope: declared package namespaces or dependency-free standalone default extern prelude; undeclared --extern, RUSTFLAGS and .cargo compiler namespace overrides are excluded\n");
+        }
         for (file, message) in &self.unreadable {
             output.push_str(&format!("{file}: unreadable: {message}\n"));
         }
@@ -377,6 +444,13 @@ impl Report {
             self.findings.len() - self.errors(),
             self.files.len()
         ));
+        if let Some(summary) = &self.resolution {
+            output.push_str(&format!(
+                "resolved native source closure: {} files; {} explicit inactive cfg locations\n",
+                summary.active_files.len(),
+                summary.skipped_cfg.len()
+            ));
+        }
         output
     }
 }
@@ -388,22 +462,49 @@ const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
 ///
 /// Anything the check cannot read is reported as unreadable, so a file it
 /// did not read can never leave the result clean or confined.
+#[cfg(test)]
 pub(crate) fn check_paths(paths: &[PathBuf]) -> Report {
-    let mut report = Report::default();
-    for path in paths {
-        if path.is_dir() && path.join("Cargo.toml").is_file() {
-            check_crate(path, &mut report);
-        } else if path.is_dir() {
-            for file in rust_files(path, &mut report) {
-                check_file(&file, &mut report);
-            }
-        } else {
-            check_file(path, &mut report);
-        }
+    let (mut report, sources) = collect_paths(paths);
+    for source in &sources {
+        report.findings.extend(reference_findings(
+            &source.path.display().to_string(),
+            &source.syntax,
+        ));
     }
     report.findings.sort();
     report.findings.dedup();
     report
+}
+
+/// Resolves paths through actual declared modules and lexical import scopes.
+/// Unsupported resolution/expansion is an error rather than a clean result.
+pub(crate) fn check_resolved_paths(paths: &[PathBuf]) -> Report {
+    let (report, sources) = collect_paths(paths);
+    resolution::check(paths, report, &sources)
+}
+
+fn collect_paths(paths: &[PathBuf]) -> (Report, Vec<ParsedSource>) {
+    let mut report = Report::default();
+    let mut sources = Vec::new();
+    for path in paths {
+        if path.is_dir() && path.join("Cargo.toml").is_file() {
+            check_crate(path, &mut report, &mut sources);
+        } else if path.is_dir() {
+            for file in rust_files(path, &mut report) {
+                if let Some((syntax, _)) = check_file(&file, &mut report) {
+                    sources.push(ParsedSource { path: file, syntax });
+                }
+            }
+        } else if let Some((syntax, _)) = check_file(path, &mut report) {
+            sources.push(ParsedSource {
+                path: path.clone(),
+                syntax,
+            });
+        }
+    }
+    report.findings.sort();
+    report.findings.dedup();
+    (report, sources)
 }
 
 /// Lists the Rust files under a directory without following symbolic links.
@@ -471,14 +572,11 @@ fn check_file(path: &Path, report: &mut Report) -> Option<(syn::File, String)> {
     let name = path.display().to_string();
     report.files.push(name.clone());
     let checked = read_bounded(path, MAX_FILE_BYTES).and_then(|source| {
-        let (file, findings) = check_source(&name, &source)?;
-        Ok((file, findings, source))
+        let file = parse_source(&source)?;
+        Ok((file, source))
     });
     match checked {
-        Ok((file, findings, source)) => {
-            report.findings.extend(findings);
-            Some((file, source))
-        }
+        Ok((file, source)) => Some((file, source)),
         Err(message) => {
             report.unreadable.push((name, message));
             None
@@ -502,14 +600,25 @@ fn read_bounded(path: &Path, limit: u64) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|_| "not UTF-8".to_string())
 }
 
-/// Checks one source text; the name labels its findings.
-pub(crate) fn check_source(name: &str, source: &str) -> Result<(syn::File, Vec<Finding>), String> {
-    let file = syn::parse_file(source).map_err(|error| {
+fn parse_source(source: &str) -> Result<syn::File, String> {
+    syn::parse_file(source).map_err(|error| {
         let start = error.span().start();
         format!("{}:{}: {error}", start.line, start.column + 1)
-    })?;
+    })
+}
+
+/// Original private reference scanner, retained with all regression assertions.
+#[cfg(test)]
+pub(crate) fn check_source(name: &str, source: &str) -> Result<(syn::File, Vec<Finding>), String> {
+    let file = parse_source(source)?;
+    let findings = reference_findings(name, &file);
+    Ok((file, findings))
+}
+
+#[cfg(test)]
+fn reference_findings(name: &str, file: &syn::File) -> Vec<Finding> {
     let mut aliases = Aliases::default();
-    aliases.visit_file(&file);
+    aliases.visit_file(file);
     let mut scanner = Scanner {
         file: name,
         aliases: aliases.names,
@@ -518,11 +627,11 @@ pub(crate) fn check_source(name: &str, source: &str) -> Result<(syn::File, Vec<F
     for entry in &aliases.entries {
         scanner.check_import(entry);
     }
-    scanner.visit_file(&file);
-    Ok((file, scanner.findings))
+    scanner.visit_file(file);
+    scanner.findings
 }
 
-fn check_crate(directory: &Path, report: &mut Report) {
+fn check_crate(directory: &Path, report: &mut Report, sources: &mut Vec<ParsedSource>) {
     let mut structure = Structure {
         krate: directory.display().to_string(),
         ..Structure::default()
@@ -582,6 +691,10 @@ fn check_crate(directory: &Path, report: &mut Report) {
             });
             structure.forbid_unsafe = parsed.attrs.iter().any(forbids_unsafe_code);
         }
+        sources.push(ParsedSource {
+            path: file,
+            syntax: parsed,
+        });
     }
     report.structures.push(structure);
 }
@@ -922,12 +1035,15 @@ fn names_runtime_dependencies(text: &str) -> bool {
     })
 }
 
+/// Why a `[[bin]]` table is reported. A binary target adds no dependency.
+pub(crate) const BINARY_TARGET: &str = "binary target, which confinement does not cover";
+
 /// Returns why a table or key named `first`, outside `[lib]` itself, changes
 /// the package's targets or where its dependencies come from.
 fn changes_targets_or_sources(first: &str) -> Option<&'static str> {
     match first {
         "lib" | "autolib" => Some("library target changed"),
-        "bin" => Some("binary target, which confinement does not cover"),
+        "bin" => Some(BINARY_TARGET),
         "patch" | "replace" => Some("dependency sources replaced"),
         _ => None,
     }
@@ -943,6 +1059,7 @@ fn crate_rule(name: &str) -> Option<&'static str> {
 }
 
 /// One `use` or `extern crate` entry.
+#[cfg(test)]
 struct Import {
     path: Vec<String>,
     glob: bool,
@@ -951,11 +1068,13 @@ struct Import {
 
 /// Collects every import and its local name, in every scope of one file.
 #[derive(Default)]
+#[cfg(test)]
 struct Aliases {
     names: BTreeMap<String, Vec<String>>,
     entries: Vec<Import>,
 }
 
+#[cfg(test)]
 impl Aliases {
     fn walk(&mut self, tree: &syn::UseTree, prefix: &mut Vec<String>) {
         match tree {
@@ -1006,6 +1125,7 @@ impl Aliases {
     }
 }
 
+#[cfg(test)]
 impl<'ast> Visit<'ast> for Aliases {
     fn visit_item_use(&mut self, item: &'ast syn::ItemUse) {
         self.walk(&item.tree, &mut Vec::new());
@@ -1021,12 +1141,14 @@ impl<'ast> Visit<'ast> for Aliases {
     }
 }
 
+#[cfg(test)]
 struct Scanner<'a> {
     file: &'a str,
     aliases: BTreeMap<String, Vec<String>>,
     findings: Vec<Finding>,
 }
 
+#[cfg(test)]
 impl Scanner<'_> {
     fn report(&mut self, span: Span, rule: &'static str, severity: Severity, subject: String) {
         let start = span.start();
@@ -1145,6 +1267,7 @@ impl Scanner<'_> {
     }
 }
 
+#[cfg(test)]
 impl<'ast> Visit<'ast> for Scanner<'_> {
     fn visit_path(&mut self, path: &'ast syn::Path) {
         let segments: Vec<String> = path
@@ -1288,6 +1411,7 @@ impl<'ast> Visit<'ast> for Scanner<'_> {
     }
 }
 
+#[cfg(test)]
 fn is_path_separator(tokens: &[TokenTree], index: usize) -> bool {
     matches!(
         (tokens.get(index), tokens.get(index + 1)),

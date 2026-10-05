@@ -25,7 +25,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 
 /// Maximum compartments attached to one information-flow label.
 pub const MAX_COMPARTMENTS: usize = 64;
@@ -67,10 +67,18 @@ impl SecurityDomainId {
     }
 }
 
-impl CanonicalEncode for SecurityDomainId {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SecurityDomainId {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.0.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -95,10 +103,18 @@ impl CompartmentId {
     }
 }
 
-impl CanonicalEncode for CompartmentId {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CompartmentId {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.0.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -166,8 +182,9 @@ impl SecurityLabel {
     }
 }
 
-impl CanonicalEncode for SecurityLabel {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SecurityLabel {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.confidentiality.to_be_bytes());
         output.extend_from_slice(&self.integrity.to_be_bytes());
         put_u16_length(output, self.compartments.len())?;
@@ -175,6 +192,13 @@ impl CanonicalEncode for SecurityLabel {
             compartment.encode_to(output)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -214,10 +238,18 @@ pub enum ObservationKind {
     Electromagnetic = 14,
 }
 
-impl CanonicalEncode for ObservationKind {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ObservationKind {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -233,10 +265,18 @@ pub enum ChannelClass {
     Covert = 2,
 }
 
-impl CanonicalEncode for ChannelClass {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ChannelClass {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -287,12 +327,20 @@ impl Declassification {
     }
 }
 
-impl CanonicalEncode for Declassification {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Declassification {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.authority_hash.as_bytes());
         output.extend_from_slice(self.purpose_hash.as_bytes());
         output.extend_from_slice(&self.max_bits.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -394,8 +442,9 @@ impl Observation {
     }
 }
 
-impl CanonicalEncode for Observation {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Observation {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.observer.encode_to(output)?;
         self.kind.encode_to(output)?;
         self.channel.encode_to(output)?;
@@ -411,6 +460,13 @@ impl CanonicalEncode for Observation {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -462,12 +518,16 @@ impl ObservationTrace {
 
     /// Computes the trace commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, SecurityError> {
-        hash_canonical::<H>("zeno-fcis/security-trace", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::SECURITY_TRACE,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for ObservationTrace {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ObservationTrace {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-SECURITY-TRACE\0");
         output.extend_from_slice(self.public_input_hash.as_bytes());
         output.extend_from_slice(self.secret_variant_hash.as_bytes());
@@ -476,6 +536,13 @@ impl CanonicalEncode for ObservationTrace {
             put_blob(output, &observation.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -486,7 +553,8 @@ struct ObservationKey {
     channel: ChannelClass,
 }
 
-impl CanonicalEncode for ObservationKey {
+impl ObservationKey {
+    /// Appends this protocol type's exact canonical encoding.
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.observer.encode_to(output)?;
         self.kind.encode_to(output)?;
@@ -517,8 +585,9 @@ pub enum RuleMode {
     },
 }
 
-impl CanonicalEncode for RuleMode {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl RuleMode {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Prohibit => output.push(0),
             Self::Exact => output.push(1),
@@ -538,6 +607,13 @@ impl CanonicalEncode for RuleMode {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -608,10 +684,18 @@ impl LeakageRule {
     }
 }
 
-impl CanonicalEncode for LeakageRule {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl LeakageRule {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.key.encode_to(output)?;
         self.mode.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -657,10 +741,18 @@ pub enum Mitigation {
     VerifiedCompilation = 17,
 }
 
-impl CanonicalEncode for Mitigation {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Mitigation {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -736,12 +828,16 @@ impl DeploymentContract {
 
     /// Computes the deployment-contract commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, SecurityError> {
-        hash_canonical::<H>("zeno-fcis/security-deployment", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::SECURITY_DEPLOYMENT,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for DeploymentContract {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DeploymentContract {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-SECURITY-DEPLOYMENT\0");
         for hash in [
             self.target_hash,
@@ -758,6 +854,13 @@ impl CanonicalEncode for DeploymentContract {
             mitigation.encode_to(output)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -791,10 +894,18 @@ impl ObserverClearance {
     }
 }
 
-impl CanonicalEncode for ObserverClearance {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ObserverClearance {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.observer.encode_to(output)?;
         put_blob(output, &self.clearance.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -901,12 +1012,16 @@ impl LeakagePolicy {
 
     /// Computes the policy commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, SecurityError> {
-        hash_canonical::<H>("zeno-fcis/security-policy", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::SECURITY_POLICY,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for LeakagePolicy {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl LeakagePolicy {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-SECURITY-POLICY\0");
         output.extend_from_slice(self.threat_model_hash.as_bytes());
         output.extend_from_slice(self.deployment_contract_hash.as_bytes());
@@ -928,10 +1043,18 @@ impl CanonicalEncode for LeakagePolicy {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// One fail-closed leakage-policy violation.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum LeakageBlocker {
     /// Traces do not bind the same public input.
     PublicInputMismatch,
@@ -1032,8 +1155,9 @@ pub enum LeakageBlocker {
     ArithmeticOverflow,
 }
 
-impl CanonicalEncode for LeakageBlocker {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl LeakageBlocker {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::PublicInputMismatch => output.push(0),
             Self::SameSecretVariant => output.push(1),
@@ -1120,6 +1244,13 @@ impl CanonicalEncode for LeakageBlocker {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Result of comparing two secret variants under one leakage policy.
@@ -1177,8 +1308,9 @@ impl LeakageReport {
     }
 }
 
-impl CanonicalEncode for LeakageReport {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl LeakageReport {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-LEAKAGE-REPORT\0");
         output.extend_from_slice(self.deployment_hash.as_bytes());
         output.extend_from_slice(self.policy_hash.as_bytes());
@@ -1190,6 +1322,13 @@ impl CanonicalEncode for LeakageReport {
             put_blob(output, &blocker.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1434,10 +1573,18 @@ pub enum SecurityEvidenceKind {
     HardwareAttestation = 9,
 }
 
-impl CanonicalEncode for SecurityEvidenceKind {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SecurityEvidenceKind {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1489,14 +1636,22 @@ impl SecurityEvidence {
     }
 }
 
-impl CanonicalEncode for SecurityEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SecurityEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.kind.encode_to(output)?;
         output.extend_from_slice(self.claim_hash.as_bytes());
         output.extend_from_slice(self.artifact_hash.as_bytes());
         output.extend_from_slice(self.toolchain_hash.as_bytes());
         output.extend_from_slice(self.deployment_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1567,8 +1722,9 @@ impl CapacityEvidence {
     }
 }
 
-impl CanonicalEncode for CapacityEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CapacityEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.key.encode_to(output)?;
         output.extend_from_slice(self.deployment_hash.as_bytes());
         output.extend_from_slice(&self.upper_bound_millibits_per_second.to_be_bytes());
@@ -1576,6 +1732,13 @@ impl CanonicalEncode for CapacityEvidence {
         output.extend_from_slice(self.artifact_hash.as_bytes());
         output.extend_from_slice(self.toolchain_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1635,12 +1798,16 @@ impl SecurityPromotionPolicy {
 
     /// Computes the complete promotion-policy commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, SecurityError> {
-        hash_canonical::<H>("zeno-fcis/security-promotion-policy", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::SECURITY_PROMOTION_POLICY,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for SecurityPromotionPolicy {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SecurityPromotionPolicy {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.deployment_hash.as_bytes());
         output.extend_from_slice(self.threat_model_hash.as_bytes());
         put_u16_length(output, self.required_evidence.len())?;
@@ -1651,10 +1818,18 @@ impl CanonicalEncode for SecurityPromotionPolicy {
         output.extend_from_slice(&self.min_capacity_confidence_ppm.to_be_bytes());
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Production-security promotion blocker.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SecurityPromotionBlocker {
     /// A trace comparison found a modeled leak.
     LeakageReportFailed {
@@ -1733,8 +1908,9 @@ pub enum SecurityPromotionBlocker {
     },
 }
 
-impl CanonicalEncode for SecurityPromotionBlocker {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SecurityPromotionBlocker {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::LeakageReportFailed { index } => {
                 output.push(0);
@@ -1803,6 +1979,13 @@ impl CanonicalEncode for SecurityPromotionBlocker {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Security-promotion evaluation.
@@ -1860,8 +2043,9 @@ impl SecurityPromotionReport {
     }
 }
 
-impl CanonicalEncode for SecurityPromotionReport {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SecurityPromotionReport {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-SECURITY-PROMOTION-REPORT\0");
         output.extend_from_slice(self.promotion_policy_hash.as_bytes());
         output.extend_from_slice(self.leakage_policy_hash.as_bytes());
@@ -1873,6 +2057,13 @@ impl CanonicalEncode for SecurityPromotionReport {
             put_blob(output, &blocker.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1993,11 +2184,20 @@ pub fn evaluate_security_promotion<H: CommitmentHasher>(
     }
 
     let evaluated_reports = &reports[..reports.len().min(MAX_LEAKAGE_REPORTS)];
-    let leakage_reports_hash =
-        hash_sequence::<H, _>("zeno-fcis/security-leakage-report-set", evaluated_reports)?;
-    let evidence_hash = hash_sequence::<H, _>("zeno-fcis/security-evidence-set", &evidence)?;
-    let capacity_evidence_hash =
-        hash_sequence::<H, _>("zeno-fcis/security-capacity-evidence-set", &capacities)?;
+    let leakage_reports_hash = hash_sequence::<H>(
+        zeno_fcis_codec::domains::SECURITY_LEAKAGE_REPORT_SET,
+        (evaluated_reports)
+            .iter()
+            .map(|item| item.canonical_bytes()),
+    )?;
+    let evidence_hash = hash_sequence::<H>(
+        zeno_fcis_codec::domains::SECURITY_EVIDENCE_SET,
+        evidence.iter().map(|item| item.canonical_bytes()),
+    )?;
+    let capacity_evidence_hash = hash_sequence::<H>(
+        zeno_fcis_codec::domains::SECURITY_CAPACITY_EVIDENCE_SET,
+        capacities.iter().map(|item| item.canonical_bytes()),
+    )?;
 
     Ok(SecurityPromotionReport {
         promotion_policy_hash,
@@ -2011,6 +2211,7 @@ pub fn evaluate_security_promotion<H: CommitmentHasher>(
 
 /// Security model construction or commitment failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SecurityError {
     /// A stable numeric identifier was zero.
     ZeroIdentifier,
@@ -2093,24 +2294,22 @@ fn hash_is_zero(hash: Hash32) -> bool {
 }
 
 fn hash_canonical<H: CommitmentHasher>(
-    domain_name: &'static str,
-    value: &impl CanonicalEncode,
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, SecurityError> {
-    let bytes = value.canonical_bytes().map_err(SecurityError::Encode)?;
-    let domain = Domain::new(domain_name, 1).map_err(SecurityError::Encode)?;
+    let bytes = value.map_err(SecurityError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(SecurityError::Encode)
 }
 
-fn hash_sequence<H: CommitmentHasher, T: CanonicalEncode>(
-    domain_name: &'static str,
-    values: &[T],
+fn hash_sequence<H: CommitmentHasher>(
+    domain: Domain<'static>,
+    values: impl ExactSizeIterator<Item = Result<Vec<u8>, EncodeError>>,
 ) -> Result<Hash32, SecurityError> {
     let mut bytes = Vec::new();
     put_u32_length(&mut bytes, values.len())?;
     for value in values {
-        put_blob(&mut bytes, &value.canonical_bytes()?)?;
+        put_blob(&mut bytes, &value?)?;
     }
-    let domain = Domain::new(domain_name, 1).map_err(SecurityError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(SecurityError::Encode)
 }
 
@@ -2136,23 +2335,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 mod tests {
     use super::*;
 
-    #[derive(Clone, Copy, Debug)]
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test-only/1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(*byte)
-                    .rotate_left((index % 8) as u32);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
     fn hash(byte: u8) -> Hash32 {
         Hash32::new([byte; 32])

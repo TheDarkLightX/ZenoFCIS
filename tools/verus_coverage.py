@@ -10,10 +10,15 @@ from __future__ import annotations
 import hashlib
 import json
 
+# Exact evaluator source arrays are translated as byte literals in the
+# authority subject. Keep a finite parser bound large enough for that complete
+# closure; this does not change contract, inventory or body comparisons.
+MAX_VIR_CHARACTERS = 32 * 1024 * 1024
+
 
 def parse_vir(source: str) -> list:
     """Read complete S-expressions, including comments and quoted atoms."""
-    if len(source) > 8 * 1024 * 1024:
+    if len(source) > MAX_VIR_CHARACTERS:
         raise ValueError("VIR log exceeds this profile's size limit")
     roots: list = []
     stack = [roots]

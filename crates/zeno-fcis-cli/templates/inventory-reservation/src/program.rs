@@ -1,11 +1,4 @@
-//! The complete finite decision is interpreted by the library from the
-//! canonical `program.zcve` and the closed plan in `profile.rs`.
-//!
-//! The generated Rust transition remains an evidence artifact only. The
-//! production authority cannot call it or substitute hand-written staging.
-
-use zeno_fcis_authority::finite_decision::FiniteDecisionProgram;
-use zeno_fcis_crypto::RustCryptoSha256;
-
-/// Library-owned stock decision evaluator, nominally bound into authority.
-pub type StockProgram = FiniteDecisionProgram<RustCryptoSha256>;
+//! Retired native program implementation.
+//! Its complete original body and regressions are retained exclusively in
+//! verification/kernel-laws/src/oracle/templates/inventory-reservation/original/src/program.rs.
+//! The production library evaluates src/v2_contract.rs through checked V2 publication.

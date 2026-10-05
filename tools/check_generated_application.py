@@ -319,7 +319,8 @@ def exercise_prepared_application(app: Path, directory: Path, package_roots: dic
     identities = [line.removeprefix("completion_problem=") for line in test_output.splitlines()
                   if line.startswith("completion_problem=")]
     if identities != [reports[0]["problem"]]:
-        raise RuntimeError("CLI completion model differs from the exhaustive runtime comparison model")
+        raise RuntimeError("CLI completion model differs from the exhaustive runtime comparison model: "
+                           f"runtime {identities}, CLI {reports[0]['problem']}")
     demonstration = json.loads(result["demonstration"])
     if (demonstration.get("status") != "passed" or
         tuple(demonstration.get(key) for key in ("count", "bundles", "deliveries", "pending")) != (0, 2, 2, 0) or

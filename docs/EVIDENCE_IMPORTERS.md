@@ -1,121 +1,66 @@
-# Formal-Evidence Importers — Design Document
+# Retained evidence and external attestations
 
-## Work Package D (Issue #9)
+V2 calls the successful externally reported result `EvidenceResult::Attested`.
+`EvidenceKind` replaces `ToolKind`; `AttestedLawEvidence` replaces the old law
+evidence status name. `DecisionCoverageStatus::AttestedUnreachable` records an
+external reachability assertion. None of these names has a deprecated alias.
+Ordinal tags are unchanged; a successful tag does not mean kernel proof.
 
-### Inputs
+`SourceBindings` contains exactly the profile, schema, and algorithm digests,
+all nonzero. The old `source_commit` field and constructor argument are gone.
+These are declared protocol bindings, not an automatically established source
+revision. `EvidenceEnvelope` records producer identity, those bindings, exact
+claim/query, assumptions, result, artifact digest, and declared coverage. It is
+untrusted metadata until a consumer checks the corresponding bytes and subject.
+Its V2 canonical encoding begins with `ZFCIS-EVIDENCE\0` and version 2, and
+omits the former source-commit digest. Old envelope encodings are not V2 evidence.
 
-- A `ToolIdentity` binding the tool name, version, and binary hash.
-- A `SourceBindings` struct binding the source commit, profile hash, schema
-  hash, and algorithm hash.
-- A query identifier (theorem or model-checking query name).
-- A claim hash (cryptographic commitment to the theorem/query statement).
-- A list of named assumptions with statement hashes.
-- An `EvidenceResult` (Proven, Disproven, Inconclusive, Timeout, Crash,
-  SolverDisagreement).
-- A retained artifact digest (SHA-256 of the proof artifact, model-check
-  output, or replay log).
-- A `CoverageDeclaration` (ExhaustiveFinite, Bounded, ProofAssisted, Unbounded).
+`EvidenceArtifact::new::<H>(bytes)` takes ownership of exact immutable bytes
+and computes their digest. Its fields are private. It has no constructor from
+only a digest and exposes no mutable byte access. A consumer recomputes the
+digest using its selected provider; a caller-selected provider cannot bypass
+that check. `EvidenceInput` pairs this container with an untrusted envelope.
 
-### Outputs
+`EvidenceImporter::import::<H, C>` applies these checks to an entire batch:
 
-- A canonical `EvidenceEnvelope` that is content-addressed via
-  `CanonicalEncode`.
-- A `ToolEvidence` value compatible with `zeno-fcis-refine`'s promotion
-  pipeline.
-- A `PromotionGate` evaluation that fail-closed checks all required tool
-  evidence and mounted runtime refinement.
+1. The count must fit the existing envelope bound.
+2. Profile, schema, and algorithm must match the importer's bindings.
+3. The artifact's cached digest must recompute under `H` and equal the envelope.
+4. `EvidenceChecker::check(envelope, artifact_bytes)` must accept those bytes.
+5. No evidence kind may duplicate an existing or earlier batch item.
 
-### Authority Boundary
+Only after every check succeeds does the importer replace its retained inputs.
+Any refusal leaves its previous evidence unchanged. `inputs()` retains the
+bytes alongside each envelope; `envelopes()` is a borrowed iterator. Conversion
+to refinement `ToolEvidence` preserves the bytes. An envelope alone cannot
+produce that proposal without an artifact.
 
-- The **evidence envelope** is the sole authority for what was proved, by
-  which tool, under which assumptions, and with what coverage.
-- The **independent checker** (`EvidenceChecker` trait) is the sole authority
-  for validating the retained artifact. The importer never trusts a tool's
-  self-reported result without an independent check.
-- The **promotion gate** is the sole authority for determining whether
-  evidence is sufficient for promotion. It is fail-closed.
-- The **source bindings** anchor evidence to exact protocol artifacts. Stale
-  or mismatched bindings are rejected.
+The same custody applies to composition and footprint evidence.
+`EvidenceVerifier` and `FootprintEvidenceVerifier` receive the complete claim
+and exact artifact bytes. Complete-footprint admission checks the full expected
+binding, then the pinned verifier identity, then the recomputed digest, before
+calling the external verifier. Refinement `ProofVerifier` likewise receives
+`&ToolEvidence` and bytes; both promotion evaluators check the digest first.
+No hash-only verifier implementation satisfies these V2 traits.
 
-### Trusted Dependencies
+`RejectAllChecker` always refuses. `StructuralChecker` remains a structural
+fixture: it does not verify a theorem or inspect artifact semantics. The
+library's digest check still precedes it. A successful external callback is an
+attestation under that callback's trusted semantics. Neither that callback,
+importer, nor a legacy promotion report creates a V2 Authority capability.
+Callers must select an appropriate hash provider and checker, retain the real
+artifact, and bind the full intended subject. Claimed tool binary hashes alone
+do not prove which executable ran.
 
-- `zeno-fcis-codec` for `Hash32`, `CanonicalEncode`, and `EncodeError`.
-- `zeno-fcis-refine` for `ToolKind`, `ToolEvidence`, `CoverageMode`, and
-  integration with the existing promotion pipeline.
+Bounds remain 64-byte ASCII tool names/versions, 128-byte ASCII query IDs,
+32 assumptions of at most 256 ASCII bytes each, and 64 imported envelopes.
+The artifact container adds no arbitrary byte cap; callers must bound retained
+artifact allocation. Law evidence keeps its separate explicit byte budget.
+All code is `no_std + alloc`, without tool execution or I/O.
 
-No external dependencies are added. Both dependencies are existing workspace
-crates under ZenoFCIS control.
-
-### Deterministic Resource Bounds
-
-- Maximum tool name length: 64 bytes (ASCII).
-- Maximum tool version length: 64 bytes (ASCII).
-- Maximum query identifier length: 128 bytes (ASCII).
-- Maximum assumptions per envelope: 32.
-- Maximum assumption label length: 256 bytes (ASCII).
-- Maximum envelopes per importer: 64.
-- Maximum artifact size: enforced by `CanonicalEncode` length bounds.
-
-### Laws
-
-1. **Fail-closed construction**: envelopes with blocking results, unbound
-   bindings, zero digests (claim or artifact), or unbounded coverage are rejected at construction.
-2. **Binding consistency**: the importer rejects envelopes whose source
-   bindings do not match the importer's bindings (stale commit, profile
-   mismatch, schema mismatch, algorithm mismatch).
-3. **Independent verification**: the importer rejects envelopes that fail the
-   `EvidenceChecker` check. `RejectAllChecker` is the fail-closed default.
-4. **No duplicate tools**: the importer rejects envelopes with a tool kind
-   already imported.
-5. **Runtime refinement required**: the promotion gate requires mounted
-   runtime refinement evidence (`ToolKind::RuntimeRefinement`) for any
-   production promotion.
-6. **Coverage distinction**: exhaustive finite, bounded, proof-assisted, and
-   unbounded coverage are explicitly distinguished. Unbounded coverage is
-   always rejected.
-7. **Canonical encoding**: evidence envelopes implement `CanonicalEncode` for
-   content-addressed storage and deterministic comparison.
-
-### Negative Cases
-
-- Empty or non-ASCII tool name → rejected.
-- Zero binary hash → rejected.
-- Zero source commit, profile, schema, or algorithm hash → rejected.
-- Empty query identifier → rejected.
-- Zero artifact digest → rejected.
-- Inconclusive, timeout, crash, or solver-disagreement result → rejected.
-- Unbounded coverage → rejected.
-- Stale source commit → rejected by importer.
-- Profile/schema/algorithm mismatch → rejected by importer.
-- Failed independent artifact check → rejected by importer.
-- Duplicate tool kind → rejected by importer.
-- Missing required tool evidence → promotion gate blocker.
-- Missing runtime refinement → promotion gate blocker.
-
-### Assumptions
-
-- The `EvidenceChecker` implementation is trusted to correctly validate
-  retained artifacts. The `StructuralChecker` is a minimal structural check,
-  not a proof verification. Production code must supply a real checker.
-- The `claim_hash` field is provided by the caller, who is responsible for
-  computing a proper cryptographic commitment to the theorem/query statement.
-- The promotion gate does not verify the correctness of the proof itself; it
-  verifies that the required evidence is present and independently checked.
-
-### Explicit Nonclaims
-
-- An evidence envelope authenticates and classifies a proof result; it does
-  not make an incorrect specification true or extend a theorem beyond its
-  assumptions.
-- The `StructuralChecker` does not verify proof artifacts. It checks only
-  structural consistency (artifact digest matches query identity, binary hash
-  is non-zero, result is proven).
-- The evidence importer does not grant production authority. It produces
-  evidence for the promotion gate, which is itself fail-closed.
-- Imported evidence does not make legacy `evaluate_promotion` authoritative.
-  That compatibility path accepts untrusted normalized decisions and always
-  reports `UnvalidatedDecisionArtifacts`. Production promotion uses strict
-  `ValidatedPromotionEvidence` and `evaluate_validated_promotion` after the
-  configured evidence importer and independent verifier have established the
-  exact claims.
-- No crate is published or claimed as production-ready.
+Native negative controls cover schema/profile/algorithm substitution, altered
+artifact bytes, mismatched providers, rejection before external callbacks,
+failed checks, duplicate kinds, immutable custody, and retired hash-only APIs.
+These checks establish the tested native integrity behavior. They do not prove
+an external tool result, establish whole-workspace qualification, or validate
+historical evidence under the new canonical formats.

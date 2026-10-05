@@ -706,7 +706,7 @@ pub fn elaborate_project(
     if !diagnostics.is_empty() {
         return Err(DiagnosticSet::from_vec(diagnostics, diagnostic_limit));
     }
-    Ok(ProjectSpec {
+    let spec = ProjectSpec {
         project_id,
         name,
         namespaces: namespaces.into_boxed_slice(),
@@ -720,7 +720,48 @@ pub fn elaborate_project(
         composition: CompositionAst::new(wirings, merge_order),
         laws: laws.into_boxed_slice(),
         claims: claims.into_boxed_slice(),
-    })
+    };
+    // Resolve only after schema and formula-shape admission. Both parsed input
+    // and ProjectSpecBuilder pass through this mandatory boundary.
+    let law_paths = spec
+        .laws()
+        .iter()
+        .map(|law| (9, "law", law.id(), crate::law_paths(law)));
+    let claim_paths = spec
+        .claims()
+        .iter()
+        .map(|claim| (10, "claim", claim.id(), crate::claim_paths(claim)));
+    for (tag, kind, id, paths) in law_paths.chain(claim_paths) {
+        for path in paths {
+            let resolution = crate::resolve_path(&spec, path);
+            let actual = match resolution {
+                crate::PathResolution::UnknownRootType { segment } => {
+                    format!(
+                        "type {} is not declared for {:?}",
+                        segment.get(),
+                        path.root()
+                    )
+                }
+                crate::PathResolution::UnknownField { owner, segment } => {
+                    format!("type {} declares no field {}", owner.get(), segment.get())
+                }
+                _ => continue,
+            };
+            push(
+                &mut diagnostics,
+                DiagnosticCode::UnknownReference,
+                span_for(&spans, tag, id),
+                format!("{kind}.{}.path", id.get()),
+                "declared type and field path",
+                actual,
+                "use the declared root type and each field's declared owner",
+            );
+        }
+    }
+    if !diagnostics.is_empty() {
+        return Err(DiagnosticSet::from_vec(diagnostics, diagnostic_limit));
+    }
+    Ok(spec)
 }
 
 fn sort_and_duplicates<T, F, G>(

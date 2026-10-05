@@ -125,7 +125,7 @@ fn previous_close(sketch: &Sketch, assignment: &Assignment) -> Result<Program, E
                     .ok_or(Error::Invalid("missing-assignment"))?;
                 alternatives
                     .iter()
-                    .find(|op| op.value() == *value)
+                    .find(|op| checked(op.value()) == *value)
                     .cloned()
                     .ok_or(Error::Invalid("unknown-assignment"))
             }
@@ -155,7 +155,7 @@ fn stored_choice_values_match_instructions_in_canonical_order() {
                 assert_eq!(hole.values().len(), alternatives.len());
                 let mut previous = None;
                 for (value, op) in hole.values().zip(alternatives) {
-                    assert_eq!(*value, op.value());
+                    assert_eq!(*value, checked(op.value()));
                     let encoded = checked(value.canonical_bytes());
                     if let Some(previous) = previous {
                         assert!(previous < encoded);
@@ -208,30 +208,36 @@ fn assignment(entries: Vec<(u32, Value)>) -> Assignment {
 #[test]
 fn bad_assignments_keep_the_first_error_and_extra_ids_are_ignored() {
     let sketch = mixed_choices(0);
-    let integer = Op::Int(-1).value();
-    let boolean = Op::Bool(true).value();
+    let integer = checked(Op::Int(-1).value());
+    let boolean = checked(Op::Bool(true).value());
     let missing = Error::Invalid("missing-assignment");
     let unknown = Error::Invalid("unknown-assignment");
     let mut cases = vec![
         (vec![], missing.clone()),
         (vec![(7, boolean.clone())], missing.clone()),
         (vec![(91, integer.clone())], missing.clone()),
-        (vec![(91, Value::Unit)], unknown.clone()),
-        (vec![(7, Value::Unit)], missing),
+        (vec![(91, Value::unit())], unknown.clone()),
+        (vec![(7, Value::unit())], missing),
         (
             vec![(91, boolean.clone()), (7, integer.clone())],
             unknown.clone(),
         ),
         (
-            vec![(91, integer.clone()), (7, Value::Unit)],
+            vec![(91, integer.clone()), (7, Value::unit())],
             unknown.clone(),
         ),
     ];
+    assert!(Value::text_ascii("\u{e9}".into()).is_err());
     for wrong in [
-        Value::Text("\u{e9}".into()),
-        tuple(vec![Value::U128(1), Value::I128(-1)]),
-        tuple(vec![Value::I128(1), Value::I128(-1), Value::I128(0)]),
-        Value::Vector(vec![Value::I128(1), Value::I128(-1)].into_boxed_slice()),
+        checked(Value::text_ascii("wrong-kind".into())),
+        checked(tuple(vec![Value::unsigned(1), Value::signed(-1)])),
+        checked(tuple(vec![
+            Value::signed(1),
+            Value::signed(-1),
+            Value::signed(0),
+        ])),
+        Value::vector(vec![Value::signed(1), Value::signed(-1)])
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
     ] {
         cases.push((vec![(91, wrong), (7, boolean.clone())], unknown.clone()));
     }
@@ -242,10 +248,10 @@ fn bad_assignments_keep_the_first_error_and_extra_ids_are_ignored() {
     }
     let good = assignment(vec![(91, integer.clone()), (7, boolean.clone())]);
     let extra = assignment(vec![
-        (1, Value::Unit),
+        (1, Value::unit()),
         (7, boolean),
         (91, integer),
-        (u32::MAX, Value::Bool(false)),
+        (u32::MAX, Value::boolean(false)),
     ]);
     assert_eq!(sketch.close(&extra), previous_close(&sketch, &good));
     assert_eq!(sketch.close(&good), previous_close(&sketch, &good));

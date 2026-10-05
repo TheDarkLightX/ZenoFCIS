@@ -1,0 +1,4 @@
+# Required by the offline --locked reproduction runner.
+!Cargo.lock
+/target/
+__pycache__/

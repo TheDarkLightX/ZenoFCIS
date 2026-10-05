@@ -13,14 +13,12 @@ readme.workspace = true
 [features]
 default = ["rustcrypto"]
 std = []
-rustcrypto = ["dep:sha2"]
-libcrux = ["dep:libcrux-sha2"]
+rustcrypto = ["zeno-fcis-codec/rustcrypto"]
+libcrux = ["zeno-fcis-codec/libcrux"]
 parity = ["rustcrypto", "libcrux"]
 
 [dependencies]
 zeno-fcis-codec = { version = "=1.1.0", path = "../zeno-fcis-codec", default-features = false }
-sha2 = { version = "=0.11.0", default-features = false, optional = true }
-libcrux-sha2 = { version = "=0.0.8", default-features = false, optional = true }
 
 [dev-dependencies]
 criterion = "=0.5.1"

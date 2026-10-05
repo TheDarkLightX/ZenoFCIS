@@ -19,9 +19,9 @@ Feature: Adopt the ZenoFCIS core library
     And no external checker is treated as trusted merely because it is mounted
 
   @atdd-external-consumer
-  Scenario: Compile an unchanged V1 consumer against the current release
-    Given a consumer outside the ZenoFCIS workspace package graph
-    When the consumer compiles against the RC3 umbrella authoring API and locked graph
+  Scenario: Compile the V1 consumer through its documented V2 migration
+    Given a V1 consumer outside the ZenoFCIS workspace package graph
+    When it changes only its import to the legacy module and compiles against the locked graph
     Then the documented public imports and feature selection remain usable
 
   @atdd-project-bootstrap

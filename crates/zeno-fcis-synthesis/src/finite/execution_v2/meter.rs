@@ -3,49 +3,8 @@
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
-/// Resource classes in the V2 logical-work profile.
-#[non_exhaustive]
-#[cfg_attr(verus_keep_ghost, verus_verify)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Resource {
-    /// Protected data access attempts.
-    Read,
-    /// Staged state-write attempts.
-    Write,
-    /// Candidate construction attempts.
-    Candidate,
-    /// Staged effect attempts.
-    Effect,
-    /// Payload bytes, under the consuming operation's profile.
-    Byte,
-    /// Witness bytes, under the consuming operation's profile.
-    WitnessByte,
-    /// Structural depth, under the consuming operation's profile.
-    Depth,
-    /// Eager IR instruction attempts, including a trapping instruction.
-    Step,
-}
-
-#[cfg_attr(verus_keep_ghost, verus_spec)]
-pub(super) const COUNT: usize = 8;
-
-impl Resource {
-    #[cfg_attr(verus_keep_ghost, verus_spec(result =>
-        ensures result == super::spec::resource_index(self), result < COUNT,
-    ))]
-    pub(super) const fn index(self) -> usize {
-        match self {
-            Self::Read => 0,
-            Self::Write => 1,
-            Self::Candidate => 2,
-            Self::Effect => 3,
-            Self::Byte => 4,
-            Self::WitnessByte => 5,
-            Self::Depth => 6,
-            Self::Step => 7,
-        }
-    }
-}
+pub use zeno_fcis_core::Resource;
+pub(super) use zeno_fcis_core::resource::COUNT;
 
 /// V2 policy limits; these are configuration, not a usage report.
 #[cfg_attr(verus_keep_ghost, verus_verify)]

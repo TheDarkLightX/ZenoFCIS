@@ -1,0 +1,13 @@
+{
+  "schema": "zeno-fcis/template-schema-origin/1",
+  "retained_original": "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve",
+  "sha256": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8",
+  "bytes": 329,
+  "schema_commitment": "3df814da07001d361778b2e4e8f6abd3f55690b7a303078aa6e0bac03c9c3171",
+  "source_inputs": {
+    "project.zeno": "5a985b9343c83c2ba26f49dc0ea8122312f45f1260c17127ca454ceed82c305c",
+    "build.rs": "74e32c690b1b78aa7f93f5f4ad4de1eb24f645ced66fe44280439aeedeee59c1",
+    "profile.rs": "7de0e821b7a8b7f50f34fd42fb4cbdc7089a36381d6fdc23d9313a80d18dfd29"
+  },
+  "qualification": "Retained actual original lower_schema output; full Description matched at catalog binding; fresh build assertion must also pass."
+}

@@ -1,0 +1,202 @@
+{
+  "schema": "zeno-fcis/account-stage-migration/1",
+  "baseline": "94bac799b44859b158e50377313b7e0ef6c1bc51",
+  "universal_account_correspondence_theorem": "withdrawn with account-specific implementation; native finite grids are not a replacement universal theorem",
+  "abstraction_controls": [
+    {
+      "retired": "lose_original_seen",
+      "replacement": [
+        "account-data:lose_original_seen"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "lock_equality_is_locked",
+      "replacement": [
+        "account-data:lock_equality_is_locked"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "early_third_failure",
+      "replacement": [
+        "account-data:early_third_failure"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "short_lock",
+      "replacement": [
+        "account-data:short_lock"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "wrong_arithmetic",
+      "replacement": [
+        "account-data:wrong_arithmetic"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "cap_legal_timestamp",
+      "replacement": [
+        "account-data:cap_legal_timestamp"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "wrong_original_field",
+      "replacement": [
+        "account-data:wrong_original_field"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "widen_command_domain",
+      "replacement": [
+        "account-data:widen_command_domain"
+      ],
+      "reason": "Template-specific rule/domain fault moves from the removed universal correspondence proof to independent native rule-oracle replay; assurance delta explicitly accepted.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "accept_trailing_context",
+      "replacement": [
+        "protected-input:allow_trailing_bytes"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "skip_step_charge",
+      "replacement": [
+        "metered-execution:omit_step_charge"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "rollback_prior_usage",
+      "replacement": [
+        "composition:record_meter_prefix"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "erase_request_prefix",
+      "replacement": [
+        "composition:record_read_prefix"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "compute_before_step_charge",
+      "replacement": [
+        "metered-execution:execute_before_charging"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "weaken_public_contract",
+      "replacement": [
+        "composition:record_execution_contract"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "narrow_public_domain",
+      "replacement": [
+        "composition:record_execution_domain"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    },
+    {
+      "retired": "new_uncontracted_work",
+      "replacement": [
+        "composition:uncontracted_helper"
+      ],
+      "reason": "Same custody/resource/contract obligation at the surviving generic executable boundary.",
+      "status": "final replay pending"
+    }
+  ],
+  "composition_controls": [
+    {
+      "retired": "account_backwards_fact",
+      "replacement": [
+        "account-data:account_backwards_fact"
+      ],
+      "reason": "Wrong backwards-vs-locked fact is represented by wrong raw rule predicate; independent native oracle must reject."
+    },
+    {
+      "retired": "account_previous_seen",
+      "replacement": [
+        "composition:record_scalar_position",
+        "protected-input:wrong_integer_value",
+        "native:account_full_boundaries_14580_and_all_20_retained_examples"
+      ],
+      "reason": "Specialized raw-to-pre reconstruction removed. Generic exact scalar/record contracts and retained candidate.pre seen assertion cover the surviving source."
+    },
+    {
+      "retired": "account_full_deadline",
+      "replacement": [
+        "account-data:account_full_deadline"
+      ],
+      "reason": "Computed deadline is an ordinary graph output; wrong output root must fail the independent successor/alert oracle."
+    }
+  ],
+  "authority_controls": [
+    {
+      "retired": "policy_producer",
+      "replacement": [],
+      "reason": "The producer enum and serialized discriminator no longer exist. Complete graph/domain/policy identity controls remain mandatory; no producer choice survives to mutate."
+    }
+  ],
+  "native_consumers": [
+    {
+      "retired": "forge_raw",
+      "replacement": [
+        "composition:construct_core"
+      ],
+      "reason": "Private interpreted Raw type removed; public invocation bytes remain untrusted inputs, admitted by BoundCore."
+    },
+    {
+      "retired": "forge_facts",
+      "replacement": [
+        "composition:supplied_producer",
+        "composition:mutate_candidate",
+        "publication:supplied_candidate"
+      ],
+      "reason": "Facts type and fact-taking producer removed; no caller-supplied interpreted-fact input survives."
+    },
+    {
+      "retired": "forge_outcome",
+      "replacement": [
+        "composition:forge_report",
+        "authority:forge_evaluation",
+        "publication:forge_publication"
+      ],
+      "reason": "Removed abstraction Outcome custody maps to surviving private report/evaluation/publication."
+    },
+    {
+      "retired": "caller_usage",
+      "replacement": [
+        "metered-execution:supply_usage",
+        "metered-execution:forge_usage"
+      ],
+      "reason": "Surviving entrypoints create the private meter and reject supplied Usage."
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 # ZenoFCIS quickstart
 
+The normal V2 route is `use zeno_fcis::prelude::*;` with complete checked declarations, `bind_catalog`, `bind_program` and genuine publication capabilities. It needs no optional authority feature. Follow [normal program migration](V2_PROGRAM_API_MIGRATION.md) and run `cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core`. This development-branch cutover is intentionally breaking; combined V2 qualification remains tracked separately.
+
+## Retained V1 compatibility journey
+
+The rest of this guide preserves the original compatibility workflow and independent oracles. Its traits, budget reports, candidate builders and law engines are not the normal V2 authority route. Explicit umbrella imports use `legacy`; direct older subcrates keep their separately documented migration obligations.
+
 ZenoFCIS helps a project express authoritative state changes as deterministic,
 inspectable values:
 
@@ -30,7 +36,7 @@ zeno-fcis = { version = "=1.1.0", default-features = false, features = [
 Use the curated imports in application code:
 
 ```rust
-use zeno_fcis::prelude::*;
+use zeno_fcis::legacy::prelude::*;
 ```
 
 To start from `.zeno`, create and check a project in one command sequence:

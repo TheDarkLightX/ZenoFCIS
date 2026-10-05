@@ -1,6 +1,4 @@
-use inventory_reservation::{
-    authority, create, delivery::Destination, generated::*, invoke, journey, request,
-};
+use inventory_reservation::{authority, create, generated::*, invoke, journey, request};
 use std::{
     fs,
     path::PathBuf,
@@ -45,13 +43,10 @@ fn complete_stock_journey() {
 #[test]
 fn rejections_leave_stock_and_outbox_unchanged() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let mut shell = create(
-        &temp.0.join("stock.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = inventory_reservation::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let mut shell = create(&temp.0.join("stock.sqlite"), &authority).unwrap();
     assert_eq!(
         invoke(
             &mut shell,

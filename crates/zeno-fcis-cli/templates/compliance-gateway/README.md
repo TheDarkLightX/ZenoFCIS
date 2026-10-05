@@ -1,5 +1,12 @@
 # Generated compliance gateway
 
+Normal decisions use the checked original schema and complete V2 policy over all
+2,880 original inputs, with mandatory genuine publication for committing outcomes.
+The reviewed rule parser is a build-time producer and grants no runtime authority.
+Original native programs, law checkers, factories and all 27 original regressions
+are retained only in the repository’s nonpublished private template oracle.
+
+
 This local, non-value-moving application screens transfers for one customer
 with an expert system's rule base. It shows five patterns:
 - a rule base as the contract: `rules.txt` holds prioritized rules over
@@ -19,11 +26,16 @@ with an expert system's rule base. It shows five patterns:
   keeps the strikes within their bounds, for every integer. CVC5 attests the
   induction step, and the tests check the rest of the argument.
 
-`src/program.rs` calls the synthesized step in `synthesized/transition.rs`
-for the complete finite decision, then maps its output into typed staging.
-The law checker in `src/laws.rs` evaluates the formulas in
-`project.zeno` against every decision, evaluates `rules.txt` itself through
-`src/rules.rs`, and refuses any decision that breaks either.
+`src/v2_contract.rs` declares the complete original schema, policy, branches,
+footprints and laws. The checked library binds those declarations, independently
+admits the original envelopes, and evaluates the decision and required laws
+before it can construct a private publication. `src/rules.rs` remains an
+independent rule evaluator for build-time checks and comparisons.
+
+The original native `src/program.rs` and `src/laws.rs` are retained in the
+private oracle. Their synthesized-step mapper and handwritten law checker
+describe the historical verification path below; they do not grant authority
+in the normal V2 application.
 
 `project.zeno` owns record fields, command variants, reason order, channel
 types, and relational formulas. `build.rs` supplies explicit scalar bounds and
@@ -114,8 +126,9 @@ the priority order; either way the officer, not the code, should resolve it,
 so the shipped rule base has no such rule, and each of its twelve rules
 decides at least one of the examples in `tests/decision-examples.txt`.
 `build.rs` loads the rule base through `src/rules.rs`, so a refused rule base
-fails `cargo build`, and the law checker loads it again when the authority is
-built, so no application decides under a rule base that was not checked.
+fails `cargo build`. The normal authority binds the complete reviewed policy
+bytes and evaluates the declared rules through library-owned execution. The
+retained native law checker also loads the rule base in the private oracle.
 `tests/rule_base.rs` shows the refusal: a same-priority pair with different
 conclusions, the same pair with the same conclusion, the shipped rule base
 with one more rule at an existing priority, the shipped rule base without its
@@ -187,8 +200,8 @@ Every decision is checked at run time, before it can be published:
   reinstating clears them;
 - law 503: only a screening commits a failure; a blocked transfer adds one
   strike, and a frozen account stays at three;
-- in Rust, because formulas cannot see them: the rule base itself, evaluated
-  on the screening's features; the kind of decision and its reason; the
+- the complete checked policy fixes the rule selected for the screening's
+  features, the kind of decision and its reason, the
   exact ticket or alert, or the absence of both; the absence of effects; and
   a zero genesis.
 
@@ -211,7 +224,11 @@ command that is neither a screening nor a reinstatement would satisfy both
 accept laws vacuously. CVC5 answers `unsat`, which is attested, not
 independently checked.
 
-The step says something about this application only together with
+The following claim, observer, law-manifest and detector checks describe the
+original native implementation, retained as private regression evidence.
+They are separate from the normal V2 checked-core qualification.
+
+The step says something about that implementation only together with
 `tests/claims.rs`, which checks four things:
 - the law checker's own observer, `laws::trace_step`, reads every field the
   invariant reads, and the invariant evaluates on every admitted standing;

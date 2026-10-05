@@ -23,10 +23,10 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 PIN = Path("verification/verus/toolchain.json")
 HARNESS = Path("verification/verus/domain_bounds.rs")
-SUBJECT = Path("crates/zeno-fcis-authority/src/finite_bounds.rs")
+SUBJECT = Path("verification/kernel-laws/src/oracle/authority/finite_bounds.rs")
 SOURCES = (PIN, HARNESS, SUBJECT, Path("tools/check_verus.py"), Path("Cargo.toml"),
-           Path("crates/zeno-fcis-authority/src/lib.rs"),
-           Path("crates/zeno-fcis-authority/src/finite_decision.rs"))
+           Path("verification/kernel-laws/src/oracle/authority/mod.rs"),
+           Path("verification/kernel-laws/src/oracle/authority/finite_decision.rs"))
 
 
 def digest(path: Path) -> str:

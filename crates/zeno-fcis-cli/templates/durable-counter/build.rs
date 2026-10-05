@@ -8,7 +8,6 @@ use zeno_fcis_catalog::{
     CatalogLimits, CatalogManifest, ChannelDefinition, OperationSemantics, ProjectCatalog,
     ReasonDefinition, ReasonDisposition,
 };
-use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_project::{
     DomainPrefix, ProfileBindings, ProjectProfile, RegistryEntry, RegistryKind,
@@ -37,6 +36,16 @@ fn main() {
         SchemaLimits::default(),
     )
     .expect("lower exact authored shapes and reviewed scalar bounds");
+    // Preserve the actual original SC bytes, including all names and unused types.
+    assert_eq!(
+        schema
+            .canonical_bytes()
+            .expect("original schema bytes")
+            .as_slice(),
+        include_bytes!("v2/schema.zcve"),
+        "V2 policy must bind the exact freshly lowered original schema"
+    );
+    println!("cargo::rerun-if-changed=v2/schema.zcve");
     assert!(
         project.effects().is_empty(),
         "new effects require a reviewed program and checker"
@@ -171,6 +180,11 @@ fn main() {
     .expect("retain source identity");
     for path in [
         "project.zeno",
+        "v2/policy.zcve",
+        "v2/schema-origin.json",
+        "v2/schema.zcve",
+        "v2/policy.json",
+        "src/v2_contract.rs",
         "profile.rs",
         "build.rs",
         "Cargo.toml",

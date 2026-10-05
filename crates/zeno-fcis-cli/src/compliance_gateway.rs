@@ -113,4 +113,24 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         "tests/rule_base.rs",
         include_bytes!("../templates/compliance-gateway/tests/rule_base.rs"),
     ),
+    (
+        "src/v2_contract.rs",
+        include_bytes!("../templates/compliance-gateway/src/v2_contract.rs"),
+    ),
+    (
+        "v2/policy.json",
+        include_bytes!("../templates/compliance-gateway/v2/policy.json"),
+    ),
+    (
+        "v2/schema.zcve",
+        include_bytes!("../templates/compliance-gateway/v2/schema.zcve"),
+    ),
+    (
+        "v2/schema-origin.json",
+        include_bytes!("../templates/compliance-gateway/v2/schema-origin.json"),
+    ),
+    (
+        "v2/policy.zcve",
+        include_bytes!("../templates/compliance-gateway/v2/policy.zcve"),
+    ),
 ];

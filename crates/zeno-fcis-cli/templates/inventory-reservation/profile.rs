@@ -1,12 +1,7 @@
 //! Reviewed example bindings shared by generation and the runtime law checker.
 //! These hashes identify local source and policy, not independently certified builds.
 
-use zeno_fcis_authority::finite_decision::{
-    ConditionalOutbox, DecisionBranch, FiniteDecisionContract, InputBinding, InputScalar,
-    InputSource, StateAssignment,
-};
-use zeno_fcis_codec::{CanonicalEncode, Domain, Hash32, commitment};
-use zeno_fcis_core::{BudgetLimits, Resource};
+use zeno_fcis_codec::{Domain, Hash32, commitment};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_laws::{
     DecisionScope, GenesisApplicability, LawDefinition, LawEvidenceRequirement, LawFamilyPolicy,
@@ -14,9 +9,6 @@ use zeno_fcis_laws::{
 };
 use zeno_fcis_project::{SemanticId, StableName};
 use zeno_fcis_spec::{ProjectLimits, ProjectSpec, SourceLimits, elaborate_project, parse_project};
-use zeno_fcis_synthesis::finite::Domain as FiniteDomain;
-use zeno_fcis_synthesis::finite_runtime::evaluator_hash;
-use zeno_fcis_value::Value;
 
 /// The committed-failure law. This application never commits a failure, so
 /// the law checker refuses any committed failure outright. It has no formula,
@@ -61,11 +53,13 @@ pub fn source_hash() -> Hash32 {
             "\0",
             include_str!("src/lib.rs"),
             "\0",
-            include_str!("src/program.rs"),
-            "\0",
-            include_str!("src/laws.rs"),
-            "\0",
             include_str!("src/delivery.rs"),
+            "\0",
+            include_str!("src/v2_contract.rs"),
+            "\0",
+            include_str!("v2/policy.json"),
+            "\0",
+            include_str!("v2/schema-origin.json"),
             "\0",
             include_str!("synthesis.json"),
             "\0",
@@ -79,124 +73,30 @@ pub fn source_hash() -> Hash32 {
         )
         .as_bytes(),
     );
-    let program = digest(
-        "example/inventory-reservation/closed-ir",
-        include_bytes!("synthesized/program.zcve"),
+    let schema = digest(
+        "example/inventory-reservation/v2-schema",
+        include_bytes!("v2/schema.zcve"),
     );
-    let evaluator = evaluator_hash().expect("static finite evaluator source");
+    let policy = digest(
+        "example/inventory-reservation/v2-policy",
+        include_bytes!("v2/policy.zcve"),
+    );
     digest(
         "example/inventory-reservation/source-complete",
         &[
             source.as_bytes().as_slice(),
-            program.as_bytes().as_slice(),
-            evaluator.as_bytes().as_slice(),
+            schema.as_bytes().as_slice(),
+            policy.as_bytes().as_slice(),
         ]
         .concat(),
     )
 }
 
 pub fn program_hash() -> Hash32 {
-    decision_contract()
-        .identity::<RustCryptoSha256>()
-        .expect("closed decision identity")
-}
-
-pub fn decision_contract() -> FiniteDecisionContract {
-    let inputs = vec![
-        FiniteDomain::Int { min: 0, max: 5 },
-        FiniteDomain::Int { min: 0, max: 5 },
-        FiniteDomain::Int { min: 0, max: 3 },
-        FiniteDomain::Int { min: 1, max: 3 },
-        FiniteDomain::Bool,
-    ];
-    let outputs = vec![
-        FiniteDomain::Int { min: 0, max: 4 },
-        FiniteDomain::Int { min: 0, max: 5 },
-        FiniteDomain::Int { min: 0, max: 5 },
-        FiniteDomain::Bool,
-    ];
-    FiniteDecisionContract::try_new(
-        source_hash(),
-        include_bytes!("synthesized/program.zcve"),
-        inputs,
-        outputs,
-        vec![
-            InputBinding {
-                source: InputSource::State,
-                field: 110,
-                scalar: InputScalar::I128,
-            },
-            InputBinding {
-                source: InputSource::State,
-                field: 111,
-                scalar: InputScalar::I128,
-            },
-            InputBinding {
-                source: InputSource::Command,
-                field: 120,
-                scalar: InputScalar::SumVariants {
-                    type_id: 107,
-                    variants: vec![(150, 0), (151, 1), (152, 2), (153, 3)],
-                },
-            },
-            InputBinding {
-                source: InputSource::Command,
-                field: 121,
-                scalar: InputScalar::I128,
-            },
-            InputBinding {
-                source: InputSource::Context,
-                field: 130,
-                scalar: InputScalar::Bool,
-            },
-        ],
-        vec![
-            DecisionBranch {
-                code: 0,
-                rejection: Some(id(201)),
-            },
-            DecisionBranch {
-                code: 1,
-                rejection: Some(id(202)),
-            },
-            DecisionBranch {
-                code: 2,
-                rejection: Some(id(203)),
-            },
-            DecisionBranch {
-                code: 3,
-                rejection: None,
-            },
-            DecisionBranch {
-                code: 4,
-                rejection: Some(id(200)),
-            },
-        ],
-        vec![
-            StateAssignment {
-                field: 110,
-                output: 1,
-            },
-            StateAssignment {
-                field: 111,
-                output: 2,
-            },
-        ],
-        vec![ConditionalOutbox {
-            ordinal: 0,
-            channel: id(300),
-            when_output: 3,
-            destination: Value::Text("warehouse".into()),
-            payload_fields: vec![(140, 3)],
-        }],
-        BudgetLimits::zero()
-            .with_limit(Resource::Read, 7)
-            .with_limit(Resource::Write, 2)
-            .with_limit(Resource::Candidate, 1)
-            .with_limit(Resource::Effect, 1),
-        256,
+    digest(
+        "example/inventory-reservation/program",
+        source_hash().as_bytes(),
     )
-    .expect("complete checked inventory decision contract")
 }
 
 pub fn checker_hash() -> Hash32 {

@@ -2,7 +2,7 @@
 
 use std::cell::RefCell;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Hash32};
+use zeno_fcis_codec::{CommitmentHasher, EncodeError, EvidenceArtifact, Hash32};
 use zeno_fcis_compose::{
     AccessPath, ComponentContract, ComponentId, CompositionClaim, CompositionEvidence,
     CompositionSpec, ContractError, DecisionClassCoverage, DecisionCoverageStatus,
@@ -14,23 +14,7 @@ use zeno_fcis_compose::{
     verify_complete_footprint,
 };
 
-#[derive(Clone, Copy, Debug)]
-struct TestHasher;
-
-impl CommitmentHasher for TestHasher {
-    const ALGORITHM_ID: &'static str = "test-only/1";
-
-    fn hash(bytes: &[u8]) -> Hash32 {
-        let mut output = [0_u8; 32];
-        for (index, byte) in bytes.iter().enumerate() {
-            let slot = index % output.len();
-            output[slot] = output[slot]
-                .wrapping_add(*byte)
-                .rotate_left((index % 8) as u32);
-        }
-        Hash32::new(output)
-    }
-}
+use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
 #[derive(Clone, Copy)]
 struct ExactFootprintVerifier {
@@ -43,19 +27,25 @@ impl FootprintEvidenceVerifier for ExactFootprintVerifier {
         self.identity
     }
 
-    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: Hash32) -> bool {
-        self.accept && claim.commitment::<TestHasher>().ok() == Some(artifact)
+    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: &[u8]) -> bool {
+        self.accept && claim.canonical_bytes().ok().as_deref() == Some(artifact)
     }
 }
 
 struct ExactCompositionVerifier;
 
 impl EvidenceVerifier for ExactCompositionVerifier {
-    fn verify(&self, claim: &CompositionClaim, artifact: Hash32) -> bool {
-        claim.commitment::<TestHasher>().ok() == Some(artifact)
+    fn verify(&self, claim: &CompositionClaim, artifact: &[u8]) -> bool {
+        claim.canonical_bytes().ok().as_deref() == Some(artifact)
     }
 }
 
+// Toy native verifier fixture: exact canonical claim bytes, not a proof.
+fn evidence_artifact(bytes: Result<Vec<u8>, EncodeError>) -> EvidenceArtifact {
+    EvidenceArtifact::new::<TestHasher>(
+        bytes.unwrap_or_else(|error| panic!("artifact bytes: {error}")),
+    )
+}
 fn hash(byte: u8) -> Hash32 {
     Hash32::new([byte; 32])
 }
@@ -148,10 +138,8 @@ fn exact_footprint_verifier() -> ExactFootprintVerifier {
 
 fn footprint_evidence(binding: FootprintAuthorityBinding) -> FootprintCompletenessEvidence {
     let claim = claim(binding);
-    let artifact = claim
-        .commitment::<TestHasher>()
-        .unwrap_or_else(|error| panic!("claim commitment: {error}"));
-    FootprintCompletenessEvidence::try_new(claim, artifact, hash(44))
+    let artifact = evidence_artifact(claim.canonical_bytes());
+    FootprintCompletenessEvidence::try_new(claim, artifact.clone(), hash(44))
         .unwrap_or_else(|error| panic!("evidence: {error}"))
 }
 
@@ -375,13 +363,12 @@ fn every_authority_identity_substitution_invalidates_witness_minting() {
 
     for substitution in substitutions {
         let claim = claim(substitution);
-        let artifact = claim
-            .commitment::<TestHasher>()
-            .unwrap_or_else(|error| panic!("claim commitment: {error}"));
-        let evidence = FootprintCompletenessEvidence::try_new(claim, artifact, verifier.identity)
-            .unwrap_or_else(|error| panic!("evidence: {error}"));
+        let artifact = evidence_artifact(claim.canonical_bytes());
+        let evidence =
+            FootprintCompletenessEvidence::try_new(claim, artifact.clone(), verifier.identity)
+                .unwrap_or_else(|error| panic!("evidence: {error}"));
         assert_eq!(
-            verify_complete_footprint(&expected, evidence, &verifier),
+            verify_complete_footprint::<TestHasher, _>(&expected, evidence, &verifier),
             Err(FootprintWitnessError::AuthorityBindingMismatch)
         );
     }
@@ -391,25 +378,27 @@ fn every_authority_identity_substitution_invalidates_witness_minting() {
 fn witness_requires_exact_verifier_identity_and_acceptance() {
     let expected = base_binding(1, 10);
     let claim = claim(expected.clone());
-    let artifact = claim
-        .commitment::<TestHasher>()
-        .unwrap_or_else(|error| panic!("claim commitment: {error}"));
+    let artifact = evidence_artifact(claim.canonical_bytes());
     let exact = ExactFootprintVerifier {
         identity: hash(44),
         accept: true,
     };
-    let wrong_identity = FootprintCompletenessEvidence::try_new(claim.clone(), artifact, hash(45))
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
+    let wrong_identity =
+        FootprintCompletenessEvidence::try_new(claim.clone(), artifact.clone(), hash(45))
+            .unwrap_or_else(|error| panic!("evidence: {error}"));
     assert_eq!(
-        verify_complete_footprint(&expected, wrong_identity, &exact),
+        verify_complete_footprint::<TestHasher, _>(&expected, wrong_identity, &exact),
         Err(FootprintWitnessError::VerifierIdentityMismatch)
     );
 
-    let wrong_artifact =
-        FootprintCompletenessEvidence::try_new(claim.clone(), hash(99), exact.identity)
-            .unwrap_or_else(|error| panic!("evidence: {error}"));
+    let wrong_artifact = FootprintCompletenessEvidence::try_new(
+        claim.clone(),
+        EvidenceArtifact::new::<TestHasher>(hash(99).as_bytes().to_vec()),
+        exact.identity,
+    )
+    .unwrap_or_else(|error| panic!("evidence: {error}"));
     assert_eq!(
-        verify_complete_footprint(&expected, wrong_artifact, &exact),
+        verify_complete_footprint::<TestHasher, _>(&expected, wrong_artifact, &exact),
         Err(FootprintWitnessError::UnverifiedEvidence)
     );
 
@@ -417,10 +406,62 @@ fn witness_requires_exact_verifier_identity_and_acceptance() {
         identity: hash(44),
         accept: false,
     };
-    let rejected = FootprintCompletenessEvidence::try_new(claim, artifact, rejecting.identity)
+    let rejected =
+        FootprintCompletenessEvidence::try_new(claim, artifact.clone(), rejecting.identity)
+            .unwrap_or_else(|error| panic!("evidence: {error}"));
+    assert_eq!(
+        verify_complete_footprint::<TestHasher, _>(&expected, rejected, &rejecting),
+        Err(FootprintWitnessError::UnverifiedEvidence)
+    );
+}
+
+#[test]
+fn footprint_checks_authority_binding_before_calling_the_external_attester() {
+    struct CountingVerifier(RefCell<usize>);
+    impl FootprintEvidenceVerifier for CountingVerifier {
+        fn verifier_hash(&self) -> Hash32 {
+            hash(44)
+        }
+        fn verify(&self, _: &FootprintCompletenessClaim, _: &[u8]) -> bool {
+            *self.0.borrow_mut() += 1;
+            true
+        }
+    }
+    let expected = base_binding(1, 10);
+    let claim = claim(base_binding(2, 10));
+    let bytes = claim
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("claim bytes: {error}"));
+    let artifact = EvidenceArtifact::new::<TestHasher>(bytes.clone());
+    assert_eq!(artifact.digest(), TestHasher::hash(&bytes));
+    let evidence = FootprintCompletenessEvidence::try_new(claim, artifact, hash(44))
+        .unwrap_or_else(|error| panic!("evidence: {error}"));
+    let verifier = CountingVerifier(RefCell::new(0));
+    assert_eq!(
+        verify_complete_footprint::<TestHasher, _>(&expected, evidence, &verifier),
+        Err(FootprintWitnessError::AuthorityBindingMismatch)
+    );
+    assert_eq!(*verifier.0.borrow(), 0);
+}
+
+#[test]
+fn footprint_attester_receives_and_rejects_altered_actual_bytes() {
+    let expected = base_binding(1, 10);
+    let claim = claim(expected.clone());
+    let mut altered = claim
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("claim bytes: {error}"));
+    altered.push(0);
+    let artifact = EvidenceArtifact::new::<TestHasher>(altered);
+    assert!(artifact.matches::<TestHasher>());
+    let evidence = FootprintCompletenessEvidence::try_new(claim, artifact, hash(44))
         .unwrap_or_else(|error| panic!("evidence: {error}"));
     assert_eq!(
-        verify_complete_footprint(&expected, rejected, &rejecting),
+        verify_complete_footprint::<TestHasher, _>(
+            &expected,
+            evidence,
+            &exact_footprint_verifier()
+        ),
         Err(FootprintWitnessError::UnverifiedEvidence)
     );
 }
@@ -435,7 +476,7 @@ fn decision_class_coverage_is_complete_and_identity_bearing() {
     let unreachable_committed_failure = DecisionClassCoverage::new(
         DecisionCoverageStatus::Covered,
         DecisionCoverageStatus::Covered,
-        DecisionCoverageStatus::ProvedUnreachable,
+        DecisionCoverageStatus::AttestedUnreachable,
     );
     let method = FootprintProofMethod::theorem(hash(40), hash(41))
         .unwrap_or_else(|error| panic!("method: {error}"));
@@ -510,11 +551,10 @@ fn parallel_fixture() -> (
         sequential_result: result,
         composed_result: result,
     };
-    let parity_artifact = parity_claim
-        .commitment::<TestHasher>()
-        .unwrap_or_else(|error| panic!("parity artifact: {error}"));
-    let parity = ParallelParityEvidence::try_new(context.clone(), result, result, parity_artifact)
-        .unwrap_or_else(|error| panic!("parity: {error}"));
+    let parity_artifact = evidence_artifact(parity_claim.canonical_bytes());
+    let parity =
+        ParallelParityEvidence::try_new(context.clone(), result, result, parity_artifact.clone())
+            .unwrap_or_else(|error| panic!("parity: {error}"));
     let evidence = CompositionEvidence::try_new(Vec::new(), Vec::new(), Some(parity))
         .unwrap_or_else(|error| panic!("composition evidence: {error}"));
     let first = base_binding(1, 11);
@@ -703,13 +743,13 @@ impl FootprintEvidenceVerifier for RecordingFootprintVerifier {
         self.identity
     }
 
-    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: Hash32) -> bool {
+    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: &[u8]) -> bool {
         let component = claim.binding().component().get();
         self.calls
             .borrow_mut()
             .push(FootprintVerifierCall::Verify(component));
         self.rejected_component != Some(component)
-            && claim.commitment::<TestHasher>().ok() == Some(artifact)
+            && claim.canonical_bytes().ok().as_deref() == Some(artifact)
     }
 }
 

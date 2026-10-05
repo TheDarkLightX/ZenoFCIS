@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import os
 from pathlib import Path
 import platform
@@ -46,9 +47,17 @@ def snapshot() -> dict[str, str]:
 
 
 def once(source: str, before: str, after: str) -> str:
-    if source.count(before) != 1:
+    """Replace the single token-equal occurrence of `before`.
+
+    Tokens must match exactly and in order; whitespace between them may differ,
+    so reformatting does not hide or duplicate an anchor.
+    """
+    tokens = re.findall(r"\w+|[^\w\s]", before)
+    matches = list(re.finditer(r"\s*".join(re.escape(t) for t in tokens), source))
+    if len(matches) != 1:
         raise RuntimeError(f"mutation anchor changed: {before}")
-    return source.replace(before, after)
+    found = matches[0]
+    return source[:found.start()] + after + source[found.end():]
 
 
 def final_contract(source: str, replacement: str) -> str:

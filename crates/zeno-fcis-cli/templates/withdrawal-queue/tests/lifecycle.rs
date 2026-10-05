@@ -4,8 +4,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 use withdrawal_queue::{
-    Authority, Shell, authority, create, delivery::Destination, deposit, generated::*, invoke,
-    journey, request, tick,
+    Authority, Shell, authority, create, deposit, generated::*, invoke, journey, request, tick,
 };
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -29,8 +28,8 @@ impl Drop for Temp {
 
 /// Sends one command and returns the outcome.
 fn send(
-    shell: &mut Shell,
-    authority: &Authority,
+    shell: &mut Shell<'_, '_>,
+    authority: &Authority<'_>,
     command: VaultCommand,
     caller: Caller,
     alarm: bool,
@@ -39,8 +38,8 @@ fn send(
     invoke(shell, authority, command, caller, alarm, replay).unwrap()
 }
 
-fn state(shell: &Shell) -> Vault {
-    Vault::try_from_value(shell.snapshot().unwrap().state().clone()).unwrap()
+fn state(shell: &mut Shell<'_, '_>) -> Vault {
+    withdrawal_queue::decode_state(shell.snapshot().unwrap().state()).unwrap()
 }
 
 #[test]
@@ -62,13 +61,10 @@ fn complete_vault_journey() {
 #[test]
 fn a_sustained_alarm_delays_each_payout_by_three_ticks_but_never_stops_them() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("vault.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = withdrawal_queue::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("vault.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -109,7 +105,7 @@ fn a_sustained_alarm_delays_each_payout_by_three_ticks_but_never_stops_them() {
             "Accept"
         );
         for _ in 0..4 {
-            let before = shell.snapshot().unwrap().pending_outbox();
+            let before = shell.snapshot().unwrap().pending();
             assert_eq!(
                 send(
                     shell,
@@ -122,7 +118,7 @@ fn a_sustained_alarm_delays_each_payout_by_three_ticks_but_never_stops_them() {
                 "Accept"
             );
             ticks += 1;
-            if shell.snapshot().unwrap().pending_outbox() > before {
+            if shell.snapshot().unwrap().pending() > before {
                 payout_ticks.push(ticks);
             }
         }
@@ -138,13 +134,10 @@ fn a_sustained_alarm_delays_each_payout_by_three_ticks_but_never_stops_them() {
 #[test]
 fn rejections_leave_the_vault_and_outbox_unchanged() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("vault.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = withdrawal_queue::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("vault.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -213,9 +206,10 @@ fn rejections_leave_the_vault_and_outbox_unchanged() {
 fn a_pause_survives_a_database_reopen() {
     let temp = Temp::new();
     let path = temp.0.join("vault.sqlite");
-    let authority = authority().unwrap();
-    let destination = Destination::default();
-    let mut shell = create(&path, &authority, destination.clone()).unwrap();
+    let contract = withdrawal_queue::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let mut shell = create(&path, &authority).unwrap();
     assert_eq!(
         send(
             &mut shell,
@@ -249,17 +243,12 @@ fn a_pause_survives_a_database_reopen() {
         ),
         "Accept"
     );
-    let paused = state(&shell);
+    let paused = state(&mut shell);
     assert_eq!((&paused.lane_b, paused.pause.0), (&LaneStatus::Pending, 2));
     drop(shell);
     // The reopened store re-executes its history, and the pause holds.
-    let mut shell = Shell::open_existing(
-        &path,
-        &authority,
-        authority.bind_delivery_interpreter(destination),
-    )
-    .unwrap();
-    assert_eq!(state(&shell), paused);
+    let mut shell = withdrawal_queue::Shell::open(&path, &authority).unwrap();
+    assert_eq!(state(&mut shell), paused);
     assert_eq!(
         send(
             &mut shell,
@@ -271,9 +260,9 @@ fn a_pause_survives_a_database_reopen() {
         ),
         "Accept"
     );
-    let vault = state(&shell);
+    let vault = state(&mut shell);
     assert_eq!((vault.pause.0, vault.must_serve.0), (1, false));
-    assert_eq!(shell.snapshot().unwrap().pending_outbox(), 0);
+    assert_eq!(shell.snapshot().unwrap().pending(), 0);
     assert_eq!(
         send(
             &mut shell,
@@ -285,7 +274,7 @@ fn a_pause_survives_a_database_reopen() {
         ),
         "Accept"
     );
-    assert!(state(&shell).must_serve.0);
+    assert!(state(&mut shell).must_serve.0);
     assert_eq!(
         send(
             &mut shell,
@@ -297,10 +286,10 @@ fn a_pause_survives_a_database_reopen() {
         ),
         "Accept"
     );
-    let vault = state(&shell);
+    let vault = state(&mut shell);
     assert_eq!(
         (vault.balance.0, vault.lane_b, vault.must_serve.0),
         (0, LaneStatus::Empty, false)
     );
-    assert_eq!(shell.snapshot().unwrap().pending_outbox(), 1);
+    assert_eq!(shell.snapshot().unwrap().pending(), 1);
 }

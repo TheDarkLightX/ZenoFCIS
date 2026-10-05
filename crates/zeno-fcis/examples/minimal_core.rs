@@ -1,111 +1,58 @@
-//! A minimal pure transition using the ZenoFCIS decision algebra and logical budget.
+//! Bind a complete declarative program and publish an original-wire invocation.
+//!
+//! The support module contains unadmitted example data, not application execution.
+//! Its finite policy illustrates the API; it is not a policy for financial accounts.
+#[path = "support/program_fixture.rs"]
+mod support;
 
 use zeno_fcis::prelude::*;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct Account {
-    balance: u64,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct Withdraw {
-    amount: u64,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum RejectReason {
-    ResourceLimit,
-    InsufficientFunds,
-}
-
-impl StableReason for RejectReason {
-    fn code(&self) -> &'static str {
-        match self {
-            Self::ResourceLimit => "resource_limit",
-            Self::InsufficientFunds => "insufficient_funds",
-        }
-    }
-
-    fn precedence(&self) -> u16 {
-        match self {
-            Self::ResourceLimit => 0,
-            Self::InsufficientFunds => 1,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum CommittedFailureReason {}
-
-impl StableReason for CommittedFailureReason {
-    fn code(&self) -> &'static str {
-        match *self {}
-    }
-
-    fn precedence(&self) -> u16 {
-        match *self {}
-    }
-}
-
-struct WithdrawTransition;
-
-impl Transition for WithdrawTransition {
-    type State = Account;
-    type Command = Withdraw;
-    type Context = ();
-    type Candidate = Account;
-    type Reject = RejectReason;
-    type Failure = CommittedFailureReason;
-
-    fn step(
-        state: &Self::State,
-        command: &Self::Command,
-        _context: &Self::Context,
-        limits: BudgetLimits,
-    ) -> BudgetedDecision<Self::Candidate, Self::Reject, Self::Failure> {
-        let mut budget = Budget::new(limits);
-
-        if budget.charge(Resource::Read, 1).is_err() {
-            return budget.finish(Decision::Reject(Rejected::new(RejectReason::ResourceLimit)));
-        }
-        if command.amount > state.balance {
-            return budget.finish(Decision::Reject(Rejected::new(
-                RejectReason::InsufficientFunds,
-            )));
-        }
-        if budget.charge(Resource::Write, 1).is_err() {
-            return budget.finish(Decision::Reject(Rejected::new(RejectReason::ResourceLimit)));
-        }
-
-        let candidate = Account {
-            balance: state.balance - command.amount,
-        };
-        budget.finish(Decision::Accept(Accepted::new(candidate)))
-    }
-}
-
 fn main() -> Result<(), &'static str> {
-    let state = Account { balance: 100 };
-    let limits = BudgetLimits::zero()
-        .with_limit(Resource::Read, 1)
-        .with_limit(Resource::Write, 1);
+    let mut result = Ok(());
+    support::with_material(support::generous(), true, |declaration| {
+        result = run(declaration);
+    });
+    result
+}
 
-    let result = WithdrawTransition::step(&state, &Withdraw { amount: 40 }, &(), limits);
-
-    match result.decision() {
-        Decision::Accept(accepted) if accepted.candidate().balance == 60 => {}
-        Decision::Accept(_) => return Err("unexpected accepted candidate"),
-        Decision::Reject(_) => return Err("unexpected rejection"),
-        Decision::CommittedFailure(_) => {
-            return Err("this transition defines no committed failure");
-        }
+fn run(declaration: support::Material<'_>) -> Result<(), &'static str> {
+    let catalog = bind_catalog(
+        declaration.original,
+        declaration.description,
+        support::catalog_limits(),
+        declaration.policy,
+        declaration.descriptor,
+        declaration.framing,
+        declaration.links,
+    )
+    .map_err(|_| "catalog admission refused")?;
+    let program = bind_program(&catalog).map_err(|_| "program admission refused")?;
+    let (state, command, context) = support::originals(0, true);
+    let initial = program.publish_genesis(&state);
+    if !matches!(initial, PublicationOutcome::Commit(_)) {
+        return Err("genesis refused");
     }
-    if state.balance != 100 {
-        return Err("the immutable pre-state changed");
+    let original = Invocation {
+        state: &state,
+        command: &command,
+        context: &context,
+    };
+    let PublicationOutcome::Commit(publication) = program.publish(original) else {
+        return Err("publication refused");
+    };
+    if publication.poststate() != support::frame(100, &[9, 0, 0, 0, 1, 0, 0, 1]) {
+        return Err("unexpected original-wire successor");
     }
-    if result.used().used(Resource::Read) != 1 || result.used().used(Resource::Write) != 1 {
-        return Err("unexpected logical resource report");
+    if publication.evaluation().usage().used(Resource::Step) == 0 {
+        return Err("missing library instruction usage");
     }
-
+    let PublicationOutcome::Commit(replayed) =
+        program.replay_publication(original, publication.subject())
+    else {
+        return Err("replay refused");
+    };
+    if replayed.subject() != publication.subject() {
+        return Err("replay subject changed");
+    }
     Ok(())
 }

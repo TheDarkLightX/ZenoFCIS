@@ -54,7 +54,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Maximum bytes accepted by a dynamically sized secret container.
@@ -149,7 +149,10 @@ impl ExposurePermit {
 
     /// Computes the content-derived permit identity.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, SecretError> {
-        hash_canonical::<H>("zeno-fcis/secret-exposure-permit", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::SECRET_EXPOSURE_PERMIT,
+            (self).canonical_bytes(),
+        )
     }
 
     fn authorize(&self, secret_id: Hash32, length: usize) -> Result<(), SecretError> {
@@ -171,8 +174,9 @@ impl ExposurePermit {
     }
 }
 
-impl CanonicalEncode for ExposurePermit {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ExposurePermit {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-SECRET-PERMIT\0");
         output.extend_from_slice(&SECRET_AUDIT_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.secret_id.as_bytes());
@@ -180,6 +184,13 @@ impl CanonicalEncode for ExposurePermit {
         output.extend_from_slice(self.purpose_hash.as_bytes());
         output.extend_from_slice(&self.maximum_bytes.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -211,14 +222,22 @@ impl ExposureEvent {
     }
 }
 
-impl CanonicalEncode for ExposureEvent {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ExposureEvent {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-SECRET-EXPOSURE\0");
         output.extend_from_slice(&SECRET_AUDIT_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.secret_id.as_bytes());
         output.extend_from_slice(self.permit_hash.as_bytes());
         output.extend_from_slice(&self.bytes_exposed.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -548,17 +567,16 @@ fn require_same_identity(left: Hash32, right: Hash32) -> Result<(), SecretError>
 }
 
 fn hash_canonical<H: CommitmentHasher>(
-    domain_name: &'static str,
-    value: &impl CanonicalEncode,
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, SecretError> {
-    let bytes = value.canonical_bytes().map_err(SecretError::Encode)?;
-    let domain =
-        Domain::new(domain_name, SECRET_AUDIT_FORMAT_VERSION).map_err(SecretError::Encode)?;
+    let bytes = value.map_err(SecretError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(SecretError::Encode)
 }
 
 /// Secret-container construction or use failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SecretError {
     /// Constant-time/exposure operation was requested in a debug-assertion build.
     DebugAssertionsEnabled,
@@ -627,23 +645,7 @@ impl std::error::Error for SecretError {}
 mod tests {
     use super::*;
 
-    #[derive(Clone, Copy, Debug)]
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test-only/1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(*byte)
-                    .rotate_left((index % 8) as u32);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
     fn hash(byte: u8) -> Hash32 {
         Hash32::new([byte; 32])

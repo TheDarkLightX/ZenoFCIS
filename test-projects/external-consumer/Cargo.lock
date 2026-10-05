@@ -202,6 +202,7 @@ dependencies = [
 name = "zeno-fcis-codec"
 version = "1.1.0"
 dependencies = [
+ "sha2",
  "zeno-fcis-value",
 ]
 
@@ -257,7 +258,6 @@ version = "1.1.0"
 name = "zeno-fcis-crypto"
 version = "1.1.0"
 dependencies = [
- "sha2",
  "zeno-fcis-codec",
 ]
 

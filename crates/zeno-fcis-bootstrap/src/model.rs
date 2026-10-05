@@ -261,6 +261,7 @@ impl BootstrapBundle {
 
 /// Deterministic project-bootstrap failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum BootstrapError {
     /// The requested package name was not a bounded lowercase identifier.
     InvalidPackageName,
@@ -307,6 +308,8 @@ pub enum BootstrapError {
     Catalog(CatalogError),
     /// Canonical encoding or commitment construction failed.
     Encode(EncodeError),
+    /// This generator version does not support the catalogued reason disposition.
+    UnsupportedReasonDisposition,
 }
 
 impl From<CodegenError> for BootstrapError {
@@ -358,6 +361,9 @@ impl fmt::Display for BootstrapError {
             Self::Codegen(error) => write!(formatter, "schema generation failed: {error}"),
             Self::Catalog(error) => write!(formatter, "catalog validation failed: {error}"),
             Self::Encode(error) => write!(formatter, "bootstrap encoding failed: {error}"),
+            Self::UnsupportedReasonDisposition => {
+                formatter.write_str("unsupported catalog reason disposition")
+            }
         }
     }
 }

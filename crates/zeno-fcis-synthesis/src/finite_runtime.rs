@@ -7,7 +7,7 @@ use crate::SynthesisError;
 use crate::finite::{Domain, Error, Op, PROFILE, Program};
 use alloc::vec::Vec;
 use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Hash32, decode_value};
-use zeno_fcis_value::{Value, ValueLimits};
+use zeno_fcis_value::{Value, ValueLimits, ValueRef};
 
 /// Binds a mounted runtime to the exact importer and finite evaluator source.
 pub fn evaluator_hash() -> Result<Hash32, SynthesisError> {
@@ -22,17 +22,12 @@ pub fn evaluator_hash() -> Result<Hash32, SynthesisError> {
     source.extend_from_slice(include_bytes!("finite/execution_v2/spec.rs"));
     source.extend_from_slice(include_bytes!("finite/execution_v2/input_view.rs"));
     source.extend_from_slice(include_bytes!("finite/execution_v2/input_view/spec.rs"));
-    source.extend_from_slice(include_bytes!("finite/execution_v2/record_execution.rs"));
-    source.extend_from_slice(include_bytes!(
-        "finite/execution_v2/record_execution/spec.rs"
-    ));
     source.extend_from_slice(include_bytes!("finite/canonical_v2/mod.rs"));
     source.extend_from_slice(include_bytes!("finite/canonical_v2/spec.rs"));
     source.extend_from_slice(crate::finite::V2_EXECUTION_PROFILE.as_bytes());
     source.extend_from_slice(crate::finite::V2_RECORD_PROFILE.as_bytes());
-    source.extend_from_slice(crate::finite::V2_RECORD_EXECUTION_PROFILE.as_bytes());
     source.extend_from_slice(include_bytes!("finite_runtime.rs"));
-    crate::hash_bytes("zeno-fcis/finite-runtime-source", &source)
+    crate::hash_bytes(zeno_fcis_codec::domains::FINITE_RUNTIME_SOURCE, &source)
 }
 
 /// Imports a bounded canonical finite program and rechecks its complete
@@ -52,36 +47,48 @@ pub fn import_program(bytes: &[u8]) -> Result<Program, Error> {
         },
     )
     .map_err(|_| invalid())?;
-    let Value::Tuple(fields) = &value else {
+    let ValueRef::Tuple(fields) = value.view() else {
         return Err(invalid());
     };
-    let [
-        Value::Text(profile),
-        Value::Tuple(schema),
-        Value::Tuple(nodes),
-        Value::Tuple(roots),
-    ] = fields.as_ref()
+    let [profile, schema, nodes, roots] = fields else {
+        return Err(invalid());
+    };
+    let (
+        ValueRef::Text(profile),
+        ValueRef::Tuple(schema),
+        ValueRef::Tuple(nodes),
+        ValueRef::Tuple(roots),
+    ) = (profile.view(), schema.view(), nodes.view(), roots.view())
     else {
         return Err(invalid());
     };
-    if profile.as_ref() != PROFILE {
+    if profile != PROFILE {
         return Err(invalid());
     }
-    let [Value::Tuple(inputs), Value::Tuple(outputs)] = schema.as_ref() else {
+    let [inputs, outputs] = schema else {
+        return Err(invalid());
+    };
+    let (ValueRef::Tuple(inputs), ValueRef::Tuple(outputs)) = (inputs.view(), outputs.view())
+    else {
         return Err(invalid());
     };
     let parse_domain = |value: &Value| -> Result<Domain, Error> {
-        let Value::Tuple(parts) = value else {
+        let ValueRef::Tuple(parts) = value.view() else {
             return Err(invalid());
         };
-        let [Value::Bool(boolean), Value::I128(min), Value::I128(max)] = parts.as_ref() else {
+        let [boolean, min, max] = parts else {
+            return Err(invalid());
+        };
+        let (ValueRef::Bool(boolean), ValueRef::I128(min), ValueRef::I128(max)) =
+            (boolean.view(), min.view(), max.view())
+        else {
             return Err(invalid());
         };
         let (min, max) = (
-            i64::try_from(*min).map_err(|_| invalid())?,
-            i64::try_from(*max).map_err(|_| invalid())?,
+            i64::try_from(min).map_err(|_| invalid())?,
+            i64::try_from(max).map_err(|_| invalid())?,
         );
-        if *boolean {
+        if boolean {
             if (min, max) != (0, 1) {
                 return Err(invalid());
             }
@@ -99,13 +106,13 @@ pub fn import_program(bytes: &[u8]) -> Result<Program, Error> {
         .map(parse_domain)
         .collect::<Result<Vec<_>, _>>()?;
     let parse_op = |value: &Value| -> Result<Op, Error> {
-        let Value::Tuple(parts) = value else {
+        let ValueRef::Tuple(parts) = value.view() else {
             return Err(invalid());
         };
         let args = parts
             .iter()
-            .map(|part| match part {
-                Value::I128(value) => Ok(*value),
+            .map(|part| match part.view() {
+                ValueRef::I128(value) => Ok(value),
                 _ => Err(invalid()),
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -128,13 +135,18 @@ pub fn import_program(bytes: &[u8]) -> Result<Program, Error> {
     let nodes = nodes.iter().map(parse_op).collect::<Result<Vec<_>, _>>()?;
     let roots = roots
         .iter()
-        .map(|value| match value {
-            Value::U128(value) => u16::try_from(*value).map_err(|_| invalid()),
+        .map(|value| match value.view() {
+            ValueRef::U128(value) => u16::try_from(value).map_err(|_| invalid()),
             _ => Err(invalid()),
         })
         .collect::<Result<Vec<_>, _>>()?;
     let program = Program::try_new(inputs, outputs, nodes, roots)?;
-    if program.value().canonical_bytes().map_err(|_| invalid())? != bytes {
+    if program
+        .value()
+        .and_then(|value| value.canonical_bytes())
+        .map_err(|_| invalid())?
+        != bytes
+    {
         return Err(invalid());
     }
     Ok(program)

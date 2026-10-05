@@ -1,0 +1,13 @@
+{
+  "schema": "zeno-fcis/template-schema-origin/1",
+  "retained_original": "verification/kernel-laws/src/oracle/templates/account-lockout/original/v2/schema.zcve",
+  "sha256": "b08d78b453e0aadf775da9c1dd95e50edd4056b1908d6705e870f044d1aba894",
+  "bytes": 540,
+  "schema_commitment": "1a2a86e25e8870cf23e35e3cac4966d5a49eb6e2b525860ffd316d6315d265cc",
+  "source_inputs": {
+    "project.zeno": "68dec4f90ba35de9ca4e4d71cca8ea867c0da9a0a71aa1b8d58b79056d9b2f6d",
+    "build.rs": "fcb4eeee4bc3c1f0fb4993a0a33aad130bbb4a0bd4ef6d74c6697e02bbabec73",
+    "profile.rs": "42070c2d3194d459a4753bafb1e31aef586acd3e0c8a306dc88bb30f2a7d4285"
+  },
+  "qualification": "Retained actual original lower_schema output; full Description matched at catalog binding; fresh build assertion must also pass."
+}

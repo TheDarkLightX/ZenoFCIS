@@ -10,11 +10,10 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_patch::{PatchError, hash_value};
 use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_receipt::{CandidateId, CommitBundle, Receipt, SealError};
@@ -193,6 +192,7 @@ impl CommitResult {
 
 /// Atomic commit outcome.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CommitStatus {
     /// The complete bundle was newly published.
     Committed,
@@ -358,82 +358,18 @@ pub fn acknowledge(
     })
 }
 
-/// Idempotent destination boundary: the contract a delivery adapter refines.
-///
-/// It lives here, in the pure reference model; `zeno-fcis-shell-sqlite`
-/// re-exports it under its previous path.
-pub trait IdempotentDestination {
-    /// Destination-specific failure type.
-    type Error: fmt::Display;
-
-    /// Delivers once by identity and returns the observed exact entry hash.
-    fn deliver(
-        &mut self,
-        delivery_id: Hash32,
-        entry_hash: Hash32,
-        entry: &OutboxEntry,
-    ) -> Result<Hash32, Self::Error>;
-}
-
-/// Deterministic destination stub that rejects identity/content collisions.
-///
-/// It performs no I/O and needs only `alloc`, so it lives here;
-/// `zeno-fcis-shell-sqlite` re-exports it under its previous path.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct MemoryDestination {
-    delivered: BTreeMap<Hash32, Hash32>,
-}
-
-impl MemoryDestination {
-    /// Returns the exact number of distinct delivered identities.
-    #[must_use]
-    pub fn delivered_count(&self) -> usize {
-        self.delivered.len()
-    }
-}
-
-/// Memory-destination collision failure, defined here and re-exported by
-/// `zeno-fcis-shell-sqlite`.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct DeliveryCollision;
-
-impl fmt::Display for DeliveryCollision {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("delivery identity already binds different entry content")
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::error::Error for DeliveryCollision {}
-
-impl IdempotentDestination for MemoryDestination {
-    type Error = DeliveryCollision;
-
-    fn deliver(
-        &mut self,
-        delivery_id: Hash32,
-        entry_hash: Hash32,
-        _: &OutboxEntry,
-    ) -> Result<Hash32, Self::Error> {
-        match self.delivered.get(&delivery_id) {
-            Some(existing) if *existing != entry_hash => Err(DeliveryCollision),
-            Some(existing) => Ok(*existing),
-            None => {
-                self.delivered.insert(delivery_id, entry_hash);
-                Ok(entry_hash)
-            }
-        }
-    }
-}
+mod delivery;
+pub use delivery::{DeliveryCollision, IdempotentDestination, MemoryDestination};
 
 fn hash_outbox_entry<H: CommitmentHasher>(entry: &OutboxEntry) -> Result<Hash32, ShellError> {
-    let domain = Domain::new("zeno-fcis/outbox-entry", 1).map_err(ShellError::Encode)?;
+    let domain = zeno_fcis_codec::domains::OUTBOX_ENTRY;
     let bytes = entry.canonical_bytes().map_err(ShellError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(ShellError::Encode)
 }
 
 /// Reference-shell validation failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ShellError {
     /// Initial semantic-state commitment failed.
     State(PatchError),
@@ -524,139 +460,10 @@ impl fmt::Display for ShellError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
-    use zeno_fcis_core::DecisionKind;
-    use zeno_fcis_patch::{CanonicalPatch, PatchOp, PathSegment, ValuePath, hash_value};
-    use zeno_fcis_plan::{CommitPlan, OutboxEntry, OutboxPlan};
-    use zeno_fcis_receipt::{CandidateBindings, CandidateBuilder};
-    use zeno_fcis_value::Field;
-
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test/fold/v1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                let slot = index % 32;
-                output[slot] = output[slot].wrapping_add(byte);
-            }
-            Hash32::new(output)
-        }
-    }
-
-    fn domain() -> Domain<'static> {
-        Domain::new("test/state", 1).unwrap_or_else(|error| panic!("domain: {error}"))
-    }
-
-    fn bundle(state: &Value) -> CommitBundle {
-        let root = hash_value::<TestHasher>(domain(), state).unwrap_or(Hash32::ZERO);
-        let patch = CanonicalPatch::try_new(
-            1,
-            root,
-            vec![PatchOp::Insert {
-                path: ValuePath::new(vec![PathSegment::Field(1)]),
-                map_key: None,
-                value: Value::U128(1),
-            }],
-        )
-        .unwrap_or_else(|error| panic!("patch: {error}"));
-        let outbox =
-            OutboxPlan::try_new(vec![OutboxEntry::new(0, 1, Value::Unit, Value::Bool(true))])
-                .unwrap_or_else(|error| panic!("outbox: {error}"));
-        CandidateBuilder::seal::<TestHasher>(
-            state,
-            domain(),
-            DecisionKind::Accept,
-            None,
-            CandidateBindings {
-                profile_hash: Hash32::new([1; 32]),
-                command_hash: Hash32::new([2; 32]),
-                context_hash: Hash32::new([3; 32]),
-                precedence_hash: Hash32::new([4; 32]),
-                algorithm_hash: Hash32::new([5; 32]),
-                budget_hash: Hash32::new([6; 32]),
-            },
-            patch,
-            CommitPlan::empty(),
-            outbox,
-        )
-        .unwrap_or_else(|error| panic!("bundle: {error}"))
-    }
-
-    #[test]
-    fn commit_is_atomic_and_replay_is_idempotent() {
-        let state = Value::Record(Vec::<Field>::new().into_boxed_slice());
-        let bundle = bundle(&state);
-        let shell = ShellState::new::<TestHasher>(state, domain())
-            .unwrap_or_else(|error| panic!("shell: {error}"));
-        let replay = Hash32::new([9; 32]);
-        let first = apply_reference_bundle::<TestHasher>(&shell, domain(), replay, &bundle)
-            .unwrap_or_else(|error| panic!("commit: {error}"));
-        assert_eq!(first.status(), CommitStatus::Committed);
-        assert_eq!(
-            first.state().state(),
-            bundle
-                .patch()
-                .apply::<TestHasher>(shell.state(), domain())
-                .unwrap_or_else(|error| panic!("patch: {error}"))
-                .state()
-        );
-        let second = apply_reference_bundle::<TestHasher>(first.state(), domain(), replay, &bundle)
-            .unwrap_or_else(|error| panic!("replay: {error}"));
-        assert_eq!(second.status(), CommitStatus::IdempotentReplay);
-        assert_eq!(first.state(), second.state());
-        assert_eq!(first.state().bundles().len(), 1);
-        assert_eq!(
-            first.state().outbox_records()[0].entry(),
-            bundle
-                .outbox_plan()
-                .entries()
-                .first()
-                .unwrap_or_else(|| panic!("entry"))
-        );
-    }
-
-    #[test]
-    fn wrong_expected_root_publishes_nothing() {
-        let intended_state = Value::Record(Vec::<Field>::new().into_boxed_slice());
-        let bundle = bundle(&intended_state);
-        let shell = ShellState::new::<TestHasher>(Value::U128(99), domain())
-            .unwrap_or_else(|error| panic!("shell: {error}"));
-        let result =
-            apply_reference_bundle::<TestHasher>(&shell, domain(), Hash32::new([8; 32]), &bundle);
-        assert!(matches!(result, Err(ShellError::RootConflict { .. })));
-        assert_eq!(shell.outbox_records().len(), 0);
-        assert_eq!(shell.receipts().len(), 0);
-        assert_eq!(shell.bundles().len(), 0);
-    }
-
-    #[test]
-    fn acknowledgement_binds_exact_entry_content() {
-        let state = Value::Record(Vec::<Field>::new().into_boxed_slice());
-        let bundle = bundle(&state);
-        let shell = ShellState::new::<TestHasher>(state, domain())
-            .unwrap_or_else(|error| panic!("shell: {error}"));
-        let committed =
-            apply_reference_bundle::<TestHasher>(&shell, domain(), Hash32::new([7; 32]), &bundle)
-                .unwrap_or_else(|error| panic!("commit: {error}"));
-        let pending = committed
-            .state()
-            .next_pending()
-            .unwrap_or_else(|| panic!("missing pending record"));
-        assert!(acknowledge(committed.state(), pending.delivery_id(), Hash32::ZERO).is_err());
-        let acknowledged = acknowledge(
-            committed.state(),
-            pending.delivery_id(),
-            pending.entry_hash(),
-        );
-        assert!(acknowledged.is_ok());
-    }
 
     #[test]
     fn memory_destination_delivers_once_by_identity_and_refuses_other_content() {
-        let entry = OutboxEntry::new(0, 1, Value::U128(1), Value::U128(2));
+        let entry = OutboxEntry::new(0, 1, Value::unsigned(1), Value::unsigned(2));
         let (id, hash, other) = (
             Hash32::new([1; 32]),
             Hash32::new([2; 32]),

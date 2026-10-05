@@ -23,6 +23,7 @@ pub(super) mod spec;
 /// Closed scalar domain. Boolean wire values are exactly the integers 0 and 1.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Domain {
     /// Logical values, distinct from integers during type checking.
     Bool,
@@ -81,6 +82,7 @@ impl Domain {
 /// Evaluation is eager, including both arms of `Select`; add/sub are checked.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Op {
     /// Read a declared input by its zero-based position.
     Input(u16),

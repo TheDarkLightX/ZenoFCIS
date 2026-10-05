@@ -1,0 +1,42 @@
+{
+  "artifacts": {
+    "boolean-kernel-candidate.zcve": {
+      "bytes": 763,
+      "sha256": "b76551883b1aebb553faf5e10089d92cb46df6ff94698f7e09a77a42ba50f37b"
+    },
+    "boolean-kernel-original.zcve": {
+      "bytes": 1063,
+      "sha256": "84c7a4ecff4c9bd49dd2e3f5f5e0b63b38a0f92db3a9bfadb99df8325f8f81c5"
+    },
+    "boolean-kernel-padded.zcve": {
+      "bytes": 1114,
+      "sha256": "f800c6048253c258289b2b5d94e8aaee76b182d07ffef4fe50cb1c698d37d257"
+    },
+    "current-decision-scalars-candidate.zcve": {
+      "bytes": 6486,
+      "sha256": "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89"
+    },
+    "current-decision-scalars-original.zcve": {
+      "bytes": 6686,
+      "sha256": "21435b72cad2748bc20dbee6cc8ebf9b6e78f5a05a77c850851ccaa51e585f0c"
+    },
+    "current-decision-scalars-padded.zcve": {
+      "bytes": 6720,
+      "sha256": "0c214b5f2b4bdcd680587bd15f1106ff98d40f49afad3aff2a1b57572e455b35"
+    },
+    "retained-controller-candidate.zcve": {
+      "bytes": 3790,
+      "sha256": "f9f04c4c9cf2e62c2146903c25018ba00c25a03c60f5c50e082718afd344eb18"
+    },
+    "retained-controller-original.zcve": {
+      "bytes": 4090,
+      "sha256": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc"
+    },
+    "retained-controller-padded.zcve": {
+      "bytes": 4141,
+      "sha256": "521872eafe8ff8ac26166d13b0ef920ac0be8b4e2a304ebf5788db8445fb1ee8"
+    }
+  },
+  "authority": "none",
+  "schema": "zeno-fcis/withdrawal-research-artifacts/1"
+}

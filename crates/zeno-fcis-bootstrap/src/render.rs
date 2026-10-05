@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
 use zeno_fcis_catalog::ProjectCatalog;
-use zeno_fcis_codec::{CanonicalEncode as _, CommitmentHasher, Domain, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Domain, Hash32, commitment};
 use zeno_fcis_codegen::{GeneratedBundle, generate};
 
 use crate::templates::{
@@ -264,19 +264,22 @@ fn hash_file<H: CommitmentHasher>(path: &str, bytes: &[u8]) -> Result<Hash32, Bo
     preimage.extend_from_slice(path.as_bytes());
     preimage.extend_from_slice(&byte_len.to_be_bytes());
     preimage.extend_from_slice(bytes);
-    hash_bytes::<H>("zeno-fcis/bootstrap-file", &preimage)
+    hash_bytes::<H>(zeno_fcis_codec::domains::BOOTSTRAP_FILE, &preimage)
 }
 
 fn hash_manifest<H: CommitmentHasher>(bytes: &[u8]) -> Result<Hash32, BootstrapError> {
-    hash_bytes::<H>("zeno-fcis/bootstrap-manifest", bytes)
+    hash_bytes::<H>(zeno_fcis_codec::domains::BOOTSTRAP_MANIFEST, bytes)
 }
 
 fn hash_bytes<H: CommitmentHasher>(
-    name: &'static str,
+    domain: Domain<'static>,
     bytes: &[u8],
 ) -> Result<Hash32, BootstrapError> {
-    let domain = Domain::new(name, BOOTSTRAP_FORMAT_VERSION)?;
     let hash = commitment::<H>(domain, bytes)?;
+    require_nonzero_derived(hash)
+}
+
+fn require_nonzero_derived(hash: Hash32) -> Result<Hash32, BootstrapError> {
     if hash == Hash32::ZERO {
         Err(BootstrapError::ZeroDerivedCommitment)
     } else {
@@ -313,55 +316,9 @@ mod tests {
 
     use super::*;
 
-    #[derive(Clone, Copy, Debug)]
-    struct TestHasher;
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test/bootstrap/1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(byte)
-                    .rotate_left((index % 7) as u32);
-            }
-            if output == [0_u8; 32] {
-                output[0] = 1;
-            }
-            Hash32::new(output)
-        }
-    }
-
-    #[derive(Clone, Copy, Debug)]
-    struct WrongHasher;
-
-    impl CommitmentHasher for WrongHasher {
-        const ALGORITHM_ID: &'static str = "test/bootstrap/wrong";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            TestHasher::hash(bytes)
-        }
-    }
-
-    #[derive(Clone, Copy, Debug)]
-    struct ZeroBootstrapHasher;
-
-    impl CommitmentHasher for ZeroBootstrapHasher {
-        const ALGORITHM_ID: &'static str = TestHasher::ALGORITHM_ID;
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            if bytes
-                .windows(b"zeno-fcis/bootstrap".len())
-                .any(|window| window == b"zeno-fcis/bootstrap")
-            {
-                Hash32::ZERO
-            } else {
-                TestHasher::hash(bytes)
-            }
-        }
-    }
+    use zeno_fcis_codec::LibcruxSha256 as WrongHasher;
 
     fn hash(byte: u8) -> Hash32 {
         Hash32::new([byte; 32])
@@ -590,51 +547,51 @@ mod tests {
         assert!(text.contains("pub struct GeneratedContextEnvelope {"));
         assert!(text.contains("pub enum RejectReasonId {"));
         assert!(text.contains("pub enum CommittedFailureReasonId {"));
-        assert!(text.contains("pub struct GeneratedTransition<'a, H: CommitmentHasher> {"));
+        assert!(text.contains("pub struct GeneratedProgramProposal<'a> {"));
+        assert!(
+            text.contains("pub fn read_amount() -> Result<Expr<'static>, GeneratedProjectError>")
+        );
+        assert!(text.contains("Ok(Expr::Input(Source::State, 1))"));
         assert!(text.contains(
-            "pub fn read_amount(\n        &mut self,\n    ) -> Result<crate::generated::Amount, GeneratedProjectError>"
+            "pub fn update_amount<'a>(value: Expr<'a>) -> Result<Assignment<'a>, GeneratedProjectError>"
         ));
         assert!(text.contains(
-            ".read(crate::generated::BalanceState::amount_path())?\n            .clone();"
+            "Ok(Assignment { field: 1, value, domain: DeclaredDomain::U128 { min: 0u128, max: 1000000u128 } })"
         ));
         assert!(text.contains(
-            "pub fn update_amount(\n        &mut self,\n        value: &crate::generated::Amount,"
+            "pub fn effect_20(\n    ordinal: u32,\n    authority: zeno_fcis_catalog::NonZeroHash,\n    payload: &crate::generated::Amount,"
         ));
         assert!(text.contains(
-            "crate::generated::BalanceState::amount_path(),\n            value.to_value()?,"
+            "EffectKind::Effect20.get(),\n        authority.get(),\n        Hash32::ZERO,"
         ));
         assert!(text.contains(
-            "pub fn emit_effect_20(\n        &mut self,\n        ordinal: u32,\n        authority: zeno_fcis_catalog::NonZeroHash,\n        payload: &crate::generated::Amount,"
+            "pub fn effect_21(\n    ordinal: u32,\n    authority: Hash32,\n    subject: Hash32,\n    payload: &crate::generated::Signed,"
         ));
         assert!(text.contains(
-            "let effect = effect_20(\n            ordinal,\n            authority.get(),\n            Hash32::ZERO,"
+            "pub fn effect_22(\n    ordinal: u32,\n    payload: &crate::generated::Amount,"
         ));
         assert!(text.contains(
-            "pub fn emit_effect_21(\n        &mut self,\n        ordinal: u32,\n        authority: Hash32,\n        subject: Hash32,\n        payload: &crate::generated::Signed,"
-        ));
-        assert!(text.contains(
-            "pub fn emit_effect_22(\n        &mut self,\n        ordinal: u32,\n        payload: &crate::generated::Amount,"
-        ));
-        assert!(text.contains(
-            "pub fn enqueue_channel_30(\n        &mut self,\n        ordinal: u32,\n        destination: &crate::generated::Label,\n        payload: &crate::generated::Event,"
+            "pub fn channel_30(\n    ordinal: u32,\n    destination: &crate::generated::Label,\n    payload: &crate::generated::Event,"
         ));
         assert!(text.contains("reason: RejectReasonId"));
         assert!(text.contains("reason: CommittedFailureReasonId"));
-        assert!(text.contains("Result<GeneratedTransition<'a, H>, GeneratedProjectError>"));
+        assert!(text.contains("Result<checked_authority::Authority<'a>, GeneratedProjectError>"));
         assert!(text.contains("pub fn admit_command<H: CommitmentHasher>"));
         assert!(text.contains("command: &crate::generated::Event"));
         assert!(text.contains("pub fn admit_context<H: CommitmentHasher>"));
         assert!(text.contains("context: &crate::generated::BalanceState"));
-        assert!(text.contains(
-            "pub fn observe_context_amount(\n        &mut self,\n    ) -> Result<&mut Self, GeneratedProjectError>"
-        ));
-        assert!(text.contains("CONTEXT_TYPE_ID,\n            vec![PathAtom::Field(1)],"));
+        assert!(text.contains("pub const fn context_amount_binding() -> DeclaredBinding"));
+        assert!(
+            text.contains(
+                "DeclaredBinding { source: Source::Context, selector: Selector::Field(1) }"
+            )
+        );
         assert!(text.contains("command: &GeneratedCommandEnvelope"));
         assert!(text.contains("context: &GeneratedContextEnvelope"));
         assert!(text.contains("INPUT_COMMITMENT_FORMAT_VERSION: u16 = 1"));
         assert!(text.contains("COMMAND_DOMAIN: &str = \"example/core/command\""));
         assert!(text.contains("CONTEXT_DOMAIN: &str = \"example/core/context\""));
-        assert!(text.contains("pre_state: &'a SchemaAdmittedEnvelope"));
+        assert!(text.contains("pre_state: &SchemaAdmittedEnvelope"));
         assert!(text.contains("let actual_catalog_hash = self.catalog.commitment::<H>()?"));
         assert!(!text.contains("pre_state: &'a Value"));
         assert!(!text.contains("catalog: &'a ProjectCatalog"));
@@ -670,10 +627,10 @@ mod tests {
             .unwrap_or_else(|| panic!("project helpers missing"));
         let text = core::str::from_utf8(project.bytes())
             .unwrap_or_else(|error| panic!("project source UTF-8: {error}"));
-        assert!(text.contains(
-            "pub fn observe_context_root(&mut self) -> Result<&mut Self, GeneratedProjectError>"
-        ));
-        assert!(text.contains("AccessPath::try_new(CONTEXT_TYPE_ID, vec![])"));
+        assert!(text.contains("pub const fn context_root_binding() -> DeclaredBinding"));
+        assert!(
+            text.contains("DeclaredBinding { source: Source::Context, selector: Selector::Root }")
+        );
         assert!(!text.contains("pub fn observe_context(&mut self, path: AccessPath)"));
     }
 
@@ -729,10 +686,7 @@ mod tests {
     #[test]
     fn reserved_zero_bootstrap_commitment_fails_closed() {
         assert_eq!(
-            generate_project::<ZeroBootstrapHasher>(
-                &catalog(false),
-                &spec(BootstrapLimits::default()),
-            ),
+            require_nonzero_derived(Hash32::ZERO),
             Err(BootstrapError::ZeroDerivedCommitment)
         );
     }

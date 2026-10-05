@@ -18,3 +18,6 @@ Cargo.lock
 .idea/
 .vscode/
 crates/zeno-fcis-generated-code-tests/python/
+
+# Local run records written by zeno-fcis inside a project; never source.
+.zeno-fcis/

@@ -15,6 +15,7 @@ pub(in super::super) fn schema_valid(fields: &[Field]) -> bool {
     fields.windows(2).all(|pair| pair[0].id < pair[1].id)
         && fields.iter().all(|field| match &field.leaf {
             Leaf::I128 { min, max } => min <= max,
+            Leaf::U128 { min, max } => min <= max && *max <= i64::MAX as u128,
             Leaf::Bool => true,
             Leaf::Enum {
                 min, max, variants, ..
@@ -36,6 +37,13 @@ fn field(bytes: &[u8], position: &mut usize, descriptor: &Field) -> Option<i64> 
     }
     let [tag] = take(bytes, position)?;
     match &descriptor.leaf {
+        Leaf::U128 { min, max } => {
+            if tag != 3 {
+                return None;
+            }
+            let value = u128::from_be_bytes(take(bytes, position)?);
+            (*min <= value && value <= *max && value <= i64::MAX as u128).then_some(value as i64)
+        }
         Leaf::I128 { min, max } => {
             if tag != 4 {
                 return None;
@@ -475,5 +483,106 @@ fn empty_and_full_sized_records_need_no_artificial_field_limit() {
             count as u64
         );
         assert_eq!(outcome.attempts().len(), count as usize);
+    }
+}
+
+#[test]
+fn unsigned_scalar_projection_checks_original_wire_and_is_injective() {
+    let leaf = Leaf::U128 {
+        min: 0,
+        max: 1_000_000,
+    };
+    assert!(validate_leaf(&leaf));
+    for value in [0u128, 1, 9, 1_000_000] {
+        let mut bytes = alloc::vec![3];
+        bytes.extend_from_slice(&value.to_be_bytes());
+        assert_eq!(decode_scalar(&bytes, 0, &leaf), Some((value as i64, 17)));
+        let actual = super::super::decision::Atom::U128(
+            decode_scalar(&bytes, 0, &leaf)
+                .unwrap_or_else(|| panic!("strict83 expected checked unsigned scalar projection"))
+                .0 as u128,
+        );
+        assert!(matches!(actual,super::super::decision::Atom::U128(v) if v==value));
+        assert_eq!(
+            crate::finite::canonical_v2::output::encode_atom(actual, 17).unwrap_or_else(
+                |error| panic!("strict83 unexpected typed test refusal: {error:?}")
+            ),
+            bytes
+        );
+        for end in 0..17 {
+            assert!(decode_scalar(&bytes[..end], 0, &leaf).is_none());
+        }
+        bytes[0] = 4;
+        assert!(decode_scalar(&bytes, 0, &leaf).is_none());
+    }
+    for value in [
+        1_000_001u128,
+        i64::MAX as u128,
+        i64::MAX as u128 + 1,
+        u128::MAX,
+    ] {
+        let mut bytes = alloc::vec![3];
+        bytes.extend_from_slice(&value.to_be_bytes());
+        assert!(decode_scalar(&bytes, 0, &leaf).is_none());
+    }
+    let largest = Leaf::U128 {
+        min: i64::MAX as u128,
+        max: i64::MAX as u128,
+    };
+    assert!(validate_leaf(&largest));
+    let mut bytes = alloc::vec![3];
+    bytes.extend_from_slice(&(i64::MAX as u128).to_be_bytes());
+    assert_eq!(decode_scalar(&bytes, 0, &largest), Some((i64::MAX, 17)));
+    assert!(!validate_leaf(&Leaf::U128 {
+        min: 0,
+        max: i64::MAX as u128 + 1
+    }));
+    assert!(!validate_leaf(&Leaf::U128 { min: 1, max: 0 }));
+}
+
+// Migrates the removed account reader's exact signed-wire/truncation grid to
+// the surviving decoder. Its admitted scalar range is explicitly i64; full
+// i128 byte values outside that profile refuse instead of being narrowed.
+#[test]
+fn migrated_account_signed_wire_reader_extremes() {
+    let values = [
+        i128::MIN,
+        i128::MIN + 1,
+        -901,
+        -900,
+        -1,
+        0,
+        1,
+        2,
+        3,
+        899,
+        900,
+        901,
+        i64::MAX as i128 + 1,
+        i128::MAX - 900,
+        i128::MAX - 1,
+        i128::MAX,
+    ];
+    for x in values {
+        for id in [0, 1, 110, u16::MAX] {
+            let field = Field {
+                id,
+                leaf: Leaf::I128 {
+                    min: i64::MIN,
+                    max: i64::MAX,
+                },
+            };
+            let mut b = id.to_be_bytes().to_vec();
+            b.push(4);
+            b.extend(x.to_be_bytes());
+            assert_eq!(
+                decode_field(&b, 0, &field),
+                i64::try_from(x).ok().map(|n| (n, 19))
+            );
+            for end in 0..19 {
+                assert_eq!(decode_field(&b[..end], 0, &field), None);
+            }
+            assert_eq!(decode_field(&b, usize::MAX, &field), None);
+        }
     }
 }

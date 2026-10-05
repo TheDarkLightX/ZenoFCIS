@@ -5,7 +5,7 @@
 //! include the transition itself: an exact encoding of a `finite-i64/1`
 //! program, its input and output domains, and its checked arithmetic. A
 //! property is a closed Boolean relation over the transition's inputs followed
-//! by its outputs: a synthesis [`Property`].
+//! by its outputs: a synthesis [`Contract`].
 //!
 //! Each property yields three scripts. Each script is unsatisfiable exactly
 //! when the answer to its question is yes:
@@ -27,8 +27,7 @@
 
 use core::fmt::Write as _;
 
-use zeno_fcis_synthesis::finite::{Domain, Op, Program};
-use zeno_fcis_synthesis::system::Property;
+use zeno_fcis_synthesis::finite::{Contract, Domain, Op, Program};
 
 use crate::ExportError;
 
@@ -102,13 +101,25 @@ impl SystemObligations {
 /// # Errors
 ///
 /// Returns [`ExportError::InvalidFormula`] when the property's input or output
-/// domains differ from the transition's.
+/// domains differ from the transition's, or a future finite domain or operation is unsupported.
 pub fn export_system_smt(
     transition: &Program,
-    property: &Property,
+    property: &Contract,
 ) -> Result<SystemObligations, ExportError> {
-    let contract = property.contract();
+    let contract = property;
     if contract.inputs() != transition.inputs() || contract.outputs() != transition.outputs() {
+        return Err(ExportError::InvalidFormula);
+    }
+    if [transition, property.relation()]
+        .into_iter()
+        .any(|program| {
+            program
+                .inputs()
+                .iter()
+                .chain(program.outputs())
+                .any(|domain| !matches!(domain, Domain::Bool | Domain::Int { .. }))
+        })
+    {
         return Err(ExportError::InvalidFormula);
     }
     let inputs = transition.inputs().len();
@@ -117,7 +128,7 @@ pub fn export_system_smt(
     let mut model_names = input_names.clone();
     model_names.extend((0..outputs).map(|index| format!("free_out_{index}")));
 
-    let transition_terms = encode("t", transition, |id| format!("in_{id}"));
+    let transition_terms = encode("t", transition, |id| format!("in_{id}"))?;
     let transition_outputs: Vec<String> = transition
         .roots()
         .iter()
@@ -137,14 +148,14 @@ pub fn export_system_smt(
         } else {
             transition_outputs[usize::from(id) - inputs].clone()
         }
-    });
+    })?;
     let without_transition = encode("p", property.relation(), |id| {
         if usize::from(id) < inputs {
             format!("in_{id}")
         } else {
             format!("free_out_{}", usize::from(id) - inputs)
         }
-    });
+    })?;
 
     let mut totality = header(transition.inputs());
     totality.push_str(&transition_terms.definitions);
@@ -334,7 +345,7 @@ fn model_value(text: &str, name: &str) -> Option<i64> {
 /// answer, or a model cannot be replayed.
 pub fn system_verdict(
     transition: &Program,
-    property: &Property,
+    property: &Contract,
     mut solve: impl FnMut(SystemObligationKind, &[u8]) -> Result<SystemAnswer, SystemSolveError>,
 ) -> Result<SystemVerdict, SystemSolveError> {
     let obligations = export_system_smt(transition, property).map_err(SystemSolveError::Export)?;
@@ -363,7 +374,7 @@ pub fn system_verdict(
         let Ok(result) = transition.evaluate(&input) else {
             return Err(refuse(kind, input, output));
         };
-        return match property.contract().holds(&input, &result) {
+        return match property.holds(&input, &result) {
             Ok(false) => Ok(SystemVerdict::Violated {
                 input,
                 output: result,
@@ -380,7 +391,7 @@ pub fn system_verdict(
         SystemAnswer::Sat { input, output } => {
             let violates = admitted(transition.inputs(), &input)
                 && admitted(transition.outputs(), &output)
-                && !matches!(property.contract().holds(&input, &output), Ok(true));
+                && !matches!(property.holds(&input, &output), Ok(true));
             if violates {
                 Ok(SystemVerdict::SystemProperty)
             } else {
@@ -408,7 +419,11 @@ struct Encoded {
     root: String,
 }
 
-fn encode(prefix: &str, program: &Program, input: impl Fn(u16) -> String) -> Encoded {
+fn encode(
+    prefix: &str,
+    program: &Program,
+    input: impl Fn(u16) -> String,
+) -> Result<Encoded, ExportError> {
     let mut definitions = String::new();
     let mut checked = Vec::new();
     let node = |id: u16| format!("{prefix}_{id}");
@@ -424,6 +439,7 @@ fn encode(prefix: &str, program: &Program, input: impl Fn(u16) -> String) -> Enc
             Op::And(a, b) => format!("(ite (and (= {} 1) (= {} 1)) 1 0)", node(a), node(b)),
             Op::Not(a) => format!("(ite (= {} 0) 1 0)", node(a)),
             Op::Select(c, a, b) => format!("(ite (= {} 1) {} {})", node(c), node(a), node(b)),
+            _ => return Err(ExportError::InvalidFormula),
         };
         let name = format!("{prefix}_{index}");
         let _ = writeln!(definitions, "(define-fun {name} () Int {term})");
@@ -435,11 +451,11 @@ fn encode(prefix: &str, program: &Program, input: impl Fn(u16) -> String) -> Enc
         .roots()
         .first()
         .map_or_else(String::new, |root| node(*root));
-    Encoded {
+    Ok(Encoded {
         definitions,
         defined: conjunction(checked.into_iter()),
         root,
-    }
+    })
 }
 
 fn header(inputs: &[Domain]) -> String {
@@ -519,23 +535,23 @@ mod tests {
         .unwrap_or_else(|error| panic!("counter program: {error:?}"))
     }
 
-    fn property(nodes: Vec<Op>) -> Property {
+    fn property(nodes: Vec<Op>) -> Contract {
         let root = u16::try_from(nodes.len() - 1).unwrap_or_else(|_| unreachable!());
         let relation = Program::try_new(vec![COUNT, COUNT], vec![Domain::Bool], nodes, vec![root])
             .unwrap_or_else(|error| panic!("property program: {error:?}"));
-        Property::try_new(vec![COUNT], vec![COUNT], relation)
+        Contract::try_new(vec![COUNT], vec![COUNT], relation)
             .unwrap_or_else(|error| panic!("property: {error:?}"))
     }
 
-    fn monotone() -> Property {
+    fn monotone() -> Contract {
         property(vec![Op::Input(1), Op::Input(0), Op::Lt(0, 1), Op::Not(2)])
     }
 
-    fn bounded() -> Property {
+    fn bounded() -> Contract {
         property(vec![Op::Int(3), Op::Input(1), Op::Lt(0, 1), Op::Not(2)])
     }
 
-    fn unchanged() -> Property {
+    fn unchanged() -> Contract {
         property(vec![Op::Input(1), Op::Input(0), Op::Eq(0, 1)])
     }
 
@@ -684,11 +700,11 @@ mod tests {
             .unwrap_or_else(|error| panic!("identity: {error:?}"))
     }
 
-    fn bit_property(nodes: Vec<Op>) -> Property {
+    fn bit_property(nodes: Vec<Op>) -> Contract {
         let root = u16::try_from(nodes.len() - 1).unwrap_or_else(|_| unreachable!());
         let relation = Program::try_new(vec![BIT, BIT], vec![Domain::Bool], nodes, vec![root])
             .unwrap_or_else(|error| panic!("bit relation: {error:?}"));
-        Property::try_new(vec![BIT], vec![BIT], relation)
+        Contract::try_new(vec![BIT], vec![BIT], relation)
             .unwrap_or_else(|error| panic!("bit property: {error:?}"))
     }
 
@@ -869,13 +885,13 @@ mod tests {
     }
 
     /// Relations over (pre, post) on {0, 1, 2}.
-    fn small_properties() -> Vec<(&'static str, Property)> {
+    fn small_properties() -> Vec<(&'static str, Contract)> {
         let property = |nodes: Vec<Op>| {
             let root = u16::try_from(nodes.len() - 1).unwrap_or_else(|_| unreachable!());
             let relation =
                 Program::try_new(vec![SMALL, SMALL], vec![Domain::Bool], nodes, vec![root])
                     .unwrap_or_else(|error| panic!("small relation: {error:?}"));
-            Property::try_new(vec![SMALL], vec![SMALL], relation)
+            Contract::try_new(vec![SMALL], vec![SMALL], relation)
                 .unwrap_or_else(|error| panic!("small property: {error:?}"))
         };
         vec![
@@ -948,12 +964,11 @@ mod tests {
     /// validated, replayed, and combined.
     fn reference_answer(
         transition: &Program,
-        property: &Property,
+        property: &Contract,
         kind: SystemObligationKind,
     ) -> SystemAnswer {
-        let fails = |input: &[i64], output: &[i64]| {
-            !matches!(property.contract().holds(input, output), Ok(true))
-        };
+        let fails =
+            |input: &[i64], output: &[i64]| !matches!(property.holds(input, output), Ok(true));
         let inputs = tuples(transition.inputs());
         let found = match kind {
             SystemObligationKind::Totality => inputs
@@ -1008,12 +1023,9 @@ mod tests {
         let mut seen = BTreeMap::new();
         for (transition_name, transition) in small_transitions() {
             for (property_name, property) in small_properties() {
-                let exhaustive = check_system_property(
-                    &transition,
-                    property.contract(),
-                    SystemLimits::default(),
-                )
-                .unwrap_or_else(|error| panic!("exhaustive: {error:?}"));
+                let exhaustive =
+                    check_system_property(&transition, &property, SystemLimits::default())
+                        .unwrap_or_else(|error| panic!("exhaustive: {error:?}"));
                 *seen.entry(exhaustive.code()).or_insert(0_u32) += 1;
                 let verdict = system_verdict(&transition, &property, |kind, _| {
                     Ok(reference_answer(&transition, &property, kind))
@@ -1047,9 +1059,8 @@ mod tests {
             (counter(4), monotone(), "not-total"),
         ];
         for (transition, property, expected) in &cases {
-            let exhaustive =
-                check_system_property(transition, property.contract(), SystemLimits::default())
-                    .unwrap_or_else(|error| panic!("exhaustive: {error:?}"));
+            let exhaustive = check_system_property(transition, property, SystemLimits::default())
+                .unwrap_or_else(|error| panic!("exhaustive: {error:?}"));
             assert_eq!(exhaustive.code(), *expected);
             let verdict = system_verdict(transition, property, |kind, script| {
                 run_solver(&cvc5, kind, script, 1, 1)
@@ -1070,12 +1081,9 @@ mod tests {
         );
         for (transition_name, transition) in small_transitions() {
             for (property_name, property) in small_properties() {
-                let exhaustive = check_system_property(
-                    &transition,
-                    property.contract(),
-                    SystemLimits::default(),
-                )
-                .unwrap_or_else(|error| panic!("exhaustive: {error:?}"));
+                let exhaustive =
+                    check_system_property(&transition, &property, SystemLimits::default())
+                        .unwrap_or_else(|error| panic!("exhaustive: {error:?}"));
                 let verdict = system_verdict(&transition, &property, |kind, script| {
                     run_solver(&cvc5, kind, script, 1, 1)
                 })

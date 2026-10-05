@@ -1,0 +1,23 @@
+{
+  "paths": [
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/output/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/choice_tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/evaluation_tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/invocation_tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication_tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/sealing_tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/account_tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/record_tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/continuation/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/decision/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tests.rs"
+  ],
+  "schema": "zeno-fcis/authority-test-sources/1"
+}

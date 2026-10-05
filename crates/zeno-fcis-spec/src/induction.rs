@@ -4,19 +4,13 @@
 //! the laws its induction step may assume. The formal tools export the step:
 //! does every transition that satisfies the assumed laws, and starts in a state
 //! that satisfies the invariant, end in one? This module restates the invariant
-//! over another root for that obligation, and evaluates it on one state for the
-//! base case, which needs no solver.
+//! over another root for that inert obligation. Runtime invariant enforcement
+//! belongs to the checked program and its complete genesis/transition laws.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use crate::ast::{
-    ClaimDecl, ClaimFormula, ClaimMode, Identifier, ProjectionPath, ProjectionRoot, RelExpr,
-    ValueExpr,
-};
-use crate::logic::{
-    EvalLimits, EvalOutcome, EvaluationContext, PredicateProvider, TraceStep, evaluate_relational,
-};
+use crate::ast::{ProjectionPath, ProjectionRoot, RelExpr, ValueExpr};
 
 /// Restates a state invariant over `root`, replacing every `pre.` projection
 /// and keeping everything else.
@@ -116,35 +110,6 @@ fn value_at(value: &ValueExpr, root: ProjectionRoot) -> Option<ValueExpr> {
     })
 }
 
-struct NoPredicates;
-impl PredicateProvider for NoPredicates {
-    fn evaluate(&self, _: &Identifier, _: &[i128]) -> Option<bool> {
-        None
-    }
-}
-
-/// Evaluates an inductive claim's invariant on one state, observed under
-/// `pre.` paths, for the base case of the induction.
-///
-/// The base case holds only when this returns `Some(EvalOutcome::True)`.
-/// Evaluation is strict, as for laws: an undefined subterm, a missing
-/// observation, or a named predicate gives `Indeterminate`, and so does not
-/// establish the base case. Returns `None` for a claim that is not inductive.
-#[must_use]
-pub fn evaluate_invariant(
-    claim: &ClaimDecl,
-    state: &TraceStep,
-    limits: EvalLimits,
-) -> Option<EvalOutcome> {
-    match (claim.mode(), claim.formula()) {
-        (ClaimMode::Inductive, ClaimFormula::Relational(invariant)) => Some(evaluate_relational(
-            invariant,
-            EvaluationContext::new(state, &NoPredicates, limits),
-        )),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use alloc::format;
@@ -152,9 +117,8 @@ mod tests {
     use alloc::vec;
 
     use super::*;
-    use crate::ast::{LawScope, ProjectSpec, StableId};
+    use crate::ast::{ClaimFormula, ClaimMode, LawScope, ProjectSpec, StableId};
     use crate::diagnostic::DiagnosticCode;
-    use crate::logic::{IndeterminateReason, Observation};
     use crate::substance::{Substance, claim_substance};
     use crate::{ProjectLimits, SourceLimits, elaborate_project, parse_project};
 
@@ -224,11 +188,6 @@ mod tests {
 
     fn count(root: ProjectionRoot) -> ProjectionPath {
         ProjectionPath::try_new(root, vec![id(100), id(110)]).unwrap_or_else(|| unreachable!())
-    }
-
-    fn state(value: i128) -> TraceStep {
-        TraceStep::try_new(vec![Observation::new(count(ProjectionRoot::Pre), value)])
-            .unwrap_or_else(|| unreachable!())
     }
 
     #[test]
@@ -342,38 +301,6 @@ mod tests {
             ),
         );
         assert_eq!(invariant_at(&reads_command, ProjectionRoot::Post), None);
-    }
-
-    #[test]
-    fn the_base_case_evaluates_the_invariant_strictly_on_one_state() {
-        let spec = project(
-            "claim 500 nonnegative cvc5 inductive assume [400] = pre.100.110 >= 0;\n\
-             claim 501 grows cvc5 inductive assume [400] = pre.100.110 + 1 > pre.100.110;\n\
-             claim 502 relational cvc5 relational = pre.100.110 >= 0;\n",
-        )
-        .unwrap_or_else(|error| panic!("{error}"));
-        let claim = |value| spec.claim(id(value)).unwrap_or_else(|| unreachable!());
-        let limits = EvalLimits::default();
-        assert_eq!(
-            evaluate_invariant(claim(500), &state(3), limits),
-            Some(EvalOutcome::True)
-        );
-        assert_eq!(
-            evaluate_invariant(claim(500), &state(-1), limits),
-            Some(EvalOutcome::False)
-        );
-        assert_eq!(
-            evaluate_invariant(claim(501), &state(i128::MAX), limits),
-            Some(EvalOutcome::Indeterminate(IndeterminateReason::Overflow))
-        );
-        let unobserved = TraceStep::try_new(Vec::new()).unwrap_or_else(|| unreachable!());
-        assert_eq!(
-            evaluate_invariant(claim(500), &unobserved, limits),
-            Some(EvalOutcome::Indeterminate(
-                IndeterminateReason::MissingProjection
-            ))
-        );
-        assert_eq!(evaluate_invariant(claim(502), &state(3), limits), None);
     }
 
     #[test]

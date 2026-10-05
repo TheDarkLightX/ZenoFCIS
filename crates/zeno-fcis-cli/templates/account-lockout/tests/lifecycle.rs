@@ -1,6 +1,4 @@
-use account_lockout::{
-    authority, context, create, delivery::Destination, generated::*, invoke, journey,
-};
+use account_lockout::{authority, context, create, generated::*, invoke, journey};
 use std::{
     fs,
     path::PathBuf,
@@ -46,9 +44,10 @@ fn complete_account_journey() {
 fn a_lock_survives_a_restart() {
     let temp = Temp::new();
     let path = temp.0.join("account.sqlite");
-    let authority = authority().unwrap();
-    let destination = Destination::default();
-    let mut shell = create(&path, &authority, destination.clone()).unwrap();
+    let contract = account_lockout::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let mut shell = create(&path, &authority).unwrap();
     for (n, now) in [100, 110, 120].into_iter().enumerate() {
         assert_eq!(
             invoke(
@@ -64,12 +63,7 @@ fn a_lock_survives_a_restart() {
     }
     drop(shell);
     // Reopening re-executes every persisted decision before admitting new ones.
-    let mut shell = account_lockout::Shell::open_existing(
-        &path,
-        &authority,
-        authority.bind_delivery_interpreter(destination),
-    )
-    .unwrap();
+    let mut shell = account_lockout::Shell::open(&path, &authority).unwrap();
     let before = shell.snapshot().unwrap();
     assert_eq!(
         invoke(
@@ -94,5 +88,5 @@ fn a_lock_survives_a_restart() {
         .unwrap(),
         "Accept"
     );
-    assert_eq!(shell.snapshot().unwrap().bundle_count(), 4);
+    assert_eq!(shell.snapshot().unwrap().version(), 4);
 }

@@ -1,0 +1,128 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "account-lockout",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "failed": "pre.100.110",
+    "until": "pre.100.111",
+    "seen": "pre.100.112",
+    "action": "command.101",
+    "now": "context.102.130",
+    "admin": "context.102.131"
+  },
+  "cases": [
+    {
+      "when": "now < seen",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action != 122 && now < until",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 122 && !admin",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 120",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 0,
+        "111": "until",
+        "112": "now"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 121 && failed == 2",
+      "class": "CommittedFailure",
+      "reason": 203,
+      "post": {
+        "110": 0,
+        "111": "computed.deadline",
+        "112": "now"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "security-team",
+          "payload": {
+            "140": 150,
+            "141": "computed.deadline"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 121",
+      "class": "CommittedFailure",
+      "reason": 203,
+      "post": {
+        "110": "computed.increment",
+        "111": "until",
+        "112": "now"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 0,
+        "111": 0,
+        "112": "now"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "security-team",
+          "payload": {
+            "140": 151,
+            "141": 0
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AuthoritySubjectRecipient",
+    "503": "CommittedFailureEffects"
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+}

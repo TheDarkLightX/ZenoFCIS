@@ -23,8 +23,8 @@ use serde_json::{Value, json};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_formal_tools::{
     CVC5_VERSION, LEAN_VERSION, ToolBackend, ToolFailure, ToolRunStatus, Z3_VERSION, doctor,
-    execute_tool, export_inductive_smt, export_lean, export_smt, inspect_lean_toolchain,
-    load_tools_manifest, retain_run, verify_tool,
+    execute_tool, export_inductive_smt, export_smt, inspect_lean_toolchain, load_tools_manifest,
+    retain_run, verify_tool,
 };
 use zeno_fcis_spec::{
     ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, PathResolution, ProjectLimits,
@@ -135,7 +135,7 @@ enum Command {
         /// Fail when any law or claim cannot constrain a transition.
         #[arg(long)]
         require_substantive: bool,
-        /// Fail when any law or claim path names no declared type or field.
+        /// Compatibility option: unresolved paths always fail in V2.
         #[arg(long)]
         require_resolved_paths: bool,
     },
@@ -359,6 +359,18 @@ fn describe(path: &[String]) -> u8 {
         "schema": DESCRIPTION_SCHEMA,
         "cli_version": env!("CARGO_PKG_VERSION"),
         "authority": "diagnostic-only",
+        "normal_program": {
+            "declaration_api": "zeno_fcis::program", "authority": "none",
+            "runtime_admission": "not-run",
+            "templates": ["durable-counter", "account-lockout", "order-fulfillment",
+                "inventory-reservation", "withdrawal-queue", "agent-treasury-guard",
+                "prepared-counter", "compliance-gateway"],
+            "binding": ["complete original schema and policy", "complete ProgramDefinition",
+                "original frame and channel links", "bind_catalog", "bind_program"],
+            "execution": "Original envelopes, private meter, complete decision, required transition/genesis laws, then private Publication",
+            "unsupported": "Named library refusal; no native callback authority fallback",
+            "shell": "Context authentication, durable replay/state comparison and physical effects require the trusted host"
+        },
         "limits": {"max_source_bytes": limits.max_bytes(), "max_source_tokens": limits.max_tokens(), "max_diagnostics": limits.max_diagnostics()},
         "exit_codes": [
             {"code": OK, "meaning": "requested result completed"},
@@ -543,7 +555,7 @@ fn check(
     path: &Path,
     format: OutputFormat,
     require_substantive: bool,
-    require_resolved_paths: bool,
+    _require_resolved_paths: bool,
 ) -> u8 {
     let spec = match project_or_report(path, format) {
         Ok(value) => value,
@@ -559,7 +571,7 @@ fn check(
     let substance = SubstanceReport::of(&spec);
     let vacuous = require_substantive && substance.vacuous_count() > 0;
     let paths = PathReport::of(&spec);
-    let unresolved = require_resolved_paths && paths.unresolved_count() > 0;
+    let unresolved = paths.unresolved_count() > 0;
     let status = if unresolved {
         "unresolved-paths"
     } else if vacuous {
@@ -594,6 +606,7 @@ fn check(
             }
         }
         OutputFormat::Json => print_json(&json!({
+            "authority": "none", "evidence": "authoring-spec", "runtime_admission": "not-run",
             "claims": spec.claims().len(), "components": spec.components().len(),
             "path": path.display().to_string(), "project_id": spec.project_id().get(),
             "schema": JSON_SCHEMA, "semantic_program_hash": derived.semantic_program_hash().to_string(),
@@ -859,6 +872,7 @@ fn generate(path: &Path, out: &Path, check_only: bool, format: OutputFormat) -> 
     };
     match format {
         OutputFormat::Json => print_json(&json!({
+            "authority": "none", "evidence": "generated-declarations", "runtime_admission": "not-run",
             "schema": JSON_SCHEMA, "status": status, "path": path.display().to_string(),
             "output": out.display().to_string(), "artifacts": files.map(|(name, _)| name), "drift": drift
         })),
@@ -1042,7 +1056,7 @@ fn prove(
                     export_inductive_smt(claim, &spec, tool_backend)
                 }
                 (ToolBackend::Cvc5 | ToolBackend::Z3, _) => export_smt(claim, tool_backend),
-                (ToolBackend::Lean, _) => export_lean(claim),
+                (ToolBackend::Lean, _) => Err(zeno_fcis_formal_tools::ExportError::UnsupportedMode),
             };
             let obligation = match obligation {
                 Ok(value) => value,
@@ -1137,6 +1151,13 @@ fn prove(
                     );
                     tool_run_exit(run.status(), counterexample)
                 }
+                _ => {
+                    eprintln!(
+                        "claim {} blocked: unsupported formal outcome",
+                        claim.id().get()
+                    );
+                    BLOCKED
+                }
             };
             let assumptions = claim.assumptions();
             if !assumptions.is_empty() {
@@ -1175,7 +1196,7 @@ fn prove(
 }
 
 fn run_purity(paths: &[PathBuf], format: OutputFormat) -> u8 {
-    let report = purity::check_paths(paths);
+    let report = purity::check_resolved_paths(paths);
     match format {
         OutputFormat::Json => print_json(&report.to_json()),
         OutputFormat::Human => print!("{}", report.render()),
@@ -1342,6 +1363,7 @@ fn print_command_error(path: &Path, code: &str, message: &str, format: OutputFor
     match format {
         OutputFormat::Human => eprintln!("{message}"),
         OutputFormat::Json => print_json(&json!({
+            "authority": "none", "runtime_admission": "not-run",
             "error": {"code": code, "message": message},
             "path": path.display().to_string(),
             "schema": JSON_SCHEMA,
@@ -1383,7 +1405,7 @@ fn diagnostic_json(path: &Path, diagnostics: &[&Diagnostic], truncated: bool) ->
             "column": item.span().column(), "end": item.span().end(), "line": item.span().line(), "start": item.span().start()
         }, "stage": item.stage().as_str()
     })).collect();
-    json!({ "diagnostics": entries, "path": path.display().to_string(), "schema": JSON_SCHEMA, "status": "invalid", "truncated": truncated })
+    json!({ "authority": "none", "runtime_admission": "not-run", "diagnostics": entries, "path": path.display().to_string(), "schema": JSON_SCHEMA, "status": "invalid", "truncated": truncated })
 }
 
 fn print_json(value: &Value) {
@@ -1420,6 +1442,7 @@ fn tool_run_exit(status: &ToolRunStatus, counterexample: bool) -> u8 {
         ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) if counterexample => OK,
         ToolRunStatus::Refuted | ToolRunStatus::Undefined(_) => INVALID,
         ToolRunStatus::Failed(_) => FAILURE,
+        _ => BLOCKED,
     }
 }
 
@@ -1542,6 +1565,10 @@ mod tests {
             while let Some(next) = pending.pop() {
                 for entry in fs::read_dir(&next).unwrap_or_else(|error| panic!("{error}")) {
                     let path = entry.unwrap_or_else(|error| panic!("{error}")).path();
+                    // Runtime evidence is retained locally; it is never a shipped template file.
+                    if path.is_dir() && path == root.join(directory).join(".zeno-fcis") {
+                        continue;
+                    }
                     if path.is_dir() {
                         pending.push(path);
                     } else {
@@ -1556,6 +1583,7 @@ mod tests {
             }
             let emitted: BTreeSet<String> =
                 files.iter().map(|(name, _)| (*name).to_owned()).collect();
+            assert!(emitted.iter().all(|name| !name.starts_with(".zeno-fcis/")));
             assert_eq!(emitted, on_disk, "{directory}");
             for (name, content) in files {
                 let source = root.join(directory).join(if *name == "Cargo.toml" {
@@ -1572,12 +1600,191 @@ mod tests {
         }
     }
 
-    /// Every application template declares each law's scope in
-    /// `project.zeno`, and its `authority()` checks the law manifest against
-    /// those declarations before it binds the laws. The second point is
-    /// checked here, on the source, because a template's own tests cannot
-    /// see it: the shipped manifest passes the check, so its absence changes
-    /// nothing they observe.
+    fn declared_array(expression: &syn::Expr) -> &syn::ExprArray {
+        match expression {
+            syn::Expr::Reference(reference) => declared_array(&reference.expr),
+            syn::Expr::Array(array) => array,
+            _ => panic!("expected a complete literal declaration array"),
+        }
+    }
+
+    fn literal_law_id(expression: &syn::Expr) -> u32 {
+        let syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Int(id),
+            ..
+        }) = expression
+        else {
+            panic!("expected a literal law identifier");
+        };
+        id.base10_parse()
+            .unwrap_or_else(|error| panic!("law identifier: {error}"))
+    }
+
+    fn declared_law_scopes(ast: &syn::File) -> std::collections::BTreeMap<u32, (String, bool)> {
+        let declaration = ast
+            .items
+            .iter()
+            .find_map(|item| match item {
+                syn::Item::Const(item) if item.ident == "LAWS" => Some(item),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("missing complete LAWS declaration"));
+        let mut laws = std::collections::BTreeMap::new();
+        for expression in &declared_array(&declaration.expr).elems {
+            let syn::Expr::Struct(law) = expression else {
+                panic!("expected a literal law");
+            };
+            let field = |name: &str| {
+                law.fields
+                    .iter()
+                    .find_map(|field| match &field.member {
+                        syn::Member::Named(member) if member == name => Some(&field.expr),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| panic!("law omits {name}"))
+            };
+            let id = literal_law_id(field("id"));
+            let syn::Expr::Path(scope) = field("scope") else {
+                panic!("expected a scoped law");
+            };
+            let scope = scope
+                .path
+                .segments
+                .last()
+                .unwrap_or_else(|| panic!("empty scope"));
+            let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Bool(genesis),
+                ..
+            }) = field("genesis")
+            else {
+                panic!("expected literal genesis applicability");
+            };
+            assert!(
+                laws.insert(id, (scope.ident.to_string(), genesis.value))
+                    .is_none(),
+                "duplicate law {id}"
+            );
+        }
+        laws
+    }
+
+    #[derive(Default)]
+    struct DeclarationLinks {
+        descriptor: bool,
+        calls: Vec<String>,
+    }
+
+    impl<'ast> syn::visit::Visit<'ast> for DeclarationLinks {
+        fn visit_expr_struct(&mut self, expression: &'ast syn::ExprStruct) {
+            if expression
+                .path
+                .segments
+                .last()
+                .is_some_and(|segment| segment.ident == "Descriptor")
+            {
+                let linked = |name: &str, target: &str| {
+                    expression.fields.iter().any(|field| {
+                    matches!(&field.member, syn::Member::Named(member) if member == name)
+                        && matches!(&field.expr, syn::Expr::Path(path) if path.path.is_ident(target))
+                })
+                };
+                self.descriptor |= linked("laws", "LAWS") && linked("required", "REQUIRED");
+            }
+            syn::visit::visit_expr_struct(self, expression);
+        }
+
+        fn visit_expr_call(&mut self, expression: &'ast syn::ExprCall) {
+            if let syn::Expr::Path(path) = &*expression.func {
+                self.calls.push(
+                    path.path
+                        .segments
+                        .iter()
+                        .map(|segment| segment.ident.to_string())
+                        .collect::<Vec<_>>()
+                        .join("::"),
+                );
+            }
+            syn::visit::visit_expr_call(self, expression);
+        }
+    }
+
+    fn check_template_declarations(directory: &str, project: &ProjectSpec, source: &str) {
+        use syn::visit::Visit as _;
+        let ast = syn::parse_file(source).unwrap_or_else(|error| panic!("{directory}: {error}"));
+        let laws = declared_law_scopes(&ast);
+        for law in project.laws() {
+            let applicability = law
+                .applicability()
+                .unwrap_or_else(|| panic!("missing law scope"));
+            assert_eq!(
+                laws.get(&law.id().get()),
+                Some(&(
+                    format!("{:?}", applicability.scope()),
+                    applicability.genesis()
+                )),
+                "{directory}: law {} applicability differs",
+                law.id().get()
+            );
+        }
+        let required = ast
+            .items
+            .iter()
+            .find_map(|item| match item {
+                syn::Item::Const(item) if item.ident == "REQUIRED" => Some(item),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("{directory}: missing REQUIRED"));
+        let required: Vec<_> = declared_array(&required.expr)
+            .elems
+            .iter()
+            .map(literal_law_id)
+            .collect();
+        assert_eq!(
+            required,
+            laws.keys().copied().collect::<Vec<_>>(),
+            "{directory}: every law must be required"
+        );
+        let mut links = DeclarationLinks::default();
+        links.visit_file(&ast);
+        assert!(
+            links.descriptor,
+            "{directory}: descriptor omits its complete law family"
+        );
+        for (function, first, second) in [
+            (
+                "checked_catalog",
+                "catalog::bind_original",
+                "catalog::bind_original",
+            ),
+            ("checked_authority", "checked_catalog", "authority::bind"),
+        ] {
+            let function = ast
+                .items
+                .iter()
+                .find_map(|item| match item {
+                    syn::Item::Fn(item) if item.sig.ident == function => Some(item),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("{directory}: missing {function}"));
+            let mut links = DeclarationLinks::default();
+            links.visit_block(&function.block);
+            let position = |name| {
+                links
+                    .calls
+                    .iter()
+                    .position(|call| call == name)
+                    .unwrap_or_else(|| panic!("{directory}: missing {name} binding"))
+            };
+            assert!(
+                position(first) <= position(second),
+                "{directory}: catalog must be admitted before authority"
+            );
+        }
+    }
+
+    /// Preserve every original template's scoped/genesis declarations. Checked
+    /// templates carry them in the actual complete descriptor and required set;
+    /// the two pending native templates retain their original correspondence check.
     #[test]
     fn every_application_template_checks_its_manifest_against_its_declared_scopes() {
         for (directory, files) in [
@@ -1608,6 +1815,10 @@ mod tests {
                     "{directory}: law {} declares no scope",
                     law.id().get()
                 );
+            }
+            if files.iter().any(|(name, _)| *name == "src/v2_contract.rs") {
+                check_template_declarations(directory, &project, file("src/v2_contract.rs"));
+                continue;
             }
             let authority = file("src/lib.rs");
             let checked = authority

@@ -7,22 +7,36 @@ use meter::Meter;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+pub mod authority;
+pub mod catalog;
+pub mod composition;
+pub mod continuation;
+mod decision;
 mod input_view;
+pub mod laws;
 mod meter;
-mod record_execution;
 #[cfg(verus_keep_ghost)]
 mod spec;
+mod util;
 
 pub use input_view::{
     AccessAttempt, Failure as RecordFailure, Field as InputField, Leaf as InputLeaf,
     Projection as RecordProjection, Variant as InputVariant, project as project_record,
 };
 pub use meter::{Limits, MeterFailure, Resource, Usage, zero_limits};
-pub use record_execution::{
-    Attempts as RecordAttempts, Binding as InputBinding, Failure as RecordExecutionFailure,
-    Invocation as RecordInvocation, Outcome as RecordExecutionOutcome, RawRecord, ScalarProgram,
-    Source as RecordSource, execute as execute_records,
-};
+/// Borrowed eager scalar graph used by the library-owned producer.
+#[cfg_attr(verus_keep_ghost, verus_verify)]
+#[derive(Debug)]
+pub struct ScalarProgram<'a> {
+    /// Exact scalar domains in declared ABI order.
+    pub inputs: &'a [Domain],
+    /// Exact result domains in root order.
+    pub outputs: &'a [Domain],
+    /// Eager instruction sequence, including unused and unselected nodes.
+    pub nodes: &'a [Op],
+    /// Result references, in declared order.
+    pub roots: &'a [u16],
+}
 
 /// Refusal by scalar execution or the V2 logical meter.
 #[non_exhaustive]
@@ -262,6 +276,14 @@ pub fn execute(
         usage: meter.used,
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs"]
+mod order_fixture;
+
+#[cfg(test)]
+/// Unchanged emitted order fixture for complete-decision test comparisons.
+pub use order_fixture::transition as order_fixture_transition;
 
 #[cfg(test)]
 mod tests;

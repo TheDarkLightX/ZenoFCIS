@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, EncodeError, Hash32, commitment};
 
 use crate::{PROJECT_SPEC_FORMAT_VERSION, SourceSpan};
 
@@ -23,10 +23,18 @@ impl StableId {
     }
 }
 
-impl CanonicalEncode for StableId {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl StableId {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.0.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -55,9 +63,17 @@ impl Identifier {
     }
 }
 
-impl CanonicalEncode for Identifier {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Identifier {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_blob(output, self.0.as_bytes())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1290,13 +1306,14 @@ impl ProjectSpec {
     }
     /// Computes the authoring identity. Source formatting and comments are excluded.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, EncodeError> {
-        let domain = Domain::new("zeno-fcis/project-spec", PROJECT_SPEC_FORMAT_VERSION)?;
+        let domain = zeno_fcis_codec::domains::PROJECT_SPEC;
         commitment::<H>(domain, &self.canonical_bytes()?)
     }
 }
 
-impl CanonicalEncode for ProjectSpec {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ProjectSpec {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-SPEC\0");
         output.extend_from_slice(&PROJECT_SPEC_FORMAT_VERSION.to_be_bytes());
         self.project_id.encode_to(output)?;
@@ -1313,6 +1330,13 @@ impl CanonicalEncode for ProjectSpec {
         put_ids(output, &self.composition.merge_order)?;
         put_slice(output, &self.laws, encode_law)?;
         put_slice(output, &self.claims, encode_claim)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 

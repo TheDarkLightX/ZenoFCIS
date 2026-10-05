@@ -10,7 +10,7 @@ and restocking brings units in. It shows three patterns:
   exactly right;
 - commands with parameters: each command carries an action and a quantity.
 
-The authority imports `synthesized/program.zcve` and the closed plan in
+The retained legacy authority imports `synthesized/program.zcve` and the closed plan in
 `profile.rs`. Library code interprets both: it maps finite outputs to catalogued
 rejections, state updates, and the shipment outbox. `src/program.rs` names
 that library-owned interpreter; `synthesized/transition.rs` is retained as a
@@ -28,8 +28,25 @@ The closed plan is authored in `profile.rs`; the library checks its complete
 field projection against the schema, binds it to the catalog identity, and
 interprets it without application staging code. The independent application
 model checks all 864 admitted inputs. These checks establish this bounded
-example's behavior against its stated rules; they do not certify the rules
-themselves or make the current optional path the mandatory V2 gate.
+legacy example's behavior against its stated rules; they do not certify the
+rules themselves. The normal runnable route now uses the checked V2 policy.
+
+## V2 execution and retained legacy evidence
+
+The normal `src/lib.rs` and demonstration use `v2_contract::Contract`, its
+complete original-schema descriptor, and the checked library V2 Authority.
+The library reads the original envelopes, evaluates the declared typed graph,
+constructs the complete decision, and checks the original law programs with
+one meter. The SQLite shell consumes genuine `Publication` and
+`Publication` capabilities; exact replay recomputes the same original inputs.
+
+The hand-written adapters, legacy law engines and earlier synthesis/model
+checks described below are retained only in the repository’s nonpublished
+`verification/kernel-laws/src/oracle/templates/inventory-reservation` package for independent oracle
+and historical evidence tests. They do not execute the normal V2 decision.
+The declared policy still requires independent review of the intended rules.
+Host input framing, caller authentication and typed display remain shell
+assumptions; the demonstration destination's ledger persists only in-process.
 
 ## The rules
 
@@ -122,7 +139,7 @@ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
 ```
 
 Each law with a formula also declares the decisions it is enforced on: `on
-commit, genesis` for 500 and `on accept` for 501 and 502. `authority()`
+commit, genesis` for 500 and `on accept` for 501 and 502. the privately retained native authority
 checks the law manifest against those declarations before it builds the
 authority, and `tests/laws.rs` shows a manifest that binds law 501 to every
 commit, or to the genesis, reported as a mismatch.
@@ -176,11 +193,11 @@ cargo +1.97.1 run --locked -- new-stock.sqlite
 ```
 
 The SQLite shell is the `sqlite` feature, on by default. Without it,
-`cargo +1.97.1 build --no-default-features` builds the core alone: the
-generated bindings, the library decision interpreter, the law checker, the
-profile, the delivery adapter, and `authority()`, with no database; the gate checks that it also
-compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
-binary need the feature.
+`cargo +1.97.1 build --no-default-features` builds the V2 declarations,
+checked Authority and generated proposal/admission helpers; original native
+oracles are confined to the nonpublished private suite
+without a database. The gate also checks `wasm32-unknown-unknown`.
+`create`, `invoke`, `journey` and the demonstration binary need the feature.
 
 The demonstration requires a new database path. It restocks, reserves,
 releases, and ships, meeting every rejection reason along the way. It then

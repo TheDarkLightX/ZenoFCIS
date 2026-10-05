@@ -15,6 +15,7 @@ default = ["sqlite"]
 sqlite = ["dep:zeno-fcis-shell-sqlite"]
 
 [dependencies]
+zeno-fcis-synthesis = { version = "=1.1.0", default-features = false }
 zeno-fcis-authority = "=1.1.0"
 zeno-fcis-catalog = "=1.1.0"
 zeno-fcis-codec = "=1.1.0"

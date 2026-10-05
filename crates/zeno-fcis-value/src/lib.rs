@@ -203,6 +203,7 @@ impl<const MAX: usize> AsciiText<MAX> {
 
 /// Protocol-text construction failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum TextError {
     /// The initial profile accepts ASCII only.
     NonAscii,
@@ -261,7 +262,7 @@ impl Field {
 /// ```compile_fail
 /// use zeno_fcis_value::{MapEntry, Value};
 ///
-/// let _ = MapEntry::new(vec![0], Value::Unit, Value::Unit);
+/// let _ = MapEntry::new(vec![0], Value::unit(), Value::unit());
 /// ```
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct MapEntry {
@@ -276,7 +277,17 @@ impl MapEntry {
     /// Callers cannot supply the encoded key independently. The enclosing map
     /// still validates strict ordering and uniqueness.
     pub fn try_new(key: Value, value: Value) -> Result<Self, ValueError> {
-        let encoded_key = key.zcve_bytes()?;
+        Self::try_new_with_limits(key, value, ValueLimits::default())
+    }
+
+    /// Derives key bytes using exactly the supplied value limits.
+    pub fn try_new_with_limits(
+        key: Value,
+        value: Value,
+        limits: ValueLimits,
+    ) -> Result<Self, ValueError> {
+        let encoded_key = key.zcve_bytes_with_limits(limits)?;
+        check_wire_length(encoded_key.len())?;
         Ok(Self {
             encoded_key: encoded_key.into_boxed_slice(),
             key,
@@ -309,13 +320,77 @@ impl MapEntry {
     }
 }
 
-/// The closed reference value algebra used at protocol boundaries.
+/// An immutable borrowed inspection of a value, never a construction witness.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ValueRef<'a> {
+    /// Unit.
+    Unit,
+    /// Boolean.
+    Bool(bool),
+    /// Unsigned integer.
+    U128(u128),
+    /// Signed integer.
+    I128(i128),
+    /// Exact bytes.
+    Bytes(&'a [u8]),
+    /// ASCII text.
+    Text(&'a str),
+    /// Exact enum identifiers.
+    Enum {
+        /// Type identifier.
+        type_id: u32,
+        /// Variant identifier.
+        variant: u16,
+    },
+    /// Tuple items.
+    Tuple(&'a [Value]),
+    /// Ordered record fields.
+    Record(&'a [Field]),
+    /// Exact sum identifiers and optional payload.
+    Sum {
+        /// Type identifier.
+        type_id: u32,
+        /// Variant identifier.
+        variant: u16,
+        /// Immutable optional payload.
+        payload: Option<&'a Value>,
+    },
+    /// Vector items.
+    Vector(&'a [Value]),
+    /// Ordered map entries.
+    Map(&'a [MapEntry]),
+}
+
+/// A structurally canonical, transitively owned protocol value.
 ///
-/// Domain crates should prefer generated strongly typed structures for hot
-/// paths. This dynamic algebra is the reference, inspection, patching, and
-/// cross-language boundary representation.
+/// Construction checks ASCII, ordered fields/keys and fixed wire lengths.
+/// Resource admission is explicit through [`Self::validate_limits`]. A value
+/// can be well formed while exceeding a caller's resource policy.
+///
+/// ```compile_fail
+/// use zeno_fcis_value::Value;
+/// let _ = Value { repr: () };
+/// ```
+/// ```compile_fail
+/// use zeno_fcis_value::Value;
+/// let _ = Value::Text("non-ASCII: é".into());
+/// ```
+/// ```compile_fail
+/// use zeno_fcis_value::ValueRepr;
+/// ```
+/// ```compile_fail
+/// use zeno_fcis_value::{Value, ValueRef};
+/// let value = Value::bytes(vec![1]).unwrap();
+/// if let ValueRef::Bytes(bytes) = value.view() { bytes[0] = 2; }
+/// ```
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Value {
+pub struct Value {
+    repr: ValueRepr,
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+enum ValueRepr {
     /// Unit value.
     Unit,
     /// Boolean value.
@@ -355,6 +430,104 @@ pub enum Value {
 }
 
 impl Value {
+    /// Creates Unit.
+    #[must_use]
+    pub const fn unit() -> Self {
+        Self {
+            repr: ValueRepr::Unit,
+        }
+    }
+    /// Creates a Boolean.
+    #[must_use]
+    pub const fn boolean(value: bool) -> Self {
+        Self {
+            repr: ValueRepr::Bool(value),
+        }
+    }
+    /// Creates a full-width unsigned integer.
+    #[must_use]
+    pub const fn unsigned(value: u128) -> Self {
+        Self {
+            repr: ValueRepr::U128(value),
+        }
+    }
+    /// Creates a full-width signed integer.
+    #[must_use]
+    pub const fn signed(value: i128) -> Self {
+        Self {
+            repr: ValueRepr::I128(value),
+        }
+    }
+    /// Creates a generic enum; zero and all full-width identifiers are legal.
+    #[must_use]
+    pub const fn enumeration(type_id: u32, variant: u16) -> Self {
+        Self {
+            repr: ValueRepr::Enum { type_id, variant },
+        }
+    }
+    /// Owns a sum payload; scalar and payload-bearing variants remain distinct.
+    #[must_use]
+    pub fn sum(type_id: u32, variant: u16, payload: Option<Self>) -> Self {
+        Self {
+            repr: ValueRepr::Sum {
+                type_id,
+                variant,
+                payload: payload.map(Box::new),
+            },
+        }
+    }
+    /// Borrows every value component without exposing mutable representation.
+    #[must_use]
+    pub fn view(&self) -> ValueRef<'_> {
+        match &self.repr {
+            ValueRepr::Unit => ValueRef::Unit,
+            ValueRepr::Bool(v) => ValueRef::Bool(*v),
+            ValueRepr::U128(v) => ValueRef::U128(*v),
+            ValueRepr::I128(v) => ValueRef::I128(*v),
+            ValueRepr::Bytes(v) => ValueRef::Bytes(v),
+            ValueRepr::Text(v) => ValueRef::Text(v),
+            ValueRepr::Enum { type_id, variant } => ValueRef::Enum {
+                type_id: *type_id,
+                variant: *variant,
+            },
+            ValueRepr::Tuple(v) => ValueRef::Tuple(v),
+            ValueRepr::Record(v) => ValueRef::Record(v),
+            ValueRepr::Sum {
+                type_id,
+                variant,
+                payload,
+            } => ValueRef::Sum {
+                type_id: *type_id,
+                variant: *variant,
+                payload: payload.as_deref(),
+            },
+            ValueRepr::Vector(v) => ValueRef::Vector(v),
+            ValueRepr::Map(v) => ValueRef::Map(v),
+        }
+    }
+    /// Constructs bytes under exactly the supplied resource limits.
+    pub fn bytes_with_limits(bytes: Vec<u8>, limits: ValueLimits) -> Result<Self, ValueError> {
+        check_wire_length(bytes.len())?;
+        let value = Self {
+            repr: ValueRepr::Bytes(bytes.into_boxed_slice()),
+        };
+        value.validate_limits(limits)?;
+        Ok(value)
+    }
+    /// Constructs ASCII text under exactly the supplied resource limits.
+    /// Non-ASCII refusal precedes size and resource refusal.
+    pub fn text_ascii_with_limits(text: String, limits: ValueLimits) -> Result<Self, ValueError> {
+        if !text.is_ascii() {
+            return Err(ValueError::NonAsciiText);
+        }
+        check_wire_length(text.len())?;
+        let value = Self {
+            repr: ValueRepr::Text(text.into_boxed_str()),
+        };
+        value.validate_limits(limits)?;
+        Ok(value)
+    }
+
     /// Creates owned bytes admitted by the default payload ceiling.
     ///
     /// A single byte leaf cannot exceed
@@ -374,7 +547,9 @@ impl Value {
                 actual,
             });
         }
-        Ok(Self::Bytes(bytes.into_boxed_slice()))
+        Ok(Self {
+            repr: ValueRepr::Bytes(bytes.into_boxed_slice()),
+        })
     }
 
     /// Creates ASCII text admitted by the default payload ceiling.
@@ -399,25 +574,34 @@ impl Value {
                 actual,
             }));
         }
-        Ok(Self::Text(text.into_boxed_str()))
+        Ok(Self {
+            repr: ValueRepr::Text(text.into_boxed_str()),
+        })
     }
 
-    /// Creates a tuple.
-    #[must_use]
-    pub fn tuple(items: Vec<Self>) -> Self {
-        Self::Tuple(items.into_boxed_slice())
+    /// Creates a tuple after checking its canonical u32 item count.
+    pub fn tuple(items: Vec<Self>) -> Result<Self, ValueError> {
+        check_wire_length(items.len())?;
+        Ok(Self {
+            repr: ValueRepr::Tuple(items.into_boxed_slice()),
+        })
     }
 
-    /// Creates a vector.
-    #[must_use]
-    pub fn vector(items: Vec<Self>) -> Self {
-        Self::Vector(items.into_boxed_slice())
+    /// Creates a vector after checking its canonical u32 item count.
+    pub fn vector(items: Vec<Self>) -> Result<Self, ValueError> {
+        check_wire_length(items.len())?;
+        Ok(Self {
+            repr: ValueRepr::Vector(items.into_boxed_slice()),
+        })
     }
 
     /// Creates a record only when field identifiers are strictly increasing.
     pub fn record_canonical(fields: Vec<Field>) -> Result<Self, ValueError> {
+        check_wire_length(fields.len())?;
         ensure_strict_fields(&fields)?;
-        Ok(Self::Record(fields.into_boxed_slice()))
+        Ok(Self {
+            repr: ValueRepr::Record(fields.into_boxed_slice()),
+        })
     }
 
     /// Sorts record fields by identifier and rejects duplicates.
@@ -428,8 +612,14 @@ impl Value {
 
     /// Creates a map only when encoded keys are strictly increasing.
     pub fn map_canonical(entries: Vec<MapEntry>) -> Result<Self, ValueError> {
+        check_wire_length(entries.len())?;
         ensure_strict_map_keys(&entries)?;
-        Ok(Self::Map(entries.into_boxed_slice()))
+        for entry in &entries {
+            check_wire_length(entry.value().encoded_length()?)?;
+        }
+        Ok(Self {
+            repr: ValueRepr::Map(entries.into_boxed_slice()),
+        })
     }
 
     /// Sorts entries by encoded key and rejects duplicates.
@@ -455,26 +645,55 @@ impl Value {
     /// exists at the lower dependency ring so [`MapEntry::try_new`] can derive
     /// canonical ordering bytes without accepting a caller-supplied encoding.
     pub fn encode_zcve_to(&self, output: &mut Vec<u8>) -> Result<(), ValueError> {
-        self.validate_limits(ValueLimits::default())?;
-        encode_zcve_value(self, output)
+        self.encode_zcve_to_with_limits(output, ValueLimits::default())
+    }
+
+    /// Returns exact canonical bytes admitted under the supplied limits.
+    pub fn zcve_bytes_with_limits(&self, limits: ValueLimits) -> Result<Vec<u8>, ValueError> {
+        let mut output = Vec::new();
+        self.encode_zcve_to_with_limits(&mut output, limits)?;
+        Ok(output)
+    }
+
+    /// Validates exactly the supplied limits before appending a complete encoding.
+    /// Every refusal preserves the original output prefix.
+    pub fn encode_zcve_to_with_limits(
+        &self,
+        output: &mut Vec<u8>,
+        limits: ValueLimits,
+    ) -> Result<(), ValueError> {
+        self.validate_limits(limits)?;
+        let mut encoded = Vec::new();
+        encode_zcve_value(self, &mut encoded)?;
+        output
+            .len()
+            .checked_add(encoded.len())
+            .ok_or(ValueError::ArithmeticOverflow)?;
+        output.extend_from_slice(&encoded);
+        Ok(())
+    }
+
+    /// Computes the exact canonical wire length using checked arithmetic.
+    pub fn encoded_length(&self) -> Result<usize, ValueError> {
+        encoded_length(self)
     }
 
     /// Returns the structural value kind.
     #[must_use]
     pub const fn kind(&self) -> ValueKind {
-        match self {
-            Self::Unit => ValueKind::Unit,
-            Self::Bool(_) => ValueKind::Bool,
-            Self::U128(_) => ValueKind::U128,
-            Self::I128(_) => ValueKind::I128,
-            Self::Bytes(_) => ValueKind::Bytes,
-            Self::Text(_) => ValueKind::Text,
-            Self::Enum { .. } => ValueKind::Enum,
-            Self::Tuple(_) => ValueKind::Tuple,
-            Self::Record(_) => ValueKind::Record,
-            Self::Sum { .. } => ValueKind::Sum,
-            Self::Vector(_) => ValueKind::Vector,
-            Self::Map(_) => ValueKind::Map,
+        match &self.repr {
+            ValueRepr::Unit => ValueKind::Unit,
+            ValueRepr::Bool(_) => ValueKind::Bool,
+            ValueRepr::U128(_) => ValueKind::U128,
+            ValueRepr::I128(_) => ValueKind::I128,
+            ValueRepr::Bytes(_) => ValueKind::Bytes,
+            ValueRepr::Text(_) => ValueKind::Text,
+            ValueRepr::Enum { .. } => ValueKind::Enum,
+            ValueRepr::Tuple(_) => ValueKind::Tuple,
+            ValueRepr::Record(_) => ValueKind::Record,
+            ValueRepr::Sum { .. } => ValueKind::Sum,
+            ValueRepr::Vector(_) => ValueKind::Vector,
+            ValueRepr::Map(_) => ValueKind::Map,
         }
     }
 
@@ -492,39 +711,39 @@ fn encode_zcve_value(value: &Value, output: &mut Vec<u8>) -> Result<(), ValueErr
         TAG_TEXT, TAG_TUPLE, TAG_U128, TAG_UNIT, TAG_VECTOR,
     };
 
-    match value {
-        Value::Unit => output.push(TAG_UNIT),
-        Value::Bool(false) => output.push(TAG_BOOL_FALSE),
-        Value::Bool(true) => output.push(TAG_BOOL_TRUE),
-        Value::U128(integer) => {
+    match &value.repr {
+        ValueRepr::Unit => output.push(TAG_UNIT),
+        ValueRepr::Bool(false) => output.push(TAG_BOOL_FALSE),
+        ValueRepr::Bool(true) => output.push(TAG_BOOL_TRUE),
+        ValueRepr::U128(integer) => {
             output.push(TAG_U128);
             output.extend_from_slice(&integer.to_be_bytes());
         }
-        Value::I128(integer) => {
+        ValueRepr::I128(integer) => {
             output.push(TAG_I128);
             output.extend_from_slice(&integer.to_be_bytes());
         }
-        Value::Bytes(bytes) => {
+        ValueRepr::Bytes(bytes) => {
             output.push(TAG_BYTES);
             put_zcve_blob(output, bytes)?;
         }
-        Value::Text(text) => {
+        ValueRepr::Text(text) => {
             output.push(TAG_TEXT);
             put_zcve_blob(output, text.as_bytes())?;
         }
-        Value::Enum { type_id, variant } => {
+        ValueRepr::Enum { type_id, variant } => {
             output.push(TAG_ENUM);
             output.extend_from_slice(&type_id.to_be_bytes());
             output.extend_from_slice(&variant.to_be_bytes());
         }
-        Value::Tuple(items) => {
+        ValueRepr::Tuple(items) => {
             output.push(TAG_TUPLE);
             put_zcve_length(output, items.len())?;
             for item in items {
                 encode_zcve_value(item, output)?;
             }
         }
-        Value::Record(fields) => {
+        ValueRepr::Record(fields) => {
             output.push(TAG_RECORD);
             put_zcve_length(output, fields.len())?;
             for field in fields {
@@ -532,7 +751,7 @@ fn encode_zcve_value(value: &Value, output: &mut Vec<u8>) -> Result<(), ValueErr
                 encode_zcve_value(field.value(), output)?;
             }
         }
-        Value::Sum {
+        ValueRepr::Sum {
             type_id,
             variant,
             payload,
@@ -548,14 +767,14 @@ fn encode_zcve_value(value: &Value, output: &mut Vec<u8>) -> Result<(), ValueErr
                 }
             }
         }
-        Value::Vector(items) => {
+        ValueRepr::Vector(items) => {
             output.push(TAG_VECTOR);
             put_zcve_length(output, items.len())?;
             for item in items {
                 encode_zcve_value(item, output)?;
             }
         }
-        Value::Map(entries) => {
+        ValueRepr::Map(entries) => {
             output.push(TAG_MAP);
             put_zcve_length(output, entries.len())?;
             for entry in entries {
@@ -567,6 +786,64 @@ fn encode_zcve_value(value: &Value, output: &mut Vec<u8>) -> Result<(), ValueErr
         }
     }
     Ok(())
+}
+
+fn check_wire_length(length: usize) -> Result<(), ValueError> {
+    u32::try_from(length)
+        .map(|_| ())
+        .map_err(|_| ValueError::ArithmeticOverflow)
+}
+
+fn encoded_length(value: &Value) -> Result<usize, ValueError> {
+    fn add(left: usize, right: usize) -> Result<usize, ValueError> {
+        left.checked_add(right)
+            .ok_or(ValueError::ArithmeticOverflow)
+    }
+    match &value.repr {
+        ValueRepr::Unit | ValueRepr::Bool(_) => Ok(1),
+        ValueRepr::U128(_) | ValueRepr::I128(_) => Ok(17),
+        ValueRepr::Bytes(bytes) => {
+            check_wire_length(bytes.len())?;
+            add(5, bytes.len())
+        }
+        ValueRepr::Text(text) => {
+            check_wire_length(text.len())?;
+            add(5, text.len())
+        }
+        ValueRepr::Enum { .. } => Ok(7),
+        ValueRepr::Tuple(items) | ValueRepr::Vector(items) => {
+            check_wire_length(items.len())?;
+            let mut length = 5;
+            for child in items {
+                length = add(length, encoded_length(child)?)?;
+            }
+            Ok(length)
+        }
+        ValueRepr::Record(fields) => {
+            check_wire_length(fields.len())?;
+            let mut length = 5;
+            for field in fields {
+                length = add(add(length, 2)?, encoded_length(field.value())?)?;
+            }
+            Ok(length)
+        }
+        ValueRepr::Sum { payload, .. } => match payload {
+            None => Ok(8),
+            Some(child) => add(8, encoded_length(child)?),
+        },
+        ValueRepr::Map(entries) => {
+            check_wire_length(entries.len())?;
+            let mut length = 5;
+            for entry in entries {
+                let key = entry.encoded_key().len();
+                let value = encoded_length(entry.value())?;
+                check_wire_length(key)?;
+                check_wire_length(value)?;
+                length = add(add(add(length, 8)?, key)?, value)?;
+            }
+            Ok(length)
+        }
+    }
 }
 
 fn put_zcve_length(output: &mut Vec<u8>, length: usize) -> Result<(), ValueError> {
@@ -638,7 +915,7 @@ pub struct ValueLimits {
     pub max_depth: u32,
     /// Maximum total value nodes.
     pub max_nodes: u64,
-    /// Maximum aggregate owned byte and text payload bytes.
+    /// Maximum decoder-compatible payload charge: byte/text leaves plus both map entry blobs.
     pub max_payload_bytes: u64,
     /// Maximum children in any single collection.
     pub max_collection_len: u32,
@@ -669,37 +946,54 @@ impl Default for ValueLimits {
 pub struct ValueMetrics {
     /// Total value nodes.
     pub nodes: u64,
-    /// Aggregate bytes and text bytes.
+    /// Byte/text leaf bytes plus both canonical map entry blob lengths.
     pub payload_bytes: u64,
     /// Maximum observed depth.
     pub depth: u32,
 }
 
-/// An owned value admitted by the reviewed default canonical limits.
+/// An owned value admitted by exact retained canonical limits.
 ///
-/// Construction performs one complete [`ValueLimits::default`] validation and
-/// retains the exact observed metrics. Private fields prevent callers from
+/// Construction performs one complete validation and retains the supplied
+/// limits and exact observed metrics. Private fields prevent callers from
 /// pairing an unvalidated value with invented metrics:
 ///
 /// ```compile_fail
-/// use zeno_fcis_value::{AdmittedValue, Value, ValueMetrics};
+/// use zeno_fcis_value::{AdmittedValue, Value, ValueLimits, ValueMetrics};
 ///
 /// let _ = AdmittedValue {
-///     value: Value::Unit,
+///     value: Value::unit(),
 ///     metrics: ValueMetrics::default(),
+///     limits: ValueLimits::default(),
 /// };
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdmittedValue {
     value: Value,
     metrics: ValueMetrics,
+    limits: ValueLimits,
 }
 
 impl AdmittedValue {
     /// Owns a value after validating the exact default canonical envelope.
     pub fn try_new(value: Value) -> Result<Self, ValueError> {
-        let metrics = value.validate_limits(ValueLimits::default())?;
-        Ok(Self { value, metrics })
+        Self::try_new_with_limits(value, ValueLimits::default())
+    }
+
+    /// Owns a value and its exact observed metrics under the supplied limits.
+    pub fn try_new_with_limits(value: Value, limits: ValueLimits) -> Result<Self, ValueError> {
+        let metrics = value.validate_limits(limits)?;
+        Ok(Self {
+            value,
+            metrics,
+            limits,
+        })
+    }
+
+    /// Returns the actual limits used for this admission.
+    #[must_use]
+    pub const fn limits(&self) -> ValueLimits {
+        self.limits
     }
 
     /// Returns the admitted immutable value.
@@ -725,7 +1019,14 @@ impl AdmittedValue {
     /// This is sound because construction owns the value, fields are private,
     /// and the public API exposes no mutable access to the admitted value.
     pub fn encode_zcve_to(&self, output: &mut Vec<u8>) -> Result<(), ValueError> {
-        encode_zcve_value(&self.value, output)
+        let mut encoded = Vec::new();
+        encode_zcve_value(&self.value, &mut encoded)?;
+        output
+            .len()
+            .checked_add(encoded.len())
+            .ok_or(ValueError::ArithmeticOverflow)?;
+        output.extend_from_slice(&encoded);
+        Ok(())
     }
 }
 
@@ -753,42 +1054,72 @@ fn validate_value(
         });
     }
 
-    match value {
-        Value::Bytes(bytes) => add_payload(bytes.len(), limits, metrics)?,
-        Value::Text(text) => {
+    match &value.repr {
+        ValueRepr::Bytes(bytes) => add_payload(bytes.len(), limits, metrics)?,
+        ValueRepr::Text(text) => {
             if !text.is_ascii() {
                 return Err(ValueError::NonAsciiText);
             }
             add_payload(text.len(), limits, metrics)?;
         }
-        Value::Tuple(items) | Value::Vector(items) => {
+        ValueRepr::Tuple(items) | ValueRepr::Vector(items) => {
             validate_collection_len(items.len(), limits)?;
             for child in items {
-                validate_value(child, depth + 1, limits, metrics)?;
+                validate_value(
+                    child,
+                    depth.checked_add(1).ok_or(ValueError::ArithmeticOverflow)?,
+                    limits,
+                    metrics,
+                )?;
             }
         }
-        Value::Record(fields) => {
+        ValueRepr::Record(fields) => {
             validate_collection_len(fields.len(), limits)?;
             ensure_strict_fields(fields)?;
             for field in fields {
-                validate_value(field.value(), depth + 1, limits, metrics)?;
+                validate_value(
+                    field.value(),
+                    depth.checked_add(1).ok_or(ValueError::ArithmeticOverflow)?,
+                    limits,
+                    metrics,
+                )?;
             }
         }
-        Value::Sum { payload, .. } => {
+        ValueRepr::Sum { payload, .. } => {
             if let Some(child) = payload {
-                validate_value(child, depth + 1, limits, metrics)?;
+                validate_value(
+                    child,
+                    depth.checked_add(1).ok_or(ValueError::ArithmeticOverflow)?,
+                    limits,
+                    metrics,
+                )?;
             }
         }
-        Value::Map(entries) => {
+        ValueRepr::Map(entries) => {
             validate_collection_len(entries.len(), limits)?;
             ensure_strict_map_keys(entries)?;
             for entry in entries {
                 add_payload(entry.encoded_key().len(), limits, metrics)?;
-                validate_value(entry.key(), depth + 1, limits, metrics)?;
-                validate_value(entry.value(), depth + 1, limits, metrics)?;
+                add_payload(entry.value().encoded_length()?, limits, metrics)?;
+                validate_value(
+                    entry.key(),
+                    depth.checked_add(1).ok_or(ValueError::ArithmeticOverflow)?,
+                    limits,
+                    metrics,
+                )?;
+                validate_value(
+                    entry.value(),
+                    depth.checked_add(1).ok_or(ValueError::ArithmeticOverflow)?,
+                    limits,
+                    metrics,
+                )?;
             }
         }
-        Value::Unit | Value::Bool(_) | Value::U128(_) | Value::I128(_) | Value::Enum { .. } => {}
+        ValueRepr::Unit
+        | ValueRepr::Bool(_)
+        | ValueRepr::U128(_)
+        | ValueRepr::I128(_)
+        | ValueRepr::Enum { .. } => {}
     }
     Ok(())
 }
@@ -825,6 +1156,7 @@ fn add_payload(
 
 /// Closed-value construction or validation failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ValueError {
     /// Record fields are duplicated or out of order.
     RecordFieldOrder {
@@ -920,7 +1252,8 @@ mod tests {
         let bytes = Value::bytes(vec![1, 2]).unwrap_or_else(|error| panic!("bytes: {error}"));
         let text =
             Value::text_ascii(String::from("ab")).unwrap_or_else(|error| panic!("text: {error}"));
-        let value = Value::tuple(vec![bytes, text]);
+        let value =
+            Value::tuple(vec![bytes, text]).unwrap_or_else(|error| panic!("collection: {error}"));
         let admitted = AdmittedValue::try_new(value.clone())
             .unwrap_or_else(|error| panic!("admission: {error}"));
 
@@ -949,15 +1282,18 @@ mod tests {
 
     #[test]
     fn admitted_value_rejects_raw_non_ascii_text() {
-        let value = Value::Text(String::from("é").into_boxed_str());
+        let value = Value {
+            repr: ValueRepr::Text(String::from("é").into_boxed_str()),
+        };
         assert_eq!(AdmittedValue::try_new(value), Err(ValueError::NonAsciiText));
     }
 
     #[test]
     fn admitted_value_is_bound_to_default_limits() {
-        let mut value = Value::Unit;
+        let mut value = Value::unit();
         for _ in 0..65 {
-            value = Value::vector(vec![value]);
+            value =
+                Value::vector(vec![value]).unwrap_or_else(|error| panic!("collection: {error}"));
         }
         let permissive = ValueLimits {
             max_depth: 65,
@@ -977,7 +1313,9 @@ mod tests {
     fn value_bytes_accept_exact_bound() {
         assert_eq!(
             Value::bytes_with_max(vec![1, 2, 3], 3),
-            Ok(Value::Bytes(vec![1, 2, 3].into_boxed_slice()))
+            Ok(Value {
+                repr: ValueRepr::Bytes(vec![1, 2, 3].into_boxed_slice())
+            })
         );
     }
 
@@ -1011,7 +1349,8 @@ mod tests {
         let value = Value::vector(vec![
             first.unwrap_or_else(|error| panic!("first bytes: {error}")),
             second.unwrap_or_else(|error| panic!("second bytes: {error}")),
-        ]);
+        ])
+        .unwrap_or_else(|error| panic!("collection: {error}"));
         let limits = ValueLimits {
             max_payload_bytes: 3,
             ..ValueLimits::default()
@@ -1028,7 +1367,12 @@ mod tests {
     #[test]
     fn value_ascii_text_accepts_exact_bound() {
         let value = Value::text_ascii_with_max(String::from("abc"), 3);
-        assert_eq!(value, Ok(Value::Text(String::from("abc").into_boxed_str())));
+        assert_eq!(
+            value,
+            Ok(Value {
+                repr: ValueRepr::Text(String::from("abc").into_boxed_str())
+            })
+        );
     }
 
     #[test]
@@ -1078,7 +1422,8 @@ mod tests {
         let value = Value::vector(vec![
             first.unwrap_or_else(|error| panic!("first text: {error}")),
             second.unwrap_or_else(|error| panic!("second text: {error}")),
-        ]);
+        ])
+        .unwrap_or_else(|error| panic!("collection: {error}"));
         let limits = ValueLimits {
             max_payload_bytes: 3,
             ..ValueLimits::default()
@@ -1094,7 +1439,10 @@ mod tests {
 
     #[test]
     fn records_require_stable_field_order() {
-        let fields = vec![Field::new(2, Value::U128(2)), Field::new(1, Value::U128(1))];
+        let fields = vec![
+            Field::new(2, Value::unsigned(2)),
+            Field::new(1, Value::unsigned(1)),
+        ];
         assert!(Value::record_canonical(fields.clone()).is_err());
         let normalized = Value::normalize_record(fields);
         assert!(normalized.is_ok());
@@ -1102,8 +1450,8 @@ mod tests {
 
     #[test]
     fn maps_reject_duplicate_encoded_keys() {
-        let first = MapEntry::try_new(Value::U128(1), Value::Bool(true));
-        let second = MapEntry::try_new(Value::U128(1), Value::Bool(false));
+        let first = MapEntry::try_new(Value::unsigned(1), Value::boolean(true));
+        let second = MapEntry::try_new(Value::unsigned(1), Value::boolean(false));
         assert!(first.is_ok() && second.is_ok());
         let entries = vec![
             first.unwrap_or_else(|error| panic!("map entry: {error}")),
@@ -1114,9 +1462,10 @@ mod tests {
 
     #[test]
     fn map_entry_derives_exact_key_bytes() {
-        let key = Value::tuple(vec![Value::U128(7), Value::Bool(true)]);
+        let key = Value::tuple(vec![Value::unsigned(7), Value::boolean(true)])
+            .unwrap_or_else(|error| panic!("collection: {error}"));
         let expected = key.zcve_bytes();
-        let entry = MapEntry::try_new(key, Value::Unit);
+        let entry = MapEntry::try_new(key, Value::unit());
         assert!(expected.is_ok() && entry.is_ok());
         let expected = expected.unwrap_or_else(|error| panic!("key bytes: {error}"));
         let entry = entry.unwrap_or_else(|error| panic!("map entry: {error}"));
@@ -1126,7 +1475,10 @@ mod tests {
     #[test]
     fn structural_limits_are_checked_transitively() {
         let bytes = Value::bytes(vec![1, 2, 3]).unwrap_or_else(|error| panic!("bytes: {error}"));
-        let value = Value::vector(vec![Value::vector(vec![bytes])]);
+        let inner =
+            Value::vector(vec![bytes]).unwrap_or_else(|error| panic!("collection: {error}"));
+        let value =
+            Value::vector(vec![inner]).unwrap_or_else(|error| panic!("collection: {error}"));
         let limits = ValueLimits {
             max_depth: 1,
             ..ValueLimits::default()

@@ -19,7 +19,7 @@ fn canonical_program_import_rejects_hostile_artifacts() {
     let program = identity();
     let bytes = program
         .value()
-        .canonical_bytes()
+        .and_then(|value| value.canonical_bytes())
         .unwrap_or_else(|error| panic!("canonical program: {error}"));
     assert_eq!(
         crate::finite_runtime::import_program(&bytes),
@@ -31,10 +31,16 @@ fn canonical_program_import_rejects_hostile_artifacts() {
     assert!(crate::finite_runtime::import_program(&trailing).is_err());
     assert!(crate::finite_runtime::import_program(&bytes[..bytes.len() - 1]).is_err());
 
-    let mut wrong_profile = program.value();
-    if let Value::Tuple(fields) = &mut wrong_profile {
-        fields[0] = Value::Text("other-profile".into());
-    }
+    let source = program
+        .value()
+        .unwrap_or_else(|error| panic!("program: {error}"));
+    let zeno_fcis_value::ValueRef::Tuple(fields) = source.view() else {
+        panic!("program tuple")
+    };
+    let mut changed = fields.to_vec();
+    changed[0] = Value::text_ascii("other-profile".into())
+        .unwrap_or_else(|error| panic!("profile: {error}"));
+    let wrong_profile = Value::tuple(changed).unwrap_or_else(|error| panic!("tuple: {error}"));
     assert!(
         crate::finite_runtime::import_program(
             &wrong_profile
@@ -44,12 +50,15 @@ fn canonical_program_import_rejects_hostile_artifacts() {
         .is_err()
     );
 
-    let mut bad_reference = program.value();
-    if let Value::Tuple(fields) = &mut bad_reference
-        && let Value::Tuple(nodes) = &mut fields[2]
-    {
-        nodes[0] = Value::Tuple(vec![Value::I128(0), Value::I128(99)].into());
-    }
+    let mut changed = fields.to_vec();
+    let zeno_fcis_value::ValueRef::Tuple(nodes) = changed[2].view() else {
+        panic!("nodes tuple")
+    };
+    let mut nodes = nodes.to_vec();
+    nodes[0] = Value::tuple(vec![Value::signed(0), Value::signed(99)])
+        .unwrap_or_else(|error| panic!("node: {error}"));
+    changed[2] = Value::tuple(nodes).unwrap_or_else(|error| panic!("nodes: {error}"));
+    let bad_reference = Value::tuple(changed).unwrap_or_else(|error| panic!("tuple: {error}"));
     assert!(
         crate::finite_runtime::import_program(
             &bad_reference
