@@ -219,6 +219,19 @@ EXAMPLE_TEMPLATES = {
         "bundles": 10, "pending": 0, "deliveries": 5,
     },
 }
+# Applications `zeno-fcis new --contract` builds from the example contracts
+# in examples/, with the decision examples each one's tests must check and
+# the expected summary of its session.
+CONTRACT_EXAMPLES = {
+    "dual-approval": {
+        "examples": 12,
+        "summary": {
+            "status": "passed",
+            "decisions": ["Reject", "Reject", "Accept", "Reject", "Accept", "Reject", "Reject"],
+            "bundles": 2, "pending": 0, "deliveries": 1,
+        },
+    },
+}
 # Examples whose decision core is synthesized, with the check of that synthesis.
 SYNTHESIZED_EXAMPLES = {"order-fulfillment": check_synthesis.exercise_order,
                         "inventory-reservation": check_synthesis.exercise_inventory,
@@ -296,6 +309,23 @@ def exercise_example_application(template: str, app: Path, directory: Path,
             **({"orbit_check": orbit} if orbit is not None else {})}
 
 
+def exercise_contract_application(name: str, app: Path, directory: Path,
+                                  package_roots: dict[str, Path], version: str,
+                                  environment: dict[str, str]) -> dict:
+    """An application built from a contract alone: every decision example is
+    checked against the library Authority, then the examples run as one
+    SQLite session from genesis."""
+    result, test_output = exercise_rust_application(app, directory, package_roots, version, environment)
+    expected = CONTRACT_EXAMPLES[name]
+    checked = [line for line in test_output.splitlines() if line.startswith("decision examples checked: ")]
+    if checked != [f"decision examples checked: {expected['examples']}"]:
+        raise RuntimeError(f"{name}: the decision examples were not all checked: {checked}")
+    demonstration = json.loads(result["demonstration"])
+    if any(demonstration.get(key) != value for key, value in expected["summary"].items()):
+        raise RuntimeError(f"{name} session differs from its expected summary")
+    return {**result, "contract": name}
+
+
 def exercise_prepared_application(app: Path, directory: Path, package_roots: dict[str, Path],
                                   version: str, environment: dict[str, str], cli: list[str]) -> dict:
     case = directory / "completion-case"
@@ -355,7 +385,8 @@ def check(directory: Path) -> None:
     packaged = set(run(["cargo", "+1.97.1", "package", "-p", "zeno-fcis-cli", "--list",
                         "--allow-dirty", "--locked", "--offline"], ROOT, capture=True).splitlines())
     template = ROOT / "crates/zeno-fcis-cli/templates"
-    for source in template.rglob("*"):
+    contract_application = ROOT / "crates/zeno-fcis-cli/contract-app"
+    for source in [*template.rglob("*"), *contract_application.rglob("*")]:
         if source.is_file() and str(source.relative_to(ROOT / "crates/zeno-fcis-cli")) not in packaged:
             raise RuntimeError(f"CLI package omits template resource: {source}")
     run(["cargo", "+1.97.1", "run", "-p", "zeno-fcis-cli", "--locked", "--offline", "--",
@@ -378,6 +409,13 @@ def check(directory: Path) -> None:
         run([*cli, "new", str(example), "--template", template], ROOT)
         exercise_example_application(template, example, example_root, packages, version,
                                      dict(os.environ), cli)
+    for name in CONTRACT_EXAMPLES:
+        contract_root = directory / f"contract-{name}"
+        contract_root.mkdir()
+        contract_app = contract_root / "app"
+        run([*cli, "new", str(contract_app), "--contract", str(ROOT / "examples" / name)], ROOT)
+        exercise_contract_application(name, contract_app, contract_root, packages, version,
+                                      dict(os.environ))
     exercise_v1_consumer(directory, packages, version, dict(os.environ))
     print("generated applications: isolated consumers, V1 compatibility, reviewed dependencies, complete decisions and lifecycle passed")
 

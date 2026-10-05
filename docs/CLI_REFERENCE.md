@@ -6,8 +6,10 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 ```text
 zeno-fcis describe [COMMAND...]
 zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue|agent-treasury-guard
+zeno-fcis new <dir> --contract <contract-dir>
 zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
+zeno-fcis generate contract [<app-dir>] [--check] [--format human|json]
 zeno-fcis graph [project.zeno] --format dot|mermaid|json
 zeno-fcis explain [project.zeno] [--code CODE] [--format human|json]
 zeno-fcis prove [project.zeno] --claim ID|all --backend cvc5|z3|lean|all [--tools FILE]
@@ -17,6 +19,8 @@ zeno-fcis purity <PATH>... [--format human|json]
 zeno-fcis backend list
 zeno-fcis backend inspect|verify [--tools FILE]
 zeno-fcis backend inventory-lean ROOT [--format human|json]
+zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--max-input-tuples N] [--receipt OUT]
+zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
@@ -39,7 +43,23 @@ claim has no value at the counterexample, because of an overflow, a division
 by zero, or an inexact exact division, the line ends with the reason, and the
 run record's status is `undefined`.
 `generate` replaces each deterministic Rust/manifest file atomically;
-`--check` writes nothing and reports drift. `graph` and `explain` are derived
+`--check` writes nothing and reports drift. `generate contract` reads an
+application's `project.zeno` and `v2/policy.json` and replaces
+`v2/schema.zcve`, `src/v2_contract.rs` and `v2/policy.zcve`; the policy bytes
+come from the library's encoder, and the library's catalog binding must accept
+them first. With `--check` it writes nothing, names each drifted file and
+exits 1. An invalid contract exits 1 and writes nothing. The generator's own
+checks name the file and entry at fault. Among them: an accept has no reason,
+and a reject or committed failure has one; constants lie within their
+declared ranges; the variants of a sum the decision program reads have
+consecutive IDs; a law that applies at genesis reads only `post` fields; and
+no declared law shares an ID with a law generation adds (990, 991, and the
+reject and committed-failure laws). A contract that passes these checks but
+that the library's catalog binding refuses is reported as that refusal, with
+no entry named.
+`new --contract` builds an application from a directory holding
+`project.zeno`, `v2/policy.json` and, optionally,
+`tests/decision-examples.txt`. `graph` and `explain` are derived
 diagnostic views. `prove` and `counterexample` use only the separate checked
 tools manifest and retain process records below `.zeno-fcis/evidence`.
 
@@ -234,6 +254,57 @@ separate new receipt file outside DIR. Both commands accept
 [language-neutral synthesis](LANGUAGE_NEUTRAL_SYNTHESIS.md) for the JSON
 contract, distinct failure outcomes, and target-conformance boundary.
 
+
+## Checked program transform
+
+`transform check` compares a supplied candidate with an original finite scalar
+program. Both files use the canonical `program.zcve` encoding, at most 64 KiB,
+and must pass the library importer. Their input and output domains must match
+exactly, in order. The check runs both programs on each tuple of the declared
+input domain, last input fastest, until the first difference. It uses the
+library's metered evaluator at a budget of 256 Steps, which no admitted program
+can exhaust, so unused nodes and unselected `Select` arms still trap. Each run
+gives the program's result and its true Step usage. The declared
+`--step-limit` (default 256) is then compared with that usage; it never
+changes a result. The default domain limit is 100,000,000 tuples.
+
+Results use schema `zeno-fcis/transform-result/1`. Every result has a `detail`
+object. Once both programs are read, `check` also reports the `limits` it used
+and both programs' SHA-256 digests. Input and output values and integer domain
+bounds are decimal strings; Boolean positions are `"0"` or `"1"`.
+
+| Command | Status | Exit | Meaning |
+| --- | --- | ---: | --- |
+| `check` | `equivalent` | 0 | Every tuple gave identical outputs or identical failures, and no tuple needs more Steps than the limit in either program. |
+| `check` | `counterexample` | 1 | The first tuple whose outputs or failures differ, with both observations and their Step usage. |
+| `check` | `refused` | 1 | A program failed admission or exceeds 64 KiB, the ABIs differ, or an input domain is empty. |
+| `check` | `receipt-exists` | 1 | The `--receipt` path already exists, as a file or a link; nothing was checked. |
+| `check` | `inconclusive` | 2 | The domain exceeds the tuple limit (`domain-too-large`); the programs agree but some tuple needs more Steps than the limit (`budget-boundary`, with counts and the smallest limit that never binds); or the defensive enumeration count failed (`coverage-mismatch`). |
+| `replay` | `replayed` | 0 | The recomputed receipt is byte-for-byte identical. |
+| `replay` | `replay-mismatch` | 1 | The program digests, the domain size or the recomputed receipt differ, or the check no longer gives `equivalent`. |
+| `replay` | `invalid-receipt` | 1 | The file is not a readable transform receipt or exceeds 64 KiB. |
+| `replay` | `inconclusive` | 2 | The domain exceeds replay's own `--max-input-tuples`; nothing was evaluated. |
+| both | `io-error` | 3 | A file could not be read, is not a regular file, or the receipt could not be created. |
+
+`--receipt OUT` creates a new file for an `equivalent` result. The receipt,
+schema `zeno-fcis/transform-receipt/1`, is compact JSON with sorted keys and a
+final newline. It records both programs' SHA-256 digests, sizes and node
+counts, the domains, both limits, the tuples checked, the Step usage report
+and the checker identity: crate version, SHA-256 of
+`crates/zeno-fcis-cli/src/transform.rs`, and the library's evaluator digest.
+`transform replay` first checks the receipt's program digests and domain size
+against the supplied files, and the domain against its own tuple cap. Only then
+does it rerun the check with the receipt's limits; it accepts the receipt only
+if the recomputed bytes are identical.
+
+The usage report gives each program's largest Step usage, the number of tuples
+on which the candidate uses more Steps, and `usage_preserved`, which is true
+only when both programs use the same Steps on every tuple. Usage does not
+decide equivalence. V2 seals usage counters into every publication, so
+adopting a candidate whose `usage_preserved` is false changes the
+application's sealed observations and would be a new contract version. This
+command does not adopt candidates, and a receipt grants no application or
+publication authority.
 
 ## Bounded completion in 1.1.0
 

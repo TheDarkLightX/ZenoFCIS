@@ -33,7 +33,7 @@ None computes Any; the three-Select witness computes all three required function
 This rechecks the finite Boolean model. It does not replay the reported Lean proof
 or establish a Rust-to-Lean refinement or full-template minimum.
 
-The current `tools/check_template_contracts_v2.py` still expands scalar OR into
+The contract generator (`zeno-fcis generate contract`) still expands scalar OR into
 Not/And/Not operations. The brief reports a 69-to-60-node full-graph rewrite;
 this intake did not reproduce that complete graph or its native journeys.
 

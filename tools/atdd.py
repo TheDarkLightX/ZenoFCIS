@@ -201,6 +201,17 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
           "every_application_template")),
     ),
+    "generated-contracts": AcceptanceScenario(
+        "Regenerate each template's V2 contract from its declarations and rules",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "contract::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_generation", "--locked")),
+    ),
+    "checked-transform": AcceptanceScenario(
+        "Accept a candidate program only with an exhaustive equivalence receipt",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "transform::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "transform_cli", "--locked")),
+    ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",
         (("python3", "tools/test_record_gate_evidence.py"),),

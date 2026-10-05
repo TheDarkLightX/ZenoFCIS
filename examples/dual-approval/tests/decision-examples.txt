@@ -1,0 +1,26 @@
+# Dual-approval decision examples.
+#
+# Provenance: written by an AI agent together with the rules in
+# v2/policy.json, so the examples are not an independent oracle; no person
+# has reviewed them yet.
+#
+# Numeric IDs come from project.zeno: state fields 110 status, 111
+# first_approval and 112 second_approval; status 150 Pending, 151 Approved and
+# 152 Cancelled; officers 160 Nobody, 161 Alice, 162 Bob and 163 Carol;
+# commands 140 Approve and 141 Cancel; context field 120 officer; reasons 200
+# closed, 201 unknown_officer, 202 cancelled and 203 same_officer; channel 300,
+# whose payload fields are 130 approved_by and 131 first_approved_by.
+#
+# status first second command officer | outcome reason status first second | release
+150 160 160 140 160 | reject 201 150 160 160 | -
+150 160 160 141 160 | reject 201 150 160 160 | -
+150 160 160 140 161 | accept - 150 161 160 | -
+150 161 160 140 161 | reject 203 150 161 160 | -
+150 161 160 140 162 | accept - 151 161 162 | 300 162 161
+151 161 162 140 163 | reject 200 151 161 162 | -
+151 161 162 141 163 | reject 200 151 161 162 | -
+150 162 160 140 163 | accept - 151 162 163 | 300 163 162
+150 161 160 141 161 | failure 202 152 161 160 | -
+150 160 160 141 162 | failure 202 152 160 160 | -
+152 161 160 140 162 | reject 200 152 161 160 | -
+152 161 160 141 163 | reject 200 152 161 160 | -

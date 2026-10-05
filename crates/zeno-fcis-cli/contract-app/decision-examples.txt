@@ -1,0 +1,7 @@
+# Decision examples, one per line:
+#   inputs | class reason post-state | deliveries
+# Inputs are the state fields, then the command, then the context, in the
+# order the program reads them; booleans are 0 or 1 and sums are variant IDs.
+# The class is accept, reject or failure, and the reason a number or -.
+# A reject repeats the pre-state. Deliveries are -, or each delivery's
+# channel then payload fields, separated by ;.

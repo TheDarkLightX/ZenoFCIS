@@ -1,0 +1,37 @@
+[package]
+name = "{package}"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+# The emitted application is independent of any enclosing workspace.
+[workspace]
+
+# The SQLite session is optional: the core builds without it, for a host or
+# for wasm32-unknown-unknown.
+[features]
+default = ["sqlite"]
+sqlite = ["dep:zeno-fcis-crypto", "dep:zeno-fcis-shell", "dep:zeno-fcis-shell-sqlite"]
+
+# Every application built from a contract shares this source, so the library
+# has one fixed name.
+[lib]
+name = "application"
+
+[dependencies]
+zeno-fcis-codec = "={version}"
+zeno-fcis-crypto = { version = "={version}", features = ["rustcrypto"], optional = true }
+zeno-fcis-shell = { version = "={version}", optional = true }
+zeno-fcis-shell-sqlite = { version = "={version}", optional = true }
+zeno-fcis-synthesis = { version = "={version}", default-features = false }
+zeno-fcis-value = "={version}"
+
+[[bin]]
+name = "{package}"
+path = "src/main.rs"
+required-features = ["sqlite"]
+
+[profile.dev]
+debug = 0
+incremental = false

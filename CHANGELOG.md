@@ -6,6 +6,47 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Add `zeno-fcis transform check --original P --candidate C [--receipt OUT]`
+  and `zeno-fcis transform replay --receipt R --original P --candidate C`.
+  Both programs must pass the library importer's full admission and have the
+  same input and output ABI. Each tuple of the declared input domain then
+  runs through the library's verified metered evaluator at a full Step
+  budget that no admitted program can exhaust. `check` reports one of three
+  outcomes:
+  - an equivalence, only when every tuple gives identical outputs or
+    identical failures and the declared Step limit never binds. It writes a
+    canonical receipt binding both programs, the domain, the limits, the
+    counts and the Step usage. Step usage is always reported, never compared;
+  - the first differing tuple as a counterexample, with no receipt;
+  - inconclusive, when the domain exceeds the cap (default 10^8 tuples) or
+    the Step limit binds.
+
+  `replay` re-runs the check and accepts only a byte-identical receipt. A
+  receipt proves equivalence only over the declared domain, under eager
+  semantics. It grants no application or publication authority. The checker
+  is pure code in the CLI crate; `Cargo.lock` and the verified core are
+  unchanged.
+- Add `zeno-fcis generate contract <dir> [--check]`. An application's
+  `project.zeno` and reviewed `v2/policy.json` generate `v2/schema.zcve`,
+  `src/v2_contract.rs` and `v2/policy.zcve`. Generation is pure functions in
+  the CLI crate, which already depends on everything it needs, so
+  `Cargo.lock`, part of the approved evaluator source closure, is unchanged;
+  the command itself only reads and writes files. The policy bytes come from
+  `v2_authority::policy_bytes`, and the library's catalog binding, including
+  its exact canonical-schema check, must accept them before anything is
+  written. All eight templates regenerate byte for byte. This replaces
+  `tools/check_template_contracts_v2.py`, its test, and the ignored
+  `emit_library_policy_artifacts` test; a non-ignored test recomputes every
+  template's policy bytes from its compiled source. Every generated contract
+  states its genesis state as `GENESIS`. An invalid contract writes nothing;
+  for the rules the generator checks itself, the error names the file and
+  entry at fault.
+- Add `zeno-fcis new DIR --contract CONTRACT`: an application built from
+  `project.zeno`, `v2/policy.json` and optional decision examples alone, with
+  source shared by every such application and no decision or law code; its
+  tests check each example against the library Authority and run the
+  examples as one SQLite session from genesis. `examples/dual-approval` is
+  the first such contract.
 - Share the V2 genesis and transition outcome/publication types while retaining
   the invoked kind through evaluation, publication and replay contracts.
   The SQLite adapter refuses genuine publications used for the wrong invocation
