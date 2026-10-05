@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use zeno_fcis_codec::{CanonicalEncode as _, Hash32};
 use zeno_fcis_schema::{EnumVariantDef, Schema, TypeDef, TypeId, TypeKind};
-use zeno_fcis_value::{Field, MapEntry, Value};
+use zeno_fcis_value::{Field, MapEntry, Value, ValueRef};
 
 use crate::{CodegenError, VectorKind};
 
@@ -118,8 +118,8 @@ fn push_malformed(cases: &mut Vec<VectorCase>, minimal_bytes: &[u8]) {
 }
 
 fn push_noncanonical(cases: &mut Vec<VectorCase>, schema: &Schema) -> Result<(), CodegenError> {
-    let amount = minimal_value(schema, TypeId::new(1)).unwrap_or(Value::U128(0));
-    let signed = Value::I128(0);
+    let amount = minimal_value(schema, TypeId::new(1)).unwrap_or(Value::unsigned(0));
+    let signed = Value::signed(0);
     let record = encode_record_raw(&[(2, signed.clone()), (1, amount.clone())])?;
     cases.push(VectorCase {
         name: "noncanonical_record_order".to_owned(),
@@ -129,9 +129,9 @@ fn push_noncanonical(cases: &mut Vec<VectorCase>, schema: &Schema) -> Result<(),
         validate_type: None,
     });
 
-    let key_two = Value::U128(2);
-    let key_one = Value::U128(1);
-    let map = encode_map_raw(&[(key_two, Value::U128(0)), (key_one, Value::U128(0))])?;
+    let key_two = Value::unsigned(2);
+    let key_one = Value::unsigned(1);
+    let map = encode_map_raw(&[(key_two, Value::unsigned(0)), (key_one, Value::unsigned(0))])?;
     cases.push(VectorCase {
         name: "noncanonical_map_order".to_owned(),
         kind: VectorKind::NonCanonical,
@@ -147,11 +147,11 @@ fn push_unknown_field(
     schema: &Schema,
     minimal: &Value,
 ) -> Result<(), CodegenError> {
-    let Value::Record(fields) = minimal else {
+    let ValueRef::Record(fields) = minimal.view() else {
         return Ok(());
     };
-    let mut extended: Vec<Field> = fields.clone().into_vec();
-    extended.push(Field::new(UNKNOWN_FIELD_ID, Value::U128(0)));
+    let mut extended: Vec<Field> = fields.to_vec();
+    extended.push(Field::new(UNKNOWN_FIELD_ID, Value::unsigned(0)));
     let record = match Value::record_canonical(extended) {
         Ok(value) => value,
         Err(_) => return Ok(()),
@@ -171,10 +171,7 @@ fn push_unknown_variant(cases: &mut Vec<VectorCase>, schema: &Schema) -> Result<
     let Some(enum_type) = first_enum_type(schema) else {
         return Ok(());
     };
-    let value = Value::Enum {
-        type_id: enum_type.id().get(),
-        variant: UNKNOWN_VARIANT_ORDINAL,
-    };
+    let value = Value::enumeration(enum_type.id().get(), UNKNOWN_VARIANT_ORDINAL);
     let bytes = encode(&value)?;
     cases.push(VectorCase {
         name: "unknown_variant_enum".to_owned(),
@@ -210,10 +207,10 @@ fn minimal_value(schema: &Schema, type_id: TypeId) -> Result<Value, CodegenError
         .type_by_id(type_id)
         .ok_or(CodegenError::VectorConstruction)?;
     match definition.kind() {
-        TypeKind::Unit => Ok(Value::Unit),
-        TypeKind::Bool => Ok(Value::Bool(false)),
-        TypeKind::U128 { min, .. } => Ok(Value::U128(*min)),
-        TypeKind::I128 { min, .. } => Ok(Value::I128(*min)),
+        TypeKind::Unit => Ok(Value::unit()),
+        TypeKind::Bool => Ok(Value::boolean(false)),
+        TypeKind::U128 { min, .. } => Ok(Value::unsigned(*min)),
+        TypeKind::I128 { min, .. } => Ok(Value::signed(*min)),
         TypeKind::Bytes { min_len, .. } => {
             let length = usize::try_from(*min_len).map_err(|_| CodegenError::VectorConstruction)?;
             Value::bytes(vec![0; length]).map_err(|_| CodegenError::VectorConstruction)
@@ -225,7 +222,7 @@ fn minimal_value(schema: &Schema, type_id: TypeId) -> Result<Value, CodegenError
             for item in items.iter() {
                 values.push(minimal_value(schema, *item)?);
             }
-            Ok(Value::tuple(values))
+            Value::tuple(values).map_err(|_| CodegenError::VectorConstruction)
         }
         TypeKind::Record { fields } => {
             let mut built = Vec::with_capacity(fields.len());
@@ -244,7 +241,7 @@ fn minimal_value(schema: &Schema, type_id: TypeId) -> Result<Value, CodegenError
             for _ in 0..count {
                 items.push(minimal_value(schema, *element)?);
             }
-            Ok(Value::vector(items))
+            Value::vector(items).map_err(|_| CodegenError::VectorConstruction)
         }
         TypeKind::Map {
             key,
@@ -260,10 +257,10 @@ fn maximal_value(schema: &Schema, type_id: TypeId) -> Result<Option<Value>, Code
         .type_by_id(type_id)
         .ok_or(CodegenError::VectorConstruction)?;
     match definition.kind() {
-        TypeKind::Unit => Ok(Some(Value::Unit)),
-        TypeKind::Bool => Ok(Some(Value::Bool(true))),
-        TypeKind::U128 { max, .. } => Ok(Some(Value::U128(*max))),
-        TypeKind::I128 { max, .. } => Ok(Some(Value::I128(*max))),
+        TypeKind::Unit => Ok(Some(Value::unit())),
+        TypeKind::Bool => Ok(Some(Value::boolean(true))),
+        TypeKind::U128 { max, .. } => Ok(Some(Value::unsigned(*max))),
+        TypeKind::I128 { max, .. } => Ok(Some(Value::signed(*max))),
         TypeKind::Bytes { max_len, .. } => {
             let length = usize::try_from(*max_len).map_err(|_| CodegenError::VectorConstruction)?;
             Value::bytes(vec![0; length])
@@ -280,7 +277,9 @@ fn maximal_value(schema: &Schema, type_id: TypeId) -> Result<Option<Value>, Code
                     None => return Ok(None),
                 }
             }
-            Ok(Some(Value::tuple(values)))
+            Value::tuple(values)
+                .map(Some)
+                .map_err(|_| CodegenError::VectorConstruction)
         }
         TypeKind::Record { fields } => {
             let mut built = Vec::with_capacity(fields.len());
@@ -304,7 +303,9 @@ fn maximal_value(schema: &Schema, type_id: TypeId) -> Result<Option<Value>, Code
                 None => minimal_value(schema, *element)?,
             };
             let items = vec![element; count];
-            Ok(Some(Value::vector(items)))
+            Value::vector(items)
+                .map(Some)
+                .map_err(|_| CodegenError::VectorConstruction)
         }
         TypeKind::Map {
             key,
@@ -323,12 +324,12 @@ fn text_minimal(len: u32) -> Result<Value, CodegenError> {
 
 fn enum_minimal(type_id: u32, variants: &[EnumVariantDef]) -> Value {
     let variant = variants.first().map(|item| item.id().get()).unwrap_or(0);
-    Value::Enum { type_id, variant }
+    Value::enumeration(type_id, variant)
 }
 
 fn enum_maximal(type_id: u32, variants: &[EnumVariantDef]) -> Value {
     let variant = variants.last().map(|item| item.id().get()).unwrap_or(0);
-    Value::Enum { type_id, variant }
+    Value::enumeration(type_id, variant)
 }
 
 fn sum_minimal(
@@ -341,13 +342,9 @@ fn sum_minimal(
     };
     let payload = match first.payload() {
         None => None,
-        Some(child_type) => Some(Box::new(minimal_value(schema, child_type)?)),
+        Some(child_type) => Some(minimal_value(schema, child_type)?),
     };
-    Ok(Value::Sum {
-        type_id,
-        variant: first.id().get(),
-        payload,
-    })
+    Ok(Value::sum(type_id, first.id().get(), payload))
 }
 
 fn sum_maximal(
@@ -361,15 +358,11 @@ fn sum_maximal(
     let payload = match last.payload() {
         None => None,
         Some(child_type) => match maximal_value(schema, child_type)? {
-            Some(value) => Some(Box::new(value)),
-            None => Some(Box::new(minimal_value(schema, child_type)?)),
+            Some(value) => Some(value),
+            None => Some(minimal_value(schema, child_type)?),
         },
     };
-    Ok(Some(Value::Sum {
-        type_id,
-        variant: last.id().get(),
-        payload,
-    }))
+    Ok(Some(Value::sum(type_id, last.id().get(), payload)))
 }
 
 fn map_minimal(
@@ -422,26 +415,26 @@ fn distinct_keys(schema: &Schema, key: TypeId, count: u32) -> Result<Vec<Value>,
     match definition.kind() {
         TypeKind::U128 { min, .. } => {
             for offset in 0..u128::try_from(count).map_err(|_| CodegenError::VectorConstruction)? {
-                keys.push(Value::U128(min + offset));
+                keys.push(Value::unsigned(min + offset));
             }
         }
         TypeKind::I128 { min, .. } => {
             for offset in 0..i128::try_from(count).map_err(|_| CodegenError::VectorConstruction)? {
-                keys.push(Value::I128(min + offset));
+                keys.push(Value::signed(min + offset));
             }
         }
         TypeKind::Bool => {
-            keys.push(Value::Bool(false));
+            keys.push(Value::boolean(false));
             if count >= 2 {
-                keys.push(Value::Bool(true));
+                keys.push(Value::boolean(true));
             }
         }
         TypeKind::Enum { variants } => {
             for variant in variants.iter().take(count) {
-                keys.push(Value::Enum {
-                    type_id: definition.id().get(),
-                    variant: variant.id().get(),
-                });
+                keys.push(Value::enumeration(
+                    definition.id().get(),
+                    variant.id().get(),
+                ));
             }
         }
         TypeKind::Text { .. } => {
@@ -465,7 +458,7 @@ fn distinct_keys(schema: &Schema, key: TypeId, count: u32) -> Result<Vec<Value>,
         }
         TypeKind::Unit => {
             if count >= 1 {
-                keys.push(Value::Unit);
+                keys.push(Value::unit());
             }
         }
         _ => return Err(CodegenError::VectorConstruction),
@@ -701,17 +694,7 @@ mod tests {
     use super::*;
     use zeno_fcis_codec::{CommitmentHasher, decode_value};
 
-    struct XorHasher;
-    impl CommitmentHasher for XorHasher {
-        const ALGORITHM_ID: &'static str = "test/xor";
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut out = [0_u8; 32];
-            for (i, b) in bytes.iter().enumerate() {
-                out[i % 32] ^= b;
-            }
-            Hash32::new(out)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as XorHasher;
 
     fn fixture_schema() -> Schema {
         crate::fixture_schema().unwrap_or_else(|e| panic!("fixture schema failed: {e}"))
@@ -719,7 +702,7 @@ mod tests {
 
     #[test]
     fn hardcoded_record_tag_matches_codec() {
-        let value = Value::record_canonical(vec![Field::new(1, Value::U128(0))]);
+        let value = Value::record_canonical(vec![Field::new(1, Value::unsigned(0))]);
         let value = match value {
             Ok(v) => v,
             Err(e) => panic!("record rejected: {e}"),

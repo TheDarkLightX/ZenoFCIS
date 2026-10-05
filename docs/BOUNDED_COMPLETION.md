@@ -20,7 +20,10 @@ tuples, and declared limit; input sizing preserves prefix/domain error order.
 The item schema supplies one fixed encoded size, avoiding per-item encoding;
 invalid-item diagnostics identify the input position without printing its contents.
 
-See [the complete example](../crates/zeno-fcis/examples/bounded_completion.rs).
+The original example is kept as a private regression test in
+[`bounded_completion.rs`](../verification/kernel-laws/src/oracle/tests/bounded_completion.rs).
+The V2 checked replacement is described in
+[V2_CHECKED_CONTINUATION_STAGE.md](V2_CHECKED_CONTINUATION_STAGE.md).
 No new plugin, language-specific callback, solver installation, or Lean upgrade
 is needed. Existing finite-IR language emitters remain applicable to the step
 programs; a native application still needs its normal target-conformance gate.

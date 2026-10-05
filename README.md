@@ -1,6 +1,18 @@
 # ZenoFCIS
 
-ZenoFCIS is a high-assurance Rust library family for functional-core / imperative-shell systems.
+**A neurosymbolic software factory for high assurance FCIS applications.**
+
+ZenoFCIS combines LLM-assisted authoring with symbolic checking in a Rust
+library family for functional-core / imperative-shell systems. LLMs propose
+specifications and programs; deterministic checkers decide whether supported
+artifacts meet their declared contracts. The assurance comes from those
+contracts and qualified checks, regardless of which model makes a proposal.
+
+ZenoFCIS intends to become a **state of the art high assurance software factory**:
+turning reviewed requirements into applications built around a **formally
+verified functional core**, with durable effects and evidence agents can maintain.
+
+**V2's central assurance goal is a formally verified functional core.**
 
 Its primary design rule is:
 
@@ -13,6 +25,68 @@ immutable state + command + policy + authenticated context
 ```
 
 The semantic kernel treats values, decisions, resource budgets, canonical bytes, and commitments as explicit protocol data. It forbids unsafe Rust and is designed for `no_std + alloc` use without clocks, randomness, networking, filesystems, databases, or executable effect closures.
+
+## Formally verified functional core
+
+A **formally verified functional core** combines a pure, total decision
+boundary with a machine-checked proof that its executable implementation follows
+its versioned decision contract for every input in its admitted domain:
+
+```text
+For every admitted input x:
+    executable_core(x) = decision_contract(x)
+```
+
+This is the central assurance principle behind ZenoFCIS V2's FCIS architecture.
+The contract specifies the complete decision: Accept, Reject or
+CommittedFailure; its reason, successor state, patch and ordered effect plan;
+and its law, genesis, resource and refusal rules. The proof must cover the
+executable decision path and the connections between its stages.
+
+V2 is being built around this boundary:
+
+```text
+reviewed decision contract + immutable original inputs
+    -> verified library admission, execution and law evaluation
+    -> exact decision and bound authorization
+    -> imperative-shell persistence and delivery
+```
+
+The completed V2 API must require this path, refuse unsupported contracts and
+prevent application callbacks from substituting authoritative decisions.
+Synthesis and LLMs can propose contracts and programs; admission and execution
+must preserve the same assurance regardless of who produced them.
+
+Each guarantee identifies the exact implementation, specification, full
+supported input domain and trusted-base assumptions. Reviewing whether the
+rules capture the intended product behavior remains essential. External fact
+authentication, storage atomicity and effect delivery have their own assurance
+obligations in the imperative shell.
+
+**Current status:** V2 is under construction. Executable interpreter, admission,
+meter, decision, law/genesis and raw-domain units have bounded verification
+evidence; the combined mandatory authority route and release gates remain
+unfinished. The [V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md)
+records the checked scope and open obligations. The full-core guarantee becomes
+a release claim only after that complete route is qualified.
+
+The [2.1 factory roadmap](docs/V2_1_FACTORY_PLAN.md) plans additional
+specification review, reusable verified components, generated integration,
+verified upgrades, a bounded neurosymbolic proposal/check/feedback loop, and
+agent-maintenance benchmarks after V2's required gates close. The integrated
+loop is planned; the completed e-graph study evaluated symbolic optimization.
+The factory description states our intended destination; comparative leadership
+remains a claim to demonstrate.
+
+The [neurosymbolic loop design](docs/neurosymbolic-loop/DESIGN.md) and
+[implementation specifications](docs/neurosymbolic-loop/specs/INDEX.md) describe
+how proposals, checker feedback and revisions form a bounded process under a
+fixed contract. Human review governs changes to the intended behavior.
+
+The [draft paper](docs/neurosymbolic-loop/paper.md), authored by Dana Edwards,
+explains the factory architecture and the proposed loop. The
+[implementation handoff](docs/neurosymbolic-loop/CLAUDE_HANDOFF.md) gives
+continuation agents the contracts, delivery order and qualification gates.
 
 ## Why functional core, imperative shell
 
@@ -28,58 +102,40 @@ inputs to exactly one decision:
 - reject, with a reason and no change;
 - commit a failure, with a reason and a candidate.
 
-The candidate is data: an exact patch to the state, the external obligations to
-queue, and the resources used. With no clock, file, network, or randomness in
-the core, the same inputs produce the same bytes. How that is assured depends on
-the code:
+The candidate is data: an exact successor, patch, ordered effects and measured
+resource use. In the supported V2 route, applications declare a closed program
+and policy; the library interprets them without application callbacks or ambient
+clocks, environment reads or randomness. Time and external observations enter
+as explicit inputs.
 
-- A synthesized finite core is deterministic by construction. Its language has
-  no clock, randomness, input or output, or unordered collection.
-- The library's own semantic crates forbid unsafe Rust and are checked for
-  ambient effects.
-- A hand-written project transition is deterministic by contract, and three
-  checks test that contract:
-  - `zeno-fcis purity` reports clocks, environment reads, randomness,
-    hash-map iteration, global state, and the other sources it can see in the
-    decision code;
-  - `execute_probed` runs a decision several times and withholds it if any two
-    runs differ;
-  - reopening a SQLite store re-executes every persisted transition and
-    requires identical bytes.
+Finite synthesis can propose the scalar program. Independently written examples
+and conformance tests challenge the declarations. Purity scans, repeated-run
+probes and history replay remain useful detectors, but a clean result from them
+is not a proof of determinism or of agreement with human intent. See
+[determinism](docs/DETERMINISM.md) for those checks and their limits.
 
-  These checks detect nondeterminism; they do not prove its absence. See
-  [determinism](docs/DETERMINISM.md).
+**The shell acts.** Persistence, delivery and every external operation happen
+outside the core. Outbox entries have transaction-bound delivery identities;
+a destination must implement the acknowledgement and deduplication contract.
+A stable ID alone does not prove exactly-once external execution.
 
-**The shell acts.** Persistence, delivery, and every external operation happen
-outside the core, and only on values the core produced. External work is an
-outbox entry with a stable delivery identity, so a destination can recognize a
-retry and perform the work once.
-
-**Authority is a value, not a code path.** The SQLite shell, the library's
-production port, cannot publish a raw decision. It publishes only a
-`CatalogAuthorizedTransition`, a type that no code outside the library can
-construct. The library mints one only after it:
-
-1. runs the reviewed program itself on the admitted invocation, so no caller
-   can supply the decision;
-2. obtains a verdict on every applicable project law from the deployment's law
-   engine, and requires each law to hold;
-3. binds the result to the exact catalog, hash provider, law set, and
-   deployment.
-
-Reopening a store re-authorizes its entire history.
+**Authority is a value.** The V2 SQLite shell accepts private library
+publications. The library admits the schema and declarations, computes the
+complete decision and resource use, evaluates applicable declared laws, and
+binds the publication to the exact policy, evaluator and invocation. A project
+cannot substitute a law-verdict callback or construct a publication itself.
+Genesis has its own law checks; reopening replays the stored history.
 
 The strategic shape follows from one rule: **untrusted components propose, and
 small deterministic checkers judge.** Hand-written code, LLM-written code,
 synthesizers, solver models, databases, and mounted runtimes may all propose
 values. Strict decoders, exhaustive checkers, replay, and the authority decide
 what is admitted, and their verdicts are types that other code cannot forge.
-Some results still rest on components that the library trusts rather than
-rechecks:
-
-- a project's law engine, whose verdicts the authority enforces;
-- a solver's `unsat` answer;
-- the pinned Lean kernel and runtime.
+The assurance argument names its trusted base: the reviewed specification,
+Verus and its solver/library, compilers, identity generation and checks,
+cryptographic assumptions, and the platform. Storage and external delivery
+have separate obligations. A solver result and an independently checked proof
+retain their distinct evidence classifications.
 
 ```text
 proposers (untrusted)          judges (small, deterministic)       shell (effects)
@@ -103,14 +159,13 @@ describe the full design.
 
 ### What this gives developers, LLMs, and agents
 
-- **Developers** test one pure function with plain values. Decisions are data,
+- **Developers** review declarative rules and test the library decision with explicit inputs. Decisions are data,
   so tests compare exact bytes and a failure replays from its inputs. Reviewers
   start from the catalog of reasons and the laws. Generated typed APIs name
   each state field, so code need not use raw paths, and authoring diagnostics
   arrive together in one pass.
-- **LLMs** get a small, well-defined target: one function with explicit inputs
-  and outputs and no ambient effects, and checks that give the same answer on
-  every run. The design assumes generated code can be wrong:
+- **LLMs** get a bounded authoring target: declarations with explicit inputs
+  and outputs, interpreted by the library, plus reproducible checks. The design assumes generated code can be wrong:
   - generated typed APIs narrow what it needs to write;
   - every decision is checked against the project laws before it can be
     published;
@@ -118,7 +173,7 @@ describe the full design.
     instead of being written by hand;
   - an [inductive claim](docs/INDUCTIVE_CLAIMS.md) checks an invariant over
     the full integer range by induction over the laws the authority enforces,
-    for a hand-written program as much as a synthesized one. The solver's
+    for the declared action laws. The solver's
     `unsat` for the step is attested, not independently checked.
 - **Agents** get reproducible, machine-readable feedback:
   - `zeno-fcis describe` and versioned JSON results with stable exit codes;
@@ -134,7 +189,9 @@ describe the full design.
 
 ## See it run
 
-This is the published CLI running inside a virtual terminal. One command reads
+These captures document the earlier CLI and Mini Determinator workflow; they
+are historical demonstrations, not qualification of the smaller V2 source.
+This is the CLI running inside a virtual terminal. One command reads
 the Mini Determinator project and reports its typed components, claims,
 remaining checks, and content-bound program identity.
 
@@ -183,30 +240,37 @@ published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
 
 ## Start here
 
-For a project-neutral multi-domain application, enable the composed-program
-path and import the curated prelude:
+The normal V2 library route declares a complete checked program. It is available
+in this development checkout with default features and with
+`default-features = false`. Use the reviewed checkout; the published `1.1.0`
+package does not supply this breaking V2 API:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.1.0", default-features = false, features = [
-    "composed-program",
-] }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false }
 ```
 
 ```rust
 use zeno_fcis::prelude::*;
 ```
 
-The supported application path is:
-
 ```text
-ProjectProfile + ProjectCatalog
-    -> generated transition or typed domain machines
-    -> ComposedDomainProgram
-    -> verified project laws
-    -> CatalogCommitAuthority + policy-bound genesis
-    -> authorized shell publication
+original schema + complete ProgramDefinition + reviewed policy + framing/channel roots
+    -> bind_catalog
+    -> bind_program (private library-owned Program)
+    -> original state/command/context envelopes
+    -> actual decision + shared meter + laws
+    -> private Publication or audited Reject/refusal
 ```
+
+See the [normal program migration](docs/V2_PROGRAM_API_MIGRATION.md) and run
+`cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core`.
+The root/prelude cutover is intentionally breaking on this V2 development branch.
+Native transition callbacks, public candidate sealing and caller-supplied
+usage have been retired. `zeno_fcis::legacy` retains inert compatibility data
+and standalone evidence utilities; historical authoring algorithms are in a
+private verification oracle. See the [scope ledger](docs/V2_LEDGER_SCOPE.md)
+for retained obligations and the separate release track.
 
 Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
@@ -242,30 +306,25 @@ python3 tools/atdd.py run --all
 ```
 
 The [Verus verification units](verification/verus/README.md) check shared
-finite-domain arithmetic, structural program admission, and eager scalar
-execution against mathematical contracts. The V2 raw-record pipeline derives
-the exact typed scalar tuple in source/field ABI order and executes it with one
-owned Read/Byte/Step meter. Its shared dependency closure has 81 executable
-functions, including generated clones, and 145 proof obligations. Operational
-charge ordering has a separate reviewed body guard. Catalog extraction,
-original envelope/hash admission, complete decisions, laws, genesis and the
-mandatory authority/replay route remain separate proof obligations. See the
-[V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md) and
-[lessons from Verus and the V2 plan](docs/VERUS_LESSONS_AND_V2_PLAN.md) for the
-integration design and remaining proof obligations.
+executable code against mathematical contracts. The smaller V2 qualification
+covers admission, original-byte interpretation, scalar execution, complete
+decisions, laws/genesis and mandatory authority/replay. Per-stage proof runs
+are provisional; final source-bound profiles, controls and integration checks
+must pass together. See the [V2 plan](docs/V2_VERIFIED_CORE_PLAN.md) for the exact
+scope and [Verus lessons](docs/VERUS_LESSONS_AND_V2_PLAN.md) for its background.
 
 ## Example applications
 
 `zeno-fcis new DIR --template NAME` creates a complete application: an
-authored `project.zeno`, generated typed bindings, a decision, a law checker
-that checks every decision before it is published, a SQLite store with an
+authored `project.zeno`, generated typed bindings, declarative decision and law programs
+evaluated by the library before publication, a SQLite store with an
 outbox, tests, and a README that states its rules.
 
 | Template | What it shows |
 | --- | --- |
 | `durable-counter` | The smallest complete application: a synthesized step, runtime laws, a committed failure, and restart with delivery retry. |
 | `account-lockout` | Failed logins committed as failures, time as an input instead of a clock read, authority from the request context, alerts through the outbox, and an inductive claim, attested by CVC5 over the integer ranges `project.zeno` declares, that the action laws alone keep the lock invariant. |
-| `order-fulfillment` | A hand-written state machine that sends idempotent payment and shipping requests and rejects duplicate or late callbacks. |
+| `order-fulfillment` | A declarative state machine that sends idempotent payment and shipping requests and rejects duplicate or late callbacks. |
 | `inventory-reservation` | A decision core synthesized and verified on all 432 inputs, commands with quantities, and a conservation law. |
 | `compliance-gateway` | An expert system's rule base as the synthesis contract, checked on all 720 inputs; every decision names the rule that fired, a rule base with a conflict, a gap, or a dead rule fails the build, and claims for `zeno-fcis prove` state the strikes invariant's inductive steps. |
 | `withdrawal-queue` | A controller step synthesized by `zeno-fcis synth` from a sketch of a fair policy, whose table OrbitSynthesis certified for every input sequence, so an alarm can delay a withdrawal but never freeze it; a refinement law that ties each tick to that finite model; and inductive claims, attested by CVC5, that the action laws alone keep the vault solvent. |
@@ -277,8 +336,7 @@ compliance-gateway, withdrawal-queue, and agent-treasury-guard examples, every
 law formula in `project.zeno` can constrain some transition and reads only
 declared fields (`zeno-fcis check --require-substantive
 --require-resolved-paths` passes). Each also ships decision examples, a
-conformance test through the running application, a determinism probe, and the
-purity command for its decision code. `python3 tools/check_generated_application.py`
+conformance test through the running application and determinism checks. `python3 tools/check_generated_application.py`
 creates, builds, and tests each template in this table as an isolated package
 against this checkout. Each application's core builds without its SQLite
 shell (`cargo build --no-default-features`), including for
@@ -402,8 +460,10 @@ The guarantee depends on four things:
   contract, not your intent, and a wrong contract yields a program that is
   faithfully wrong. This is the largest risk, so the durable-counter template
   also checks decision examples that were reviewed against its README.
-- **The checker must be correct.** The interpreter and its enumeration are
-  small and tested, but they have not themselves been formally proven.
+- **The checker must be correct.** The V1 end-to-end synthesis path trusts its
+  interpreter and enumeration. V2 has executable interpreter proofs and is
+  closing the remaining admission, decision and authority bridges described
+  in the [full-core plan](docs/V2_VERIFIED_CORE_PLAN.md).
 - **The code around the program needs its own check.** In the durable-counter
   template, `tests/conformance.rs` runs all 64 admitted inputs through the real
   application: admission, the authority, the adapter that turns outputs into
@@ -428,152 +488,35 @@ Properties of a finite transition are checked the same way.
 [System properties](docs/SYSTEM_PROPERTIES.md) are checked on every admitted
 input, with a control that flags a property the declared domains already imply.
 
-## Implemented workspace
-
-The workspace now includes the complete package ladder:
-
-- semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches, non-executable commit-evidence plans, durable outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
-- assume-guarantee composition, deterministic-parallel conflict checking,
-  backend-neutral complete static footprint claims, nominal footprint witnesses,
-  witness-gated parallel authorization, untrusted runtime refinement reports,
-  strict approved-provider reconstruction into nominal validated decisions,
-  canonical finite-domain manifests, independently verified exhaustive
-  coverage, content-addressed promotion reports, canonical evidence envelopes,
-  and the first ZenoDEX profile;
-- fixed-size executable domain machines with schema-admitted state, command,
-  context, and port matrices; narrow per-machine interfaces; routes derived
-  exactly from global composition wiring; deterministic merge-order execution;
-  global reject rollback; and terminal committed-failure preservation;
-- one authority-owned composed-domain program with closed root-to-context maps,
-  nominal machine ownership, complete state projection, fail-closed internal
-  routing, and exact catalogued effect/outbox projection;
-- vetted RustCrypto and libcrux SHA-256 providers with known-answer and cross-provider parity evidence;
-- closed schema validation, root and selected-type schema-bound envelope admission, generated exact-schema and exact-catalog reconstruction, typed root/command/context smart constructors, derived command/context commitments, schema-typed direct root-field reads, updates, and context observations, raw-path-free generated mutation and context-observation surfaces, disposition-typed reason application, catalog-typed effect/channel staging, private-inner generated transitions, deterministic Rust/Python adapters, negative codec vectors, cross-language replay, and content-addressed generation manifests;
-- project-neutral profiles with stable reason/effect/channel/capability/event registries, explicit evolution modes, and exact content-addressed migration evidence;
-- tool-neutral, profile-bound relational-law manifests for state invariants, conservation, mint/burn authority, debit/credit-to-effect equality, fees and rounding, authority/subject/recipient relations, rejection purity, and committed-failure effects, with retained proof evidence and fresh bounded per-invocation evaluation;
-- nominal catalog authorization that owns the reviewed transition program and exact project-law engine, binds the reviewed initial root/source/configuration/evidence/deployment instance, creates a private-construction `CatalogAuthorizedGenesis` only after every genesis-applicable law is satisfied, admits external command/context/principal/replay invocations, pins a sealed known-answer-verified provider plus exact outbox-delivery-interpreter/deployment/resource bindings, and creates a private-construction `CatalogAuthorizedTransition` only after every applicable transition law is satisfied;
-- a reusable callable/strict JSON-line mounted-runtime adapter for complete normalized decisions from any project profile;
-- strict JSON-line runtime adapters that compare complete normalized decisions and retain mismatch records;
-- a permanent exact-revision mount of the real ZenoDEX Python/Rust single-vault zUSD transitions, with a retained 17-case full-decision parity report;
-- an explicit dual-root sparse authenticated-state reference with strict bounded proof/plan decoding, projector-bound profiles, context-verified membership/absence witnesses, expected-version publication, and full-rebuild equality checks;
-- a candidate-bound authenticated authority that verifies exact retained projector evidence at setup, requires a project-specific per-transition projection law, reconstructs persisted plans locally, and exposes a production-facing port that accepts only nominal `CatalogAuthorizedAuthenticatedCommit` values;
-- [language-neutral finite synthesis](docs/LANGUAGE_NEUTRAL_SYNTHESIS.md) with relational realizability checks, canonical hole search, Rust/Python/JavaScript emission, and separate exhaustive target conformance;
-- [bounded completion and ordered preparation](docs/BOUNDED_COMPLETION.md) with finite exit-path search, independent rank checking, complete resource reservations, and resumable computation that grants no publication authority;
-- crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
-- persistent collections with reference, shared hash-map, and shared ordered-map implementations, logical-entry equality, property tests, and benchmarks;
-- release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
-- a frozen V1 product contract, human-readable BDD scenarios, a closed
-  fail-closed ATDD registry, and optional deterministic Probity guardrails with
-  a pinned Node/npm graph and hostile command corpus.
-
-## Demonstrated ZenoDEX runtime mount
-
-ZenoFCIS mounts the existing ZenoDEX single-vault zUSD functional core through
-two thin JSON-line entry points: one calls the Python transition and one calls
-the independent Rust transition. Both receive the same exact state, command,
-context, and policy. ZenoFCIS normalization additionally binds the profile,
-algorithm, schema, codec, precedence, and budget identities.
-
-The retained v1 corpus executes 17 state-threaded cases. It currently produces
-9 accepted transitions and 8 rejections with no Python/Rust divergence. For
-each case, the mount compares the complete normalized decision:
+## Supported architecture and roadmap
 
 ```text
-decision kind and reason
-+ pre-state and post-state roots
-+ candidate identity and CanonicalPatch
-+ CommitPlan and OutboxPlan
-+ receipt and CommitBundle
-+ complete decision commitment
+reviewed schema + decision/law declarations + exact policy
+    -> checked library Program / Authority
+    -> immutable original state, command and context
+    -> complete decision, private meter and law evaluation
+    -> private Publication
+    -> SQLite identity/freshness checks and atomic persistence
+    -> durable outbox and destination acknowledgements
 ```
 
-The permanent `mounted-zenodex` workflow checks out the exact pinned ZenoDEX
-revision, builds its Rust runtime, runs both implementations, and byte-compares
-the new report with the retained
-[`test-data/zenodex/zusd-v1/report.json`](test-data/zenodex/zusd-v1/report.json).
-The runner can also be invoked directly:
+The eight templates above define the smaller V2 application scope. Scalar and
+flat-record execution retain their declared domains. The shell stores compact
+subjects but reconstructs the complete authority subject for replay; compact
+bytes alone are not publication authority. See the
+[API migration guide](docs/V2_PROGRAM_API_MIGRATION.md).
 
-```bash
-cargo +1.97.1 run -p zeno-fcis-adapter-zenodex \
-  --bin mount-zenodex-zusd --locked -- \
-  <pinned-zenodex-checkout> <zenodex-rust-binary> <output-directory>
-```
+The [V2.1 roadmap](docs/V2_1_FACTORY_PLAN.md) adds a separately qualified
+compound-value profile and full-width U128 zUSD, then specification review,
+reusable verified components and upgrade support. The earlier 17-case ZenoDEX
+mount is historical bounded parity evidence. It does not qualify that future
+profile; the removed native mount runner is not the current application route.
 
-This establishes bounded executable integration for the mounted profile. It
-does not authorize production effects, cover multiple vaults or other ZenoDEX
-lanes, or replace an audit or unbounded refinement proof.
-
-Mounted `NormalizedDecision` values remain untrusted transport. A production
-promotion path must reconstruct every receipt or complete bundle through
-`ValidatedNormalizedDecision`, derive case identities from the exact
-invocation, and use a verified `ExhaustiveDomainManifest` when claiming finite
-domain completeness. See
-[`docs/VALIDATED_REFINEMENT_AND_EXHAUSTIVE_COVERAGE.md`](docs/VALIDATED_REFINEMENT_AND_EXHAUSTIVE_COVERAGE.md).
-
-The `zeno-fcis` umbrella keeps the semantic kernel small by default. Application
-code should enable the smallest explicit feature set, for example:
-
-```toml
-[dependencies]
-zeno-fcis = { version = "=1.1.0", default-features = false, features = ["composed-program"] }
-```
-
-The umbrella crate's default and `no_std` feature sets are project-neutral.
-Enable `zenodex-profile` for the ZenoDEX profile exports or `mounted-zenodex`
-for that profile plus its concrete mounted runtime.
-
-Important optional features include `authority`, `domain-machines`, `composed-program`, `codegen`,
-`evidence`, `mounted-runtime`, `zenodex-profile`, `mounted-zenodex`,
-`authenticated-state`, `authenticated-authority`, `synthesis`, `sqlite-shell`, `collections`, and
-`persistent-collections`.
-
-## Architecture
-
-The repository keeps computation and coordination separate:
-
-```text
-pure transition
-    -> immutable, content-addressed candidate
-    -> external invocation + catalog/provider/deployment validation
-    -> complete project-law evaluation
-    -> nominal CatalogAuthorizedTransition
-    -> optional qualified projector + nominal CatalogAuthorizedAuthenticatedCommit
-    -> policy-pinned atomic shell publication
-    -> idempotent outbox delivery
-```
-
-Before that transition path can publish, the same authority must evaluate the
-reviewed initial state under every genesis-applicable law and mint a nominal
-`CatalogAuthorizedGenesis`. Creation consumes that witness exactly once;
-reopening accepts no replacement initial state. See
-[`docs/GENESIS_AUTHORIZATION.md`](docs/GENESIS_AUTHORIZATION.md).
-
-Projects that publish an authenticated index should additionally use the
-[`authenticated-authority` boundary](docs/AUTHENTICATED_AUTHORITY_BOUNDARY.md).
-Raw sparse-tree plans are reference data. The production-facing authenticated
-port accepts only an exact catalog-authorized candidate whose projector evidence
-and per-transition projection relation have passed the setup-owned checks.
-
-Persistent backends are sealed behind a pure logical-map interface. Updates return new structurally shared versions; equality and canonical bytes depend on logical entries only. Map-entry ordering bytes are derived from the semantic key, the explicit persistent-entry boundary rejects mismatched key bytes, and materialization exposes only fallible APIs.
-
-Concrete runtimes, databases, and synthesis engines remain outside the semantic authority boundary. Their adapters propose or store data; pure validators decide whether that data is admissible. A structurally valid `CommitBundle` remains reference data and cannot enter the production SQLite commit port directly.
-
-The [design and algorithm review](docs/DESIGN_IMPROVEMENTS.md) explains recent
-performance changes, preserved acceptance rules, measurements and tradeoffs.
-
-The `zeno-fcis-domain` layer makes global composition executable without
-introducing hidden shared state. Every component receives only its fixed state
-row, one command, one context, and fixed typed input ports. The complete route
-matrix is derived from `CompositionSpec`; state and invocation matrices bind
-the exact executable composition and cannot be replayed across another
-same-shaped topology. See
-[`docs/FIXED_STATE_DOMAIN_MACHINES.md`](docs/FIXED_STATE_DOMAIN_MACHINES.md).
-The production bridge is documented in
-[`docs/COMPOSED_DOMAIN_PROGRAM.md`](docs/COMPOSED_DOMAIN_PROGRAM.md).
-Its aggregate-root projection paths are required to equal the exact state paths
-declared by the corresponding machine interfaces; the bounded law and its
-nonclaims are documented in
-[`docs/COMPOSED_ROOT_PROJECTION_CONFORMANCE.md`](docs/COMPOSED_ROOT_PROJECTION_CONFORMANCE.md).
+Existing package names and optional compatibility data do not enlarge the
+supported V2 execution scope. The [32-entry ledger](docs/V2_LEDGER_SCOPE.md)
+records which obligations remain required and which broader requirements were
+withdrawn. QEMU, packaging, private historical-oracle transport and version
+cutover have a separate release track.
 
 ## Verification
 
@@ -607,23 +550,16 @@ binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 
 ## Assurance posture
 
-Version `1.1.0` extends the stable Cargo API with checked finite exit plans and
-bounded ordered preparation. See [V1.1 release notes](docs/V1_1_RELEASE_NOTES.md)
-and the [V1.1 release checklist](docs/V1_1_RELEASE_CHECKLIST.md).
-The release's evidence covers the declared library, packaging and integration
-checks. The pinned ZenoDEX single-vault zUSD mount is bounded executable
-refinement evidence. Production
-value-moving promotion still requires each profile's independently reviewed
-laws and evidence, qualified concrete storage and outbox-delivery interpreters,
-deployment qualification, and an exact-head audit. This release does not claim
-audit completion, project-specific economic correctness, side-channel
-resistance, full ZenoDEX coverage, or approval of an external JMT, ESSO,
-solver, prover, compiler, or LLM runtime.
+V2 remains under construction. Its intended claim is executable conformance to
+a reviewed contract across the supported domain, under named trusted
+assumptions. It is not a proof that the requirements match human intent, that
+external observations are true, or that a destination performs an effect
+correctly. A passing stage check is not a release receipt.
 
-The V1 execution model is explicit: `CommitPlan` is non-executable committed
-evidence, while every external operation and every value movement uses the
-durable replay-safe outbox. See the
-[execution-model specification](docs/COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md).
+The existing `1.1.0` release and its [release notes](docs/V1_1_RELEASE_NOTES.md)
+have their own historical scope. This development branch changes the public
+execution API. Source qualification, exact-head CI, packaging, owner signing
+and publication remain distinct steps; this README announces no V2 release.
 
 ## License
 

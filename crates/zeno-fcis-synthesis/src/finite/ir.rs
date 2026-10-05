@@ -1,5 +1,6 @@
 use alloc::{vec, vec::Vec};
-use zeno_fcis_value::Value;
+use zeno_fcis_codec::EncodeError;
+use zeno_fcis_value::{Value, ValueLimits};
 
 use super::Error;
 use super::evaluation::admission::{self, AdmissionFailure};
@@ -11,12 +12,12 @@ pub use super::evaluation::{Domain, MAX_FIELDS, MAX_NODES, Op};
 pub const PROFILE: &str = "zeno-fcis/finite-i64/1";
 
 impl Domain {
-    pub(super) fn value(self) -> Value {
+    pub(super) fn value(self) -> Result<Value, EncodeError> {
         let (min, max) = self.bounds();
         tuple(vec![
-            Value::Bool(self.boolean()),
-            Value::I128(min.into()),
-            Value::I128(max.into()),
+            Value::boolean(self.boolean()),
+            Value::signed(min.into()),
+            Value::signed(max.into()),
         ])
     }
 }
@@ -25,11 +26,11 @@ impl Op {
     pub(super) fn kind(&self, inputs: &[Domain], previous: &[bool]) -> Result<bool, Error> {
         admission::kind(self, inputs, previous).map_err(admission_error)
     }
-    pub(super) fn value(&self) -> Value {
+    pub(super) fn value(&self) -> Result<Value, EncodeError> {
         let ints = |tag: i128, args: &[i128]| {
             tuple(
-                core::iter::once(Value::I128(tag))
-                    .chain(args.iter().copied().map(Value::I128))
+                core::iter::once(Value::signed(tag))
+                    .chain(args.iter().copied().map(Value::signed))
                     .collect(),
             )
         };
@@ -144,18 +145,23 @@ impl Program {
         })
     }
     /// Canonical, language-neutral program data, including the semantic profile.
-    #[must_use]
-    pub fn value(&self) -> Value {
+    pub fn value(&self) -> Result<Value, EncodeError> {
         tuple(vec![
-            Value::Text(PROFILE.into()),
-            schema_value(&self.inputs, &self.outputs),
-            tuple(self.nodes.iter().map(Op::value).collect()),
+            Value::text_ascii_with_limits(PROFILE.into(), ValueLimits::default())
+                .map_err(EncodeError::InvalidValue)?,
+            schema_value(&self.inputs, &self.outputs)?,
+            tuple(
+                self.nodes
+                    .iter()
+                    .map(Op::value)
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?,
             tuple(
                 self.roots
                     .iter()
-                    .map(|id| Value::U128((*id).into()))
+                    .map(|id| Value::unsigned((*id).into()))
                     .collect(),
-            ),
+            )?,
         ])
     }
 }
@@ -189,14 +195,24 @@ pub(super) fn validate_roots(
 ) -> Result<(), Error> {
     admission::validate_roots(outputs, roots, kinds).map_err(admission_error)
 }
-pub(super) fn schema_value(inputs: &[Domain], outputs: &[Domain]) -> Value {
+pub(super) fn schema_value(inputs: &[Domain], outputs: &[Domain]) -> Result<Value, EncodeError> {
     tuple(vec![
-        tuple(inputs.iter().map(|d| d.value()).collect()),
-        tuple(outputs.iter().map(|d| d.value()).collect()),
+        tuple(
+            inputs
+                .iter()
+                .map(|d| d.value())
+                .collect::<Result<Vec<_>, _>>()?,
+        )?,
+        tuple(
+            outputs
+                .iter()
+                .map(|d| d.value())
+                .collect::<Result<Vec<_>, _>>()?,
+        )?,
     ])
 }
-pub(super) fn tuple(values: Vec<Value>) -> Value {
-    Value::Tuple(values.into_boxed_slice())
+pub(super) fn tuple(values: Vec<Value>) -> Result<Value, EncodeError> {
+    Value::tuple(values).map_err(EncodeError::InvalidValue)
 }
 
 #[cfg(test)]

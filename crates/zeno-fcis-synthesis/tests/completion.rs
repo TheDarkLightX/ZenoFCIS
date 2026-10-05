@@ -12,23 +12,25 @@ use zeno_fcis_value::{Value, zcve};
 const PLAN_PROFILE: &str = "zeno-fcis/completion-plan/1";
 
 fn tuple(values: Vec<Value>) -> Value {
-    Value::Tuple(values.into_boxed_slice())
+    Value::tuple(values).unwrap_or_else(|error| panic!("value fixture: {error}"))
 }
 
 fn plan_value(plan: &CompletionPlan) -> Value {
     tuple(vec![
-        Value::Text(PLAN_PROFILE.into()),
-        Value::Bytes(plan.problem_hash.as_bytes().to_vec().into_boxed_slice()),
+        Value::text_ascii(String::from(PLAN_PROFILE))
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::bytes(plan.problem_hash.as_bytes().to_vec())
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
         tuple(
             plan.steps
                 .iter()
                 .map(|row| {
                     tuple(vec![
-                        Value::U128(row.remaining.into()),
+                        Value::unsigned(row.remaining.into()),
                         tuple(
                             row.command
                                 .iter()
-                                .map(|v| Value::I128((*v).into()))
+                                .map(|v| Value::signed((*v).into()))
                                 .collect(),
                         ),
                     ])
@@ -38,15 +40,20 @@ fn plan_value(plan: &CompletionPlan) -> Value {
     ])
 }
 
-fn fields(value: &mut Value) -> &mut [Value] {
-    let Value::Tuple(values) = value else {
+fn fields(value: &Value) -> &[Value] {
+    let zeno_fcis_value::ValueRef::Tuple(values) = value.view() else {
         panic!("expected a test tuple")
     };
     values
 }
 
-fn row_fields(value: &mut Value, row: usize) -> &mut [Value] {
-    fields(&mut fields(&mut fields(value)[2])[row])
+fn replace_at(value: &Value, path: &[usize], replacement: Value) -> Value {
+    let Some((&first, rest)) = path.split_first() else {
+        return replacement;
+    };
+    let mut children = fields(value).to_vec();
+    children[first] = replace_at(&children[first], rest, replacement);
+    tuple(children)
 }
 
 fn terminal(domain: Domain, value: i64) -> Program {
@@ -417,7 +424,8 @@ fn bindings_include_resource_policy_and_program_semantics() {
 
 #[test]
 fn canonical_state_size_is_the_actual_codec_size() {
-    let wire = Value::Tuple(vec![Value::I128(3)].into_boxed_slice())
+    let wire = Value::tuple(vec![Value::signed(3)])
+        .unwrap_or_else(|error| panic!("value fixture: {error}"))
         .canonical_bytes()
         .unwrap();
     let (step, terminal) = capacity_model(true);
@@ -529,67 +537,56 @@ fn portable_import_rejects_truncation_trailing_data_and_noncanonical_values() {
 fn portable_import_requires_exact_shapes_tags_and_integer_ranges() {
     let model = problem();
     let original = plan_value(&find_completion(&model).unwrap());
-    let mut changes = vec![Value::Unit];
-    let Value::Tuple(top) = original.clone() else {
-        unreachable!()
-    };
-    changes.push(Value::Vector(top.clone()));
+    let mut changes = vec![Value::unit()];
+    let top = fields(&original).to_vec();
+    changes
+        .push(Value::vector(top.clone()).unwrap_or_else(|error| panic!("value fixture: {error}")));
     changes.push(tuple(top[..2].to_vec()));
     let mut extra = top.to_vec();
-    extra.push(Value::Unit);
+    extra.push(Value::unit());
     changes.push(tuple(extra));
     for value in [
-        Value::Unit,
-        Value::Text("binding".into()),
-        Value::Bytes(vec![1; 31].into_boxed_slice()),
+        Value::unit(),
+        Value::text_ascii(String::from("binding"))
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::bytes(vec![1; 31]).unwrap_or_else(|error| panic!("value fixture: {error}")),
     ] {
-        let mut changed = original.clone();
-        fields(&mut changed)[1] = value;
-        changes.push(changed);
+        changes.push(replace_at(&original, &[1], value));
     }
     for value in [
-        Value::Bool(true),
-        Value::I128(1),
-        Value::Text("1".into()),
-        Value::U128(u128::from(u32::MAX) + 1),
+        Value::boolean(true),
+        Value::signed(1),
+        Value::text_ascii(String::from("1"))
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::unsigned(u128::from(u32::MAX) + 1),
         // Truncation would recover row 1's valid rank and silently admit it.
-        Value::U128((1u128 << 32) + 1),
+        Value::unsigned((1u128 << 32) + 1),
     ] {
-        let mut changed = original.clone();
-        row_fields(&mut changed, 1)[0] = value;
-        changes.push(changed);
+        changes.push(replace_at(&original, &[2, 1, 0], value));
     }
     for value in [
-        Value::Bool(true),
-        Value::U128(1),
-        Value::Text("1".into()),
-        Value::I128(i128::from(i64::MAX) + 1),
-        Value::I128(i128::from(i64::MIN) - 1),
+        Value::boolean(true),
+        Value::unsigned(1),
+        Value::text_ascii(String::from("1"))
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::signed(i128::from(i64::MAX) + 1),
+        Value::signed(i128::from(i64::MIN) - 1),
         // Truncation would recover the admitted Boolean exit command 1.
-        Value::I128((1i128 << 64) + 1),
+        Value::signed((1i128 << 64) + 1),
     ] {
-        let mut changed = original.clone();
-        row_fields(&mut changed, 1)[1] = tuple(vec![value]);
-        changes.push(changed);
+        changes.push(replace_at(&original, &[2, 1, 1], tuple(vec![value])));
     }
     for value in [
-        Value::Vector(vec![Value::I128(1)].into_boxed_slice()),
+        Value::vector(vec![Value::signed(1)])
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
         tuple(vec![]),
-        tuple(vec![Value::I128(1), Value::I128(1)]),
+        tuple(vec![Value::signed(1), Value::signed(1)]),
     ] {
-        let mut changed = original.clone();
-        row_fields(&mut changed, 1)[1] = value;
-        changes.push(changed);
+        changes.push(replace_at(&original, &[2, 1, 1], value));
     }
-    let mut changed = original.clone();
-    fields(&mut fields(&mut changed)[2])[1] = Value::Unit;
-    changes.push(changed);
-    let mut changed = original;
-    let Value::Tuple(rows) = &mut fields(&mut changed)[2] else {
-        unreachable!()
-    };
-    *rows = rows[..3].to_vec().into_boxed_slice();
-    changes.push(changed);
+    changes.push(replace_at(&original, &[2, 1], Value::unit()));
+    let rows = fields(&fields(&original)[2]);
+    changes.push(replace_at(&original, &[2], tuple(rows[..3].to_vec())));
     for changed in changes {
         assert!(verify_completion_bytes(&model, &changed.canonical_bytes().unwrap()).is_err());
     }
@@ -599,8 +596,12 @@ fn portable_import_requires_exact_shapes_tags_and_integer_ranges() {
 fn portable_import_cannot_choose_its_profile_problem_or_progress_rules() {
     let model = problem();
     let original = find_completion(&model).unwrap();
-    let mut wrong_profile = plan_value(&original);
-    fields(&mut wrong_profile)[0] = Value::Text("zeno-fcis/completion-plan/0".into());
+    let wrong_profile = replace_at(
+        &plan_value(&original),
+        &[0],
+        Value::text_ascii(String::from("zeno-fcis/completion-plan/0"))
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+    );
     assert!(matches!(
         verify_completion_bytes(&model, &wrong_profile.canonical_bytes().unwrap()),
         Err(CompletionError::InvalidPlan {
@@ -681,7 +682,7 @@ fn portable_import_bounds_bytes_nodes_depth_collections_and_payloads() {
                 if attempted == count
         ));
     }
-    let mut deep = Value::Unit;
+    let mut deep = Value::unit();
     for _ in 0..5 {
         deep = tuple(vec![deep]);
     }
@@ -692,7 +693,7 @@ fn portable_import_bounds_bytes_nodes_depth_collections_and_payloads() {
             attempted: 5
         }))
     ));
-    let too_many_nodes = tuple((0..4).map(|_| tuple(vec![Value::Unit; 4])).collect());
+    let too_many_nodes = tuple((0..4).map(|_| tuple(vec![Value::unit(); 4])).collect());
     assert!(matches!(
         verify_completion_bytes(&model, &too_many_nodes.canonical_bytes().unwrap()),
         Err(CompletionError::Decoding(DecodeError::NodeLimit {
@@ -706,7 +707,12 @@ fn portable_import_bounds_bytes_nodes_depth_collections_and_payloads() {
         verify_completion_bytes(&model, &blob),
         Err(CompletionError::Decoding(DecodeError::BlobLimit { .. }))
     ));
-    let payloads = tuple(vec![Value::Bytes(vec![0; 32].into_boxed_slice()); 2]);
+    let payloads = tuple(vec![
+        Value::bytes(vec![0; 32]).unwrap_or_else(
+            |error| panic!("value fixture: {error}")
+        );
+        2
+    ]);
     assert!(matches!(
         verify_completion_bytes(&model, &payloads.canonical_bytes().unwrap()),
         Err(CompletionError::Decoding(DecodeError::PayloadLimit { .. }))

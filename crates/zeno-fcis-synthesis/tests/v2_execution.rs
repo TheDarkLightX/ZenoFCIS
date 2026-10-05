@@ -48,7 +48,7 @@ fn public_byte_readers_preserve_existing_canonical_integer_payloads() {
     use zeno_fcis_value::Value;
 
     for value in [i128::MIN, i128::MIN + 1, -1, 0, 1, i128::MAX - 1, i128::MAX] {
-        let encoded = Value::I128(value)
+        let encoded = Value::signed(value)
             .canonical_bytes()
             .unwrap_or_else(|error| panic!("canonical integer: {error}"));
         assert_eq!(encoded.len(), 17);

@@ -1,0 +1,24 @@
+{
+  "checks": {
+    "links_exist": true,
+    "native_counts_match_documentation": true,
+    "native_source_manifest_still_matches": true
+  },
+  "date": "2026-10-04",
+  "discovery_provenance": {
+    "method": "neurosymbolic optimizer using e-graphs",
+    "search_replayed": false,
+    "source": "owner statement in this session",
+    "status": "reported"
+  },
+  "documentation_sha256": {
+    "docs/V2_1_FACTORY_PLAN.md": "b3f416449a6a5324c02129cefd099ef28d541e1c9d61ce3809bd676d54ed0e90",
+    "docs/V2_1_TRANSFORM_DESIGN.md": "18973a7312ada60e5b59c12697c04edfbe0c1760f7a6db40e69000ec922b51c0",
+    "docs/research/V2_1_CHECKED_OPTIMIZATION_EVIDENCE.md": "f1ffe481b7ddbdead630a379bcdcfaa37c8479908eb02ae69bef295af7c6d126"
+  },
+  "feature": "V2.1 track 6 transform/optimize and neurosymbolic proposal/check loop",
+  "native_evidence_sha256": "34f74d157e4ad7350865723e65b1937325a4ec873d97f0304a531a7018e0967e",
+  "product_feature_status": "planned with native research evidence",
+  "runtime_changed": false,
+  "schema": "zeno-fcis/withdrawal-feature-evidence-link/1"
+}

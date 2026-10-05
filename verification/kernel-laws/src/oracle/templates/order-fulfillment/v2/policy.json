@@ -1,0 +1,182 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "order-fulfillment",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "106": [
+      "I128",
+      0,
+      3
+    ],
+    "109": [
+      "Text",
+      1,
+      32
+    ]
+  },
+  "variables": {
+    "status": "pre.100.120",
+    "attempts": "pre.100.121",
+    "action": "command.101.125",
+    "callback": "command.101.126",
+    "caller": "context.102.130",
+    "payment": "action == 151 || action == 152",
+    "sender": "choose(action == 150 || action == 155, 170, choose(payment, 171, 172))",
+    "legal": "(action == 150 && status == 160) || (payment && status == 161) || (action == 153 && status == 162) || (action == 154 && status == 163) || (action == 155 && (status == 160 || status == 161))"
+  },
+  "cases": [
+    {
+      "when": "caller != sender",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!legal",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "payment && callback != attempts",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && attempts == 3",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 161,
+        "121": "attempts + 1"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payment-provider",
+          "payload": {
+            "140": "attempts + 1",
+            "141": 175
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 162,
+        "121": "attempts"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "carrier",
+          "payload": {
+            "145": "attempts"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 152",
+      "class": "CommittedFailure",
+      "reason": 204,
+      "post": {
+        "120": 160,
+        "121": "attempts"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 153",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 163,
+        "121": "attempts"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 154",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 164,
+        "121": "attempts"
+      },
+      "outbox": []
+    },
+    {
+      "when": "status == 160",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 165,
+        "121": "attempts"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 165,
+        "121": "attempts"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payment-provider",
+          "payload": {
+            "140": "attempts",
+            "141": 176
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "120": 160,
+    "121": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AuthoritySubjectRecipient",
+    "503": "AuthoritySubjectRecipient",
+    "504": "AuthoritySubjectRecipient",
+    "505": "AuthoritySubjectRecipient",
+    "506": "CommittedFailureEffects"
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+}

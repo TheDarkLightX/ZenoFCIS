@@ -11,7 +11,7 @@ use core::fmt;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use serde::{Deserialize, Serialize};
-use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::DecisionKind;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_refine::{
@@ -86,7 +86,7 @@ pub fn encode_decision_line(
     decision: &NormalizedDecision,
     limits: JsonLimits,
 ) -> Result<Vec<u8>, AdapterError> {
-    let wire = WireDecision::from_decision(decision);
+    let wire = WireDecision::from_decision(decision)?;
     let mut bytes = serde_json::to_vec(&wire).map_err(AdapterError::Json)?;
     bytes.push(b'\n');
     validate_single_line(&bytes, limits.max_line_bytes)?;
@@ -116,7 +116,7 @@ pub fn compare_case(
     model: &NormalizedDecision,
     runtime: &NormalizedDecision,
 ) -> Result<MountedCase, AdapterError> {
-    let input_hash = hash_bytes("zeno-fcis/mounted-input", canonical_input)?;
+    let input_hash = hash_bytes(zeno_fcis_codec::domains::MOUNTED_INPUT, canonical_input)?;
     let report = compare_exact(model, runtime);
     let replay = if report.is_exact() {
         None
@@ -213,14 +213,15 @@ impl DecisionMismatchRecord {
     /// Returns a content commitment for persistence and deduplication.
     pub fn commitment(&self) -> Result<Hash32, AdapterError> {
         hash_bytes(
-            "zeno-fcis/mounted-counterexample",
+            zeno_fcis_codec::domains::MOUNTED_COUNTEREXAMPLE,
             &self.canonical_bytes().map_err(AdapterError::Encode)?,
         )
     }
 }
 
-impl CanonicalEncode for DecisionMismatchRecord {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DecisionMismatchRecord {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.case_id.as_bytes());
         output.extend_from_slice(self.input_hash.as_bytes());
         output.extend_from_slice(self.model_hash.as_bytes());
@@ -233,12 +234,19 @@ impl CanonicalEncode for DecisionMismatchRecord {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Commits the complete normalized decision, including receipt and bundle bytes.
 pub fn decision_commitment(decision: &NormalizedDecision) -> Result<Hash32, AdapterError> {
     let bytes = decision.canonical_bytes().map_err(AdapterError::Encode)?;
-    hash_bytes("zeno-fcis/normalized-decision", &bytes)
+    hash_bytes(zeno_fcis_codec::domains::NORMALIZED_DECISION, &bytes)
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -263,10 +271,10 @@ struct WireDecision {
 }
 
 impl WireDecision {
-    fn from_decision(decision: &NormalizedDecision) -> Self {
+    fn from_decision(decision: &NormalizedDecision) -> Result<Self, AdapterError> {
         let artifacts = decision.artifacts();
-        Self {
-            kind: kind_label(artifacts.kind).to_owned(),
+        Ok(Self {
+            kind: kind_label(artifacts.kind)?.to_owned(),
             reason_code: artifacts.reason_code.as_deref().map(str::to_owned),
             profile_hash: artifacts.profile_hash.to_string(),
             command_hash: artifacts.command_hash.to_string(),
@@ -282,7 +290,7 @@ impl WireDecision {
             outbox_plan: artifacts.outbox_plan_bytes.as_deref().map(encode_hex),
             receipt: encode_hex(&artifacts.receipt_bytes),
             bundle: artifacts.bundle_bytes.as_deref().map(encode_hex),
-        }
+        })
     }
 
     fn into_decision(self, limits: JsonLimits) -> Result<NormalizedDecision, AdapterError> {
@@ -336,11 +344,12 @@ fn parse_kind(value: &str) -> Result<DecisionKind, AdapterError> {
     }
 }
 
-const fn kind_label(kind: DecisionKind) -> &'static str {
+const fn kind_label(kind: DecisionKind) -> Result<&'static str, AdapterError> {
     match kind {
-        DecisionKind::Accept => "accept",
-        DecisionKind::Reject => "reject",
-        DecisionKind::CommittedFailure => "committed_failure",
+        DecisionKind::Accept => Ok("accept"),
+        DecisionKind::Reject => Ok("reject"),
+        DecisionKind::CommittedFailure => Ok("committed_failure"),
+        _ => Err(AdapterError::UnknownDecisionKind),
     }
 }
 
@@ -390,8 +399,7 @@ fn encode_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn hash_bytes(domain: &'static str, bytes: &[u8]) -> Result<Hash32, AdapterError> {
-    let domain = Domain::new(domain, 1).map_err(AdapterError::Encode)?;
+fn hash_bytes(domain: Domain<'static>, bytes: &[u8]) -> Result<Hash32, AdapterError> {
     commitment::<RustCryptoSha256>(domain, bytes).map_err(AdapterError::Encode)
 }
 
@@ -418,6 +426,7 @@ const fn mismatch_tag(mismatch: Mismatch) -> u8 {
 
 /// Strict mounted-adapter failure.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum AdapterError {
     /// Input or output exceeds the declared line budget.
     LineLength,

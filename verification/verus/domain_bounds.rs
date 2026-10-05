@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 #![cfg_attr(verus_keep_ghost, feature(proc_macro_hygiene))]
 
-#[path = "../../crates/zeno-fcis-authority/src/finite_bounds.rs"]
+#[path = "../kernel-laws/src/oracle/authority/finite_bounds.rs"]
 mod finite_bounds;
 
 #[cfg(test)]

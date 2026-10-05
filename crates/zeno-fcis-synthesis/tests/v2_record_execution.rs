@@ -1,9 +1,8 @@
 //! Public raw-record composition against actual canonical Value bytes.
 use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_synthesis::finite::{
-    Domain, Op, V2InputBinding, V2InputField, V2InputLeaf, V2InputVariant, V2RawRecord,
-    V2RecordExecutionFailure, V2RecordFailure, V2RecordInvocation, V2RecordSource, V2Resource,
-    V2ScalarProgram, execute_records_v2, v2_zero_limits,
+    Domain, Op, V2InputField, V2InputLeaf, V2InputVariant, V2Resource, V2ScalarProgram,
+    v2_composition as c, v2_laws as l, v2_zero_limits,
 };
 use zeno_fcis_value::{Field, Value};
 
@@ -11,24 +10,11 @@ use zeno_fcis_value::{Field, Value};
 fn canonical_original_records_preserve_binding_order_and_shared_budget() {
     let values = [
         Value::record_canonical(vec![
-            Field::new(7, Value::I128(-9)),
-            Field::new(32, Value::Bool(true)),
+            Field::new(7, Value::signed(-9)),
+            Field::new(32, Value::boolean(true)),
         ]),
-        Value::record_canonical(vec![Field::new(
-            7,
-            Value::Enum {
-                type_id: u32::MAX,
-                variant: u16::MAX,
-            },
-        )]),
-        Value::record_canonical(vec![Field::new(
-            u16::MAX,
-            Value::Sum {
-                type_id: 0,
-                variant: 7,
-                payload: None,
-            },
-        )]),
+        Value::record_canonical(vec![Field::new(7, Value::enumeration(u32::MAX, u16::MAX))]),
+        Value::record_canonical(vec![Field::new(u16::MAX, Value::sum(0, 7, None))]),
     ];
     let bytes: [Vec<u8>; 3] = values.map(|value| {
         value
@@ -76,36 +62,22 @@ fn canonical_original_records_preserve_binding_order_and_shared_budget() {
             ],
         },
     }];
-    let inv = V2RecordInvocation {
-        state: V2RawRecord {
-            bytes: &bytes[0],
-            fields: &state,
-        },
-        command: V2RawRecord {
-            bytes: &bytes[1],
-            fields: &command,
-        },
-        context: V2RawRecord {
-            bytes: &bytes[2],
-            fields: &context,
-        },
-    };
     let bindings = [
-        V2InputBinding {
-            source: V2RecordSource::Context,
-            field: u16::MAX,
+        c::Binding {
+            source: c::Source::Context,
+            selector: c::Selector::Field(u16::MAX),
         },
-        V2InputBinding {
-            source: V2RecordSource::State,
-            field: 32,
+        c::Binding {
+            source: c::Source::State,
+            selector: c::Selector::Field(32),
         },
-        V2InputBinding {
-            source: V2RecordSource::Command,
-            field: 7,
+        c::Binding {
+            source: c::Source::Command,
+            selector: c::Selector::Field(7),
         },
-        V2InputBinding {
-            source: V2RecordSource::State,
-            field: 7,
+        c::Binding {
+            source: c::Source::State,
+            selector: c::Selector::Field(7),
         },
     ];
     let domains = [
@@ -120,71 +92,216 @@ fn canonical_original_records_preserve_binding_order_and_shared_budget() {
         nodes: &[Op::Input(0), Op::Input(1), Op::Input(2), Op::Input(3)],
         roots: &[0, 1, 2, 3],
     };
+
+    let output_types = [
+        V2InputLeaf::I128 { min: 10, max: 11 },
+        V2InputLeaf::Bool,
+        V2InputLeaf::Enum {
+            type_id: u32::MAX,
+            min: -5,
+            max: -4,
+            variants: vec![
+                V2InputVariant {
+                    id: u16::MAX,
+                    code: -4,
+                },
+                V2InputVariant { id: 0, code: -5 },
+            ],
+        },
+        V2InputLeaf::I128 { min: -9, max: 9 },
+    ];
+    let assignments = [
+        c::Assignment {
+            field: 7,
+            value: c::Expr::Output(3),
+            domain: c::Domain::I128 { min: -9, max: 9 },
+        },
+        c::Assignment {
+            field: 32,
+            value: c::Expr::Output(1),
+            domain: c::Domain::Bool,
+        },
+    ];
+    let payload = [c::PayloadField {
+        field: 7,
+        value: c::Expr::Output(2),
+    }];
+    let deliveries = [c::DeliveryPlan {
+        ordinal: 0,
+        channel: 7,
+        when: c::Expr::Constant(c::Atom::Bool(true)),
+        destination: c::Expr::Constant(c::Atom::Bool(false)),
+        payload: &payload,
+        idempotency: c::Expr::Constant(c::Atom::Bool(true)),
+    }];
+    let branches = [
+        c::Branch {
+            code: 10,
+            class: c::Class::Accept,
+            reason: None,
+            assignments: &assignments,
+            effects: &[],
+            outbox: &[],
+        },
+        c::Branch {
+            code: 11,
+            class: c::Class::Accept,
+            reason: None,
+            assignments: &assignments,
+            effects: &deliveries,
+            outbox: &[],
+        },
+    ];
+    let payload_types = [c::TypedField {
+        field: 7,
+        domain: c::Domain::Enum {
+            type_id: u32::MAX,
+            variants: &[0, u16::MAX],
+        },
+    }];
+    let channels = [c::Channel {
+        id: 7,
+        destination: c::Domain::Bool,
+        payload: &payload_types,
+        idempotency: c::Domain::Bool,
+    }];
+    // These fixture laws satisfy the complete route's mandatory families; the
+    // assertions below independently check the record semantics under test.
+    let predicate = [l::Op::Literal(l::Atom::Bool(true))];
+    let laws: Vec<_> = [
+        (1, l::Kind::StateInvariant, l::Scope::Committing, true),
+        (2, l::Kind::RejectNoAuthority, l::Scope::Reject, false),
+        (
+            3,
+            l::Kind::CommittedFailureEffects,
+            l::Scope::CommittedFailure,
+            false,
+        ),
+        (4, l::Kind::DecisionConformance, l::Scope::Always, false),
+        (5, l::Kind::InitialCondition, l::Scope::Always, true),
+    ]
+    .into_iter()
+    .map(|(id, kind, scope, genesis)| l::Law {
+        id,
+        kind,
+        scope,
+        genesis,
+        program: l::Program {
+            nodes: &predicate,
+            root: 0,
+        },
+    })
+    .collect();
     let total = bytes.iter().map(|b| b.len() as u64).sum();
     let limits = v2_zero_limits()
         .with_limit(V2Resource::Byte, total)
         .with_limit(V2Resource::Read, 4)
-        .with_limit(V2Resource::Step, 4);
-    let complete = execute_records_v2(&inv, &program, &bindings, limits);
-    assert_eq!(complete.usage().used(V2Resource::Byte), total);
-    assert_eq!(complete.usage().used(V2Resource::Read), 4);
-    assert_eq!(complete.usage().used(V2Resource::Step), 4);
-    assert_eq!(
-        complete
-            .attempts(V2RecordSource::Command)
-            .iter()
-            .map(|a| (a.field_id(), a.permitted()))
-            .collect::<Vec<_>>(),
-        [(7, true)]
-    );
-    assert_eq!(complete.into_parts().0, Ok(vec![11, 1, -4, -9]));
-    let refused = execute_records_v2(
-        &inv,
-        &program,
-        &bindings,
-        limits.with_limit(V2Resource::Read, 3),
-    );
-    assert_eq!(refused.usage().used(V2Resource::Byte), total);
-    assert_eq!(refused.usage().used(V2Resource::Read), 3);
-    assert_eq!(refused.usage().used(V2Resource::Step), 0);
-    assert_eq!(refused.attempts(V2RecordSource::State).len(), 2);
-    assert_eq!(
-        refused
-            .attempts(V2RecordSource::Context)
-            .iter()
-            .map(|a| (a.field_id(), a.permitted()))
-            .collect::<Vec<_>>(),
-        [(u16::MAX, false)]
-    );
-    assert!(
-        matches!(refused.into_parts().0,Err(V2RecordExecutionFailure::Record { source:V2RecordSource::Context,refusal:V2RecordFailure::Budget(error) })
-        if error.resource==V2Resource::Read && error.limit==3 && error.attempted==4)
-    );
-    let step = execute_records_v2(
-        &inv,
-        &program,
-        &bindings,
-        limits.with_limit(V2Resource::Step, 3),
-    );
+        .with_limit(V2Resource::Step, 6)
+        .with_limit(V2Resource::Candidate, 1)
+        .with_limit(V2Resource::Write, 2)
+        .with_limit(V2Resource::Effect, 1);
+    let mut descriptor = c::Descriptor {
+        state: c::Schema::Record(&state),
+        command: c::Schema::Record(&command),
+        context: c::Schema::Record(&context),
+        program,
+        bindings: &bindings,
+        output_types: &output_types,
+        decision_output: 0,
+        branches: &branches,
+        reasons: &[],
+        channels: &channels,
+        laws: &laws,
+        required: &[],
+        limits,
+    };
+    let raw = c::Raw {
+        state: &bytes[0],
+        command: &bytes[1],
+        context: &bytes[2],
+    };
+    {
+        let bound = c::bind(&descriptor).unwrap_or_else(|e| panic!("composition admission: {e:?}"));
+        let complete = bound.execute(raw);
+        assert_eq!(complete.usage().used(V2Resource::Byte), total);
+        assert_eq!(complete.usage().used(V2Resource::Read), 4);
+        assert_eq!(complete.usage().used(V2Resource::Step), 6);
+        assert_eq!(
+            complete
+                .reads()
+                .iter()
+                .filter(|r| r.source == 1)
+                .map(|r| (r.selector, r.permitted))
+                .collect::<Vec<_>>(),
+            [(c::Selector::Field(7), true)]
+        );
+        let candidate = complete
+            .result()
+            .unwrap_or_else(|e| panic!("complete canonical records: {e:?}"));
+        assert_eq!(
+            candidate.post(),
+            [
+                c::Field {
+                    id: 7,
+                    value: c::Atom::I128(-9)
+                },
+                c::Field {
+                    id: 32,
+                    value: c::Atom::Bool(true)
+                }
+            ]
+        );
+        assert_eq!(
+            candidate.effects()[0].payload,
+            [c::Field {
+                id: 7,
+                value: c::Atom::Enum {
+                    type_id: u32::MAX,
+                    variant: u16::MAX
+                }
+            }]
+        );
+        // The retained four-output tuple oracle lives at the producer ABI/evaluator
+        // boundary; this public route also performs a complete candidate stage
+        // and the two applicable one-instruction laws (four + two steps).
+        assert_eq!(complete.usage().used(V2Resource::Candidate), 1);
+        assert_eq!(complete.usage().used(V2Resource::Write), 2);
+        assert_eq!(complete.usage().used(V2Resource::Effect), 1);
+        for resource in [V2Resource::WitnessByte, V2Resource::Depth] {
+            assert_eq!(complete.usage().used(resource), 0);
+        }
+    }
+    descriptor.limits = limits.with_limit(V2Resource::Read, 3);
+    {
+        let bound =
+            c::bind(&descriptor).unwrap_or_else(|e| panic!("bounded read admission: {e:?}"));
+        let refused = bound.execute(raw);
+        assert_eq!(refused.usage().used(V2Resource::Byte), total);
+        assert_eq!(refused.usage().used(V2Resource::Read), 3);
+        assert_eq!(refused.usage().used(V2Resource::Step), 0);
+        assert_eq!(refused.reads().iter().filter(|r| r.source == 0).count(), 2);
+        assert_eq!(
+            refused
+                .reads()
+                .iter()
+                .filter(|r| r.source == 2)
+                .map(|r| (r.selector, r.permitted))
+                .collect::<Vec<_>>(),
+            [(c::Selector::Field(u16::MAX), false)]
+        );
+        let Err(c::Failure::Ingress(2, refusal)) = refused.result() else {
+            panic!("expected context ingress refusal");
+        };
+        assert_eq!(
+            format!("{refusal:?}"),
+            "Record(Budget(MeterFailure { resource: Read, limit: 3, attempted: 4, overflow: false }))"
+        );
+    }
+    descriptor.limits = limits.with_limit(V2Resource::Step, 3);
+    let bound = c::bind(&descriptor).unwrap_or_else(|e| panic!("bounded step admission: {e:?}"));
+    let step = bound.execute(raw);
     assert_eq!(step.usage().used(V2Resource::Byte), total);
     assert_eq!(step.usage().used(V2Resource::Read), 4);
     assert_eq!(step.usage().used(V2Resource::Step), 3);
-    assert!(matches!(
-        step.into_parts().0,
-        Err(V2RecordExecutionFailure::Execution(_))
-    ));
-    for resource in [
-        V2Resource::Candidate,
-        V2Resource::Write,
-        V2Resource::Effect,
-        V2Resource::WitnessByte,
-        V2Resource::Depth,
-    ] {
-        assert_eq!(
-            execute_records_v2(&inv, &program, &bindings, limits)
-                .usage()
-                .used(resource),
-            0
-        );
-    }
+    assert!(matches!(step.result(), Err(c::Failure::Execution(_))));
 }

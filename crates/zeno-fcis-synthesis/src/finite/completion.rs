@@ -10,8 +10,10 @@ use super::{
 use crate::{SynthesisError, hash_bytes, hash_canonical};
 use alloc::{collections::VecDeque, vec, vec::Vec};
 use core::fmt;
-use zeno_fcis_codec::{CanonicalEncode, DecodeError, DecodeLimits, Hash32, decode_value};
-use zeno_fcis_value::{Value, ValueLimits};
+use zeno_fcis_codec::{
+    CanonicalEncode, DecodeError, DecodeLimits, EncodeError, Hash32, decode_value,
+};
+use zeno_fcis_value::{Value, ValueLimits, ValueRef};
 
 const MAX_POLICY_BYTES: u64 = 16 * 1024 * 1024;
 const PLAN_PROFILE: &str = "zeno-fcis/completion-plan/1";
@@ -44,6 +46,7 @@ impl Default for CompletionLimits {
 
 /// Rejected input or evidence; none of these results establishes completion.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CompletionError {
     /// Invalid finite model shape or configured limit.
     Invalid(&'static str),
@@ -88,6 +91,11 @@ impl std::error::Error for CompletionError {}
 impl From<SynthesisError> for CompletionError {
     fn from(error: SynthesisError) -> Self {
         Self::Encoding(error)
+    }
+}
+impl From<EncodeError> for CompletionError {
+    fn from(error: EncodeError) -> Self {
+        Self::Encoding(SynthesisError::Encode(error))
     }
 }
 impl From<DecodeError> for CompletionError {
@@ -157,27 +165,30 @@ impl CompletionProblem {
         require("command-bytes", command_size, limits.max_command_bytes)?;
         // Exact canonical overheads are derived with the existing encoder.
         // Scalar positions have fixed-width I128/U128 encoding in this profile.
-        let row_header = value_size(&ir::tuple(vec![Value::U128(0)]))?;
-        let plan_header = value_size(&plan_value(Hash32::ZERO, &[]))?;
+        let row_header = value_size(&ir::tuple(vec![Value::unsigned(0)])?)?;
+        let plan_header = value_size(&plan_value(Hash32::ZERO, &[])?)?;
         let plan_byte_limit = plan_header + states * (row_header + command_size);
         require("policy-bytes", plan_byte_limit, limits.max_policy_bytes)?;
         let source = hash_bytes(
-            "zeno-fcis/completion-checker-source",
+            zeno_fcis_codec::domains::COMPLETION_CHECKER_SOURCE,
             include_bytes!("completion.rs"),
         )?;
-        let evaluator = hash_bytes("zeno-fcis/completion-ir-source", include_bytes!("ir.rs"))?;
+        let evaluator = hash_bytes(
+            zeno_fcis_codec::domains::COMPLETION_IR_SOURCE,
+            include_bytes!("ir.rs"),
+        )?;
         let enumeration = hash_bytes(
-            "zeno-fcis/completion-space-source",
+            zeno_fcis_codec::domains::COMPLETION_SPACE_SOURCE,
             include_bytes!("mod.rs"),
         )?;
         let problem_hash = hash_canonical(
-            "zeno-fcis/completion-problem",
-            &ir::tuple(vec![
-                step.value(),
-                terminal.value(),
-                bytes_value(source),
-                bytes_value(evaluator),
-                bytes_value(enumeration),
+            zeno_fcis_codec::domains::COMPLETION_PROBLEM,
+            ir::tuple(vec![
+                step.value()?,
+                terminal.value()?,
+                bytes_value(source)?,
+                bytes_value(evaluator)?,
+                bytes_value(enumeration)?,
                 ir::tuple(
                     [
                         limits.max_transitions,
@@ -187,10 +198,11 @@ impl CompletionProblem {
                         limits.max_policy_bytes,
                     ]
                     .into_iter()
-                    .map(|v| Value::U128(v.into()))
+                    .map(|v| Value::unsigned(v.into()))
                     .collect(),
-                ),
-            ]),
+                )?,
+            ])?
+            .canonical_bytes(),
         )?;
         Ok(Self {
             step,
@@ -275,7 +287,7 @@ impl VerifiedCompletion {
     /// Import with `verify_completion_bytes` against the consumer's independently
     /// chosen problem. Decoding alone never grants this type.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, CompletionError> {
-        plan_value(self.plan.problem_hash, &self.plan.steps)
+        plan_value(self.plan.problem_hash, &self.plan.steps)?
             .canonical_bytes()
             .map_err(SynthesisError::Encode)
             .map_err(CompletionError::Encoding)
@@ -319,23 +331,22 @@ pub fn verify_completion_bytes(
             },
         },
     )?;
-    let Value::Tuple(fields) = value else {
+    let ValueRef::Tuple(fields) = value.view() else {
         return Err(invalid_plan("plan-shape", None));
     };
-    let [
-        Value::Text(profile),
-        Value::Bytes(binding),
-        Value::Tuple(rows),
-    ] = fields.as_ref()
+    let [profile, binding, rows] = fields else {
+        return Err(invalid_plan("plan-shape", None));
+    };
+    let (ValueRef::Text(profile), ValueRef::Bytes(binding), ValueRef::Tuple(rows)) =
+        (profile.view(), binding.view(), rows.view())
     else {
         return Err(invalid_plan("plan-shape", None));
     };
-    if profile.as_ref() != PLAN_PROFILE {
+    if profile != PLAN_PROFILE {
         return Err(invalid_plan("plan-profile", None));
     }
     let binding = Hash32::new(
         binding
-            .as_ref()
             .try_into()
             .map_err(|_| invalid_plan("problem-binding", None))?,
     );
@@ -347,21 +358,26 @@ pub fn verify_completion_bytes(
     }
     let mut steps = Vec::with_capacity(problem.states);
     for row in rows {
-        let Value::Tuple(fields) = row else {
+        let ValueRef::Tuple(fields) = row.view() else {
             return Err(invalid_plan("row-shape", None));
         };
-        let [Value::U128(remaining), Value::Tuple(command)] = fields.as_ref() else {
+        let [remaining, command] = fields else {
             return Err(invalid_plan("row-shape", None));
         };
-        let remaining = u32::try_from(*remaining).map_err(|_| invalid_plan("rank-range", None))?;
+        let (ValueRef::U128(remaining), ValueRef::Tuple(command)) =
+            (remaining.view(), command.view())
+        else {
+            return Err(invalid_plan("row-shape", None));
+        };
+        let remaining = u32::try_from(remaining).map_err(|_| invalid_plan("rank-range", None))?;
         if command.len() > problem.command_domains().len() {
             return Err(invalid_plan("command-shape", None));
         }
         let command = command
             .iter()
-            .map(|value| match value {
-                Value::I128(value) => {
-                    i64::try_from(*value).map_err(|_| invalid_plan("command-range", None))
+            .map(|value| match value.view() {
+                ValueRef::I128(value) => {
+                    i64::try_from(value).map_err(|_| invalid_plan("command-range", None))
                 }
                 _ => Err(invalid_plan("command-scalar", None)),
             })
@@ -541,30 +557,32 @@ fn domain_tuple_size(domains: &[Domain]) -> Result<u64, CompletionError> {
             .iter()
             .map(|domain| domain.bounds().0)
             .collect::<Vec<_>>(),
-    ))
+    )?)
 }
 fn value_size(value: &Value) -> Result<u64, CompletionError> {
     let bytes = value.canonical_bytes().map_err(SynthesisError::Encode)?;
     u64::try_from(bytes.len()).map_err(|_| CompletionError::Invalid("encoding-size"))
 }
-fn bytes_value(hash: Hash32) -> Value {
-    Value::Bytes(hash.as_bytes().to_vec().into_boxed_slice())
+fn bytes_value(hash: Hash32) -> Result<Value, EncodeError> {
+    Value::bytes_with_limits(hash.as_bytes().to_vec(), ValueLimits::default())
+        .map_err(EncodeError::InvalidValue)
 }
-fn plan_value(problem_hash: Hash32, steps: &[CompletionStep]) -> Value {
+fn plan_value(problem_hash: Hash32, steps: &[CompletionStep]) -> Result<Value, EncodeError> {
     ir::tuple(vec![
-        Value::Text(PLAN_PROFILE.into()),
-        bytes_value(problem_hash),
+        Value::text_ascii_with_limits(PLAN_PROFILE.into(), ValueLimits::default())
+            .map_err(EncodeError::InvalidValue)?,
+        bytes_value(problem_hash)?,
         ir::tuple(
             steps
                 .iter()
                 .map(|step| {
                     ir::tuple(vec![
-                        Value::U128(step.remaining.into()),
-                        finite_tuple(&step.command),
+                        Value::unsigned(step.remaining.into()),
+                        finite_tuple(&step.command)?,
                     ])
                 })
-                .collect(),
-        ),
+                .collect::<Result<Vec<_>, _>>()?,
+        )?,
     ])
 }
 fn invalid_plan(reason: &'static str, state: Option<Vec<i64>>) -> CompletionError {

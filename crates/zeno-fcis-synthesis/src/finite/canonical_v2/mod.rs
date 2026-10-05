@@ -6,6 +6,10 @@
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 
+pub mod envelope;
+pub mod output;
+pub mod schema;
+
 #[cfg(verus_keep_ghost)]
 pub(super) mod spec;
 

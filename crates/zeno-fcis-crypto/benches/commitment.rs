@@ -4,12 +4,11 @@
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use zeno_fcis_codec::{CommitmentHasher, Domain, commitment, domain_preimage};
+use zeno_fcis_codec::{CommitmentHasher, commitment, domain_preimage};
 use zeno_fcis_crypto::{LibcruxSha256, RustCryptoSha256};
 
 fn bench_provider<H: CommitmentHasher>(c: &mut Criterion, name: &str) {
-    let domain = Domain::new("zeno-fcis/bench", 1)
-        .unwrap_or_else(|error| panic!("benchmark domain: {error}"));
+    let domain = zeno_fcis_codec::domains::BENCH;
     let mut group = c.benchmark_group(name);
     for size in [0_usize, 64, 1024, 65_536, 1_048_576] {
         let payload: Vec<u8> = (0_u8..=255).cycle().take(size).collect();

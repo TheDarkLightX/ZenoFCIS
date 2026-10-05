@@ -1,5 +1,8 @@
 #![forbid(unsafe_code)]
 
+/// Complete original-domain policy and checked library Authority construction.
+pub mod v2_contract;
+
 pub mod generated {
     #![allow(dead_code, unused_imports, clippy::all, clippy::pedantic)]
     include!(concat!(env!("OUT_DIR"), "/schema-codegen/rust/order.rs"));
@@ -9,47 +12,38 @@ pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/rust/project.rs"));
 }
 pub mod delivery;
-pub mod laws;
 #[path = "../profile.rs"]
 pub mod profile;
-pub mod program;
-#[path = "../synthesized/transition.rs"]
-pub mod synthesized;
 
+#[cfg(feature = "sqlite")]
 use bindings::GeneratedProject;
+#[cfg(feature = "sqlite")]
 use delivery::Destination;
 use generated::{Attempts, Order, OrderAction, OrderCommand, OrderStatus};
 #[cfg(feature = "sqlite")]
 use generated::{Caller, CallerContext};
-use laws::{NoExternalProofs, OrderLaws};
-use program::OrderProgram;
 #[cfg(feature = "sqlite")]
 use std::path::Path;
 #[cfg(feature = "sqlite")]
-use zeno_fcis_authority::AuthorizationDecodeLimits;
-use zeno_fcis_authority::{
-    CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding, StateDomainBinding,
-};
+use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, decode_envelope};
 #[cfg(feature = "sqlite")]
-use zeno_fcis_codec::CanonicalEncode;
-use zeno_fcis_codec::Domain;
+use zeno_fcis_crypto::RustCryptoSha256;
 #[cfg(feature = "sqlite")]
-use zeno_fcis_core::Decision;
-use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
-use zeno_fcis_laws::{LawLimits, verify_project_laws};
-use zeno_fcis_patch::hash_value;
 use zeno_fcis_schema::ValidationLimits;
 #[cfg(feature = "sqlite")]
-use zeno_fcis_shell::{CommitStatus, IdempotentDestination};
+use zeno_fcis_shell::CommitStatus;
+use zeno_fcis_synthesis::finite::v2_composition as composition;
 #[cfg(feature = "sqlite")]
-use zeno_fcis_shell_sqlite::SqliteShell;
-use zeno_fcis_transition::TransitionLimits;
+use zeno_fcis_synthesis::finite::{v2_authority::PublicationOutcome, v2_composition::Class};
 
-pub type Authority = CatalogCommitAuthority<RustCryptoSha256, OrderProgram, OrderLaws, Destination>;
+/// Library authority borrowing the exact checked policy descriptor.
+pub type Authority<'p> = zeno_fcis_synthesis::finite::v2_authority::Authority<'p>;
+/// Persistent shell consuming genuine library publication capabilities.
 #[cfg(feature = "sqlite")]
-pub type Shell = SqliteShell<OrderProgram, OrderLaws, Destination>;
+pub type Shell<'a, 'p> = zeno_fcis_shell_sqlite::v2::V2SqliteShell<'a, 'p>;
 pub type AppResult<T> = Result<T, String>;
 
+#[cfg(feature = "sqlite")]
 fn checked<T, E: std::fmt::Debug>(value: Result<T, E>) -> AppResult<T> {
     value.map_err(|error| format!("{error:?}"))
 }
@@ -71,130 +65,107 @@ pub fn command(action: OrderAction, callback_attempt: i128) -> OrderCommand {
     }
 }
 
-pub fn authority() -> AppResult<Authority> {
-    let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
-    let initial = checked(
-        project.admit_root::<RustCryptoSha256>(&genesis_state(), ValidationLimits::default()),
-    )?;
-    let domain = checked(Domain::new("example/order-fulfillment/state", 1))?;
-    let initial_root = checked(hash_value::<RustCryptoSha256>(
-        domain,
-        initial.value().value(),
-    ))?;
-    // The scopes `project.zeno` declares, which `check` and `prove` read,
-    // must be the scopes this authority enforces.
-    let manifest = profile::manifest();
-    checked(manifest.check_declared_scopes(&profile::project()))?;
-    let laws = checked(verify_project_laws::<RustCryptoSha256, _, _>(
-        project.catalog(),
-        manifest,
-        profile::source_hash(),
-        vec![],
-        LawLimits::default(),
-        profile::checker_hash(),
-        OrderLaws::default(),
-        &NoExternalProofs,
-    ))?;
-    let label =
-        |name: &str| profile::digest("example/order-fulfillment/local-policy", name.as_bytes());
-    checked(CatalogCommitAuthority::try_new(
-        project.catalog(),
-        checked(StateDomainBinding::try_new(
-            "example/order-fulfillment/state",
-            1,
-        ))?,
-        checked(ExecutionBinding::try_new(
-            profile::program_hash(),
-            label("RustCrypto SHA-256 with library known-answer admission; no build attestation"),
-            label("MemoryDestination exact ID and entry hash"),
-            label("local tutorial deployment"),
-            label("exact invocation replay ID and complete bundle"),
-        ))?,
-        checked(GenesisPolicyBinding::try_new(
-            initial_root,
-            profile::source_hash(),
-            label("status=Placed; payment_attempts=0"),
-            label("runtime-checked genesis; no external proof"),
-            label("local tutorial deployment"),
-        ))?,
-        TransitionLimits::default(),
-        &checked(verify_approved_provider::<RustCryptoSha256>())?,
-        laws,
-        OrderProgram,
-    ))
-}
-
-/// Creates the exact reviewed genesis. An existing database is rejected by the shell.
-#[cfg(feature = "sqlite")]
-pub fn create(path: &Path, authority: &Authority, destination: Destination) -> AppResult<Shell> {
-    let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
-    let initial = checked(
-        project.admit_root::<RustCryptoSha256>(&genesis_state(), ValidationLimits::default()),
-    )?;
-    let genesis = checked(authority.authorize_genesis(initial))?;
-    checked(Shell::create(
-        path,
-        authority,
-        genesis,
-        authority.bind_delivery_interpreter(destination),
-    ))
-}
-
-/// Decides one command and, if it commits, publishes it and checks its exact replay.
+/// Bind only the checked complete original schema and retained reviewed policy.
+/// The caller owns Contract, then Descriptor, then this borrowing Authority.
 ///
-/// `replay` identifies the incoming message, such as a webhook's delivery ID.
-/// Publishing the same authorized decision again is an idempotent replay; a
-/// message that arrives again is decided against the order's current status.
-/// Local tutorial inputs: a deployment must authenticate the caller before
-/// admission.
+/// # Errors
+/// Returns the actual catalog or authority refusal.
+pub fn authority<'p>(descriptor: &'p composition::Descriptor<'p>) -> AppResult<Authority<'p>> {
+    v2_contract::checked_authority(descriptor).map_err(|error| match error {
+        v2_contract::BindFailure::Catalog(error) => format!("catalog: {error:?}"),
+        v2_contract::BindFailure::Authority(error) => format!("authority: {error:?}"),
+    })
+}
+
+/// Publish the actual reviewed initial state through genuine Genesis.
+///
+/// # Errors
+/// Returns schema/framing/genesis or persistent-shell refusal. Existing history is refused.
+#[cfg(feature = "sqlite")]
+pub fn create<'a, 'p>(path: &Path, authority: &'a Authority<'p>) -> AppResult<Shell<'a, 'p>> {
+    let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
+    let initial = checked(
+        project.admit_root::<RustCryptoSha256>(&genesis_state(), ValidationLimits::default()),
+    )?;
+    let initial = checked(initial.envelope().canonical_bytes())?;
+    let genesis = match authority.publish_genesis(&initial) {
+        PublicationOutcome::Commit(genesis) => genesis,
+        PublicationOutcome::Refused { evaluation, error } => {
+            return Err(format!("genesis: {error:?}; evaluation: {evaluation:?}"));
+        }
+        other => return Err(format!("unsupported genesis outcome: {other:?}")),
+    };
+    checked(Shell::create(path, authority, genesis))
+}
+
+/// Decide exact original inputs, publish a genuine capability, and recompute its exact replay.
+/// Local principal/context authentication and input framing are host assumptions.
+///
+/// # Errors
+/// Returns schema admission, actual technical refusal, or shell/replay failure.
 #[cfg(feature = "sqlite")]
 pub fn invoke(
-    shell: &mut Shell,
-    authority: &Authority,
+    shell: &mut Shell<'_, '_>,
+    authority: &Authority<'_>,
     command: OrderCommand,
     caller: Caller,
     replay: &str,
 ) -> AppResult<&'static str> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let snapshot = checked(shell.snapshot())?;
-    let pre = checked(Order::try_from_value(snapshot.state().clone()))?;
-    let pre = checked(project.admit_root::<RustCryptoSha256>(&pre, ValidationLimits::default()))?;
     let command =
         checked(project.admit_command::<RustCryptoSha256>(&command, ValidationLimits::default()))?;
     let context = checked(project.admit_context::<RustCryptoSha256>(
         &CallerContext { caller },
         ValidationLimits::default(),
     ))?;
-    let witness = checked(authority.admit_invocation(
-        pre,
-        command.admitted().clone(),
-        context.admitted().clone(),
-        profile::digest(
-            "example/order-fulfillment/principal",
-            b"local tutorial caller",
-        ),
-        profile::digest(
-            "example/order-fulfillment/authentication",
-            b"trusted local input; no remote authentication",
-        ),
-        profile::digest("example/order-fulfillment/replay", replay.as_bytes()),
-    ))?;
-    let (candidate, outcome) = match checked(authority.execute(witness))? {
-        Decision::Accept(accept) => (accept.into_candidate(), "Accept"),
-        Decision::CommittedFailure(failure) => (failure.into_parts().0, "CommittedFailure"),
-        Decision::Reject(_) => return Ok("Reject"),
+    let command = checked(command.admitted().envelope().canonical_bytes())?;
+    let context = checked(context.admitted().envelope().canonical_bytes())?;
+    let original = composition::Raw {
+        state: snapshot.state(),
+        command: &command,
+        context: &context,
     };
-    let bytes = checked(candidate.canonical_bytes())?;
-    if checked(shell.commit(candidate))? != CommitStatus::Committed {
+    let publication = match authority.publish(original) {
+        PublicationOutcome::Commit(publication) => publication,
+        PublicationOutcome::Reject(_) => return Ok("Reject"),
+        PublicationOutcome::Refused { evaluation, error } => {
+            return Err(format!(
+                "publication: {error:?}; evaluation: {evaluation:?}"
+            ));
+        }
+        other => return Err(format!("unsupported publication outcome: {other:?}")),
+    };
+    let outcome = match checked(publication.evaluation().result())?.class() {
+        Class::Accept => "Accept",
+        Class::CommittedFailure => "CommittedFailure",
+        Class::Reject => return Err("reject yielded a publication capability".into()),
+        other => return Err(format!("unsupported decision class: {other:?}")),
+    };
+    let subject = publication.subject().to_vec();
+    let replay_id = profile::digest("example/order-fulfillment/replay", replay.as_bytes());
+    if checked(shell.commit(replay_id, publication))?.status() != CommitStatus::Committed {
         return Err("expected first publication".into());
     }
-    let replayed = checked(
-        authority.reauthorize_canonical_transition(&bytes, AuthorizationDecodeLimits::default()),
-    )?;
-    if checked(shell.commit(replayed))? != CommitStatus::IdempotentReplay {
+    let replayed = match authority.replay_publication(original, &subject) {
+        PublicationOutcome::Commit(publication) => publication,
+        other => return Err(format!("exact publication replay refused: {other:?}")),
+    };
+    if checked(shell.commit(replay_id, replayed))?.status() != CommitStatus::IdempotentReplay {
         return Err("exact replay was not idempotent".into());
     }
     Ok(outcome)
+}
+
+/// Decode an already checked snapshot only for typed host presentation.
+/// The decoded Value is never supplied to core evaluation.
+///
+/// # Errors
+/// Returns malformed envelope or typed presentation failure.
+#[cfg(feature = "sqlite")]
+pub fn decode_state(original: &[u8]) -> AppResult<Order> {
+    let envelope = checked(decode_envelope(original, DecodeLimits::default()))?;
+    checked(Order::try_from_value(envelope.into_value()))
 }
 
 /// Declines one payment, and refuses a late capture of it. After a second
@@ -206,9 +177,11 @@ pub fn invoke(
 /// Returns a JSON summary.
 #[cfg(feature = "sqlite")]
 pub fn journey(path: &Path) -> AppResult<String> {
-    let authority = authority()?;
-    let mut destination = Destination::default();
-    let mut shell = create(path, &authority, destination.clone())?;
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor)?;
+    let destination = Destination::default();
+    let mut shell = create(path, &authority)?;
     let steps = [
         (OrderAction::Checkout, 0, Caller::Customer, "Accept"),
         (
@@ -267,20 +240,20 @@ pub fn journey(path: &Path) -> AppResult<String> {
     }
     let pending = checked(shell.next_pending())?.ok_or("missing pending request")?;
     // Model interruption after the destination records delivery but before SQLite acknowledges it.
-    checked(destination.deliver(pending.delivery_id(), pending.entry_hash(), pending.entry()))?;
+    let delivered = checked(shell.deliver_next_memory_unacknowledged(&mut destination.memory()))?
+        .ok_or("missing pending delivery")?;
+    if delivered != (pending.delivery_id(), pending.entry_hash()) {
+        return Err("destination observed a different pending entry".into());
+    }
     drop(shell);
-    let mut shell = checked(Shell::open_existing(
-        path,
-        &authority,
-        authority.bind_delivery_interpreter(destination.clone()),
-    ))?;
-    while checked(shell.deliver_next())? {}
+    let mut shell = checked(Shell::open(path, &authority))?;
+    while checked(shell.deliver_next_memory(&mut destination.memory()))? {}
     checked(shell.acknowledge(pending.delivery_id(), pending.entry_hash()))?;
     let snapshot = checked(shell.snapshot())?;
-    let state = checked(Order::try_from_value(snapshot.state().clone()))?;
+    let state = decode_state(snapshot.state())?;
     let summary = (
-        snapshot.bundle_count(),
-        snapshot.pending_outbox(),
+        snapshot.version(),
+        snapshot.pending(),
         destination.delivered_count(),
     );
     if state.status != OrderStatus::Delivered

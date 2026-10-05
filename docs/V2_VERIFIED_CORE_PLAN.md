@@ -1,356 +1,299 @@
-# V2 implementation and core verification plan
+# Smaller V2: verified core and mandatory publication route
 
-Owner requirement, 2026-10-01: build V2 while verifying the actual functional
-core completely. The release remains blocked until the supported core path and
-its implementation correspondence are covered. A passing model check, a tool
-name, or a subset of verified functions does not close this plan.
+Status: implementation complete on one tree; final qualification in progress, 2026-10-04.
+The owner chose simplification first, then a smaller V2. This plan supersedes
+its earlier open-ended definition of done. It does not announce a release.
 
-## Baseline and definition of done
+A **formally verified functional core** is the central architecture concept.
+ZenoFCIS intends to become a **state of the art high assurance software factory**.
+That is the destination; the supported guarantees and unfinished work below
+define what this V2 can establish. Additional factory features remain in the
+[V2.1 roadmap](V2_1_FACTORY_PLAN.md).
 
-Implementation starts from `4dd979b95433bc70dcdc3ce834ff6db90eef806f`, on
-`agent/v2-verified-core-20261001`. The retained 1.x checkouts are separate.
-The baseline's acceptance gate passed 41/41; its Verus unit verifies two
-finite-domain arithmetic functions. The inventory runtime has exhaustive
-conformance evidence on 864 admitted inputs. Neither result verifies the whole
-core. The required breaking changes remain in [ADR 0004](adr/0004-v2-ledger.md)
-and the decision boundary in [ADR 0005](adr/0005-decision-gate.md).
+## Supported scope and guarantee
 
-V2 core completion requires all of the following:
+The supported applications are durable-counter, account-lockout,
+order-fulfillment, inventory-reservation, compliance-gateway, withdrawal-queue,
+agent-treasury-guard and prepared-counter, using their retained legal domains.
+Their one authoritative route is:
 
-1. A closed specification for admitted input, all decision classes, complete
-   successor state, reasons, patches, effects, outbox, footprints, logical work,
-   law/genesis checks, canonical identities, and replay authorization.
-2. Verification of the executable functions implementing those specifications,
-   including success, refusal, overflow, malformed input, and exhaustion.
-3. Verified bridges between stages. A checked function's preconditions must
-   follow from admission or another verified function, rather than a project
-   callback or an unchecked assertion.
-4. A mandatory V2 authority route that constructs the complete decision through
-   library code. Project decision and law callbacks cannot substitute for it.
-5. Proof coverage of every application-owned function reachable on that route,
-   a named trusted base, source/build binding, and no unreviewed assumption or
-   `external_body` used to obtain success.
-6. Independent application examples, complete-decision comparisons, meaningful
-   mutations, malformed-input and bypass negatives, and exact-head CI.
-7. The remaining V2 ledger changes, migration documentation, and integration
-   gates. Release approval remains separate from implementation and proof.
+```text
+checked schema + reviewed declarative program/policy + immutable invocation
+    -> library Authority: admission, execution, decisions, laws and genesis
+    -> private Publication
+    -> SQLite v2 shell: identity/freshness checks, persistence and replay
+```
 
-The mathematical correctness claim is relative to a reviewed specification and
-its admitted domain. Authentication of external facts, database atomicity,
-external delivery, allocator/standard-library behavior, compiler, verifier,
-solver, and hardware assumptions are named separately. Effect-plan derivation
-is core behavior; effect delivery is shell behavior. No template may shrink its
-legal domain merely to make a proof cheaper.
+Applications declare meaning. They cannot supply an authoritative decision,
+law verdict, usage report, candidate sealer or substitute evaluator.
+Reject and technical refusal grant no publication capability. Reject changes
+no authoritative state, effect or outbox. CommittedFailure has only the changes
+specified by its reviewed branch. Replays must match the exact bound subject.
 
-## Required proof chain and implementation order
+The core claim is executable conformance to the reviewed mathematical contract
+for every input in the supported admitted domain, including refusal behavior.
+It does not prove that the contract captures human intent or external facts.
+The SQLite refinement and delivery environment have separate evidence.
 
-| Order | Actual core component | Required statement | Current frontier |
-| --- | --- | --- | --- |
-| 1 | Shared scalar IR and execution loop | Every instruction and eager prefix match the mathematical semantics; invalid input and traps refuse without exposing partial output | Admission/eager execution unit: 20 executable functions, 34 obligations; all 132 GitHub checks passed at `9882136` |
-| 2 | Schema and canonical admission | Every accepted byte string decodes to exactly its typed value, respects declared ranges and limits, and consumes all bytes | Integer readers qualified at `f88f1a3`; protected flat-record unit qualified at `5f88a67`; record-execution development proof passes; catalog and envelope correspondence open |
-| 3 | Library meter and state view | Actual accesses and steps are charged before protected work; exhaustion and overflow cannot mutate authoritative state | Owned meter and exact multi-record/ABI composition implemented; exact result proofs plus separately reviewed source order; mandatory route open |
-| 4 | Complete decision construction | Class, reason, successor, patch, effects, outbox and order equal the bound contract | Inventory's 864-case evidence; general proof open |
-| 5 | Laws and genesis | Library evaluates every applicable predicate on the exact invocation and actual initial state | Project-supplied law engine remains; mandatory library checks open |
-| 6 | Authority, identity and replay | Only the bound contract/evaluator can produce authorization; stale input, changed identity, and replay mismatch refuse | 1.x nominal bindings; full V2 route open |
-| 7 | Larger template domains | Every raw-input abstraction preserves rules, including account-lockout time and integer boundaries | Application-specific bridges open |
-| 8 | Composition and release | Verified local contracts compose through checked interfaces; all remaining ledger/migration obligations close | Open |
+## Intake and current qualification
 
-The order is a dependency order. Specifying law and decision representations
-may happen earlier when it determines the interpreter's required language.
+Status on 2026-10-04, branch `agent/v2-simplify-20261003`.
 
-## First proof unit: shared eager finite execution
+**Frozen intake (2026-10-03).** All eight templates constructed a checked
+library Authority; seven used `V2SqliteShell` and prepared-counter used
+`HistorySqliteShell`. The intake contained the embedded source bundle, compound
+walker, account producer, law bridge and separate genesis artifact wrappers.
+Normal authority and native transition callbacks were already retired.
+Source: templates under `crates/zeno-fcis-cli/templates/*/src/lib.rs`.
 
-The baseline instruction set has exactly ten variants: input, integer,
-Boolean, checked add/subtract, equality, signed less-than, Boolean conjunction,
-Boolean negation, and selection. Preserve the existing Boolean wire encoding
-of exactly 0/1 and eager evaluation. An unused or unselected earlier node can
-still trap; changing this to lazy evaluation changes the contract.
+**Implemented since intake, on one source tree (S1-S5).** A generated
+evaluator digest replaces the embedded source bundle. History, the History
+wrappers and the pair export/import API are removed; prepared-counter runs on
+`V2SqliteShell`. One scalar/record decoder and driver replaces the compound
+walker and the separate record driver. Account rules are declared on the
+generic path. One value model and one tagged outcome shape, retaining the
+invoked `Kind`, replace the separate genesis wrappers. Admission is performed
+once and carried by the `BoundCore` type invariant; the law bridge is gone and
+laws read decision deliveries directly. Shared helpers live in `util.rs`.
 
-Proof sketch, pinned to Verus `0.2026.09.27.3cf1832`:
+**Checkpoints that pass on this tree.** These are the intermediate checkpoints
+named under "Checkpoints and final qualification"; none is the final gate.
 
-- Define instruction semantics over mathematical sequences and integers.
-  Successful add/sub results are exact within inclusive `i64` bounds; every
-  out-of-range result refuses. Invalid references also refuse.
-- Prove exact domain admission and instruction evaluation using the same
-  source bodies compiled by ordinary Rust 1.97.1.
-- Define eager prefix evaluation recursively. The execution loop maintains
-  that its local values equal the specified successful prefix, and its
-  increasing index supplies the decreasing loop measure.
-- Establish output projection in ABI order and exact output-domain checking.
-  Clear caller scratch/output buffers on every failure.
-- Derive structural/reference preconditions from verified program admission.
-  Structural admission now specifies the complete shape-first, typed-prefix,
-  root-order result. The evaluator itself has no executable preconditions;
-  it handles malformed graphs defensively. Canonical import and production
-  diagnostic wrappers remain outside this proof unit.
-- Keep the source of all extracted helpers and their specifications in the
-  evaluator/checker identity. Source refactoring intentionally changes identity;
-  old receipts must not qualify a new implementation.
-- Run negative mutations for arithmetic, Boolean encoding, eager selection,
-  reference safety, result projection, error cleanup, and omitted proof coverage.
+- Whole-core proof: `verification/verus/authority_v2.rs` with the pinned
+  flags reports 835 verified, 0 errors. All 468 Exec functions have zero
+  `requires` and at least one `ensures`. The core contains no `admit`,
+  `assume`, `external_body` or `#[verifier::external]`. Its two `rlimit`
+  attributes (`decision.rs` 30, `authority/spec.rs` 20) are unchanged from
+  the baseline; `seal` and `prepare` gained proof assertions after formatting
+  instead of a raised limit. The baseline reported 1338 verified and 625 Exec
+  functions; unit counts overlap and are not additive, and the decrease comes
+  from removed code, not dropped checks.
+- Native: the core harness's 134 native tests pass; strict Clippy on
+  `zeno-fcis-synthesis` (all targets), the no-std harness build and the
+  no-default-features check pass; the workspace is rustfmt-clean.
+- Gate positives: the 14 gate profiles are regenerated from fresh pinned
+  positive proofs. The positive runs of twelve gates, plus the authority,
+  guarded-laws and original-output positives, pass on this source. The
+  shared-runtime gate's proof subject (`domain_bounds.rs` with
+  `finite_bounds.rs`) is unchanged from the baseline. The account-data
+  gate's positive suite runs in the ATDD.
+- Templates: the six finite synthesis manifests are regenerated (only the
+  `certificate` field changed; programs, vectors and emitted source are
+  byte-identical) and the Rust, Python and JavaScript replays pass. The
+  kernel-laws oracle template copies are re-synchronized and their policy
+  files regenerated. `check_template_contracts_v2.py` reports matching
+  declarations and library-encoded policies for all eight templates.
+- Compatibility: `test-data/v1-compatibility/baseline.json` pins the V1
+  consumer's documented V2 migration, the five API changes listed in the
+  [migration guide](V2_PROGRAM_API_MIGRATION.md#v1-consumer-migration). The
+  native zUSD mount is retired from packaging and its workflow deleted.
+- Mutation-control inventory: seven controls retired, one replaced, one
+  added and two moved from the composition gate to the laws gate, each with
+  its reason, in `verification/verus/simplification-retired-controls.json`.
+  Anchors are re-pointed, and each must match exactly once (token-wise in
+  the finite-execution and catalog gates).
 
-Pinned microprobes identified concrete compatibility issues before editing:
-`Vec::reserve_exact` is unsupported, `i64::from(bool)` lacks a sufficient bundled
-specification, and the existing iterator/closure forms need additional proofs.
-An indexed loop and Boolean cast can preserve the declared semantics. Any
-replacement needs native compilation, independent conformance, and explicit
-allocation/resource nonclaims until the V2 meter is complete. No trusted wrapper
-will be added to hide an unsupported operation.
+**Open before acceptance.** Nothing below is claimed.
 
-## Work discipline and evidence
+- Gates 2, 3 and 4: the full mutation controls of all 16 proof gates
+  (`check_verus`, `check_finite_execution`, `check_metered_execution`,
+  `check_canonical_bytes`, `check_protected_input`,
+  `check_envelope_frame_v2`, `check_schema_binding_v2`, `check_decision_v2`,
+  `check_account_graph_v2`, `check_laws_v2`, `check_catalog_v2`,
+  `check_original_output_v2`, `check_publication_v2`,
+  `check_composition_v2`, `check_guarded_laws_v2`, `check_authority_v2`) on
+  the final source. The profiles are regenerated (above), but no full
+  mutation round on the final source has completed; rounds run before the
+  anchor repair are not evidence either way. Under the owner decision below,
+  CI runs them on the pushed commit, and every retained or replacement
+  control must fail there for its stated reason.
+- Gate 6: the workspace, template and shell regressions must pass in the
+  ATDD run before commit and in exact-head CI. These include
+  `check_generated_application.py` for all eight templates and the
+  account-lockout boundary cases.
+- Gate 7: `python3 tools/atdd.py run --all` immediately before the commit;
+  independent scope, source and evidence review (the Astra review packet);
+  exact final source identities; exact-head CI on the committed revision.
+  The umbrella crate's API custody fixtures run with all features in the
+  ATDD (`tools/check_api_refusals.py`); custody of the direct crates'
+  exports stays with the independent review.
+- Shell: the SQLite shell re-decodes each delivery's destination and payload
+  under `DecodeLimits::default()` to rebuild the V1 `OutboxEntry` it commits
+  to. A value outside those limits is refused at persistence, so the path
+  fails closed. The review decides whether those limits must match the
+  core's.
+- Ledger: the 19 route-required entries in
+  [V2_LEDGER_SCOPE.md](V2_LEDGER_SCOPE.md) stay open until the above pass;
+  the 13 withdrawn entries keep their recorded reasons.
 
-Before each implementation stage, record its source boundary, mathematical
-contract, callers, preserved behavior, intentional identity/API changes, and
-required checks here. After the last edit, inspect the final checker result,
-function coverage, assumptions, mutation outcomes, native build, and acceptance
-gate. Run `python3 tools/atdd.py run --all` immediately before each commit.
+Implementation acceptance is distinct from merge, deployment and release
+authorization. Verus/Z3 results keep their stated trusted base and are not
+Lean `KernelChecked` evidence.
 
-Keep proof receipts source-bound and separate from runtime authority. Verus/Z3
-checks retain their stated trusted base and their own evidence kind; they do
-not silently become Lean `KernelChecked` or upgrade an unchecked solver report
-to the repository's `Proved` status. Independently checked proof objects remain
-a separate obligation where that status requires them (ADR 0003).
+## Bounded definition of done
 
-Do not equate 41 passing acceptance scenarios with V2 completion. Track every
-open proof and ledger entry, and retain failed probes/counterexamples.
+All seven gates apply to the same frozen source tree and reviewed scope.
+Missing, stale, filtered or development-only evidence leaves its gate open.
 
-For bounded parallel proof work, use at most two child tasks and depth one.
-Children may retrieve premises or audit fixed proof subjects; the main agent
-owns the specification, implementation and integration. Verify every returned
-artifact before folding it into this record.
+1. **One route and one core representation.** Qualify the approved sequence
+   S1, S3, S2, S4, S5: a 32-byte evaluator manifest digest; one scalar/record
+   decoder and driver; account rules declared on the generic path; one value
+   model; one tagged artifact shape with genesis as the identity candidate.
+   Remove History and pair export/import; migrate prepared-counter to SQLite
+   v2. Keep defensive rechecks if removing them needs executable preconditions.
+   Check: stage reports, native touched-crate tests, whole-authority proof,
+   migrated-test ledger and `check_generated_application.py` for all eight.
+   Check public custody with the existing compile-fail/custody controls and an
+   independent review of root, direct-crate and feature-enabled exports.
 
-## Progress
+2. **Library work and accesses.** The private meter starts at zero and charges
+   protected work before each attempt. Exhaustion preserves previous charges
+   and exposes no partial authority. Mandatory checked declarations determine
+   the logical ingress selectors, complete successor assignment targets,
+   branch delivery plans/channels and law observation nodes. Library execution
+   constructs attempts only from those declarations; recorded `permitted`
+   flags report meter grants. Ingress reads all declared fields, and successor
+   writes include unchanged values; the changed patch is a subset. This is a
+   reviewed derived bound over verified components, not a separately proved
+   universal footprint theorem or parallel-disjointness certificate.
+   Check: renew translated order profiles, meter/protected-input/composition
+   and law/sealing controls, and source review after the remaining stages.
+   See [ledger row 22](V2_LEDGER_SCOPE.md); no additional caller-supplied
+   footprint report or duplicate runtime whitelist is required.
 
-- Baseline integration pushed in draft PR #113 at `4dd979b`; local proof,
-  four mutation controls, native boundaries, zero-vulnerability npm audit, and
-  41/41 acceptance passed. GitHub results are tracked independently.
-- Premise search replayed enum contracts, Boolean casts, checked arithmetic,
-  and slice/Vec prefix loops against the pinned verifier and ordinary Rust.
-  These are compatibility probes, not a proof of the production evaluator.
-- Shared admission and evaluator unit implemented; whole-core proof remains
-  in progress through the remaining stages below.
-- Shared admission and eager scalar execution pass the pinned checker locally:
-  20 executable functions (including generated clones), 21 specification
-  functions/constants and three induction lemmas; 34 verification obligations.
-  The native unit has nine tests, including 2,753,237 admission comparisons
-  against the retained baseline. The synthesis library's 78 tests passed.
-- The gate catches 12 incorrect-behavior mutations and four coverage mutations:
-  omitted or weakened postcondition, narrowed input domain, and an uncontracted
-  function. A controlled omission verified the same 34 obligations, so the
-  gate checks the actual translated signatures, contracts and specification bodies in
-  addition to function inventory, counts, pinned tools and source hashes.
-- Production `Program::try_new`, scalar-kind checks and evaluation now call the
-  shared functions. Source identities include every extracted admission,
-  execution and specification file. These identity changes are intentional;
-  persisted 1.x receipts do not qualify this V2 implementation.
-- The initial acceptance run refused the six templates' earlier source-bound
-  certificates. Each was synthesized again into a fresh directory, compared
-  with its independent decision table, and replayed natively: 12,064 inputs in
-  total. Only certificate fields changed; contracts, search traces, program
-  bytes, vectors and emitted source stayed byte-identical. The template
-  manifests now contain the newly computed certificates.
-- Native regression and source-bound proof receipts cover the shared unit.
-  The error-string wrappers, canonical import, meter, complete decision,
-  law/genesis and authority composition have not acquired formal proofs.
-  Independent review found no blocker within this unit. The full acceptance
-  gate and exact-head CI remain separate required checks.
-- Mandatory V2 gate, law/genesis enforcement, remaining proof chain and ledger:
-  open.
-- First unit committed and pushed in draft PR #114 at `9882136`; full 42/42
-  acceptance and the clean-head 34-obligation/16-mutation gate passed.
-  All 132 GitHub checks passed at that exact head; merge authorization is
-  separate from those results.
-- Owned V2 meter and eager instruction execution implemented. The direct
-  `execute_v2` body is in the proof subject; the `Program` convenience adapter
-  is compared natively and remains an explicit correspondence obligation.
-  The combined subject passes 57 obligations over 38 executable functions
-  (20 retained scalar helpers and 18 additions), 31 specifications/constants
-  and four induction lemmas. These counts overlap the first unit.
-- Native wider-arithmetic comparisons, all 83 synthesis tests and four external
-  API custody refusals passed. Exact-head evidence, full acceptance and review
-  of this second unit are still required.
-- The second unit's development gate passed all 57 obligations and 16 mutation
-  controls. The cached-result reorder still verified all 57 obligations and
-  was refused by the separate operational body inventory as intended.
-  The prior scalar unit retained its 34-obligation/16-mutation pass.
-  No-std compatibility and Clippy passed without implementation lint waivers.
-- Six template certificates were regenerated for the second identity change,
-  independently checked and replayed natively over the same 12,064 inputs.
-  Again only certificates changed; scalar program/vector/source bytes and
-  contract/search identities stayed unchanged.
-- Second unit committed and pushed in draft PR #115 at `f82bd84`. Full 43/43
-  acceptance passed immediately before the commit. Its clean-head meter,
-  scalar and arithmetic gates passed 57/34/3 obligations respectively, zero
-  errors, with 16/16/4 mutation controls. The scalar and meter counts overlap.
-  Independent bounded source review found no blocker. GitHub checks and merge
-  authorization remain separate from these local results.
-- GitHub refused that second head: its Miri matrix omitted the new integration
-  target and release assembly reported an archive inspection failure. The
-  target now passes strict-provenance Miri. A separate reproduced native home-
-  path leak was fixed, and the rebuilt CLI/archive pass the privacy scanner.
-  Repair `e633429` passed 43/43 acceptance immediately before commit. The
-  scanner retains refusal of malformed archives and now emits bounded error
-  categories. Both GitHub release assemblies passed at that exact repair
-  revision; 128 checks passed with four Miri checks still finishing at the
-  recorded observation. The original CI archive cause remains unresolved.
-  No privacy gate was bypassed.
+3. **Executable proof coverage and composition.** Run the whole source harness
+   `verification/verus/authority_v2.rs` with the pinned Verus flags
+   `--no-cheating --no-external-by-default --num-threads 2 -V spinoff-all`.
+   Inventory every reachable Exec body: zero `requires`, positive `ensures`,
+   no unreviewed assumption, `admit`, opaque body or filtered proof.
+   Preserve surviving public postconditions and checked bridges. Regenerate
+   source/body profiles after edits and rerun all retained and replacement
+   mutations, checking the reason for each failure. Check: full authority and
+   publication gates, translated inventory, native shared-source comparisons,
+   no-std harness, and independent source/specification review.
 
-## Second proof unit: owned V2 meter and instruction attempts
+4. **Policy and evaluator identity.** Generate the fixed evaluator digest from
+   the sorted source manifest outside the verified core, and check it against
+   the approved sources in the required gates. Cargo does not regenerate it. Exclude
+   test-only files and the generated digest; retain Cargo.lock, dependency
+   manifests and toolchain pins required by the compiled evaluator. Replace
+   FINITE_V2_* pins with that digest. Bind exact policy and evaluator identity
+   at Authority construction and compare it on create/open/commit/replay.
+   Check: planned `v2_evaluator_identity` workspace test plus manifest checks
+   registered in ATDD and CI. Omission, source edit and digest-flip controls
+   must fail. Different-policy replay and stored-genesis-identity tampering
+   must refuse through the surviving shell API; removing the comparison must
+   make a negative control fail. Record every identity change separately.
 
-Stage parent: `9882136`. Add a versioned execution unit beside the shared
-evaluator, rather than changing the byte-frozen 1.x `Resource` or `BudgetUsed`.
-The library constructs the meter at zero and returns an opaque usage report;
-the execution API accepts limits and input, never initial usage or a substitute
-report. Production finite programs call this same checked implementation.
+5. **SQLite and delivery preservation.** The shell accepts only genuine
+   publications, enforces the pre-state root/version, stores authorization
+   certificates and chain integrity, and reexecutes persisted subjects.
+   If storage strips identity bytes, splice/strip must preserve exact replay.
+   Keep prepared-counter's 16,384-byte aggregate publication cap and original
+   capacity, partition, crash, cancellation, freshness and retry cases.
+   Delivery IDs must bind the real policy/history, record and transaction
+   certificate. Recurrent state, identical payloads, different transactions,
+   lanes and ordinals must remain distinguishable; an identity digest alone
+   is insufficient. Preserve commit-order delivery and destination collision
+   refusal. Check: migrated SQLite/prepared-counter lifecycle suites, tamper
+   and crash controls, recurrent-state delivery negatives, and I/O review.
 
-One Step is charged immediately before each eager instruction attempt, including
-an unused, unselected or trapping instruction. Exhaustion prevents that attempt.
-A successful graph consumes exactly its node count; a trapped instruction
-consumes its Step. Invalid initial scalar tuples refuse with zero Steps. Charge
-overflow or exhaustion preserves all counters; a later refusal retains charges
-already consumed. Refused execution exposes no partial output.
+6. **Application meaning and domain preservation.** Retain all legal inputs,
+   decision examples, precedence, required successful cases, laws and effect
+   order for the eight templates. Re-run independent decision comparisons,
+   six finite template replays (12,064 retained inputs), and all eight native
+   generated-app journeys. Account-lockout must retain now/seen values from
+   0 through 4,102,444,800 and until values through 4,102,445,700. At the largest
+   legal now, now+900 equals 4,102,445,700; the next now value must refuse as
+   outside the admitted domain. This is not machine-integer overflow.
+   The approved simplification design removes its specialized correspondence
+   lemma. Generic graph execution proves the graph's declared semantics;
+   fact-class/boundary replay is bounded evidence of agreement with the rules,
+   not an all-timestamps correspondence theorem. State this assurance delta
+   explicitly. A template-local proof over generated constants may retain the
+   stronger theorem. Check: full-domain descriptor comparison, fact-class
+   replay, independent rule review, native conformance and boundary cases.
+   Malformed-account refusal classes and regenerated Step limits are explicit
+   approved design changes; they must not silently shrink legal inputs.
 
-The mathematical metered-prefix specification pairs the exact eager result with
-all eight resource counters. The proof covers arbitrary inclusive i64 domains,
-malformed references, output failure and limits up to u64::MAX, with no executable
-preconditions. Mutations must challenge charge order, eager attempts, arithmetic
-overflow, retained usage, output cleanup and translated proof coverage.
+7. **Final acceptance and review.** Apply the [32-row ledger scope](V2_LEDGER_SCOPE.md):
+   qualify its 19 route-required entries; preserve the recorded reasons for
+   withdrawing 13 broader requirements from this V2 completion gate.
+   Update API migration and user-facing descriptions to this exact scope.
+   Run `python3 tools/check_template_contracts_v2.py`,
+   `python3 tools/check_generated_application.py`, required native/Clippy,
+   no-default/no-std and Miri checks, full mutation gates (run in CI; see
+   "Checkpoints and final qualification"), and
+   `python3 tools/atdd.py run --all`. The ATDD run is immediately before any
+   commit. Recheck exact final source identities and required exact-head CI;
+   obtain independent scope/source/evidence review. Implementation acceptance
+   is distinct from merge, deployment and release authorization.
 
-The final-result/counter theorem alone cannot establish charge-before-work
-ordering: computing a node before charging and caching its result preserves
-those postconditions. The second coverage manifest also fixes translated
-executable bodies, with an explicit successfully verifying reorder negative.
-This guard preserves reviewed source structure; it is separate from the
-extensional theorem and does not prove physical CPU cost or the unfinished
-protected-view implementation. A manifest update requires renewed order review.
+## Checkpoints and final qualification
 
-This unit does not make the V2 authority mandatory or meter canonical decoding,
-raw-value/schema projection, allocation or hashing. It does not yet implement a
-protected raw-state view, atomic groups of staged operations, law/genesis checks
-or authorization/replay composition. Those remain required follow-on units;
-scalar inputs admitted before execution are not a proof of the raw-state bridge.
+Intermediate stages retain frozen sources, whole-core proof and executable
+inventory, touched native/template/shell regressions, strict/no-default/no-std
+checks and independent review. They are provisional implementation checkpoints.
 
-## Third proof unit: canonical raw-input boundary
+**Owner decision, 2026-10-04: mutation suites run in CI, not before the local
+commit.** The owner deferred local mutation-control runs so that working 2.1 and
+2.2 releases come first. The GitHub `verus.yml` workflow runs every gate and
+every control on the pushed commit, so the suites still run on the exact final
+source; they run in the cloud after push instead of locally before commit.
 
-Stage parent: `e633429`; isolated branch `agent/v2-canonical-input-20261001`.
-The retained finite gate reads flat record roots whose leaves are signed i128,
-Boolean, closed Enum or payload-free Sum. Complete successor construction
-currently restricts state leaves to i128. Command and context may use all four
-shapes. Empty per-source records, arbitrary legal field/type/variant IDs and
-permuted variant codes must remain supported; a 16-field limit would incorrectly
-exclude a legal 32-input program. Preserve the existing ZCVE tags and widths.
+The local pre-commit gate for V2 is:
+- the whole-core proof, with its executable-function inventory;
+- every gate profile regenerated from a fresh pinned positive proof;
+- native, strict Clippy, no-std and no-default checks;
+- the API custody fixtures (`tools/check_api_refusals.py`);
+- the full ATDD run immediately before commit;
+- independent review of the exact source.
 
-The first subunit establishes exact big-endian byte reads and signed conversion
-over all byte strings and offsets, including truncation, excessive widths and
-offset overflow. Its actual Rust source will be shared by the subsequent
-private record decoder. Success must return the exact mathematical integer and
-next offset; refusal must be specified precisely. No executable precondition,
-application assumption or opaque external body may hide a decoding obligation.
-Native comparisons must use the independent standard-library conversion, and
-mutations must challenge byte order, bounds, offset, sign and coverage.
+Every retained control, or its reviewed replacement, must still fail for its
+intended reason in CI. A control that does not is an open defect, not a pass.
+One is already known: in a stopped local run, the guarded-laws control
+`change_declared_law_order` did not report as caught. The CI run decides it.
 
-The first subunit is implemented in the production `finite::canonical_v2`
-module. Its two public readers have no executable preconditions and use the
-existing canonical integer byte order. The direct shared-source harness passes
-nine obligations: two executable functions, five specifications and four
-induction lemmas. Four independent native tests include every two-byte value,
-all widths/offsets/truncations in the retained patterns, sign-bit boundaries,
-both signed extremes and offsets through usize::MAX. The development gate
-catches nine behavior mutations and five coverage mutations. These are
-development results. Bounded independent source review accepted the readers and
-their coverage, and native, Miri, Clippy and no-std checks passed. All six
-templates were freshly synthesized and independently replayed over 12,064
-inputs; only their source-bound certificates changed. The unit was committed
-and pushed in draft PR #116 at `f88f1a3` after 44/44 acceptance. Its clean-head
-byte, meter, scalar and arithmetic gates passed 9/57/34/3 obligations with
-14/16/16/4 mutation controls respectively. All 134 GitHub checks passed at that
-exact head. Merge authorization remains separate. Both new sources join the
-evaluator identity.
+## Trusted base and evidence strength
 
-Byte helpers alone do not implement a protected state view. The next subunit
-must bind decoding and field interpretation to the same owned meter as eager
-execution, return opaque usage and actual access observations on refusal, and
-derive the scalar tuple from the complete declared raw domain. Costs and
-refusal order for ingress bytes and protected field accesses must be explicit;
-interpreting payloads before their stated charge is not acceptable.
+Name the reviewed specification and translation, Verus/vstd
+`0.2026.09.27.3cf1832`, Z3, verifier Rust 1.98.1, native Rust 1.97.1,
+dependencies, allocator/platform and hardware. Name the manifest
+producer/checker and SHA-256 assumption for evaluator identity.
+Compiling without the required digest checks no longer establishes the former
+include_bytes source-binding guarantee. Name SQLite,
+OS/filesystem, hash provider and observed destination acknowledgements for
+shell claims. The logical meter does not measure physical CPU, allocation,
+construction-time hashing, database scans or external delivery.
 
-The current authority witness retains admitted Value envelopes rather than
-original canonical input bytes. Re-encoding those Values and feeding a checked
-parser would add an unproved adapter. A later mandatory byte-based V2 route
-must bind original admitted bytes and its complete schema descriptor directly.
-Catalog descriptor extraction, envelope framing/hashing, complete decisions,
-law/genesis evaluation, authorization and replay remain proof obligations.
-This stage cannot claim to close them merely by proving byte primitives.
+Verus/Z3 evidence has its own stated scope and trusted base. It is not Lean
+`KernelChecked`. A bare solver unsat report does not become `Proved` under
+[ADR0003](adr/0003-epistemic-status.md). Historical receipts qualify their own
+sources; copies, source scans, tests and review do not qualify a changed tree.
 
-The finite-interpreter paper supplied by the owner is assessed in
-[the assurance note](FINITE_INTERPRETER_ASSURANCE.md). Its philosophical
-scope does not reduce the full-core proof obligation: a fixed specification
-and its implementation can be proved over their complete declared domain,
-while requirements, assumptions and future revisions remain explicit.
+## Retained history
 
-## Fourth proof unit: protected flat-record projection
+Earlier qualified units established shared scalar admission/eager execution
+(`9882136`), the owned meter (`f82bd84`), canonical integer readers (`f88f1a3`),
+protected flat records (`5f88a67`) and typed multi-record composition
+(`1ed6f88`). Bounded decision, law/genesis, schema/catalog and authority receipts
+followed in isolated worktrees. Their contracts, negative evidence and limits
+remain historical; none is a receipt for the simplified combined route.
+The earlier full plan is recoverable at
+`refs/simplify/baseline:docs/V2_VERIFIED_CORE_PLAN.md` in the local recovery tree.
+That ref is not yet a published recovery artifact. Preserve a reachable recovery
+commit or source archive before claiming remote recovery of removed V2.1 code.
 
-The bounded stage contract is [V2_PROTECTED_RECORD_STAGE.md](V2_PROTECTED_RECORD_STAGE.md).
-It preserves arbitrary closed-code intervals and map order, reuses the same
-private meter and mathematical integer readers, and distinguishes descriptor
-attempts from physical tracing. Its parent byte-reader unit is qualified at
-`f88f1a3` and pushed. The actual private record implementation and its dependency
-closure pass 98 obligations with zero errors: 59 executable functions, 51
-specifications/constants and 12 induction lemmas. These counts overlap prior
-units. The protected gate passes 23 proof-failing behavior mutations and seven
-verifying coverage controls; the expanded meter gate passes its 16 controls.
-The standalone integer-reader gate retains its nine-obligation/14-control pass.
+## Work outside this V2 core claim
 
-Independent wire-format and metadata oracles, all 89 synthesis tests, strict
-Clippy and no-std checks passed. Actual strict-provenance Miri passed four
-internal record tests and the public interface test. All six templates were
-freshly synthesized and independently replayed over 12,064 inputs, with only
-their certificates changed. Source review, the full 45-scenario acceptance
-gate, clean-head replay and exact-head GitHub CI remain required. The protected
-record profile and actual source/specification files join the evaluator identity.
-This unit does not close the multi-record, catalog-binding, decision or
-mandatory-authority bridges.
+V2.1 gains a **new supported profile** for 12-type compound-value execution and
+full-width U128 zUSD, including producer/laws/root patch and successful wide
+values such as the retained 2^63 deposit. Narrowing those domains is not
+qualification. The baseline contains recoverable code and historical evidence,
+not an implemented end-to-end replacement for that profile.
 
-
-## Fifth proof unit: original-record execution and typed ABI binding
-
-The parent protected-record unit is qualified at `5f88a67`, pushed in draft
-PR #117 and accepted by GPT-6-Astra at xhigh. All 136 GitHub checks passed at
-that exact head. That is cross-model review by a separate agent with hashed
-source and receipt provenance, not third-party certification or merge authority.
-
-The bounded next-stage contract is [V2_RECORD_EXECUTION_STAGE.md](V2_RECORD_EXECUTION_STAGE.md).
-The actual production pipeline and complete dependency closure pass a
-whole-crate development proof of 145 obligations, with zero errors: 81
-executable functions, 75 specifications/constants and 26 ghost proof helpers.
-Successful typed wire decoding and exact complete bindings derive admitted
-scalar inputs. Exact Source/ID projection prevents same-typed source confusion;
-all three records and eager graph execution reuse the same private meter.
-The implementation preserves full generic IDs, arbitrary closed intervals/maps,
-empty/32/100-field records and defensive malformed-graph behavior.
-
-The new public bounded API returns an opaque result with retained counters and
-source-attempt sequences. A source tag survives Byte/Header failures without
-Read attempts. Metadata admission precedes ingress; a later source refusal
-retains earlier records' usage, and every refusal clears scalar output. The
-private helper additionally preserves arbitrary initial counters and source
-prefixes. Unused fields are still required; no public callback or usage report
-substitutes for this library execution.
-
-Independent native comparisons cover all 144 source/ABI permutations of four
-leaves across the three sources, plus malformed metadata/bytes/graphs, quotas,
-private prefixes and large/empty records. Actual public canonical Value bytes
-also pass. The new 24-control gate distinguishes 18 proof failures from six
-verifying coverage refusals; the 30/16 inherited gates retain their own
-operational-order controls. All three complete harness counts overlap.
-The new sources/profile intentionally refresh evaluator/checker identities.
-Fresh six-template synthesis/replay, strict Clippy/no-std/Miri, complete
-46-scenario acceptance, clean-head replay and Astra review remain required for
-local qualification before push. Exact-head GitHub CI is required after that
-push; current development proof is not release acceptance.
-
-This stage closes the bounded multi-record scalar composition, rather than the
-complete authority route. Next remain catalog extraction/admission and original
-envelope/hash binding, complete decisions, laws/genesis, mandatory V2 authority
-and replay, larger template abstractions, remaining ledger/migration obligations,
-and implementation correspondence under the named compiler/platform base.
+Release engineering separately owns QEMU boot, portable source transport and
+mirrors, archive/privacy scans, the private historical oracle and package/version
+cutover. This scope decision does not remove the release gates before shipping,
+or allow these artifacts to authorize the core. V2 core acceptance can be
+reported separately from release readiness.

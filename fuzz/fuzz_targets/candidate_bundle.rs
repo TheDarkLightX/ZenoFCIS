@@ -30,7 +30,7 @@ fuzz_target!(|input: &[u8]| {
             .into_boxed_slice(),
     );
     let pre_state = Value::Record(Vec::new().into_boxed_slice());
-    let Ok(domain) = Domain::new("zeno-fcis/fuzz-state", 1) else {
+    let Ok(domain) = Domain::new("fuzz/candidate-state", 1) else {
         panic!("fixed fuzz domain must be valid");
     };
     let Ok(pre_root) = hash_value::<RustCryptoSha256>(domain, &pre_state) else {

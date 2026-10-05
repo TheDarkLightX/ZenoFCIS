@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use serde_json::{Value, json};
 use zeno_fcis_codec::CommitmentHasher as _;
 use zeno_fcis_crypto::RustCryptoSha256;
-use zeno_fcis_formal_tools::{LEAN_LINUX_X86_64_TREE_SHA256, inspect_lean_toolchain};
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
@@ -877,80 +876,6 @@ fn rc3_cli_formal_outcomes_and_retention_are_process_level() {
 }
 
 #[test]
-#[cfg(unix)]
-#[ignore = "requires the workflow-pinned Lean 4.30.0 Linux x86-64 distribution"]
-fn pinned_lean_cli_prove_is_process_level() {
-    let lean = PathBuf::from(
-        std::env::var_os("ZENO_FCIS_LEAN").unwrap_or_else(|| panic!("missing pinned Lean")),
-    );
-    let lean_root = PathBuf::from(
-        std::env::var_os("ZENO_FCIS_LEAN_ROOT")
-            .unwrap_or_else(|| panic!("missing pinned Lean root")),
-    );
-    let inventory = inspect_lean_toolchain(&lean_root)
-        .unwrap_or_else(|error| panic!("inventory pinned Lean: {error:?}"));
-    assert_eq!(
-        inventory.tree_sha256().to_string(),
-        LEAN_LINUX_X86_64_TREE_SHA256
-    );
-    let executable = fs::read(&lean).unwrap_or_else(|error| panic!("read pinned Lean: {error}"));
-    let root = TempRoot::new("pinned-lean-process");
-    let tools = root.path().join("tools.json");
-    fs::write(
-        &tools,
-        serde_json::to_vec(&json!({
-            "format": "zeno-fcis/tools/2",
-            "tools": [{
-                "backend": "lean",
-                "path": lean,
-                "version": "4.30.0",
-                "sha256": sha256_hex(&executable),
-                "runtime": {
-                    "root": lean_root,
-                    "tree_sha256": LEAN_LINUX_X86_64_TREE_SHA256
-                },
-                "timeout_ms": 30_000,
-                "max_output_bytes": 1_048_576,
-                "allowed_axioms": ["Quot.sound", "propext"]
-            }]
-        }))
-        .unwrap_or_else(|_| unreachable!()),
-    )
-    .unwrap_or_else(|error| panic!("write Lean manifest: {error}"));
-    let project = root.path().join("project.zeno");
-    fs::copy(
-        repository_root().join("examples/mini-determinator/project.zeno"),
-        &project,
-    )
-    .unwrap_or_else(|error| panic!("copy Mini Determinator project: {error}"));
-    let output = run(Command::new(cli())
-        .arg("prove")
-        .arg(&project)
-        .args(["--claim", "501", "--backend", "lean", "--tools"])
-        .arg(&tools));
-    assert_eq!(
-        output.status.code(),
-        Some(0),
-        "stdout={} stderr={}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    assert!(String::from_utf8_lossy(&output.stdout).contains("kernel checked"));
-    let evidence = evidence_directory(&project);
-    assert_retained(
-        &evidence,
-        &[
-            "formal-run-record.bin",
-            "record.json",
-            "source",
-            "toolchain.json",
-            "transcript-01-kernel-input",
-            "transcript-01-kernel-stdout",
-        ],
-    );
-}
-
-#[test]
 fn check_reports_substance_of_laws_and_claims_that_cannot_constrain_a_transition() {
     let project = repository_root().join("examples/mini-determinator/project.zeno");
     let human = run(Command::new(cli()).arg("check").arg(&project));
@@ -1006,45 +931,32 @@ fn check_reports_law_and_claim_paths_that_name_no_declared_field() {
     .unwrap_or_else(|error| panic!("write paths project: {error}"));
 
     let human = run(Command::new(cli()).arg("check").arg(&project));
-    assert_eq!(human.status.code(), Some(0));
-    let warnings = String::from_utf8_lossy(&human.stderr);
-    for expected in [
-        "warning: law 400 typo reads post.100.119, but type 100 declares no field 119",
-        "warning: claim 500 wrong_root reads pre.101, but 101 is not a declared state type",
-    ] {
-        assert!(
-            warnings.contains(expected),
-            "missing {expected:?} in {warnings}"
-        );
-    }
-    assert!(!warnings.contains("post.100.110,"), "{warnings}");
-
-    let json = run(Command::new(cli())
-        .arg("check")
-        .arg(&project)
-        .args(["--format", "json"]));
-    assert_eq!(json.status.code(), Some(0));
-    let document = json_stdout(&json);
-    assert_eq!(document["status"], "valid");
-    assert_eq!(
-        document["unresolved_paths"],
-        json!({
-            "claims": [
-                {"code": "unknown-root-type", "id": 500, "name": "wrong_root", "path": "pre.101"}
-            ],
-            "laws": [
-                {"code": "unknown-field", "id": 400, "name": "typo", "path": "post.100.119"}
-            ]
-        })
+    assert_eq!(human.status.code(), Some(1));
+    let errors = String::from_utf8_lossy(&human.stderr);
+    assert!(
+        errors.contains("type 100 declares no field 119"),
+        "{errors}"
+    );
+    assert!(
+        errors.contains("type 101 is not declared for Pre"),
+        "{errors}"
     );
 
-    let refused = run(Command::new(cli()).arg("check").arg(&project).args([
-        "--format",
-        "json",
-        "--require-resolved-paths",
-    ]));
-    assert_eq!(refused.status.code(), Some(1));
-    assert_eq!(json_stdout(&refused)["status"], "unresolved-paths");
+    for strict in [false, true] {
+        let mut command = Command::new(cli());
+        command
+            .arg("check")
+            .arg(&project)
+            .args(["--format", "json"]);
+        if strict {
+            command.arg("--require-resolved-paths");
+        }
+        let refused = run(&mut command);
+        assert_eq!(refused.status.code(), Some(1));
+        let document = json_stdout(&refused);
+        assert_eq!(document["status"], "invalid");
+        assert_eq!(document["diagnostics"].as_array().map(Vec::len), Some(2));
+    }
 
     let shipped = repository_root().join("examples/mini-determinator/project.zeno");
     let clean = run(Command::new(cli())
@@ -1052,6 +964,48 @@ fn check_reports_law_and_claim_paths_that_name_no_declared_field() {
         .arg(&shipped)
         .arg("--require-resolved-paths"));
     assert_eq!(clean.status.code(), Some(0));
+}
+
+#[test]
+fn check_mandatorily_resolves_delivery_payload_paths() {
+    let root = TempRoot::new("delivery-paths");
+    let project = root.path().join("project.zeno");
+    let base = String::from_utf8(read(
+        repository_root().join("examples/minimal/project.zeno"),
+    ))
+    .unwrap_or_else(|error| panic!("read valid source: {error}"));
+    let declarations = "type 105 int Count in 0..=3;\nfield 110 104 count 105;\n\
+        effect 350 deliver destination 103 payload 104;\n\
+        channel 351 notify destination 103 payload 104;\n";
+    for (projection, valid) in [
+        ("outbox.104.110", true),
+        ("effects.104.110", true),
+        ("outbox.999.110", false),
+        ("effects.999.110", false),
+        ("outbox.104.999", false),
+        ("effects.104.999", false),
+        ("events.999", false),
+    ] {
+        let source = format!("{base}{declarations}law 401 delivery = {projection} >= 0;\n");
+        fs::write(&project, source)
+            .unwrap_or_else(|error| panic!("write delivery path fixture: {error}"));
+        let result = run(Command::new(cli())
+            .arg("check")
+            .arg(&project)
+            .args(["--format", "json"]));
+        assert_eq!(
+            result.status.code(),
+            Some(i32::from(!valid)),
+            "{projection}: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        let document = json_stdout(&result);
+        assert_eq!(document["status"], if valid { "valid" } else { "invalid" });
+        if !valid {
+            assert_eq!(document["diagnostics"].as_array().map(Vec::len), Some(1));
+            assert_eq!(document["diagnostics"][0]["code"], "ZENO-E0203");
+        }
+    }
 }
 
 #[test]
@@ -1090,4 +1044,29 @@ fn require_substantive_refuses_vacuous_projects_and_accepts_transition_laws() {
         String::from_utf8_lossy(&accepted.stderr)
     );
     assert!(accepted.stderr.is_empty());
+}
+
+#[test]
+fn normal_cli_refuses_the_retired_shallow_lean_producer() {
+    let root = TempRoot::new("retired-lean");
+    let project = root.path().join("project.zeno");
+    fs::copy(
+        repository_root().join("examples/mini-determinator/project.zeno"),
+        &project,
+    )
+    .unwrap_or_else(|error| panic!("project: {error}"));
+    let tools = root.path().join("tools.json");
+    // Configuration is inert: producer refusal must precede tool execution.
+    fs::write(&tools, serde_json::to_vec(&json!({"format":"zeno-fcis/tools/2","tools":[{"backend":"lean","path":"/definitely-absent-runtime/bin/lean","version":"4.30.0","sha256":"11".repeat(32),"runtime":{"root":"/definitely-absent-runtime","tree_sha256":zeno_fcis_formal_tools::LEAN_LINUX_X86_64_TREE_SHA256},"timeout_ms":30000,"max_output_bytes":1048576,"allowed_axioms":["Quot.sound","propext"]}]})).unwrap_or_else(|error| panic!("manifest: {error}"))).unwrap_or_else(|error| panic!("tools: {error}"));
+    let before = artifact_snapshot(root.path());
+    let result = run(Command::new(cli())
+        .arg("prove")
+        .arg(&project)
+        .args(["--claim", "501", "--backend", "lean", "--tools"])
+        .arg(&tools));
+    assert_eq!(result.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&result.stderr).contains("UnsupportedMode"));
+    assert!(!String::from_utf8_lossy(&result.stdout).contains("kernel checked"));
+    assert_eq!(artifact_snapshot(root.path()), before);
+    assert!(!root.path().join(".zeno-fcis").exists());
 }

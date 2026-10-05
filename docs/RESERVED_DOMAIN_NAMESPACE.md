@@ -1,70 +1,40 @@
-# Reserved commitment-domain namespace
+# Reserved commitment domains
 
-## Purpose
+V2 reserves exactly the name `zeno-fcis` and every name beginning with
+`zeno-fcis/`. `Domain::new`, `DomainPrefix::try_new`, and
+`StateDomainBinding::try_new` reject those names at their normal public
+boundaries. Their `try_new_project` conveniences enforce the same reservation.
+There is no normalization: `zeno-fcis-app/state`, `app/zeno-fcis/state`, and
+`ZENO-FCIS/state` are different names and do not enter this namespace.
 
-Every ZenoFCIS commitment hashes a domain name and version together with its
-payload. Library identities use names in the `zeno-fcis/` namespace:
-`zeno-fcis/candidate` for candidate IDs, `zeno-fcis/value` for patch
-preconditions, and so on. The V1 constructors for project-supplied names
-accept any bounded ASCII name. A project could therefore bind its state root
-to a library domain such as `zeno-fcis/candidate` or choose the profile prefix
-`zeno-fcis`. Its commitments would then share a domain with library
-identities, which defeats the purpose of domain separation.
+Library code selects a fixed `Domain<'static>` from
+`zeno_fcis_codec::domains`. Each constant fixes both name and version; `ALL`
+contains the complete sorted registry. No API accepts a string and returns an
+arbitrary reserved domain, and no caller/provider declaration grants an
+exception. Private `Domain` fields prevent constructing or changing a tag.
+Selecting a published constant gives no verification or publication authority.
 
-This package reserves the namespace and adds project constructors that reject
-it.
+The registry contains 147 entries. Existing library pairs retain their exact
+name and version. The domain preimage remains
+`ZENOFCIS-HASH\0 || version:u16be || name_length:u16be || name ||
+payload_length:u64be || payload`. Native golden tests independently spell out
+each original name/version and construct this preimage. The cryptographic
+known-answer vectors retain their original expected values.
 
-## Inputs and outputs
+The fixed V2 shell entries are `V2_STATE`, `V2_GENESIS`, `V2_PUBLICATION`,
+`V2_CHAIN`, `V2_EFFECT_DELIVERY`, `V2_CHECKPOINT`, and `V2_CERTIFICATE`, each
+version 1 under `zeno-fcis/v2/` with the corresponding lowercase hyphenated
+suffix. `OUTBOX_ENTRY` and `DELIVERY` retain their original version-1 domains.
+`DELIVERY_INTERPRETER` uses version 2 at `zeno-fcis/delivery-interpreter` to
+bind the concrete memory delivery source and its sealed hash provider. The
+SQLite genesis records this identity and refuses a different interpreter at
+open or delivery binding. This source identity assumes the named compiler and
+platform; it is not binary attestation or a proof of external delivery.
+Private library hash helpers accept an explicit `Domain` rather than a string.
+Project state/profile constructors cannot repurpose those fixed names.
 
-- `zeno_fcis_project::RESERVED_DOMAIN_NAMESPACE` is `zeno-fcis`.
-  `is_reserved_domain_name(name)` is true for `zeno-fcis` itself and every
-  name that starts with `zeno-fcis/`, and false otherwise. For example,
-  `zeno-fcis-app/state` and `myproject/zeno-fcis/x` are not reserved.
-- `DomainPrefix::try_new_project` returns `ProfileError::InvalidDomainPrefix`
-  for a reserved prefix, in addition to every rejection `try_new` makes.
-- `StateDomainBinding::try_new_project` returns
-  `AuthorityError::Encode(EncodeError::InvalidDomain)` for a reserved state
-  domain, in addition to every rejection `try_new` makes.
-
-## Authority boundary
-
-The project constructors change no canonical bytes and no identity. The V1
-constructors keep accepting reserved names, so existing profiles and stores
-are unchanged. Projects opt in by calling the project constructors. Making the
-check mandatory is recorded for V2.
-
-## Trusted dependencies
-
-The check compares bytes only. It adds no dependency.
-
-## Deterministic resource bounds
-
-The check is one prefix comparison over an already bounded name.
-
-## Laws
-
-1. A name is reserved exactly when it equals `zeno-fcis` or starts with
-   `zeno-fcis/`.
-2. A project constructor accepts a name only if the corresponding V1
-   constructor accepts it and the name is not reserved.
-
-## Negative cases
-
-- `zeno-fcis`, `zeno-fcis/`, `zeno-fcis/candidate`, and `zeno-fcis/value` are
-  reserved.
-- `zeno-fcisx`, `zeno-fcis-app/state`, `myproject/zeno-fcis/x`, and `zeno` are
-  not.
-- `try_new_project` rejects reserved state domains and prefixes, and the V1
-  `try_new` constructors still accept them.
-
-## Assumptions
-
-- Library code keeps its own domain names inside the reserved namespace.
-
-## Explicit nonclaims
-
-- The V1 constructors do not enforce the reservation. Code that calls them
-  can still choose a reserved name.
-- This package does not register individual library domains or detect a
-  collision between two library domains. A registry with golden preimages is
-  separate follow-up work.
+This preserves domain preimage bytes, not every caller's payload format. The
+separate evidence/law V2 migration intentionally changes certain payloads and
+identities; old receipts for those subjects must be regenerated. The registry
+and hash provider are native shell/evidence dependencies. Listing them in an
+inventory does not establish a Verus theorem about their implementation.

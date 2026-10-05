@@ -10,6 +10,11 @@ use zeno_fcis_shell::{DeliveryCollision, IdempotentDestination, MemoryDestinatio
 pub struct Destination(Rc<RefCell<MemoryDestination>>);
 
 impl Destination {
+    #[cfg(feature = "sqlite")]
+    pub(crate) fn memory(&self) -> std::cell::RefMut<'_, MemoryDestination> {
+        self.0.borrow_mut()
+    }
+
     pub fn delivered_count(&self) -> usize {
         self.0.borrow().delivered_count()
     }

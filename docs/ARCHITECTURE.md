@@ -2,6 +2,54 @@
 
 ZenoFCIS separates protocol meaning from runtime mechanism.
 
+It intends to become a **state of the art high assurance software factory**.
+A formally verified functional core is the architectural foundation; the
+[2.1 roadmap](V2_1_FACTORY_PLAN.md) adds tooling for reviewing meaning, reusing
+verified components and maintaining applications through change.
+
+## Formally verified functional core
+
+The central assurance goal for V2 is a **formally verified functional core**:
+a pure, total decision boundary whose executable implementation has a
+machine-checked proof of conformance to its versioned decision contract over
+the full admitted input domain.
+
+Purity is reviewed at the complete authoritative invocation boundary. Immutable
+input bytes and bound policy determine the result; checked results expose no
+mutable aliases to admitted state. Private, exclusively owned invocation
+scratch may change while computing that result. The compound parser's meter
+and read log account for actual parsing work and refusals within this boundary;
+they do not make it an imperative-shell component. The shell acquires inputs,
+persists authorized results and delivers effects.
+
+Stateful preparation handles and utilities that append to caller buffers are
+not individually pure decision functions. Their contracts must identify that
+state explicitly. Preparation does not confer decision, resource-usage or
+publication authority; the authoritative invocation evaluates and accounts for
+its own work. Ownership review alone does not establish semantic correctness
+or complete the machine-checked proof obligations.
+
+The contract covers complete decisions, successor state, ordered effect plans,
+laws, genesis, logical resources and refusal behavior. Verification must also
+establish the connections from original-byte admission through decision
+construction to authorization and replay. An open connection remains a
+completion obligation.
+
+V2's supported authority route must require library-owned verified execution,
+with private checked results between stages. Applications declare rules;
+synthesizers and LLMs may propose programs. Unsupported contracts are refused,
+and application decision or law callbacks cannot replace this route.
+
+Each claim binds an implementation, specification, domain and named trusted
+base. Specification adequacy, external fact authentication, persistence and
+delivery retain their own review and qualification obligations.
+
+V2 remains under construction. The
+[implementation and proof plan](V2_VERIFIED_CORE_PLAN.md) tracks the bounded
+verified units, open bridges and release gates. The dependency rings below
+describe the existing library; their presence alone does not establish the
+completed V2 guarantee.
+
 ## Dependency rings
 
 1. Foundations: `zeno-fcis-core`, `zeno-fcis-value`, and `zeno-fcis-codec`

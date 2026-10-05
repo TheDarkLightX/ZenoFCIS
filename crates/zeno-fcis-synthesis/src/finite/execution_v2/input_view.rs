@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
-mod spec;
+pub(super) mod spec;
 
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -19,7 +19,15 @@ pub struct Variant {
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug, Eq, PartialEq)]
 /// A complete finite leaf descriptor; codes may occupy any inclusive i64 interval.
+#[non_exhaustive]
 pub enum Leaf {
+    /// Original unsigned canonical u128, with an injective bounded scalar projection.
+    U128 {
+        /// Complete inclusive unsigned lower bound.
+        min: u128,
+        /// Complete inclusive unsigned upper bound; scalar admission requires i64 fit.
+        max: u128,
+    },
     /// A signed canonical i128 constrained by an inclusive i64 value interval.
     I128 {
         /// Inclusive lower value bound.
@@ -120,9 +128,10 @@ fn validate_variants(variants: &[Variant], min: i64, max: i64) -> bool {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::leaf_valid(*leaf),
 ))]
-fn validate_leaf(leaf: &Leaf) -> bool {
+pub(super) fn validate_leaf(leaf: &Leaf) -> bool {
     match leaf {
         Leaf::I128 { min, max } => min <= max,
+        Leaf::U128 { min, max } => min <= max && *max <= i64::MAX as u128,
         Leaf::Bool => true,
         Leaf::Enum {
             min, max, variants, ..
@@ -215,9 +224,19 @@ fn decode_variant(
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::scalar(bytes@, offset, *leaf),
 ))]
-fn decode_scalar(bytes: &[u8], offset: usize, leaf: &Leaf) -> Option<(i64, usize)> {
+pub(super) fn decode_scalar(bytes: &[u8], offset: usize, leaf: &Leaf) -> Option<(i64, usize)> {
     let (tag, payload_offset) = read_big_endian(bytes, offset, 1)?;
     match leaf {
+        Leaf::U128 { min, max } => {
+            if tag != 0x03 {
+                return None;
+            }
+            let (value, end) = read_big_endian(bytes, payload_offset, 16)?;
+            if value < *min || value > *max || value > i64::MAX as u128 {
+                return None;
+            }
+            Some((value as i64, end))
+        }
         Leaf::I128 { min, max } => {
             if tag != 0x04 {
                 return None;
@@ -364,6 +383,7 @@ pub closed spec fn schema_valid(fields: Seq<Field>) -> bool {
 pub closed spec fn leaf_domain(leaf: Leaf) -> super::super::evaluation::Domain {
     match leaf {
         Leaf::Bool => super::super::evaluation::Domain::Bool,
+        Leaf::U128 { min, max } => super::super::evaluation::Domain::Int { min: min as i64, max: max as i64 },
         Leaf::I128 { min, max } | Leaf::Enum { min, max, .. }
         | Leaf::Sum { min, max, .. } => super::super::evaluation::Domain::Int { min, max },
     }
@@ -394,6 +414,10 @@ pub(super) fn scalar_domain(leaf: &Leaf) -> super::super::evaluation::Domain {
     proof! { reveal(leaf_domain); }
     match leaf {
         Leaf::Bool => super::super::evaluation::Domain::Bool,
+        Leaf::U128 { min, max } => super::super::evaluation::Domain::Int {
+            min: *min as i64,
+            max: *max as i64,
+        },
         Leaf::I128 { min, max } | Leaf::Enum { min, max, .. } | Leaf::Sum { min, max, .. } => {
             super::super::evaluation::Domain::Int {
                 min: *min,

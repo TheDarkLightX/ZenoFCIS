@@ -1,0 +1,13 @@
+{
+  "schema": "zeno-fcis/template-schema-origin/1",
+  "retained_original": "verification/kernel-laws/src/oracle/templates/agent-treasury-guard/original/v2/schema.zcve",
+  "sha256": "1666ce1610f943d7029a225dbe7314f7bbea0cf154a1b6bfbb465e29be834fd9",
+  "bytes": 1354,
+  "schema_commitment": "d732026ce25b290138cd0a984bf7c54ac5500380148a0ad5028ba9e914766433",
+  "source_inputs": {
+    "project.zeno": "a8aa8b9b2693a639b81d007ca887205f5e147f4dead38ea0b7986dae4b565197",
+    "build.rs": "af7ea3831bfaa6a330a81b5f1d9f503e4490aa1535a2fe490b4e00fd95d054ac",
+    "profile.rs": "1c63542749ed49a33b7703bc734204bb3c2949b8fd6a18e8527279857308c494"
+  },
+  "qualification": "Retained actual original lower_schema output; full Description matched at catalog binding; fresh build assertion must also pass."
+}

@@ -16,6 +16,8 @@ import subprocess
 import tempfile
 import zipfile
 
+from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
+from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import UNIT_SOURCES as SCALAR_SOURCES, once
 from verus_coverage import require_coverage
@@ -25,15 +27,17 @@ PROFILE = Path("verification/verus/metered-execution.json")
 HARNESS = Path("verification/verus/metered_execution.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs")
 METER, SPEC = SUBJECT.parent / "meter.rs", SUBJECT.parent / "spec.rs"
+RESOURCE = Path("crates/zeno-fcis-core/src/resource.rs")
 INPUT = SUBJECT.parent / "input_view.rs"
 INPUT_SPEC = SUBJECT.parent / "input_view/spec.rs"
 CANONICAL = SUBJECT.parent.parent / "canonical_v2/mod.rs"
 CANONICAL_SPEC = CANONICAL.parent / "spec.rs"
-UNIT_SOURCES = (HARNESS, *SCALAR_SOURCES[1:], SUBJECT, METER, SPEC,
-                INPUT, INPUT_SPEC, CANONICAL, CANONICAL_SPEC,
-                SUBJECT.parent / "record_execution.rs", SUBJECT.parent / "record_execution/spec.rs")
+UNIT_SOURCES = (HARNESS, RESOURCE, *SCALAR_SOURCES[1:], SUBJECT, METER, SPEC,
+                INPUT, INPUT_SPEC, CANONICAL, CANONICAL_SPEC)
+
+UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
-           SUBJECT.parent / "input_view/tests.rs", SUBJECT.parent / "record_execution/tests.rs",
+           SUBJECT.parent / "input_view/tests.rs", SUBJECT.parent / "composition/record_tests.rs",
            Path("tools/check_metered_execution.py"), Path("tools/test_check_metered_execution.py"),
            Path("tools/check_finite_execution.py"), Path("tools/check_verus.py"),
            Path("tools/verus_coverage.py"), Path("Cargo.toml"), Path("rust-toolchain.toml"),
@@ -41,6 +45,11 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
            Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
            Path("crates/zeno-fcis-synthesis/tests/v2_execution.rs"))
+
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
+                                Path("verification/verus/authority_v2_sources.json"))))
+
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
 
 
 def snapshot() -> dict[str, str]:
@@ -56,7 +65,7 @@ def entry_contract(source: str, replacement: str) -> str:
     return source[:start] + replacement + source[end:]
 
 
-def mutation_sources(execution: str, meter: str, spec: str) -> dict[str, tuple[Path, str, str]]:
+def mutation_sources(execution: str, meter: str, spec: str, resource: str) -> dict[str, tuple[Path, str, str]]:
     mutations = {}
     for name, before, after in (
         ("omit_step_charge", "meter.charge(Resource::Step, 1)", "meter.charge(Resource::Step, 0)"),
@@ -69,11 +78,11 @@ def mutation_sources(execution: str, meter: str, spec: str) -> dict[str, tuple[P
         mutations[name] = (SUBJECT, once(execution, before, after), "proof")
     for name, before, after in (
         ("accept_exhausted_charge", "if next > limit {", "if false {"),
-        ("alias_step_counter", "Self::Step => 7", "Self::Step => 6"),
         ("mutate_usage_on_overflow", "let Some(next) = self.used.counters[index].checked_add(amount) else {",
          "let Some(next) = self.used.counters[index].checked_add(amount) else { self.used.counters[index] = 0;"),
     ):
         mutations[name] = (METER, once(meter, before, after), "proof")
+    mutations["alias_step_counter"] = (RESOURCE, once(resource, "Self::Step => 7", "Self::Step => 6"), "proof")
     # Computing the node before charging preserves final outputs/counters. This
     # mutant must verify, then fail the independent operational body inventory.
     reordered = once(execution, "        if let Err(error) = meter.charge(Resource::Step, 1) {",
@@ -103,6 +112,7 @@ def mutation_sources(execution: str, meter: str, spec: str) -> dict[str, tuple[P
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     rust = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024",
             "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)"]
+    rust += native_dependency_args(ROOT, directory, environment)
     executable = directory / "metered-tests"
     verifier.require_success(verifier.run([*rust, "--test", str(HARNESS), "-o", str(executable)], ROOT, environment))
     native = verifier.run([str(executable)], ROOT, environment)
@@ -145,7 +155,7 @@ def check(cache: Path, install: bool) -> dict:
                    if not key.startswith(("VERUS_", "VARGO_")) and key not in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")}
     environment.update(RUSTUP_TOOLCHAIN=pin["rust_toolchain"], VERUS_Z3_PATH=str(tools / "z3"))
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024", "--no-cheating",
-               "--no-external-by-default", "--num-threads", "2", "--output-json", "--log", "vir",
+               "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
     with tempfile.TemporaryDirectory(prefix="zeno-fcis-meter-proof-") as temporary:
@@ -160,12 +170,14 @@ def check(cache: Path, install: bool) -> dict:
         native = native_checks(directory, pin, environment)
         print("V2 meter: exact proof coverage and native/API boundaries passed", flush=True)
         for name, (path, changed, expected) in mutation_sources(
-                (ROOT / SUBJECT).read_text(), (ROOT / METER).read_text(), (ROOT / SPEC).read_text()).items():
+                (ROOT / SUBJECT).read_text(), (ROOT / METER).read_text(), (ROOT / SPEC).read_text(),
+                (ROOT / RESOURCE).read_text()).items():
             specimen = directory / name
             for unit in UNIT_SOURCES:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
+            adjust_specimen_source_lengths(specimen)
             mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"), str(HARNESS)], specimen, environment)
             result = json.loads(mutant.stdout).get("verification-results", {})
             coverage_error = None

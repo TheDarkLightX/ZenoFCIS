@@ -8,6 +8,11 @@ and check. It is evidence for the decision recorded in the
 [design records](adr/README.md): extend `.zeno` v1 and the finite IR, or build a
 separate semantic core.
 
+V2 update: mandatory elaboration now closes finding 9. Its original three-path
+witness is retained as a refusal control. The other findings below remain the
+historical V1 characterization; this update is not a new zUSD audit or a claim
+that the remaining expressiveness limits have been resolved.
+
 ## Method
 
 - **Source of truth.** ZenoDEX commit
@@ -64,7 +69,7 @@ separate semantic core.
 | 6 | Reason order | The registry's ranks disagree with native order when several checks fail. Disjoint guards or early returns reproduce native order under any ranking, but then the precedence does not decide which reason wins. See [Reason order](#reason-order). | Not applicable | Pinned Python authority |
 | 7 | Frame: fields a step leaves unchanged | Expressible only by listing every field. Law 510 needs 65 comparisons, 63 of them frame equalities. | Not applicable | Laws 510 and 513 in the attempt |
 | 8 | Conservation over fixed fields | Expressible: supply conservation, liquidation collateral conservation, and the matching debt burn. Conservation across vaults would need collections, which v1 lacks. | Not representable | Laws 501, 511, and 512 |
-| 9 | Checked field references | Elaboration does not resolve paths against the schema: `post.100.999`, `command.101.777`, and `post.555.1.2.3` elaborate without a diagnostic. `zeno-fcis check` now warns about them, and `--require-resolved-paths` refuses them ([law path resolution](LAW_PATH_RESOLUTION.md)). | Not applicable | `zeno_v1_accepts_formula_paths_that_name_no_declared_field` |
+| 9 | Checked field references | V1 admitted `post.100.999`, `command.101.777`, and `post.555.1.2.3`. V2 elaboration refuses all three with `UnknownReference`; normal CLI loading refuses without an opt-in flag ([law path resolution](LAW_PATH_RESOLUTION.md)). | Not applicable | `v2_elaboration_rejects_the_original_unresolved_path_witness` |
 | 10 | Unbounded command arguments | A bounded schema rejects a large argument at admission, where the native code rejects it through the action's own checks. The mounted `ZusdCommandV1` holds amounts as `u128`, so an argument of 2^128 or more is not representable. | Not representable | `ZusdCommandV1` |
 
 ### Reason order
@@ -130,7 +135,7 @@ option is chosen:
 - a way to state per-action reason order without restating every earlier
   check in each guard;
 - a frame construct;
-- path resolution in elaboration (1.x `check` now reports unresolved paths);
+- path resolution in elaboration (implemented by V2; the original witness now refuses);
 - minimum, conditional expressions, and local bindings;
 - evaluation beyond i128, and literals beyond u64.
 

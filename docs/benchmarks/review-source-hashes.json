@@ -1,0 +1,10 @@
+{
+  "cases.json": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55",
+  "CLAUDE_HANDOFF.md": "62afc305c2ec3bea4940cb82ca58b8dba171e9eca891e7539682f8c8ff3c2786",
+  "independent-fixture-check.json": "59206363ce998c9d0dff5775ba55a4226feee0ca0ae5da3aea6342108b268b85",
+  "PROTOCOL.md": "0dc53ecc408a7c60b6e250aaa20e6a451b539d0ceb90e574216af4ac7aab5d83",
+  "DESIGN.md": "f6486d60ef762d9dadae2227ab6b7edb16908435cc26965b3d2d641160713761",
+  "independent_check.py": "3cba8eab910d732d7b8cf9a8d9c3aba363f9d0f6c707e94d5c3b241eafc91f8d",
+  "README.md": "ee885c74c9440be3c61eb6a1cad4bcaa75e641648118732842654c21c49ae0db",
+  "generate_cases.py": "bbde23fc085cbc3a6cace83f51f56d841335982bc17764b77cd93b538ff430f6"
+}

@@ -1,0 +1,68 @@
+{
+  "checked_utc": "2026-10-04T04:18:40.106629+00:00",
+  "checksum_mismatches": [],
+  "historical_source_freeze_against_current": {
+    "entries": 12,
+    "mismatches": [
+      "analyze.py"
+    ],
+    "missing": []
+  },
+  "json_checksums_recomputed": 1600,
+  "live_v2_head_not_a_clean_source_identity": "1ed6f88f7b1098bed6c409bc9aa3c12c99d43c3c",
+  "live_v2_inspected_file_sha256": {
+    "AGENTS.md": "29895ad792342d76065cb2c757152b77cc6af26eaffb81470b8f31b6a058092c",
+    "crates/zeno-fcis-authority/src/lib.rs": "84c5d31455e018d8597c4908f4172ec44c0a0938a6e68673165d271f831616e6",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound.rs": "36075940a52ae18015f6463a2c060a65a598f36cbaf38775d31d0230b7c587a3",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs": "f68a9daf54f645b3b4d94b0705e96c02d52a74d93b385bd85d434a0990389dc4",
+    "crates/zeno-fcis-synthesis/src/finite/ir.rs": "a18e9795e6abda418f8cca3d1a19a39c2ee522913120d33e13c4692bcd1ff2b0",
+    "crates/zeno-fcis-synthesis/src/finite/mod.rs": "41b54262e4f9de8ac5becd7327faca73c0ab592dbaf2f7f7e414a9a45fdd9e45",
+    "docs/V2_1_FACTORY_PLAN.md": "54b08d46356805a3403283290401b0a1711cb4631f980285e769b874d125d6ff",
+    "skills/handoff-completion-gate/SKILL.md": "3af608f109f26194ad7a06a076043980bc05356391e232de2f92277a760aab5a"
+  },
+  "manifest": {
+    "entries": 54,
+    "mismatches": [],
+    "missing": []
+  },
+  "model": "gpt-6-astra",
+  "not_run": [
+    "Rust optimizer/build/tests",
+    "Lean/Verus replay",
+    "dependency download/license qualification"
+  ],
+  "proof_receipt_files": {
+    "entries": 5,
+    "mismatches": [],
+    "missing": []
+  },
+  "published_commit": "a69ed8db594d95279a46bff0f65185ef67d51f98",
+  "reasoning_effort": "max",
+  "repeat_config_and_controls_identical": true,
+  "repeat_stable_field_differences": [],
+  "stored_variant_records_checked": 800,
+  "totals": {
+    "main": {
+      "aggregate_nodes": {
+        "local_baseline": 895,
+        "raw": 1506,
+        "rewrite_egg": 854,
+        "semantic_egg": 816
+      },
+      "invalid_probes": 8176,
+      "max_recorded_egraph_nodes": 1351,
+      "valid_comparisons": 12544
+    },
+    "repeat": {
+      "aggregate_nodes": {
+        "local_baseline": 895,
+        "raw": 1506,
+        "rewrite_egg": 854,
+        "semantic_egg": 816
+      },
+      "invalid_probes": 8176,
+      "max_recorded_egraph_nodes": 1351,
+      "valid_comparisons": 12544
+    }
+  }
+}

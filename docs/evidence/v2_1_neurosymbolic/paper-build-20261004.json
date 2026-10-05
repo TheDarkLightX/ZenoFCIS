@@ -1,0 +1,41 @@
+{
+  "kind": "paper_build_only",
+  "markdown_sha256": "a1b7cae1c52437afc68b90d98bc5ff7a826674fb3e1a1ea22d8ff7905a144b1d",
+  "latex_sha256": "710d79dbbe4f9215ac8508d766045eaf29aca467dd57136b5c474dd47298f992",
+  "pdf_sha256": "00f844f744cd74ee894858f581d7a1b2f1558a394563ed81b7e310e6ebfcd8ed",
+  "passes": [
+    {
+      "pass": 1,
+      "exit_code": 0,
+      "command": [
+        "pdflatex",
+        "-no-shell-escape",
+        "-halt-on-error",
+        "-interaction=nonstopmode",
+        "-output-directory",
+        "/tmp/zenofcis-neurosymbolic-20261004/root/pdf-build",
+        "/tmp/zenofcis-neurosymbolic-20261004/root/pdf-build/paper.tex"
+      ],
+      "stdout_sha256": "9b4a55dac6e04e7939b67e3088c9a112d499123b21cf71e2c94c17708cc7c940"
+    },
+    {
+      "pass": 2,
+      "exit_code": 0,
+      "command": [
+        "pdflatex",
+        "-no-shell-escape",
+        "-halt-on-error",
+        "-interaction=nonstopmode",
+        "-output-directory",
+        "/tmp/zenofcis-neurosymbolic-20261004/root/pdf-build",
+        "/tmp/zenofcis-neurosymbolic-20261004/root/pdf-build/paper.tex"
+      ],
+      "stdout_sha256": "9b4a55dac6e04e7939b67e3088c9a112d499123b21cf71e2c94c17708cc7c940"
+    }
+  ],
+  "blocking_tex_messages": [],
+  "pdfinfo": "Title:           Toward a Neurosymbolic Software Factory: Bounded Proposal and Checked Transformation in ZenoFCIS\nSubject:         Research design draft; scoped symbolic evidence; proposed neural loop\nKeywords:        ZenoFCIS, neurosymbolic software factory, translation validation\nAuthor:          Dana Edwards\nCreator:         LaTeX with hyperref\nProducer:        pdfTeX-1.40.25\nCreationDate:    Sun Oct  4 02:19:58 2026 EDT\nModDate:         Sun Oct  4 02:19:58 2026 EDT\nCustom Metadata: yes\nMetadata Stream: no\nTagged:          no\nUserProperties:  no\nSuspects:        no\nForm:            none\nJavaScript:      no\nPages:           11\nEncrypted:       no\nPage size:       612 x 792 pts (letter)\nPage rot:        0\nFile size:       285693 bytes\nOptimized:       no\nPDF version:     1.5\n",
+  "validation_filter_correction": "Initial warning scan mistook the informational rerunfilecheck package description for a rerun warning; inspected and narrowed to actual warnings. Both compilation passes succeeded.",
+  "success": true,
+  "runtime_or_neural_experiments_run": false
+}

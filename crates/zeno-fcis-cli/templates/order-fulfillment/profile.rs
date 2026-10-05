@@ -1,7 +1,7 @@
 //! Reviewed example bindings shared by generation and the runtime law checker.
 //! These hashes identify local source and policy, not independently certified builds.
 
-use zeno_fcis_codec::{CanonicalEncode, Domain, Hash32, commitment};
+use zeno_fcis_codec::{Domain, Hash32, commitment};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_laws::{
     DecisionScope, GenesisApplicability, LawDefinition, LawEvidenceRequirement, LawFamilyPolicy,
@@ -48,13 +48,13 @@ pub fn source_hash() -> Hash32 {
             "\0",
             include_str!("src/lib.rs"),
             "\0",
-            include_str!("src/program.rs"),
-            "\0",
-            include_str!("src/laws.rs"),
-            "\0",
             include_str!("src/delivery.rs"),
             "\0",
-            include_str!("decision_to_synthesis.py"),
+            include_str!("src/v2_contract.rs"),
+            "\0",
+            include_str!("v2/policy.json"),
+            "\0",
+            include_str!("v2/schema-origin.json"),
             "\0",
             include_str!("synthesis.json"),
             "\0",
@@ -64,17 +64,28 @@ pub fn source_hash() -> Hash32 {
             "\0",
             include_str!("synthesized/vectors.json"),
             "\0",
-            include_str!("synthesized/transition.rs")
+            include_str!("synthesized/transition.rs"),
+            "\0",
+            include_str!("decision_to_synthesis.py")
         )
         .as_bytes(),
     );
-    let program = digest(
-        "example/order-fulfillment/closed-ir",
-        include_bytes!("synthesized/program.zcve"),
+    let schema = digest(
+        "example/order-fulfillment/v2-schema",
+        include_bytes!("v2/schema.zcve"),
+    );
+    let policy = digest(
+        "example/order-fulfillment/v2-policy",
+        include_bytes!("v2/policy.zcve"),
     );
     digest(
         "example/order-fulfillment/source-complete",
-        &[source.as_bytes().as_slice(), program.as_bytes().as_slice()].concat(),
+        &[
+            source.as_bytes().as_slice(),
+            schema.as_bytes().as_slice(),
+            policy.as_bytes().as_slice(),
+        ]
+        .concat(),
     )
 }
 

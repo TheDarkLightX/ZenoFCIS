@@ -1,5 +1,15 @@
 # V2 record-to-execution proof unit
 
+Historical stage contract. S3 of the smaller V2 simplification removes this
+standalone record driver and public API. The supported route uses the shared
+protected decoder and composition evaluator through mandatory Authority. Six
+record-driver tests and their independent oracles migrate to composition tests;
+lower-level malformed graphs remain checked at the evaluator boundary. This
+does not claim unchanged public refusal ordering for the removed entry point.
+The original contract below is retained as migration history, not current API
+instructions or final qualification. See [the current plan](V2_VERIFIED_CORE_PLAN.md)
+and [API migration](V2_PROGRAM_API_MIGRATION.md).
+
 Parent: `5f88a67b6ab470e208f2a2507dfcbc9a1d6e2e73`, the protected flat-record
 unit. Its clean-head five proof gates passed after 45/45 acceptance. Astra at
 xhigh accepted that exact bounded unit; draft PR #117 is pushed. Work

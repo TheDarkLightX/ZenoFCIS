@@ -1,7 +1,11 @@
 #![forbid(unsafe_code)]
 
 use core::mem::size_of;
-use zeno_fcis::prelude::*;
+// V2 migration: the checked program API is the crate root; V1 data types and
+// standalone tools moved under `legacy`. This is not the normal V2 authority route.
+use zeno_fcis::legacy;
+use zeno_fcis::legacy::prelude::*;
+use zeno_fcis::{PublicationOutcome, zero_limits};
 
 const AUTHORING_PROJECT: &str = r#"zeno 1;
 project 7 consumer_authoring;
@@ -25,13 +29,12 @@ claim 500 identity cvc5 relational = pre.100 == pre.100;
 "#;
 fn main() -> Result<(), &'static str> {
     foundational_errors_interoperate()?;
-    let limits = BudgetLimits::zero().with_limit(Resource::Read, 1);
-    let mut budget = Budget::new(limits);
-    budget
-        .charge(Resource::Read, 1)
-        .map_err(|_| "exact budget unexpectedly rejected")?;
-    if budget.charge(Resource::Read, 1).is_ok() {
-        return Err("one-over budget unexpectedly succeeded");
+    // V2: the library owns the meter. A caller sets limits; it can neither charge
+    // nor report usage, so the V1 caller-side charge checks have no equivalent.
+    let limits = zero_limits().with_limit(zeno_fcis::Resource::Step, 1);
+    if limits.limit(zeno_fcis::Resource::Step) != 1 || limits.limit(zeno_fcis::Resource::Read) != 0
+    {
+        return Err("V2 limits did not record exactly the requested bound");
     }
 
     if StableName::try_new("consumer").is_err() {
@@ -44,8 +47,8 @@ fn main() -> Result<(), &'static str> {
     if authored.project_id().get() != 7 {
         return Err("authored project identity changed");
     }
-    let value = Value::Bool(true);
-    if value.kind() != zeno_fcis::ValueKind::Bool {
+    let value = Value::boolean(true);
+    if value.kind() != legacy::ValueKind::Bool {
         return Err("unexpected admitted value kind");
     }
 
@@ -53,7 +56,7 @@ fn main() -> Result<(), &'static str> {
     // authority, composition, backend, and bootstrap exports without creating
     // placeholder authority or proof values.
     let _ = size_of::<Option<ProjectCatalog>>();
-    let _ = size_of::<Option<TransitionDecision>>();
+    let _ = size_of::<Option<PublicationOutcome<'static>>>();
     let _ = size_of::<Option<BackendOperation>>();
     let _ = size_of::<Option<BootstrapSpec>>();
     let _ = size_of::<Option<RustCryptoSha256>>();
@@ -64,14 +67,13 @@ fn main() -> Result<(), &'static str> {
 
 fn foundational_errors_interoperate() -> Result<(), &'static str> {
     fn standard_error<E: core::error::Error + Send + Sync + 'static>() {}
-    standard_error::<zeno_fcis::BudgetExceeded>();
-    standard_error::<zeno_fcis::EncodeError>();
-    standard_error::<zeno_fcis::DecodeError>();
-    standard_error::<zeno_fcis::LengthError>();
-    standard_error::<zeno_fcis::TextError>();
-    standard_error::<zeno_fcis::ValueError>();
-    standard_error::<zeno_fcis::PlanError>();
-    standard_error::<zeno_fcis::PatchError>();
+    standard_error::<legacy::EncodeError>();
+    standard_error::<legacy::DecodeError>();
+    standard_error::<legacy::LengthError>();
+    standard_error::<legacy::TextError>();
+    standard_error::<legacy::ValueError>();
+    standard_error::<legacy::PlanError>();
+    standard_error::<legacy::PatchError>();
 
     fn domain_error() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Domain::new("", 1)?;
@@ -79,8 +81,8 @@ fn foundational_errors_interoperate() -> Result<(), &'static str> {
     }
     match domain_error() {
         Err(error)
-            if error.downcast_ref::<zeno_fcis::EncodeError>()
-                == Some(&zeno_fcis::EncodeError::InvalidDomain) =>
+            if error.downcast_ref::<legacy::EncodeError>()
+                == Some(&legacy::EncodeError::InvalidDomain) =>
         {
             Ok(())
         }

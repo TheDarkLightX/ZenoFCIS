@@ -1,5 +1,7 @@
 #![forbid(unsafe_code)]
 
+/// Complete original schema, decision, laws and genuine checked authority.
+pub mod v2_contract;
 pub mod generated {
     #![allow(dead_code, unused_imports, clippy::all, clippy::pedantic)]
     include!(concat!(env!("OUT_DIR"), "/schema-codegen/rust/counter.rs"));
@@ -9,103 +11,49 @@ pub mod bindings {
     include!(concat!(env!("OUT_DIR"), "/rust/project.rs"));
 }
 pub mod delivery;
-pub mod laws;
 #[cfg(feature = "sqlite")]
 pub mod prepare;
 #[path = "../profile.rs"]
 pub mod profile;
-pub mod program;
 
+#[cfg(feature = "sqlite")]
 use bindings::GeneratedProject;
-use delivery::Destination;
+#[cfg(feature = "sqlite")]
 use generated::{CounterState, CounterValue};
-use laws::{CounterLaws, NoExternalProofs};
-use program::CounterProgram;
 #[cfg(feature = "sqlite")]
 use std::path::Path;
-use zeno_fcis_authority::{
-    CatalogCommitAuthority, ExecutionBinding, GenesisPolicyBinding, StateDomainBinding,
-};
-use zeno_fcis_codec::Domain;
-use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
-use zeno_fcis_laws::{LawLimits, verify_project_laws};
-use zeno_fcis_patch::hash_value;
+#[cfg(feature = "sqlite")]
+use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, decode_envelope};
+#[cfg(feature = "sqlite")]
+use zeno_fcis_crypto::RustCryptoSha256;
+#[cfg(feature = "sqlite")]
 use zeno_fcis_schema::ValidationLimits;
 #[cfg(feature = "sqlite")]
-use zeno_fcis_shell::IdempotentDestination;
-#[cfg(feature = "sqlite")]
-use zeno_fcis_shell_sqlite::SqliteShell;
-use zeno_fcis_transition::TransitionLimits;
+use zeno_fcis_synthesis::finite::v2_authority::PublicationOutcome;
+use zeno_fcis_synthesis::finite::v2_composition as composition;
 
-pub type Authority =
-    CatalogCommitAuthority<RustCryptoSha256, CounterProgram, CounterLaws, Destination>;
+/// Borrows a descriptor admitted by the actual library-owned constructors.
+pub type Authority<'p> = zeno_fcis_synthesis::finite::v2_authority::Authority<'p>;
 #[cfg(feature = "sqlite")]
-pub type Shell = SqliteShell<CounterProgram, CounterLaws, Destination>;
+pub type Shell<'a, 'p> = zeno_fcis_shell_sqlite::v2::V2SqliteShell<'a, 'p>;
 pub type AppResult<T> = Result<T, String>;
-
+#[cfg(feature = "sqlite")]
 fn checked<T, E: std::fmt::Debug>(value: Result<T, E>) -> AppResult<T> {
     value.map_err(|error| format!("{error:?}"))
 }
 
-pub fn authority() -> AppResult<Authority> {
-    let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
-    let initial = checked(project.admit_root::<RustCryptoSha256>(
-        &CounterState {
-            count: CounterValue(0),
-        },
-        ValidationLimits::default(),
-    ))?;
-    let domain = checked(Domain::new("example/prepared-counter/state", 1))?;
-    let initial_root = checked(hash_value::<RustCryptoSha256>(
-        domain,
-        initial.value().value(),
-    ))?;
-    // The scopes `project.zeno` declares, which `check` and `prove` read,
-    // must be the scopes this authority enforces.
-    let manifest = profile::manifest();
-    checked(manifest.check_declared_scopes(&profile::project()))?;
-    let laws = checked(verify_project_laws::<RustCryptoSha256, _, _>(
-        project.catalog(),
-        manifest,
-        profile::source_hash(),
-        vec![],
-        LawLimits::default(),
-        profile::checker_hash(),
-        CounterLaws::default(),
-        &NoExternalProofs,
-    ))?;
-    let label =
-        |name: &str| profile::digest("example/prepared-counter/local-policy", name.as_bytes());
-    checked(CatalogCommitAuthority::try_new(
-        project.catalog(),
-        checked(StateDomainBinding::try_new(
-            "example/prepared-counter/state",
-            1,
-        ))?,
-        checked(ExecutionBinding::try_new(
-            profile::program_hash(),
-            label("RustCrypto SHA-256 with library known-answer admission; no build attestation"),
-            label("MemoryDestination exact ID and entry hash"),
-            label("local tutorial deployment"),
-            label("exact invocation replay ID and complete bundle"),
-        ))?,
-        checked(GenesisPolicyBinding::try_new(
-            initial_root,
-            profile::source_hash(),
-            label("count=0; bounds=0..3"),
-            label("runtime-checked genesis; no external proof"),
-            label("local tutorial deployment"),
-        ))?,
-        TransitionLimits::default(),
-        &checked(verify_approved_provider::<RustCryptoSha256>())?,
-        laws,
-        CounterProgram,
-    ))
+/// Bind the complete original policy; caller-authored callbacks confer no authority.
+/// # Errors
+/// Returns the actual catalog or authority refusal.
+pub fn authority<'p>(descriptor: &'p composition::Descriptor<'p>) -> AppResult<Authority<'p>> {
+    v2_contract::checked_authority(descriptor).map_err(|error| format!("{error:?}"))
 }
 
-/// Creates the exact reviewed genesis. An existing database is rejected by the shell.
+/// Checked genuine genesis stores the complete admitted H once in schema9.
+/// # Errors
+/// Returns schema, genesis, existing-store or SQLite failure.
 #[cfg(feature = "sqlite")]
-pub fn create(path: &Path, authority: &Authority, destination: Destination) -> AppResult<Shell> {
+pub fn create<'a, 'p>(path: &Path, authority: &'a Authority<'p>) -> AppResult<Shell<'a, 'p>> {
     let project = checked(GeneratedProject::try_new::<RustCryptoSha256>())?;
     let initial = checked(project.admit_root::<RustCryptoSha256>(
         &CounterState {
@@ -113,71 +61,91 @@ pub fn create(path: &Path, authority: &Authority, destination: Destination) -> A
         },
         ValidationLimits::default(),
     ))?;
-    let genesis = checked(authority.authorize_genesis(initial))?;
-    checked(Shell::create(
-        path,
-        authority,
-        genesis,
-        authority.bind_delivery_interpreter(destination),
-    ))
+    let initial = checked(initial.envelope().canonical_bytes())?;
+    let genesis = match authority.publish_genesis(&initial) {
+        PublicationOutcome::Commit(genesis) => genesis,
+        other => return Err(format!("genuine genesis refused: {other:?}")),
+    };
+    checked(Shell::create(path, authority, genesis))
 }
 
-/// Runs bounded preparation, exact replay, restart and interrupted delivery.
+/// Decode an already checked envelope solely for typed input and display.
+/// # Errors
+/// Returns malformed frame or typed presentation failure.
+#[cfg(feature = "sqlite")]
+pub fn decode_state(original: &[u8]) -> AppResult<CounterState> {
+    let envelope = checked(decode_envelope(original, DecodeLimits::default()))?;
+    checked(CounterState::try_from_value(envelope.into_value()))
+}
+
+/// Original complete preparation, exact replay, restart and interrupted delivery.
+/// The checked cursor grants computation only; the scoped guard fully reevaluates
+/// the original operation before the complete bounded schema9 commit.
+/// # Errors
+/// Returns actual admission, preparation, capacity, freshness or durable failure.
 #[cfg(feature = "sqlite")]
 pub fn journey(path: &Path) -> AppResult<String> {
-    use prepare::{MAX_PUBLICATION_BYTES, PreparedBatch, command};
-    use zeno_fcis_authority::AuthorizationDecodeLimits;
-    use zeno_fcis_shell::CommitStatus;
-
-    let authority = authority()?;
-    let mut destination = Destination::default();
-    let mut shell = create(path, &authority, destination.clone())?;
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor)?;
+    let destination = delivery::Destination::default();
+    let mut shell = create(path, &authority)?;
     let before = checked(shell.snapshot())?;
-    let mut batch =
-        PreparedBatch::start(&authority, &before, &command([1, 1, 1]), true, "batch-1")?;
+    let mut batch = prepare::PreparedBatch::start(
+        &authority,
+        &before,
+        &prepare::command([1, 1, 1]),
+        true,
+        "batch-1",
+    )?;
     batch.advance(0, 1)?;
     if checked(shell.snapshot())? != before {
         return Err("partial work published data".into());
     }
     batch.advance(1, 2)?;
-    let publication = batch.publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES, None)?;
-    if publication.status != CommitStatus::Committed {
+    let publication = batch.publish(
+        &mut shell,
+        &authority,
+        true,
+        prepare::MAX_PUBLICATION_BYTES,
+        None,
+    )?;
+    if publication.status != zeno_fcis_shell::CommitStatus::Committed {
         return Err("first publication was not committed".into());
     }
-    let replay = checked(authority.reauthorize_canonical_transition(
-        &publication.authorization,
-        AuthorizationDecodeLimits::default(),
-    ))?;
-    if checked(shell.commit(replay))? != CommitStatus::IdempotentReplay {
+    if publication.replay(&mut shell, &authority)?.status()
+        != zeno_fcis_shell::CommitStatus::IdempotentReplay
+    {
         return Err("exact replay was not idempotent".into());
     }
-    let pending = checked(shell.next_pending())?.ok_or("missing notification")?;
-    checked(destination.deliver(pending.delivery_id(), pending.entry_hash(), pending.entry()))?;
+    checked(shell.deliver_next_memory_unacknowledged(&mut destination.memory()))?
+        .ok_or("missing notification")?;
     drop(shell);
-    let mut shell = checked(Shell::open_existing(
-        path,
-        &authority,
-        authority.bind_delivery_interpreter(destination.clone()),
-    ))?;
-    while checked(shell.deliver_next())? {}
-    let mut exit = PreparedBatch::start(
+    let mut shell = checked(Shell::open(path, &authority))?;
+    while checked(shell.deliver_next_memory(&mut destination.memory()))? {}
+    let mut exit = prepare::PreparedBatch::start(
         &authority,
         &checked(shell.snapshot())?,
-        &command([-1, -1, -1]),
+        &prepare::command([-1, -1, -1]),
         true,
         "exit-1",
     )?;
     exit.advance(0, 3)?;
-    exit.publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES, None)?;
-    while checked(shell.deliver_next())? {}
+    exit.publish(
+        &mut shell,
+        &authority,
+        true,
+        prepare::MAX_PUBLICATION_BYTES,
+        None,
+    )?;
+    while checked(shell.deliver_next_memory(&mut destination.memory()))? {}
     let snapshot = checked(shell.snapshot())?;
-    let state = checked(CounterState::try_from_value(snapshot.state().clone()))?;
     if (
-        state.count.0,
+        decode_state(snapshot.state())?.count.0,
         snapshot.version(),
         snapshot.bundle_count(),
         snapshot.replay_count(),
-        snapshot.pending_outbox(),
+        snapshot.pending(),
         destination.delivered_count(),
     ) != (0, 2, 2, 2, 0, 2)
     {
@@ -185,6 +153,6 @@ pub fn journey(path: &Path) -> AppResult<String> {
     }
     Ok(format!(
         "{{\"status\":\"passed\",\"count\":0,\"bundles\":2,\"deliveries\":2,\"pending\":0,\"publication_bytes\":{}}}",
-        publication.sizes.total()
+        checked(publication.sizes.total())?
     ))
 }

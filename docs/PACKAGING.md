@@ -8,7 +8,7 @@ This document describes the ZenoFCIS `1.1.0` artifact set.
 
 - 36 public crates in dependency-first publication order;
 - one private crate for compiled generated-code tests;
-- the `zeno-fcis` authoring CLI and `mount-zenodex-zusd` diagnostic target;
+- the `zeno-fcis` authoring CLI;
 - the exact Cargo version and Rust toolchain.
 
 `tools/rc_package.py check` compares that manifest with Cargo metadata and
@@ -25,7 +25,6 @@ crate.
 ```text
 packages/*.crate
 binaries/zeno-fcis-<version>-<target>.tar.gz
-binaries/mount-zenodex-zusd-<version>-<target>.tar.gz
 docs/zeno-fcis-rustdoc-<version>.tar.gz
 source/zeno-fcis-<version>-source.tar.gz
 SOURCE-MANIFEST.json

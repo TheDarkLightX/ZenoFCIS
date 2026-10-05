@@ -1,4 +1,26 @@
 {
+  "body_covered_functions": [
+    "finite_execution::evaluation::admission::impl&%1::clone",
+    "finite_execution::evaluation::admission::kind",
+    "finite_execution::evaluation::admission::node_kind",
+    "finite_execution::evaluation::admission::require_node",
+    "finite_execution::evaluation::admission::valid_domains",
+    "finite_execution::evaluation::admission::validate_program",
+    "finite_execution::evaluation::admission::validate_roots",
+    "finite_execution::evaluation::admission::validate_shape",
+    "finite_execution::evaluation::admitted",
+    "finite_execution::evaluation::at",
+    "finite_execution::evaluation::evaluate_into",
+    "finite_execution::evaluation::evaluate_node",
+    "finite_execution::evaluation::evaluate_nodes",
+    "finite_execution::evaluation::impl&%0::boolean",
+    "finite_execution::evaluation::impl&%0::bounds",
+    "finite_execution::evaluation::impl&%0::contains",
+    "finite_execution::evaluation::impl&%0::valid",
+    "finite_execution::evaluation::impl&%14::clone",
+    "finite_execution::evaluation::impl&%1::clone",
+    "finite_execution::evaluation::impl&%3::clone"
+  ],
   "expected_verified": 34,
   "functions": {
     "finite_execution::evaluation::MAX_FIELDS": {
@@ -20,6 +42,7 @@
       "signature_sha256": "0180a73a9b0de5bd83e0d2ebac4e54493a913d80346d096ec9561a8e3527962c"
     },
     "finite_execution::evaluation::admission::impl&%1::clone": {
+      "body_sha256": "f6d88d179a63a2aa933977aee40065f11823b6c8ba2ae12ecea635523162da05",
       "ensures": 1,
       "ensures_sha256": "b6507bc3ed08f659005c7399cfff6e052e7f08df57fb8f24e7517c892c721683",
       "mode": "Exec",
@@ -28,6 +51,7 @@
       "signature_sha256": "5ee8ed2ca75889c1cb7df68bf14927269e8b53b96fb6c9eb4892552e9c0f445c"
     },
     "finite_execution::evaluation::admission::kind": {
+      "body_sha256": "5d04473f85e937e49b267b7a812767878f9d1eccfa24e3a6aaf23110c09921b2",
       "ensures": 1,
       "ensures_sha256": "c48f2eed30a8687dae09846145340e1425304a9e38a53826893ee4634ab12baa",
       "mode": "Exec",
@@ -36,6 +60,7 @@
       "signature_sha256": "7a346d79c6ef50922bbc0e12eba342e5e4700c1d765fdfe1fbd6b3c4d7cea0ad"
     },
     "finite_execution::evaluation::admission::node_kind": {
+      "body_sha256": "9905bd94b3e53ecd058980efe3154fa24d15e3a0d35b52e7f864a18d56792b99",
       "ensures": 1,
       "ensures_sha256": "149dc668ea8266fc1d2b8710666c372a6c96914f7b829b0595b9e0f0dc8e3863",
       "mode": "Exec",
@@ -44,6 +69,7 @@
       "signature_sha256": "67f7e05945a689d60105cbaf02138b9f2bb17e15cc9a0ff8a05a087cf4b86179"
     },
     "finite_execution::evaluation::admission::require_node": {
+      "body_sha256": "84cca2b0d3dfba89fcc1b15f146ef91ddcc65058183d9bc30667edfa5e616861",
       "ensures": 1,
       "ensures_sha256": "7e3f3eeae1faf278de2bd451efde69cdc3995e929dea175d47a53cd5c13c261e",
       "mode": "Exec",
@@ -168,6 +194,7 @@
       "signature_sha256": "2cd42a6116603091fe10f9afd3d80873752a974332a5dcedb3f12ec484f95ec6"
     },
     "finite_execution::evaluation::admission::valid_domains": {
+      "body_sha256": "531f54719bc084e437944bfed1e04b51fc30f98b951016b090b36b24e0b37a82",
       "ensures": 1,
       "ensures_sha256": "fc989b1d25ee5ae39187c41f0e14532779c79477b847cbcca9e353a9fa13f671",
       "mode": "Exec",
@@ -176,6 +203,7 @@
       "signature_sha256": "08b06dcb660121a028cd5a372000bf66421d7a20b270a1268393b010e50de8ad"
     },
     "finite_execution::evaluation::admission::validate_program": {
+      "body_sha256": "a55d23d32bb9ce05d434825cb939a72b718d9c2ad11059fb5de0a27066b34e2f",
       "ensures": 1,
       "ensures_sha256": "86fc1f69643b10f7dc496dd610097f119abf7964882752f431c128b19952e996",
       "mode": "Exec",
@@ -184,6 +212,7 @@
       "signature_sha256": "d571b7783652367bb1c13e76ac67e8004eb57480cf245075e7f6261d6e3f3749"
     },
     "finite_execution::evaluation::admission::validate_roots": {
+      "body_sha256": "715a38a4bca5bb31f26ffe8e9d035cfd78c139a20229990c9bba1db3d2e50bdb",
       "ensures": 1,
       "ensures_sha256": "55bfb3adc23d3dd489e698a6fe3ea3fa7c5b28843c2887752abf60ac34fc5d70",
       "mode": "Exec",
@@ -192,6 +221,7 @@
       "signature_sha256": "bdcef1a1afa0232085a0ff9c50fcb5ff0a69d09e2db767ccfcb7e5de20564642"
     },
     "finite_execution::evaluation::admission::validate_shape": {
+      "body_sha256": "f9a1b05f48c647de6784619523a703164f30205682774a6f71811d8f3cd0bf62",
       "ensures": 1,
       "ensures_sha256": "44b7da2986d9680b90f99a89d734c0235e38b541a7020797738302fb7c01151b",
       "mode": "Exec",
@@ -200,6 +230,7 @@
       "signature_sha256": "e95cf74acc58052de8e0545a31d455ccd331de377740a7e20ab2b3d993d63e84"
     },
     "finite_execution::evaluation::admitted": {
+      "body_sha256": "ad7a97f979734615e1dc70e9b77ff3d24e54e0253e9d996ea64aad38af4f688b",
       "ensures": 1,
       "ensures_sha256": "b95e484641529eb6009d63a3ba07f34f5d314e0c50710e97acb7130cd07d777e",
       "mode": "Exec",
@@ -208,6 +239,7 @@
       "signature_sha256": "74222ab50621b5214c3117ee46767d268f60f9a07a167b97e602e4b82aca862b"
     },
     "finite_execution::evaluation::at": {
+      "body_sha256": "7364b5edbfa8feaf08b385c1f72a986f580c2a0c944fbe8aecebb20d8be09acb",
       "ensures": 1,
       "ensures_sha256": "6665f31e7bb3b8185e6fd80744eabf326df3490739f517f18ca01b1cd9abc86c",
       "mode": "Exec",
@@ -216,6 +248,7 @@
       "signature_sha256": "78fede05e44fc2038914b63ab87e1c66f26ade88de6c35d5b586955bb6ef1b73"
     },
     "finite_execution::evaluation::evaluate_into": {
+      "body_sha256": "c9117518e561a319fdd7708c80b1a899116cd4249470ea0d1a25055574e4cb40",
       "ensures": 1,
       "ensures_sha256": "843970f22926289501da6b4db992e11458e5b3262e5832b8a64290da84453cfb",
       "mode": "Exec",
@@ -224,6 +257,7 @@
       "signature_sha256": "7860cdcf4286fdcfeed04f238c0ae69a2ac2b775a85e64b650815bcbb109c025"
     },
     "finite_execution::evaluation::evaluate_node": {
+      "body_sha256": "af1f7f92ed9f99284eb9ca6a3b463a0d2e980da463cbc775fc40c27f320b5383",
       "ensures": 1,
       "ensures_sha256": "ccc3cc5653331220cc3e1979a018deb99cf9da7048e63baee779473dcd366bde",
       "mode": "Exec",
@@ -232,6 +266,7 @@
       "signature_sha256": "5a1fd7ae7f94f289df42ecea188ee99d13ff72e501a46175de5ea3e5b615ee8b"
     },
     "finite_execution::evaluation::evaluate_nodes": {
+      "body_sha256": "53c80a63df03b06011ad01381ddd70b5dd7a515cbf7f6df76f370985cc945b29",
       "ensures": 1,
       "ensures_sha256": "4b4dad8067326881e1e5e6128cf3edf1220c40c4b1b7dbfc1a537534dae6e858",
       "mode": "Exec",
@@ -240,6 +275,7 @@
       "signature_sha256": "7860cdcf4286fdcfeed04f238c0ae69a2ac2b775a85e64b650815bcbb109c025"
     },
     "finite_execution::evaluation::impl&%0::boolean": {
+      "body_sha256": "cf482b6064c8d14249ac427b5f910fdcd8e7d47418c074dc1666692264bdda09",
       "ensures": 1,
       "ensures_sha256": "6816b612efb35404d0fd662e383e98216c05ebf875573bba4db46a4d9cbf9241",
       "mode": "Exec",
@@ -248,6 +284,7 @@
       "signature_sha256": "634303260a335ee138da4d9ddb3a607ad1d13d1f78cceea6df0c08f3b5ccf1ba"
     },
     "finite_execution::evaluation::impl&%0::bounds": {
+      "body_sha256": "c2f5a2be9203e08a94661cf68e64fa9831b84d444ccc9fdd92f7779aa9b22cbd",
       "ensures": 1,
       "ensures_sha256": "daf97250a1bf70e84195d0bcc18fc3a6ee25f0cabc82c5a147a3afb3e59a8b4b",
       "mode": "Exec",
@@ -256,6 +293,7 @@
       "signature_sha256": "ad327b8dcc649aa6eefdcbb0b3027956d92c2fbf1bab4efc54169281f166b2df"
     },
     "finite_execution::evaluation::impl&%0::contains": {
+      "body_sha256": "36da69784aa10440abd09dd192871b3df58b19e6a0b55e1539d437572a62e9ae",
       "ensures": 1,
       "ensures_sha256": "d069b12de4f7a9141e2c2bfc9497b388b3a21d4b6ecb36ed3164f2e67c04f8c6",
       "mode": "Exec",
@@ -264,6 +302,7 @@
       "signature_sha256": "f53e60a66ca1c53ef41a0a16b8c43cb3c1bd5d4a4ca69730d987fef717be4f01"
     },
     "finite_execution::evaluation::impl&%0::valid": {
+      "body_sha256": "976d2dcef825b480f8795cd72847c47f0a4ebf49400709f670059c4c0cd0a26c",
       "ensures": 1,
       "ensures_sha256": "28b86a405b0fc8f17c45f3dc23e870c60fca45a65ae5c7047976d8889cc9eed1",
       "mode": "Exec",
@@ -272,6 +311,7 @@
       "signature_sha256": "634303260a335ee138da4d9ddb3a607ad1d13d1f78cceea6df0c08f3b5ccf1ba"
     },
     "finite_execution::evaluation::impl&%14::clone": {
+      "body_sha256": "76293dbe042b6b32cbae4483dfacbaef442a6221a49d78a5a1d228d7fcb04bbe",
       "ensures": 1,
       "ensures_sha256": "58f4aedf224abd6a3a4c72f5a67810b5036dbecefa921aba70d1c341caecad84",
       "mode": "Exec",
@@ -280,6 +320,7 @@
       "signature_sha256": "c0099ecd17ef20de66358b12b970884b55dcc74b7184348ced2d468f49ed22f4"
     },
     "finite_execution::evaluation::impl&%1::clone": {
+      "body_sha256": "40e417706ee5c1b5d4d8f7a30c1c8a34f9121d819cc3f34567f0d922d981022f",
       "ensures": 1,
       "ensures_sha256": "4aa0be5f083755fa4525f71607b8e729c1648537a48ea404e266c3e024e70927",
       "mode": "Exec",
@@ -288,6 +329,7 @@
       "signature_sha256": "c05eb970f51cdc58af45a4290114b910cea7ee0163cc0d3f79a90dbe30cb03e9"
     },
     "finite_execution::evaluation::impl&%3::clone": {
+      "body_sha256": "03ae0a943b28b609b89c7de1694e290e55197b9f2326bb3d9618be989d11664e",
       "ensures": 1,
       "ensures_sha256": "a658c6cf26985f2749ec79b1b1216f9a0cbd95074d424a1b8450c96665e167a1",
       "mode": "Exec",
@@ -376,7 +418,6 @@
     }
   },
   "namespace": "finite_execution::evaluation::",
-  "schema": "zeno-fcis/finite-execution-proof/1",
   "target_functions": [
     "finite_execution::evaluation::Domain::boolean",
     "finite_execution::evaluation::Domain::bounds",

@@ -28,11 +28,20 @@ jobs:
           {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib"},
           {"group": "synthesis-documentation", "packages": "-p zeno-fcis-synthesis", "target": "--doc"},
           {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
-          {"group": "synthesis-preparation", "packages": "-p zeno-fcis-synthesis", "target": "--test preparation"},
           {"group": "synthesis-search", "packages": "-p zeno-fcis-synthesis", "target": "--test search"},
           {"group": "synthesis-v2-execution", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_execution"},
           {"group": "synthesis-v2-protected-input", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_protected_input"},
           {"group": "synthesis-v2-record-execution", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_record_execution"},
+          {"group": "synthesis-v2-abstraction", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_abstraction"},
+          {"group": "synthesis-v2-catalog", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_catalog"},
+          {"group": "synthesis-v2-composition", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_composition"},
+          {"group": "synthesis-v2-laws", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_laws"},
+          {"group": "synthesis-v2-authority", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_authority"},
+          {"group": "synthesis-v2-evaluator-identity", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_evaluator_identity"},
+          {"group": "synthesis-v2-template-contracts", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts"},
+          {"group": "synthesis-v2-original-output", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_output"},
+          {"group": "synthesis-v2-publication", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_publication"},
+          {"group": "synthesis-v2-guarded-laws", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_guarded_laws"},
           {"group": "synthesis-completion", "packages": "-p zeno-fcis-synthesis", "target": "--test completion"},
           {"group": "synthesis-graphs-00-to-03", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_00_to_03"},
           {"group": "synthesis-graphs-04-to-07", "packages": "-p zeno-fcis-synthesis", "target": "--test completion", "test": "larger_branching_graphs_seeds_04_to_07"},
@@ -50,6 +59,7 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Install pinned Miri toolchain
@@ -111,6 +121,27 @@ jobs:
               names = output.splitlines()
               assert names and all(re.fullmatch(r'\w+(?:::\w+)*: test', name) for name in names), 'unexpected or empty test inventory'
               return [name.removesuffix(': test') for name in names]
+
+          # Source-tree recomputation is a required native host test. Its pure
+          # framing/hash vector must execute under Miri, not vanish with the target.
+          if selected['target'] == '--test v2_evaluator_identity':
+              output = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_evaluator_identity', '--', '--list', '--format', 'terse'])
+              assert output.splitlines() == ['fixed_encoding_vector: test'], 'Miri identity vector must execute'
+          if selected['target'] == '--test v2_template_contracts':
+              output = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--list', '--format', 'terse'])
+              expected = {
+                  'emit_library_policy_artifacts',
+                  'retained_complete_examples_genesis_and_replay',
+                  'all_original_small_domains_and_unlawful_order_states',
+                  'account_complete_clock_boundaries_without_domain_narrowing',
+                  'withdrawal_complete_raw_domain_and_certified_controller',
+                  'treasury_guard_arithmetic_callbacks_and_unlawful_prestates',
+                  'policy_schema_law_and_meter_mutations_refuse',
+                  'original_conservation_and_required_delivery_checks_remain_independent',
+              }
+              assert collections.Counter(output.splitlines()) == collections.Counter(name + ': test' for name in expected), 'template semantic inventory differs'
+              ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--ignored', '--list', '--format', 'terse'])
+              assert ignored.splitlines() == ['emit_library_policy_artifacts: test'], 'semantic template tests must not be ignored'
 
           if selected['target'] == '--test completion':
               if 'test' in selected:

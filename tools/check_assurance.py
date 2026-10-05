@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Fail-closed repository assurance checks using only the Python standard library."""
+"""Repository guardrails with semantic inspection delegated to the Rust resolver."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import subprocess
 import sys
+import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
+
+from resolved_purity import ResolvedChecker, ResolutionError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,88 +90,12 @@ DEPENDENCY_RING = {
 
 
 @dataclass(frozen=True)
-class ForbiddenPattern:
-    name: str
-    expression: re.Pattern[str]
-    witness: str
-
-
-@dataclass(frozen=True)
 class DecoderAllocationRegion:
     path: str
     start_marker: str
     end_marker: str
     required_patterns: tuple[str, ...]
 
-
-FORBIDDEN_PATTERNS = (
-    ForbiddenPattern("unsafe-block", re.compile(r"\bunsafe\s*\{"), "unsafe { operation(); }"),
-    ForbiddenPattern("unsafe-function", re.compile(r"\bunsafe\s+fn\b"), "unsafe fn operation() {}"),
-    ForbiddenPattern("foreign-function", re.compile(r'\bextern\s+"C"'), 'extern "C" { }'),
-    ForbiddenPattern("filesystem", re.compile(r"\bstd::fs(?:::|\b)"), "std::fs::read(path)"),
-    ForbiddenPattern("network", re.compile(r"\bstd::net(?:::|\b)"), "std::net::TcpStream"),
-    ForbiddenPattern("process", re.compile(r"\bstd::process(?:::|\b)"), "std::process::Command"),
-    ForbiddenPattern(
-        "environment",
-        re.compile(r"\bstd::env(?:::|\b)|\b(?:env|option_env)!\s*\("),
-        "std::env::var(name)",
-    ),
-    ForbiddenPattern("wall-clock", re.compile(r"\bstd::time(?:::|\b)"), "std::time::SystemTime"),
-    ForbiddenPattern("system-time", re.compile(r"\b(?:SystemTime|Instant)::"), "Instant::now()"),
-    ForbiddenPattern("threads", re.compile(r"\b(?:std::)?thread::"), "std::thread::spawn(f)"),
-    ForbiddenPattern("async-runtime", re.compile(r"\btokio::"), "tokio::spawn(f)"),
-    ForbiddenPattern("async-function", re.compile(r"\basync\s+fn\b"), "async fn operation() {}"),
-    ForbiddenPattern("randomness", re.compile(r"\b(?:rand|getrandom)::"), "rand::random()"),
-    ForbiddenPattern(
-        "interior-mutability",
-        re.compile(r"\b(?:RefCell|Mutex|RwLock|Atomic[A-Za-z0-9_]*)\s*<"),
-        "Mutex<State>",
-    ),
-    ForbiddenPattern("floating-point", re.compile(r"\b(?:f32|f64)\b"), "let value: f64 = 1.0;"),
-    ForbiddenPattern("mutable-static", re.compile(r"\bstatic\s+mut\b"), "static mut STATE: u8 = 0;"),
-    # The rules above match only fully qualified paths or a generic `<`. These
-    # close the spellings that reach the same effects without them.
-    ForbiddenPattern(
-        "standard-io",
-        re.compile(r"\bstd::io(?:::|\b)"),
-        "std::io::stdin().read_line(&mut line)",
-    ),
-    ForbiddenPattern(
-        "grouped-std-import",
-        re.compile(r"\bstd::(?:\*|\{[^}]*\b(?:fs|net|process|env|time|thread|io)\b)"),
-        "use std::{fs, io::Read};",
-    ),
-    ForbiddenPattern(
-        "std-alias",
-        re.compile(r"\b(?:use\s+(?:::)?std|extern\s+crate\s+std)\s+as\b"),
-        "use std as platform;",
-    ),
-    ForbiddenPattern("thread-local", re.compile(r"\bthread_local!"), "thread_local! { static DEPTH: u8 = 0; }"),
-    ForbiddenPattern(
-        "atomic-type",
-        re.compile(r"\bAtomic[A-Z][A-Za-z0-9_]*\b"),
-        "static COUNT: AtomicU64 = AtomicU64::new(0);",
-    ),
-    ForbiddenPattern(
-        "cell-type",
-        re.compile(
-            r"\b(?:Cell|UnsafeCell|OnceCell|OnceLock|LazyCell|LazyLock|RefCell|Mutex|RwLock)\s*(?:<|::)"
-        ),
-        "let state = RefCell::new(0);",
-    ),
-    ForbiddenPattern(
-        "hash-ordered-collection",
-        re.compile(r"\b(?:HashMap|HashSet|RandomState|DefaultHasher)\b"),
-        "let seen = HashMap::new();",
-    ),
-)
-SAFE_WITNESSES = (
-    "fn transition(state: &State) -> State { state.clone() }",
-    "use core::{cmp::Ordering, fmt::Write};",
-    "use std::{collections::BTreeSet, vec::Vec};",
-    "let cells: BTreeMap<u32, WorkspaceCell> = BTreeMap::new();",
-    "enum Mode { Atomic, Staged }",
-)
 
 DECODER_ALLOCATION_REGIONS = (
     DecoderAllocationRegion(
@@ -219,7 +148,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--self-test",
         action="store_true",
-        help="prove every forbidden-pattern rule rejects its witness before scanning",
+        help="exercise the actual resolver and independent guardrail witnesses before scanning",
     )
     return parser.parse_args()
 
@@ -296,20 +225,30 @@ def line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def check_semantic_source(crate_name: str) -> list[str]:
-    failures: list[str] = []
-    source_root = ROOT / "crates" / crate_name / "src"
-    if not source_root.is_dir():
-        return [f"missing semantic crate source: crates/{crate_name}/src"]
-    for path in sorted(source_root.rglob("*.rs")):
-        text = path.read_text(encoding="utf-8")
-        for forbidden in FORBIDDEN_PATTERNS:
-            match = forbidden.expression.search(text)
-            if match is not None:
-                failures.append(
-                    f"{path.relative_to(ROOT)}:{line_number(text, match.start())}: "
-                    f"semantic core contains forbidden {forbidden.name}"
-                )
+def check_semantic_sources(checker: ResolvedChecker) -> list[str]:
+    paths = [ROOT / "crates" / name for name in SEMANTIC_CRATES]
+    missing = [f"missing semantic crate source: crates/{name}/src"
+               for name, path in zip(SEMANTIC_CRATES, paths) if not (path / "src").is_dir()]
+    if missing:
+        return missing
+    try:
+        report = checker.check(paths)
+    except ResolutionError as error:
+        return [f"resolved semantic inspection refused: {error}"]
+    return semantic_report_failures(report)
+
+
+def semantic_report_failures(report: dict) -> list[str]:
+    failures = [f"{entry['file']}: unreadable: {entry['message']}"
+                for entry in report["unreadable"]]
+    for finding in report["findings"]:
+        # Assurance's semantic boundary also forbids floating-point and
+        # unstable hashes, which the interactive purity command calls warnings.
+        if finding["severity"] == "error" or finding["rule"] in {"floating-point", "unstable-hash"}:
+            failures.append(f"{finding['file']}:{finding['line']}:{finding['column']}: "
+                            f"semantic core {finding['rule']}: {finding['subject']}")
+    if report["status"] in {"violations", "unreadable"} and not failures:
+        failures.append("resolved checker refused without a corresponding diagnostic")
     return failures
 
 
@@ -404,15 +343,312 @@ def check_workflows() -> list[str]:
     return failures
 
 
-def run_self_test() -> list[str]:
+RESOLVER_NEGATIVES = (
+    ("unsafe-block", "fn operation(){} fn f(){unsafe { operation(); }}", "unsafe"),
+    ("unsafe-function", "unsafe fn operation() {}", "unsafe"),
+    ("foreign-function", 'unsafe extern "C" { }', "foreign-code"),
+    ("filesystem", 'fn f(){std::fs::read("x");}', "filesystem"),
+    ("network", "fn f(){std::net::TcpStream::connect(\"x\");}", "network"),
+    ("process", 'fn f(){std::process::Command::new("x");}', "process"),
+    ("environment", 'fn f(){std::env::var("x");}', "environment"),
+    ("wall-clock", "fn f(){std::time::SystemTime::now();}", "clock"),
+    ("system-time", "use std::time::Instant; fn f(){Instant::now();}", "clock"),
+    ("threads", "fn f(){std::thread::spawn(||0);}", "threads"),
+    ("async-runtime", "fn f(){tokio::spawn(async {});}", "threads"),
+    ("async-function", "async fn operation() {}", "threads"),
+    ("randomness", "fn f(){rand::random::<u64>();}", "randomness"),
+    ("interior-mutability", "use std::sync::Mutex; struct State; type X=Mutex<State>;", "shared-state"),
+    ("floating-point", "fn f(){let value: f64 = 1.0;}", "floating-point"),
+    ("mutable-static", "static mut STATE: u8 = 0;", "shared-state"),
+    ("standard-io", "fn f(){std::io::stdin();}", "io"),
+    ("grouped-std-import", "use std::{fs, io::Read};", "filesystem"),
+    ("std-alias", "use std as platform; fn f(){platform::time::Instant::now();}", "clock"),
+    ("thread-local", "thread_local! { static DEPTH: u8 = 0; }", "shared-state"),
+    ("atomic-type", "use core::sync::atomic::AtomicU64; static COUNT: AtomicU64 = AtomicU64::new(0);", "shared-state"),
+    ("cell-type", "use core::cell::RefCell; fn f(){let state = RefCell::new(0);}", "shared-state"),
+    ("hash-ordered-collection", "use std::collections::HashMap; fn f(){let seen = HashMap::<u8,u8>::new();}", "hash-order"),
+    ("nested-alias", "use std::{time::{Instant as I}}; use I as Clock; fn f(){Clock::now();}", "clock"),
+    ("module-alias", "mod bridge{pub use std::env::var as read;} use bridge::read as get; fn f(){get(\"x\");}", "environment"),
+    ("scope-shadow", "use std::time::Instant as Clock; mod pure{pub struct Clock;} fn f(){Clock::now();}", "clock"),
+    ("type-alias", "type Counter=core::sync::atomic::AtomicU64; fn f(){Counter::new(0);}", "shared-state"),
+    ("macro-argument", "use std::time::Instant as Clock; fn f(){let _=vec![Clock::now()];}", "clock"),
+    ("unknown-expansion", "macro_rules! hidden{()=>{std::time::Instant::now()}} fn f(){hidden!();}", "resolution-macro"),
+    ("external-glob", "use std::time::*; fn f(){Instant::now();}", "resolution-glob"),
+    ("raw-address", "fn f(p:*const u8)->usize{p.addr()}", "address"),
+)
+
+RESOLVER_POSITIVES = (
+    "#[derive(Clone)] struct State; fn transition(state: &State) -> State { state.clone() }",
+    "use core::{cmp::Ordering, fmt::Write};",
+    "use std::{collections::BTreeSet, vec::Vec};",
+    "use alloc::collections::BTreeMap; struct WorkspaceCell; fn f(){let cells: BTreeMap<u32, WorkspaceCell> = BTreeMap::new();}",
+    "enum Mode { Atomic, Staged }",
+    "mod std{pub mod time{pub fn now()->u8{0}}} fn f()->u8{std::time::now()}",
+    "fn f(random:u64)->u64{let time=random+1;time}",
+    "fn f(){let _=stringify!(std::time::Instant::now());}",
+)
+
+
+RESOLVER_REPAIR_NEGATIVES = (
+    ("inherited-user-builtin", "macro_rules! stringify { () => { 7u8 }; }\npub mod child { pub fn value()->u8 { stringify!() } }\n", "resolution-macro"),
+    ("nested-user-builtin", "macro_rules! stringify { () => { 7u8 }; } mod outer { mod inner { pub fn value()->u8 { stringify!() } } }", "resolution-macro"),
+    ("block-user-builtin", "pub fn value()->u8 { macro_rules! stringify { () => { 7u8 }; } { stringify!() } }", "resolution-macro"),
+    ("exported-user-builtin", "pub fn value()->u8 { crate::stringify!() } mod definitions { #[macro_export] macro_rules! stringify { () => { 7u8 }; } }", "resolution-macro"),
+    ("imported-user-builtin", "macro_rules! local_value { () => { 7u8 }; } pub(crate) use local_value as stringify; mod child { use super::stringify; pub fn value()->u8 { stringify!() } }", "resolution-macro"),
+    ("qualified-attribute-prefix", "#![no_std]\n#![forbid(unsafe_code)]\n#[doc::noop]\npub fn value()->u8{7}\n", "resolution-attribute"),
+    ("qualified-tool-unknown", "#[rustfmt::noop] pub fn value()->u8{7}", "resolution-attribute"),
+    ("conditional-qualified-attribute", "#[cfg_attr(not(test), doc::noop)] pub fn value()->u8{7}", "resolution-attribute"),
+    ("raw-const-borrow", "pub fn address(x: &u8) -> usize { (&raw const *x) as usize }\n", "address"),
+    ("raw-mut-borrow", "pub fn address(x: &mut u8) -> usize { (&raw mut *x) as usize }\n", "address"),
+    ("generic-alias-ambient-argument", "type Identity<T> = T; pub fn value(x:Identity<std::time::Instant>){let _=x;}", "clock"),
+    ("generic-alias-shared-state", "type Identity<T> = T; pub fn value(x:Identity<core::sync::atomic::AtomicU64>){let _=x;}", "shared-state"),
+    ("generic-alias-unknown", "type Identity<T> = Unknown<T>; pub fn value()->Identity<u8>{7}", "resolution-unresolved"),
+)
+
+RESOLVER_REPAIR_POSITIVES = (
+    "pub fn value()->&'static str { stringify!(seven) } macro_rules! stringify { () => { 7u8 }; }",
+    "mod child { pub fn value()->&'static str { stringify!(seven) } } macro_rules! stringify { () => { 7u8 }; }",
+    "macro_rules! stringify { () => { 7u8 }; } pub fn value()->&'static str { core::stringify!(seven) }",
+    "mod builtin { pub use core::stringify as show; } use builtin::show; pub fn value()->&'static str { show!(seven) }",
+    "type Identity<T> = T; pub fn value()->Identity<u8> { 7 }\n",
+    "type Identity<std> = std; pub fn value()->Identity<u8> { 7 }",
+    "type Identity<T> = T; type Second<T> = Identity<T>; pub fn value()->Second<u8> { 7 }",
+    "type Array<const N:usize> = [u8;N]; pub fn value()->Array<1>{[7]}",
+    "#![no_std] #![forbid(unsafe_code)] #[doc=\"state\"] #[allow(dead_code)] #[derive(Clone, Copy)] #[repr(C)] #[non_exhaustive] pub struct State { value:u8 } #[rustfmt::skip] pub fn value()->u8{7}",
+    "#[cfg_attr(test, doc::noop)] pub fn value()->u8{7}",
+    "pub fn shared(x:&u8)->&u8{x} pub fn exclusive(x:&mut u8)->&mut u8{x}",
+)
+
+
+def check_resolver_self_test(checker: ResolvedChecker) -> list[str]:
+    with tempfile.TemporaryDirectory(prefix="zeno-assurance-resolver-") as directory:
+        base = Path(directory)
+        expected = {}
+        positives = set()
+        paths = []
+        for name, source, rule in RESOLVER_NEGATIVES + RESOLVER_REPAIR_NEGATIVES:
+            path = base / f"negative-{name}.rs"
+            path.write_text(source, encoding="utf-8")
+            paths.append(path)
+            expected[str(path)] = rule
+        for index, source in enumerate(RESOLVER_POSITIVES + RESOLVER_REPAIR_POSITIVES):
+            path = base / f"positive-{index}.rs"
+            path.write_text(source, encoding="utf-8")
+            paths.append(path)
+            positives.add(str(path))
+        try:
+            report = checker.check(paths)
+        except ResolutionError as error:
+            return [f"semantic self-test could not run the actual resolver: {error}"]
+        by_file = {str(path): [] for path in paths}
+        for finding in report["findings"]:
+            by_file.setdefault(finding["file"], []).append(finding)
+        failures = [f"semantic self-test unreadable: {entry}" for entry in report["unreadable"]]
+        for path, rule in expected.items():
+            if not any(finding["rule"] == rule and
+                       (finding["severity"] == "error" or rule in {"floating-point", "unstable-hash"})
+                       for finding in by_file[path]):
+                failures.append(f"semantic self-test missed {Path(path).stem}: required {rule}")
+        for path in positives:
+            if by_file[path]:
+                failures.append(f"semantic self-test rejected {Path(path).stem}: {by_file[path]}")
+        return failures
+
+
+def check_resolver_package_self_test(checker: ResolvedChecker) -> list[str]:
+    """An unsupported package closure must refuse without an established root."""
+    fixtures = {
+        "custom": {
+            "Cargo.toml": "[package]\nname='custom_root_fixture'\nversion='0.0.0'\nedition='2024'\n[workspace]\n[lib]\npath='src/entry.rs'\n",
+            "src/entry.rs": "#![forbid(unsafe_code)]\nmacro_rules! local_value { () => { 7u8 }; }\npub fn value()->u8 { local_value!() }\n",
+        },
+        "binary": {
+            "Cargo.toml": "[package]\nname='bin_root_fixture'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
+            "src/bin/worker.rs": "macro_rules! local_value { () => { 7u8 }; }\nfn main(){ let _ = local_value!(); }\n",
+        },
+        "inactive": {
+            "Cargo.toml": "[package]\nname='inactive_fixture'\nversion='0.0.0'\nedition='2024'\n[workspace]\n",
+            "src/lib.rs": "#![cfg(test)]\n#![no_std]\n#![forbid(unsafe_code)]\nunsupported!();\n",
+        },
+    }
+    with tempfile.TemporaryDirectory(prefix="zeno-assurance-package-") as directory:
+        base = Path(directory)
+        for name, files in fixtures.items():
+            for filename, source in files.items():
+                path = base / name / filename
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(source, encoding="utf-8")
+        try:
+            report = checker.check([base / name for name in fixtures])
+        except ResolutionError as error:
+            return [f"package self-test could not run the actual resolver: {error}"]
+        failures = [f"package self-test unreadable: {entry}" for entry in report["unreadable"]]
+        for name in ("custom", "binary"):
+            manifest = str(base / name / "Cargo.toml")
+            if not any(f["file"] == manifest and f["rule"] == "resolution-target" and
+                       f["severity"] == "error" for f in report["findings"]):
+                failures.append(f"package self-test omitted the {name} manifest target refusal")
+        if any(f["file"].startswith(str(base / "inactive") + "/") for f in report["findings"]):
+            failures.append("package self-test confused a known inactive root with an absent root")
+        if not any(str(base / "inactive" / "src/lib.rs") in location
+                   for location in report["resolution"]["skipped_cfg"]):
+            failures.append("package self-test omitted custody of the recognized inactive root")
+        if not semantic_report_failures(report):
+            failures.append("package self-test unsupported closure became assurance success")
+        return failures
+
+
+RESOLVER_TOOL_NEGATIVES = (
+    "mod rustfmt {} #[rustfmt::skip] pub fn value()->u8{7}",
+    "use core as rustfmt; #[rustfmt::skip] pub fn value()->u8{7}",
+    "extern crate core as rustfmt; #[rustfmt::skip] pub fn value()->u8{7}",
+    "type rustfmt=u8; #[rustfmt::skip] pub fn value()->u8{7}",
+    "fn value()->u8 {use core as rustfmt; #[rustfmt::skip] fn inner()->u8{7} inner()}",
+    "mod bridge{pub use core as rustfmt;} use bridge::*; #[rustfmt::skip] pub fn value()->u8{7}",
+    "#[cfg(feature=\"optional\")] use core as rustfmt; #[rustfmt::skip] pub fn value()->u8{7}",
+    "use std::fmt::*; #[rustfmt::skip] pub fn value()->u8{7}",
+)
+
+RESOLVER_TOOL_POSITIVES = (
+    "fn rustfmt(){} #[rustfmt::skip] pub fn value()->u8{7}",
+    "macro_rules! rustfmt {()=>{7u8};} #[rustfmt::skip] pub fn value()->u8{7}",
+    "#[cfg(test)] use core as rustfmt; #[rustfmt::skip] pub fn value()->u8{7}",
+    "mod child{pub mod rustfmt{}} #[rustfmt::skip] pub fn value()->u8{7}",
+)
+
+
+def check_resolver_tool_self_test(checker: ResolvedChecker) -> list[str]:
+    """Compiler-tool spelling cannot authorize a shadowed or unknown qualifier."""
+    with tempfile.TemporaryDirectory(prefix="zeno-assurance-tool-") as directory:
+        base = Path(directory)
+        paths = []
+        negatives = set()
+        positives = set()
+        for label, cases, expected in (("negative", RESOLVER_TOOL_NEGATIVES, negatives),
+                                       ("positive", RESOLVER_TOOL_POSITIVES, positives)):
+            for index, source in enumerate(cases):
+                path = base / f"{label}-{index}.rs"
+                path.write_text(source, encoding="utf-8")
+                paths.append(path)
+                expected.add(str(path))
+        try:
+            report = checker.check(paths)
+        except ResolutionError as error:
+            return [f"compiler-tool self-test could not run actual resolver: {error}"]
+        by_file = {str(path): [] for path in paths}
+        for finding in report["findings"]:
+            by_file.setdefault(finding["file"], []).append(finding)
+        failures = [f"compiler-tool self-test unreadable: {entry}" for entry in report["unreadable"]]
+        for path in negatives:
+            if not any(f["rule"] == "resolution-attribute" and f["severity"] == "error"
+                       for f in by_file[path]):
+                failures.append(f"compiler-tool self-test missed qualifier refusal: {path}")
+        for path in positives:
+            if by_file[path]:
+                failures.append(f"compiler-tool self-test rejected true tool: {path}: {by_file[path]}")
+        return failures
+
+
+def check_resolver_tool_package_self_test(checker: ResolvedChecker) -> list[str]:
+    """Declaring, renaming or importing a procedural namespace stays blocking."""
+    package = "[package]\nname='tool_fixture'\nversion='0.0.0'\nedition='2024'\n[workspace]\n"
+    source = "#[rustfmt::skip] pub fn value()->u8{7}\n"
+    cases = {
+        "declared": ("[dependencies]\nrustfmt={path='stub'}\n", source),
+        "dependency-table": ("[dependencies.rustfmt]\npath='stub'\n", source),
+        "renamed": ("[dependencies]\nrustfmt={package='benign_formatter',path='stub'}\n", source),
+        "target": ("[target.'cfg(not(unix))'.dependencies]\nrustfmt={path='stub'}\n", source),
+        "imported": ("[dependencies]\nformatter={path='stub'}\n",
+                     "use formatter as rustfmt; " + source),
+        "genuine": ("", source),
+    }
+    with tempfile.TemporaryDirectory(prefix="zeno-assurance-tool-package-") as directory:
+        base = Path(directory)
+        for name, (declarations, body) in cases.items():
+            path = base / name
+            (path / "src").mkdir(parents=True)
+            (path / "Cargo.toml").write_text(package + declarations, encoding="utf-8")
+            (path / "src/lib.rs").write_text(body, encoding="utf-8")
+        try:
+            report = checker.check([base / name for name in cases])
+        except ResolutionError as error:
+            return [f"compiler-tool package self-test could not run actual resolver: {error}"]
+        failures = [f"compiler-tool package self-test unreadable: {entry}" for entry in report["unreadable"]]
+        for name in cases.keys() - {"genuine"}:
+            source_path = str(base / name / "src/lib.rs")
+            if not any(f["file"] == source_path and f["rule"] == "resolution-attribute"
+                       and f["severity"] == "error" for f in report["findings"]):
+                failures.append(f"compiler-tool package self-test omitted {name} refusal")
+        if any(f["file"].startswith(str(base / "genuine") + "/") for f in report["findings"]):
+            failures.append("compiler-tool package self-test rejected genuine tool context")
+        if not semantic_report_failures(report):
+            failures.append("compiler-tool package refusal became assurance success")
+        return failures
+
+
+def check_resolver_relative_self_test(checker: ResolvedChecker) -> list[str]:
+    """The real process cwd cannot hide an enclosing compiler namespace."""
+    if checker.binary is None:
+        return ["relative-path self-test requires the actual built resolver"]
+    package = "[package]\nname='relative_fixture'\nversion='0.0.0'\nedition='2024'\n[workspace]\n"
+    source = "#[rustfmt::skip] pub fn value()->u8{7}\n"
+    failures = []
+    with tempfile.TemporaryDirectory(prefix="zeno-assurance-relative-") as directory:
+        base = Path(directory)
+        for name, manifest in (("collision", package + "[dependencies]\nrustfmt={path='stub'}\n"),
+                               ("genuine", package), ("unknown", "[workspace]\n"),
+                               ("unreadable", None)):
+            path = base / name
+            (path / "src").mkdir(parents=True)
+            (path / "src/lib.rs").write_text(source, encoding="utf-8")
+            if manifest is None:
+                (path / "Cargo.toml").mkdir()
+            else:
+                (path / "Cargo.toml").write_text(manifest, encoding="utf-8")
+        standalone = base / "standalone"
+        standalone.mkdir()
+        (standalone / "lib.rs").write_text(source, encoding="utf-8")
+        paths = ("lib.rs", "./lib.rs", "../src/lib.rs", ".", "./", "../src", "..")
+        cases = []
+        for name in ("collision", "genuine", "unknown", "unreadable"):
+            cwd = base / name / "src"
+            for argument in paths + (str(cwd / "lib.rs"),):
+                cases.append((name, cwd, argument, name != "genuine"))
+        for argument in ("lib.rs", "./lib.rs", ".", "./", str(standalone / "lib.rs")):
+            cases.append(("standalone", standalone, argument, False))
+        cases.append(("escape-collision", base / "collision/src", "../../standalone/lib.rs", False))
+        removed = base / "removed"
+        removed.mkdir()
+        wrapper = "import os,sys; os.chdir(sys.argv[2]); os.rmdir(sys.argv[2]); os.execv(sys.argv[1], [sys.argv[1],sys.argv[3]])"
+        for label, cwd, argument, negative in cases + [("removed-cwd", base, str(standalone / "lib.rs"), True)]:
+            command = ([sys.executable, "-B", "-c", wrapper, str(checker.binary), str(removed), argument]
+                       if label == "removed-cwd" else [str(checker.binary), argument])
+            try:
+                result = subprocess.run(command, cwd=cwd, env=checker.environment, text=True,
+                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+                report = json.loads(result.stdout)
+                semantic = semantic_report_failures(report)
+                blocked = result.returncode in (1, 2) and bool(semantic) and any(
+                    finding["rule"] == "resolution-attribute" and finding["severity"] == "error"
+                    for finding in report["findings"])
+                positive = result.returncode == 0 and not semantic and not report["findings"] and not report["unreadable"]
+                if report.get("schema") != "zeno-fcis/purity-report/2" or not (blocked if negative else positive):
+                    failures.append(f"relative-path self-test {label}/{argument}: unexpected actual result {report}")
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                failures.append(f"relative-path self-test {label}/{argument}: actual resolver unavailable: {error}")
+    return failures
+
+
+def run_self_test(checker: ResolvedChecker | None = None) -> list[str]:
     failures: list[str] = []
-    for forbidden in FORBIDDEN_PATTERNS:
-        if forbidden.expression.search(forbidden.witness) is None:
-            failures.append(f"self-test failed for {forbidden.name}")
-    for safe_witness in SAFE_WITNESSES:
-        unexpected = [item.name for item in FORBIDDEN_PATTERNS if item.expression.search(safe_witness)]
-        if unexpected:
-            failures.append(f"safe witness {safe_witness!r} rejected by: {', '.join(unexpected)}")
+    if checker is not None:
+        failures.extend(check_resolver_self_test(checker))
+        failures.extend(check_resolver_package_self_test(checker))
+        failures.extend(check_resolver_tool_self_test(checker))
+        failures.extend(check_resolver_tool_package_self_test(checker))
+        failures.extend(check_resolver_relative_self_test(checker))
+    else:
+        failures.append("semantic self-test requires the actual built resolver")
 
     guarded = "Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 1)?)"
     requirement = (
@@ -440,9 +676,17 @@ def run_self_test() -> list[str]:
 
 def main() -> int:
     args = parse_args()
+    print("assurance scope: declared package namespaces or dependency-free standalone default extern prelude; "
+          "undeclared --extern, RUSTFLAGS/CARGO_ENCODED_RUSTFLAGS and .cargo compiler namespace overrides are excluded")
     failures: list[str] = []
+    checker = ResolvedChecker()
+    try:
+        checker.prepare()
+    except ResolutionError as error:
+        failures.append(f"actual resolved checker unavailable: {error}")
+        checker = None
     if args.self_test:
-        failures.extend(run_self_test())
+        failures.extend(run_self_test(checker))
 
     try:
         members = workspace_members()
@@ -466,8 +710,10 @@ def main() -> int:
         except (OSError, tomllib.TOMLDecodeError) as error:
             failures.append(f"{manifest.relative_to(ROOT)}: cannot parse: {error}")
 
-    for crate_name in SEMANTIC_CRATES:
-        failures.extend(check_semantic_source(crate_name))
+    if checker is not None:
+        failures.extend(check_semantic_sources(checker))
+    else:
+        failures.append("semantic source inspection not performed: actual resolver unavailable")
     failures.extend(check_decoder_allocation_guards())
     failures.extend(check_workflows())
 
@@ -480,7 +726,7 @@ def main() -> int:
     mode = "self-test + repository" if args.self_test else "repository"
     print(
         f"assurance: PASS ({mode}; {len(members)} crates; "
-        f"{len(SEMANTIC_CRATES)} semantic boundaries; {len(FORBIDDEN_PATTERNS)} effect rules)"
+        f"{len(SEMANTIC_CRATES)} semantic boundaries; scoped resolved-use checker)"
     )
     return 0
 

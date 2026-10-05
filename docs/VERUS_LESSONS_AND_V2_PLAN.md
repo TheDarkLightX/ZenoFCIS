@@ -47,7 +47,7 @@ At the ZenoFCIS baseline:
 | Component | Existing behavior | Remaining obligation |
 | --- | --- | --- |
 | [Finite importer](../crates/zeno-fcis-synthesis/src/finite_runtime.rs) | Checks canonical program encoding and the IR's type/topology/shape | Prove decoder/evaluator correspondence and preserve exact artifact binding |
-| [Finite decision interpreter](../crates/zeno-fcis-authority/src/finite_decision.rs) | Imports a closed plan, checks schema projections, constructs reasons, updates and outbox | Verify the complete implementation and make the intended V2 route mandatory |
+| [Finite decision construction](../crates/zeno-fcis-synthesis/src/finite/execution_v2/decision.rs) | Imports a closed plan, checks schema projections, constructs reasons, updates and outbox | Verify the complete implementation and make the intended V2 route mandatory |
 | [Inventory conformance](../crates/zeno-fcis-cli/templates/inventory-reservation/tests/conformance.rs) | Compares all 864 admitted inputs against an independent application model | Preserve this independent challenge while expanding proof coverage |
 | [Public authority](../crates/zeno-fcis-authority/src/lib.rs) | Still accepts `CatalogTransitionProgram` implementations | Prevent a project callback from substituting for the V2 library decision gate |
 | [Law engine](../crates/zeno-fcis-laws/src/lib.rs) | `ProjectLawEngine` supplies law and genesis verdicts | Library evaluation of laws and initial conditions |

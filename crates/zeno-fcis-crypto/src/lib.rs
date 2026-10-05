@@ -14,78 +14,24 @@ extern crate std;
 use core::fmt;
 use core::marker::PhantomData;
 
-use zeno_fcis_codec::{CommitmentHasher, Domain, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Hash32, commitment};
 
 #[cfg(feature = "parity")]
 use zeno_fcis_codec::domain_preimage;
 
+// The codec owns the only implementations of its privately sealed hasher trait.
+// This crate adds nominal admission and fixed-vector evidence to those exact types.
 #[cfg(feature = "rustcrypto")]
-use sha2::{Digest as _, Sha256 as RustCryptoEngine};
+pub use zeno_fcis_codec::RustCryptoSha256;
 
 #[cfg(feature = "libcrux")]
-use libcrux_sha2::{Digest as _, Sha256 as LibcruxEngine};
-
-/// SHA-256 backed by RustCrypto `sha2`.
-#[cfg(feature = "rustcrypto")]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct RustCryptoSha256;
+pub use zeno_fcis_codec::LibcruxSha256;
 
 #[cfg(feature = "rustcrypto")]
 impl private::Sealed for RustCryptoSha256 {}
 
-#[cfg(feature = "rustcrypto")]
-impl CommitmentHasher for RustCryptoSha256 {
-    const ALGORITHM_ID: &'static str = "sha2-256/rustcrypto-0.11.0";
-
-    fn hash(bytes: &[u8]) -> Hash32 {
-        let digest = RustCryptoEngine::digest(bytes);
-        let mut output = [0_u8; 32];
-        output.copy_from_slice(&digest);
-        Hash32::new(output)
-    }
-
-    fn hash_parts(parts: &[&[u8]]) -> Hash32 {
-        let mut engine = RustCryptoEngine::new();
-        for part in parts {
-            engine.update(part);
-        }
-        let digest = engine.finalize();
-        let mut output = [0_u8; 32];
-        output.copy_from_slice(&digest);
-        Hash32::new(output)
-    }
-}
-
-/// SHA-256 backed by the libcrux HACL* implementation.
-#[cfg(feature = "libcrux")]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct LibcruxSha256;
-
 #[cfg(feature = "libcrux")]
 impl private::Sealed for LibcruxSha256 {}
-
-#[cfg(feature = "libcrux")]
-impl CommitmentHasher for LibcruxSha256 {
-    const ALGORITHM_ID: &'static str = "sha2-256/libcrux-0.0.8-hacl";
-
-    fn hash(bytes: &[u8]) -> Hash32 {
-        Self::hash_parts(&[bytes])
-    }
-
-    fn hash_parts(parts: &[&[u8]]) -> Hash32 {
-        const MAXIMUM_CHUNK: usize = u32::MAX as usize;
-
-        let mut engine = LibcruxEngine::new();
-        for part in parts {
-            for chunk in part.chunks(MAXIMUM_CHUNK) {
-                engine.update(chunk);
-            }
-        }
-        let mut output = [0_u8; 32];
-        engine.finish(&mut output);
-        Hash32::new(output)
-    }
-}
 
 mod private {
     pub trait Sealed {}
@@ -237,6 +183,7 @@ impl ProviderParityReport {
 
 /// Provider self-check failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ProviderVerificationError {
     /// One fixed SHA-256 vector differed from its published digest.
     KnownAnswerMismatch {
@@ -326,20 +273,13 @@ pub fn verify_known_answers<H: CommitmentHasher>()
             } else {
                 H::hash(message)
             };
-            if observed != expected {
-                let vector = u16::try_from(ordinal)
-                    .map_err(|_| ProviderVerificationError::LengthOverflow)?;
-                return Err(ProviderVerificationError::KnownAnswerMismatch {
-                    vector,
-                    expected,
-                    observed,
-                });
-            }
+            let vector =
+                u16::try_from(ordinal).map_err(|_| ProviderVerificationError::LengthOverflow)?;
+            check_known_answer(vector, expected, observed)?;
         }
     }
 
-    let domain = Domain::new("zeno-fcis/test", 1)
-        .map_err(|_| ProviderVerificationError::SemanticEncoding)?;
+    let domain = zeno_fcis_codec::domains::TEST;
     let observed =
         commitment::<H>(domain, b"abc").map_err(|_| ProviderVerificationError::SemanticEncoding)?;
     if observed != DOMAIN_DIGEST {
@@ -355,6 +295,22 @@ pub fn verify_known_answers<H: CommitmentHasher>()
     })
 }
 
+fn check_known_answer(
+    vector: u16,
+    expected: Hash32,
+    observed: Hash32,
+) -> Result<(), ProviderVerificationError> {
+    if observed == expected {
+        Ok(())
+    } else {
+        Err(ProviderVerificationError::KnownAnswerMismatch {
+            vector,
+            expected,
+            observed,
+        })
+    }
+}
+
 /// Compares the two configured providers over exact bytes and over the semantic
 /// kernel's exact domain-separated preimage.
 #[cfg(feature = "parity")]
@@ -366,8 +322,7 @@ pub fn verify_provider_parity(
 
     compare_hashes(RustCryptoSha256::hash(bytes), LibcruxSha256::hash(bytes))?;
 
-    let domain = Domain::new("zeno-fcis/parity", 1)
-        .map_err(|_| ProviderVerificationError::SemanticEncoding)?;
+    let domain = zeno_fcis_codec::domains::PARITY;
     let preimage =
         domain_preimage(domain, bytes).map_err(|_| ProviderVerificationError::SemanticEncoding)?;
     let reference_left = RustCryptoSha256::hash(&preimage);
@@ -441,10 +396,10 @@ mod tests {
 
     #[cfg(any(feature = "rustcrypto", feature = "libcrux"))]
     fn check_domain_commitments<H: CommitmentHasher>() {
-        use zeno_fcis_codec::domain_preimage;
+        use zeno_fcis_codec::{Domain, domain_preimage};
 
         let maximum_name = "x".repeat(usize::from(u16::MAX));
-        for name in ["x", "zeno-fcis/test", maximum_name.as_str()] {
+        for name in ["x", "provider-test", maximum_name.as_str()] {
             for version in [0, 1, u16::MAX] {
                 let domain = Domain::new(name, version)
                     .unwrap_or_else(|error| panic!("test domain: {error}"));
@@ -477,20 +432,10 @@ mod tests {
     #[cfg(feature = "rustcrypto")]
     #[test]
     fn known_answers_reject_a_broken_segmented_path() {
-        struct BrokenParts;
-        impl CommitmentHasher for BrokenParts {
-            const ALGORITHM_ID: &'static str = "test/broken-parts";
-
-            fn hash(bytes: &[u8]) -> Hash32 {
-                RustCryptoSha256::hash(bytes)
-            }
-
-            fn hash_parts(_: &[&[u8]]) -> Hash32 {
-                Hash32::ZERO
-            }
-        }
+        // A downstream fake provider is now impossible. Feed the same broken
+        // segmented observation through the production vector comparison.
         assert!(matches!(
-            verify_known_answers::<BrokenParts>(),
+            check_known_answer(0, EMPTY_DIGEST, Hash32::ZERO),
             Err(ProviderVerificationError::KnownAnswerMismatch { vector: 0, .. })
         ));
         // The nominal provider identity and fixed-vector report stay intact.
@@ -538,10 +483,7 @@ mod tests {
     #[cfg(feature = "rustcrypto")]
     #[test]
     fn semantic_domain_vector_is_stable() {
-        let domain = match Domain::new("zeno-fcis/test", 1) {
-            Ok(domain) => domain,
-            Err(error) => panic!("fixed domain rejected: {error}"),
-        };
+        let domain = zeno_fcis_codec::domains::TEST;
         let observed = match commitment::<RustCryptoSha256>(domain, b"abc") {
             Ok(observed) => observed,
             Err(error) => panic!("fixed commitment rejected: {error}"),

@@ -1,0 +1,71 @@
+{
+  "schema": "zenofcis-benchmark-document-check-v1",
+  "scope": "benchmark design and development fixtures only",
+  "success": true,
+  "cases_sha256": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55",
+  "cases": 32,
+  "tuple_pairs": 355,
+  "equivalent_pairs": 21,
+  "different_pairs": 11,
+  "positive_targets": 17,
+  "no_improvement_controls": 4,
+  "development_checks": {
+    "author_evaluator_exit": 0,
+    "separate_evaluator_exit": 0,
+    "exact_regeneration": true,
+    "first_witnesses_checked": true
+  },
+  "review": {
+    "design_author": "gpt-6-astra/high",
+    "reviewer": "gpt-6-astra/max",
+    "findings_resolved": 2,
+    "focused_followup_completed": true,
+    "final_readme_delta": "added validation and review links only"
+  },
+  "local_links_resolved": 19,
+  "changed_existing_paths": [
+    "docs/V2_1_FACTORY_PLAN.md"
+  ],
+  "new_documentation_paths": [
+    "docs/benchmarks/CLAUDE_HANDOFF.md",
+    "docs/benchmarks/DESIGN.md",
+    "docs/benchmarks/PROTOCOL.md",
+    "docs/benchmarks/README.md",
+    "docs/benchmarks/REVIEW.md",
+    "docs/benchmarks/VALIDATION.md",
+    "docs/benchmarks/cases.json",
+    "docs/benchmarks/check_cases.py",
+    "docs/benchmarks/fixture-check.json",
+    "docs/benchmarks/generate_cases.py",
+    "docs/benchmarks/independent-fixture-check.json",
+    "docs/benchmarks/independent_check.py",
+    "docs/benchmarks/intake-sources.json",
+    "docs/benchmarks/review-source-hashes.json"
+  ],
+  "unchanged_head": "1ed6f88f7b1098bed6c409bc9aa3c12c99d43c3c",
+  "other_preexisting_files_unchanged": true,
+  "files_sha256": {
+    "docs/benchmarks/CLAUDE_HANDOFF.md": "62afc305c2ec3bea4940cb82ca58b8dba171e9eca891e7539682f8c8ff3c2786",
+    "docs/benchmarks/DESIGN.md": "f6486d60ef762d9dadae2227ab6b7edb16908435cc26965b3d2d641160713761",
+    "docs/benchmarks/PROTOCOL.md": "0dc53ecc408a7c60b6e250aaa20e6a451b539d0ceb90e574216af4ac7aab5d83",
+    "docs/benchmarks/README.md": "b8b7c50db318a75515dd98c9f9a45270ffcab82e0abff984a258482a65f87359",
+    "docs/benchmarks/REVIEW.md": "cb27c1ef7653ed478dd8422b3eea874fa1777f38d2892e22ca2b1df85715162c",
+    "docs/benchmarks/VALIDATION.md": "fa4827843686782b464718155d64773556117cda45c2e22f92e40d2bfcd2447d",
+    "docs/benchmarks/cases.json": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55",
+    "docs/benchmarks/check_cases.py": "3ee6bfe5aa77b73b7e1b5e182220c3425c0461097ba3a23673e42921d2c1eee5",
+    "docs/benchmarks/fixture-check.json": "e559d4777c9ccf167b8a3b01f29cb11d87529085fb328fc80cc6305023f882be",
+    "docs/benchmarks/generate_cases.py": "bbde23fc085cbc3a6cace83f51f56d841335982bc17764b77cd93b538ff430f6",
+    "docs/benchmarks/independent-fixture-check.json": "59206363ce998c9d0dff5775ba55a4226feee0ca0ae5da3aea6342108b268b85",
+    "docs/benchmarks/independent_check.py": "3cba8eab910d732d7b8cf9a8d9c3aba363f9d0f6c707e94d5c3b241eafc91f8d",
+    "docs/benchmarks/intake-sources.json": "7357c9bd09efb648c4bde52704cc8c1b2880aaf0ed703ba78144a29655c0c621",
+    "docs/benchmarks/review-source-hashes.json": "d79325fad8582080c7b9cf8e1dc30546ec6fcb594639c3fbbd066f159fcbe48f"
+  },
+  "unperformed": [
+    "production qualification",
+    "native/proof gates",
+    "canonical-byte costs",
+    "optimizer or neural study",
+    "held-out effectiveness"
+  ],
+  "commit_or_push_performed": false
+}

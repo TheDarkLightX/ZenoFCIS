@@ -246,12 +246,16 @@ impl Assignment {
 
     /// Returns the assignment commitment.
     pub fn commitment(&self) -> Result<Hash32, SynthesisError> {
-        hash_canonical("zeno-fcis/synthesis-assignment", self)
+        hash_canonical(
+            zeno_fcis_codec::domains::SYNTHESIS_ASSIGNMENT,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for Assignment {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Assignment {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_length(output, self.entries.len())?;
         for (id, value) in &self.entries {
             output.extend_from_slice(&id.get().to_be_bytes());
@@ -259,10 +263,18 @@ impl CanonicalEncode for Assignment {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Independent checker result for one complete assignment.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CheckResult {
     /// Candidate passed both independent reference and composition checks.
     Accepted {
@@ -301,6 +313,7 @@ pub struct CounterexampleRecord {
 
 /// Certified bounded-search outcome.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SearchResult {
     /// Canonically first checked candidate that passed every required checker.
     Selected {
@@ -361,12 +374,16 @@ impl SynthesisCertificate {
 
     /// Returns the certificate commitment.
     pub fn commitment(&self) -> Result<Hash32, SynthesisError> {
-        hash_canonical("zeno-fcis/synthesis-certificate", self)
+        hash_canonical(
+            zeno_fcis_codec::domains::SYNTHESIS_CERTIFICATE,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for SynthesisCertificate {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SynthesisCertificate {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.problem_hash.as_bytes());
         for hash in [
             self.bindings.schema_hash,
@@ -390,6 +407,13 @@ impl CanonicalEncode for SynthesisCertificate {
             output.extend_from_slice(record.counterexample_hash.as_bytes());
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -418,7 +442,10 @@ pub fn search<C: CandidateChecker>(
                 if reference_claim == Hash32::ZERO || composition_claim == Hash32::ZERO {
                     return Err(SynthesisError::MissingAcceptanceEvidence);
                 }
-                let compiled_hash = hash_canonical("zeno-fcis/synthesis-compiled", &compiled)?;
+                let compiled_hash = hash_canonical(
+                    zeno_fcis_codec::domains::SYNTHESIS_COMPILED,
+                    compiled.canonical_bytes(),
+                )?;
                 trace_hash = extend_trace(
                     trace_hash,
                     assignment_hash,
@@ -445,8 +472,10 @@ pub fn search<C: CandidateChecker>(
                 });
             }
             CheckResult::Rejected { counterexample } => {
-                let counterexample_hash =
-                    hash_canonical("zeno-fcis/synthesis-counterexample", &counterexample)?;
+                let counterexample_hash = hash_canonical(
+                    zeno_fcis_codec::domains::SYNTHESIS_COUNTEREXAMPLE,
+                    counterexample.canonical_bytes(),
+                )?;
                 trace_hash = extend_trace(trace_hash, assignment_hash, 1, &[counterexample_hash])?;
                 counterexamples.push(CounterexampleRecord {
                     assignment_hash,
@@ -499,7 +528,7 @@ fn assignment_hash_at(
         encoding.extend_from_slice(&hole.id.get().to_be_bytes());
         put_blob(&mut encoding, &hole.values[*index].bytes).map_err(SynthesisError::Encode)?;
     }
-    hash_bytes("zeno-fcis/synthesis-assignment", &encoding)
+    hash_bytes(zeno_fcis_codec::domains::SYNTHESIS_ASSIGNMENT, &encoding)
 }
 
 fn increment_indexes(problem: &SynthesisProblem, indexes: &mut [usize]) {
@@ -537,7 +566,7 @@ fn hash_problem(
             put_blob(&mut bytes, &value.bytes).map_err(SynthesisError::Encode)?;
         }
     }
-    hash_bytes("zeno-fcis/synthesis-problem", &bytes)
+    hash_bytes(zeno_fcis_codec::domains::SYNTHESIS_PROBLEM, &bytes)
 }
 
 fn extend_trace(
@@ -553,19 +582,18 @@ fn extend_trace(
     for hash in bindings {
         bytes.extend_from_slice(hash.as_bytes());
     }
-    hash_bytes("zeno-fcis/synthesis-trace", &bytes)
+    hash_bytes(zeno_fcis_codec::domains::SYNTHESIS_TRACE, &bytes)
 }
 
 fn hash_canonical(
-    domain: &'static str,
-    value: &impl CanonicalEncode,
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, SynthesisError> {
-    let bytes = value.canonical_bytes().map_err(SynthesisError::Encode)?;
+    let bytes = value.map_err(SynthesisError::Encode)?;
     hash_bytes(domain, &bytes)
 }
 
-fn hash_bytes(domain: &'static str, bytes: &[u8]) -> Result<Hash32, SynthesisError> {
-    let domain = Domain::new(domain, 1).map_err(SynthesisError::Encode)?;
+fn hash_bytes(domain: Domain<'static>, bytes: &[u8]) -> Result<Hash32, SynthesisError> {
     commitment::<RustCryptoSha256>(domain, bytes).map_err(SynthesisError::Encode)
 }
 
@@ -593,6 +621,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 
 /// Synthesis construction, search, or certification failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SynthesisError {
     /// Stable hole ID used the forbidden zero sentinel.
     ZeroHoleId,
@@ -685,7 +714,7 @@ mod tests {
     fn hole(id: u32, values: Vec<u128>) -> Hole {
         Hole::try_new(
             HoleId::try_new(id).unwrap_or_else(|error| panic!("id: {error}")),
-            values.into_iter().map(Value::U128).collect(),
+            values.into_iter().map(Value::unsigned).collect(),
         )
         .unwrap_or_else(|error| panic!("hole: {error}"))
     }
@@ -697,7 +726,11 @@ mod tests {
             vec![
                 Hole::try_new(
                     HoleId::try_new(91).unwrap_or_else(|error| panic!("{error}")),
-                    vec![Value::Bytes(vec![0; 300].into_boxed_slice()), Value::Unit],
+                    vec![
+                        Value::bytes(vec![0; 300])
+                            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+                        Value::unit(),
+                    ],
                 )
                 .unwrap_or_else(|error| panic!("{error}")),
                 hole(7, vec![0, u128::MAX]),
@@ -736,20 +769,20 @@ mod tests {
             let sum = assignment
                 .entries()
                 .iter()
-                .map(|(_, value)| match value {
-                    Value::U128(value) => *value,
+                .map(|(_, value)| match value.view() {
+                    zeno_fcis_value::ValueRef::U128(value) => value,
                     _ => 0,
                 })
                 .sum::<u128>();
             if sum == 5 {
                 CheckResult::Accepted {
-                    compiled: Value::U128(sum),
+                    compiled: Value::unsigned(sum),
                     reference_claim: hash(11),
                     composition_claim: hash(12),
                 }
             } else {
                 CheckResult::Rejected {
-                    counterexample: Value::U128(sum),
+                    counterexample: Value::unsigned(sum),
                 }
             }
         }
@@ -802,14 +835,14 @@ mod tests {
             }
             fn check(&mut self, assignment: &Assignment) -> CheckResult {
                 CheckResult::Rejected {
-                    counterexample: Value::Bytes(
+                    counterexample: Value::bytes(
                         assignment
                             .commitment()
                             .unwrap_or_else(|error| panic!("hash: {error}"))
                             .as_bytes()
-                            .to_vec()
-                            .into_boxed_slice(),
-                    ),
+                            .to_vec(),
+                    )
+                    .unwrap_or_else(|error| panic!("value fixture: {error}")),
                 }
             }
         }

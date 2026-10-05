@@ -2,15 +2,16 @@
 //!
 //! Proof and verification artifacts are first-class, independently checkable
 //! ZenoFCIS promotion inputs. An evidence envelope binds the tool identity,
-//! source commit, profile/schema/algorithm hashes, theorem or query identity,
-//! assumptions, result, retained artifact digest, and coverage mode. The
-//! envelope is fail-closed: missing, stale, inconclusive, timed-out,
-//! malformed, unbound, or solver-disagreed evidence is rejected at
-//! construction time.
+//! profile/schema/algorithm hashes, theorem or query identity,
+//! assumptions, reported result, retained artifact digest, and declared coverage.
+//! Construction rejects malformed metadata, zero required bindings, blocking
+//! results, and unbounded coverage. Import checks the configured subject
+//! bindings and the actual artifact; construction alone does not check them.
 //!
-//! An external [`EvidenceChecker`] validates the retained artifact under
-//! pinned tool semantics. The importer never trusts a tool's self-reported
-//! result without an independent check of its artifact or replay surface.
+//! The importer checks exact retained bytes and their digest before calling
+//! an external [`EvidenceChecker`]. Its answer remains an attestation under
+//! the selected checker semantics; the library does not promote it to kernel
+//! proof. [`StructuralChecker`] performs only the documented structural checks.
 //!
 //! This crate is `no_std + alloc` and contains no `unsafe` code.
 
@@ -23,8 +24,9 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, EncodeError, Hash32};
-use zeno_fcis_refine::{CoverageMode, ToolEvidence, ToolKind};
+pub use zeno_fcis_codec::EvidenceArtifact;
+use zeno_fcis_codec::{CommitmentHasher, EncodeError, Hash32};
+use zeno_fcis_refine::{CoverageMode, EvidenceKind, ToolEvidence};
 
 // ---------------------------------------------------------------------------
 // Bounds
@@ -43,9 +45,8 @@ const MAX_ENVELOPES: usize = 64;
 
 /// Pinned identity of the proof or verification tool that produced an artifact.
 ///
-/// The binary hash binds the exact tool binary, preventing silent tool
-/// substitution. The algorithm identifier distinguishes independent
-/// implementations (e.g., RustCrypto vs. libcrux SHA-256).
+/// The binary hash is a declared commitment to the producer executable. It
+/// does not by itself establish which executable actually ran.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ToolIdentity {
     name: Box<str>,
@@ -111,8 +112,6 @@ fn validate_tool_version(version: &str) -> Result<(), EvidenceError> {
 /// evidence is unbound and must be rejected.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SourceBindings {
-    /// Source commit hash of the code under verification.
-    source_commit: Hash32,
     /// Profile commitment being promoted.
     profile_hash: Hash32,
     /// Schema commitment for the profile.
@@ -124,14 +123,10 @@ pub struct SourceBindings {
 impl SourceBindings {
     /// Creates validated source bindings. Rejects any zero hash.
     pub fn try_new(
-        source_commit: Hash32,
         profile_hash: Hash32,
         schema_hash: Hash32,
         algorithm_hash: Hash32,
     ) -> Result<Self, EvidenceError> {
-        if source_commit == Hash32::ZERO {
-            return Err(EvidenceError::UnboundSourceCommit);
-        }
         if profile_hash == Hash32::ZERO {
             return Err(EvidenceError::UnboundProfile);
         }
@@ -142,17 +137,10 @@ impl SourceBindings {
             return Err(EvidenceError::UnboundAlgorithm);
         }
         Ok(Self {
-            source_commit,
             profile_hash,
             schema_hash,
             algorithm_hash,
         })
-    }
-
-    /// Returns the source commit hash.
-    #[must_use]
-    pub const fn source_commit(&self) -> Hash32 {
-        self.source_commit
     }
 
     /// Returns the profile commitment.
@@ -175,9 +163,6 @@ impl SourceBindings {
 
     /// Validates that every binding is non-zero.
     pub fn validate(&self) -> Result<(), EvidenceError> {
-        if self.source_commit == Hash32::ZERO {
-            return Err(EvidenceError::UnboundSourceCommit);
-        }
         if self.profile_hash == Hash32::ZERO {
             return Err(EvidenceError::UnboundProfile);
         }
@@ -198,9 +183,10 @@ impl SourceBindings {
 /// The outcome reported by a proof or verification tool.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum EvidenceResult {
-    /// The tool established the claim (proof, verification, or model-check success).
-    Proven = 0,
+    /// An external tool reports success. This is an attestation, not kernel proof.
+    Attested = 0,
     /// The tool disproved the claim (counterexample found).
     Disproven = 1,
     /// The tool could not reach a conclusion within its bounds.
@@ -217,7 +203,7 @@ impl EvidenceResult {
     /// Returns true only when the result can support promotion.
     #[must_use]
     pub const fn is_conclusive_success(self) -> bool {
-        matches!(self, Self::Proven)
+        matches!(self, Self::Attested)
     }
 
     /// Returns true when the result is a failure that blocks promotion.
@@ -362,13 +348,14 @@ impl CoverageDeclaration {
 
 /// A canonical, content-addressed evidence envelope.
 ///
-/// Every field is bound at construction time. The envelope is immutable and
-/// transitively owned. Only envelopes with `EvidenceResult::Proven` and
+/// Every declared field is structurally validated at construction. The envelope
+/// alone does not establish the claim or artifact. It is immutable and
+/// transitively owned. Only envelopes with `EvidenceResult::Attested` and
 /// admissible coverage can be imported for promotion.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvidenceEnvelope {
     tool: ToolIdentity,
-    kind: ToolKind,
+    kind: EvidenceKind,
     bindings: SourceBindings,
     query_id: Box<str>,
     claim_hash: Hash32,
@@ -391,7 +378,7 @@ impl EvidenceEnvelope {
     #[allow(clippy::too_many_arguments)]
     pub fn try_new(
         tool: ToolIdentity,
-        kind: ToolKind,
+        kind: EvidenceKind,
         bindings: SourceBindings,
         query_id: &str,
         claim_hash: Hash32,
@@ -439,7 +426,7 @@ impl EvidenceEnvelope {
 
     /// Returns the evidence kind.
     #[must_use]
-    pub const fn kind(&self) -> ToolKind {
+    pub const fn kind(&self) -> EvidenceKind {
         self.kind
     }
 
@@ -483,20 +470,6 @@ impl EvidenceEnvelope {
     #[must_use]
     pub const fn coverage(&self) -> CoverageDeclaration {
         self.coverage
-    }
-
-    /// Converts to a `ToolEvidence` for the refine crate's promotion pipeline.
-    ///
-    /// The `claim` is the provided claim hash, the `artifact` is the retained
-    /// artifact digest, and the `toolchain` is the tool binary hash.
-    #[must_use]
-    pub fn to_tool_evidence(&self) -> ToolEvidence {
-        ToolEvidence::new(
-            self.kind,
-            self.claim_hash,
-            self.artifact_digest,
-            self.tool.binary_hash,
-        )
     }
 }
 
@@ -550,7 +523,7 @@ impl TryFrom<u8> for EvidenceResult {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Self::Proven),
+            0 => Ok(Self::Attested),
             1 => Ok(Self::Disproven),
             2 => Ok(Self::Inconclusive),
             3 => Ok(Self::Timeout),
@@ -579,29 +552,28 @@ impl TryFrom<u8> for EvidenceResult {
 ///     Assumption, CoverageDeclaration, EvidenceEnvelopeBuilder,
 ///     EvidenceResult, SourceBindings, ToolIdentity,
 /// };
-/// use zeno_fcis_refine::ToolKind;
+/// use zeno_fcis_refine::EvidenceKind;
 ///
 /// let tool = ToolIdentity::try_new("kani", "0.62.0", Hash32::new([1; 32])).unwrap();
 /// let bindings = SourceBindings::try_new(
-///     Hash32::new([2; 32]),
 ///     Hash32::new([3; 32]),
 ///     Hash32::new([4; 32]),
 ///     Hash32::new([5; 32]),
 /// ).unwrap();
-/// let envelope = EvidenceEnvelopeBuilder::new(tool, ToolKind::Kani, bindings)
+/// let envelope = EvidenceEnvelopeBuilder::new(tool, EvidenceKind::Kani, bindings)
 ///     .query_id("theorem_001")
 ///     .claim_hash(Hash32::new([6; 32]))
 ///     .artifact_digest(Hash32::new([7; 32]))
-///     .result(EvidenceResult::Proven)
+///     .result(EvidenceResult::Attested)
 ///     .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
 ///     .build()
 ///     .unwrap();
-/// assert_eq!(envelope.kind(), ToolKind::Kani);
+/// assert_eq!(envelope.kind(), EvidenceKind::Kani);
 /// ```
 #[derive(Clone, Debug)]
 pub struct EvidenceEnvelopeBuilder {
     tool: ToolIdentity,
-    kind: ToolKind,
+    kind: EvidenceKind,
     bindings: SourceBindings,
     query_id: Option<Box<str>>,
     claim_hash: Option<Hash32>,
@@ -614,7 +586,7 @@ pub struct EvidenceEnvelopeBuilder {
 impl EvidenceEnvelopeBuilder {
     /// Creates a builder with the required identity fields.
     #[must_use]
-    pub fn new(tool: ToolIdentity, kind: ToolKind, bindings: SourceBindings) -> Self {
+    pub fn new(tool: ToolIdentity, kind: EvidenceKind, bindings: SourceBindings) -> Self {
         Self {
             tool,
             kind,
@@ -713,13 +685,15 @@ fn validate_query_id(query_id: &str) -> Result<(), EvidenceError> {
 // Canonical encoding
 // ---------------------------------------------------------------------------
 
-impl CanonicalEncode for EvidenceEnvelope {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl EvidenceEnvelope {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.extend_from_slice(b"ZFCIS-EVIDENCE\0");
+        output.extend_from_slice(&2_u16.to_be_bytes());
         put_text(output, self.tool.name())?;
         put_text(output, self.tool.version())?;
         output.extend_from_slice(self.tool.binary_hash.as_bytes());
         output.push(self.kind as u8);
-        output.extend_from_slice(self.bindings.source_commit().as_bytes());
         output.extend_from_slice(self.bindings.profile_hash().as_bytes());
         output.extend_from_slice(self.bindings.schema_hash().as_bytes());
         output.extend_from_slice(self.bindings.algorithm_hash().as_bytes());
@@ -736,6 +710,13 @@ impl CanonicalEncode for EvidenceEnvelope {
         output.extend_from_slice(self.artifact_digest.as_bytes());
         encode_coverage(output, self.coverage)?;
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -777,11 +758,11 @@ fn put_text(output: &mut Vec<u8>, text: &str) -> Result<(), EncodeError> {
 ///
 /// An importer must not trust a tool's self-reported result without checking
 /// its retained artifact or replay surface. The checker receives the complete
-/// envelope and returns `true` only when the artifact establishes the claim
-/// under the pinned tool semantics.
+/// envelope and exact bytes. Its result is an external attestation under
+/// the selected semantics, not a kernel theorem.
 pub trait EvidenceChecker {
     /// Returns true only when the retained artifact establishes the claim.
-    fn check(&self, envelope: &EvidenceEnvelope) -> bool;
+    fn check(&self, envelope: &EvidenceEnvelope, artifact: &[u8]) -> bool;
 }
 
 /// A checker that always rejects. Used as a fail-closed default.
@@ -789,7 +770,7 @@ pub trait EvidenceChecker {
 pub struct RejectAllChecker;
 
 impl EvidenceChecker for RejectAllChecker {
-    fn check(&self, _envelope: &EvidenceEnvelope) -> bool {
+    fn check(&self, _envelope: &EvidenceEnvelope, _artifact: &[u8]) -> bool {
         false
     }
 }
@@ -802,7 +783,7 @@ impl EvidenceChecker for RejectAllChecker {
 pub struct StructuralChecker;
 
 impl EvidenceChecker for StructuralChecker {
-    fn check(&self, envelope: &EvidenceEnvelope) -> bool {
+    fn check(&self, envelope: &EvidenceEnvelope, _artifact: &[u8]) -> bool {
         envelope.claim_hash() != Hash32::ZERO
             && envelope.artifact_digest() != Hash32::ZERO
             && envelope.tool().binary_hash() != Hash32::ZERO
@@ -814,6 +795,45 @@ impl EvidenceChecker for StructuralChecker {
 // Evidence importer
 // ---------------------------------------------------------------------------
 
+/// An untrusted envelope paired with the exact retained artifact bytes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EvidenceInput {
+    envelope: EvidenceEnvelope,
+    artifact: EvidenceArtifact,
+}
+
+impl EvidenceInput {
+    /// Owns a proposed pair; import independently checks all bindings and bytes.
+    #[must_use]
+    pub const fn new(envelope: EvidenceEnvelope, artifact: EvidenceArtifact) -> Self {
+        Self { envelope, artifact }
+    }
+
+    /// Borrows the claimed envelope.
+    #[must_use]
+    pub const fn envelope(&self) -> &EvidenceEnvelope {
+        &self.envelope
+    }
+
+    /// Borrows the exact retained artifact and computed digest.
+    #[must_use]
+    pub const fn artifact(&self) -> &EvidenceArtifact {
+        &self.artifact
+    }
+
+    /// Creates an untrusted refinement proposal retaining these same bytes.
+    /// The consuming refinement check independently rechecks the digest.
+    #[must_use]
+    pub fn to_tool_evidence(&self) -> ToolEvidence {
+        ToolEvidence::new(
+            self.envelope.kind,
+            self.envelope.claim_hash,
+            self.artifact.clone(),
+            self.envelope.tool.binary_hash,
+        )
+    }
+}
+
 /// Validates and imports evidence envelopes for promotion.
 ///
 /// The importer is fail-closed: any envelope that fails validation or whose
@@ -823,7 +843,7 @@ impl EvidenceChecker for StructuralChecker {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EvidenceImporter {
     bindings: SourceBindings,
-    envelopes: Box<[EvidenceEnvelope]>,
+    inputs: Box<[EvidenceInput]>,
     has_runtime_refinement: bool,
 }
 
@@ -833,7 +853,7 @@ impl EvidenceImporter {
         bindings.validate()?;
         Ok(Self {
             bindings,
-            envelopes: Box::from([]),
+            inputs: Box::from([]),
             has_runtime_refinement: false,
         })
     }
@@ -846,8 +866,14 @@ impl EvidenceImporter {
 
     /// Returns the imported envelopes.
     #[must_use]
-    pub fn envelopes(&self) -> &[EvidenceEnvelope] {
-        &self.envelopes
+    pub fn envelopes(&self) -> impl ExactSizeIterator<Item = &EvidenceEnvelope> {
+        self.inputs.iter().map(EvidenceInput::envelope)
+    }
+
+    /// Borrows all imported envelopes with their retained immutable bytes.
+    #[must_use]
+    pub fn inputs(&self) -> &[EvidenceInput] {
+        &self.inputs
     }
 
     /// Returns whether mounted runtime refinement evidence is present.
@@ -860,45 +886,57 @@ impl EvidenceImporter {
     ///
     /// Every envelope must:
     /// - bind the same source bindings as the importer
-    /// - pass the independent checker
-    /// - not duplicate an existing tool kind
-    pub fn import<C: EvidenceChecker>(
+    /// - have a matching artifact digest under the selected hash provider
+    /// - pass the independent checker over those exact bytes
+    /// - not duplicate an existing evidence kind
+    pub fn import<H: CommitmentHasher, C: EvidenceChecker>(
         &mut self,
-        envelopes: Vec<EvidenceEnvelope>,
+        inputs: Vec<EvidenceInput>,
         checker: &C,
     ) -> Result<(), EvidenceError> {
-        if self.envelopes.len() + envelopes.len() > MAX_ENVELOPES {
+        if self.inputs.len() + inputs.len() > MAX_ENVELOPES {
             return Err(EvidenceError::TooManyEnvelopes);
         }
-        let mut merged: Vec<EvidenceEnvelope> = self.envelopes.to_vec();
-        for envelope in &envelopes {
+        let mut merged = self.inputs.to_vec();
+        for input in &inputs {
+            let envelope = input.envelope();
             verify_bindings_match(&self.bindings, envelope)?;
-            if !checker.check(envelope) {
+            if !input.artifact.matches::<H>()
+                || input.artifact.digest() != envelope.artifact_digest()
+            {
+                return Err(EvidenceError::ArtifactDigestMismatch {
+                    kind: envelope.kind(),
+                });
+            }
+            if !checker.check(envelope, input.artifact.bytes()) {
                 return Err(EvidenceError::ArtifactCheckFailed {
                     kind: envelope.kind(),
                 });
             }
-            if merged.iter().any(|existing| existing.kind == envelope.kind) {
-                return Err(EvidenceError::DuplicateToolKind {
+            if merged
+                .iter()
+                .any(|existing| existing.envelope.kind == envelope.kind)
+            {
+                return Err(EvidenceError::DuplicateEvidenceKind {
                     kind: envelope.kind(),
                 });
             }
-            merged.push(envelope.clone());
+            merged.push(input.clone());
         }
-        merged.sort_by_key(|e| e.kind);
-        self.has_runtime_refinement |= envelopes
+        merged.sort_by_key(|input| input.envelope.kind);
+        self.has_runtime_refinement = merged
             .iter()
-            .any(|e| e.kind == ToolKind::RuntimeRefinement);
-        self.envelopes = merged.into_boxed_slice();
+            .any(|input| input.envelope.kind == EvidenceKind::RuntimeRefinement);
+        self.inputs = merged.into_boxed_slice();
         Ok(())
     }
 
     /// Converts imported envelopes to `ToolEvidence` for the refine crate.
     #[must_use]
     pub fn to_tool_evidence(&self) -> Vec<ToolEvidence> {
-        self.envelopes
+        self.inputs
             .iter()
-            .map(EvidenceEnvelope::to_tool_evidence)
+            .map(EvidenceInput::to_tool_evidence)
             .collect()
     }
 
@@ -909,7 +947,7 @@ impl EvidenceImporter {
     #[must_use]
     pub fn best_coverage(&self) -> Option<CoverageMode> {
         let mut best: Option<CoverageDeclaration> = None;
-        for envelope in self.envelopes.iter() {
+        for envelope in self.envelopes() {
             best = match (best, envelope.coverage()) {
                 (None, cov) => Some(cov),
                 (
@@ -933,9 +971,6 @@ fn verify_bindings_match(
     envelope: &EvidenceEnvelope,
 ) -> Result<(), EvidenceError> {
     let actual = envelope.bindings();
-    if actual.source_commit() != expected.source_commit() {
-        return Err(EvidenceError::StaleSourceCommit);
-    }
     if actual.profile_hash() != expected.profile_hash() {
         return Err(EvidenceError::ProfileMismatch);
     }
@@ -955,14 +990,14 @@ fn verify_bindings_match(
 /// Fail-closed promotion gate requiring mounted runtime refinement.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PromotionGate {
-    required_tools: Box<[ToolKind]>,
+    required_tools: Box<[EvidenceKind]>,
     require_runtime_refinement: bool,
 }
 
 impl PromotionGate {
     /// Creates a promotion gate with required tool kinds.
     pub fn try_new(
-        mut required_tools: Vec<ToolKind>,
+        mut required_tools: Vec<EvidenceKind>,
         require_runtime_refinement: bool,
     ) -> Result<Self, EvidenceError> {
         required_tools.sort();
@@ -979,7 +1014,7 @@ impl PromotionGate {
 
     /// Returns required tool kinds.
     #[must_use]
-    pub fn required_tools(&self) -> &[ToolKind] {
+    pub fn required_tools(&self) -> &[EvidenceKind] {
         &self.required_tools
     }
 
@@ -996,7 +1031,7 @@ impl PromotionGate {
     pub fn evaluate(&self, importer: &EvidenceImporter) -> Vec<PromotionBlocker> {
         let mut blockers = Vec::new();
         for &kind in self.required_tools.iter() {
-            if !importer.envelopes().iter().any(|e| e.kind == kind) {
+            if !importer.envelopes().any(|e| e.kind == kind) {
                 blockers.push(PromotionBlocker::MissingToolEvidence { kind });
             }
         }
@@ -1015,11 +1050,12 @@ impl PromotionGate {
 
 /// One fail-closed promotion blocker from the evidence gate.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum PromotionBlocker {
     /// A required tool kind is absent from the imported evidence.
     MissingToolEvidence {
         /// Required evidence kind.
-        kind: ToolKind,
+        kind: EvidenceKind,
     },
     /// Mounted runtime refinement evidence is absent.
     MissingRuntimeRefinement,
@@ -1031,6 +1067,7 @@ pub enum PromotionBlocker {
 
 /// Evidence construction, validation, or import failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum EvidenceError {
     /// Tool name was empty, non-ASCII, or too long.
     InvalidToolName,
@@ -1038,8 +1075,6 @@ pub enum EvidenceError {
     InvalidToolVersion,
     /// Tool binary hash was zero.
     ZeroBinaryHash,
-    /// Source commit binding was zero.
-    UnboundSourceCommit,
     /// Profile binding was zero.
     UnboundProfile,
     /// Schema binding was zero.
@@ -1075,8 +1110,6 @@ pub enum EvidenceError {
     ZeroTheoremClaim,
     /// Too many envelopes for one importer.
     TooManyEnvelopes,
-    /// Envelope source commit does not match importer bindings.
-    StaleSourceCommit,
     /// Envelope profile does not match importer bindings.
     ProfileMismatch,
     /// Envelope schema does not match importer bindings.
@@ -1086,12 +1119,17 @@ pub enum EvidenceError {
     /// Independent artifact check failed.
     ArtifactCheckFailed {
         /// Evidence kind that failed.
-        kind: ToolKind,
+        kind: EvidenceKind,
     },
-    /// Duplicate tool kind in imported evidence.
-    DuplicateToolKind {
+    /// The retained bytes do not match the envelope digest or selected provider.
+    ArtifactDigestMismatch {
+        /// Evidence kind whose artifact mismatched.
+        kind: EvidenceKind,
+    },
+    /// Duplicate evidence kind in imported inputs.
+    DuplicateEvidenceKind {
         /// Duplicated evidence kind.
-        kind: ToolKind,
+        kind: EvidenceKind,
     },
     /// Promotion gate has duplicate or excessive tool requirements.
     InvalidPromotionGate,
@@ -1115,7 +1153,6 @@ impl fmt::Display for EvidenceError {
             Self::InvalidToolName => formatter.write_str("invalid tool name"),
             Self::InvalidToolVersion => formatter.write_str("invalid tool version"),
             Self::ZeroBinaryHash => formatter.write_str("tool binary hash is zero"),
-            Self::UnboundSourceCommit => formatter.write_str("source commit binding is zero"),
             Self::UnboundProfile => formatter.write_str("profile binding is zero"),
             Self::UnboundSchema => formatter.write_str("schema binding is zero"),
             Self::UnboundAlgorithm => formatter.write_str("algorithm binding is zero"),
@@ -1136,14 +1173,16 @@ impl fmt::Display for EvidenceError {
                 formatter.write_str("proof-assisted theorem claim hash is zero")
             }
             Self::TooManyEnvelopes => formatter.write_str("too many evidence envelopes"),
-            Self::StaleSourceCommit => formatter.write_str("envelope source commit is stale"),
             Self::ProfileMismatch => formatter.write_str("envelope profile does not match"),
             Self::SchemaMismatch => formatter.write_str("envelope schema does not match"),
             Self::AlgorithmMismatch => formatter.write_str("envelope algorithm does not match"),
             Self::ArtifactCheckFailed { kind } => {
                 write!(formatter, "independent artifact check failed for {kind:?}")
             }
-            Self::DuplicateToolKind { kind } => {
+            Self::ArtifactDigestMismatch { kind } => {
+                write!(formatter, "retained artifact digest mismatch for {kind:?}")
+            }
+            Self::DuplicateEvidenceKind { kind } => {
                 write!(formatter, "duplicate tool evidence kind {kind:?}")
             }
             Self::InvalidPromotionGate => formatter.write_str("invalid promotion gate"),

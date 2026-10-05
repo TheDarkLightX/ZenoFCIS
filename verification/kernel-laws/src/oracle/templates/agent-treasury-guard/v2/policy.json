@@ -1,0 +1,321 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "agent-treasury-guard",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "105": [
+      "I128",
+      0,
+      20
+    ],
+    "106": [
+      "I128",
+      0,
+      20
+    ],
+    "107": [
+      "I128",
+      0,
+      4
+    ],
+    "108": [
+      "I128",
+      0,
+      11
+    ],
+    "111": [
+      "I128",
+      0,
+      3
+    ],
+    "112": [
+      "I128",
+      1,
+      3
+    ],
+    "113": [
+      "I128",
+      0,
+      3
+    ],
+    "114": [
+      "I128",
+      0,
+      3
+    ],
+    "117": [
+      "I128",
+      1,
+      2
+    ],
+    "119": [
+      "I128",
+      0,
+      13
+    ]
+  },
+  "variables": {
+    "quote": "pre.100.130",
+    "base": "pre.100.131",
+    "spent": "pre.100.132",
+    "seen": "pre.100.133",
+    "pending": "pre.100.134",
+    "held": "pre.100.135",
+    "minimum": "pre.100.136",
+    "action": "command.101.140",
+    "direction": "command.101.141",
+    "amount": "command.101.142",
+    "min_out": "command.101.143",
+    "intent": "command.101.144",
+    "amount_out": "command.101.145",
+    "caller": "context.102.150",
+    "now": "context.102.151",
+    "price": "context.102.152",
+    "price_time": "context.102.153",
+    "model": "context.102.154",
+    "proposes": "action == 175",
+    "buys": "direction == 173",
+    "sender": "choose(proposes, 178, 179)",
+    "new_day": "choose(now < 4, 0, choose(now < 8, 1, 2)) > choose(seen < 4, 0, choose(seen < 8, 1, 2))",
+    "spent_now": "choose(new_day, 0, spent)",
+    "value": "choose(buys || price == 1, amount, amount + amount)",
+    "least": "choose(buys, choose(price == 1, amount, choose(amount == 3, 2, 1)), choose(price == 1, amount, choose(amount == 1, 2, choose(amount == 2, 3, 5))))",
+    "reserve": "choose(buys, quote - amount >= 2, base - amount >= 0)"
+  },
+  "cases": [
+    {
+      "when": "caller != sender",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now <= seen",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && model != 180",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && (price_time > now || now - price_time > 1)",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && pending != 170",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!proposes && pending == 170",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!proposes && intent != seen",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 176 && amount_out < minimum",
+      "class": "Reject",
+      "reason": 207,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && value > 3",
+      "class": "Reject",
+      "reason": 208,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && spent_now + value > 4",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && min_out < least",
+      "class": "Reject",
+      "reason": 210,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && !reserve",
+      "class": "Reject",
+      "reason": 211,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "proposes && buys",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "130": "quote - amount",
+        "131": "pre.100.131",
+        "132": "spent_now + value",
+        "133": "now",
+        "134": 171,
+        "135": "amount",
+        "136": "min_out"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "zenodex",
+          "payload": {
+            "160": "now",
+            "161": 183,
+            "162": 184,
+            "163": "amount",
+            "164": "min_out",
+            "165": "now + 2"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "proposes",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "130": "pre.100.130",
+        "131": "base - amount",
+        "132": "spent_now + value",
+        "133": "now",
+        "134": 172,
+        "135": "amount",
+        "136": "min_out"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "zenodex",
+          "payload": {
+            "160": "now",
+            "161": 184,
+            "162": 183,
+            "163": "amount",
+            "164": "min_out",
+            "165": "now + 2"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 176 && pending == 171",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "130": "pre.100.130",
+        "131": "base + amount_out",
+        "132": "spent_now",
+        "133": "now",
+        "134": 170,
+        "135": 0,
+        "136": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 176",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "130": "quote + amount_out",
+        "131": "pre.100.131",
+        "132": "spent_now",
+        "133": "now",
+        "134": 170,
+        "135": 0,
+        "136": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "pending == 171",
+      "class": "CommittedFailure",
+      "reason": 212,
+      "post": {
+        "130": "quote + held",
+        "131": "pre.100.131",
+        "132": "spent_now",
+        "133": "now",
+        "134": 170,
+        "135": 0,
+        "136": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "CommittedFailure",
+      "reason": 212,
+      "post": {
+        "130": "pre.100.130",
+        "131": "base + held",
+        "132": "spent_now",
+        "133": "now",
+        "134": 170,
+        "135": 0,
+        "136": 0
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "130": 6,
+    "131": 1,
+    "132": 0,
+    "133": 0,
+    "134": 170,
+    "135": 0,
+    "136": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation",
+    "503": "AuthoritySubjectRecipient",
+    "504": "AssetConservation",
+    "505": "AssetConservation",
+    "506": "DebitCreditEffectEquality",
+    "507": "FeeAndRounding",
+    "508": "CommittedFailureEffects"
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+}

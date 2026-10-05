@@ -29,6 +29,12 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
+      - name: Evaluator identity
+        run: |
+          python3 tools/check_authority_v2.py --check-sources
+          python3 -m unittest discover -s tools -p test_evaluator_identity.py
+          cargo +1.97.1 test --locked -p zeno-fcis-synthesis --test v2_evaluator_identity
+
       - name: Format
         run: cargo +1.97.1 fmt --all -- --check
 

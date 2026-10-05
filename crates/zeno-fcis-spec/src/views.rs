@@ -5,7 +5,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt::Write as _;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, EncodeError, Hash32, commitment};
 
 use crate::{ComponentDecl, FootprintKind, ProjectSpec, StableId};
 
@@ -93,7 +93,7 @@ pub fn derive_composition<H: CommitmentHasher>(
 ) -> Result<DerivedComposition, EncodeError> {
     let bytes = spec.canonical_bytes()?;
     let semantic_program_hash =
-        commitment::<H>(Domain::new("zeno-fcis/semantic-program", 1)?, &bytes)?;
+        commitment::<H>(zeno_fcis_codec::domains::SEMANTIC_PROGRAM, &bytes)?;
     let mut obligations = Vec::new();
     for component in spec.components() {
         for claim in component.assumptions() {
@@ -216,7 +216,7 @@ pub fn generate_project<H: CommitmentHasher>(
     );
     let _ = writeln!(
         rust,
-        "pub type Projection = zeno_fcis::composed_program::ProjectionPlan<MACHINES, STATE_SLOTS, PORTS>;"
+        "pub type Projection = zeno_fcis::legacy::composed_program::ProjectionPlan<MACHINES, STATE_SLOTS, PORTS>;"
     );
     let _ = writeln!(
         rust,

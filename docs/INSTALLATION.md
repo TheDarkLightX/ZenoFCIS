@@ -63,23 +63,17 @@ hook setup and explicit nonclaims.
 
 ## Host binaries
 
-The core library does not require a daemon. V1 includes the authoring CLI and
-the existing host diagnostic parity tool:
+The core library does not require a daemon. V2 ships one host binary, the
+authoring CLI:
 
 ```bash
 cargo +1.97.1 install zeno-fcis-cli --version 1.1.0 --locked
 zeno-fcis check project.zeno
 ```
 
-```bash
-cargo +1.97.1 install zeno-fcis-adapter-zenodex \
-  --version 1.1.0 --locked
-```
-
-`mount-zenodex-zusd` compares the pinned ZenoDEX Python and Rust transitions.
-It requires a clean checkout of the exact pinned ZenoDEX revision and that
-repository's Rust binary. It does not run a production shell or authorize
-value movement.
+V1's `mount-zenodex-zusd` diagnostic parity tool is not shipped in V2. Its
+pinned assertions remain in the private kernel-law oracle, and a checked
+full-width zUSD profile is planned for V2.1.
 
 ## Offline verification
 

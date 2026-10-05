@@ -1,0 +1,28 @@
+[package]
+name = "zeno-fcis-resolved-purity"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[workspace]
+
+[dependencies]
+proc-macro2 = { version = "=1.0.107", default-features = false, features = ["span-locations"] }
+syn = { version = "=2.0.119", default-features = false, features = ["full", "parsing", "visit"] }
+serde_json = "=1.0.151"
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+
+[profile.dev]
+overflow-checks = true
+
+[profile.release]
+overflow-checks = true

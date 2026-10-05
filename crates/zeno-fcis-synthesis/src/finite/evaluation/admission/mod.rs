@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
-pub(super) mod spec;
+pub(in super::super) mod spec;
 
 /// Exact structural refusal, independent of the frontend's diagnostic strings.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
