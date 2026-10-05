@@ -21,7 +21,7 @@ zeno-fcis backend inspect|verify [--tools FILE]
 zeno-fcis backend inventory-lean ROOT [--format human|json]
 zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--max-input-tuples N] [--receipt OUT]
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
-zeno-fcis optimize --program FILE [--strategy FILE] [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
+zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i64-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
 zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--format human|json]
 ```
 
@@ -330,18 +330,27 @@ and prints one JSON report. It adopts nothing into any application.
 
 The engine is an in-house e-graph: a union-find over classes, hash-consed
 e-nodes and congruence rebuilding over the existing ten instructions, with no
-new dependency. Each class carries its scalar kind, interval bounds and, when
-the declared domain has at most 64 input tuples (six Boolean inputs), its
-exact signature: the value on every tuple in the checker's enumeration order,
-with poison at the tuples where an earlier `Add` or `Sub` has already trapped.
-Two classes merge only when their signatures are identical, poison included.
-Beyond 64 tuples the annotations are conservative: rules merge only classes
-that no possible trap can poison, while congruence and commutativity merge
-the same computation on the same operands. Every `Add` or `Sub` that may
-overflow on a tuple whose operands are defined is pinned: no rule removes,
-merges away or folds it, and extraction emits it whether or not an output
-uses it. Arithmetic is otherwise rewritten only by constant folding, and a
-pinned instruction is never a constant.
+new dependency. Every class carries its scalar kind, interval bounds, its
+support (the inputs it depends on) and, when the product of its support's
+domains has at most 2^16 tuples, an exact table: its value, or the poison left
+where an earlier `Add` or `Sub` has already trapped, on every tuple of that
+product, in the checker's enumeration order restricted to the support. Tables
+are kept over the minimal support, so two classes compute the same function on
+the whole declared domain exactly when their kinds and tables are identical,
+and a class over three inputs of a domain with millions of tuples still has an
+exact table of a few dozen entries. Two classes with tables merge only when
+the tables are identical, poison included. A class whose support is too large,
+or that arrives after the per-search table budget (2^28 tuple evaluations and
+64 MiB) is spent, keeps conservative annotations: rules merge it only when no
+possible trap can poison either side, while congruence and commutativity
+merge the same computation on the same operands. Every class also keeps its
+values at fixed sample tuples, every tuple of a domain of at most 1,024 tuples
+and 256 fixed tuples otherwise; samples bucket candidates, and different
+sample values refuse any rule merge. Every `Add` or `Sub` that may overflow on
+a tuple whose operands are defined is pinned: no rule removes, merges away or
+folds it, and extraction emits it whether or not an output uses it.
+Arithmetic is otherwise rewritten only by constant folding, and a pinned
+instruction is never a constant.
 
 A strategy is a small versioned JSON document in a closed grammar; unknown or
 duplicate keys, wrong types and out-of-range values are refused, and no
@@ -351,17 +360,20 @@ user-supplied code runs. Phase names come from a closed set:
 | --- | --- |
 | `boolean` | Algebraic rules over `And`, `Not`, `Eq`, `Lt` and the Or form `Select(a, a, b)`: involution, idempotence, identity, annihilation, complement, absorption, De Morgan's Or recognition, Or commutation, factoring both ways, mux recognition and sharing-directed associativity. |
 | `select` | `Select` simplification for both kinds: equal arms, constant or negated conditions, Boolean identities, and the condition's known value inside its arms. |
-| `fold` | Constant folding from exact signatures or interval bounds, for never-poisoned classes only. |
+| `fold` | Constant folding from exact tables or interval bounds, for never-poisoned classes only. |
 | `share` | Common-subexpression sharing modulo commutativity of `And` and `Eq`; structural sharing of identical instructions is inherent to the e-graph. |
-| `semantic-merge` | Merges classes with identical exact signatures, then adds single instructions over existing classes whose signature an existing class already has (Not, And, Eq, Lt and Select), so extraction can use them. Skipped, and reported as such, above 64 tuples. |
+| `semantic-merge` | Merges classes with identical exact tables, at any domain size, then adds single instructions over existing classes whose function an existing class already has (Not, And, Eq, Lt and Select), so extraction can use them. Candidates are bucketed by their sample values and each is confirmed by its exact table before anything is added. Skipped, and reported as such, when no class has a table. |
+| `cut-rewrite` | Exact local rewriting of Boolean classes, in the style of ABC's DAG-aware rewriting: cuts of at most three leaves through each class's cheapest e-node, with their truth tables; when the leaves can never be poisoned and the table's minimum circuit for that function has fewer instructions than the chain the cut came from, the class is proposed equal to that circuit. The circuits come from a built-in table of minimum circuits for every Boolean function of up to three inputs (with and without `Eq`), generated by an exhaustive search and checked by tests. |
 
 ```json
 {
   "schema": "zeno-fcis/optimize-strategy/1",
-  "phases": [{"phase": "boolean", "rounds": 3}, {"phase": "select", "rounds": 2}],
+  "phases": [{"phase": "boolean", "rounds": 3}, {"phase": "cut-rewrite", "rounds": 2}],
   "limits": {"max_enodes": 20000, "max_classes": 10000,
-             "max_rewrites_per_round": 10000, "max_extraction_rounds": 8},
-  "extractor": "dag-greedy"
+             "max_rewrites_per_round": 10000, "max_extraction_rounds": 8,
+             "max_work": 100000},
+  "extractor": "dag-greedy",
+  "profile": "functional-bool-v1"
 }
 ```
 
@@ -369,14 +381,45 @@ user-supplied code runs. Phase names come from a closed set:
 | --- | --- |
 | `schema` | Required; exactly `zeno-fcis/optimize-strategy/1`. |
 | `phases` | Required; 1 to 16 objects, each `{"phase": NAME, "rounds": 1..=8}` with `NAME` from the table above. A round collects every match against the current graph, applies the rewrites and rebuilds; a phase stops early when a round changes nothing. |
-| `limits` | Optional object; each entry is optional and defaults to the value shown, with range 1 to 100000: `max_enodes` (e-nodes ever created, retired duplicates included), `max_classes` (live classes), `max_rewrites_per_round` (rewrites proposed or completions attempted in one round), `max_extraction_rounds` (improvement rounds of `dag-greedy`). A phase that reaches a limit stops and names it. |
+| `limits` | Optional object; each entry is optional and defaults to the value shown, with range 1 to 100000: `max_enodes` (e-nodes ever created, retired duplicates included), `max_classes` (live classes), `max_rewrites_per_round` (rewrites proposed or completions attempted in one round), `max_extraction_rounds` (improvement rounds of `dag-greedy`), `max_work` (deterministic work in millions of steps: rule matches, completion pairs, cut evaluations and table tuple evaluations; no round starts once it is reached). A phase that reaches a limit stops and names it. `max_work` stands in for a time budget, which a deterministic search cannot read; its default does not bind in practice. |
 | `extractor` | Optional; `dag-greedy` (default) or `tree`. |
+| `profile` | Optional; `functional-bool-v1` or `checked-i64-v1`, the artifact profiles of the [bounded optimization loop](#bounded-optimization-loop). Instructions outside the profile (`Int`, `Add`, `Sub`, `Eq` and `Lt` for `functional-bool-v1`) are never added by any phase and have no finite extraction cost; cut rewriting uses its table without `Eq`, and may replace a stored instruction outside the profile. Every candidate must also pass the profile's gate before it is judged. |
 
-Without `--strategy` the fixed default strategy, version 1, runs: `fold` 1,
-`share` 1, `boolean` 3, `select` 3, `semantic-merge` 2, `boolean` 2, `select`
-2, `fold` 1, with the limits above and `dag-greedy`. After every phase a
-candidate is extracted, re-encoded canonically and judged, so an early
-phase's candidate survives a later phase that finds nothing better.
+Without `--strategy` the fixed default portfolio, version 1
+(`zeno-fcis/optimize-portfolio/1`), runs three strategies in turn, each from
+the original program:
+
+1. the default strategy (`fold` 1, `share` 1, `boolean` 3, `select` 3,
+   `semantic-merge` 2, `boolean` 2, `select` 2, `fold` 1);
+2. the same with `select` before `boolean` in both places;
+3. `fold` 1, `share` 1 and three cycles of `boolean` 3, `select` 3 and
+   `semantic-merge` 2.
+
+Each is followed by `semantic-merge` 2, `cut-rewrite` 2 and `semantic-merge` 1,
+so merging by tables comes after the rules, and each runs under its own size
+budget (`max_enodes` 20000) and work budget (`max_work` 400, that is 400
+million steps; the most any measured run used is about 97 million). One
+incumbent spans the three runs. `--strategy FILE` runs that one strategy instead.
+`--profile` applies a profile to every strategy that runs; a strategy naming
+another profile is `invalid-strategy`, and an original whose inputs, outputs
+or domain size the profile cannot hold is `refused` (`original-outside-profile`)
+before any search. After every phase a candidate is extracted, re-encoded
+canonically and judged, so an early phase's candidate survives a later phase
+that finds nothing better.
+
+`--with-candidate FILE` (repeatable, at most 8 files of at most 64 KiB)
+supplies programs claimed equivalent to the original, to be fused into the
+search. Each is judged before any run: the checker always compares it with
+the original over the full domain (and the profile's gate applies), and it
+becomes the incumbent when it is smaller and better. Only an accepted program
+is fused: its instructions are added to every run's e-graph, never pinned,
+since it fails on exactly the original's failing tuples, which the original's
+pinned instructions already keep. Each of its roots is merged with the
+original's matching root when the original has no instruction that may
+trap, so the checker's verdict makes the two roots equal on every tuple, or
+otherwise when both roots have identical exact tables. Extraction can then
+combine the best parts of every supplied program and every rewrite; the
+result is never worse than the best accepted input, by the incumbent rule.
 
 Extraction is a deterministic DAG cost search with no solver. Cost is the
 pair (instruction count, canonical byte length); the byte length is exact per
@@ -389,52 +432,75 @@ the whole shared candidate becomes strictly cheaper and never when it would
 close a cycle. Instructions are emitted in a stable topological order, earliest
 original position first.
 
-Each extracted candidate is screened before judging: it must be componentwise
-no larger than the original in instructions and bytes, strictly smaller in at
-least one, not byte-identical to the original or an earlier candidate, and not
-worse than the incumbent on (instructions, bytes). Then `transform check` runs
-it over the full domain at the full Step budget with the default declared Step
-limit of 256, which never binds. The best accepted candidate wins by
-(instructions, bytes, largest Step usage, canonical bytes). Step usage is
-reported from the receipt and never compared for equivalence.
+Each extracted candidate is screened before judging: it must pass the
+profile's gate when one is set, be componentwise no larger than the original
+in instructions and bytes, strictly smaller in at least one, not byte-identical
+to the original, a supplied program or an earlier candidate of any run, and
+not worse than the
+incumbent on (instructions, bytes). Then `transform check` runs it over the
+full domain at the full Step budget with the default declared Step limit of
+256, which never binds. The best accepted candidate wins by (instructions,
+bytes, largest Step usage, canonical bytes). Step usage is reported from the
+receipt and never compared for equivalence.
 
 Results use schema `zeno-fcis/optimize-result/1`. Every result has a `detail`
 object; once the program and strategy are read, the report also carries
-`original_sha256`, `strategy_sha256` and the checker `limits`. A searched
-result's `detail` reports the original's size, the domain size and whether
-signatures were exact, the strategy, the termination bounds (`search`: phases
-requested and run, per-phase rounds requested and run, saturation, the limit
-hit if any, rewrites, nodes added, merges accepted and refused, e-node and
-class counts), every candidate with its verdict (`accepted`,
+`original_sha256`, `strategy_sha256` (of the strategy file, or of the built-in
+portfolio document) and the checker `limits`. A searched result's `detail`
+reports the original's size, the domain size and whether every class of the
+original has an exact table, the strategy or portfolio document, the
+termination bounds (`search`: phases requested and run, each phase's run,
+rounds requested and run, saturation, the limit hit if any, rewrites, nodes
+added, merges accepted and refused, cut evaluations, work, e-node and class
+counts; `runs`: each run's e-graph size, merges, tables with and without an
+exact table, table work and whether the table budget ran out, work and stop
+reason), every candidate with its run and verdict (`accepted`,
 `accepted-not-better`, `counterexample`, `inconclusive`, `refused`,
-`not-smaller`, `duplicate`, `not-better-than-incumbent`, `unextractable`), and
-`best` with the candidate's digest, sizes, largest Step usage and its complete
-transform receipt.
+`not-smaller`, `duplicate`, `not-better-than-incumbent`, `unextractable`), each
+supplied program with its digest, size, verdict and whether it was fused, and
+`best` with its run and phase (or the index of the supplied program it is),
+the candidate's digest, sizes, largest Step usage and its complete transform
+receipt. Each run also reports how many supplied roots were merged and
+refused. With a portfolio, the top-level `enodes` and
+`classes` are the largest run's and the merge counts are totals.
 
 | Status | Exit | Meaning |
 | --- | ---: | --- |
 | `improved` | 0 | An accepted candidate is smaller than the original. `--candidate-out` and `--receipt` were created when given. |
 | `no-checked-improvement` | 2 | The search ended within its bounds without an accepted smaller candidate; the original stands. Nothing is written. |
 | `inconclusive` | 2 | The domain exceeds `--max-input-tuples` (default 100,000,000); no candidate could be judged, so nothing was searched. |
-| `refused` | 1 | The original failed the library importer, exceeds 64 KiB, or has an empty input domain. |
-| `invalid-strategy` | 1 | The strategy is not a document of the closed grammar, or exceeds 64 KiB. |
+| `refused` | 1 | The original failed the library importer, exceeds 64 KiB, has an empty input domain, or has an ABI or domain size the requested profile cannot hold; or more than 8 programs, or one larger than 64 KiB, were supplied. |
+| `invalid-strategy` | 1 | The strategy is not a document of the closed grammar, exceeds 64 KiB, or names a profile other than `--profile`. |
 | `output-exists` | 1 | A `--candidate-out` or `--receipt` path already exists, as a file or a link; nothing was searched. |
 | `io-error` | 3 | A file could not be read, is not a regular file, or an output could not be created. |
 
 The written receipt is the checker's `zeno-fcis/transform-receipt/1` for the
 original and the written candidate; `transform replay` reproduces it byte for
-byte. The same program and strategy give byte-identical output. On the
-recorded withdrawal-queue artifacts the default strategy reaches the 7-node
-Boolean kernel (from 16) and a 46-node retained controller (from 69; the
-recorded hand candidate has 60), each accepted with a receipt, and the
-106-node current decision graph reaches 100 nodes with every one of its
-1,296,000 tuples checked; on the sixteen Boolean benchmark seeds it matches or
-beats every recorded candidate and leaves the minimal originals unchanged.
-These are results of a bounded search,
-not minimality claims: signatures are exact only up to 64 tuples, larger
-domains get algebraic rules under conservative trap bounds, and an accepted
-candidate changes Step usage, so adopting one into an application remains a
-separate reviewed step that this command does not perform.
+byte. The same program, strategy and profile give byte-identical output.
+
+On the recorded withdrawal-queue artifacts the default portfolio reaches the
+7-node Boolean kernel (from 16), a 35-node retained controller (from 69; the
+recorded hand candidate has 60) and an 88-node current decision graph (from
+106, every one of its 1,296,000 tuples checked), each accepted with a receipt.
+Over the 32 seeds of `docs/benchmarks/cases.json` the outputs total 58
+instructions on the Boolean seeds and 45 on the integer seeds (an unimproved
+seed counts at its own size), and over the
+[published 100-case corpus](benchmarks/published-corpus/README.md)
+(calibration only) 508 instructions; under `functional-bool-v1` every Boolean
+seed and corpus output passes the profile's gate with the same totals.
+[`docs/benchmarks/measure_optimizer.py`](benchmarks/measure_optimizer.py)
+reproduces these figures and replays every receipt. In a release build the
+portfolio takes about 1 second on the controller, 14 seconds on the decision
+graph (mostly the checker's enumeration of 1,296,000 tuples) and under 0.5
+seconds on 87 of the 100 corpus cases (at most 1.5 seconds); a debug build is
+several times slower.
+
+These are results of a bounded search, not minimality claims: tables are exact
+only for supports of at most 2^16 tuples and within the table budget, larger
+supports get algebraic rules under conservative trap bounds, the cut table
+covers three inputs, and an accepted candidate changes Step usage, so adopting
+one into an application remains a separate reviewed step that this command
+does not perform.
 
 ## Bounded optimization loop
 
@@ -491,11 +557,20 @@ two-second deadline and panic capture; memory caps are not installed by this
 shell, the checker's allocation being bounded by the admitted artifact limits.
 
 Strategy proposals in the optimizer's grammar (`zeno-fcis/optimize-strategy/1`:
-named phases with bounded rounds, optional limits, a fixed extractor) are
-admitted as data and run by the wired engine, the checked e-graph optimizer
-(engine `zeno-fcis/optimize/1`, searching domains of at most 1,000,000
-tuples under the search worker's deadline). A phase outside the optimizer's
-table is `strategy-unavailable`. The optimizer's own checker verdict is only
+named phases with bounded rounds, optional limits, a fixed extractor and an
+optional profile) are admitted as data and run by the wired engine, the
+checked e-graph optimizer (engine `zeno-fcis/optimize/1`, searching domains
+of at most 1,000,000 tuples under the search worker's five-second deadline).
+The engine runs every strategy within the request's profile, so its candidate
+can pass the loop's profile admission, and fuses the session's checked
+replacement, when there is one, into its search as a supplied program; it
+proposes nothing unless it finds a candidate better than that replacement. A
+strategy that names another profile is `strategy-unavailable`, as is a phase
+outside the optimizer's table. In a
+debug build the default strategy finishes within 2 seconds on every measured
+program of at most 1,024 tuples; a larger domain can take longer than the
+deadline, and an abandoned search is reported as a failed search, never as a
+candidate. The optimizer's own checker verdict is only
 provenance: the bytes it emits enter the same admission and check path as
 any candidate, and only the loop's check can replace the incumbent. The MCP tools
 `transform_request`, `transform_candidate` and `transform_replay` in

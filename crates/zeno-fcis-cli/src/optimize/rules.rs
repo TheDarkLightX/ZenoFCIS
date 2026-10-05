@@ -9,12 +9,15 @@
 //! trap is never folded away.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
+use super::cuts;
 use super::egraph::{
     AddError, Caps, ClassId, EGraph, ENode, Inconsistency, Limit, Merge, MergeReason,
 };
 use super::extract::tree_costs;
-use super::semantics::{Kind, Signature};
+use super::semantics::Kind;
+use super::signature::{self, Samples, Table};
 use super::strategy::{Limits, Phase};
 
 /// A right-hand side over existing classes and new constants.
@@ -55,6 +58,8 @@ pub(crate) type Rule = fn(&EGraph, ClassId, ENode, &mut Vec<Rewrite>);
 /// What one phase did.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct PhaseReport {
+    /// Index of the run (the strategy within the plan) the phase belongs to.
+    pub(crate) run: usize,
     pub(crate) phase: Phase,
     pub(crate) rounds_requested: u32,
     pub(crate) rounds_run: u32,
@@ -65,6 +70,10 @@ pub(crate) struct PhaseReport {
     pub(crate) nodes_added: u64,
     pub(crate) merges: u64,
     pub(crate) refused: u64,
+    /// Cut combinations evaluated (the `cut-rewrite` phase only).
+    pub(crate) cut_evaluations: u64,
+    /// The e-graph's deterministic work after the phase.
+    pub(crate) work: u64,
     /// Why the phase did nothing at all, when so.
     pub(crate) skipped: Option<&'static str>,
     /// E-nodes ever created and live classes after the phase.
@@ -79,6 +88,10 @@ struct RoundTally {
     nodes_added: u64,
     merges: u64,
     refused: u64,
+    cut_evaluations: u64,
+    /// Rule matches, completion pairs and cut evaluations, for the work
+    /// budget.
+    steps: u64,
     limit_hit: Option<Limit>,
 }
 
@@ -96,6 +109,7 @@ pub(crate) fn run_phase(
     limits: &Limits,
 ) -> Result<PhaseReport, Inconsistency> {
     let mut report = PhaseReport {
+        run: 0,
         phase,
         rounds_requested: rounds,
         rounds_run: 0,
@@ -105,27 +119,36 @@ pub(crate) fn run_phase(
         nodes_added: 0,
         merges: 0,
         refused: 0,
+        cut_evaluations: 0,
+        work: egraph.work(),
         skipped: None,
         enodes: egraph.enode_count(),
         classes: egraph.class_count(),
     };
-    if phase == Phase::SemanticMerge && !egraph.domain().exact() {
-        report.skipped = Some("domain has more than 64 tuples; no exact signatures");
+    if phase == Phase::SemanticMerge && egraph.exactness().0 == 0 {
+        report.skipped = Some("no class has an exact table");
         return Ok(report);
     }
     for _ in 0..rounds {
+        if egraph.work() >= limits.work() {
+            report.limit_hit = Some(Limit::Work);
+            break;
+        }
         let tally = match phase {
             Phase::Boolean => round(egraph, &boolean_rules(), limits)?,
             Phase::Select => round(egraph, &select_rules(), limits)?,
             Phase::Fold => round(egraph, &[fold_rule], limits)?,
             Phase::Share => round(egraph, &[commute_rule], limits)?,
             Phase::SemanticMerge => semantic_round(egraph, limits)?,
+            Phase::CutRewrite => cut_round(egraph, limits)?,
         };
+        egraph.charge(tally.steps);
         report.rounds_run += 1;
         report.rewrites += tally.rewrites;
         report.nodes_added += tally.nodes_added;
         report.merges += tally.merges;
         report.refused += tally.refused;
+        report.cut_evaluations += tally.cut_evaluations;
         if let Some(limit) = tally.limit_hit {
             report.limit_hit = Some(limit);
             break;
@@ -137,6 +160,7 @@ pub(crate) fn run_phase(
     }
     report.enodes = egraph.enode_count();
     report.classes = egraph.class_count();
+    report.work = egraph.work();
     Ok(report)
 }
 
@@ -150,6 +174,7 @@ pub(crate) fn run_rules(
     limits: &Limits,
 ) -> Result<PhaseReport, Inconsistency> {
     let mut report = PhaseReport {
+        run: 0,
         phase: Phase::Boolean,
         rounds_requested: rounds,
         rounds_run: 0,
@@ -159,6 +184,8 @@ pub(crate) fn run_rules(
         nodes_added: 0,
         merges: 0,
         refused: 0,
+        cut_evaluations: 0,
+        work: egraph.work(),
         skipped: None,
         enodes: egraph.enode_count(),
         classes: egraph.class_count(),
@@ -197,6 +224,7 @@ fn round(
         for id in egraph.class_nodes(class) {
             let node = egraph.node(id);
             for rule in rules {
+                tally.steps += 1;
                 rule(egraph, class, node, &mut rewrites);
                 if rewrites.len() > limits.max_rewrites_per_round as usize {
                     rewrites.truncate(limits.max_rewrites_per_round as usize);
@@ -208,6 +236,22 @@ fn round(
     }
     tally.rewrites = rewrites.len() as u64;
     apply(egraph, &rewrites, limits.caps(), &mut tally)?;
+    egraph.rebuild()?;
+    Ok(tally)
+}
+
+/// One round of exact cut rewriting: every proposal is a rule merge, so the
+/// guard decides it like any other.
+fn cut_round(egraph: &mut EGraph, limits: &Limits) -> Result<RoundTally, Inconsistency> {
+    let proposals = cuts::proposals(egraph, limits.max_rewrites_per_round as usize);
+    let mut tally = RoundTally {
+        rewrites: proposals.rewrites.len() as u64,
+        cut_evaluations: proposals.evaluations,
+        steps: proposals.evaluations,
+        limit_hit: proposals.limit_hit.then_some(Limit::Rewrites),
+        ..RoundTally::default()
+    };
+    apply(egraph, &proposals.rewrites, limits.caps(), &mut tally)?;
     egraph.rebuild()?;
     Ok(tally)
 }
@@ -735,22 +779,23 @@ fn commute_rule(egraph: &EGraph, class: ClassId, node: ENode, out: &mut Vec<Rewr
 
 // ---- Semantic phase ----------------------------------------------------------
 
-/// Merges classes with identical exact signatures, then adds single
-/// instructions over existing classes whose exact signature some existing
-/// class already has, so extraction can use them as cheaper alternatives.
+/// Merges classes with identical exact tables, then adds single instructions
+/// over existing classes whose function some existing class already has, so
+/// extraction can use them as cheaper alternatives.
 fn semantic_round(egraph: &mut EGraph, limits: &Limits) -> Result<RoundTally, Inconsistency> {
     let mut tally = RoundTally::default();
-    let mut by_signature: BTreeMap<(Kind, Signature), ClassId> = BTreeMap::new();
+    let mut by_table: BTreeMap<(Kind, Arc<Table>), ClassId> = BTreeMap::new();
     let mut unions = Vec::new();
     for class in egraph.classes() {
         let data = egraph.data(class);
-        let Some(signature) = data.signature.clone() else {
+        let Some(table) = &data.table else {
             continue;
         };
-        match by_signature.get(&(data.kind, signature.clone())) {
+        let key = (data.kind, Arc::clone(table));
+        match by_table.get(&key) {
             Some(existing) => unions.push((*existing, class)),
             None => {
-                by_signature.insert((data.kind, signature), class);
+                by_table.insert(key, class);
             }
         }
     }
@@ -767,7 +812,11 @@ fn semantic_round(egraph: &mut EGraph, limits: &Limits) -> Result<RoundTally, In
     Ok(tally)
 }
 
-/// Signature-directed completion. Targets are classes whose cheapest tree
+/// Signature-directed completion over never-poisoned classes with exact
+/// tables. Candidates are bucketed by their values at the domain's sample
+/// tuples, then each one is confirmed by computing its exact table before
+/// anything is added; with at most 1,024 tuples the samples are the whole
+/// domain and need no confirmation. Targets are classes whose cheapest tree
 /// needs at least two instructions; a one-instruction target cannot improve.
 fn complete(
     egraph: &mut EGraph,
@@ -775,95 +824,99 @@ fn complete(
     tally: &mut RoundTally,
 ) -> Result<(), Inconsistency> {
     let caps = limits.caps();
-    let full = egraph.domain().full_mask();
+    let full = egraph.domain().sample_mask();
+    let not = |a: &[u64]| -> Vec<u64> { a.iter().zip(&full).map(|(a, f)| !a & f).collect() };
+    let and = |a: &[u64], b: &[u64]| -> Vec<u64> { a.iter().zip(b).map(|(a, b)| a & b).collect() };
+    let xnor = |a: &[u64], b: &[u64]| -> Vec<u64> {
+        a.iter()
+            .zip(b)
+            .zip(&full)
+            .map(|((a, b), f)| !(a ^ b) & f)
+            .collect()
+    };
     let costs = tree_costs(egraph);
     let expensive = |class: ClassId| costs.get(&class).is_none_or(|(cost, _)| cost.nodes >= 2);
-    // Unpoisoned Boolean classes by their bit signature; unpoisoned classes of
-    // either kind by their full signature.
-    let mut bools: Vec<(ClassId, u64)> = Vec::new();
-    let mut ints: Vec<(ClassId, Signature)> = Vec::new();
-    let mut by_bits: BTreeMap<u64, ClassId> = BTreeMap::new();
-    let mut by_signature: BTreeMap<(Kind, Signature), ClassId> = BTreeMap::new();
+    let allows_eq = egraph.admits(ENode::Eq(0, 0));
+    let allows_lt = egraph.admits(ENode::Lt(0, 0));
+    // Boolean classes by their sample bits; integer classes with their samples.
+    let mut bools: Vec<(ClassId, Vec<u64>)> = Vec::new();
+    let mut ints: Vec<(ClassId, Arc<Samples>)> = Vec::new();
+    let mut by_bits: BTreeMap<Vec<u64>, Vec<ClassId>> = BTreeMap::new();
     for class in egraph.classes() {
         let data = egraph.data(class);
-        let Some(signature) = &data.signature else {
-            continue;
-        };
-        if signature.poisoned() {
+        if data.table.as_ref().is_none_or(|table| table.poisoned()) {
             continue;
         }
-        by_signature.insert((data.kind, signature.clone()), class);
         match data.kind {
             Kind::Bool => {
-                if let Some(bits) = signature.bits() {
-                    bools.push((class, bits));
-                    by_bits.insert(bits, class);
-                }
+                let bits = data.samples.bits();
+                by_bits.entry(bits.clone()).or_default().push(class);
+                bools.push((class, bits));
             }
-            Kind::Int => ints.push((class, signature.clone())),
+            Kind::Int => ints.push((class, Arc::clone(&data.samples))),
         }
     }
-    let mut proposals: Vec<(ClassId, ENode)> = Vec::new();
-    let budget = limits.max_rewrites_per_round as usize;
+    let targets_with = |bits: &[u64], excluded: &[ClassId]| -> Vec<ClassId> {
+        by_bits.get(bits).map_or_else(Vec::new, |classes| {
+            classes
+                .iter()
+                .copied()
+                .filter(|target| !excluded.contains(target) && expensive(*target))
+                .collect()
+        })
+    };
+    // The pair and Select loops below, for the work budget.
+    let (b, i) = (bools.len() as u64, ints.len() as u64);
+    tally.steps += b + b * (b + 1) / 2 + i * (i + 1) / 2;
+    let mut candidates: Vec<(ENode, Vec<ClassId>)> = Vec::new();
     // Not(x).
-    for &(x, bits) in &bools {
-        if let Some(&target) = by_bits.get(&(!bits & full))
-            && target != x
-            && expensive(target)
-        {
-            proposals.push((target, ENode::Not(x)));
+    for (x, bits) in &bools {
+        let targets = targets_with(&not(bits), &[*x]);
+        if !targets.is_empty() {
+            candidates.push((ENode::Not(*x), targets));
         }
     }
     // And(x, y) and Boolean Eq(x, y).
-    for (index, &(x, xb)) in bools.iter().enumerate() {
-        for &(y, yb) in &bools[index..] {
-            if let Some(&target) = by_bits.get(&(xb & yb))
-                && target != x
-                && target != y
-                && expensive(target)
-            {
-                proposals.push((target, ENode::And(x, y)));
+    for (index, (x, xb)) in bools.iter().enumerate() {
+        for (y, yb) in &bools[index..] {
+            let targets = targets_with(&and(xb, yb), &[*x, *y]);
+            if !targets.is_empty() {
+                candidates.push((ENode::And(*x, *y), targets));
             }
-            if x != y
-                && let Some(&target) = by_bits.get(&(!(xb ^ yb) & full))
-                && target != x
-                && target != y
-                && expensive(target)
-            {
-                proposals.push((target, ENode::Eq(x, y)));
+            if allows_eq && x != y {
+                let targets = targets_with(&xnor(xb, yb), &[*x, *y]);
+                if !targets.is_empty() {
+                    candidates.push((ENode::Eq(*x, *y), targets));
+                }
             }
         }
     }
     // Integer Eq(x, y) and Lt(x, y).
+    let compare = |xs: &Samples, ys: &Samples, op: fn(i64, i64) -> bool| -> Vec<u64> {
+        signature::words(
+            (0..xs.len()).map(|sample| match (xs.get(sample), ys.get(sample)) {
+                (Some(a), Some(b)) => op(a, b),
+                _ => false,
+            }),
+            xs.len(),
+        )
+    };
     for (index, (x, xs)) in ints.iter().enumerate() {
         for (y, ys) in &ints[index..] {
-            let pairs = || xs.values().iter().zip(ys.values());
-            let eq = Signature::from_values(
-                pairs()
-                    .map(|(a, b)| Some(i64::from((*a)? == (*b)?)))
-                    .collect(),
-            );
-            if let Some(&target) = by_signature.get(&(Kind::Bool, eq))
-                && expensive(target)
-            {
-                proposals.push((target, ENode::Eq(*x, *y)));
+            if allows_eq {
+                let targets = targets_with(&compare(xs, ys, |a, b| a == b), &[]);
+                if !targets.is_empty() {
+                    candidates.push((ENode::Eq(*x, *y), targets));
+                }
             }
-            if x == y {
+            if x == y || !allows_lt {
                 continue;
             }
             for (p, q) in [(*x, *y), (*y, *x)] {
                 let (ps, qs) = if p == *x { (xs, ys) } else { (ys, xs) };
-                let lt = Signature::from_values(
-                    ps.values()
-                        .iter()
-                        .zip(qs.values())
-                        .map(|(a, b)| Some(i64::from((*a)? < (*b)?)))
-                        .collect(),
-                );
-                if let Some(&target) = by_signature.get(&(Kind::Bool, lt))
-                    && expensive(target)
-                {
-                    proposals.push((target, ENode::Lt(p, q)));
+                let targets = targets_with(&compare(ps, qs, |a, b| a < b), &[]);
+                if !targets.is_empty() {
+                    candidates.push((ENode::Lt(p, q), targets));
                 }
             }
         }
@@ -876,64 +929,61 @@ fn complete(
             expensive(*class)
                 && egraph
                     .data(*class)
-                    .signature
+                    .table
                     .as_ref()
-                    .is_some_and(|signature| !signature.poisoned())
+                    .is_some_and(|table| !table.poisoned())
         })
         .collect();
-    for &(c, ones) in &bools {
-        if ones == 0 || ones == full {
+    tally.steps += b * (b + targets.len() as u64);
+    for (c, ones) in &bools {
+        if ones.iter().all(|word| *word == 0) || *ones == full {
             continue;
         }
-        let zeros = !ones & full;
-        let mut on_ones: BTreeMap<u64, Vec<ClassId>> = BTreeMap::new();
-        let mut on_zeros: BTreeMap<u64, Vec<ClassId>> = BTreeMap::new();
-        for &(x, xb) in &bools {
-            on_ones.entry(xb & ones).or_default().push(x);
-            on_zeros.entry(xb & zeros).or_default().push(x);
+        let zeros = not(ones);
+        let mut on_ones: BTreeMap<Vec<u64>, Vec<ClassId>> = BTreeMap::new();
+        let mut on_zeros: BTreeMap<Vec<u64>, Vec<ClassId>> = BTreeMap::new();
+        for (x, xb) in &bools {
+            on_ones.entry(and(xb, ones)).or_default().push(*x);
+            on_zeros.entry(and(xb, &zeros)).or_default().push(*x);
         }
         for &target in &targets {
             // A target as its own condition would only add a cyclic member.
-            if target == c {
+            if target == *c {
                 continue;
             }
             let data = egraph.data(target);
-            let Some(signature) = &data.signature else {
-                continue;
-            };
             match data.kind {
                 Kind::Bool => {
-                    let Some(tb) = signature.bits() else {
-                        continue;
-                    };
+                    let tb = data.samples.bits();
                     let empty = Vec::new();
-                    let arms_a = on_ones.get(&(tb & ones)).unwrap_or(&empty);
-                    let arms_b = on_zeros.get(&(tb & zeros)).unwrap_or(&empty);
+                    let arms_a = on_ones.get(&and(&tb, ones)).unwrap_or(&empty);
+                    let arms_b = on_zeros.get(&and(&tb, &zeros)).unwrap_or(&empty);
                     for &a in arms_a.iter().filter(|a| **a != target).take(4) {
                         for &b in arms_b.iter().filter(|b| **b != target).take(4) {
                             if a != b {
-                                proposals.push((target, ENode::Select(c, a, b)));
+                                candidates.push((ENode::Select(*c, a, b), vec![target]));
                             }
                         }
                     }
                 }
                 Kind::Int => {
+                    let samples = &data.samples;
                     let arms_a: Vec<ClassId> = ints
                         .iter()
-                        .filter(|(x, xs)| *x != target && xs.agrees_on(signature, ones))
+                        .filter(|(x, xs)| *x != target && xs.agrees_on(samples, ones))
                         .map(|(x, _)| *x)
                         .take(4)
                         .collect();
                     let arms_b: Vec<ClassId> = ints
                         .iter()
-                        .filter(|(x, xs)| *x != target && xs.agrees_on(signature, zeros))
+                        .filter(|(x, xs)| *x != target && xs.agrees_on(samples, &zeros))
                         .map(|(x, _)| *x)
                         .take(4)
                         .collect();
                     for &a in &arms_a {
                         for &b in &arms_b {
                             if a != b {
-                                proposals.push((target, ENode::Select(c, a, b)));
+                                candidates.push((ENode::Select(*c, a, b), vec![target]));
                             }
                         }
                     }
@@ -941,9 +991,41 @@ fn complete(
             }
         }
     }
-    if proposals.len() > budget {
-        proposals.truncate(budget);
-        tally.limit_hit = Some(Limit::Rewrites);
+    // Confirm each candidate against its targets' exact tables, in order,
+    // before anything is added. When the samples are the whole domain, equal
+    // samples already mean equal functions.
+    let budget = limits.max_rewrites_per_round as usize;
+    let exhaustive = egraph.domain().exhaustive();
+    let mut proposals: Vec<(ClassId, ENode)> = Vec::new();
+    for (node, targets) in candidates {
+        if proposals.len() == budget {
+            tally.limit_hit = Some(Limit::Rewrites);
+            break;
+        }
+        if exhaustive {
+            proposals.extend(targets.first().map(|target| (*target, node)));
+            continue;
+        }
+        let table = match egraph.analyze_detached(node) {
+            Ok(analysis) => analysis.data.table,
+            Err(AddError::Type(_)) => {
+                tally.refused += 1;
+                continue;
+            }
+            Err(AddError::Limit(limit)) => {
+                tally.limit_hit = Some(limit);
+                break;
+            }
+        };
+        let Some(table) = table else {
+            continue;
+        };
+        if let Some(target) = targets
+            .into_iter()
+            .find(|target| egraph.data(*target).table.as_ref() == Some(&table))
+        {
+            proposals.push((target, node));
+        }
     }
     tally.rewrites += proposals.len() as u64;
     for (target, node) in proposals {

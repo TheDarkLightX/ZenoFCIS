@@ -556,7 +556,11 @@ fn describe_effects(path: &[String]) -> Value {
                 None,
             ),
             ["optimize"] => (
-                &["original-program", "optional-strategy"],
+                &[
+                    "original-program",
+                    "optional-strategy",
+                    "optional-candidate-programs",
+                ],
                 &["optional-candidate-program", "optional-equivalence-receipt"],
                 false,
                 None,

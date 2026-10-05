@@ -14,6 +14,45 @@ embedded in ZenoFCIS values.
   and initialization now compare every `sqlite_master` object with no name
   filter. A regression test plants triggers named `sqlitex`, `SQLiteX` and
   `sqlite1`. An independent review of V2.1 found the defect.
+- Improve `zeno-fcis optimize` (F4.1, from the 2026-10-05 e-graph literature
+  review). Every e-class now keeps an exact table over the inputs it depends
+  on, its minimal support, whenever that support's domains have at most 2^16
+  tuples, so classes of large domains merge by exact equality (poison
+  included) instead of only within domains of at most 64 tuples; classes
+  beyond the cap or the per-search table budget keep the conservative interval
+  guard. Completion buckets candidates by sample values (every tuple up to
+  1,024 tuples) and confirms each by its table before adding it. A new
+  `cut-rewrite` phase rewrites Boolean classes over cuts of up to three leaves
+  with a built-in table of minimum circuits, with and without `Eq`, that a
+  test regenerates and checks entry by entry. Strategies gain an optional
+  `profile` (`functional-bool-v1` or `checked-i64-v1`): no instruction outside
+  it is proposed or extracted, and every candidate passes its gate; `optimize`
+  gains `--profile`. Strategies also gain `limits.max_work`, a deterministic
+  work budget in millions of steps that stands in for time. Without
+  `--strategy`, `optimize` now runs a fixed portfolio
+  (`zeno-fcis/optimize-portfolio/1`) of three strategies, each ending with
+  merging and cut rewriting under its own size and work budgets, with one
+  incumbent across them; the report tags phases and candidates with their run
+  and adds per-run statistics. `--with-candidate FILE` (up to 8) supplies
+  programs to fuse into the search: each is checked against the original
+  first, and only an accepted one is added, unpinned, with its roots merged
+  with the original's when the original can never fail or when their exact
+  tables agree. The loop's strategy grammar admits `profile` and `max_work`,
+  its engine phase table lists `cut-rewrite`, and the engine seam now passes
+  the request's profile and the session's checked replacement, so the
+  engine's candidates stay within the profile (a strategy naming another
+  profile is `strategy-unavailable`) and must beat the replacement.
+  Measured, every result accepted by the checker with a replaying receipt:
+  withdrawal-queue controller 46 to 35 instructions, current decision graph
+  100 to 88, kernel unchanged at 7; Boolean seeds 59 to 58 (B07 6 to 5),
+  integer seeds 47 to 45 (I04 7 to 5); the published 100-case corpus, added
+  under `docs/benchmarks/published-corpus/` as calibration data with its
+  generator and provenance, 514 to 508. `docs/benchmarks/measure_optimizer.py`
+  reproduces the figures. Two e-graph changes cut search time without
+  changing any result: rebuild repairs each dirty class once per pass, and
+  unions keep class lists sorted without re-sorting. These are bounded,
+  checked results, not minimality claims; `Cargo.lock` and the verified core
+  are unchanged.
 - Add `zeno-fcis optimize --program P [--strategy FILE] [--candidate-out OUT]
   [--receipt OUT] [--max-input-tuples N]`: an in-house e-graph optimizer
   (union-find, hash-consing, congruence rebuild; no new dependency) that

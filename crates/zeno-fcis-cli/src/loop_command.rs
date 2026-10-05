@@ -47,7 +47,14 @@ const ENGINE_MAX_INPUT_TUPLES: u64 = 1_000_000;
 /// Provenance name of the wired engine (never assurance).
 const ENGINE_IDENTITY: &str = "zeno-fcis/optimize/1";
 /// The phase names of F4's grammar, which the driver checks a strategy against.
-const ENGINE_PHASES: [&str; 5] = ["boolean", "semantic-merge", "select", "fold", "share"];
+const ENGINE_PHASES: [&str; 6] = [
+    "boolean",
+    "semantic-merge",
+    "select",
+    "fold",
+    "share",
+    "cut-rewrite",
+];
 const PROGRAM_LIMIT: u64 = 64 * 1024;
 const PROGRAM_JSON_LIMIT: u64 = 1024 * 1024;
 const LEDGER_LIMIT: u64 = 4 * 1024 * 1024;
@@ -232,10 +239,16 @@ impl StrategyEngine for OptimizeEngine {
         &ENGINE_PHASES
     }
 
-    fn run(&self, original: &[u8], strategy: &Strategy) -> SearchReport {
+    fn run(
+        &self,
+        original: &[u8],
+        strategy: &Strategy,
+        profile: Profile,
+        checked: &[Vec<u8>],
+    ) -> SearchReport {
         // The optimizer re-parses the document with its own strict grammar.
         let document = strategy.json().to_string();
-        let strategy = match optimize::strategy::Strategy::parse(document.as_bytes()) {
+        let mut strategy = match optimize::strategy::Strategy::parse(document.as_bytes()) {
             Ok(strategy) => strategy,
             Err(error) => {
                 return SearchReport::Failed {
@@ -243,13 +256,35 @@ impl StrategyEngine for OptimizeEngine {
                 };
             }
         };
-        match optimize::optimize(original, &strategy, ENGINE_MAX_INPUT_TUPLES) {
+        // The search stays within the request's profile, so its candidate
+        // can pass the loop's profile admission.
+        if let Some(named) = strategy.profile
+            && named != profile
+        {
+            return SearchReport::Unavailable {
+                reason: format!(
+                    "engine:profile-mismatch:{}:{}",
+                    named.name(),
+                    profile.name()
+                ),
+            };
+        }
+        strategy.profile = Some(profile);
+        // The loop's checked candidates are fused into the search; the
+        // optimizer judges them again before using them.
+        let plan = optimize::strategy::Plan::single(strategy);
+        match optimize::optimize_plan(original, &plan, checked, ENGINE_MAX_INPUT_TUPLES) {
             optimize::Outcome::Searched(search) => match search.best {
-                Some(best) => SearchReport::Candidate {
-                    bytes: best.bytes,
-                    extraction: format!("engine-accepted:phase-{}", best.phase_index),
+                Some(optimize::Accepted {
+                    bytes,
+                    source: optimize::Source::Phase { phase_index, .. },
+                    ..
+                }) => SearchReport::Candidate {
+                    bytes,
+                    extraction: format!("engine-accepted:phase-{phase_index}"),
                 },
-                None => SearchReport::Failed {
+                // Nothing better than what the loop already holds.
+                _ => SearchReport::Failed {
                     reason: String::from("engine:no-checked-improvement"),
                 },
             },
@@ -766,10 +801,19 @@ pub(crate) fn drive(
                 _ => {
                     let worker = Arc::clone(engine);
                     let original = session.request().original().to_vec();
-                    supervise(SEARCH_DEADLINE, move || worker.run(&original, &strategy))
-                        .unwrap_or_else(|failure| SearchReport::Failed {
-                            reason: format!("search-worker:{}", failure.name()),
-                        })
+                    let profile = session.request().profile();
+                    let checked: Vec<Vec<u8>> = session
+                        .incumbent()
+                        .replacement()
+                        .map(|replacement| replacement.bytes().to_vec())
+                        .into_iter()
+                        .collect();
+                    supervise(SEARCH_DEADLINE, move || {
+                        worker.run(&original, &strategy, profile, &checked)
+                    })
+                    .unwrap_or_else(|failure| SearchReport::Failed {
+                        reason: format!("search-worker:{}", failure.name()),
+                    })
                 }
             };
             prepared = session.searched(job, report);

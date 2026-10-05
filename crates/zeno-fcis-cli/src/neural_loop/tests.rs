@@ -763,6 +763,8 @@ fn every_reachable_incumbent_equals_the_original_for_arbitrary_proposals() {
                         "extractor": "dag-greedy"}),
                             )
                             .unwrap_or_else(|error| panic!("{error:?}")),
+                            Profile::FunctionalBoolV1,
+                            &[],
                         ),
                     ) {
                         Prepared::Settled(outcome) => outcome,
@@ -1205,11 +1207,21 @@ fn strategies_are_validated_data_and_unavailable_without_an_engine() {
     let valid = json!({
         "schema": "zeno-fcis/optimize-strategy/1",
         "phases": [{"phase": "fold", "rounds": 1}, {"phase": "boolean", "rounds": 3}],
-        "limits": {"max_enodes": 20000, "max_extraction_rounds": 8},
+        "limits": {"max_enodes": 20000, "max_extraction_rounds": 8, "max_work": 400},
         "extractor": "dag-greedy"
     });
     let strategy = Strategy::from_json(&valid).unwrap_or_else(|error| panic!("{error:?}"));
     assert_eq!(strategy.json(), valid);
+    assert_eq!(strategy.profile, None);
+    let mut named = valid.clone();
+    named["profile"] = json!("functional-bool-v1");
+    let bound = Strategy::from_json(&named).unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(bound.profile, Some(Profile::FunctionalBoolV1));
+    assert_eq!(bound.json(), named);
+    assert_eq!(
+        StrategyRefusal::Profile.json(),
+        json!({"reason": "strategy-profile"})
+    );
     assert_eq!(NoEngine.identity(), "none");
     assert!(NoEngine.phases().is_empty());
     let ticket = session
@@ -1219,7 +1231,7 @@ fn strategies_are_validated_data_and_unavailable_without_an_engine() {
         panic!("expected a search job");
     };
     assert_eq!(job.strategy(), &strategy);
-    let report = NoEngine.run(original, job.strategy());
+    let report = NoEngine.run(original, job.strategy(), Profile::FunctionalBoolV1, &[]);
     assert!(matches!(
         session.searched(job, report),
         Prepared::Settled(Outcome::StrategyUnavailable(_))
@@ -1264,6 +1276,14 @@ fn strategies_are_validated_data_and_unavailable_without_an_engine() {
                 value: 100_001,
             },
         ),
+        (
+            json!({"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "fold", "rounds": 1}], "extractor": "tree", "profile": "checked-i64-v2"}),
+            StrategyRefusal::Profile,
+        ),
+        (
+            json!({"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "fold", "rounds": 1}], "extractor": "tree", "profile": null}),
+            StrategyRefusal::Profile,
+        ),
     ]
     .into_iter()
     .enumerate()
@@ -1286,7 +1306,13 @@ fn strategies_are_validated_data_and_unavailable_without_an_engine() {
         fn phases(&self) -> &[&str] {
             &["fold", "boolean"]
         }
-        fn run(&self, _original: &[u8], _strategy: &Strategy) -> SearchReport {
+        fn run(
+            &self,
+            _original: &[u8],
+            _strategy: &Strategy,
+            _profile: Profile,
+            _checked: &[Vec<u8>],
+        ) -> SearchReport {
             SearchReport::Candidate {
                 bytes: self.0.clone(),
                 extraction: "unknown-optimality".into(),
@@ -1305,7 +1331,10 @@ fn strategies_are_validated_data_and_unavailable_without_an_engine() {
         panic!("expected a search job");
     };
     let engine = FakeEngine(artifact("boolean-kernel-candidate").to_vec());
-    let Prepared::Check(check) = session.searched(job, engine.run(original, &strategy)) else {
+    let Prepared::Check(check) = session.searched(
+        job,
+        engine.run(original, &strategy, Profile::FunctionalBoolV1, &[]),
+    ) else {
         panic!("engine bytes must reach the checker");
     };
     let report = check.run();
@@ -1330,7 +1359,12 @@ fn strategies_are_validated_data_and_unavailable_without_an_engine() {
     assert!(matches!(
         session.searched(
             job,
-            FakeEngine(b"partial".to_vec()).run(original, &strategy)
+            FakeEngine(b"partial".to_vec()).run(
+                original,
+                &strategy,
+                Profile::FunctionalBoolV1,
+                &[]
+            )
         ),
         Prepared::Settled(Outcome::Refused(AdmissionRefusal::NotAdmitted { .. }))
     ));

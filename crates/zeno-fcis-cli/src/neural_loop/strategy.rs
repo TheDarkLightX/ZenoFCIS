@@ -1,16 +1,19 @@
 //! The closed strategy DSL and the engine seam (NSL-003, NSM-004, NSM-005).
 //!
 //! A strategy is data in F4's grammar `zeno-fcis/optimize-strategy/1`: an
-//! ordered list of named phases with bounded rounds, optional numeric limits
-//! and one of a fixed set of extractors. It selects behavior of an already
-//! qualified fixed interpreter; it is never code. This module admits the
-//! grammar's shape and bounds; the engine behind [`StrategyEngine`] (F4's
-//! e-graph optimizer) owns the phase table and the semantics; the shell wires
-//! that optimizer (`loop_command::OptimizeEngine`). Whatever engine runs, the
-//! candidate bytes it emits re-enter the
-//! ordinary admission and `transform::check` path; no engine verdict is trusted.
+//! ordered list of named phases with bounded rounds, optional numeric limits,
+//! one of a fixed set of extractors and an optional artifact profile. It
+//! selects behavior of an already qualified fixed interpreter; it is never
+//! code. This module admits the grammar's shape and bounds; the engine behind
+//! [`StrategyEngine`] (F4's e-graph optimizer) owns the phase table and the
+//! semantics; the shell wires that optimizer (`loop_command::OptimizeEngine`)
+//! and passes it the request's profile. Whatever engine runs, the candidate
+//! bytes it emits re-enter the ordinary admission and `transform::check` path;
+//! no engine verdict is trusted.
 
 use serde_json::{Value, json};
+
+use super::profiles::Profile;
 
 /// F4's strategy schema; the loop accepts the same document.
 pub(crate) const STRATEGY_SCHEMA: &str = "zeno-fcis/optimize-strategy/1";
@@ -19,11 +22,12 @@ pub(crate) const MAX_ROUNDS: u32 = 8;
 /// Largest value any limit may take.
 pub(crate) const MAX_LIMIT: u32 = 100_000;
 pub(crate) const MAX_PHASE_NAME_BYTES: usize = 32;
-const LIMIT_FIELDS: [&str; 4] = [
+const LIMIT_FIELDS: [&str; 5] = [
     "max_enodes",
     "max_classes",
     "max_rewrites_per_round",
     "max_extraction_rounds",
+    "max_work",
 ];
 
 /// A phase name from the engine's fixed table. The grammar only bounds its
@@ -77,6 +81,7 @@ pub(crate) struct SearchLimits {
     pub(crate) max_classes: Option<u32>,
     pub(crate) max_rewrites_per_round: Option<u32>,
     pub(crate) max_extraction_rounds: Option<u32>,
+    pub(crate) max_work: Option<u32>,
 }
 
 /// A validated strategy.
@@ -85,6 +90,8 @@ pub(crate) struct Strategy {
     pub(crate) phases: Vec<Phase>,
     pub(crate) limits: Option<SearchLimits>,
     pub(crate) extractor: Extractor,
+    /// The artifact profile the search must stay within, when named.
+    pub(crate) profile: Option<Profile>,
 }
 
 /// Why strategy data is outside the grammar.
@@ -92,18 +99,33 @@ pub(crate) struct Strategy {
 pub(crate) enum StrategyRefusal {
     Shape,
     Schema,
-    Phases { count: usize },
-    PhaseName { index: usize },
-    Rounds { index: usize, value: u64 },
+    Phases {
+        count: usize,
+    },
+    PhaseName {
+        index: usize,
+    },
+    Rounds {
+        index: usize,
+        value: u64,
+    },
     Limits,
-    Limit { field: &'static str, value: u64 },
+    Limit {
+        field: &'static str,
+        value: u64,
+    },
     Extractor,
+    /// `profile` is not the name of a known profile.
+    Profile,
 }
 
 impl Strategy {
     /// Strict reader: exact fields, bounded counts and values, closed names.
     pub(crate) fn from_json(value: &Value) -> Result<Strategy, StrategyRefusal> {
-        if !super::only_fields(value, &["schema", "phases", "limits", "extractor"]) {
+        if !super::only_fields(
+            value,
+            &["schema", "phases", "limits", "extractor", "profile"],
+        ) {
             return Err(StrategyRefusal::Shape);
         }
         if value.get("schema").and_then(Value::as_str) != Some(STRATEGY_SCHEMA) {
@@ -171,6 +193,7 @@ impl Strategy {
                     max_classes: field("max_classes")?,
                     max_rewrites_per_round: field("max_rewrites_per_round")?,
                     max_extraction_rounds: field("max_extraction_rounds")?,
+                    max_work: field("max_work")?,
                 })
             }
         };
@@ -179,10 +202,19 @@ impl Strategy {
             Some("dag-greedy") => Extractor::DagGreedy,
             _ => return Err(StrategyRefusal::Extractor),
         };
+        let profile = match value.get("profile") {
+            None => None,
+            Some(name) => Some(
+                name.as_str()
+                    .and_then(Profile::parse)
+                    .ok_or(StrategyRefusal::Profile)?,
+            ),
+        };
         Ok(Strategy {
             phases,
             limits,
             extractor,
+            profile,
         })
     }
 
@@ -203,12 +235,16 @@ impl Strategy {
                 ("max_classes", limits.max_classes),
                 ("max_rewrites_per_round", limits.max_rewrites_per_round),
                 ("max_extraction_rounds", limits.max_extraction_rounds),
+                ("max_work", limits.max_work),
             ] {
                 if let Some(value) = value {
                     fields.insert(name.to_owned(), json!(value));
                 }
             }
             document["limits"] = Value::Object(fields);
+        }
+        if let Some(profile) = self.profile {
+            document["profile"] = json!(profile.name());
         }
         document
     }
@@ -240,6 +276,7 @@ impl StrategyRefusal {
                 "reason": "strategy-limit", "field": field, "value": value, "max": MAX_LIMIT
             }),
             StrategyRefusal::Extractor => json!({"reason": "strategy-extractor"}),
+            StrategyRefusal::Profile => json!({"reason": "strategy-profile"}),
         }
     }
 }
@@ -260,15 +297,26 @@ pub(crate) enum SearchReport {
 /// The seam F4's optimizer implements. The shell runs `run` under the search
 /// worker's deadline (NSR-002); the loop never calls it. Wiring F4 is one
 /// `impl`: parse `strategy.json()` with the optimizer's own strict parser,
-/// call its `optimize` on the original bytes, and map its best extracted
-/// candidate to `SearchReport::Candidate` (any other outcome to `Failed`).
+/// call its optimizer on the original bytes under the request's profile with
+/// the loop's checked candidates, and map its best extracted candidate to
+/// `SearchReport::Candidate` (any other outcome to `Failed`, or
+/// `Unavailable` when the strategy names another profile).
 pub(crate) trait StrategyEngine {
     /// Engine identity for provenance (never assurance).
     fn identity(&self) -> &str;
     /// The fixed phase table the grammar's phase names are checked against.
     fn phases(&self) -> &[&str];
-    /// Runs one validated strategy on the original's exact bytes.
-    fn run(&self, original: &[u8], strategy: &Strategy) -> SearchReport;
+    /// Runs one validated strategy on the original's exact bytes, proposing
+    /// only programs within the request's `profile`. `checked` holds the
+    /// loop's checked replacement, if any, as canonical bytes; an engine may
+    /// fuse it into its search but must not trust it.
+    fn run(
+        &self,
+        original: &[u8],
+        strategy: &Strategy,
+        profile: Profile,
+        checked: &[Vec<u8>],
+    ) -> SearchReport;
 }
 
 /// An engine that runs nothing: every strategy is unavailable. Tests use it to
@@ -287,7 +335,13 @@ impl StrategyEngine for NoEngine {
         &[]
     }
 
-    fn run(&self, _original: &[u8], _strategy: &Strategy) -> SearchReport {
+    fn run(
+        &self,
+        _original: &[u8],
+        _strategy: &Strategy,
+        _profile: Profile,
+        _checked: &[Vec<u8>],
+    ) -> SearchReport {
         SearchReport::Unavailable {
             reason: String::from("strategy mode is unavailable: this engine runs nothing"),
         }
