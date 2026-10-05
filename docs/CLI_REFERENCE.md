@@ -631,7 +631,14 @@ The session directory holds `request.json`, `original.zcve`, the append-only
 `ledger.jsonl` with its separately written `ledger.head`, `artifacts/` by
 digest, `receipts/`, `witnesses/` and a transcript capped at 512 KiB. Every
 attempt, model call and check is reserved in the ledger before its work and
-never refunded; a crash leaves the reservation charged as unresolved. The
+never refunded; a crash leaves the reservation charged as unresolved.
+`resume`, `candidate` and `run` each start by replaying the incumbent and
+the stored counterexamples, and that replay is reserved and written to the
+ledger before any of its work runs, so an interrupted replay stays charged.
+The ledger records no completion for a replay and no invocation reuses an
+earlier one's: each pays for its own, and when the remaining session work
+cannot cover it the invocation exits 2 with `resume-inconclusive`
+(`insufficient-replay-allowance`) and writes nothing. The
 ledger's hash chain detects truncation and edits relative to the head; a host
 that rolls back both files together is outside its detection, which is the
 documented host-integrity assumption. The `--deadline-ms` limit bounds one

@@ -17,11 +17,13 @@ use super::request::{
 };
 use super::session::{
     AdmissionRefusal, CheckJob, CheckReport, Outcome, Prepared, Proposal, ProposerFailure,
-    ResumeRefusal, Resumed, Session, Status, StopReason, Stored, WorkerFailure,
+    ResumePlan, ResumeRefusal, Resumed, Session, Status, StopReason, Stored, WorkerFailure,
+    replay_probe,
 };
 use super::strategy::{NoEngine, SearchReport, Strategy, StrategyEngine, StrategyRefusal};
 use crate::transform::{self, sha256_hex};
 use serde_json::{Value, json};
+use std::convert::Infallible;
 use zeno_fcis_synthesis::finite::{Domain, Op, Program};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
@@ -1667,17 +1669,57 @@ impl Persisted {
     }
 }
 
+/// What a resume of persisted data came to, as the shell sees it.
+#[derive(Debug)]
+enum Resume {
+    Session(Box<Session>),
+    /// Refused before anything was reserved.
+    Refused(ResumeRefusal),
+    /// Inconclusive before anything was reserved.
+    Inconclusive(ResumeRefusal),
+    /// Refused by the replay, with the ledger the durable write received.
+    ReplayRefused(ResumeRefusal, Ledger),
+}
+
+/// Resumes the way the shell does: the plan's reservation goes to a durable
+/// write, modeled here by keeping a copy, before the replay runs. A resumed
+/// session's ledger must be exactly what that write received.
+fn resume(persisted: &Persisted, elapsed_ms: u64) -> Resume {
+    let pending = match Session::prepare_resume(persisted.stored(), elapsed_ms) {
+        ResumePlan::Replay(pending) => pending,
+        ResumePlan::Refused(reason) => return Resume::Refused(reason),
+        ResumePlan::Inconclusive(reason) => return Resume::Inconclusive(reason),
+    };
+    let mut durable = None;
+    let reserved = pending
+        .reserve(|ledger| {
+            durable = Some(ledger.clone());
+            Ok::<(), Infallible>(())
+        })
+        .unwrap_or_else(|never| match never {});
+    let durable = durable.unwrap_or_else(|| panic!("the reservation is written before replay"));
+    match reserved.replay() {
+        Resumed::Session(session) => {
+            assert_eq!(session.ledger(), &durable, "the replay appends nothing");
+            Resume::Session(session)
+        }
+        Resumed::Refused(reason) => Resume::ReplayRefused(reason, durable),
+    }
+}
+
 fn resumed_session(persisted: &Persisted) -> Session {
-    match Session::resume(persisted.stored(), 0) {
-        Resumed::Session(session) => *session,
+    match resume(persisted, 0) {
+        Resume::Session(session) => *session,
         other => panic!("expected a resumed session, found {other:?}"),
     }
 }
 
 fn resume_refusal(persisted: &Persisted) -> ResumeRefusal {
-    match Session::resume(persisted.stored(), 0) {
-        Resumed::Refused(reason, _) | Resumed::Inconclusive(reason, _) => reason,
-        Resumed::Session(_) => panic!("resume must not yield a trusted incumbent"),
+    match resume(persisted, 0) {
+        Resume::Refused(reason)
+        | Resume::Inconclusive(reason)
+        | Resume::ReplayRefused(reason, _) => reason,
+        Resume::Session(_) => panic!("resume must not yield a trusted incumbent"),
     }
 }
 
@@ -1744,10 +1786,7 @@ fn stale_or_tampered_resume_yields_no_trusted_incumbent() {
     let mut session = Session::open(request(original, Profile::FunctionalBoolV1));
     attempt(&mut session, Proposal::Candidate(candidate.to_vec()));
     let persisted = Persisted::of(&session);
-    assert!(matches!(
-        Session::resume(persisted.stored(), 0),
-        Resumed::Session(_)
-    ));
+    assert!(matches!(resume(&persisted, 0), Resume::Session(_)));
     // Stale receipt: one byte differs from the receipt the ledger binds.
     let mut stale = Persisted::of(&session);
     if let Some((_, receipt)) = &mut stale.replacement {
@@ -1781,8 +1820,8 @@ fn stale_or_tampered_resume_yields_no_trusted_incumbent() {
     forged.ledger = rewritten.entries().iter().flat_map(Entry::line).collect();
     forged.head = Some(rewritten.head());
     forged.replacement = Some((candidate.to_vec(), forged_receipt));
-    match Session::resume(forged.stored(), 0) {
-        Resumed::Refused(ResumeRefusal::ReceiptMismatch(detail), Some(ledger)) => {
+    match resume(&forged, 0) {
+        Resume::ReplayRefused(ResumeRefusal::ReceiptMismatch(detail), ledger) => {
             assert_eq!(detail, "receipt-bytes");
             assert_eq!(ledger.accounting().replays, 1);
             assert!(ledger.accounting().work_reserved > rewritten.accounting().work_reserved);
@@ -1884,8 +1923,98 @@ fn stale_or_tampered_resume_yields_no_trusted_incumbent() {
     );
     // Deadline already reached.
     assert!(matches!(
-        Session::resume(persisted.stored(), 20_000),
-        Resumed::Inconclusive(ResumeRefusal::Deadline, None)
+        resume(&persisted, 20_000),
+        Resume::Inconclusive(ResumeRefusal::Deadline)
+    ));
+}
+
+#[test]
+fn resume_replays_only_after_its_reservation_was_written_and_never_refunds_it() {
+    let original = artifact("boolean-kernel-original");
+    let candidate = artifact("boolean-kernel-candidate");
+    let mut session = Session::open(request(original, Profile::FunctionalBoolV1));
+    attempt(&mut session, Proposal::Candidate(candidate.to_vec()));
+    let persisted = Persisted::of(&session);
+    let before = session.ledger().accounting();
+    let work = session
+        .request()
+        .check_work(replacement(&session).cost())
+        .unwrap_or_default();
+    let replayed = std::rc::Rc::new(std::cell::Cell::new(false));
+    let probe = std::rc::Rc::clone(&replayed);
+    replay_probe::arm(move || probe.set(true));
+    // Preparing runs no replay work and reserves exactly the replay.
+    let ResumePlan::Replay(pending) = Session::prepare_resume(persisted.stored(), 0) else {
+        panic!("expected a replay plan");
+    };
+    assert!(!replayed.get());
+    // A failed durable write runs no replay work and reports the failure.
+    assert_eq!(
+        pending.reserve(|_| Err("write failed")).map(|_| ()),
+        Err("write failed")
+    );
+    assert!(!replayed.get());
+    // A written reservation whose replay never runs (an interruption) stays
+    // charged: the next resume pays for a replay of its own.
+    let ResumePlan::Replay(pending) = Session::prepare_resume(persisted.stored(), 0) else {
+        panic!("expected a replay plan");
+    };
+    let mut written = None;
+    let reserved = pending
+        .reserve(|ledger| {
+            written = Some(ledger.clone());
+            Ok::<(), Infallible>(())
+        })
+        .unwrap_or_else(|never| match never {});
+    drop(reserved);
+    assert!(!replayed.get());
+    let written = written.unwrap_or_else(|| panic!("written"));
+    assert_eq!(
+        written.entries().last().map(|entry| &entry.kind),
+        Some(&Kind::Reserved {
+            attempt: None,
+            stage: Stage::Replay { work },
+        })
+    );
+    let mut interrupted = Persisted::of(&session);
+    interrupted.ledger = written.entries().iter().flat_map(Entry::line).collect();
+    interrupted.head = Some(written.head());
+    let resumed = resumed_session(&interrupted);
+    assert!(replayed.get());
+    let totals = resumed.ledger().accounting();
+    assert_eq!(totals.replays, before.replays + 2);
+    assert_eq!(totals.work_reserved, before.work_reserved + 2 * work);
+    assert_eq!(resumed.incumbent(), session.incumbent());
+    // When the remaining allowance cannot pay for the new replay, resume is
+    // inconclusive and reserves nothing.
+    let mut limits = Limits::CEILING;
+    limits.check_work = session
+        .request()
+        .check_work(session.request().cost())
+        .unwrap_or_default();
+    limits.session_work = before.work_reserved + work;
+    let mut tight = Session::open(request_with(original, Profile::FunctionalBoolV1, limits));
+    attempt(&mut tight, Proposal::Candidate(candidate.to_vec()));
+    let ResumePlan::Replay(pending) = Session::prepare_resume(Persisted::of(&tight).stored(), 0)
+    else {
+        panic!("expected a replay plan");
+    };
+    let mut written = None;
+    drop(
+        pending
+            .reserve(|ledger| {
+                written = Some(ledger.clone());
+                Ok::<(), Infallible>(())
+            })
+            .unwrap_or_else(|never| match never {}),
+    );
+    let written = written.unwrap_or_else(|| panic!("written"));
+    let mut spent = Persisted::of(&tight);
+    spent.ledger = written.entries().iter().flat_map(Entry::line).collect();
+    spent.head = Some(written.head());
+    assert!(matches!(
+        Session::prepare_resume(spent.stored(), 0),
+        ResumePlan::Inconclusive(ResumeRefusal::InsufficientReplayAllowance)
     ));
 }
 

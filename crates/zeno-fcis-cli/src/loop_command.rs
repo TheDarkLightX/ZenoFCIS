@@ -8,7 +8,9 @@
 //! Durability order for every stage (NSR-005, NSR-007): the core appends a
 //! reservation, the shell persists the ledger, and only then does the work
 //! run. A crash in between leaves a reservation without a settlement; resume
-//! keeps it charged as unresolved.
+//! keeps it charged as unresolved. Resume's own replay follows the same
+//! order: its reservation is persisted before any replay work, through the
+//! core's `PendingReplay::reserve` (see `load_session`).
 
 use crate::loop_proposers::{CONFIG_LIMIT, Fake, Hosted, HostedConfig, Local, Proposer};
 use crate::neural_loop::canonical_json;
@@ -18,8 +20,8 @@ use crate::neural_loop::profiles::Profile;
 use crate::neural_loop::program_json::{encode, program_from_json, program_to_json};
 use crate::neural_loop::request::{Policy, Request};
 use crate::neural_loop::session::{
-    CheckReport, Outcome, Prepared, Proposal, ProposerFailure, Resumed, Session, Status,
-    StopReason, Stored, WorkerFailure,
+    CheckReport, Outcome, Prepared, Proposal, ProposerFailure, ResumePlan, ResumeRefusal, Resumed,
+    Session, Status, StopReason, Stored, WorkerFailure,
 };
 use crate::neural_loop::strategy::{SearchReport, Strategy, StrategyEngine};
 use crate::optimize;
@@ -402,42 +404,49 @@ fn encode_command(program: &Path, out: &Path) -> (u8, Value) {
 }
 
 /// Loads a session and resumes it; a refusal is rendered for the caller.
+///
+/// Resume runs in two steps with a durable write between them (NSR-005,
+/// NSR-008): the core verifies the stored data and reserves the replay work,
+/// [`Store::persist`] writes that reservation, and only then does the replay
+/// run. An interruption during the replay therefore leaves the reservation
+/// charged on disk, and the next resume reserves and pays for a replay of its
+/// own, or refuses when the remaining allowance cannot cover it. `resume`,
+/// `candidate` and `run` all load through here.
 fn load_session(dir: &Path, started: Instant) -> Result<(Store, Session), (u8, Value)> {
     let (mut store, loaded) = Store::open(dir).map_err(|error| io_failure(&error))?;
-    match Session::resume(loaded.stored(), elapsed_ms(started)) {
+    let pending = match Session::prepare_resume(loaded.stored(), elapsed_ms(started)) {
+        ResumePlan::Replay(pending) => pending,
+        ResumePlan::Refused(reason) => return Err(resume_failure("resume-refused", &reason)),
+        ResumePlan::Inconclusive(reason) => {
+            return Err(resume_failure("resume-inconclusive", &reason));
+        }
+    };
+    let reserved = pending
+        .reserve(|ledger| store.persist(ledger))
+        .map_err(|error| io_failure(&error))?;
+    match reserved.replay() {
         Resumed::Session(session) => Ok((store, *session)),
-        Resumed::Refused(reason, ledger) => {
-            if let Some(ledger) = ledger {
-                store.persist(&ledger).map_err(|error| io_failure(&error))?;
-            }
-            Err(result(
-                crate::BLOCKED,
-                "resume-refused",
-                json!({"refusal": reason.json(), "trusted_incumbent": Value::Null}),
-            ))
-        }
-        Resumed::Inconclusive(reason, ledger) => {
-            if let Some(ledger) = ledger {
-                store.persist(&ledger).map_err(|error| io_failure(&error))?;
-            }
-            Err(result(
-                crate::BLOCKED,
-                "resume-inconclusive",
-                json!({"refusal": reason.json(), "trusted_incumbent": Value::Null}),
-            ))
-        }
+        // The replay's reservation is already durable and stays charged.
+        Resumed::Refused(reason) => Err(resume_failure("resume-refused", &reason)),
     }
+}
+
+fn resume_failure(status: &str, reason: &ResumeRefusal) -> (u8, Value) {
+    result(
+        crate::BLOCKED,
+        status,
+        json!({"refusal": reason.json(), "trusted_incumbent": Value::Null}),
+    )
 }
 
 fn resume_command(dir: &Path) -> (u8, Value) {
     let started = Instant::now();
-    let (mut store, session) = match load_session(dir, started) {
-        Ok(loaded) => loaded,
+    // The resumed session's ledger is exactly what `load_session` persisted
+    // before the replay ran: the replay appends nothing.
+    let session = match load_session(dir, started) {
+        Ok((_, session)) => session,
         Err(failure) => return failure,
     };
-    if let Err(error) = store.persist(session.ledger()) {
-        return io_failure(&error);
-    }
     result(crate::OK, "resumed", json!({"report": session.report()}))
 }
 
@@ -880,7 +889,7 @@ pub(crate) enum StorageError {
     Io(std::io::Error),
 }
 
-/// Everything `Store::open` read for `Session::resume`.
+/// Everything `Store::open` read for `Session::prepare_resume`.
 pub(crate) struct Loaded {
     request: Vec<u8>,
     original: Vec<u8>,
@@ -947,8 +956,8 @@ impl Store {
     }
 
     /// Reads a session directory. Faults in the ledger are left for
-    /// `Session::resume` to classify; the replacement artifacts are loaded
-    /// only when the ledger names them.
+    /// `Session::prepare_resume` to classify; the replacement artifacts are
+    /// loaded only when the ledger names them.
     pub(crate) fn open(dir: &Path) -> std::io::Result<(Store, Loaded)> {
         let read =
             |name: &str, limit: u64| crate::transform_command::read_bounded(&dir.join(name), limit);

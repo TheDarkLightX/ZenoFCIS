@@ -28,6 +28,7 @@ Feature: Check a candidate program before the factory may use it
     Then only a complete equivalence with fewer nodes or bytes, never above the original's, replaces the incumbent
     And every other outcome, including a worker panic, a timeout or a late report, leaves the incumbent unchanged
     And every attempt, model call and check is reserved before its work and never refunded
+    And a resume's replay is reserved durably before any replay work, so an interrupted replay stays charged
     And a stale, tampered or rolled-back session resumes with no trusted incumbent
 
   @atdd-contract-review
