@@ -6,6 +6,14 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Fix the SQLite v2 shell's exact-schema check, which skipped objects whose
+  names matched `LIKE 'sqlite_%'`. In `LIKE`, `_` matches any character and
+  ASCII case is ignored, so a user trigger named, for example, `sqlitex`
+  passed the check. Such a trigger could mark every new delivery
+  acknowledged while audits still passed. `open`, `audit`, live operations
+  and initialization now compare every `sqlite_master` object with no name
+  filter. A regression test plants triggers named `sqlitex`, `SQLiteX` and
+  `sqlite1`. An independent review of V2.1 found the defect.
 - Add `zeno-fcis optimize --program P [--strategy FILE] [--candidate-out OUT]
   [--receipt OUT] [--max-input-tuples N]`: an in-house e-graph optimizer
   (union-find, hash-consing, congruence rebuild; no new dependency) that

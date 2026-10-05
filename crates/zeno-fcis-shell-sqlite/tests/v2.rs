@@ -390,6 +390,40 @@ fn schema_v5_is_never_silently_upgraded_or_reinterpreted() {
 }
 
 #[test]
+fn triggers_whose_names_merely_resemble_sqlite_internals_are_refused() {
+    // `LIKE 'sqlite_%'` would hide these: `_` matches any character and ASCII
+    // case is ignored. SQLite itself reserves only the literal prefix
+    // `sqlite_`, so these are ordinary user objects.
+    for name in ["sqlitex", "SQLiteX", "sqlite1"] {
+        with_authority(None, |a| {
+            let file = StoreFile::new();
+            let initial = state(0, 0);
+            let cmd = command(120);
+            let ctx = context(true);
+            let mut db = ok(V2SqliteShell::create(&file.0, a, genesis(a, &initial)));
+            let external = ok(Connection::open(&file.0));
+            ok(external.execute_batch(&format!(
+                "CREATE TRIGGER {name} AFTER INSERT ON v2_deliveries \
+                 BEGIN UPDATE v2_deliveries SET acknowledged=1 WHERE rowid=new.rowid; END;"
+            )));
+            assert!(
+                matches!(
+                    db.commit(Hash32::new([13; 32]), publication(a, &initial, &cmd, &ctx)),
+                    Err(Error::Schema(10))
+                ),
+                "{name}"
+            );
+            drop(db);
+            drop(external);
+            assert!(
+                matches!(V2SqliteShell::open(&file.0, a), Err(Error::Schema(10))),
+                "{name}"
+            );
+        });
+    }
+}
+
+#[test]
 fn external_trigger_is_refused_by_live_operations_before_it_can_modify_a_commit() {
     with_authority(None, |a| {
         let file = StoreFile::new();

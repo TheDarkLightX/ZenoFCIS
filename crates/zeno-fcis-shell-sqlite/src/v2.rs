@@ -335,11 +335,9 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             return Err(Error::InvocationKind);
         }
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let count: i64 = tx.query_row(
-            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-            [],
-            |r| r.get(0),
-        )?;
+        // Every schema object counts. A `LIKE 'sqlite_%'` filter would also hide
+        // user objects named e.g. `sqlitex` (`_` is a wildcard, case ignored).
+        let count: i64 = tx.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get(0))?;
         let version: i64 = tx.query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if count != 0 || version != 0 {
             return Err(Error::Schema(version));
@@ -1578,12 +1576,19 @@ fn save_checkpoint(connection: &Connection, anchor: &Anchor) -> Result<(), Error
     )?;
     Ok(())
 }
-fn schema_rows(connection: &Connection) -> Result<Vec<(String, String, String)>, Error> {
-    let mut statement = connection.prepare(
-        "SELECT type,name,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name",
-    )?;
+/// One `sqlite_master` row: type, name, table name and defining SQL.
+type SchemaRow = (String, String, String, Option<String>);
+
+/// The complete schema, with no name filter: the reference is built from the
+/// same DDL, so SQLite's own deterministic objects (autoindexes) compare
+/// equal, and any other object, whatever its name, is a difference.
+fn schema_rows(connection: &Connection) -> Result<Vec<SchemaRow>, Error> {
+    let mut statement = connection
+        .prepare("SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY type,name")?;
     Ok(statement
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))?
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?
         .collect::<Result<Vec<_>, _>>()?)
 }
 fn certificate_bytes(
