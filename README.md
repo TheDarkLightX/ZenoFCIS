@@ -372,11 +372,13 @@ new-version` makes a candidate decision program that a `transform` receipt
 shows equivalent the contract's next version, and keeps the superseded version
 unchanged beside it. An adoption changes only the decision program and its
 Step limit, so the application's `--upgrade` moves a store at any state to the
-new version. The SQLite shell records a chained, replayable upgrade that binds
-the adoption's receipt digest and states which premises held. Under those
-premises the two versions reach the same states, so the upgrade keeps every
-law and proved inductive claim; Step usage can change, which makes it a new
-contract version. A contract that changes anything else, such as
+new version once the SQLite shell has established the five premises of a
+program succession itself, including its own comparison of the two decision
+programs on every input tuple: 1,296,000 for the withdrawal queue. It records
+a chained, replayable upgrade that binds that count and the adoption's
+receipt digest. Under those premises the two versions reach the same states,
+so the upgrade keeps every law and proved inductive claim; Step usage can
+change, which makes it a new contract version. A contract that changes anything else, such as
 a law, upgrades only a store whose state its genesis laws admit; for a
 generated contract that is the declared genesis state. See the
 [CLI reference](docs/CLI_REFERENCE.md#contract-adoption-and-store-upgrades).

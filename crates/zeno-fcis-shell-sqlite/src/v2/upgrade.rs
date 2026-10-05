@@ -8,33 +8,35 @@
 //! schema. The record names how the new contract admits the current state;
 //! its magic bytes are the kind tag:
 //!
-//! - `program-successor`, magic `ZFCISV2-SUCCESSOR\0`: the new contract's
-//!   complete canonical policy, with its decision program's instructions and
-//!   roots and its Step limit taken from the old contract, is byte for byte the
-//!   old policy ([`program_successor`](crate::v2::upgrade::program_successor)).
-//!   Every law, branch, schema and other limit is therefore the old contract's,
-//!   and the state at the head was admitted under those laws, so the upgrade is
-//!   admitted at any state without a genesis evaluation. The record also binds
-//!   which further [`Premises`](crate::v2::upgrade::Premises) held and the
-//!   SHA-256 of the `transform` receipt of every adoption between the two
-//!   versions. With every premise, including the ones generation checks, the
-//!   two versions have the same reachable states.
+//! - `program-successor`, magic `ZFCISV2-SUCCESSOR\0`: the shell itself
+//!   established all five [`Premise`](crate::v2::upgrade::Premise)s of the
+//!   plan's program succession from the two contracts' bound catalogs (see
+//!   [`Successor::establish`](crate::v2::upgrade::Successor::establish)),
+//!   including an exhaustive comparison of the two decision programs on every
+//!   input tuple. Under those premises both contracts have the same reachable
+//!   states, so the upgrade is admitted at any state without a genesis
+//!   evaluation. The record binds the number of input tuples compared and,
+//!   as provenance, the SHA-256 of the `transform` receipt of every adoption
+//!   between the two versions as the lineage declares them.
 //! - `genesis-admission`, magic `ZFCISV2-UPGRADE\0` (the format schema v10
-//!   introduced): any other contract must admit the current state through the
-//!   library's genesis evaluation, and the record binds that genesis
-//!   publication. A generated contract's law 990 admits only its declared
-//!   genesis state, so for such contracts this kind is limited to stores at
-//!   that state.
+//!   introduced): when any premise is missing, the new contract must admit
+//!   the current state through the library's genesis evaluation, and the
+//!   record binds that genesis publication. A generated contract's law 990
+//!   admits only its declared genesis state, so for such contracts this kind
+//!   is limited to stores at that state.
 //!
 //! Every record also binds the ordinal, the head's sequence, both full
 //! identities, the state root and the chain tip it extends.
 
+use std::fmt;
 use zeno_fcis_codec::Hash32;
+
 use zeno_fcis_synthesis::finite::{
     V2Resource, V2ScalarProgram, v2_authority as authority, v2_catalog::BoundCatalog,
     v2_composition::Descriptor, v2_laws as laws,
 };
 
+use super::equivalence::{self, Unestablished};
 use super::{Error, hash};
 
 /// How an upgrade record shows that the new contract admits the store's
@@ -122,47 +124,127 @@ pub fn program_successor(from: &BoundCatalog<'_>, to: &BoundCatalog<'_>) -> Resu
     Ok(policy == from.original_contract())
 }
 
-/// The premises of the reachable-state guarantee that the shell checks for a
-/// program succession, beyond the policy comparison that defines it.
-///
-/// A program successor and the version it supersedes have the same reachable
-/// states when their policies differ only in the decision program and Step
-/// limit, the identical laws pin every committed decision to the case table
-/// (generated law 991), the adoption receipts are F3 `Equivalent`, neither
-/// Step limit binds, and no law observes Step usage. Generation checks law
-/// 991 and replays the receipts; this records the rest. Steps are charged
-/// only for program instruction attempts and law nodes, and a program change
-/// alters no other meter reading.
+/// The identifier of generated decision-conformance law 991.
+pub const DECISION_LAW: u32 = 991;
+
+/// One premise of a program succession, numbered as in the plan of record.
+/// When one is missing, the upgrade takes the genesis route instead and a
+/// refusal names it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Premise {
+    /// 1. The canonical policies are identical except the decision program
+    ///    and its Step limit: [`program_successor`].
+    Policy,
+    /// 2. Each contract declares law 991 as a decision-conformance law that
+    ///    applies to every decision and not at genesis, and requires it.
+    DecisionLaw,
+    /// 3. The two decision programs are equal on every input tuple of their
+    ///    declared domain, by the shell's own exhaustive comparison; carries
+    ///    why the comparison did not establish it.
+    Equivalence(Unestablished),
+    /// 4. Neither Step limit binds: each covers one Step for every program
+    ///    node and every law node.
+    StepLimits,
+    /// 5. No law observes Step usage.
+    StepUsage,
+}
+
+impl fmt::Display for Premise {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Policy => f.write_str(
+                "premise 1: its policy differs from the store's contract in more than the decision program and its Step limit",
+            ),
+            Self::DecisionLaw => f.write_str(
+                "premise 2: a contract does not declare and require decision-conformance law 991 on every decision",
+            ),
+            Self::Equivalence(Unestablished::Counterexample { ordinal }) => write!(
+                f,
+                "premise 3: the two decision programs differ on input tuple {ordinal} of their declared domain, counting from 0 in enumeration order"
+            ),
+            Self::Equivalence(Unestablished::DomainTooLarge {
+                size: Some(size),
+                cap,
+            }) => write!(
+                f,
+                "premise 3: the decision programs' input domain has {size} tuples, more than the lineage's comparison cap of {cap}"
+            ),
+            Self::Equivalence(Unestablished::DomainTooLarge { size: None, cap }) => write!(
+                f,
+                "premise 3: the decision programs' input domain has more than 2^128 tuples, more than the lineage's comparison cap of {cap}"
+            ),
+            Self::Equivalence(Unestablished::InputAbi) => f.write_str(
+                "premise 3: the two decision programs' input domains differ",
+            ),
+            Self::Equivalence(Unestablished::OutputAbi) => f.write_str(
+                "premise 3: the two decision programs' output domains differ",
+            ),
+            Self::Equivalence(Unestablished::EmptyInputDomain { position }) => write!(
+                f,
+                "premise 3: input {position} of the decision programs has an empty domain"
+            ),
+            Self::Equivalence(Unestablished::CoverageMismatch { expected, visited }) => write!(
+                f,
+                "premise 3: the comparison of the decision programs visited {visited} tuples, not the {expected} of their domain"
+            ),
+            Self::StepLimits => f.write_str(
+                "premise 4: a Step limit is below one Step per program node and law node, so it could refuse a decision",
+            ),
+            Self::StepUsage => f.write_str(
+                "premise 5: a law reads the Step usage, which a program change alters",
+            ),
+        }
+    }
+}
+
+/// Why an audit does not accept a stored program-successor record under the
+/// lineage that opened the store. The store may be intact: the cause can be
+/// what the application declares.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
+pub enum Unsupported {
+    /// The record is exact under the adoption receipt digests it stores, and
+    /// those are not the ones the lineage declares for the versions it
+    /// spans. A record that does not match its own stored digests is a
+    /// damaged history instead.
+    Receipts,
+    /// The lineage's own catalogs do not establish the succession under its
+    /// comparison cap; carries the missing premise.
+    Premise(Premise),
+}
+
+impl fmt::Display for Unsupported {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Receipts => f.write_str(
+                "it names other adoption receipts than this application declares for those versions",
+            ),
+            Self::Premise(premise) => write!(
+                f,
+                "this application's contracts do not establish it ({premise})"
+            ),
+        }
+    }
+}
+
+/// Evidence that the shell established all five premises of a program
+/// succession. Only [`Successor::establish`] constructs one.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Premises {
-    /// Each version's Step limit is at least one Step for every program node
-    /// and every law node, the most one evaluation charges, so neither limit
-    /// refuses a decision.
-    pub step_limits_never_bind: bool,
-    /// No law observes Step usage, the one meter reading a program change can
-    /// alter.
-    pub step_usage_unobserved: bool,
+    tuples: u64,
 }
 
 impl Premises {
-    fn of(from: &Descriptor<'_>, to: &Descriptor<'_>) -> Self {
-        Self {
-            step_limits_never_bind: steps_covered(from) && steps_covered(to),
-            step_usage_unobserved: !observes_step_usage(from) && !observes_step_usage(to),
-        }
+    /// The number of input tuples on which the shell compared the two
+    /// decision programs: their whole declared domain.
+    pub fn tuples(self) -> u64 {
+        self.tuples
     }
 
-    /// Every premise held.
-    pub fn all(self) -> bool {
-        self.step_limits_never_bind && self.step_usage_unobserved
-    }
-
-    /// The record's premises byte: bit 0 the policy comparison, which holds
-    /// for every program successor, bit 1 `step_limits_never_bind`, bit 2
-    /// `step_usage_unobserved`.
-    fn byte(self) -> u8 {
-        1 | u8::from(self.step_limits_never_bind) << 1 | u8::from(self.step_usage_unobserved) << 2
-    }
+    /// The record's premises byte: bits 0 to 4 are premises 1 to 5, and all
+    /// are set, because a record exists only when all five held.
+    const BYTE: u8 = 0b1_1111;
 }
 
 /// The Step limit covers one Step for each program node and each law node.
@@ -189,11 +271,73 @@ fn observes_step_usage(descriptor: &Descriptor<'_>) -> bool {
     })
 }
 
-/// A program succession the shell established, with the premises it
-/// checked and the SHA-256 of the `transform` receipt of every adoption from
-/// the old version to the new one, oldest first. Only
-/// [`Successor::establish`] constructs one, so a value shows that
-/// [`program_successor`] held.
+/// The contract declares law 991 as a decision-conformance law on every
+/// decision, not at genesis, and requires it. This is the generator's own
+/// test for law 991 plus the required list; the law's predicate is opaque
+/// here, so it does not show that the predicate encodes any case table.
+fn requires_decision_law(descriptor: &Descriptor<'_>) -> bool {
+    descriptor.required.contains(&DECISION_LAW)
+        && descriptor.laws.iter().any(|law| {
+            law.id == DECISION_LAW
+                && law.kind == laws::Kind::DecisionConformance
+                && law.scope == laws::Scope::Always
+                && !law.genesis
+        })
+}
+
+/// Establishes the five premises from `from` to `to` in the order 1, 2, 4,
+/// 5, 3, and reports whether the decision programs were enumerated: false
+/// when an earlier premise is missing, or when the two programs have
+/// identical instructions and roots.
+///
+/// # Errors
+/// `Error::Range` when a policy cannot be encoded.
+pub(super) fn premises(
+    from: &BoundCatalog<'_>,
+    to: &BoundCatalog<'_>,
+    max_input_tuples: u64,
+) -> Result<(Result<Premises, Premise>, bool), Error> {
+    let (old, new) = (from.descriptor(), to.descriptor());
+    let missing = if !program_successor(from, to)? {
+        Some(Premise::Policy)
+    } else if !requires_decision_law(old) || !requires_decision_law(new) {
+        Some(Premise::DecisionLaw)
+    } else if !steps_covered(old) || !steps_covered(new) {
+        Some(Premise::StepLimits)
+    } else if observes_step_usage(old) || observes_step_usage(new) {
+        Some(Premise::StepUsage)
+    } else {
+        None
+    };
+    if let Some(missing) = missing {
+        return Ok((Err(missing), false));
+    }
+    Ok(
+        match equivalence::compare(&old.program, &new.program, max_input_tuples) {
+            Ok(equal) => (
+                Ok(Premises {
+                    tuples: equal.tuples(),
+                }),
+                equal.enumerated(),
+            ),
+            Err(unestablished) => (
+                Err(Premise::Equivalence(unestablished)),
+                !matches!(
+                    unestablished,
+                    Unestablished::InputAbi
+                        | Unestablished::OutputAbi
+                        | Unestablished::EmptyInputDomain { .. }
+                        | Unestablished::DomainTooLarge { .. }
+                ),
+            ),
+        },
+    )
+}
+
+/// A program succession the shell established: all five premises held. It
+/// carries the evidence and the SHA-256 of the `transform` receipt of every
+/// adoption from the old version to the new one, oldest first, as the
+/// lineage declares them. Only [`Successor::establish`] constructs one.
 #[derive(Clone, Copy, Debug)]
 pub struct Successor<'a> {
     receipts: &'a [Hash32],
@@ -201,8 +345,18 @@ pub struct Successor<'a> {
 }
 
 impl<'a> Successor<'a> {
-    /// Compares the two catalogs' policies; `None` when `to` changes more
-    /// than the decision program and its Step limit.
+    /// Establishes every premise of a succession from `from` to `to`, from
+    /// the two bound catalogs alone, in the order 1, 2, 4, 5, 3: the policy
+    /// comparison, law 991 in both, both Step limits, no Step observation in
+    /// either, and then the exhaustive comparison of the two decision
+    /// programs through the library evaluator on every input tuple, if their
+    /// domain has at most `max_input_tuples` tuples; two programs with
+    /// identical instructions and roots are equal without enumeration.
+    /// `Ok(Err(premise))` names the first premise that is missing. This
+    /// computes afresh; a [`Lineage`](crate::v2::Lineage) remembers each
+    /// pair's outcome for its upgrades and audits.
+    ///
+    /// `receipts` are provenance only: the shell replays no receipt.
     ///
     /// # Errors
     /// `Error::Lineage` without a receipt, and `Error::Range` when a policy
@@ -211,12 +365,19 @@ impl<'a> Successor<'a> {
         from: &BoundCatalog<'_>,
         to: &BoundCatalog<'_>,
         receipts: &'a [Hash32],
-    ) -> Result<Option<Self>, Error> {
+        max_input_tuples: u64,
+    ) -> Result<Result<Self, Premise>, Error> {
         if receipts.is_empty() {
             return Err(Error::Lineage);
         }
-        let premises = Premises::of(from.descriptor(), to.descriptor());
-        Ok(program_successor(from, to)?.then_some(Self { receipts, premises }))
+        let (established, _) = premises(from, to, max_input_tuples)?;
+        Ok(established.map(|premises| Self::held(receipts, premises)))
+    }
+
+    /// The succession whose premises an earlier [`Successor::establish`],
+    /// or a lineage's memo of one, established for these two versions.
+    pub(super) fn held(receipts: &'a [Hash32], premises: Premises) -> Self {
+        Self { receipts, premises }
     }
 
     /// The adoption receipts' SHA-256 digests, oldest first.
@@ -224,7 +385,7 @@ impl<'a> Successor<'a> {
         self.receipts
     }
 
-    /// The premises the shell checked.
+    /// The evidence that every premise held.
     pub fn premises(&self) -> Premises {
         self.premises
     }
@@ -245,11 +406,13 @@ pub struct Genesis<'a> {
 pub enum Admission<'a> {
     /// A program succession: no genesis evaluation is needed.
     Successor(Successor<'a>),
-    /// The library's genesis publication over the state.
-    Genesis(Genesis<'a>),
-    /// The library's genesis evaluation did not commit the state; `Some`
-    /// carries its technical refusal, such as the law that refused.
-    Refused(Option<authority::Refusal>),
+    /// The premise named was missing, and this is the library's genesis
+    /// publication over the state.
+    Genesis(Premise, Genesis<'a>),
+    /// The premise named was missing, and the library's genesis evaluation
+    /// did not commit the state; `Some` carries its technical refusal, such
+    /// as the law that refused.
+    Refused(Premise, Option<authority::Refusal>),
 }
 
 /// What the shell established about the store and the two contracts.
@@ -286,11 +449,16 @@ pub enum Refusal {
     StateSchema,
     /// The contract to upgrade to is the one the store already runs.
     SameContract,
-    /// The new contract is not a program successor, and its genesis
-    /// evaluation does not admit the current state, or admits another one.
-    /// `Some` carries the library's refusal; for a generated contract it is
-    /// usually law 990, which admits only the declared genesis state.
-    Genesis(Option<authority::Refusal>),
+    /// A premise of a program succession is missing, and the new contract's
+    /// genesis evaluation does not admit the current state, or admits
+    /// another one.
+    Genesis {
+        /// The first missing premise, in the order the shell checks them.
+        missing: Premise,
+        /// The library's refusal; for a generated contract it is usually law
+        /// 990, which admits only the declared genesis state.
+        refusal: Option<authority::Refusal>,
+    },
 }
 
 /// A decided upgrade: its kind, the canonical record and the chain link it
@@ -320,8 +488,8 @@ impl Plan {
         self.chain
     }
 
-    /// The premises a program succession recorded; `None` for a genesis
-    /// admission.
+    /// For a program succession, the evidence that every premise held;
+    /// `None` for a genesis admission.
     pub fn premises(&self) -> Option<Premises> {
         self.premises
     }
@@ -356,14 +524,21 @@ pub fn decide(facts: &Facts<'_>) -> Result<Plan, Error> {
                 evidence,
             )
         }
-        Admission::Genesis(genesis) if genesis.poststate == facts.state => (
+        Admission::Genesis(_, genesis) if genesis.poststate == facts.state => (
             Kind::GenesisAdmission,
             genesis.subject.to_vec(),
             None,
             Vec::new(),
         ),
-        Admission::Genesis(_) => return Err(Error::Upgrade(Refusal::Genesis(None))),
-        Admission::Refused(reason) => return Err(Error::Upgrade(Refusal::Genesis(reason))),
+        Admission::Genesis(missing, _) => {
+            return Err(Error::Upgrade(Refusal::Genesis {
+                missing,
+                refusal: None,
+            }));
+        }
+        Admission::Refused(missing, refusal) => {
+            return Err(Error::Upgrade(Refusal::Genesis { missing, refusal }));
+        }
     };
     let record = record_bytes(
         kind,
@@ -386,9 +561,11 @@ pub fn decide(facts: &Facts<'_>) -> Result<Plan, Error> {
 }
 
 /// A program succession's admission as the record frames it: the premises
-/// byte, then the receipt digests.
+/// byte, the number of input tuples compared as a big-endian `u64`, then the
+/// receipt digests.
 pub(super) fn successor_admission(premises: Premises, evidence: &[u8]) -> Vec<u8> {
-    let mut admission = vec![premises.byte()];
+    let mut admission = vec![Premises::BYTE];
+    admission.extend_from_slice(&premises.tuples.to_be_bytes());
     admission.extend_from_slice(evidence);
     admission
 }
@@ -396,8 +573,8 @@ pub(super) fn successor_admission(premises: Premises, evidence: &[u8]) -> Vec<u8
 /// The canonical upgrade record: the kind's magic, the ordinal and head
 /// sequence, then the framed from-identity, identity, admission, state root
 /// and previous chain tip. The admission is the complete genesis publication
-/// for a genesis admission, and for a program successor the premises byte
-/// followed by the concatenated receipt digests.
+/// for a genesis admission, and for a program successor the premises byte,
+/// the number of input tuples compared and the concatenated receipt digests.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn record_bytes(
     kind: Kind,
@@ -437,22 +614,6 @@ pub(super) fn evidence_bytes(receipts: &[Hash32]) -> Vec<u8> {
         .collect()
 }
 
-/// The receipt digests of stored evidence: at least one, 32 bytes each.
-pub(super) fn evidence_receipts(evidence: &[u8]) -> Result<Vec<Hash32>, Error> {
-    if evidence.is_empty() || !evidence.len().is_multiple_of(32) {
-        return Err(Error::History);
-    }
-    evidence
-        .chunks_exact(32)
-        .map(|chunk| {
-            chunk
-                .try_into()
-                .map(Hash32::new)
-                .map_err(|_| Error::History)
-        })
-        .collect()
-}
-
 /// Which lineage member published each history segment. A store's segments
 /// are the contracts it ran, oldest first; they must appear in the lineage in
 /// that order, each later than the previous one. Each segment takes the
@@ -482,10 +643,7 @@ mod tests {
     use super::*;
 
     const RECEIPTS: [Hash32; 2] = [Hash32::new([7; 32]), Hash32::new([8; 32])];
-    const HELD: Premises = Premises {
-        step_limits_never_bind: true,
-        step_usage_unobserved: true,
-    };
+    const HELD: Premises = Premises { tuples: 1_296_000 };
 
     fn facts<'a>(admission: Admission<'a>) -> Facts<'a> {
         Facts {
@@ -502,10 +660,13 @@ mod tests {
         }
     }
 
-    const ADMITTED: Admission<'static> = Admission::Genesis(Genesis {
-        subject: b"sealed genesis",
-        poststate: b"state",
-    });
+    const ADMITTED: Admission<'static> = Admission::Genesis(
+        Premise::Policy,
+        Genesis {
+            subject: b"sealed genesis",
+            poststate: b"state",
+        },
+    );
 
     fn successor() -> Admission<'static> {
         Admission::Successor(Successor {
@@ -551,10 +712,13 @@ mod tests {
         let mut changed = facts(ADMITTED);
         changed.previous_chain = Hash32::new([3; 32]);
         assert_ne!(decide(&changed).ok(), Some(plan.clone()));
-        let changed = facts(Admission::Genesis(Genesis {
-            subject: b"other sealed genesis",
-            poststate: b"state",
-        }));
+        let changed = facts(Admission::Genesis(
+            Premise::Policy,
+            Genesis {
+                subject: b"other sealed genesis",
+                poststate: b"state",
+            },
+        ));
         assert_ne!(decide(&changed).ok(), Some(plan));
     }
 
@@ -563,18 +727,14 @@ mod tests {
         let plan = decide(&facts(successor())).unwrap_or_else(|error| panic!("{error}"));
         let mut evidence = vec![7; 32];
         evidence.extend_from_slice(&[8; 32]);
-        let mut admission = vec![0b111];
+        let mut admission = vec![0b1_1111];
+        admission.extend_from_slice(&1_296_000_u64.to_be_bytes());
         admission.extend_from_slice(&evidence);
         assert_eq!(plan.kind(), Kind::ProgramSuccessor);
         assert_eq!(plan.kind().tag(), "program-successor");
         assert_eq!(plan.record(), expected(b"ZFCISV2-SUCCESSOR\0", &admission));
         assert_eq!(plan.premises(), Some(HELD));
-        assert!(HELD.all());
         assert_eq!(plan.evidence(), evidence);
-        assert_eq!(
-            evidence_receipts(plan.evidence()).ok(),
-            Some(RECEIPTS.to_vec())
-        );
         assert_eq!(Kind::of_record(plan.record()), Some(Kind::ProgramSuccessor));
         let genesis = decide(&facts(ADMITTED)).unwrap_or_else(|error| panic!("{error}"));
         assert_eq!(
@@ -585,7 +745,8 @@ mod tests {
         assert_eq!(Kind::of_record(b"ZFCISV2-CERT\0"), None);
         // The two kinds never share a record or a link for the same facts.
         assert_ne!(plan.chain(), genesis.chain());
-        // Each receipt, and its order, changes the record, as does each premise.
+        // Each receipt, and its order, changes the record, as does the
+        // number of tuples compared.
         let reversed = [RECEIPTS[1], RECEIPTS[0]];
         let swapped = decide(&facts(Admission::Successor(Successor {
             receipts: &reversed,
@@ -593,39 +754,12 @@ mod tests {
         })))
         .unwrap_or_else(|error| panic!("{error}"));
         assert_ne!(swapped.chain(), plan.chain());
-        for (premises, byte) in [
-            (
-                Premises {
-                    step_limits_never_bind: false,
-                    ..HELD
-                },
-                0b101,
-            ),
-            (
-                Premises {
-                    step_usage_unobserved: false,
-                    ..HELD
-                },
-                0b011,
-            ),
-        ] {
-            assert!(!premises.all());
-            let failed = decide(&facts(Admission::Successor(Successor {
-                receipts: &RECEIPTS,
-                premises,
-            })))
-            .unwrap_or_else(|error| panic!("{error}"));
-            let mut admission = vec![byte];
-            admission.extend_from_slice(&evidence);
-            assert_eq!(
-                failed.record(),
-                expected(b"ZFCISV2-SUCCESSOR\0", &admission)
-            );
-            assert_ne!(failed.chain(), plan.chain());
-        }
-        for malformed in [&[][..], &[7; 31], &[7; 33]] {
-            assert!(matches!(evidence_receipts(malformed), Err(Error::History)));
-        }
+        let fewer = decide(&facts(Admission::Successor(Successor {
+            receipts: &RECEIPTS,
+            premises: Premises { tuples: 1 },
+        })))
+        .unwrap_or_else(|error| panic!("{error}"));
+        assert_ne!(fewer.chain(), plan.chain());
     }
 
     #[test]
@@ -650,21 +784,33 @@ mod tests {
                 Err(Error::Upgrade(Refusal::StateSchema))
             ));
         }
+        // A genesis refusal names the missing premise and the library's refusal.
         let refusal = authority::Refusal::Encoding;
+        let missing = Premise::Equivalence(Unestablished::Counterexample { ordinal: 5 });
         assert!(matches!(
-            decide(&facts(Admission::Refused(Some(refusal)))),
-            Err(Error::Upgrade(Refusal::Genesis(Some(reason)))) if reason == refusal
+            decide(&facts(Admission::Refused(missing, Some(refusal)))),
+            Err(Error::Upgrade(Refusal::Genesis { missing: named, refusal: Some(reason) }))
+                if reason == refusal && named == missing
         ));
         assert!(matches!(
-            decide(&facts(Admission::Refused(None))),
-            Err(Error::Upgrade(Refusal::Genesis(None)))
+            decide(&facts(Admission::Refused(Premise::StepLimits, None))),
+            Err(Error::Upgrade(Refusal::Genesis {
+                missing: Premise::StepLimits,
+                refusal: None
+            }))
         ));
         assert!(matches!(
-            decide(&facts(Admission::Genesis(Genesis {
-                subject: b"sealed genesis",
-                poststate: b"another state",
-            }))),
-            Err(Error::Upgrade(Refusal::Genesis(None)))
+            decide(&facts(Admission::Genesis(
+                Premise::DecisionLaw,
+                Genesis {
+                    subject: b"sealed genesis",
+                    poststate: b"another state",
+                }
+            ))),
+            Err(Error::Upgrade(Refusal::Genesis {
+                missing: Premise::DecisionLaw,
+                refusal: None
+            }))
         ));
     }
 

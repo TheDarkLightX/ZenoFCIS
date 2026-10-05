@@ -48,8 +48,11 @@ Feature: Check a candidate program before the factory may use it
     When the owner adopts the candidate as the next contract version
     Then the generator replays the receipt against the program it re-derives before emitting the candidate's graph
     And the superseded version is kept exactly beside the current one and the rules name the candidate, receipt and superseded policy digests
-    And a store at any state, with a delivery pending, upgrades to the adopted program successor, whose policy differs only in its decision program and Step limit, and the record binds the adoption's receipt digest and states which premises held
-    And with law 991, an equivalent receipt, Step limits that never bind and no law observing Step usage, both versions take every further command alike
+    And a store at any state, with a delivery pending, upgrades to the adopted program successor only after the shell itself establishes all five premises, comparing the two decision programs on every input tuple as the transform checker does, and the record binds the number of tuples compared and the lineage's receipt digest
+    And with every premise established, both versions take every further command alike
+    And a Step limit that binds, a program that decides differently, a missing law 991, a law that reads Step usage and a domain above the comparison cap each take the genesis route, and away from genesis refuse naming the premise with nothing written
+    And a lineage with the same catalogs and other receipt digests does not audit the store
+    And one bound lineage compares two programs once, never while the store's write lock is held, so another connection commits meanwhile
     And a contract that changes a law upgrades only a store whose state its genesis laws admit, which for a generated contract is the declared genesis state
     And each history segment replays under its own contract and pending deliveries are delivered exactly once with their original identifiers
     And a different schema, a refused genesis, a missing old contract, an altered record, an unreplayable receipt, a false usage claim, an unchanged program and an edit to a superseded version each refuse with nothing written

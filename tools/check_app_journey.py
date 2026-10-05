@@ -174,6 +174,9 @@ def upgrade_journey(directory: Path, packages: dict[str, Path], version: str) ->
     upgrades.expect(replayed, {"status": "replayed"}, "transform replay")
     adoption = zeno(["contract", "adopt", str(adopted), "--candidate", str(candidate), "--receipt",
                      str(receipt), "--usage", "new-version", "--format", "json"])["adoption"]
+    # The shell compares the two programs itself; it must cover exactly the
+    # tuples the adoption receipt says F3 checked.
+    held = upgrades.premises(upgrades.receipt_tuples(receipt))
     upgrades.expect(adoption, {"version": 2, "usage": "new-version",
                                "program_nodes": {"before": exported["program"]["nodes"],
                                                  "after": optimized["detail"]["best"]["nodes"]}},
@@ -199,7 +202,7 @@ def upgrade_journey(directory: Path, packages: dict[str, Path], version: str) ->
                           "version 2 decide before the upgrade")
     upgraded = upgrades.report(upgrades.run_app(new, ["--upgrade", str(paid)]), "upgrade at commit 4")
     upgrades.expect(upgraded, {"status": "upgraded", "kind": "program-successor",
-                               "premises": upgrades.PREMISES, "at_commit": 4,
+                               "premises": held, "at_commit": 4,
                                "receipts": [adoption["receipt_sha256"]], "contract_version": 2,
                                "pending": 1, "upgrades": 1}, "upgrade at commit 4")
     if upgrades.pending_ids(paid) != pending:
@@ -220,7 +223,7 @@ def upgrade_journey(directory: Path, packages: dict[str, Path], version: str) ->
                             "bundles": 2, "pending": 0}, "version 1 session")
     upgraded_open = upgrades.report(upgrades.run_app(new, ["--upgrade", str(open_request)]),
                                     "upgrade at commit 2")
-    upgrades.expect(upgraded_open, {"kind": "program-successor", "premises": upgrades.PREMISES,
+    upgrades.expect(upgraded_open, {"kind": "program-successor", "premises": held,
                                     "at_commit": 2, "contract_version": 2}, "upgrade at commit 2")
     continued = upgrades.report(upgrades.run_app(new, ["--decide", str(open_request)]),
                                 "version 2 decide")

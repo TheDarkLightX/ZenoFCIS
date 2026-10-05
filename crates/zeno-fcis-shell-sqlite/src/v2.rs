@@ -23,7 +23,7 @@
 
 use crate::CrashPoint;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
-use std::{fmt, path::Path};
+use std::{cell::Cell, fmt, path::Path};
 use zeno_fcis_codec::{
     CanonicalEncode, DecodeLimits, Domain, EncodeError, Hash32, commitment, decode_value,
 };
@@ -32,11 +32,11 @@ use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_shell::{CommitStatus, IdempotentDestination, MemoryDestination};
 use zeno_fcis_synthesis::finite::{
     v2_authority::{Authority, Publication, PublicationOutcome, WireDelivery},
-    v2_catalog::BoundCatalog,
     v2_composition::{Kind, Raw},
 };
 
 mod compact;
+pub mod equivalence;
 mod lineage;
 /// The pure upgrade decision and the lineage assignment.
 pub mod upgrade;
@@ -224,8 +224,9 @@ impl UpgradeReceipt {
     pub fn kind(&self) -> upgrade::Kind {
         self.kind
     }
-    /// For a program successor, the premises the shell checked and the
-    /// record binds; `None` for a genesis admission.
+    /// For a program successor, the evidence that the shell established all
+    /// five premises, including the number of input tuples on which it
+    /// compared the two decision programs; `None` for a genesis admission.
     pub fn premises(&self) -> Option<upgrade::Premises> {
         self.premises
     }
@@ -234,9 +235,10 @@ impl UpgradeReceipt {
         self.ordinal
     }
     /// For a program successor, the SHA-256 of each adoption receipt between
-    /// the two versions, oldest first, as the upgrading lineage carried them;
-    /// empty for a genesis admission. They name the evidence an auditor
-    /// replays; the shell itself replays no receipt.
+    /// the two versions, oldest first, as the upgrading lineage declares
+    /// them; empty for a genesis admission. They are provenance: the shell
+    /// replays no receipt, it compares the two programs itself, and an audit
+    /// requires these digests to be the auditing lineage's.
     pub fn receipts(&self) -> &[Hash32] {
         &self.receipts
     }
@@ -344,12 +346,22 @@ impl<'a, 'p> Members<'a, 'p> {
             Self::Lineage { lineage, len } => &lineage.authorities()[..len],
         }
     }
-    /// Each version's checked catalog, which a program-successor record needs;
-    /// none for a handle opened with one Authority, whose store has no upgrade.
-    fn catalogs(self) -> &'a [&'a BoundCatalog<'p>] {
+    /// What a program-successor record is checked against; nothing for a
+    /// handle opened with one Authority, whose store has no upgrade.
+    /// `missing` receives a pair of versions whose comparison the check
+    /// needed and the lineage had not yet established.
+    fn declared<'m>(self, missing: &'m Cell<Option<(usize, usize)>>) -> Declared<'m, 'a, 'p> {
+        Declared {
+            lineage: self.lineage(),
+            len: self.authorities().len(),
+            missing,
+        }
+    }
+    /// The lineage a handle was opened through, if any.
+    fn lineage(self) -> Option<&'a Lineage<'a, 'p>> {
         match self {
-            Self::One(_) => &[],
-            Self::Lineage { lineage, len } => &lineage.catalogs()[..len],
+            Self::One(_) => None,
+            Self::Lineage { lineage, .. } => Some(lineage),
         }
     }
     fn last(self) -> &'a Authority<'p> {
@@ -357,6 +369,81 @@ impl<'a, 'p> Members<'a, 'p> {
             .last()
             .unwrap_or_else(|| unreachable!("a handle is bound to at least one Authority"))
     }
+}
+
+/// What the lineage a handle is bound to declares for its first `len`
+/// versions: each version's checked catalog, the adoption receipt digests
+/// between each version and the next, and the premises it established for
+/// pairs of versions. An audit takes a program succession from these alone
+/// and never takes evidence from the store as evidence about itself. Inside a
+/// transaction it only looks an established pair up; a pair not yet
+/// established goes to `missing`, and the check ends with `Error::Unsettled`.
+#[derive(Clone, Copy)]
+struct Declared<'m, 'a, 'p> {
+    lineage: Option<&'a Lineage<'a, 'p>>,
+    len: usize,
+    missing: &'m Cell<Option<(usize, usize)>>,
+}
+
+/// Establishes, from plain reads and before any write transaction, the
+/// comparisons an operation on the store will need: one for each
+/// program-successor record, and with `to_last` the one from the version
+/// the store runs to the last. It is only a head start: a store that fails
+/// to read here fails the same way inside the transaction, and one changed
+/// in between is caught there.
+fn prepare(connection: &Connection, members: Members<'_, '_>, to_last: bool) {
+    let Some(lineage) = members.lineage() else {
+        return;
+    };
+    let authorities = members.authorities();
+    let Ok(segments) = load_upgrades(connection)
+        .and_then(|upgrades| Segments::load(connection, authorities, upgrades))
+    else {
+        return;
+    };
+    for (index, stored) in segments.upgrades.iter().enumerate() {
+        if upgrade::Kind::of_record(&stored.record) == Some(upgrade::Kind::ProgramSuccessor) {
+            let (from, to) = (segments.position(index), segments.position(index + 1));
+            // The outcome, failures included, is kept for the transaction.
+            let _ = lineage.establish(connection, from, to);
+        }
+    }
+    let (current, last) = (
+        segments.position(segments.current()),
+        authorities.len().saturating_sub(1),
+    );
+    if to_last && authorities[current].identity() != authorities[last].identity() {
+        let _ = lineage.establish(connection, current, last);
+    }
+}
+
+/// Runs `attempt`, which holds its write transaction only while it runs,
+/// until no comparison it needs is missing. After an attempt that ended
+/// with `Error::Unsettled`, and so wrote nothing, the missing pair is
+/// established with no transaction open and the attempt runs again. A store
+/// that keeps needing new pairs, which takes another connection changing it
+/// each time, ends after one attempt per lineage version with
+/// `Error::Unsettled`.
+fn settle<T>(
+    connection: &mut Connection,
+    members: Members<'_, '_>,
+    mut attempt: impl FnMut(&mut Connection, &Cell<Option<(usize, usize)>>) -> Result<T, Error>,
+) -> Result<T, Error> {
+    let missing = Cell::new(None);
+    for _ in 0..=members.authorities().len() {
+        match attempt(connection, &missing) {
+            Err(Error::Unsettled) => match (members.lineage(), missing.take()) {
+                (Some(lineage), Some((from, to))) => {
+                    // The outcome, a missing premise included, is kept for
+                    // the next attempt; only an error ends here.
+                    let _established = lineage.establish(connection, from, to)?;
+                }
+                _ => return Err(Error::Unsettled),
+            },
+            other => return other,
+        }
+    }
+    Err(Error::Unsettled)
 }
 
 /// SQLite adapter bound to immutable library Authorities: one, or a prefix of
@@ -490,36 +577,51 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
     ) -> Result<(Self, usize), Error> {
         provider()?;
         configure(&connection)?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_schema(&tx)?;
-        let authorities = members.authorities();
-        let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
-        let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
-        let delivery_interpreter = MemoryDestination::interpreter_identity()?;
-        let (start, consumed) = match checkpoint {
-            None => (initial, 0),
-            Some(c) => {
-                if c.genesis != genesis {
-                    return Err(Error::Identity);
-                }
-                let consumed = check_checkpoint(&tx, &segments, c)?;
-                if c.identity != segments.authority(authorities, consumed).identity() {
-                    return Err(Error::Identity);
-                }
-                (c.anchor.clone(), consumed)
-            }
-        };
-        let anchor = audit_tail(
-            &tx,
-            authorities,
-            members.catalogs(),
-            &segments,
-            start,
-            consumed,
-        )?;
-        let position = segments.position(segments.current());
-        let data_version = data_version(&tx)?;
-        tx.commit()?;
+        // A full open establishes its comparisons before the lock; a
+        // checkpoint open needs only the tail's, which the retry finds.
+        if checkpoint.is_none() {
+            prepare(&connection, members, false);
+        }
+        let (anchor, genesis, delivery_interpreter, position, data_version) =
+            settle(&mut connection, members, |connection, missing| {
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                check_schema(&tx)?;
+                let authorities = members.authorities();
+                let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
+                let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+                let delivery_interpreter = MemoryDestination::interpreter_identity()?;
+                let (start, consumed) = match checkpoint {
+                    None => (initial, 0),
+                    Some(c) => {
+                        if c.genesis != genesis {
+                            return Err(Error::Identity);
+                        }
+                        let consumed = check_checkpoint(&tx, &segments, c)?;
+                        if c.identity != segments.authority(authorities, consumed).identity() {
+                            return Err(Error::Identity);
+                        }
+                        (c.anchor.clone(), consumed)
+                    }
+                };
+                let anchor = audit_tail(
+                    &tx,
+                    authorities,
+                    members.declared(missing),
+                    &segments,
+                    start,
+                    consumed,
+                )?;
+                let position = segments.position(segments.current());
+                let data_version = data_version(&tx)?;
+                tx.commit()?;
+                Ok((
+                    anchor,
+                    genesis,
+                    delivery_interpreter,
+                    position,
+                    data_version,
+                ))
+            })?;
         let shell = Self {
             members,
             connection,
@@ -543,28 +645,32 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
     }
     /// Revalidate all history explicitly, including acknowledged delivery data.
     pub fn audit(&mut self) -> Result<Checkpoint, Error> {
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_schema(&tx)?;
-        let authorities = self.members.authorities();
-        let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
-        segments.require_current(authorities)?;
-        let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
-        let anchor = audit_tail(
-            &tx,
-            authorities,
-            self.members.catalogs(),
-            &segments,
-            initial,
-            0,
-        )?;
-        if genesis != self.genesis {
-            return Err(Error::History);
-        }
-        save_checkpoint(&tx, &anchor)?;
-        let data_version = data_version(&tx)?;
-        tx.commit()?;
+        let (members, expected_genesis) = (self.members, self.genesis);
+        prepare(&self.connection, members, false);
+        let (anchor, data_version) =
+            settle(&mut self.connection, members, |connection, missing| {
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                check_schema(&tx)?;
+                let authorities = members.authorities();
+                let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
+                segments.require_current(authorities)?;
+                let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+                let anchor = audit_tail(
+                    &tx,
+                    authorities,
+                    members.declared(missing),
+                    &segments,
+                    initial,
+                    0,
+                )?;
+                if genesis != expected_genesis {
+                    return Err(Error::History);
+                }
+                save_checkpoint(&tx, &anchor)?;
+                let data_version = data_version(&tx)?;
+                tx.commit()?;
+                Ok((anchor, data_version))
+            })?;
         self.anchor = anchor;
         self.data_version = data_version;
         Ok(self.checkpoint_value())
@@ -1229,12 +1335,14 @@ fn check_commit(
 }
 /// Recompute one upgrade record at the head it was recorded at, re-checking
 /// the admission its kind claims: a genesis admission replays the stored
-/// genesis publication over the state, and a program successor re-derives
-/// the policy comparison from the two versions' catalogs.
+/// genesis publication over the state, and a program successor establishes
+/// all five premises again from the two versions' catalogs, exactly as the
+/// upgrade did, and requires the stored receipt digests to be the ones the
+/// lineage declares for the versions the record spans.
 fn check_upgrade(
     connection: &Connection,
     lineage: &[Authority<'_>],
-    catalogs: &[&BoundCatalog<'_>],
+    declared: Declared<'_, '_, '_>,
     segments: &Segments,
     index: usize,
     anchor: &Anchor,
@@ -1275,19 +1383,52 @@ fn check_upgrade(
         upgrade::Kind::ProgramSuccessor => {
             // A handle opened with one Authority holds no catalog, and its
             // store cannot hold an upgrade.
-            let (Some(from_catalog), Some(to_catalog)) = (catalogs.get(old), catalogs.get(new))
-            else {
+            let (Some(declarer), true) = (declared.lineage, new < declared.len) else {
                 return Err(Error::Identity);
             };
-            let receipts = upgrade::evidence_receipts(&upgrade.publication)?;
-            // The premises are re-derived from the two versions and must be
-            // the ones the record states.
-            match upgrade::Successor::establish(from_catalog, to_catalog, &receipts)? {
-                Some(successor) if receipts.len() == new - old => {
-                    upgrade::successor_admission(successor.premises(), &upgrade.publication)
+            let Some(receipts) = declarer.receipts().get(old..new) else {
+                return Err(Error::Identity);
+            };
+            // Every premise, established from the lineage's own catalogs
+            // before this transaction; the record must bind the same tuple
+            // count.
+            let Some(settled) = declarer.settled(old, new) else {
+                declared.missing.set(Some((old, new)));
+                return Err(Error::Unsettled);
+            };
+            let premises = match settled? {
+                Ok(premises) => premises,
+                Err(premise) => {
+                    return Err(Error::Succession(upgrade::Unsupported::Premise(premise)));
                 }
-                _ => return Err(Error::History),
+            };
+            // The stored digests must be the lineage's, value for value.
+            let evidence = upgrade::evidence_bytes(receipts);
+            if upgrade.publication != evidence {
+                // A record that is exact under the digests it stores was made
+                // for another declaration of this lineage, and the store may
+                // be intact. Any other record is damaged.
+                let stored = upgrade::successor_admission(premises, &upgrade.publication);
+                let record = upgrade::record_bytes(
+                    kind,
+                    ordinal,
+                    sequence,
+                    from,
+                    &upgrade.identity,
+                    &stored,
+                    anchor.root,
+                    anchor.chain,
+                )?;
+                let exact = upgrade.publication.len() == evidence.len()
+                    && upgrade.record == record
+                    && hash(zeno_fcis_codec::domains::V2_CHAIN, &record)? == upgrade.chain;
+                return Err(if exact {
+                    Error::Succession(upgrade::Unsupported::Receipts)
+                } else {
+                    Error::History
+                });
             }
+            upgrade::successor_admission(premises, &evidence)
         }
     };
     let record = upgrade::record_bytes(
@@ -1312,7 +1453,7 @@ fn check_upgrade(
 fn apply_upgrades(
     connection: &Connection,
     lineage: &[Authority<'_>],
-    catalogs: &[&BoundCatalog<'_>],
+    declared: Declared<'_, '_, '_>,
     segments: &Segments,
     anchor: &mut Anchor,
     mut consumed: usize,
@@ -1321,7 +1462,7 @@ fn apply_upgrades(
         if upgrade.sequence > anchor.sequence {
             break;
         }
-        check_upgrade(connection, lineage, catalogs, segments, consumed, anchor)?;
+        check_upgrade(connection, lineage, declared, segments, consumed, anchor)?;
         anchor.chain = upgrade.chain;
         consumed += 1;
     }
@@ -1332,7 +1473,7 @@ fn apply_upgrades(
 fn audit_tail(
     connection: &Connection,
     lineage: &[Authority<'_>],
-    catalogs: &[&BoundCatalog<'_>],
+    declared: Declared<'_, '_, '_>,
     segments: &Segments,
     mut anchor: Anchor,
     mut consumed: usize,
@@ -1346,7 +1487,7 @@ fn audit_tail(
         consumed = apply_upgrades(
             connection,
             lineage,
-            catalogs,
+            declared,
             segments,
             &mut anchor,
             consumed,
@@ -1372,7 +1513,7 @@ fn audit_tail(
     consumed = apply_upgrades(
         connection,
         lineage,
-        catalogs,
+        declared,
         segments,
         &mut anchor,
         consumed,
@@ -2016,6 +2157,14 @@ pub enum Error {
     },
     /// The pure upgrade decision refused; see [`upgrade::Refusal`].
     Upgrade(upgrade::Refusal),
+    /// The store holds a program-successor upgrade that the lineage it was
+    /// opened with does not support; see [`upgrade::Unsupported`]. The store
+    /// may be intact. Nothing was written.
+    Succession(upgrade::Unsupported),
+    /// The store needed program comparisons that were not yet established
+    /// each time the transaction began, once per lineage version: another
+    /// connection kept changing it. Nothing was written.
+    Unsettled,
     /// An explicitly requested interruption was injected.
     InjectedCrash(CrashPoint),
 }
@@ -2101,9 +2250,10 @@ impl fmt::Display for Error {
             Self::Upgrade(upgrade::Refusal::SameContract) => f.write_str(
                 "upgrade refused: the store already runs this contract version, so there is nothing to upgrade",
             ),
-            Self::Upgrade(upgrade::Refusal::Genesis(refusal)) => {
-                f.write_str(
-                    "upgrade refused: the new contract is not a program successor of the store's, and its genesis laws do not admit the store's current state",
+            Self::Upgrade(upgrade::Refusal::Genesis { missing, refusal }) => {
+                write!(
+                    f,
+                    "upgrade refused: the new contract is not a program successor of the store's ({missing}), and its genesis laws do not admit the store's current state",
                 )?;
                 if let Some(refusal) = refusal {
                     write!(f, " (the library refused: {refusal:?})")?;
@@ -2112,6 +2262,13 @@ impl fmt::Display for Error {
                     "; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
                 )
             }
+            Self::Succession(unsupported) => write!(
+                f,
+                "the store holds a program-successor upgrade that this application does not support: {unsupported}; nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too"
+            ),
+            Self::Unsettled => f.write_str(
+                "the store kept changing while the shell compared the decision programs it needs, so nothing was written: try again when other connections are idle",
+            ),
             Self::InjectedCrash(point) => write!(
                 f,
                 "an interruption was injected at {point:?} for a crash test: reopen the store, which holds its last committed state"
@@ -2199,7 +2356,10 @@ mod message_tests {
             Error::Capacity { .. } => "Capacity",
             Error::Upgrade(upgrade::Refusal::StateSchema) => "Upgrade(StateSchema)",
             Error::Upgrade(upgrade::Refusal::SameContract) => "Upgrade(SameContract)",
-            Error::Upgrade(upgrade::Refusal::Genesis(_)) => "Upgrade(Genesis)",
+            Error::Upgrade(upgrade::Refusal::Genesis { .. }) => "Upgrade(Genesis)",
+            Error::Succession(upgrade::Unsupported::Receipts) => "Succession(Receipts)",
+            Error::Succession(upgrade::Unsupported::Premise(_)) => "Succession(Premise)",
+            Error::Unsettled => "Unsettled",
             Error::InjectedCrash(_) => "InjectedCrash",
         }
     }
@@ -2295,14 +2455,37 @@ mod message_tests {
                 "upgrade refused: the store already runs this contract version, so there is nothing to upgrade",
             ),
             (
-                Error::Upgrade(upgrade::Refusal::Genesis(None)),
-                "upgrade refused: the new contract is not a program successor of the store's, and its genesis laws do not admit the store's current state; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+                Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Policy,
+                    refusal: None,
+                }),
+                "upgrade refused: the new contract is not a program successor of the store's (premise 1: its policy differs from the store's contract in more than the decision program and its Step limit), and its genesis laws do not admit the store's current state; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
             ),
             (
-                Error::Upgrade(upgrade::Refusal::Genesis(Some(LibraryRefusal::Core(
-                    CoreFailure::Law(LawFailure::Violated),
-                )))),
-                "upgrade refused: the new contract is not a program successor of the store's, and its genesis laws do not admit the store's current state (the library refused: Core(Law(Violated))); a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+                Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Equivalence(
+                        equivalence::Unestablished::Counterexample { ordinal: 41 },
+                    ),
+                    refusal: Some(LibraryRefusal::Core(CoreFailure::Law(LawFailure::Violated))),
+                }),
+                "upgrade refused: the new contract is not a program successor of the store's (premise 3: the two decision programs differ on input tuple 41 of their declared domain, counting from 0 in enumeration order), and its genesis laws do not admit the store's current state (the library refused: Core(Law(Violated))); a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+            ),
+            (
+                Error::Succession(upgrade::Unsupported::Receipts),
+                "the store holds a program-successor upgrade that this application does not support: it names other adoption receipts than this application declares for those versions; nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
+            (
+                Error::Succession(upgrade::Unsupported::Premise(
+                    upgrade::Premise::Equivalence(equivalence::Unestablished::DomainTooLarge {
+                        size: Some(1_296_000),
+                        cap: 1_000,
+                    }),
+                )),
+                "the store holds a program-successor upgrade that this application does not support: this application's contracts do not establish it (premise 3: the decision programs' input domain has 1296000 tuples, more than the lineage's comparison cap of 1000); nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
+            (
+                Error::Unsettled,
+                "the store kept changing while the shell compared the decision programs it needs, so nothing was written: try again when other connections are idle",
             ),
             (
                 Error::InjectedCrash(CrashPoint::AfterCommit),
@@ -2319,6 +2502,6 @@ mod message_tests {
             assert!(format!("{error:?}").starts_with(stem), "{error:?}");
             covered.insert(name);
         }
-        assert_eq!(covered.len(), 21, "{covered:?}");
+        assert_eq!(covered.len(), 24, "{covered:?}");
     }
 }

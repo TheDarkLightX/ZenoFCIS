@@ -6,8 +6,25 @@
 //! that runs the last version commits and delivers. Each transition consumes
 //! its handle and returns the next one, all its checks and writes happen in
 //! one immediate transaction, and every refusal writes nothing.
+//!
+//! A program comparison never runs while a write transaction is open. What
+//! it establishes depends only on two of the lineage's catalogs, so the
+//! lineage keeps each pair's outcome in memory, and an operation establishes
+//! the pairs it needs from plain reads before it takes the lock. Inside the
+//! transaction the shell only looks a pair up; a pair still missing there,
+//! because another connection changed the store in between, ends the
+//! attempt with nothing written, and the pair is established before the next
+//! one.
 
-use std::path::Path;
+use std::{
+    cell::Cell,
+    collections::BTreeMap,
+    path::Path,
+    sync::{
+        Mutex, PoisonError,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 use rusqlite::{Connection, TransactionBehavior, params};
 use zeno_fcis_codec::Hash32;
@@ -17,36 +34,87 @@ use zeno_fcis_synthesis::finite::{
     v2_catalog::BoundCatalog,
 };
 
-use super::upgrade::{self, Admission, Facts, Kind, Successor};
+use super::equivalence::DEFAULT_MAX_INPUT_TUPLES;
+use super::upgrade::{self, Admission, Facts, Kind, Premise, Premises, Successor};
 use super::{
     Anchor, Checkpoint, CrashPoint, Error, Members, Segments, Snapshot, UpgradeReceipt,
     V2SqliteShell, audit_tail, check_schema, check_schema_v9, compact_publication, configure,
     data_version, genesis_anchor, inject, load_upgrades, migration_v9_to_v10, open_existing,
-    provider,
+    prepare, provider, settle,
 };
+
+/// The complete outcome of establishing the premises for one pair of
+/// lineage versions.
+#[derive(Clone, Copy, Debug)]
+enum Settled {
+    /// Every premise held, or the first missing one.
+    Established(Result<Premises, Premise>),
+    /// A policy could not be encoded: `Error::Range`.
+    Unencodable,
+}
+
+impl Settled {
+    fn result(self) -> Result<Result<Premises, Premise>, Error> {
+        match self {
+            Self::Established(established) => Ok(established),
+            Self::Unencodable => Err(Error::Range),
+        }
+    }
+}
 
 /// An application's contract lineage, oldest version first and the version
 /// it runs now last: each version's checked catalog and the library Authority
-/// bound from it, and between each version and the next the SHA-256 of the
-/// `transform` receipt that adopted the later one.
+/// bound from it, between each version and the next the SHA-256 of the
+/// `transform` receipt that adopted the later one, and the cap on the input
+/// tuples one comparison of two decision programs may enumerate.
 ///
-/// The shell replays no receipt. A generated contract's `with_lineage` passes
-/// the digests of receipts that `zeno-fcis generate contract` replayed, and a
-/// program-successor upgrade binds the ones it spans.
+/// The receipt digests are provenance, not evidence the shell checks: the
+/// shell replays no receipt. It establishes a program succession itself,
+/// from the two catalogs, by comparing the two decision programs on every
+/// input tuple ([`Successor::establish`]). A generated contract's
+/// `with_lineage` passes the digests of receipts that `zeno-fcis generate
+/// contract` replayed. A program-successor upgrade records the ones it spans,
+/// and an audit requires the recorded digests to be exactly these.
+///
+/// The lineage also keeps, in memory only, the outcome of establishing the
+/// premises for each pair of versions it was asked about, so one lineage
+/// value compares two programs at most once. The outcome depends only on
+/// the two catalogs it holds immutably; it is never stored in or read from a
+/// store, and another lineage value establishes it afresh.
 pub struct Lineage<'c, 'p> {
     catalogs: Vec<&'c BoundCatalog<'p>>,
     authorities: Vec<Authority<'p>>,
     receipts: Vec<Hash32>,
+    max_input_tuples: u64,
+    settled: Mutex<BTreeMap<(usize, usize), Settled>>,
+    comparisons: AtomicUsize,
 }
 
 impl<'c, 'p> Lineage<'c, 'p> {
-    /// Binds every version's catalog into its Authority through the library.
+    /// Binds every version's catalog into its Authority through the library,
+    /// with the default comparison cap of 100,000,000 input tuples, the
+    /// default of `zeno-fcis transform check`.
     ///
     /// # Errors
     /// `Error::Lineage` without a version, or unless there is exactly one
     /// receipt between each version and the next; `Error::Authority` when a
     /// catalog does not bind.
     pub fn bind(catalogs: &[&'c BoundCatalog<'p>], receipts: &[[u8; 32]]) -> Result<Self, Error> {
+        Self::bind_with_cap(catalogs, receipts, DEFAULT_MAX_INPUT_TUPLES)
+    }
+
+    /// [`Lineage::bind`] with another cap on the input tuples one comparison
+    /// of two decision programs may enumerate. A program succession whose
+    /// domain exceeds the cap is not established: the upgrade takes the
+    /// genesis route, and a store that holds such a record does not audit.
+    ///
+    /// # Errors
+    /// As [`Lineage::bind`].
+    pub fn bind_with_cap(
+        catalogs: &[&'c BoundCatalog<'p>],
+        receipts: &[[u8; 32]],
+        max_input_tuples: u64,
+    ) -> Result<Self, Error> {
         if catalogs.is_empty() || receipts.len() + 1 != catalogs.len() {
             return Err(Error::Lineage);
         }
@@ -58,7 +126,87 @@ impl<'c, 'p> Lineage<'c, 'p> {
             catalogs: catalogs.to_vec(),
             authorities,
             receipts: receipts.iter().copied().map(Hash32::new).collect(),
+            max_input_tuples,
+            settled: Mutex::new(BTreeMap::new()),
+            comparisons: AtomicUsize::new(0),
         })
+    }
+
+    /// How many times this lineage value enumerated two decision programs:
+    /// at most once for each pair of versions.
+    pub fn comparisons(&self) -> usize {
+        self.comparisons.load(Ordering::Relaxed)
+    }
+
+    fn memo(&self) -> std::sync::MutexGuard<'_, BTreeMap<(usize, usize), Settled>> {
+        // The map only ever gains complete entries, so a panic elsewhere
+        // cannot leave it inconsistent.
+        self.settled.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The premises of a program succession from version `from` to version
+    /// `to`, positions from 0, established once for this lineage value and
+    /// then remembered, failures included. It runs the program comparison,
+    /// so the connection must not be inside a transaction: no comparison
+    /// runs while a write lock is held.
+    ///
+    /// # Errors
+    /// `Error::Lineage` unless `from < to <= last`, and `Error::Range` when a
+    /// policy cannot be encoded.
+    pub(super) fn establish(
+        &self,
+        connection: &Connection,
+        from: usize,
+        to: usize,
+    ) -> Result<Result<Premises, Premise>, Error> {
+        debug_assert!(
+            connection.is_autocommit(),
+            "a program comparison must not run inside a transaction"
+        );
+        if from >= to || to >= self.versions() {
+            return Err(Error::Lineage);
+        }
+        let mut memo = self.memo();
+        if let Some(settled) = memo.get(&(from, to)) {
+            return settled.result();
+        }
+        let settled = match upgrade::premises(
+            self.catalogs[from],
+            self.catalogs[to],
+            self.max_input_tuples,
+        ) {
+            Ok((established, enumerated)) => {
+                if enumerated {
+                    self.comparisons.fetch_add(1, Ordering::Relaxed);
+                }
+                Settled::Established(established)
+            }
+            Err(Error::Range) => Settled::Unencodable,
+            Err(error) => return Err(error),
+        };
+        memo.insert((from, to), settled);
+        settled.result()
+    }
+
+    /// The remembered outcome for the pair, if this lineage established it;
+    /// never computes one.
+    pub(super) fn settled(
+        &self,
+        from: usize,
+        to: usize,
+    ) -> Option<Result<Result<Premises, Premise>, Error>> {
+        self.memo().get(&(from, to)).copied().map(Settled::result)
+    }
+
+    /// The cap on the input tuples one comparison may enumerate.
+    pub fn max_input_tuples(&self) -> u64 {
+        self.max_input_tuples
+    }
+
+    /// The declared adoption receipt digests, oldest first: one between each
+    /// version and the next.
+    pub fn receipts(&self) -> &[Hash32] {
+        &self.receipts
     }
 
     /// The number of versions; the last is the one the application runs.
@@ -202,11 +350,14 @@ impl<'a, 'p> Superseded<'a, 'p> {
     /// Records the checked upgrade to the lineage's last version and returns
     /// the store's handle under the whole lineage, with the receipt.
     ///
-    /// After a complete audit under the whole lineage, the version the store
-    /// runs and the last one are compared: a program successor
-    /// ([`upgrade::program_successor`]) is admitted at any state and binds
-    /// the receipts of the adoptions between them; any other contract must
-    /// admit the current state through its genesis evaluation. The pure
+    /// After a complete audit under the whole lineage, the shell tries to
+    /// establish every premise of a program succession from the version the
+    /// store runs to the last one ([`Successor::establish`]), including an
+    /// exhaustive comparison of the two decision programs under the lineage's
+    /// cap. A program successor is admitted at any state and records the
+    /// number of tuples compared and the lineage's receipt digests of the
+    /// adoptions between them. When any premise is missing, the new contract
+    /// must admit the current state through its genesis evaluation. The pure
     /// [`upgrade::decide`] then requires equal canonical state schemas and
     /// different identities. The record becomes the next chain link, and
     /// pending deliveries keep their IDs and order.
@@ -214,7 +365,8 @@ impl<'a, 'p> Superseded<'a, 'p> {
     /// # Errors
     /// `Schema` for a store that is no longer v10, `Identity` for a segment
     /// under no version, `History` for a failed audit, `Concurrent` when the
-    /// head moved, and `Upgrade` for the decision's refusals.
+    /// head moved, and `Upgrade` for the decision's refusals; a genesis
+    /// refusal names the missing premise.
     pub fn upgrade(self) -> Result<(V2SqliteShell<'a, 'p>, UpgradeReceipt), Error> {
         self.upgrade_with_crash(None)
     }
@@ -236,117 +388,19 @@ impl<'a, 'p> Superseded<'a, 'p> {
             delivery_interpreter,
             ..
         } = shell;
-        inject(crash, CrashPoint::BeforeTransaction)?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_schema(&tx)?;
-        let (authorities, catalogs) = (lineage.authorities(), lineage.catalogs());
-        let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
-        let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
-        let anchor = audit_tail(&tx, authorities, catalogs, &segments, initial, 0)?;
-        let (current, last) = (
-            segments.position(segments.current()),
-            lineage.versions() - 1,
-        );
-        let (from, to) = (&authorities[current], &authorities[last]);
-        let ordinal = u64::try_from(segments.upgrades.len())
-            .ok()
-            .and_then(|count| count.checked_add(1))
-            .ok_or(Error::Range)?;
-        let sequence = u64::try_from(anchor.sequence).map_err(|_| Error::Range)?;
-        // Another connection may have upgraded the store since it was
-        // opened; the decision then refuses the same contract first.
-        let same = from.identity() == to.identity();
-        let successor = if same {
-            None
-        } else {
-            Successor::establish(
-                catalogs[current],
-                catalogs[last],
-                &lineage.receipts[current..last],
-            )?
-        };
-        let genesis_outcome =
-            (!same && successor.is_none()).then(|| to.publish_genesis(&anchor.state));
-        let admission = match (successor, &genesis_outcome) {
-            (Some(successor), _) => Admission::Successor(successor),
-            (None, Some(PublicationOutcome::Commit(publication))) => {
-                Admission::Genesis(upgrade::Genesis {
-                    subject: publication.subject(),
-                    poststate: publication.poststate(),
-                })
-            }
-            (None, Some(PublicationOutcome::Refused { error, .. })) => {
-                Admission::Refused(Some(*error))
-            }
-            (None, _) => Admission::Refused(None),
-        };
-        let plan = upgrade::decide(&Facts {
-            ordinal,
-            sequence,
-            root: anchor.root,
-            previous_chain: anchor.chain,
-            from_identity: from.identity(),
-            from_schema: catalogs[current].original_schema(),
-            identity: to.identity(),
-            schema: catalogs[last].original_schema(),
-            state: &anchor.state,
-            admission,
-        })?;
-        let admitted = match (plan.kind(), &genesis_outcome) {
-            (Kind::ProgramSuccessor, _) => plan.evidence().to_vec(),
-            (Kind::GenesisAdmission, Some(PublicationOutcome::Commit(publication))) => {
-                compact_publication(to.identity(), publication.subject())?
-            }
-            _ => return Err(Error::Upgrade(upgrade::Refusal::Genesis(None))),
-        };
-        inject(crash, CrashPoint::AfterValidation)?;
-        // The head keeps its sequence, state and root; only the chain tip moves.
-        let changed = tx.execute(
-            "UPDATE v2_state SET chain=?1 WHERE singleton=1 AND sequence=?2 AND root=?3 AND chain=?4",
-            params![
-                plan.chain().as_bytes().as_slice(),
-                anchor.sequence,
-                anchor.root.as_bytes().as_slice(),
-                anchor.chain.as_bytes().as_slice()
-            ],
-        )?;
-        if changed != 1 {
-            return Err(Error::Concurrent);
-        }
-        inject(crash, CrashPoint::AfterStateWrite)?;
-        tx.execute(
-            "INSERT INTO v2_upgrades VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-            params![
-                i64::try_from(ordinal).map_err(|_| Error::Range)?,
-                anchor.sequence,
-                to.identity(),
-                admitted,
-                anchor.root.as_bytes().as_slice(),
-                anchor.chain.as_bytes().as_slice(),
-                plan.record(),
-                plan.chain().as_bytes().as_slice()
-            ],
-        )?;
-        inject(crash, CrashPoint::AfterReplayWrite)?;
-        inject(crash, CrashPoint::BeforeCommit)?;
-        let data_version = data_version(&tx)?;
-        tx.commit()?;
-        let receipt = UpgradeReceipt {
-            kind: plan.kind(),
-            premises: plan.premises(),
-            ordinal,
-            sequence,
-            chain: plan.chain(),
-            from_identity: from.identity().to_vec(),
-            identity: to.identity().to_vec(),
-            receipts: successor.map_or_else(Vec::new, |successor| successor.receipts().to_vec()),
-            record: plan.record().to_vec(),
-        };
+        let members = lineage.members(lineage.versions());
+        // Plain reads first: every comparison this upgrade needs runs before
+        // the transaction takes the lock.
+        prepare(&connection, members, true);
+        let (anchor, genesis, data_version, receipt) =
+            settle(&mut connection, members, |connection, missing| {
+                upgrade_once(connection, lineage, crash, missing)
+            })?;
         let shell = V2SqliteShell {
-            members: lineage.members(lineage.versions()),
+            members,
             connection,
             anchor: Anchor {
-                chain: plan.chain(),
+                chain: receipt.chain,
                 ..anchor
             },
             genesis,
@@ -356,6 +410,132 @@ impl<'a, 'p> Superseded<'a, 'p> {
         inject(crash, CrashPoint::AfterCommit)?;
         Ok((shell, receipt))
     }
+}
+
+/// One attempt at the upgrade, in one immediate transaction. A comparison it
+/// needs that is not yet established ends it with `Error::Unsettled` and the
+/// pair in `missing`, having written nothing.
+fn upgrade_once(
+    connection: &mut Connection,
+    lineage: &Lineage<'_, '_>,
+    crash: Option<CrashPoint>,
+    missing: &Cell<Option<(usize, usize)>>,
+) -> Result<(Anchor, Hash32, i64, UpgradeReceipt), Error> {
+    inject(crash, CrashPoint::BeforeTransaction)?;
+    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    check_schema(&tx)?;
+    let (authorities, catalogs) = (lineage.authorities(), lineage.catalogs());
+    let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
+    let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+    let declared = lineage.members(lineage.versions()).declared(missing);
+    let anchor = audit_tail(&tx, authorities, declared, &segments, initial, 0)?;
+    let (current, last) = (
+        segments.position(segments.current()),
+        lineage.versions() - 1,
+    );
+    let (from, to) = (&authorities[current], &authorities[last]);
+    let ordinal = u64::try_from(segments.upgrades.len())
+        .ok()
+        .and_then(|count| count.checked_add(1))
+        .ok_or(Error::Range)?;
+    let sequence = u64::try_from(anchor.sequence).map_err(|_| Error::Range)?;
+    // Another connection may have upgraded the store since it was
+    // opened; the decision then refuses the same contract first.
+    let same = from.identity() == to.identity();
+    // The same contract establishes nothing: the decision refuses it first.
+    let established = if same {
+        Err(Premise::Policy)
+    } else {
+        let Some(settled) = lineage.settled(current, last) else {
+            missing.set(Some((current, last)));
+            return Err(Error::Unsettled);
+        };
+        settled?.map(|premises| Successor::held(&lineage.receipts[current..last], premises))
+    };
+    let successor = established.ok();
+    let genesis_outcome = (!same && successor.is_none()).then(|| to.publish_genesis(&anchor.state));
+    let admission = match (established, &genesis_outcome) {
+        (Ok(successor), _) => Admission::Successor(successor),
+        (Err(missing), Some(PublicationOutcome::Commit(publication))) => Admission::Genesis(
+            missing,
+            upgrade::Genesis {
+                subject: publication.subject(),
+                poststate: publication.poststate(),
+            },
+        ),
+        (Err(missing), Some(PublicationOutcome::Refused { error, .. })) => {
+            Admission::Refused(missing, Some(*error))
+        }
+        (Err(missing), _) => Admission::Refused(missing, None),
+    };
+    let plan = upgrade::decide(&Facts {
+        ordinal,
+        sequence,
+        root: anchor.root,
+        previous_chain: anchor.chain,
+        from_identity: from.identity(),
+        from_schema: catalogs[current].original_schema(),
+        identity: to.identity(),
+        schema: catalogs[last].original_schema(),
+        state: &anchor.state,
+        admission,
+    })?;
+    let admitted = match (plan.kind(), &genesis_outcome) {
+        (Kind::ProgramSuccessor, _) => plan.evidence().to_vec(),
+        (Kind::GenesisAdmission, Some(PublicationOutcome::Commit(publication))) => {
+            compact_publication(to.identity(), publication.subject())?
+        }
+        _ => {
+            return Err(Error::Upgrade(upgrade::Refusal::Genesis {
+                missing: Premise::Policy,
+                refusal: None,
+            }));
+        }
+    };
+    inject(crash, CrashPoint::AfterValidation)?;
+    // The head keeps its sequence, state and root; only the chain tip moves.
+    let changed = tx.execute(
+        "UPDATE v2_state SET chain=?1 WHERE singleton=1 AND sequence=?2 AND root=?3 AND chain=?4",
+        params![
+            plan.chain().as_bytes().as_slice(),
+            anchor.sequence,
+            anchor.root.as_bytes().as_slice(),
+            anchor.chain.as_bytes().as_slice()
+        ],
+    )?;
+    if changed != 1 {
+        return Err(Error::Concurrent);
+    }
+    inject(crash, CrashPoint::AfterStateWrite)?;
+    tx.execute(
+        "INSERT INTO v2_upgrades VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+        params![
+            i64::try_from(ordinal).map_err(|_| Error::Range)?,
+            anchor.sequence,
+            to.identity(),
+            admitted,
+            anchor.root.as_bytes().as_slice(),
+            anchor.chain.as_bytes().as_slice(),
+            plan.record(),
+            plan.chain().as_bytes().as_slice()
+        ],
+    )?;
+    inject(crash, CrashPoint::AfterReplayWrite)?;
+    inject(crash, CrashPoint::BeforeCommit)?;
+    let data_version = data_version(&tx)?;
+    tx.commit()?;
+    let receipt = UpgradeReceipt {
+        kind: plan.kind(),
+        premises: plan.premises(),
+        ordinal,
+        sequence,
+        chain: plan.chain(),
+        from_identity: from.identity().to_vec(),
+        identity: to.identity().to_vec(),
+        receipts: successor.map_or_else(Vec::new, |successor| successor.receipts().to_vec()),
+        record: plan.record().to_vec(),
+    };
+    Ok((anchor, genesis, data_version, receipt))
 }
 
 /// A schema v9 store, created before upgrades were recorded. Its one
@@ -408,7 +588,16 @@ impl<'a, 'p> V9Store<'a, 'p> {
         let authorities = members.authorities();
         let segments = Segments::load(&tx, authorities, Vec::new())?;
         let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
-        let anchor = audit_tail(&tx, authorities, members.catalogs(), &segments, initial, 0)?;
+        // A v9 store holds no upgrade, so its audit compares no programs.
+        let none = Cell::new(None);
+        let anchor = audit_tail(
+            &tx,
+            authorities,
+            members.declared(&none),
+            &segments,
+            initial,
+            0,
+        )?;
         let delivery_interpreter = MemoryDestination::interpreter_identity()?;
         inject(crash, CrashPoint::AfterValidation)?;
         tx.execute_batch(&migration_v9_to_v10())?;

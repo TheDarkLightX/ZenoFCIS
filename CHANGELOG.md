@@ -23,6 +23,54 @@ embedded in ZenoFCIS values.
   writes the same ledger and report as before. This concerns work
   accounting only: the loop still installs no memory caps and does not
   cancel process trees.
+- Fix store upgrade admission and audit. A `program-successor` upgrade was
+  admitted when the two contracts' policies differed only in the decision
+  program and Step limit, with nothing else required: a successor with a
+  Step limit of zero, or with a program that decides differently on some
+  input, was admitted at any state, and the audit took the receipt digests
+  from the store's own record. Now `v2::upgrade::Successor::establish`
+  constructs a successor only when the shell itself establishes all five
+  premises from the two bound catalogs: the policy comparison; law 991
+  declared as a decision-conformance law on every decision and required, in
+  both; both Step limits covering every program and law node; no law
+  observing Step usage; and the two decision programs equal on every input
+  tuple. The last is the new pure `v2::equivalence::compare`, the predicate
+  of `zeno-fcis transform check` at the full Step budget: every tuple of the
+  ordered product of the declared input domains runs through the library
+  evaluator, with checked domain sizing and an odometer instead of a list of
+  tuples, up to a cap the lineage carries, 100,000,000 tuples by default or
+  another value through `Lineage::bind_with_cap`. A CLI test compiles the
+  module and checks that it gives the same verdict as the transform checker
+  on its known answers, the benchmark cases, planted defects and the
+  withdrawal-queue adoption, which it compares on 1,296,000 input tuples.
+  When a premise is missing the upgrade takes the genesis route, and a
+  refusal, which writes nothing, now names the missing premise:
+  `upgrade::Refusal::Genesis` carries `missing` and `refusal`. The audit
+  establishes all five premises again from the auditing lineage and requires
+  the recorded receipt digests to be that lineage's, value for value. An
+  open that fails either check ends with the new `Error::Succession`, which
+  carries `upgrade::Unsupported::Receipts` or the missing premise and says
+  the store may be intact, instead of `Error::History`. The
+  digests are provenance: the shell replays no receipt. The record's
+  admission is now the premises byte `0x1f`, the number of tuples compared
+  and the digests, and `UpgradeReceipt::premises` returns that evidence;
+  2.1 was never released, so there is no compatibility path. The
+  application's upgrade report lists the five premises and
+  `programs_equal_on_input_tuples`. Every process that upgrades a store, or
+  fully opens one holding a program-successor record, compares the two
+  programs once: a bound `Lineage` keeps each pair's outcome in memory
+  (`Lineage::comparisons` counts its enumerations), and programs with
+  identical instructions and roots are equal without enumeration. No
+  comparison runs while a write transaction is open: the needed pairs are
+  established from plain reads first, the transaction only looks them up,
+  and a pair that another connection's change made necessary in between is
+  established before a retry, bounded by the number of versions, beyond
+  which `Error::Unsettled` is returned with nothing written. Generated
+  application manifests optimise `zeno-fcis-synthesis` in dev builds, with
+  overflow checks and debug assertions still on. For the withdrawal queue
+  one comparison takes about 3 seconds in a release build and about 4 in a
+  debug build.
+
 - `zeno-fcis new` now binds every Cargo application it writes, from
   `--contract` and from the `durable-counter`, `prepared-counter` and example
   templates, to a ZenoFCIS source tree. Before, a generated application
@@ -291,12 +339,10 @@ embedded in ZenoFCIS values.
   `Superseded::upgrade`, which consumes it and returns the current handle.
   After a full audit the pure `v2::upgrade::decide` requires equal canonical
   state schema bytes and differing identities, and admits the state in one
-  of two record kinds. A `program-successor`, whose policy differs from the
-  old one only in its decision program and Step limit, as every adoption
-  does, is admitted at any state, states which premises held and binds the
-  adoption receipts' digests. With every premise (law 991, an `Equivalent`
-  receipt, Step limits that never bind, no law observing Step usage) the
-  two versions reach the same states. A
+  of two record kinds. A `program-successor` is admitted at any state only
+  when the shell establishes all five premises of the plan's program
+  succession, under which the two versions reach the same states (see the
+  entry on upgrade admission above). A
   `genesis-admission` covers other contracts and needs the new contract's
   genesis evaluation to admit the current state, which law 990 confines to
   the declared genesis state. Each segment replays under the Authority that

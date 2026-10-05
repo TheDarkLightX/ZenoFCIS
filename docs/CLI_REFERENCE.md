@@ -906,34 +906,58 @@ existing SQLite store with its whole lineage:
 | Command | Effect |
 | --- | --- |
 | `<app> --audit DB` | Replays each history segment under the version that published it and prints the head: the contract version the store runs, commits, pending deliveries and recorded upgrades. A store at any version of the application is audited, under the versions up to its own. |
-| `<app> --upgrade DB` | Records a checked upgrade from the version the store runs to this build's version. After a full audit, the two versions must have equal canonical state schema bytes and different identities. If the new contract's canonical policy, with its decision program's instructions and roots and its Step limit replaced by the old contract's, is byte for byte the old policy, the record is a `program-successor`. It is admitted at any state, because every law and every other part of the policy is unchanged; it states which further premises held (below) and binds the receipt digests of the adoptions between the two versions. Every adoption makes such a successor. Otherwise the new contract's genesis laws must admit the current state through the library's genesis evaluation, and the record is a `genesis-admission` that binds that genesis publication. For generated contracts those laws include the initial-condition law 990, so the store must then be at its declared genesis state. Either record binds both identities, the state root and the chain tip, and becomes the next chain link; the head's chain moves to it. Pending deliveries keep their IDs and commit order. The report names the kind. Any refusal writes nothing. |
+| `<app> --upgrade DB` | Records a checked upgrade from the version the store runs to this build's version. After a full audit, the two versions must have equal canonical state schema bytes and different identities. When the store's shell establishes all five premises below itself, from the two versions' contracts, the record is a `program-successor`, admitted at any state; it binds the number of input tuples on which the shell compared the two decision programs and the receipt digests this build declares for the adoptions between the two versions. A generated adoption normally establishes all five. When any premise is missing, the new contract's genesis laws must admit the current state through the library's genesis evaluation, and the record is a `genesis-admission` that binds that genesis publication. For generated contracts those laws include the initial-condition law 990, so the store must then be at its declared genesis state; otherwise the refusal names the missing premise. Either record binds both identities, the state root and the chain tip, and becomes the next chain link; the head's chain moves to it. Pending deliveries keep their IDs and commit order. The report names the kind. Any refusal writes nothing. |
 | `<app> --deliver DB` | Delivers every pending outbox entry of a store at this build's version, acknowledges each and prints their IDs. A store at an earlier version must be upgraded first. |
 | `<app> --migrate DB` | Converts a store created before upgrades were recorded (SQLite schema v9) to the current schema v10, after a complete audit under the version that created it. Any other schema, or a store under no version of the application, is refused and nothing is written. Opening or upgrading a v9 store without this step is refused. |
 | `<app> --decide DB` | Runs the decision examples as one session and leaves the outbox pending. Without a file at `DB`, the session starts at genesis in a new database, like `<app> NEW_DB`. An existing store must run this build's version; the session continues from the store's state, taking while one remains the first example whose pre-state is that state, and records each commit and its replay under a key of its own. A store at another version is refused and left as it was; one at an earlier version must be upgraded first. It is an aid for acceptance tests and maintenance, not an operational interface, which is planned for 2.2. |
 
 A program successor and the version it supersedes have the same reachable
-states when five premises hold: (1) their canonical policies differ only in
-the decision program's instructions and roots and the Step limit, so the
-genesis literals, laws and case table are identical, which the shell checks
-at the upgrade and at every audit; (2) the identical laws include generated
-law 991, which pins every committed decision to the case table; (3) each
-adoption receipt is F3 `Equivalent`, under a declared Step limit that never
-binds, which `generate contract` checks by replaying it; (4) neither
-version's Step limit binds, because each covers one Step for every program
-and law node, which the shell checks, and each program's measured usage plus
-every law node, which generation checks; and (5) no law observes Step usage,
-which the shell checks. Under these premises the two versions admit the same
-genesis states and commit the same decisions from the same states, so an
-upgrade at any reachable state keeps every property of reachable states:
-every law, every proved inductive claim and the meaning of every decision
-example, not only the laws evaluated on the current state. Step usage is not
-kept: when the receipt reports that it differs, the sealed usage
-observations change and every sealed subject names the new identity, so an
-adoption is a versioned change. The upgrade report's `premises` states
-whether premises 4 and 5 held as the shell checked them; premises 2 and 3
-rest on the generation of the build that ran the upgrade. A program successor
-without every premise still keeps the laws for every later commit, but not
-the reachable states.
+states when five premises hold. The shell establishes each one from the two
+versions' contracts at the upgrade, and again at every full open and audit of
+the upgraded store: (1) their canonical policies differ only in the decision
+program's instructions and roots and the Step limit, so the genesis literals,
+laws and case table are identical; (2) both declare and require law 991 as a
+decision-conformance law on every decision, which is the generator's own
+test for that law, though the shell cannot see the case table and so does
+not check what the law's predicate says; (3) the two decision programs are
+equal on every tuple of their declared input domain, which the shell checks
+by running both through the library evaluator on every tuple, at a budget no
+program can exhaust, up to a cap of 100,000,000 tuples by default; (4)
+neither version's Step limit binds, because each covers one Step for every
+program and law node; and (5) no law observes Step usage. Under these
+premises the two versions admit the same genesis states and commit the same
+decisions from the same states, so an upgrade at any reachable state keeps
+every property of reachable states: every law, every proved inductive claim
+and the meaning of every decision example, not only the laws evaluated on the
+current state. Step usage is not kept: when the programs' usage differs, the
+sealed usage observations change and every sealed subject names the new
+identity, so an adoption is a versioned change.
+
+The upgrade report's `premises` lists the five premises and
+`programs_equal_on_input_tuples`, the number of input tuples the shell
+compared: 1,296,000 for the withdrawal queue's adoption. That comparison is
+an exhaustive finite check by a tested checker, the same predicate as
+`zeno-fcis transform check`, not a formal proof. Every process that upgrades
+a store, or fully opens a store that holds a program-successor record,
+compares the two programs once on every input tuple; within one process the
+application binds its lineage once and remembers the outcome, so a second
+audit compares nothing again. Two programs with identical instructions and
+roots are equal without enumeration, and nothing else is skipped. For the
+withdrawal queue, measured on a shared machine, one comparison took about 3
+seconds in a release build of the application and about 4 seconds in a
+debug build, whose generated manifest optimises `zeno-fcis-synthesis` while
+keeping overflow checks and debug assertions on. A checkpoint open skips the
+comparisons before its checkpoint. Enumeration runs on one thread; parallel
+enumeration is planned, not built. No comparison runs while the store's
+write lock is held: the shell establishes what it needs before its
+transaction, so other connections can keep writing meanwhile. The receipt digests in the report and the
+record are provenance. The shell replays no receipt; it establishes
+equivalence itself. An audit requires the recorded digests to be exactly the
+ones this build declares, so a build that declares other digests for the
+same versions refuses the store. That refusal, and the refusal of a build
+whose own contracts or comparison cap do not establish the recorded
+succession, names its cause and says the store may be intact; it is not
+reported as a damaged history.
 
 Commands on an existing store open it without creating it, so a mistyped path
 is refused and leaves no file.
@@ -945,12 +969,14 @@ message saying what happened and what to do, and in parentheses the error's
 there is nothing to upgrade (Upgrade(SameContract))`.
 
 The library crate exposes the same operations as typed handles.
-`v2::Lineage::bind(catalogs, receipts)` binds a lineage, and `Lineage::open`
+`v2::Lineage::bind(catalogs, receipts)` binds a lineage, with the default
+comparison cap, and `Lineage::bind_with_cap` with another one; `Lineage::open`
 returns either a v9 store, whose only operation is `migrate`, or a v10 store
 that is current or superseded. `Superseded::upgrade` consumes its handle and
 returns the current one with the `UpgradeReceipt`. The pure
-`v2::upgrade::decide` and `v2::upgrade::program_successor` make the
-decisions; the `zeno-fcis` binary itself does not open stores.
+`v2::upgrade::decide`, `v2::upgrade::Successor::establish` and
+`v2::equivalence::compare` make the decisions; the `zeno-fcis` binary itself
+does not open stores.
 
 ## Bounded completion in 1.1.0
 
