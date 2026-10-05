@@ -12,6 +12,7 @@ Cargo.lock
 !demos/mini-determinator-qemu/Cargo.lock
 !verification/Cargo.lock
 !site/Cargo.lock
+!tools/resolved-purity/Cargo.lock
 *.profraw
 *.profdata
 .DS_Store
