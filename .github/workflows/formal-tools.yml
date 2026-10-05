@@ -18,6 +18,7 @@ on:
       - "release/formal-tools-linux-x86_64.sha256"
       - "release/lean-4.30.0-tree.sha256"
       - ".github/workflows/formal-tools.yml"
+      - ".github/actions/fetch-locked-crates/**"
   push:
     branches: [main]
   workflow_dispatch:
@@ -41,6 +42,8 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
       - name: Record runner storage before tool download
         run: df -h
       - name: Download official artifacts

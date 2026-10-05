@@ -38,8 +38,8 @@ pub const CONTEXT_TYPE_ID: u32 = 102;
 pub const DOMAIN_PREFIX: &str = "example/inventory-reservation";
 
 pub const HASH_ALGORITHM_ID: &str = "sha2-256/rustcrypto-0.11.0";
-pub const CATALOG_HASH: Hash32 = Hash32::new([79, 163, 7, 95, 24, 152, 153, 208, 211, 48, 165, 164, 232, 139, 176, 18, 40, 217, 60, 1, 116, 74, 111, 156, 121, 2, 141, 9, 179, 194, 105, 110]);
-pub const PROFILE_HASH: Hash32 = Hash32::new([96, 11, 184, 72, 195, 190, 86, 151, 166, 130, 131, 243, 33, 169, 88, 248, 63, 174, 145, 39, 0, 246, 15, 172, 112, 46, 39, 11, 176, 187, 224, 165]);
+pub const CATALOG_HASH: Hash32 = Hash32::new([249, 250, 22, 17, 122, 82, 138, 57, 120, 128, 86, 197, 29, 92, 2, 89, 134, 74, 116, 118, 120, 221, 119, 159, 43, 42, 56, 204, 246, 184, 6, 37]);
+pub const PROFILE_HASH: Hash32 = Hash32::new([197, 14, 196, 170, 213, 74, 78, 3, 18, 20, 226, 66, 198, 134, 136, 230, 106, 91, 252, 101, 15, 142, 144, 167, 54, 133, 13, 17, 254, 58, 43, 13]);
 pub const SCHEMA_HASH: Hash32 = Hash32::new([1, 133, 11, 78, 105, 86, 1, 239, 0, 182, 150, 41, 7, 223, 205, 208, 78, 230, 240, 64, 162, 82, 114, 35, 180, 23, 142, 148, 151, 209, 132, 108]);
 
 /// Generated command/context commitment-domain format version.
@@ -383,41 +383,41 @@ impl GeneratedProject {
             return Err(GeneratedProjectError::SchemaHashMismatch { expected: SCHEMA_HASH, actual: actual_schema_hash });
         }
         let reasons = vec![
-            ReasonDefinition::try_new(SemanticId::try_new(200)?, StableName::try_new("not_authorized")?, ReasonDisposition::Reject, 0, Hash32::new([173, 153, 56, 169, 59, 108, 131, 195, 244, 91, 255, 54, 144, 185, 157, 151, 222, 23, 47, 143, 127, 196, 205, 169, 161, 242, 212, 196, 174, 233, 196, 112]))?,
-            ReasonDefinition::try_new(SemanticId::try_new(201)?, StableName::try_new("insufficient_available")?, ReasonDisposition::Reject, 1, Hash32::new([173, 153, 56, 169, 59, 108, 131, 195, 244, 91, 255, 54, 144, 185, 157, 151, 222, 23, 47, 143, 127, 196, 205, 169, 161, 242, 212, 196, 174, 233, 196, 112]))?,
-            ReasonDefinition::try_new(SemanticId::try_new(202)?, StableName::try_new("insufficient_reserved")?, ReasonDisposition::Reject, 2, Hash32::new([173, 153, 56, 169, 59, 108, 131, 195, 244, 91, 255, 54, 144, 185, 157, 151, 222, 23, 47, 143, 127, 196, 205, 169, 161, 242, 212, 196, 174, 233, 196, 112]))?,
-            ReasonDefinition::try_new(SemanticId::try_new(203)?, StableName::try_new("over_capacity")?, ReasonDisposition::Reject, 3, Hash32::new([173, 153, 56, 169, 59, 108, 131, 195, 244, 91, 255, 54, 144, 185, 157, 151, 222, 23, 47, 143, 127, 196, 205, 169, 161, 242, 212, 196, 174, 233, 196, 112]))?,
+            ReasonDefinition::try_new(SemanticId::try_new(200)?, StableName::try_new("not_authorized")?, ReasonDisposition::Reject, 0, Hash32::new([177, 92, 100, 209, 202, 57, 111, 131, 137, 155, 221, 239, 128, 142, 245, 232, 63, 158, 146, 103, 128, 211, 248, 229, 161, 225, 9, 81, 62, 6, 17, 108]))?,
+            ReasonDefinition::try_new(SemanticId::try_new(201)?, StableName::try_new("insufficient_available")?, ReasonDisposition::Reject, 1, Hash32::new([177, 92, 100, 209, 202, 57, 111, 131, 137, 155, 221, 239, 128, 142, 245, 232, 63, 158, 146, 103, 128, 211, 248, 229, 161, 225, 9, 81, 62, 6, 17, 108]))?,
+            ReasonDefinition::try_new(SemanticId::try_new(202)?, StableName::try_new("insufficient_reserved")?, ReasonDisposition::Reject, 2, Hash32::new([177, 92, 100, 209, 202, 57, 111, 131, 137, 155, 221, 239, 128, 142, 245, 232, 63, 158, 146, 103, 128, 211, 248, 229, 161, 225, 9, 81, 62, 6, 17, 108]))?,
+            ReasonDefinition::try_new(SemanticId::try_new(203)?, StableName::try_new("over_capacity")?, ReasonDisposition::Reject, 3, Hash32::new([177, 92, 100, 209, 202, 57, 111, 131, 137, 155, 221, 239, 128, 142, 245, 232, 63, 158, 146, 103, 128, 211, 248, 229, 161, 225, 9, 81, 62, 6, 17, 108]))?,
         ];
         let effects = vec![
         ];
         let channels = vec![
-            ChannelDefinition::try_new(SemanticId::try_new(300)?, StableName::try_new("shipment")?, TypeId::new(103), TypeId::new(104), OperationSemantics::non_value(Hash32::new([93, 53, 63, 130, 65, 115, 196, 208, 176, 179, 89, 45, 117, 165, 111, 89, 246, 156, 145, 107, 199, 237, 36, 211, 26, 187, 203, 239, 227, 107, 204, 153]))?, Hash32::new([173, 153, 56, 169, 59, 108, 131, 195, 244, 91, 255, 54, 144, 185, 157, 151, 222, 23, 47, 143, 127, 196, 205, 169, 161, 242, 212, 196, 174, 233, 196, 112]))?,
+            ChannelDefinition::try_new(SemanticId::try_new(300)?, StableName::try_new("shipment")?, TypeId::new(103), TypeId::new(104), OperationSemantics::non_value(Hash32::new([93, 53, 63, 130, 65, 115, 196, 208, 176, 179, 89, 45, 117, 165, 111, 89, 246, 156, 145, 107, 199, 237, 36, 211, 26, 187, 203, 239, 227, 107, 204, 153]))?, Hash32::new([177, 92, 100, 209, 202, 57, 111, 131, 137, 155, 221, 239, 128, 142, 245, 232, 63, 158, 146, 103, 128, 211, 248, 229, 161, 225, 9, 81, 62, 6, 17, 108]))?,
         ];
         let manifest = CatalogManifest::try_new::<H>(reasons, effects, channels)?;
         let entries = vec![
             RegistryEntry::try_new(RegistryKind::StateType, SemanticId::try_new(100)?, StableName::try_new("state")?, Hash32::new([89, 235, 152, 25, 142, 65, 220, 29, 183, 67, 243, 223, 251, 33, 124, 45, 255, 241, 135, 65, 102, 40, 163, 42, 23, 182, 45, 119, 142, 157, 236, 45]))?,
             RegistryEntry::try_new(RegistryKind::CommandType, SemanticId::try_new(101)?, StableName::try_new("command")?, Hash32::new([64, 140, 242, 210, 38, 48, 182, 39, 76, 159, 89, 158, 183, 86, 46, 227, 246, 253, 243, 116, 60, 137, 250, 209, 242, 218, 216, 133, 3, 56, 217, 230]))?,
             RegistryEntry::try_new(RegistryKind::ContextType, SemanticId::try_new(102)?, StableName::try_new("context")?, Hash32::new([237, 254, 210, 97, 99, 134, 75, 54, 149, 48, 86, 145, 151, 163, 148, 51, 250, 237, 173, 168, 112, 104, 86, 174, 102, 247, 245, 196, 95, 227, 105, 173]))?,
-            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(200)?, StableName::try_new("not_authorized")?, Hash32::new([72, 55, 226, 126, 155, 65, 184, 104, 121, 116, 229, 98, 79, 51, 102, 116, 19, 215, 24, 178, 63, 176, 230, 91, 246, 191, 221, 249, 55, 47, 1, 155]))?,
-            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(201)?, StableName::try_new("insufficient_available")?, Hash32::new([207, 160, 242, 226, 21, 42, 241, 80, 238, 98, 173, 209, 66, 216, 94, 41, 108, 45, 195, 223, 186, 199, 88, 146, 206, 193, 157, 116, 187, 165, 137, 118]))?,
-            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(202)?, StableName::try_new("insufficient_reserved")?, Hash32::new([249, 234, 238, 93, 103, 192, 34, 100, 95, 176, 48, 62, 200, 125, 117, 205, 171, 65, 223, 128, 182, 54, 150, 127, 191, 96, 188, 188, 191, 226, 67, 98]))?,
-            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(203)?, StableName::try_new("over_capacity")?, Hash32::new([37, 44, 141, 104, 189, 229, 156, 201, 115, 5, 58, 5, 5, 33, 232, 56, 136, 216, 106, 223, 192, 231, 103, 39, 30, 67, 225, 217, 199, 60, 67, 155]))?,
-            RegistryEntry::try_new(RegistryKind::Channel, SemanticId::try_new(300)?, StableName::try_new("shipment")?, Hash32::new([78, 191, 174, 103, 130, 214, 201, 188, 82, 141, 36, 98, 201, 107, 229, 61, 208, 153, 232, 75, 239, 77, 56, 19, 130, 193, 140, 46, 39, 101, 179, 27]))?,
-            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(500)?, StableName::try_new("stock_within_bounds")?, Hash32::new([200, 65, 155, 88, 197, 61, 189, 157, 59, 58, 254, 32, 145, 222, 0, 170, 171, 44, 4, 194, 81, 28, 146, 175, 15, 127, 255, 24, 158, 62, 156, 135]))?,
-            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(501)?, StableName::try_new("units_conserved")?, Hash32::new([214, 48, 5, 224, 242, 119, 200, 45, 35, 164, 10, 17, 214, 202, 72, 86, 181, 237, 165, 96, 223, 130, 224, 218, 240, 52, 215, 121, 194, 244, 182, 49]))?,
-            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(502)?, StableName::try_new("exact_movement")?, Hash32::new([200, 156, 215, 142, 243, 176, 108, 239, 147, 104, 79, 50, 0, 14, 45, 18, 64, 119, 160, 71, 93, 131, 217, 26, 181, 215, 114, 32, 109, 183, 120, 184]))?,
-            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(508)?, StableName::try_new("no_committed_failures")?, Hash32::new([49, 125, 45, 61, 242, 247, 82, 44, 189, 42, 236, 128, 187, 237, 250, 240, 22, 97, 132, 79, 237, 199, 146, 95, 90, 227, 83, 182, 190, 86, 244, 176]))?,
-            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(509)?, StableName::try_new("reject_publishes_nothing")?, Hash32::new([207, 56, 17, 72, 114, 74, 226, 117, 78, 187, 156, 50, 14, 19, 158, 74, 31, 144, 133, 70, 54, 94, 122, 94, 68, 155, 144, 127, 114, 80, 190, 54]))?,
+            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(200)?, StableName::try_new("not_authorized")?, Hash32::new([249, 125, 251, 158, 136, 188, 151, 151, 192, 59, 42, 5, 120, 14, 198, 41, 60, 181, 252, 118, 152, 18, 83, 105, 98, 10, 42, 114, 146, 162, 75, 140]))?,
+            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(201)?, StableName::try_new("insufficient_available")?, Hash32::new([105, 122, 90, 129, 93, 79, 212, 128, 180, 19, 213, 145, 42, 153, 179, 176, 6, 219, 43, 97, 78, 227, 102, 151, 51, 52, 151, 46, 21, 198, 182, 241]))?,
+            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(202)?, StableName::try_new("insufficient_reserved")?, Hash32::new([170, 95, 94, 3, 90, 141, 55, 32, 105, 22, 186, 215, 87, 108, 64, 170, 41, 188, 45, 255, 7, 138, 125, 129, 202, 2, 122, 101, 120, 53, 80, 24]))?,
+            RegistryEntry::try_new(RegistryKind::Reason, SemanticId::try_new(203)?, StableName::try_new("over_capacity")?, Hash32::new([119, 95, 44, 159, 28, 204, 114, 56, 112, 110, 91, 136, 240, 220, 16, 69, 48, 138, 3, 214, 200, 58, 207, 189, 135, 55, 49, 133, 133, 13, 157, 247]))?,
+            RegistryEntry::try_new(RegistryKind::Channel, SemanticId::try_new(300)?, StableName::try_new("shipment")?, Hash32::new([201, 79, 56, 128, 149, 131, 12, 92, 205, 111, 149, 244, 17, 150, 124, 56, 152, 130, 49, 96, 100, 154, 23, 216, 172, 108, 27, 190, 76, 174, 38, 235]))?,
+            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(500)?, StableName::try_new("stock_within_bounds")?, Hash32::new([28, 124, 67, 48, 32, 161, 33, 113, 166, 228, 155, 164, 135, 197, 92, 167, 37, 129, 212, 209, 127, 254, 34, 52, 213, 22, 192, 39, 93, 221, 171, 131]))?,
+            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(501)?, StableName::try_new("units_conserved")?, Hash32::new([10, 64, 82, 243, 124, 173, 217, 210, 141, 166, 201, 70, 37, 100, 206, 132, 21, 205, 132, 52, 115, 68, 183, 206, 194, 227, 97, 141, 49, 211, 195, 25]))?,
+            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(502)?, StableName::try_new("exact_movement")?, Hash32::new([96, 73, 222, 220, 254, 114, 168, 64, 98, 13, 160, 59, 61, 218, 209, 65, 71, 81, 198, 0, 243, 31, 144, 146, 220, 134, 93, 205, 46, 148, 184, 126]))?,
+            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(508)?, StableName::try_new("no_committed_failures")?, Hash32::new([180, 242, 12, 171, 220, 138, 222, 61, 232, 46, 142, 173, 109, 171, 8, 151, 175, 45, 72, 51, 126, 254, 65, 219, 94, 237, 184, 94, 110, 181, 252, 100]))?,
+            RegistryEntry::try_new(RegistryKind::Claim, SemanticId::try_new(509)?, StableName::try_new("reject_publishes_nothing")?, Hash32::new([34, 113, 226, 213, 3, 84, 97, 12, 134, 178, 119, 2, 190, 37, 22, 77, 143, 252, 19, 230, 235, 195, 131, 22, 191, 85, 125, 204, 43, 116, 251, 116]))?,
         ];
         let profile = ProjectProfile::try_new(StableName::try_new("inventory_reservation")?, StableName::try_new("warehouse")?, SemanticId::try_new(1)?, 1, SemanticId::try_new(100)?, SemanticId::try_new(101)?, SemanticId::try_new(102)?, DomainPrefix::try_new("example/inventory-reservation")?,
             ProfileBindings {
                 schema_hash: Hash32::new([1, 133, 11, 78, 105, 86, 1, 239, 0, 182, 150, 41, 7, 223, 205, 208, 78, 230, 240, 64, 162, 82, 114, 35, 180, 23, 142, 148, 151, 209, 132, 108]),
-                precedence_hash: Hash32::new([193, 124, 2, 150, 76, 73, 28, 72, 236, 166, 78, 141, 55, 18, 150, 101, 39, 212, 41, 116, 84, 154, 20, 143, 143, 241, 207, 204, 214, 179, 187, 152]),
-                algorithm_hash: Hash32::new([173, 153, 56, 169, 59, 108, 131, 195, 244, 91, 255, 54, 144, 185, 157, 151, 222, 23, 47, 143, 127, 196, 205, 169, 161, 242, 212, 196, 174, 233, 196, 112]),
+                precedence_hash: Hash32::new([110, 49, 243, 56, 106, 250, 73, 88, 109, 90, 227, 209, 125, 184, 164, 101, 36, 115, 91, 162, 236, 62, 253, 41, 209, 141, 41, 72, 19, 82, 90, 213]),
+                algorithm_hash: Hash32::new([177, 92, 100, 209, 202, 57, 111, 131, 137, 155, 221, 239, 128, 142, 245, 232, 63, 158, 146, 103, 128, 211, 248, 229, 161, 225, 9, 81, 62, 6, 17, 108]),
                 codec_hash: Hash32::new([87, 47, 73, 189, 148, 228, 67, 142, 180, 215, 117, 18, 92, 177, 214, 55, 87, 204, 189, 242, 151, 140, 234, 249, 217, 90, 88, 210, 30, 179, 181, 0]),
                 effect_registry_hash: Hash32::new([170, 58, 141, 200, 62, 64, 197, 153, 86, 141, 163, 168, 249, 225, 179, 233, 224, 175, 4, 82, 175, 58, 75, 142, 101, 65, 35, 102, 56, 26, 191, 179]),
-                channel_registry_hash: Hash32::new([238, 67, 114, 30, 252, 183, 220, 107, 3, 69, 243, 31, 100, 251, 62, 131, 57, 226, 202, 159, 33, 184, 141, 46, 57, 37, 121, 70, 128, 246, 17, 84]),
-                policy_hash: Hash32::new([114, 104, 119, 136, 155, 57, 60, 128, 194, 148, 191, 158, 223, 177, 55, 56, 33, 181, 139, 118, 246, 238, 100, 206, 153, 3, 19, 50, 199, 74, 5, 232]),
+                channel_registry_hash: Hash32::new([96, 41, 200, 111, 234, 101, 95, 232, 129, 92, 70, 59, 189, 71, 164, 236, 86, 146, 81, 61, 134, 158, 158, 183, 204, 184, 213, 12, 95, 228, 165, 97]),
+                policy_hash: Hash32::new([199, 191, 224, 204, 204, 69, 162, 228, 124, 169, 202, 9, 56, 6, 176, 40, 76, 159, 30, 122, 202, 248, 91, 237, 167, 163, 169, 234, 51, 26, 129, 251]),
             },
             entries,
         )?;

@@ -158,6 +158,7 @@ fn run_semantic_demo() -> DemoOutcome {
         }
         MiniDecision::Rejected(_) => panic!("disjoint worker programs conflicted"),
         MiniDecision::Blocked(_) => panic!("bounded worker programs were blocked"),
+        _ => panic!("unknown Mini Determinator decision"),
     };
 
     let pre_before_conflict = pre.clone();

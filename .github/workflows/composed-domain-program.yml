@@ -29,14 +29,14 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
+
       - name: Check formatting
         run: cargo +1.97.1 fmt --all -- --check
 
       - name: Lint retired compatibility and current authority surfaces
         run: cargo +1.97.1 clippy -p zeno-fcis-composed-program -p zeno-fcis-authority --all-targets --all-features --locked -- -D warnings
-
-      - name: Provision the locked historical verification dependencies
-        run: cargo +1.97.1 fetch --manifest-path verification/Cargo.toml --locked
 
       - name: Execute retained historical composition assertions
         run: python3 tools/atdd.py run --scenario composed-program

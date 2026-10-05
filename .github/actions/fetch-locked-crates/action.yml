@@ -1,0 +1,14 @@
+name: Fetch locked crates
+description: >-
+  Download every crate locked by the root workspace, the verification workspace
+  and the resolved-purity checker. Repository tools run cargo with --offline
+  against these lockfiles, so a job must run this before any such tool.
+runs:
+  using: composite
+  steps:
+    - name: Fetch the root, verification and resolved-purity lockfiles
+      shell: bash
+      run: |
+        cargo +1.97.1 fetch --locked
+        cargo +1.97.1 fetch --locked --manifest-path verification/Cargo.toml
+        cargo +1.97.1 fetch --locked --manifest-path tools/resolved-purity/Cargo.toml

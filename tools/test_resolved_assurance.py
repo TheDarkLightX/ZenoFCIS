@@ -86,6 +86,27 @@ class RetainedGuardrails(unittest.TestCase):
         self.assertTrue(assurance.check_workflow_text(assurance.PAGES_WORKFLOW,
             "permissions:\n  pages: write\n  id-token: write\n  contents: write\n"))
 
+    def test_workflow_guard_rejects_contexts_github_forbids(self):
+        # The invalid verus file: job-level env read the step-only runner context,
+        # so GitHub rejected the file and none of its proof gates ran.
+        job_env = ("jobs:\n  qualification:\n    env:\n"
+                   "      GATE_OUTPUT: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}\n")
+        findings = assurance.check_workflow_text(".github/workflows/verus.yml", job_env)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("context `runner` is unavailable at jobs.<job_id>.env", findings[0])
+        step_env = ("jobs:\n  qualification:\n    steps:\n      - env:\n"
+                    "          GATE_OUTPUT: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}\n"
+                    "        run: true\n")
+        self.assertEqual(assurance.check_workflow_text(".github/workflows/verus.yml", step_env), [])
+        self.assertEqual(assurance.check_workflow_context_self_test(), [])
+
+    def test_every_repository_workflow_uses_only_available_contexts(self):
+        workflows = sorted((assurance.ROOT / ".github" / "workflows").glob("*.yml"))
+        self.assertTrue(workflows)
+        for path in workflows:
+            with self.subTest(workflow=path.name):
+                self.assertEqual(assurance.check_contexts(path.name, path.read_text(encoding="utf-8")), [])
+
     def test_exact_external_pin_and_dependency_ring_guards_survive(self):
         with tempfile.TemporaryDirectory(prefix="zeno-guardrail-test-") as directory:
             root = Path(directory)

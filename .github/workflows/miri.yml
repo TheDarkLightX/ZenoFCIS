@@ -20,13 +20,14 @@ jobs:
       matrix:
         # JSON is also YAML; the preflight reads these exact rows without a YAML dependency.
         include: [
-          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret"},
+          {"group": "values", "packages": "-p zeno-fcis-core -p zeno-fcis-value -p zeno-fcis-codec -p zeno-fcis-secret", "miri_skip": ["legal_leaf_above_default_payload_remains_constructible_and_encodable"]},
           {"group": "schemas", "packages": "-p zeno-fcis-project -p zeno-fcis-catalog -p zeno-fcis-schema -p zeno-fcis-refine"},
           {"group": "plans", "packages": "-p zeno-fcis-patch -p zeno-fcis-plan -p zeno-fcis-receipt -p zeno-fcis-security"},
           {"group": "publication", "packages": "-p zeno-fcis-transition -p zeno-fcis-authority -p zeno-fcis-shell -p zeno-fcis-compose -p zeno-fcis-domain"},
           {"group": "specification", "packages": "-p zeno-fcis-spec -p zeno-fcis-backend"},
           {"group": "synthesis-library", "packages": "-p zeno-fcis-synthesis", "target": "--lib"},
           {"group": "synthesis-documentation", "packages": "-p zeno-fcis-synthesis", "target": "--doc"},
+          {"group": "synthesis-example-checked-continuation", "packages": "-p zeno-fcis-synthesis", "target": "--example checked_continuation", "command": "run"},
           {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
           {"group": "synthesis-search", "packages": "-p zeno-fcis-synthesis", "target": "--test search"},
           {"group": "synthesis-v2-execution", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_execution"},
@@ -67,6 +68,13 @@ jobs:
           rustup toolchain install nightly-2026-07-21 --profile minimal --component miri
           cargo +nightly-2026-07-21 miri setup
 
+      - name: Check pinned Miri exclusions
+        env:
+          SELECTED_GROUP: ${{ toJSON(matrix) }}
+        run: |
+          python3 tools/miri_exclusions.py self-test
+          python3 tools/miri_exclusions.py check --selected "$SELECTED_GROUP"
+
       - name: Check synthesis target and test coverage
         if: matrix.packages == '-p zeno-fcis-synthesis'
         env:
@@ -97,11 +105,16 @@ jobs:
           for target in package['targets']:
               if target['kind'] == ['lib']:
                   assert target['test'] and target['doctest'], 'library coverage changed'
-                  expected_targets.extend([('--lib',), ('--doc',)])
+                  expected_targets.extend([('test', '--lib'), ('test', '--doc')])
+              elif target['kind'] == ['example']:
+                  # `miri test --example` builds a harness and runs zero tests, so
+                  # every example is interpreted through `miri run` instead.
+                  expected_targets.append(('run', '--example', target['name']))
               else:
                   assert target['kind'] == ['test'] and target['test'], 'unpartitioned synthesis target'
-                  expected_targets.append(('--test', target['name']))
-          actual_targets = [tuple(shlex.split(row['target'])) for row in rows if 'test' not in row]
+                  expected_targets.append(('test', '--test', target['name']))
+          assert all(row.get('command', 'test') in ('test', 'run') for row in rows), 'unknown Miri command'
+          actual_targets = [(row.get('command', 'test'), *shlex.split(row['target'])) for row in rows if 'test' not in row]
           assert collections.Counter(actual_targets) == collections.Counter(expected_targets), 'synthesis target coverage differs'
           groups = {f'larger_branching_graphs_seeds_{g * 4:02}_to_{g * 4 + 3:02}': str(g) for g in range(8)}
           exact_rows = [row for row in rows if 'test' in row]
@@ -163,7 +176,7 @@ jobs:
           PY
 
       - name: Interpret semantic boundary tests
-        run: cargo +nightly-2026-07-21 miri test --locked ${{ matrix.packages }} ${{ matrix.target }} ${MIRI_TEST_ARGS:-}
+        run: cargo +nightly-2026-07-21 miri ${{ matrix.command || 'test' }} --locked ${{ matrix.packages }} ${{ matrix.target }} ${MIRI_TEST_ARGS:-}
 
   semantic-core:
     name: semantic-core
