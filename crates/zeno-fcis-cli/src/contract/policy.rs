@@ -1,6 +1,10 @@
 //! The contract as library values: the policy bytes come from the library's
 //! own encoder, and the catalog binding the generated `checked_catalog`
 //! performs at run time must accept them before they are returned.
+//!
+//! The same values bind a library Authority in memory, so a contract, or a
+//! mutant of one, can be evaluated through the library's own route without
+//! writing any file.
 
 use zeno_fcis_synthesis::finite::{
     Domain as ScalarDomain, Op, V2InputField as InputField, V2InputLeaf as InputLeaf,
@@ -18,6 +22,38 @@ use super::rules::{Class, LawKind};
 
 /// Encodes the policy and checks the complete catalog binding.
 pub(super) fn encode(contract: &Contract<'_>, schema: &[u8]) -> Result<Vec<u8>, ContractError> {
+    bound(contract, schema, |policy, _| Ok(policy.to_vec()))
+}
+
+/// Binds the library Authority of a contract, after the same catalog binding
+/// `encode` checks, and runs `use_authority` on it. Nothing is written.
+///
+/// # Errors
+/// Returns the library's catalog or Authority refusal.
+pub(super) fn with_authority<R>(
+    contract: &Contract<'_>,
+    schema: &[u8],
+    use_authority: impl FnOnce(&authority::Authority<'_>) -> R,
+) -> Result<R, ContractError> {
+    bound(contract, schema, |_, catalog| {
+        let bound = authority::bind(catalog).map_err(|refusal| {
+            ContractError::new(
+                "library authority",
+                format!("refused the generated contract: {refusal:?}"),
+            )
+        })?;
+        Ok(use_authority(&bound))
+    })
+}
+
+/// Builds the library values the descriptor borrows, encodes the policy,
+/// checks the complete catalog binding and runs `use_bound` on the policy
+/// bytes and the bound catalog.
+fn bound<R>(
+    contract: &Contract<'_>,
+    schema: &[u8],
+    use_bound: impl FnOnce(&[u8], &catalog::BoundCatalog<'_>) -> Result<R, ContractError>,
+) -> Result<R, ContractError> {
     let declarations = contract.declarations;
     let fields: Vec<Vec<s::Field<'_>>> = declarations
         .types
@@ -283,7 +319,7 @@ pub(super) fn encode(contract: &Contract<'_>, schema: &[u8]) -> Result<Vec<u8>, 
         },
         contract_bytes: u64::try_from(policy.len()).unwrap_or(u64::MAX),
     };
-    catalog::bind_original(
+    let catalog = catalog::bind_original(
         schema,
         &description,
         limits,
@@ -298,7 +334,7 @@ pub(super) fn encode(contract: &Contract<'_>, schema: &[u8]) -> Result<Vec<u8>, 
             format!("refused the generated contract: {failure:?}"),
         )
     })?;
-    Ok(policy)
+    use_bound(&policy, &catalog)
 }
 
 /// An owned root input schema the descriptor borrows.

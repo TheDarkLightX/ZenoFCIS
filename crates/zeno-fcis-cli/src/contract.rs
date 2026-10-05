@@ -17,6 +17,7 @@ mod layout;
 mod model;
 mod policy;
 mod render;
+pub(crate) mod review;
 mod rules;
 mod schema;
 #[cfg(test)]

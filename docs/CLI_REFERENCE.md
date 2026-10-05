@@ -22,6 +22,7 @@ zeno-fcis backend inventory-lean ROOT [--format human|json]
 zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--max-input-tuples N] [--receipt OUT]
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
 zeno-fcis optimize --program FILE [--strategy FILE] [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
+zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--format human|json]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
@@ -493,6 +494,74 @@ any candidate, and only the loop's check can replace the incumbent. The MCP tool
 [`docs/benchmarks/run_neural_loop_protocol.py`](benchmarks/run_neural_loop_protocol.py)
 runs the local and fake arms of the preregistered protocol over a cases file
 and reports every result, including failures.
+
+## Contract review
+
+`contract review` is advisory. It reads an application's `project.zeno`,
+`v2/policy.json` and, when present, `tests/decision-examples.txt`, binds the
+generated contract to the library Authority exactly as the application does,
+and writes a review packet, schema `zeno-fcis/contract-review/1`: compact
+canonical JSON with a final newline, byte-identical on repeat. The review
+grants no authority and changes no application file. `--out` names the
+packet's file; without it the packet goes to stdout and the summary to
+stderr. Nothing in the packet is a reading of a rule by the command: every
+decision, of the contract and of each mutant, is the library's.
+
+The packet records:
+
+- The inputs: every program input position with its admitted domain, and the
+  input set. A domain of at most `--max-tuples` tuples (default 2^20) is
+  enumerated in full (`full-domain`). Otherwise each integer position takes a
+  boundary set: its endpoints and every integer constant the rules compare
+  with, add to, subtract from or assign to a value of its type, with that
+  constant's two neighbours, where in domain; genesis values count as
+  constants; a sum takes every variant and a boolean both values. When the
+  product of the boundary sets fits the limit it is the input set
+  (`boundary-product`). Otherwise the input set is probes
+  (`boundary-probes`): the genesis state with the first boundary value of
+  every command and context position, then each owner example, are bases,
+  and each base is varied in one position, then in two positions, over the
+  boundary sets, stopped at the limit. The packet names the construction
+  and, for a boundary set, the values, constants and bases.
+- The decision table: for each input, the library's class, reason, successor
+  digest and outbox digest, or its refusal, with each distinct successor
+  state, outbox and refusal written once. Rows are written out up to 2^17
+  inputs; a chained SHA-256 over every row is always recorded, with the
+  tallies by class, reason and refusal.
+- The examples: each line of `tests/decision-examples.txt`, in the format
+  every template uses, is run through the same route and compared on class,
+  reason, successor state and deliveries. A difference is a finding, and the
+  command exits 1 with status `disagreement`.
+- The mutants: a fixed, versioned catalog
+  (`zeno-fcis/contract-review-mutants/1`) applied to the rules model, in a
+  fixed order: comparison flips (`<`/`<=`, `>`/`>=`, `==`/`!=`); integer
+  constants moved by one, including a delivery's ordinal, channel and
+  idempotency ordinal; one side of a `&&` dropped in a guard or a variable;
+  two adjacent cases exchanged, the final catch-all staying last; a case and
+  the next case of its class exchanging reasons; a case taking the next
+  declared reason of its class; and a dropped delivery. Each mutant is
+  regenerated and bound through the library as the original is. One the
+  generator's own checks refuse is `refused-by-generator`; one the library's
+  catalog or Authority binding refuses is `refused-by-library`. Each other
+  mutant is searched for a distinguishing input, first among the owner's
+  examples in file order, then through the input set in order:
+  `distinguished`, with the witness written as a proposed decision example
+  beside both outcomes and, for an owner example, whose outcome the owner
+  shares; `equivalent-over-full-domain`, only after a fully enumerated
+  domain; otherwise `not-distinguished-within-boundary-set`, which claims
+  nothing more.
+- The findings: owner examples the contract decides differently, and owner
+  examples whose outcome is a mutant's rather than the contract's, the
+  signature of a wrong constant or comparison in the rules.
+
+Exit codes: 0 `reviewed`; 1 `disagreement`, the packet still written, or
+`contract-invalid`, nothing written and the entry at fault named; 3 when a
+file could not be read or the packet could not be written; 64 for usage,
+including `--max-tuples 0`. With `--out`, `--format json` prints a summary
+with schema `zeno-fcis/cli/1`: `status`, `packet`, `packet_schema` and the
+packet's `summary` object. A review observes the contract's behaviour on
+chosen inputs. It is not a proof about the rules, and a boundary set is not
+the domain; it does not replace the owner's review of the rules file.
 
 ## Bounded completion in 1.1.0
 

@@ -16,6 +16,7 @@ mod optimize_command;
 mod order_fulfillment;
 mod prepared_counter;
 mod purity;
+mod review_command;
 mod synth;
 mod transform;
 mod transform_command;
@@ -143,6 +144,11 @@ enum Command {
     Loop {
         #[command(subcommand)]
         command: loop_command::Command,
+    },
+    /// Review an application's contract against its input domain, its decision examples and rule mutants; advisory only.
+    Contract {
+        #[command(subcommand)]
+        command: review_command::Command,
     },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
@@ -334,6 +340,7 @@ fn run(command: Command) -> u8 {
         Command::Transform { command } => transform_command::run(command),
         Command::Optimize { arguments } => optimize_command::run(arguments),
         Command::Loop { command } => loop_command::run(command),
+        Command::Contract { command } => review_command::run(command),
         Command::New {
             dir,
             template,
@@ -481,7 +488,13 @@ fn describe_effects(path: &[String]) -> Value {
     let path: Vec<_> = path.iter().map(String::as_str).collect();
     let (reads, writes, executes_tools, read_only_flag): (&[&str], &[&str], bool, Option<&str>) =
         match path.as_slice() {
-            [] | ["backend"] | ["synth"] | ["synth", "completion"] | ["transform"] | ["loop"] => {
+            []
+            | ["backend"]
+            | ["synth"]
+            | ["synth", "completion"]
+            | ["transform"]
+            | ["loop"]
+            | ["contract"] => {
                 return json!({"classification": "command-group"});
             }
             ["describe"]
@@ -550,6 +563,12 @@ fn describe_effects(path: &[String]) -> Value {
             ),
             ["loop", "resume"] => (&["session-directory"], &["session-directory"], false, None),
             ["loop", "encode"] => (&["program-json"], &["canonical-program"], false, None),
+            ["contract", "review"] => (
+                &["application-contract", "decision-examples"],
+                &["optional-review-packet"],
+                false,
+                None,
+            ),
             ["new"] => (
                 &["target-directory", "application-contract"],
                 &["project-files"],

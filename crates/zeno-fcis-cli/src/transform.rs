@@ -565,6 +565,15 @@ pub(crate) fn failure_tag(failure: V2ExecutionFailure) -> &'static str {
     }
 }
 
+/// Compact JSON with object keys sorted by their bytes, followed by one
+/// newline: the form of every receipt and packet this crate writes.
+pub(crate) fn canonical_json(value: &Value) -> String {
+    let mut text = String::new();
+    write_canonical(value, &mut text);
+    text.push('\n');
+    text
+}
+
 /// Compact JSON with object keys sorted by their bytes, independent of the
 /// map order `serde_json` was built with. The neural loop's request, ledger
 /// and witness records use the same canonical form.

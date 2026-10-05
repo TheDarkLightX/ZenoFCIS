@@ -264,7 +264,7 @@ fn text(name: &str, bytes: Vec<u8>) -> Result<String, Failure> {
 }
 
 /// Reads a regular file of at most `INPUT_LIMIT` bytes.
-fn read_input(path: &Path) -> std::io::Result<Vec<u8>> {
+pub(crate) fn read_input(path: &Path) -> std::io::Result<Vec<u8>> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]

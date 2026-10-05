@@ -227,6 +227,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "loop_cli", "--locked"),
          ("python3", "integrations/mcp/test_transform_tools.py")),
     ),
+    "contract-review": AcceptanceScenario(
+        "Review a contract with distinguishing examples before it is trusted",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::review::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked")),
+    ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",
         (("python3", "tools/test_record_gate_evidence.py"),),

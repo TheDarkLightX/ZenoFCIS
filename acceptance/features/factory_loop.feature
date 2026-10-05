@@ -29,3 +29,12 @@ Feature: Check a candidate program before the factory may use it
     And every other outcome, including a worker panic, a timeout or a late report, leaves the incumbent unchanged
     And every attempt, model call and check is reserved before its work and never refunded
     And a stale, tampered or rolled-back session resumes with no trusted incumbent
+
+  @atdd-contract-review
+  Scenario: Review a contract with distinguishing examples before it is trusted
+    Given an application's project.zeno, v2/policy.json and its reviewed decision examples
+    When the review runs every input of a small domain, or a deterministic boundary set of a large one, through the library Authority
+    Then the packet records each decision and agrees with every owner example
+    And every rule mutant of the fixed catalog is distinguished by a witness written as a decision example, refused, or classified without a claim of equivalence on a boundary set
+    And a planted wrong constant yields a witness that contradicts an owner example
+    And the packet is byte-identical on repeat and the application is unchanged
