@@ -212,6 +212,12 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "transform::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "transform_cli", "--locked")),
     ),
+    "checked-optimizer": AcceptanceScenario(
+        "Propose smaller programs and accept only checked ones",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "optimize::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "optimize_cli", "--locked")),
+    ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",
         (("python3", "tools/test_record_gate_evidence.py"),),
