@@ -5,8 +5,8 @@ It pins `clap = 4.6.1` without environment parsing or color output.
 
 ```text
 zeno-fcis describe [COMMAND...]
-zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue|agent-treasury-guard
-zeno-fcis new <dir> --contract <contract-dir>
+zeno-fcis new <dir> --template minimal|mini-determinator|durable-counter|prepared-counter|account-lockout|order-fulfillment|inventory-reservation|compliance-gateway|withdrawal-queue|agent-treasury-guard [--source TREE]
+zeno-fcis new <dir> --contract <contract-dir> [--source TREE]
 zeno-fcis check [project.zeno] [--format human|json] [--require-substantive] [--require-resolved-paths]
 zeno-fcis generate [project.zeno] --out <dir> [--check] [--format human|json]
 zeno-fcis generate contract [<app-dir>] [--check] [--format human|json]
@@ -23,6 +23,9 @@ zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--m
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
 zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i64-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
 zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--format human|json]
+zeno-fcis contract export-program [<contract-dir>] --out FILE [--format human|json]
+zeno-fcis contract adopt [<app-dir>] --candidate FILE --receipt FILE --usage preserved|new-version [--format human|json]
+zeno-fcis contract refresh-receipts [<app-dir>] [--format human|json]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
@@ -46,7 +49,8 @@ by zero, or an inexact exact division, the line ends with the reason, and the
 run record's status is `undefined`.
 `generate` replaces each deterministic Rust/manifest file atomically;
 `--check` writes nothing and reports drift. `generate contract` reads an
-application's `project.zeno` and `v2/policy.json` and replaces
+application's `project.zeno` and `v2/policy.json`, whose format the
+[contract rules reference](CONTRACT_RULES.md) describes, and replaces
 `v2/schema.zcve`, `src/v2_contract.rs` and `v2/policy.zcve`; the policy bytes
 come from the library's encoder, and the library's catalog binding must accept
 them first. When the rules list adoptions (see [Contract adoption and store
@@ -61,12 +65,57 @@ accept has no reason, and a reject or committed failure has one; constants lie
 within their declared ranges; the variants of a sum the decision program reads
 have consecutive IDs; a law that applies at genesis reads only `post` fields;
 and no declared law shares an ID with a law generation adds (990, 991, and the
-reject and committed-failure laws). A contract that passes these checks but
-that the library's catalog binding refuses is reported as that refusal, with
-no entry named.
+reject and committed-failure laws); a case's deliveries have increasing
+ordinals; and a contract with a committed-failure case has a
+`CommittedFailureEffects` law, without which framework law 908 would refuse
+every committed failure. Each generated channel's idempotency domain covers
+every `idempotency_ordinal` the rules use on it, and the Effect limit is the
+most deliveries any case makes, so a case may deliver more than once. A
+contract that passes these checks but that the library's catalog binding
+refuses is reported as that refusal. The library reports only which stage
+refused, so the command binds the contract again without each case delivery,
+with each law's formula replaced by `true`, and without each channel, and
+names the first entry without which the library admits the contract. When no
+single entry accounts for the refusal, the error names none.
 `new --contract` builds an application from a directory holding
 `project.zeno`, `v2/policy.json`, any adoptions they list and, optionally,
-`tests/decision-examples.txt`. `graph` and `explain` are derived
+`tests/decision-examples.txt`.
+`new` binds every Cargo application it writes, from a contract or from the
+`durable-counter`, `prepared-counter` and example templates, to a ZenoFCIS
+source tree, so that it builds with no other step. The application pins each
+ZenoFCIS package to the CLI's version, and without the binding Cargo would
+resolve those pins to the crates published under the same versions, which
+are a different release. The tree is the one `--source` names, else the tree
+the CLI was built from, while that still exists; the CLI records its path
+when it is compiled. The tree must be a Cargo workspace whose listed
+`members` provide every needed ZenoFCIS package at the CLI's version, with a
+`Cargo.lock`. `new` then:
+- appends to the application's `Cargo.toml` a `[patch.crates-io]` section
+  with a path entry for every ZenoFCIS package the application needs,
+  directly or through the normal and build dependencies of other ZenoFCIS
+  packages, in sorted order;
+- copies the tree's `Cargo.lock`, so the external crates are the versions
+  the tree pins; the application's first build adds the application itself;
+- copies the tree's `rust-toolchain.toml` when it has one.
+
+Without a tree, `new` exits 2 and names `--source`; with a tree that cannot
+bind the application, it exits 1. Either way it writes no file. A build of
+the CLI with the environment variable `ZENO_FCIS_BUILD_TREE` set records that
+path as its tree instead, or, when it is empty, none, so that the binary
+holds no build directory; such a binary always needs `--source`. The release
+binaries are built that way (`tools/rc_package.py build`). With an installed
+release binary, extract the release's `source/zeno-fcis-<version>-source.tar.gz`
+and pass `--source <extracted source tree>`:
+
+```sh
+tar -xzf zeno-fcis-1.1.0-source.tar.gz
+zeno-fcis new my-app --contract my-contract --source zeno-fcis-1.1.0
+```
+ The generated README lists the build commands, which
+`tools/check_app_journey.py` runs exactly as written, in a new directory, on
+the app study's escrow contract; `tools/check_generated_application.py`
+checks the binding of every application it builds.
+`graph` and `explain` are derived
 diagnostic views. `prove` and `counterexample` use only the separate checked
 tools manifest and retain process records below `.zeno-fcis/evidence`.
 
@@ -261,6 +310,42 @@ separate new receipt file outside DIR. Both commands accept
 [language-neutral synthesis](LANGUAGE_NEUTRAL_SYNTHESIS.md) for the JSON
 contract, distinct failure outcomes, and target-conformance boundary.
 
+
+## Contract program export
+
+`contract export-program [DIR] --out FILE` writes the current decision
+program of the contract in `DIR` (default `.`) to the new file `FILE`, in the
+canonical `program.zcve` encoding that `transform check`, `transform
+replay`, `optimize` and `loop` read. `DIR` holds `project.zeno`,
+`v2/policy.json` and any adoptions. The command generates the contract as
+`generate contract` does, replaying every adoption's receipt, and writes the
+program of its last version: the bytes the next adoption's receipt names as
+its original. After an adoption these are the adopted candidate's bytes. The
+bytes are a function of the contract's files, so exporting twice gives the
+same file. `v2/policy.zcve` is the whole policy, not a program, and the
+program commands refuse it. `FILE` must not exist, as a file or a link; the
+command never overwrites one. Results use schema `zeno-fcis/cli/1`:
+`exported`, with the application, its version and the program's path,
+bytes, SHA-256, nodes and outputs; or `error`, with `contract-invalid` or
+`output-exists` (exit 1), or `contract-read-failed` or
+`program-write-failed` (exit 3).
+
+An optimization journey therefore needs no other tool:
+
+```sh
+zeno-fcis contract export-program . --out program.zcve
+zeno-fcis optimize --program program.zcve --candidate-out candidate.zcve --receipt receipt.json
+zeno-fcis transform replay --receipt receipt.json --original program.zcve --candidate candidate.zcve
+zeno-fcis contract adopt . --candidate candidate.zcve --receipt receipt.json --usage new-version
+```
+
+`transform`, `optimize` and `contract review` enumerate input domains, and a
+release build of the CLI (`cargo build --release -p zeno-fcis-cli`) does
+that several times faster than a debug build. In the app study of
+2026-10-05, three reviews took 29 s, 64 s and 168 s with a debug build and
+4.3 s, 8.5 s and 36 s with a release build, 4.7 to 7.5 times faster, and
+their packets were byte-identical. Prefer a release build for these
+commands; their results do not depend on the build.
 
 ## Checked program transform
 
@@ -579,12 +664,54 @@ any candidate, and only the loop's check can replace the incumbent. The MCP tool
 runs the local and fake arms of the preregistered protocol over a cases file
 and reports every result, including failures.
 
+## Decision examples
+
+`tests/decision-examples.txt` lists an application's reviewed decisions, one
+per line. Every application built with `new --contract` reads it with the
+grammar in its `src/examples.rs`, and `contract review` compiles that same
+file, so both read a file alike: the same examples, or the same error on the
+same line. An error names the line and what is wrong with it.
+
+A line that is blank, or whose first non-blank character is `#`, is skipped.
+Every other line is one example:
+
+```text
+inputs | class reason post | deliveries
+```
+
+- The last `|` section holds the deliveries and the one before it the
+  decision. Every earlier section holds input numbers, read in order, so the
+  inputs may be split over several sections, such as `state | command |
+  context`. Together they are the state fields, then the command, then the
+  context, in the order the program reads them, one number each.
+- The decision is the class, `accept`, `reject` or `failure`; then the
+  reason, a number or `-`; then one number per state field, the successor
+  state. A reject repeats the pre-state.
+- The deliveries are `-`, or deliveries separated by `;`. A delivery is a
+  declared channel's ID followed by one number per payload field. When the
+  contract declares exactly one channel, the payload numbers alone are also a
+  delivery on it. The count of numbers tells the two forms apart, so no line
+  has two readings.
+- A number is a decimal integer: 0 or 1 for a boolean, the value of an
+  integer, the variant ID of a sum. Each lies in the declared domain of its
+  input, state field or payload field. A field with no number form, such as
+  text, cannot be written.
+
+A comment takes a whole line: a `#` after the deliveries is read as a number
+and refused. In dual approval, whose one channel 300 carries two payload
+fields, these two lines are the same example:
+
+```text
+150 161 160 140 162 | accept - 151 161 162 | 300 162 161
+150 161 160 | 140 | 162 | accept - 151 161 162 | 162 161
+```
+
 ## Contract review
 
 `contract review` is advisory. It reads an application's `project.zeno`,
 `v2/policy.json` and, when present, `tests/decision-examples.txt`, binds the
 generated contract to the library Authority exactly as the application does,
-and writes a review packet, schema `zeno-fcis/contract-review/1`: compact
+and writes a review packet, schema `zeno-fcis/contract-review/2`: compact
 canonical JSON with a final newline, byte-identical on repeat. The review
 grants no authority and changes no application file. `--out` names the
 packet's file; without it the packet goes to stdout and the summary to
@@ -609,13 +736,34 @@ The packet records:
   and, for a boundary set, the values, constants and bases.
 - The decision table: for each input, the library's class, reason, successor
   digest and outbox digest, or its refusal, with each distinct successor
-  state, outbox and refusal written once. Rows are written out up to 2^17
+  state, outbox and refusal written once. A refusal names its class (below)
+  and, when a law refused, that law, as the library's own law diagnostics
+  report it: the first law, in the contract's law order, that refused. When a
+  refused input's pre-state does not satisfy a state law, its row also names
+  the first such law, as `unsatisfied 500`. Rows are written out up to 2^17
   inputs; a chained SHA-256 over every row is always recorded, with the
-  tallies by class, reason and refusal.
-- The examples: each line of `tests/decision-examples.txt`, in the format
-  every template uses, is run through the same route and compared on class,
-  reason, successor state and deliveries. A difference is a finding, and the
-  command exits 1 with status `disagreement`.
+  tallies by class and reason.
+- The refusals. The state laws are the contract's laws that apply at genesis
+  and to every committing decision, so that every committed state satisfies
+  them: in a generated contract, the laws declared `on commit, genesis`, every
+  `StateInvariant` among them, and those declared `on any, genesis` other
+  than an `InitialCondition`, which applies at genesis only. For each refused
+  input, the library's law evaluator runs the contract's own law programs on
+  the input's pre-state as a genesis state, the state laws first; the
+  pre-state satisfies the state laws when each one's verdict is satisfied.
+  Refusals are counted by class: `law`, an applicable law refused; `domain`,
+  a value left its declared domain; `arithmetic`, the decision program's
+  checked arithmetic overflowed; `meter`, the shared meter refused at any
+  stage; `input`, the inputs were not admitted; and `other`. Each count is
+  split between refusals on pre-states that satisfy every state law and
+  refusals on pre-states the state laws exclude, and each group of refused
+  inputs with one refusal and one unsatisfied state law is listed with its
+  first input.
+- The examples: each line of `tests/decision-examples.txt`, read with the
+  [decision-examples grammar](#decision-examples) the application compiles,
+  is run through the same route and compared on class, reason, successor
+  state and deliveries. A difference is a finding, and the command exits 1
+  with status `disagreement`.
 - The mutants: a fixed, versioned catalog
   (`zeno-fcis/contract-review-mutants/1`) applied to the rules model, in a
   fixed order: comparison flips (`<`/`<=`, `>`/`>=`, `==`/`!=`); integer
@@ -634,18 +782,37 @@ The packet records:
   shares; `equivalent-over-full-domain`, only after a fully enumerated
   domain; otherwise `not-distinguished-within-boundary-set`, which claims
   nothing more.
-- The findings: owner examples the contract decides differently, and owner
+- The findings: owner examples the contract decides differently; owner
   examples whose outcome is a mutant's rather than the contract's, the
-  signature of a wrong constant or comparison in the rules.
+  signature of a wrong constant or comparison in the rules; and law
+  refusals on pre-states that satisfy every state law. Such a refusal means
+  that, from a state the laws allow, the rules make a decision a law
+  refuses. One finding is made for each refusal and law, with the number of
+  inputs and the first of them, and the case the library's evaluation of the
+  decision program selects for it. A law refusal for which the library's
+  diagnostics name no law, such as a malformed law frame, is named by that
+  case and input alone. Refusals of other classes are counted but are not
+  findings.
 
-Exit codes: 0 `reviewed`; 1 `disagreement`, the packet still written, or
-`contract-invalid`, nothing written and the entry at fault named; 3 when a
-file could not be read or the packet could not be written; 64 for usage,
-including `--max-tuples 0`. With `--out`, `--format json` prints a summary
-with schema `zeno-fcis/cli/1`: `status`, `packet`, `packet_schema` and the
-packet's `summary` object. A review observes the contract's behaviour on
-chosen inputs. It is not a proof about the rules, and a boundary set is not
-the domain; it does not replace the owner's review of the rules file.
+The review does not decide reachability. A pre-state that satisfies every
+state law may still be unreachable from genesis: an escrow whose laws only
+conserve funds allows a created escrow that already holds funds, which no
+rule reaches. A state law that excludes such states, or a rule that decides
+them, removes the finding. A pre-state that breaks a state law is never a
+committed state, so a refusal there is reported apart and is not a finding.
+
+Exit codes: 0 `reviewed`; 1 `disagreement` when an owner example disagrees,
+otherwise `law-refusal` when a law refusal is a finding, the packet still
+written in both cases, or `contract-invalid`, nothing written and the entry
+at fault named; 3 when a file could not be read or the packet could not be
+written; 64 for usage, including `--max-tuples 0`. The human summary counts
+the refusals by class and by pre-state, and gives one line for each law
+refusal finding. With `--out`, `--format json` prints a summary with schema
+`zeno-fcis/cli/1`: `status`, `packet`, `packet_schema` and the packet's
+`summary` object, which counts the refusals and the law refusal findings. A
+review observes the contract's behaviour on chosen inputs. It is not a proof
+about the rules, and a boundary set is not the domain; it does not replace
+the owner's review of the rules file.
 
 ## Contract adoption and store upgrades
 
@@ -686,7 +853,10 @@ Generation also refuses:
 
 On success the command writes, in this order, `v2/adoptions/N/program.zcve`
 and `v2/adoptions/N/receipt.json`, the generated contract, and last
-`v2/policy.json` with the new entry appended in the file's own layout. An
+`v2/policy.json` with the new entry appended. It renders the whole rules file
+again in the templates' layout, two-space indentation and one entry per line,
+keeping its keys in order, so the file's own spacing and line breaks are not
+kept. An
 interruption leaves the rules unchanged: `generate contract` then regenerates
 the previous version, and running the same `contract adopt` again finishes
 the adoption, accepting an adoption directory that holds only this candidate
@@ -732,7 +902,7 @@ existing SQLite store with its whole lineage:
 | `<app> --upgrade DB` | Records a checked upgrade from the version the store runs to this build's version. After a full audit, the two versions must have equal canonical state schema bytes and different identities. If the new contract's canonical policy, with its decision program's instructions and roots and its Step limit replaced by the old contract's, is byte for byte the old policy, the record is a `program-successor`. It is admitted at any state, because every law and every other part of the policy is unchanged; it states which further premises held (below) and binds the receipt digests of the adoptions between the two versions. Every adoption makes such a successor. Otherwise the new contract's genesis laws must admit the current state through the library's genesis evaluation, and the record is a `genesis-admission` that binds that genesis publication. For generated contracts those laws include the initial-condition law 990, so the store must then be at its declared genesis state. Either record binds both identities, the state root and the chain tip, and becomes the next chain link; the head's chain moves to it. Pending deliveries keep their IDs and commit order. The report names the kind. Any refusal writes nothing. |
 | `<app> --deliver DB` | Delivers every pending outbox entry of a store at this build's version, acknowledges each and prints their IDs. A store at an earlier version must be upgraded first. |
 | `<app> --migrate DB` | Converts a store created before upgrades were recorded (SQLite schema v9) to the current schema v10, after a complete audit under the version that created it. Any other schema, or a store under no version of the application, is refused and nothing is written. Opening or upgrading a v9 store without this step is refused. |
-| `<app> --decide NEW_DB` | Runs the decision examples as one session in a new database, like `<app> NEW_DB`, and leaves the outbox pending. |
+| `<app> --decide DB` | Runs the decision examples as one session and leaves the outbox pending. Without a file at `DB`, the session starts at genesis in a new database, like `<app> NEW_DB`. An existing store must run this build's version; the session continues from the store's state, taking while one remains the first example whose pre-state is that state, and records each commit and its replay under a key of its own. A store at another version is refused and left as it was; one at an earlier version must be upgraded first. It is an aid for acceptance tests and maintenance, not an operational interface, which is planned for 2.2. |
 
 A program successor and the version it supersedes have the same reachable
 states when five premises hold: (1) their canonical policies differ only in
@@ -760,6 +930,12 @@ the reachable states.
 
 Commands on an existing store open it without creating it, so a mistyped path
 is refused and leaves no file.
+
+A refusal exits 1 and prints one line on stderr: `store:`, the shell's
+message saying what happened and what to do, and in parentheses the error's
+`Debug` form, which starts with the variant name that scripts may match, as in
+`store: upgrade refused: the store already runs this contract version, so
+there is nothing to upgrade (Upgrade(SameContract))`.
 
 The library crate exposes the same operations as typed handles.
 `v2::Lineage::bind(catalogs, receipts)` binds a lineage, and `Lineage::open`

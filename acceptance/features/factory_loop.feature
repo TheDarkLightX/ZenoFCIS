@@ -37,6 +37,8 @@ Feature: Check a candidate program before the factory may use it
     Then the packet records each decision and agrees with every owner example
     And every rule mutant of the fixed catalog is distinguished by a witness written as a decision example, refused, or classified without a claim of equivalence on a boundary set
     And a planted wrong constant yields a witness that contradicts an owner example
+    And a law refusal on a pre-state that satisfies every state law is a finding, while refusals on pre-states the state laws exclude are counted apart
+    And the review reads the decision examples with the grammar every application built from a contract compiles
     And the packet is byte-identical on repeat and the application is unchanged
 
   @atdd-checked-upgrade
@@ -50,3 +52,14 @@ Feature: Check a candidate program before the factory may use it
     And a contract that changes a law upgrades only a store whose state its genesis laws admit, which for a generated contract is the declared genesis state
     And each history segment replays under its own contract and pending deliveries are delivered exactly once with their original identifiers
     And a different schema, a refused genesis, a missing old contract, an altered record, an unreplayable receipt, a false usage claim, an unchanged program and an edit to a superseded version each refuse with nothing written
+
+  @atdd-app-journey
+  Scenario: Build, optimize, adopt and upgrade applications through their command lines alone
+    Given the app study's escrow and spend-approval contracts as CLI test fixtures
+    When `zeno-fcis new` builds an application from the escrow contract in a new directory outside the repository
+    Then the commands its README lists, run exactly as written, build it, check its decision examples and run its session, including the split that pays out in two deliveries
+    And `contract export-program`, `optimize`, `transform replay` and `contract adopt` make the spend-approval contract's version 2 with no other tool
+    And a version 1 store with four commits and a pending payment upgrades to version 2 as a program successor at commit 4 and delivers the payment under its original identifier
+    And the version 1 build then refuses the store, and a store at another version refuses `--decide` and keeps its bytes
+    And a version 1 store away from genesis upgrades at commit 2, keeps committing under version 2 with `--decide`, and its audit replays both segments
+    And a CLI built as the release build builds it holds no path of this checkout, refuses `new` without `--source` and binds with it

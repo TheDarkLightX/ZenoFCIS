@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use super::super::rules::Class;
-use super::evaluate::{Decision, Delivery, Fields, Outcome};
+use super::evaluate::{Decision, Delivery, Fields, Outcome, Refusal};
 
 /// One input's outcome, by index into the table's dictionaries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -15,7 +15,12 @@ pub(super) enum Row {
         post: u32,
         outbox: u32,
     },
-    Refused(u32),
+    Refused {
+        refusal: u32,
+        /// The first state law the input's pre-state does not satisfy;
+        /// `None` when it satisfies every one.
+        unsatisfied: Option<u32>,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -25,15 +30,17 @@ pub(super) struct Table {
     pub(super) post_states: Vec<([u8; 32], Fields)>,
     /// Distinct outboxes with their digests, in first-seen order.
     pub(super) outboxes: Vec<([u8; 32], Vec<Delivery>)>,
-    /// Distinct refusals, in first-seen order.
-    pub(super) refusals: Vec<String>,
+    /// Distinct refusals, each with the law that refused, in first-seen order.
+    pub(super) refusals: Vec<Refusal>,
     post_index: BTreeMap<[u8; 32], u32>,
     outbox_index: BTreeMap<[u8; 32], u32>,
-    refusal_index: BTreeMap<String, u32>,
+    refusal_index: BTreeMap<Refusal, u32>,
 }
 
 impl Table {
-    pub(super) fn record(&mut self, outcome: &Outcome) {
+    /// Records one input's outcome; for a refusal, `unsatisfied` is the
+    /// first state law its pre-state does not satisfy.
+    pub(super) fn record(&mut self, outcome: &Outcome, unsatisfied: Option<u32>) {
         let row = match outcome {
             Outcome::Decision(decision) => {
                 let post = match self.post_index.get(&decision.post_digest) {
@@ -63,21 +70,28 @@ impl Table {
                     outbox,
                 }
             }
-            Outcome::Refused(refusal) => match self.refusal_index.get(refusal) {
-                Some(index) => Row::Refused(*index),
-                None => {
-                    let index = count(self.refusals.len());
-                    self.refusals.push(refusal.clone());
-                    self.refusal_index.insert(refusal.clone(), index);
-                    Row::Refused(index)
+            Outcome::Refused(refusal) => {
+                let index = match self.refusal_index.get(refusal) {
+                    Some(index) => *index,
+                    None => {
+                        let index = count(self.refusals.len());
+                        self.refusals.push(refusal.clone());
+                        self.refusal_index.insert(refusal.clone(), index);
+                        index
+                    }
+                };
+                Row::Refused {
+                    refusal: index,
+                    unsatisfied,
                 }
-            },
+            }
         };
         self.rows.push(row);
     }
 
     /// Whether an outcome is the recorded one: the same class, reason and
-    /// digests, or the same refusal.
+    /// digests, or the same refusal as the library reports it. The law the
+    /// diagnostics name is not compared.
     pub(super) fn matches(&self, row: Row, outcome: &Outcome) -> bool {
         match (row, outcome) {
             (
@@ -94,8 +108,8 @@ impl Table {
                     && self.post_states[post as usize].0 == decision.post_digest
                     && self.outboxes[outbox as usize].0 == decision.outbox_digest
             }
-            (Row::Refused(index), Outcome::Refused(refusal)) => {
-                self.refusals[index as usize] == *refusal
+            (Row::Refused { refusal, .. }, Outcome::Refused(other)) => {
+                self.refusals[refusal as usize].text == other.text
             }
             _ => false,
         }
@@ -121,7 +135,9 @@ impl Table {
                     outbox_digest: *outbox_digest,
                 })
             }
-            Row::Refused(index) => Outcome::Refused(self.refusals[index as usize].clone()),
+            Row::Refused { refusal, .. } => {
+                Outcome::Refused(self.refusals[refusal as usize].clone())
+            }
         }
     }
 }

@@ -68,6 +68,43 @@ pub(crate) struct Adoption {
 const FAILURE_LAW: u32 = 908;
 const REJECT_LAW: u32 = 909;
 
+/// The keys a rules file may hold; `docs/CONTRACT_RULES.md` documents each.
+pub(super) const FILE_KEYS: [&str; 13] = [
+    "schema",
+    "template",
+    "roots",
+    "leaf_bindings",
+    "variables",
+    "cases",
+    "genesis",
+    "law_kinds",
+    "framework_failure_law",
+    "framework_reject_law",
+    "adoptions",
+    // Reviewer notes; they do not affect the contract.
+    "idempotency",
+    "original_domain",
+];
+/// The keys of `roots`.
+pub(super) const ROOT_KEYS: [&str; 3] = ["state", "command", "context"];
+/// The keys of one case; `rule` names the rule for reviewers only.
+pub(super) const CASE_KEYS: [&str; 6] = ["when", "class", "reason", "post", "outbox", "rule"];
+/// The keys of one delivery in a case's `outbox`.
+pub(super) const DELIVERY_KEYS: [&str; 5] = [
+    "ordinal",
+    "channel",
+    "destination",
+    "payload",
+    "idempotency_ordinal",
+];
+/// The keys of one entry of `adoptions`.
+pub(super) const ADOPTION_KEYS: [&str; 4] = [
+    "candidate_sha256",
+    "receipt_sha256",
+    "usage",
+    "superseded_policy_sha256",
+];
+
 /// Decision class of a case.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum Class {
@@ -77,6 +114,8 @@ pub(super) enum Class {
 }
 
 impl Class {
+    pub(super) const ALL: [Self; 3] = [Self::Accept, Self::Reject, Self::CommittedFailure];
+
     pub(super) fn name(self) -> &'static str {
         match self {
             Self::Accept => "Accept",
@@ -111,7 +150,7 @@ pub(super) enum LawKind {
 }
 
 impl LawKind {
-    const ALL: [Self; 10] = [
+    pub(super) const ALL: [Self; 10] = [
         Self::StateInvariant,
         Self::AssetConservation,
         Self::MintBurnAuthorization,
@@ -183,22 +222,7 @@ impl Rules {
     pub(super) fn read(source: &str) -> Result<Self, ContractError> {
         let json = parse(source)?;
         let file = Object::new(&json, FILE)?;
-        file.only(&[
-            "schema",
-            "template",
-            "roots",
-            "leaf_bindings",
-            "variables",
-            "cases",
-            "genesis",
-            "law_kinds",
-            "framework_failure_law",
-            "framework_reject_law",
-            "adoptions",
-            // Reviewer notes; they do not affect the contract.
-            "idempotency",
-            "original_domain",
-        ])?;
+        file.only(&FILE_KEYS)?;
         let schema = file.text("schema")?;
         if schema != RULES_SCHEMA {
             return Err(file.error(
@@ -216,7 +240,7 @@ impl Rules {
             }
         }
         let roots = file.object("roots")?;
-        roots.only(&["state", "command", "context"])?;
+        roots.only(&ROOT_KEYS)?;
         if (
             roots.number::<u32>("state")?,
             roots.number::<u32>("command")?,
@@ -293,8 +317,12 @@ impl Rules {
                 Ok((id(key, &place)?, kind))
             })
             .collect::<Result<_, ContractError>>()?;
+        // The library refuses law ID 0.
         let law = |key: &str, default: u32| match file.optional(key) {
-            Some(_) => file.number(key),
+            Some(_) => match file.number(key)? {
+                0 => Err(file.error(key, "must be a nonzero law ID")),
+                id => Ok(id),
+            },
             None => Ok(default),
         };
         let adoptions = match file.optional("adoptions") {
@@ -333,9 +361,11 @@ pub(super) fn reformat(source: &str) -> Result<String, ContractError> {
     Ok(parse(source)?.render())
 }
 
-/// The rules file with one more adoption appended, in the file's own layout:
-/// object keys keep their order and `adoptions` is added last when absent.
-/// The result is validated separately when it is generated from.
+/// The rules file with one more adoption appended. The whole file is
+/// rendered again in the templates' layout, two-space indentation and one
+/// entry per line, so its own spacing and line breaks are not kept; object
+/// keys keep their order and `adoptions` is added last when absent. The
+/// result is validated separately when it is generated from.
 pub(crate) fn with_adoption(source: &str, adoption: &Adoption) -> Result<String, ContractError> {
     let json = parse(source)?;
     let Json::Object(mut entries) = json else {
@@ -373,8 +403,8 @@ pub(crate) fn with_adoption(source: &str, adoption: &Adoption) -> Result<String,
 }
 
 /// The rules file with each adoption's `receipt_sha256` replaced, in order,
-/// in the file's own layout. The result is validated when it is generated
-/// from.
+/// rendered again as `with_adoption` renders it. The result is validated
+/// when it is generated from.
 pub(super) fn with_receipt_digests(
     source: &str,
     digests: &[String],
@@ -409,12 +439,7 @@ pub(super) fn with_receipt_digests(
 
 fn adoption(json: &Json, place: &str) -> Result<Adoption, ContractError> {
     let entry = Object::new(json, place)?;
-    entry.only(&[
-        "candidate_sha256",
-        "receipt_sha256",
-        "usage",
-        "superseded_policy_sha256",
-    ])?;
+    entry.only(&ADOPTION_KEYS)?;
     let digest = |key: &str| {
         let text = entry.text(key)?;
         let hex = text.len() == 64
@@ -444,21 +469,20 @@ fn adoption(json: &Json, place: &str) -> Result<Adoption, ContractError> {
 fn case(json: &Json, place: &str) -> Result<Case, ContractError> {
     let case = Object::new(json, place)?;
     // `rule` names the rule for reviewers; it does not affect the contract.
-    case.only(&["when", "class", "reason", "post", "outbox", "rule"])?;
+    case.only(&CASE_KEYS)?;
     if case.optional("rule").is_some() {
         case.text("rule")?;
     }
-    let class = match case.text("class")? {
-        "Accept" => Class::Accept,
-        "Reject" => Class::Reject,
-        "CommittedFailure" => Class::CommittedFailure,
-        other => {
-            return Err(case.error(
+    let written = case.text("class")?;
+    let class = Class::ALL
+        .into_iter()
+        .find(|class| class.name() == written)
+        .ok_or_else(|| {
+            case.error(
                 "class",
-                format!("`{other}` is not Accept, Reject or CommittedFailure"),
-            ));
-        }
-    };
+                format!("`{written}` is not Accept, Reject or CommittedFailure"),
+            )
+        })?;
     let reason = match case.field("reason")? {
         Json::Null => None,
         _ => Some(case.number("reason")?),
@@ -469,13 +493,7 @@ fn case(json: &Json, place: &str) -> Result<Case, ContractError> {
         .enumerate()
         .map(|(index, delivery)| {
             let delivery = Object::new(delivery, &format!("{place}.outbox[{index}]"))?;
-            delivery.only(&[
-                "ordinal",
-                "channel",
-                "destination",
-                "payload",
-                "idempotency_ordinal",
-            ])?;
+            delivery.only(&DELIVERY_KEYS)?;
             Ok(Delivery {
                 ordinal: delivery.number("ordinal")?,
                 channel: delivery.number("channel")?,
@@ -537,6 +555,10 @@ fn text<'j>(value: &'j Json, place: &str) -> Result<&'j str, ContractError> {
     }
 }
 
+/// The leaves `leaf_bindings` may name: `["Bool"]`, `["I128", min, max]`
+/// and `["Text", min, max]`.
+pub(super) const LEAVES: [&str; 3] = ["Bool", "I128", "Text"];
+
 fn leaf(value: &Json, place: &str) -> Result<Leaf, ContractError> {
     let items = match value {
         Json::Array(items) => items.as_slice(),
@@ -547,12 +569,12 @@ fn leaf(value: &Json, place: &str) -> Result<Leaf, ContractError> {
         _ => None,
     };
     let leaf = match (items.first(), items.len()) {
-        (Some(Json::Text(kind)), 1) if kind == "Bool" => Some(Leaf::Bool),
-        (Some(Json::Text(kind)), 3) if kind == "I128" => bound(1)
+        (Some(Json::Text(kind)), 1) if kind == LEAVES[0] => Some(Leaf::Bool),
+        (Some(Json::Text(kind)), 3) if kind == LEAVES[1] => bound(1)
             .zip(bound(2))
             .filter(|(min, max)| min <= max)
             .map(|(min, max)| Leaf::I128 { min, max }),
-        (Some(Json::Text(kind)), 3) if kind == "Text" => bound(1)
+        (Some(Json::Text(kind)), 3) if kind == LEAVES[2] => bound(1)
             .zip(bound(2))
             .and_then(|(min, max)| u32::try_from(min).ok().zip(u32::try_from(max).ok()))
             .filter(|(min, max)| min <= max)

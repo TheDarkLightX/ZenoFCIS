@@ -456,15 +456,18 @@ fn an_adopted_contract_scaffolds_an_application_with_its_lineage() {
     }
     for name in [
         "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
         "README.md",
         "src/lib.rs",
+        "src/examples.rs",
         "src/session.rs",
         "src/main.rs",
         "tests/decisions.rs",
     ] {
         assert!(files.contains_key(name), "{name} missing");
     }
-    assert_eq!(files.len(), fixture_files.len() - 1 + 6);
+    assert_eq!(files.len(), fixture_files.len() - 1 + 9);
     let check = zeno(&[
         "generate".as_ref(),
         "contract".as_ref(),
@@ -486,8 +489,18 @@ fn describe_declares_contract_adopt_effects() {
     let report = json(&output);
     let group = &report["command"];
     assert_eq!(group["effects"]["classification"], "command-group");
-    let adopt = &group["subcommands"][0];
-    assert_eq!(adopt["name"], "adopt");
+    let subcommand = |name: &str| {
+        group["subcommands"]
+            .as_array()
+            .and_then(|subcommands| {
+                subcommands
+                    .iter()
+                    .find(|subcommand| subcommand["name"] == name)
+            })
+            .cloned()
+            .unwrap_or_else(|| panic!("no contract {name}"))
+    };
+    let adopt = subcommand("adopt");
     assert_eq!(
         adopt["effects"],
         json!({
@@ -504,14 +517,22 @@ fn describe_declares_contract_adopt_effects() {
         .unwrap_or_else(|| panic!("usage argument"));
     assert_eq!(usage["required"], true);
     assert_eq!(usage["choices"], json!(["preserved", "new-version"]));
-    let refresh = &group["subcommands"][1];
-    assert_eq!(refresh["name"], "refresh-receipts");
+    let refresh = subcommand("refresh-receipts");
     assert_eq!(
         refresh["effects"],
         json!({
             "classification": "declared", "executes_tools": false, "read_only_flag": null,
             "reads": ["application-contract", "adopted-artifacts"],
             "writes": ["application-contract", "adopted-artifacts", "generated-artifacts"]
+        })
+    );
+    let export = subcommand("export-program");
+    assert_eq!(
+        export["effects"],
+        json!({
+            "classification": "declared", "executes_tools": false, "read_only_flag": null,
+            "reads": ["application-contract", "adopted-artifacts"],
+            "writes": ["decision-program"]
         })
     );
 }

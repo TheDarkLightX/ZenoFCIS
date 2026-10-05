@@ -2029,9 +2029,94 @@ impl From<EncodeError> for Error {
         Self::Encoding(e)
     }
 }
+/// One line: what happened, then what to do. The variant name stays in the
+/// `Debug` form, for logs and machine output.
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "V2 SQLite refinement refused: {self:?}")
+        match self {
+            Self::Sqlite(error) => write!(
+                f,
+                "SQLite refused the operation ({error}), so nothing was committed: check that the database file exists and is readable and writable, and that no other program locks it"
+            ),
+            Self::Encoding(error) => write!(
+                f,
+                "a value could not be canonically encoded ({error}), so nothing was written: keep values within the canonical encoding's limits"
+            ),
+            Self::Provider => f.write_str(
+                "the pinned SHA-256 provider failed its known-answer check, so nothing can be hashed safely: rebuild with the pinned dependencies",
+            ),
+            Self::Schema(9) => f.write_str(
+                "the database holds schema version 9, from before upgrades were recorded, or tables that differ from it: migrate an unaltered version 9 store to version 10 before any other operation, and create a new store only in a new, empty file",
+            ),
+            Self::Schema(10) => f.write_str(
+                "the database already holds schema version 10, the current one, or tables that differ from it: create a new store only in a new, empty file; a version 10 store needs no migration, and an altered one cannot be opened",
+            ),
+            Self::Schema(version) => write!(
+                f,
+                "the database has schema version {version}, which is not a store this shell opens: open a store this shell created, or create a new store in a new, empty file"
+            ),
+            Self::Identity => f.write_str(
+                "this database, or a checkpoint or publication used with it, belongs to a different contract: audit the database with the build that created it, or upgrade it with a build that adopted its contract",
+            ),
+            Self::Authority => f.write_str(
+                "the library refused to bind a contract version of the lineage: regenerate the contract and rebuild the application with the same ZenoFCIS version",
+            ),
+            Self::Lineage => f.write_str(
+                "the contract lineage is malformed: it needs at least one version and exactly one adoption receipt between each version and the next; regenerate the contract",
+            ),
+            Self::Checkpoint => f.write_str(
+                "the store no longer holds this checkpoint, because its head was saved again after an upgrade at the same head: open it from a newer checkpoint or with a full audit",
+            ),
+            Self::InvocationKind => f.write_str(
+                "the publication has the wrong invocation kind: create a store only from a genesis publication, and commit or bundle only a transition",
+            ),
+            Self::History => f.write_str(
+                "the stored history fails exact replay, root, certificate, upgrade record or chain validation: the database was changed outside this shell or damaged; restore it from a trusted copy before using it",
+            ),
+            Self::Range => f.write_str(
+                "an integer or entry length cannot be represented, so nothing was written: the store or a value is beyond this shell's limits",
+            ),
+            Self::PreState => f.write_str(
+                "the publication was made for a different state than the store's current one: decide again from the current state",
+            ),
+            Self::Replay => f.write_str(
+                "this replay key was already used with different input or publication bytes: use a new replay key for a new command, or resend exactly the original bytes",
+            ),
+            Self::Concurrent => f.write_str(
+                "another connection changed the store during this operation, so nothing was written: reopen the store and try again",
+            ),
+            Self::Delivery => f.write_str(
+                "a delivery or its acknowledgement differs from what the store holds: acknowledge exactly the entry the store delivered; a malformed stored entry means the database was damaged",
+            ),
+            Self::Interpreter => f.write_str(
+                "the delivery interpreter differs from the one the store was created with: deliver with the ZenoFCIS version that created the store",
+            ),
+            Self::Capacity { required, declared } => write!(
+                f,
+                "the complete publication needs {required} bytes, more than the declared limit of {declared}, so nothing was written: raise the limit or publish a smaller decision"
+            ),
+            Self::Upgrade(upgrade::Refusal::StateSchema) => f.write_str(
+                "upgrade refused: the new contract's state schema differs from the store's, and an upgrade never migrates data; keep the state schema, or start a new application",
+            ),
+            Self::Upgrade(upgrade::Refusal::SameContract) => f.write_str(
+                "upgrade refused: the store already runs this contract version, so there is nothing to upgrade",
+            ),
+            Self::Upgrade(upgrade::Refusal::Genesis(refusal)) => {
+                f.write_str(
+                    "upgrade refused: the new contract is not a program successor of the store's, and its genesis laws do not admit the store's current state",
+                )?;
+                if let Some(refusal) = refusal {
+                    write!(f, " (the library refused: {refusal:?})")?;
+                }
+                f.write_str(
+                    "; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+                )
+            }
+            Self::InjectedCrash(point) => write!(
+                f,
+                "an interruption was injected at {point:?} for a crash test: reopen the store, which holds its last committed state"
+            ),
+        }
     }
 }
 impl std::error::Error for Error {}
@@ -2080,5 +2165,160 @@ mod interpreter_tests {
         );
         assert!(check_schema(&migrated).is_ok());
         assert!(matches!(check_schema_v9(&migrated), Err(Error::Schema(10))));
+    }
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::*;
+    use zeno_fcis_synthesis::finite::{
+        v2_authority::Refusal as LibraryRefusal, v2_composition::Failure as CoreFailure,
+        v2_laws::Failure as LawFailure,
+    };
+
+    /// The variant's name. No wildcard: a new variant does not compile until
+    /// it has a message below.
+    fn variant(error: &Error) -> &'static str {
+        match error {
+            Error::Sqlite(_) => "Sqlite",
+            Error::Encoding(_) => "Encoding",
+            Error::Provider => "Provider",
+            Error::Schema(_) => "Schema",
+            Error::Identity => "Identity",
+            Error::Authority => "Authority",
+            Error::Lineage => "Lineage",
+            Error::Checkpoint => "Checkpoint",
+            Error::InvocationKind => "InvocationKind",
+            Error::History => "History",
+            Error::Range => "Range",
+            Error::PreState => "PreState",
+            Error::Replay => "Replay",
+            Error::Concurrent => "Concurrent",
+            Error::Delivery => "Delivery",
+            Error::Interpreter => "Interpreter",
+            Error::Capacity { .. } => "Capacity",
+            Error::Upgrade(upgrade::Refusal::StateSchema) => "Upgrade(StateSchema)",
+            Error::Upgrade(upgrade::Refusal::SameContract) => "Upgrade(SameContract)",
+            Error::Upgrade(upgrade::Refusal::Genesis(_)) => "Upgrade(Genesis)",
+            Error::InjectedCrash(_) => "InjectedCrash",
+        }
+    }
+
+    #[test]
+    fn every_store_error_reads_as_one_line_saying_what_happened_and_what_to_do() {
+        let cases = [
+            (
+                Error::Sqlite(rusqlite::Error::QueryReturnedNoRows),
+                "SQLite refused the operation (Query returned no rows), so nothing was committed: check that the database file exists and is readable and writable, and that no other program locks it",
+            ),
+            (
+                Error::Encoding(EncodeError::LengthOverflow),
+                "a value could not be canonically encoded (canonical length overflow), so nothing was written: keep values within the canonical encoding's limits",
+            ),
+            (
+                Error::Provider,
+                "the pinned SHA-256 provider failed its known-answer check, so nothing can be hashed safely: rebuild with the pinned dependencies",
+            ),
+            (
+                Error::Schema(9),
+                "the database holds schema version 9, from before upgrades were recorded, or tables that differ from it: migrate an unaltered version 9 store to version 10 before any other operation, and create a new store only in a new, empty file",
+            ),
+            (
+                Error::Schema(10),
+                "the database already holds schema version 10, the current one, or tables that differ from it: create a new store only in a new, empty file; a version 10 store needs no migration, and an altered one cannot be opened",
+            ),
+            (
+                Error::Schema(0),
+                "the database has schema version 0, which is not a store this shell opens: open a store this shell created, or create a new store in a new, empty file",
+            ),
+            (
+                Error::Identity,
+                "this database, or a checkpoint or publication used with it, belongs to a different contract: audit the database with the build that created it, or upgrade it with a build that adopted its contract",
+            ),
+            (
+                Error::Authority,
+                "the library refused to bind a contract version of the lineage: regenerate the contract and rebuild the application with the same ZenoFCIS version",
+            ),
+            (
+                Error::Lineage,
+                "the contract lineage is malformed: it needs at least one version and exactly one adoption receipt between each version and the next; regenerate the contract",
+            ),
+            (
+                Error::Checkpoint,
+                "the store no longer holds this checkpoint, because its head was saved again after an upgrade at the same head: open it from a newer checkpoint or with a full audit",
+            ),
+            (
+                Error::InvocationKind,
+                "the publication has the wrong invocation kind: create a store only from a genesis publication, and commit or bundle only a transition",
+            ),
+            (
+                Error::History,
+                "the stored history fails exact replay, root, certificate, upgrade record or chain validation: the database was changed outside this shell or damaged; restore it from a trusted copy before using it",
+            ),
+            (
+                Error::Range,
+                "an integer or entry length cannot be represented, so nothing was written: the store or a value is beyond this shell's limits",
+            ),
+            (
+                Error::PreState,
+                "the publication was made for a different state than the store's current one: decide again from the current state",
+            ),
+            (
+                Error::Replay,
+                "this replay key was already used with different input or publication bytes: use a new replay key for a new command, or resend exactly the original bytes",
+            ),
+            (
+                Error::Concurrent,
+                "another connection changed the store during this operation, so nothing was written: reopen the store and try again",
+            ),
+            (
+                Error::Delivery,
+                "a delivery or its acknowledgement differs from what the store holds: acknowledge exactly the entry the store delivered; a malformed stored entry means the database was damaged",
+            ),
+            (
+                Error::Interpreter,
+                "the delivery interpreter differs from the one the store was created with: deliver with the ZenoFCIS version that created the store",
+            ),
+            (
+                Error::Capacity {
+                    required: 70_000,
+                    declared: 65_536,
+                },
+                "the complete publication needs 70000 bytes, more than the declared limit of 65536, so nothing was written: raise the limit or publish a smaller decision",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::StateSchema),
+                "upgrade refused: the new contract's state schema differs from the store's, and an upgrade never migrates data; keep the state schema, or start a new application",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::SameContract),
+                "upgrade refused: the store already runs this contract version, so there is nothing to upgrade",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Genesis(None)),
+                "upgrade refused: the new contract is not a program successor of the store's, and its genesis laws do not admit the store's current state; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Genesis(Some(LibraryRefusal::Core(
+                    CoreFailure::Law(LawFailure::Violated),
+                )))),
+                "upgrade refused: the new contract is not a program successor of the store's, and its genesis laws do not admit the store's current state (the library refused: Core(Law(Violated))); a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+            ),
+            (
+                Error::InjectedCrash(CrashPoint::AfterCommit),
+                "an interruption was injected at AfterCommit for a crash test: reopen the store, which holds its last committed state",
+            ),
+        ];
+        let mut covered = std::collections::BTreeSet::new();
+        for (error, message) in &cases {
+            assert_eq!(error.to_string(), *message, "{error:?}");
+            assert!(!message.contains('\n'), "{error:?}");
+            // The variant name stays in the Debug form.
+            let name = variant(error);
+            let stem = name.split('(').next().unwrap_or(name);
+            assert!(format!("{error:?}").starts_with(stem), "{error:?}");
+            covered.insert(name);
+        }
+        assert_eq!(covered.len(), 21, "{covered:?}");
     }
 }

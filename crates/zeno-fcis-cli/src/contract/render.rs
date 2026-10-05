@@ -777,7 +777,10 @@ fn channel(channel: &ChannelSchema) -> Syntax {
                         .collect(),
                 ),
             ),
-            ("idempotency", bounds("c::Domain::U128", 0, 0)),
+            (
+                "idempotency",
+                bounds("c::Domain::U128", 0, channel.idempotency),
+            ),
         ],
     )
 }
@@ -871,7 +874,7 @@ fn descriptor(contract: &Contract<'_>) -> Syntax {
             limit("Read", budgets.read),
             limit("Write", budgets.write),
             limit("Candidate", 1),
-            limit("Effect", 1),
+            limit("Effect", budgets.effect),
             limit("Byte", budgets.byte),
             limit("WitnessByte", 0),
             limit("Depth", 0),

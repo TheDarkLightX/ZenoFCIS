@@ -15,12 +15,14 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
+use crate::binding::{self, Refusal};
 use crate::contract::{
     AdoptionSources, ContractError, ContractSources, GeneratedContract, adoption_directory,
     generate_contract,
 };
+use crate::transform::sha256_hex;
 use crate::{
-    FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, artifact_is_current, atomic_create,
+    BLOCKED, FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, artifact_is_current, atomic_create,
     atomic_replace, print_json,
 };
 
@@ -42,6 +44,10 @@ pub(crate) const ADOPTED_RECEIPT: &str = "receipt.json";
 const APPLICATION: &[(&str, &str)] = &[
     ("src/lib.rs", include_str!("../contract-app/src/lib.rs")),
     (
+        "src/examples.rs",
+        include_str!("../contract-app/src/examples.rs"),
+    ),
+    (
         "src/session.rs",
         include_str!("../contract-app/src/session.rs"),
     ),
@@ -62,6 +68,9 @@ pub(crate) enum Failure {
     Read(String),
     /// The contract is invalid: exit `INVALID`.
     Invalid { place: String, reason: String },
+    /// No source tree binds the application: exit `BLOCKED` without one,
+    /// `INVALID` for one that cannot.
+    Binding(Refusal),
 }
 
 impl From<ContractError> for Failure {
@@ -212,9 +221,10 @@ pub(crate) fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 /// `zeno-fcis new <dir> --contract <contract>`: an application built from
 /// `project.zeno`, `v2/policy.json`, the adoptions it lists and, when
-/// present, `tests/decision-examples.txt` in `contract`. `dir` exists and is
-/// empty.
-pub(crate) fn scaffold(dir: &Path, contract: &Path) -> u8 {
+/// present, `tests/decision-examples.txt` in `contract`, and bound to the
+/// ZenoFCIS source tree `source`, or the tree this CLI was built from. `dir`
+/// exists and is empty.
+pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8 {
     let result = (|| {
         let inputs = Inputs::read(contract)?;
         let examples = match read_input(&contract.join(EXAMPLES)) {
@@ -240,9 +250,14 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path) -> u8 {
         let manifest = MANIFEST
             .replace("{package}", &package)
             .replace("{version}", env!("CARGO_PKG_VERSION"));
+        let binding = binding::bind(&manifest, source).map_err(Failure::Binding)?;
         let readme = README.replace("{package}", &package);
         let mut files: Vec<(String, Vec<u8>)> = vec![
-            ("Cargo.toml".to_owned(), manifest.into_bytes()),
+            (
+                "Cargo.toml".to_owned(),
+                format!("{manifest}{}", binding.patch).into_bytes(),
+            ),
+            ("Cargo.lock".to_owned(), binding.lock),
             ("README.md".to_owned(), readme.into_bytes()),
             (PROJECT.to_owned(), inputs.project.clone().into_bytes()),
             (RULES.to_owned(), inputs.rules.clone().into_bytes()),
@@ -269,10 +284,13 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path) -> u8 {
                 .iter()
                 .map(|(name, source)| ((*name).to_owned(), source.as_bytes().to_vec())),
         );
-        Ok(files)
+        if let Some(toolchain) = binding.toolchain {
+            files.push(("rust-toolchain.toml".to_owned(), toolchain));
+        }
+        Ok((files, binding.tree))
     })();
-    let files = match result {
-        Ok(files) => files,
+    let (files, tree) = match result {
+        Ok(built) => built,
         Err(failure) => return report_failure(dir, failure, OutputFormat::Human),
     };
     for (name, bytes) in &files {
@@ -287,6 +305,66 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path) -> u8 {
         }
     }
     println!("created {}", dir.display());
+    println!("bound to the ZenoFCIS source tree {}", tree.display());
+    OK
+}
+
+/// `zeno-fcis contract export-program`: writes the contract's current
+/// decision program to a new file `out`, in the canonical program encoding
+/// that `optimize`, `transform` and `loop` read. These are the bytes the
+/// next adoption's receipt names as its original; after an adoption they are
+/// the adopted candidate's.
+pub(crate) fn export_program(dir: &Path, out: &Path, format: OutputFormat) -> u8 {
+    let refuse = |code: &str, message: String, exit: u8| {
+        match format {
+            OutputFormat::Human => eprintln!("{message}"),
+            OutputFormat::Json => print_json(&json!({
+                "schema": JSON_SCHEMA, "status": "error", "path": dir.display().to_string(),
+                "authority": "none",
+                "error": {"code": code, "place": "--out", "message": message}
+            })),
+        }
+        exit
+    };
+    // Unlike `exists`, `symlink_metadata` also sees a dangling link, which
+    // exclusive creation would refuse after the whole generation.
+    if out.symlink_metadata().is_ok() {
+        let message = format!(
+            "{} exists; the program is written only to a new file",
+            out.display()
+        );
+        return refuse("output-exists", message, INVALID);
+    }
+    let generated = match Inputs::read(dir).and_then(|inputs| inputs.generate()) {
+        Ok(generated) => generated,
+        Err(failure) => return report_failure(dir, failure, format),
+    };
+    let program = generated.program();
+    if let Err(error) = atomic_create(out, program) {
+        let message = format!("write {}: {error}", out.display());
+        return refuse("program-write-failed", message, FAILURE);
+    }
+    let summary = generated.summary();
+    match format {
+        OutputFormat::Json => print_json(&json!({
+            "schema": JSON_SCHEMA, "status": "exported", "path": dir.display().to_string(),
+            "authority": "none", "evidence": "decision-program",
+            "application": summary.application, "version": summary.version,
+            "program": {
+                "path": out.display().to_string(), "bytes": program.len(),
+                "sha256": sha256_hex(program), "nodes": summary.program_nodes,
+                "outputs": summary.outputs
+            }
+        })),
+        OutputFormat::Human => println!(
+            "wrote the decision program of {} version {} ({} nodes, {} bytes) to {}",
+            summary.application,
+            summary.version,
+            summary.program_nodes,
+            program.len(),
+            out.display()
+        ),
+    }
     OK
 }
 
@@ -354,6 +432,10 @@ pub(crate) fn report_failure(dir: &Path, failure: Failure, format: OutputFormat)
     let (code, place, message, exit) = match failure {
         Failure::Read(message) => ("contract-read-failed", None, message, FAILURE),
         Failure::Invalid { place, reason } => ("contract-invalid", Some(place), reason, INVALID),
+        Failure::Binding(Refusal::NoTree(message)) => ("no-source-tree", None, message, BLOCKED),
+        Failure::Binding(Refusal::Unusable(message)) => {
+            ("source-tree-unusable", None, message, INVALID)
+        }
     };
     match format {
         OutputFormat::Human => match &place {

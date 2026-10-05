@@ -105,3 +105,72 @@ fn examples_run_as_one_persistent_session() {
     );
     println!("session: {}", summary.json());
 }
+
+/// Each example written in the grammar's other forms, line for line: the
+/// inputs split into state, command and context sections; comments
+/// indented; and, when the contract declares one channel, each delivery as
+/// its payload numbers alone. Every form reads as the same examples, as
+/// `zeno-fcis contract review` reads them.
+#[test]
+fn every_written_form_of_an_example_reads_alike() {
+    let written = examples(EXAMPLES).unwrap_or_else(|error| panic!("{error}"));
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let width = |schema: c::Schema<'_>| match schema {
+        c::Schema::Record(fields) => fields.len(),
+        _ => 1,
+    };
+    let (state, command) = (width(descriptor.state), width(descriptor.command));
+    let one_channel = descriptor.channels.len() == 1;
+    let numbers = |values: &[i128]| {
+        values
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let mut rewritten = String::new();
+    for (index, line) in EXAMPLES.lines().enumerate() {
+        let Some(example) = written.iter().find(|example| example.line == index + 1) else {
+            rewritten.push_str(&format!("  \t{line}\n"));
+            continue;
+        };
+        let class = match example.class {
+            c::Class::Accept => "accept",
+            c::Class::Reject => "reject",
+            c::Class::CommittedFailure => "failure",
+            other => panic!("line {}: class {other:?}", example.line),
+        };
+        let reason = example
+            .reason
+            .map_or_else(|| "-".to_owned(), |reason| reason.to_string());
+        let deliveries = if example.outbox.is_empty() {
+            "-".to_owned()
+        } else {
+            example
+                .outbox
+                .iter()
+                .map(|(channel, payload)| {
+                    if one_channel && !payload.is_empty() {
+                        numbers(payload)
+                    } else {
+                        format!("{channel} {}", numbers(payload))
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("; ")
+        };
+        let (pre, rest) = example.inputs.split_at(state);
+        let (order, context) = rest.split_at(command);
+        rewritten.push_str(&format!(
+            "{} | {} | {} | {class} {reason} {} | {deliveries}\n",
+            numbers(pre),
+            numbers(order),
+            numbers(context),
+            numbers(&example.post)
+        ));
+    }
+    let reread = examples(&rewritten).unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(reread, written);
+    println!("decision example forms read alike: {}", written.len());
+}

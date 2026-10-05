@@ -6,9 +6,10 @@ use std::collections::BTreeMap;
 use serde_json::{Value, json};
 
 use super::domain::{Construction, InputSet, Position};
-use super::evaluate::{Delivery, Outcome, Value as Atom, digest, hex};
+use super::evaluate::{Delivery, Outcome, RefusalClass, Value as Atom, digest, hex};
 use super::examples::{self, Example};
 use super::mutants::{CATALOG, OPERATORS};
+use super::refusals::Group;
 use super::table::{Row, Table};
 use super::{
     ADVISORY, Classification, Classified, Finding, MAX_INLINE_ROWS, PACKET_SCHEMA, Summary,
@@ -25,6 +26,9 @@ pub(super) struct Report<'r> {
     pub(super) inputs: &'r InputSet,
     pub(super) max_tuples: u64,
     pub(super) table: &'r Table,
+    /// The contract's state laws, in its law order.
+    pub(super) state_laws: &'r [u32],
+    pub(super) groups: &'r [Group],
     pub(super) examples_file: Option<&'static str>,
     pub(super) examples: &'r [Example],
     pub(super) at_examples: &'r [Outcome],
@@ -50,6 +54,7 @@ pub(super) fn build(report: &Report<'_>) -> Value {
         "sources": report.sources,
         "inputs": inputs(report),
         "decision_table": table(report),
+        "refusals": refusals(report),
         "examples": examples(report),
         "mutants": mutants(report),
         "findings": report.findings.iter().map(finding).collect::<Vec<_>>(),
@@ -101,7 +106,6 @@ fn table(report: &Report<'_>) -> Value {
     let mut chain = [0u8; 32];
     let mut classes: BTreeMap<&str, usize> = BTreeMap::new();
     let mut reasons: BTreeMap<String, usize> = BTreeMap::new();
-    let mut refusals: BTreeMap<&str, usize> = BTreeMap::new();
     for (tuple, row) in report.inputs.tuples().zip(&table.rows) {
         let line = match *row {
             Row::Decided {
@@ -121,12 +125,20 @@ fn table(report: &Report<'_>) -> Value {
                     reason.map_or_else(|| "-".to_owned(), |reason| reason.to_string())
                 )
             }
-            Row::Refused(index) => {
+            Row::Refused {
+                refusal,
+                unsatisfied,
+            } => {
                 *classes.entry("refused").or_default() += 1;
-                *refusals
-                    .entry(table.refusals[index as usize].as_str())
-                    .or_default() += 1;
-                format!("{} | refused {index}", examples::join(tuple))
+                match unsatisfied {
+                    None => format!("{} | refused {refusal}", examples::join(tuple)),
+                    Some(law) => {
+                        format!(
+                            "{} | refused {refusal} unsatisfied {law}",
+                            examples::join(tuple)
+                        )
+                    }
+                }
             }
         };
         let mut bytes = chain.to_vec();
@@ -139,7 +151,7 @@ fn table(report: &Report<'_>) -> Value {
     }
     json!({
         "count": table.rows.len(),
-        "row_format": "input values in position order | class reason post-state-index outbox-index; or | refused refusal-index",
+        "row_format": "input values in position order | class reason post-state-index outbox-index; or | refused refusal-index, followed by `unsatisfied` and a state law's ID when the input's pre-state does not satisfy that state law, the first in the contract's law order",
         "rows": inline.then_some(rows),
         "rows_omitted": !inline,
         "rows_digest": {
@@ -152,8 +164,45 @@ fn table(report: &Report<'_>) -> Value {
         "outboxes": table.outboxes.iter().map(|(digest, deliveries)| {
             json!({"sha256": hex(digest), "deliveries": deliveries.iter().map(delivery).collect::<Vec<_>>()})
         }).collect::<Vec<_>>(),
-        "refusals": table.refusals,
-        "tallies": {"classes": classes, "reasons": reasons, "refusals": refusals},
+        "refusals": table.refusals.iter().map(|refusal| json!({
+            "refusal": refusal.text,
+            "class": refusal.class.name(),
+            "law": refusal.law,
+        })).collect::<Vec<_>>(),
+        "tallies": {"classes": classes, "reasons": reasons},
+    })
+}
+
+fn refusals(report: &Report<'_>) -> Value {
+    let table = report.table;
+    json!({
+        "state_laws": report.state_laws,
+        "state_law_rule": "the state laws are the contract's laws that apply at genesis and to every committing decision, so that every committed state satisfies them, except InitialCondition laws, which apply at genesis only; a pre-state satisfies them when the library's law evaluator, run on the contract's own law programs with the pre-state as a genesis state and the state laws first, finds each one satisfied",
+        "law_rule": "a refusal's law is the law whose evaluation the library's law diagnostics report as refusing; a refusal no law evaluation made names none",
+        "reachability": "not decided: a pre-state that satisfies every state law may still be unreachable from genesis; a pre-state that breaks one is never a committed state",
+        "findings_rule": "each refusal of class law on inputs whose pre-state satisfies every state law is a finding",
+        "classes": RefusalClass::ALL.iter().map(|class| json!({
+            "class": class.name(),
+            "holds": class.meaning(),
+        })).collect::<Vec<_>>(),
+        "counts": report.summary.refusals.json(),
+        "by_unsatisfied_state_law": report.summary.refusals.by_state_law.iter().map(|(law, count)| {
+            (law.to_string(), count)
+        }).collect::<BTreeMap<_, _>>(),
+        "groups": report.groups.iter().map(|group| {
+            let refusal = &table.refusals[group.refusal as usize];
+            json!({
+                "refusal": group.refusal,
+                "class": refusal.class.name(),
+                "law": refusal.law,
+                "unsatisfied_state_law": group.unsatisfied,
+                "count": group.count,
+                "first": {
+                    "ordinal": group.first,
+                    "input": numbers(report.inputs.tuple(group.first)),
+                },
+            })
+        }).collect::<Vec<_>>(),
     })
 }
 
@@ -251,6 +300,18 @@ fn finding(finding: &Finding) -> Value {
             "line": line,
             "mutant": mutant,
         }),
+        Finding::LawRefusal(found) => json!({
+            "kind": "law-refusal-on-law-consistent-state",
+            "law": found.law,
+            "refusal": found.refusal,
+            "inputs": found.inputs,
+            "first": {
+                "ordinal": found.ordinal,
+                "input": numbers(&found.input),
+                "case": found.case.as_ref().map(|(index, _)| index),
+                "case_when": found.case.as_ref().map(|(_, when)| when),
+            },
+        }),
     }
 }
 
@@ -264,7 +325,11 @@ pub(super) fn outcome(outcome: &Outcome) -> Value {
             "post_sha256": hex(&decision.post_digest),
             "outbox_sha256": hex(&decision.outbox_digest),
         }),
-        Outcome::Refused(refusal) => json!({"refused": refusal}),
+        Outcome::Refused(refusal) => json!({
+            "refused": refusal.text,
+            "class": refusal.class.name(),
+            "law": refusal.law,
+        }),
     }
 }
 

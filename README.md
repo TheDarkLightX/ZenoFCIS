@@ -347,7 +347,11 @@ account-lockout example in the browser through that build.
 
 `zeno-fcis new DIR --contract CONTRACT` builds an application from a contract
 directory alone: `project.zeno`, the decision rules and genesis state in
-`v2/policy.json`, and, optionally, `tests/decision-examples.txt`.
+`v2/policy.json`, and, optionally, `tests/decision-examples.txt`. `new` binds
+the application to the ZenoFCIS source tree the CLI was built from, or to the
+one `--source` names, so it builds against that tree with no other step. The
+[contract rules reference](docs/CONTRACT_RULES.md) describes every key of
+`v2/policy.json`.
 `zeno-fcis generate contract DIR` regenerates `v2/schema.zcve`,
 `src/v2_contract.rs` and `v2/policy.zcve` from the first two; with `--check`
 it changes nothing and names each file that differs. Every template above is
@@ -358,8 +362,11 @@ delivers the outbox. [Dual approval](examples/dual-approval/README.md), a
 payment released only after two different officers approve it, is built this
 way. `zeno-fcis contract review DIR` writes an advisory packet: what the
 library decides on every input of a small domain, or on a boundary set of a
-large one; whether that agrees with `tests/decision-examples.txt`; and which
-rule mutants those inputs distinguish, each with a proposed example.
+large one; whether that agrees with `tests/decision-examples.txt`; which law
+refusals fall on states the contract's state laws allow; and which rule
+mutants those inputs distinguish, each with a proposed example.
+`zeno-fcis contract export-program DIR --out P` writes the contract's
+decision program in the encoding `optimize` and `transform` read.
 `zeno-fcis contract adopt DIR --candidate C --receipt R --usage
 new-version` makes a candidate decision program that a `transform` receipt
 shows equivalent the contract's next version, and keeps the superseded version

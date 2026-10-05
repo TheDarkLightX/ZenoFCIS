@@ -203,10 +203,12 @@ fn invalid_rules_and_missing_files_are_reported() {
     assert_eq!(json(&missing)["error"]["code"], "contract-read-failed");
 }
 
-/// What `new --contract` writes: the contract, its generated files and the
-/// shared application source.
-const APPLICATION_FILES: [&str; 12] = [
+/// What `new --contract` writes: the contract, its generated files, the
+/// shared application source and the binding to this source tree.
+const APPLICATION_FILES: [&str; 15] = [
     "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
     "README.md",
     "project.zeno",
     "v2/policy.json",
@@ -214,6 +216,7 @@ const APPLICATION_FILES: [&str; 12] = [
     "v2/policy.zcve",
     "src/v2_contract.rs",
     "src/lib.rs",
+    "src/examples.rs",
     "src/session.rs",
     "src/main.rs",
     "tests/decisions.rs",
@@ -277,6 +280,31 @@ fn an_application_built_from_a_contract_is_current_and_complete() {
     assert!(manifest.contains("name = \"dual-approval\""));
     assert!(manifest.contains(&format!("\"={}\"", env!("CARGO_PKG_VERSION"))));
     assert_eq!(contract_check(&app), Some(0));
+    // The binding: this tree's packages, lock and toolchain.
+    let tree = fs::canonicalize(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .unwrap_or_else(|error| panic!("{error}"));
+    let (_, patch) = manifest
+        .split_once("\n[patch.crates-io]\n")
+        .unwrap_or_else(|| panic!("no binding in {manifest}"));
+    for name in [
+        "zeno-fcis-shell-sqlite",
+        "zeno-fcis-synthesis",
+        "zeno-fcis-value",
+    ] {
+        let entry = format!(
+            "{name} = {{ path = {:?} }}\n",
+            tree.join("crates").join(name).display().to_string()
+        );
+        assert!(patch.contains(&entry), "{entry}");
+    }
+    assert!(!patch.contains("zeno-fcis-cli "));
+    assert!(read(app.join("Cargo.lock")) == read(tree.join("Cargo.lock")));
+    assert!(read(app.join("rust-toolchain.toml")) == read(tree.join("rust-toolchain.toml")));
+    let readme = String::from_utf8(read(app.join("README.md"))).unwrap_or_default();
+    assert!(
+        readme
+            .contains("```sh\ncargo test --offline\ncargo run --offline -- NEW_DATABASE_PATH\n```")
+    );
 
     // An existing application is never overwritten, and a template and a
     // contract cannot both be chosen.
@@ -315,4 +343,53 @@ fn a_contract_without_examples_still_builds_its_application() {
 
 fn contract_check(app: &Path) -> Option<i32> {
     contract(app, &["--check"]).status.code()
+}
+
+#[test]
+fn a_source_tree_that_cannot_bind_the_application_is_refused_writing_nothing() {
+    let root = TempRoot::new("unbound");
+    let contract = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval");
+    let empty = root.path().join("not-a-tree");
+    fs::create_dir(&empty).unwrap_or_else(|error| panic!("{error}"));
+    for source in [root.path().join("absent"), empty] {
+        let app = root.path().join("app");
+        let refused = new_application(&app, &contract, &["--source", &source.to_string_lossy()]);
+        assert_eq!(refused.status.code(), Some(1));
+        let stderr = String::from_utf8_lossy(&refused.stderr);
+        assert!(stderr.contains(&source.display().to_string()), "{stderr}");
+        // Nothing is written: the directory `new` created stays empty.
+        assert_eq!(fs::read_dir(&app).map(Iterator::count).ok(), Some(0));
+        fs::remove_dir(&app).unwrap_or_else(|error| panic!("{error}"));
+    }
+    // A template application is bound the same way.
+    let refused = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
+        .arg("new")
+        .arg(root.path().join("counter"))
+        .args(["--template", "durable-counter", "--source"])
+        .arg(root.path().join("absent"))
+        .output()
+        .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"));
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(
+        fs::read_dir(root.path().join("counter"))
+            .map(Iterator::count)
+            .ok(),
+        Some(0)
+    );
+    // The tree itself, named explicitly, binds as the default does.
+    let tree = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let named = root.path().join("named");
+    let bound = new_application(&named, &contract, &["--source", &tree.to_string_lossy()]);
+    assert_eq!(
+        bound.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&bound.stderr)
+    );
+    let default = root.path().join("default");
+    assert_eq!(
+        new_application(&default, &contract, &[]).status.code(),
+        Some(0)
+    );
+    assert!(read(named.join("Cargo.toml")) == read(default.join("Cargo.toml")));
 }

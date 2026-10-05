@@ -1,19 +1,21 @@
-//! The owner's reviewed decision examples: read in the format every
-//! application's `tests/decision-examples.txt` uses, compared with the
-//! library's decision, and written back as proposed examples.
+//! The owner's reviewed decision examples: read with the decision-examples
+//! grammar every application built from a contract compiles, compared with
+//! the library's decision, and written back as proposed examples.
 //!
-//! A line is `inputs | class reason post | deliveries`. The inputs may be
-//! split over several `|` sections. The class is `accept`, `reject` or
-//! `failure`; the reason is a number or `-`; a reject repeats the pre-state
-//! as its post-state. Deliveries are `-`, or `;`-separated deliveries, each a
-//! declared channel followed by its payload values, or the payload values
-//! alone when the contract declares one channel.
+//! The grammar is `contract-app/src/examples.rs`, the file `zeno-fcis new
+//! --contract` copies into each application, compiled here unchanged, so a
+//! file the review reads is a file the application reads alike. A line is
+//! `inputs | class reason post | deliveries`; the module documentation of
+//! the grammar gives every rule.
+
+use zeno_fcis_synthesis::finite::v2_composition as c;
 
 use super::super::ContractError;
-use super::super::declarations::{Declarations, Source};
 use super::super::rules::Class;
-use super::domain::{LeafDomain, Position, leaf_domain};
 use super::evaluate::{Decision, Outcome};
+
+#[path = "../../../contract-app/src/examples.rs"]
+mod grammar;
 
 pub(super) const FILE: &str = "tests/decision-examples.txt";
 
@@ -24,175 +26,60 @@ pub(super) struct Example {
     pub(super) inputs: Vec<i64>,
     pub(super) class: Class,
     pub(super) reason: Option<u32>,
-    pub(super) post: Vec<i64>,
+    pub(super) post: Vec<i128>,
     /// Each delivery's channel and payload values.
-    pub(super) outbox: Vec<(u32, Vec<i64>)>,
+    pub(super) outbox: Vec<(u32, Vec<i128>)>,
 }
 
-/// Parses every example line; comments start with `#`.
+/// Parses every example line against the shape the contract's descriptor
+/// declares, as the application does.
 ///
 /// # Errors
 /// Returns the first malformed line, or a value outside its domain.
 pub(super) fn parse(
     text: &str,
-    positions: &[Position],
-    declarations: &Declarations,
+    descriptor: &c::Descriptor<'_>,
 ) -> Result<Vec<Example>, ContractError> {
-    let channels: Vec<(u32, Vec<LeafDomain>)> = declarations
-        .channels
-        .iter()
-        .map(|channel| {
-            Ok((
-                channel.id,
-                declarations
-                    .fields(channel.payload)?
-                    .iter()
-                    .map(|field| leaf_domain(declarations, field.type_id))
-                    .collect::<Result<_, _>>()?,
-            ))
-        })
-        .collect::<Result<_, ContractError>>()?;
-    let state_width = positions
-        .iter()
-        .filter(|position| position.source == Source::State)
-        .count();
-    let mut examples = Vec::new();
-    for (index, line) in text.lines().enumerate() {
-        let number = index + 1;
-        if line.trim().is_empty() || line.trim_start().starts_with('#') {
-            continue;
-        }
-        let error = |what: String| ContractError::new(format!("{FILE} line {number}"), what);
-        let sections: Vec<&str> = line.split('|').map(str::trim).collect();
-        if sections.len() < 3 {
-            return Err(error(
-                "expected `inputs | decision | deliveries`".to_owned(),
-            ));
-        }
-        let (decision, deliveries) = (sections[sections.len() - 2], sections[sections.len() - 1]);
-        let inputs = numbers(&sections[..sections.len() - 2].join(" ")).map_err(&error)?;
-        if inputs.len() != positions.len() {
-            return Err(error(format!(
-                "{} input numbers; the contract reads {}",
-                inputs.len(),
-                positions.len()
-            )));
-        }
-        let inputs = inputs
-            .iter()
-            .zip(positions)
-            .map(|(value, position)| {
-                if !position.domain.contains(*value) {
-                    return Err(error(format!(
-                        "`{value}` is outside the domain of `{}`",
-                        position.name
-                    )));
-                }
-                i64::try_from(*value).map_err(|_| error(format!("`{value}` is too large")))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        let mut words = decision.split_whitespace();
-        let class = match words.next() {
-            Some("accept") => Class::Accept,
-            Some("reject") => Class::Reject,
-            Some("failure") => Class::CommittedFailure,
-            _ => {
-                return Err(error(
-                    "the decision starts with accept, reject or failure".to_owned(),
-                ));
-            }
-        };
-        let reason = match words.next() {
-            Some("-") => None,
-            Some(word) => Some(
-                word.parse::<u32>()
-                    .map_err(|_| error(format!("`{word}` is not a reason")))?,
-            ),
-            None => return Err(error("missing reason".to_owned())),
-        };
-        let post = words
-            .map(|word| {
-                word.parse::<i64>()
-                    .map_err(|_| error(format!("`{word}` is not a post-state number")))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        if post.len() != state_width {
-            return Err(error(format!(
-                "{} post-state numbers; the state has {state_width} fields",
-                post.len()
-            )));
-        }
-        let outbox = if deliveries == "-" {
-            Vec::new()
-        } else {
-            deliveries
-                .split(';')
-                .map(|delivery| {
-                    let numbers = numbers(delivery).map_err(&error)?;
-                    self::delivery(&numbers, &channels).map_err(&error)
+    let shape =
+        grammar::Shape::of(descriptor).map_err(|reason| ContractError::new(FILE, reason))?;
+    let lines = grammar::parse(text, &shape)
+        .map_err(|error| ContractError::new(format!("{FILE} line {}", error.line), error.reason))?;
+    let texts: Vec<&str> = text.lines().collect();
+    lines
+        .into_iter()
+        .map(|line| {
+            // Every input domain is within the 64-bit program range.
+            let inputs = line
+                .inputs
+                .iter()
+                .map(|value| {
+                    i64::try_from(*value).map_err(|_| {
+                        ContractError::new(
+                            format!("{FILE} line {}", line.number),
+                            format!("`{value}` is too large"),
+                        )
+                    })
                 })
-                .collect::<Result<Vec<_>, _>>()?
-        };
-        examples.push(Example {
-            line: number,
-            text: line.to_owned(),
-            inputs,
-            class,
-            reason,
-            post,
-            outbox,
-        });
-    }
-    Ok(examples)
-}
-
-fn numbers(text: &str) -> Result<Vec<i128>, String> {
-    text.split_whitespace()
-        .map(|word| {
-            word.parse::<i128>()
-                .map_err(|_| format!("`{word}` is not a number"))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Example {
+                line: line.number,
+                text: texts
+                    .get(line.number - 1)
+                    .copied()
+                    .unwrap_or_default()
+                    .to_owned(),
+                inputs,
+                class: match line.class {
+                    grammar::Class::Accept => Class::Accept,
+                    grammar::Class::Reject => Class::Reject,
+                    grammar::Class::Failure => Class::CommittedFailure,
+                },
+                reason: line.reason,
+                post: line.post,
+                outbox: line.outbox,
+            })
         })
         .collect()
-}
-
-/// A delivery's channel and payload values: a declared channel followed by
-/// its payload, or the payload alone when one channel is declared.
-fn delivery(
-    numbers: &[i128],
-    channels: &[(u32, Vec<LeafDomain>)],
-) -> Result<(u32, Vec<i64>), String> {
-    let payload = |id: u32, domains: &[LeafDomain], values: &[i128]| {
-        values
-            .iter()
-            .zip(domains)
-            .map(|(value, domain)| {
-                if domain.contains(*value) {
-                    i64::try_from(*value).map_err(|_| format!("`{value}` is too large"))
-                } else {
-                    Err(format!(
-                        "payload value `{value}` is outside its domain on channel {id}"
-                    ))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map(|values| (id, values))
-    };
-    if let Some((channel, values)) = numbers.split_first()
-        && let Ok(id) = u32::try_from(*channel)
-        && let Some((_, domains)) = channels.iter().find(|(declared, _)| *declared == id)
-        && domains.len() == values.len()
-    {
-        return payload(id, domains, values);
-    }
-    if let [(id, domains)] = channels
-        && domains.len() == numbers.len()
-    {
-        return payload(*id, domains, numbers);
-    }
-    Err(
-        "a delivery is a declared channel followed by its payload values, or the payload values of the only channel"
-            .to_owned(),
-    )
 }
 
 /// The first way a library outcome differs from the example, if any.
@@ -225,7 +112,10 @@ pub(super) fn agrees(
         ));
     }
     if example.class == Class::Reject {
-        if example.post != example.inputs[..state_width.min(example.inputs.len())] {
+        let pre = example.inputs[..state_width.min(example.inputs.len())]
+            .iter()
+            .map(|value| i128::from(*value));
+        if !example.post.iter().copied().eq(pre) {
             return Err("the rejected post-state differs from the pre-state".to_owned());
         }
         if !decision.post.is_empty() {
@@ -237,12 +127,7 @@ pub(super) fn agrees(
             .iter()
             .map(|(_, value)| value.number())
             .collect();
-        let expected: Vec<i128> = example
-            .post
-            .iter()
-            .map(|value| i128::from(*value))
-            .collect();
-        if post.as_deref() != Some(expected.as_slice()) {
+        if post.as_deref() != Some(example.post.as_slice()) {
             return Err(format!(
                 "post-state differs: the example says {:?}, the library {:?}",
                 example.post,
@@ -271,8 +156,7 @@ pub(super) fn agrees(
             .iter()
             .map(|(_, value)| value.number())
             .collect();
-        let expected: Vec<i128> = payload.iter().map(|value| i128::from(*value)).collect();
-        if values.as_deref() != Some(expected.as_slice()) {
+        if values.as_deref() != Some(payload.as_slice()) {
             return Err(format!(
                 "delivery {number} payload differs: the example says {payload:?}, the library {:?}",
                 values.unwrap_or_default()

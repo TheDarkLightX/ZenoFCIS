@@ -1,8 +1,9 @@
 //! Advisory contract review: what the contract decides on every input of a
 //! small domain, or on a deterministic boundary set of a large one; whether
-//! those decisions agree with the owner's reviewed decision examples; and
-//! which rule mutants the inputs distinguish, each with a witness written as
-//! a decision example.
+//! those decisions agree with the owner's reviewed decision examples; which
+//! refusals fall on pre-states that satisfy every state law; and which rule
+//! mutants the inputs distinguish, each with a witness written as a decision
+//! example.
 //!
 //! Every decision, of the contract and of each mutant, is the library
 //! Authority's, bound to the generated contract exactly as an application
@@ -15,6 +16,7 @@ mod evaluate;
 mod examples;
 mod mutants;
 mod packet;
+mod refusals;
 mod table;
 #[cfg(test)]
 mod tests;
@@ -33,9 +35,10 @@ use domain::{Construction, InputSet};
 use evaluate::{Framer, Outcome};
 use examples::Example;
 use mutants::Mutant;
+use refusals::{Group, Tally};
 use table::{Row, Table};
 
-pub(crate) const PACKET_SCHEMA: &str = "zeno-fcis/contract-review/1";
+pub(crate) const PACKET_SCHEMA: &str = "zeno-fcis/contract-review/2";
 /// The largest input set a review enumerates or probes by default.
 pub(crate) const DEFAULT_MAX_TUPLES: u64 = 1 << 20;
 /// Decision table rows are written out up to this many inputs; the table's
@@ -48,9 +51,11 @@ const CHUNK: usize = 1 << 14;
 
 const ADVISORY: &str = "Advisory only. This packet grants no authority and changes no \
 application file. It records what the library Authority decides for the contract on the \
-listed inputs, where those decisions differ from the owner's decision examples, and which \
-rule mutants the inputs distinguish. An undistinguished mutant on a boundary set is not \
-equivalent; equivalence is claimed only over a fully enumerated domain.";
+listed inputs, where those decisions differ from the owner's decision examples, which \
+refusals fall on pre-states that satisfy every state law, and which rule mutants the inputs \
+distinguish. Whether a pre-state is reachable from genesis is not decided: a pre-state that \
+satisfies every state law may still be unreachable. An undistinguished mutant on a boundary \
+set is not equivalent; equivalence is claimed only over a fully enumerated domain.";
 
 /// The application files a review reads.
 #[derive(Clone, Copy, Debug)]
@@ -68,6 +73,7 @@ pub(crate) struct ReviewSources<'a> {
 pub(crate) struct Review {
     packet: String,
     summary: Summary,
+    law_refusals: Vec<LawRefusal>,
 }
 
 impl Review {
@@ -78,6 +84,11 @@ impl Review {
 
     pub(crate) fn summary(&self) -> &Summary {
         &self.summary
+    }
+
+    /// One line for each law-refusal finding.
+    pub(crate) fn law_refusal_lines(&self) -> Vec<String> {
+        self.law_refusals.iter().map(LawRefusal::line).collect()
     }
 }
 
@@ -95,6 +106,9 @@ pub(crate) struct Summary {
     pub(crate) refused_by_library: usize,
     pub(crate) equivalent: usize,
     pub(crate) undistinguished: usize,
+    refusals: Tally,
+    /// Findings of law refusals on pre-states that satisfy every state law.
+    pub(crate) law_refusals: usize,
     pub(crate) findings: usize,
 }
 
@@ -112,8 +126,28 @@ impl Summary {
                 "equivalent_over_full_domain": self.equivalent,
                 "not_distinguished_within_boundary_set": self.undistinguished,
             },
+            "refusals": self.refusals.json(),
+            "law_refusal_findings": self.law_refusals,
             "findings": self.findings,
         })
+    }
+
+    /// One line on the refused inputs: their count by class, and how many
+    /// fall on pre-states that satisfy every state law.
+    pub(crate) fn refusals_line(&self) -> String {
+        let refusals = &self.refusals;
+        if refusals.all.total == 0 {
+            return "refusals 0".to_owned();
+        }
+        format!(
+            "refusals {} ({}): {} on pre-states that satisfy every state law ({}), {} on pre-states the state laws exclude ({})",
+            refusals.all.total,
+            refusals.all.text(),
+            refusals.law_consistent.total,
+            refusals.law_consistent.text(),
+            refusals.excluded.total,
+            refusals.excluded.text()
+        )
     }
 }
 
@@ -177,6 +211,47 @@ enum Finding {
     ExampleDisagrees { line: usize, difference: String },
     /// An owner example agrees with a mutant and not with the contract.
     ExampleAgreesWithMutant { line: usize, mutant: String },
+    /// A law refuses inputs whose pre-state satisfies every state law.
+    LawRefusal(LawRefusal),
+}
+
+/// One refusal by one law, on inputs whose pre-state satisfies every state
+/// law, with the first such input as the witness.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct LawRefusal {
+    /// The refusing law, as the library's law diagnostics name it; `None`
+    /// for a law refusal without a refusing verdict, such as a malformed law
+    /// frame, which only the case and the input then name.
+    law: Option<u32>,
+    /// The refusal as the library reports it.
+    refusal: String,
+    inputs: usize,
+    ordinal: usize,
+    input: Vec<i64>,
+    /// The case the decision program selects for the witness, and its
+    /// `when`, as the library's program evaluator computes it.
+    case: Option<(usize, String)>,
+}
+
+impl LawRefusal {
+    /// The one-line summary a human reads.
+    fn line(&self) -> String {
+        let law = self
+            .law
+            .map_or_else(|| "a law".to_owned(), |law| format!("law {law}"));
+        let case = self
+            .case
+            .as_ref()
+            .map_or_else(String::new, |(index, when)| {
+                format!(", decided by cases[{index}] `{when}`")
+            });
+        format!(
+            "law refusal: {law} refuses {} inputs whose pre-state satisfies every state law ({}); first {}{case}",
+            self.inputs,
+            self.refusal,
+            examples::join(&self.input)
+        )
+    }
 }
 
 /// Reviews a contract. The result is advisory; nothing is written.
@@ -192,33 +267,55 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
     let contract = Contract::build(&declarations, &rules, commitment)?;
     let positions = domain::positions(&declarations)?;
     let state_width = declarations.state_fields()?.len();
-    let examples = match sources.examples {
-        Some(text) => examples::parse(text, &positions, &declarations)?,
-        None => Vec::new(),
-    };
-    let example_inputs: Vec<&[i64]> = examples
-        .iter()
-        .map(|example| example.inputs.as_slice())
-        .collect();
-    let inputs = domain::input_set(
-        &positions,
-        &rules,
-        &declarations,
-        &example_inputs,
-        max_tuples.max(1),
-    )?;
     let framer = Framer::new(&positions, &contract);
-    let (identity, table, at_examples) = policy::with_authority(&contract, &schema, |authority| {
-        let identity = evaluate::hex(&evaluate::digest(authority.identity()));
+    let Bound {
+        identity,
+        examples,
+        inputs,
+        state_laws,
+        table,
+        at_examples,
+    } = policy::with_authority(&contract, &schema, |authority| {
+        let descriptor = authority.descriptor();
+        // The examples are read against the descriptor, as the application
+        // reads them.
+        let examples = match sources.examples {
+            Some(text) => examples::parse(text, descriptor)?,
+            None => Vec::new(),
+        };
+        let example_inputs: Vec<&[i64]> = examples
+            .iter()
+            .map(|example| example.inputs.as_slice())
+            .collect();
+        let inputs = domain::input_set(
+            &positions,
+            &rules,
+            &declarations,
+            &example_inputs,
+            max_tuples.max(1),
+        )?;
+        let state_laws = evaluate::state_laws(descriptor);
         let mut table = Table::default();
         let mut start = 0;
         while start < inputs.len() {
             let end = (start + CHUNK).min(inputs.len());
             let outcomes = parallel(end - start, |offset| {
-                evaluate::evaluate(authority, &framer, inputs.tuple(start + offset))
+                let tuple = inputs.tuple(start + offset);
+                let outcome = evaluate::evaluate(authority, &framer, tuple);
+                // Only a refusal's pre-state is checked against the state laws.
+                let unsatisfied = match outcome {
+                    Outcome::Refused(_) => evaluate::first_unsatisfied_state_law(
+                        descriptor,
+                        &state_laws,
+                        &framer,
+                        tuple,
+                    ),
+                    Outcome::Decision(_) => None,
+                };
+                (outcome, unsatisfied)
             });
-            for outcome in &outcomes {
-                table.record(outcome);
+            for (outcome, unsatisfied) in &outcomes {
+                table.record(outcome, *unsatisfied);
             }
             start = end;
         }
@@ -226,8 +323,15 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
             .iter()
             .map(|example| evaluate::evaluate(authority, &framer, &example.inputs))
             .collect();
-        (identity, table, at_examples)
-    })?;
+        Ok::<_, ContractError>(Bound {
+            identity: evaluate::hex(&evaluate::digest(authority.identity())),
+            examples,
+            inputs,
+            state_laws,
+            table,
+            at_examples,
+        })
+    })??;
     let agreement: Vec<Result<(), String>> = examples
         .iter()
         .zip(&at_examples)
@@ -276,6 +380,15 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
             });
         }
     }
+    let groups = refusals::groups(&table);
+    // Naming a witness's case is a courtesy; without the program it is omitted.
+    let program = contract.program().ok();
+    let law_refusals: Vec<LawRefusal> = groups
+        .iter()
+        .filter(|group| group.unsatisfied.is_none())
+        .filter_map(|group| law_refusal(group, &table, &inputs, program.as_ref(), &rules))
+        .collect();
+    findings.extend(law_refusals.iter().cloned().map(Finding::LawRefusal));
 
     let count = |wanted: &str| {
         classified
@@ -295,6 +408,8 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
         refused_by_library: count("refused-by-library"),
         equivalent: count("equivalent-over-full-domain"),
         undistinguished: count("not-distinguished-within-boundary-set"),
+        refusals: Tally::of(&table, &groups),
+        law_refusals: law_refusals.len(),
         findings: findings.len(),
     };
     let sha256 = |bytes: &[u8]| evaluate::hex(&evaluate::digest(bytes));
@@ -311,6 +426,8 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
         inputs: &inputs,
         max_tuples,
         table: &table,
+        state_laws: &state_laws,
+        groups: &groups,
         examples_file: sources.examples.map(|_| examples::FILE),
         examples: &examples,
         at_examples: &at_examples,
@@ -323,6 +440,37 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
     Ok(Review {
         packet: crate::transform::canonical_json(&packet::build(&report)),
         summary,
+        law_refusals,
+    })
+}
+
+/// The finding a group of refused inputs makes when a law refused them and
+/// their pre-states satisfy every state law, with the case the library's
+/// program evaluator selects for the first of them.
+fn law_refusal(
+    group: &Group,
+    table: &Table,
+    inputs: &InputSet,
+    program: Option<&zeno_fcis_synthesis::finite::Program>,
+    rules: &Rules,
+) -> Option<LawRefusal> {
+    let refusal = &table.refusals[group.refusal as usize];
+    if refusal.class != evaluate::RefusalClass::Law {
+        return None;
+    }
+    let input = inputs.tuple(group.first).to_vec();
+    // Output 0 of a generated decision program is the selected case's index.
+    let case = program
+        .and_then(|program| program.evaluate(&input).ok())
+        .and_then(|outputs| usize::try_from(*outputs.first()?).ok())
+        .and_then(|index| Some((index, mutants::render(&rules.cases.get(index)?.when))));
+    Some(LawRefusal {
+        law: refusal.law,
+        refusal: refusal.text.clone(),
+        inputs: group.count,
+        ordinal: group.first,
+        input,
+        case,
     })
 }
 
@@ -364,6 +512,18 @@ fn parallel<T: Send>(count: usize, work: impl Fn(usize) -> T + Sync) -> Vec<T> {
     });
     results.sort_by_key(|(index, _)| *index);
     results.into_iter().map(|(_, result)| result).collect()
+}
+
+/// What the review computes with the contract's Authority bound.
+struct Bound {
+    /// SHA-256 of the bound Authority's identity, in hexadecimal.
+    identity: String,
+    examples: Vec<Example>,
+    inputs: InputSet,
+    /// The contract's state laws, in its law order.
+    state_laws: Vec<u32>,
+    table: Table,
+    at_examples: Vec<Outcome>,
 }
 
 /// What every mutant is classified against.

@@ -1,6 +1,8 @@
 //! `zeno-fcis contract review`: the packet is byte-identical on repeat, the
 //! summary reports the review, a planted wrong constant contradicts an owner
-//! example, and the command is described with its effects.
+//! example, a law refusal on a pre-state that satisfies every state law is a
+//! finding, an application compiles the examples grammar the review
+//! compiles, and the command is described with its effects.
 #![forbid(unsafe_code)]
 
 use std::fs;
@@ -41,6 +43,21 @@ fn template(name: &str) -> PathBuf {
 
 fn dual_approval() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval")
+}
+
+/// Copies an application's review inputs into `app`.
+fn copy_application(from: &Path, app: &Path) {
+    for file in [
+        "project.zeno",
+        "v2/policy.json",
+        "tests/decision-examples.txt",
+    ] {
+        let target = app.join(file);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).unwrap_or_else(|error| panic!("{error}"));
+        }
+        fs::copy(from.join(file), &target).unwrap_or_else(|error| panic!("copy {file}: {error}"));
+    }
 }
 
 fn zeno(args: &[&str]) -> Output {
@@ -88,7 +105,7 @@ fn the_packet_is_byte_identical_on_repeat_and_the_summary_reports_it() {
     assert_eq!(summary["schema"], "zeno-fcis/cli/1");
     assert_eq!(summary["status"], "reviewed");
     assert_eq!(summary["authority"], "none");
-    assert_eq!(summary["packet_schema"], "zeno-fcis/contract-review/1");
+    assert_eq!(summary["packet_schema"], "zeno-fcis/contract-review/2");
     assert_eq!(summary["summary"]["application"], "dual-approval");
     assert_eq!(summary["summary"]["inputs"]["construction"], "full-domain");
     assert_eq!(summary["summary"]["inputs"]["count"], 384);
@@ -108,11 +125,12 @@ fn the_packet_is_byte_identical_on_repeat_and_the_summary_reports_it() {
         human.starts_with("reviewed dual-approval: 384 inputs (full-domain)"),
         "{human}"
     );
+    assert!(human.contains("\nrefusals 0\n"), "{human}");
     let first = fs::read(&first).unwrap_or_else(|error| panic!("{error}"));
     let second = fs::read(&second).unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(first, second);
     let packet = json(&first);
-    assert_eq!(packet["schema"], "zeno-fcis/contract-review/1");
+    assert_eq!(packet["schema"], "zeno-fcis/contract-review/2");
     assert_eq!(packet["application"], "dual-approval");
     assert_eq!(
         packet["mutants"]["catalog"],
@@ -129,18 +147,7 @@ fn the_packet_is_byte_identical_on_repeat_and_the_summary_reports_it() {
 fn a_planted_wrong_constant_is_a_disagreement() {
     let root = TempRoot::new("planted");
     let app = root.path().join("account-lockout");
-    for file in [
-        "project.zeno",
-        "v2/policy.json",
-        "tests/decision-examples.txt",
-    ] {
-        let target = app.join(file);
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).unwrap_or_else(|error| panic!("{error}"));
-        }
-        fs::copy(template("account-lockout").join(file), &target)
-            .unwrap_or_else(|error| panic!("copy {file}: {error}"));
-    }
+    copy_application(&template("account-lockout"), &app);
     let rules = app.join("v2/policy.json");
     let text = fs::read_to_string(&rules).unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(text.matches("\"now + 900\"").count(), 1);
@@ -189,6 +196,98 @@ fn a_planted_wrong_constant_is_a_disagreement() {
             "v2/policy.json"
         ]
     );
+}
+
+#[test]
+fn a_law_refusal_on_a_law_consistent_state_is_a_finding_and_exits_1() {
+    let root = TempRoot::new("law-refusal");
+    let app = root.path().join("spend-approval");
+    copy_application(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/spend-approval"),
+        &app,
+    );
+    // The study's planted bug: the CFO check moved from tier 1 to tier 2.
+    let rules = app.join("v2/policy.json");
+    let text = fs::read_to_string(&rules).unwrap_or_else(|error| panic!("{error}"));
+    let check = "action == 172 && tier >= 1 && !cfo_ok";
+    assert_eq!(text.matches(check).count(), 1);
+    fs::write(
+        &rules,
+        text.replace(check, "action == 172 && tier >= 2 && !cfo_ok"),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let packet = root.path().join("packet.json");
+    let output = review(
+        &app,
+        &[
+            "--out",
+            packet.to_str().unwrap_or_default(),
+            "--format",
+            "json",
+        ],
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let summary = json(&output.stdout);
+    assert_eq!(summary["status"], "law-refusal");
+    assert_eq!(summary["summary"]["examples"]["disagreements"], 0);
+    assert_eq!(summary["summary"]["law_refusal_findings"], 1);
+    assert_eq!(summary["summary"]["findings"], 1);
+    assert_eq!(
+        summary["summary"]["refusals"]["on_law_consistent_states"]["by_class"]["law"],
+        16
+    );
+    let findings =
+        json(&fs::read(&packet).unwrap_or_else(|error| panic!("{error}")))["findings"].clone();
+    assert_eq!(findings[0]["kind"], "law-refusal-on-law-consistent-state");
+    assert_eq!(findings[0]["law"], 500);
+    // The human summary names the law, the count and the first input.
+    let output = review(&app, &["--out", packet.to_str().unwrap_or_default()]);
+    assert_eq!(output.status.code(), Some(1));
+    let human = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        human.starts_with("law-refusal spend-approval: 20480 inputs (full-domain)"),
+        "{human}"
+    );
+    assert!(
+        human.contains("\nrefusals 16 (law 16): 16 on pre-states that satisfy every state law (law 16), 0 on pre-states the state laws exclude (none)\n"),
+        "{human}"
+    );
+    assert!(
+        human.contains("\nlaw refusal: law 500 refuses 16 inputs whose pre-state satisfies every state law (Core(Law(Violated))); first 151 1 0 0 172 0 161 0 1, decided by cases[16] `action == 172`\n"),
+        "{human}"
+    );
+    assert!(human.contains("\nfindings 1\n"), "{human}");
+}
+
+#[test]
+fn an_application_compiles_the_examples_grammar_the_review_compiles() {
+    let root = TempRoot::new("grammar");
+    let app = root.path().join("app");
+    let output = zeno(&[
+        "new",
+        app.to_str().unwrap_or_default(),
+        "--contract",
+        dual_approval().to_str().unwrap_or_default(),
+    ]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let grammar = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("contract-app/src/examples.rs");
+    assert_eq!(
+        fs::read(app.join("src/examples.rs")).ok(),
+        Some(fs::read(grammar).unwrap_or_else(|error| panic!("{error}")))
+    );
+    let library =
+        fs::read_to_string(app.join("src/lib.rs")).unwrap_or_else(|error| panic!("{error}"));
+    assert!(library.contains("\nmod examples;\n"));
 }
 
 fn walkdir(root: &Path) -> Vec<String> {

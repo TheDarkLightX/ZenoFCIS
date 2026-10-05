@@ -8,7 +8,7 @@
 
 use zeno_fcis_synthesis::finite::{
     Domain as ScalarDomain, Op, V2InputField as InputField, V2InputLeaf as InputLeaf,
-    V2InputVariant as InputVariant, V2Resource as Resource, V2ScalarProgram,
+    V2InputVariant as InputVariant, V2Limits, V2Resource as Resource, V2ScalarProgram,
     canonical_v2::schema as s, v2_authority as authority, v2_catalog as catalog,
     v2_composition as c, v2_laws as l, v2_zero_limits,
 };
@@ -252,7 +252,10 @@ fn bound<R>(
             id: channel.id,
             destination: domain(&channel.destination),
             payload,
-            idempotency: c::Domain::U128 { min: 0, max: 0 },
+            idempotency: c::Domain::U128 {
+                min: 0,
+                max: channel.idempotency,
+            },
         })
         .collect();
     let law_nodes: Vec<Vec<l::Op<'_>>> = contract
@@ -277,19 +280,14 @@ fn bound<R>(
         .collect();
     let required: Vec<u32> = contract.laws.iter().map(|law| law.id).collect();
     let budgets = contract.budgets;
-    let descriptor = c::Descriptor {
-        state: roots[0].schema(),
-        command: roots[1].schema(),
-        context: roots[2].schema(),
-        program: V2ScalarProgram {
-            inputs: &inputs,
-            outputs: &outputs,
-            nodes: &nodes,
-            roots: &program_roots,
-        },
+    let parts = Parts {
+        roots: &roots,
+        inputs: &inputs,
+        outputs: &outputs,
+        nodes: &nodes,
+        program_roots: &program_roots,
         bindings: &bindings,
         output_types: &output_types,
-        decision_output: 0,
         branches: &branches,
         reasons: &reasons,
         channels: &channels,
@@ -299,42 +297,272 @@ fn bound<R>(
             .with_limit(Resource::Read, budgets.read)
             .with_limit(Resource::Write, budgets.write)
             .with_limit(Resource::Candidate, 1)
-            .with_limit(Resource::Effect, 1)
+            .with_limit(Resource::Effect, budgets.effect)
             .with_limit(Resource::Byte, budgets.byte)
             .with_limit(Resource::WitnessByte, 0)
             .with_limit(Resource::Depth, 0)
             .with_limit(Resource::Step, budgets.step),
     };
+    let descriptor = parts.descriptor();
     let policy = authority::policy_bytes(&descriptor, schema, &framing, &channel_roots)
         .ok_or_else(|| {
             ContractError::new("v2/policy.zcve", "the library policy encoding overflowed")
         })?;
-    let (types, fields, variants) = contract.schema_counts();
-    let limits = catalog::Limits {
-        schema: s::Limits {
-            bytes: u64::try_from(schema.len()).unwrap_or(u64::MAX),
-            types: u32::try_from(types).unwrap_or(u32::MAX),
-            fields: u32::try_from(fields).unwrap_or(u32::MAX),
-            variants: u32::try_from(variants).unwrap_or(u32::MAX),
-        },
-        contract_bytes: u64::try_from(policy.len()).unwrap_or(u64::MAX),
+    let binder = Binder {
+        schema,
+        description: &description,
+        counts: contract.schema_counts(),
+        framing: &framing,
     };
     let catalog = catalog::bind_original(
         schema,
         &description,
-        limits,
+        binder.limits(&policy),
         &policy,
         &descriptor,
         &framing,
         &channel_roots,
     )
     .map_err(|failure| {
-        ContractError::new(
-            "library catalog",
-            format!("refused the generated contract: {failure:?}"),
-        )
+        let entry = binder.locate(contract, &parts, &channel_roots);
+        catalog_refusal(failure, entry)
     })?;
     use_bound(&policy, &catalog)
+}
+
+/// Everything a descriptor borrows, so that a probe can replace one part.
+#[derive(Clone, Copy)]
+struct Parts<'a> {
+    roots: &'a [Root],
+    inputs: &'a [ScalarDomain],
+    outputs: &'a [ScalarDomain],
+    nodes: &'a [Op],
+    program_roots: &'a [u16],
+    bindings: &'a [c::Binding],
+    output_types: &'a [InputLeaf],
+    branches: &'a [c::Branch<'a>],
+    reasons: &'a [c::Reason],
+    channels: &'a [c::Channel<'a>],
+    laws: &'a [l::Law<'a>],
+    required: &'a [u32],
+    limits: V2Limits,
+}
+
+impl<'a> Parts<'a> {
+    fn descriptor(&self) -> c::Descriptor<'a> {
+        c::Descriptor {
+            state: self.roots[0].schema(),
+            command: self.roots[1].schema(),
+            context: self.roots[2].schema(),
+            program: V2ScalarProgram {
+                inputs: self.inputs,
+                outputs: self.outputs,
+                nodes: self.nodes,
+                roots: self.program_roots,
+            },
+            bindings: self.bindings,
+            output_types: self.output_types,
+            decision_output: 0,
+            branches: self.branches,
+            reasons: self.reasons,
+            channels: self.channels,
+            laws: self.laws,
+            required: self.required,
+            limits: self.limits,
+        }
+    }
+}
+
+/// What the catalog binding checks beside the descriptor.
+struct Binder<'a> {
+    schema: &'a [u8],
+    description: &'a s::Description<'a>,
+    /// Declared types, the most fields of one type and the most variants of one type.
+    counts: (usize, usize, usize),
+    framing: &'a c::Framing,
+}
+
+/// A rules entry a catalog refusal is about, and the probe that showed it.
+struct Entry {
+    place: String,
+    probe: &'static str,
+}
+
+impl Binder<'_> {
+    fn limits(&self, policy: &[u8]) -> catalog::Limits {
+        let (types, fields, variants) = self.counts;
+        catalog::Limits {
+            schema: s::Limits {
+                bytes: u64::try_from(self.schema.len()).unwrap_or(u64::MAX),
+                types: u32::try_from(types).unwrap_or(u32::MAX),
+                fields: u32::try_from(fields).unwrap_or(u32::MAX),
+                variants: u32::try_from(variants).unwrap_or(u32::MAX),
+            },
+            contract_bytes: u64::try_from(policy.len()).unwrap_or(u64::MAX),
+        }
+    }
+
+    /// Whether the catalog admits the descriptor of `parts`, encoded by the
+    /// library, with these channel links.
+    fn admits(&self, parts: &Parts<'_>, channel_roots: &[(u32, u32, u32)]) -> bool {
+        let descriptor = parts.descriptor();
+        authority::policy_bytes(&descriptor, self.schema, self.framing, channel_roots).is_some_and(
+            |policy| {
+                catalog::bind_original(
+                    self.schema,
+                    self.description,
+                    self.limits(&policy),
+                    &policy,
+                    &descriptor,
+                    self.framing,
+                    channel_roots,
+                )
+                .is_ok()
+            },
+        )
+    }
+
+    /// The first entry whose removal lets the catalog admit the rest: a
+    /// delivery, found by adding the deliveries back in case order to the
+    /// contract without any; a law, whose formula is replaced by `true`; or
+    /// a channel, left out with every delivery. The library reports only
+    /// which stage refused, so the entry is found by these probes.
+    fn locate(
+        &self,
+        contract: &Contract<'_>,
+        parts: &Parts<'_>,
+        channel_roots: &[(u32, u32, u32)],
+    ) -> Option<Entry> {
+        let bare: Vec<c::Branch<'_>> = parts
+            .branches
+            .iter()
+            .map(|branch| c::Branch {
+                outbox: &[],
+                ..*branch
+            })
+            .collect();
+        if self.admits(
+            &Parts {
+                branches: &bare,
+                ..*parts
+            },
+            channel_roots,
+        ) {
+            let mut growing = bare.clone();
+            for (index, branch) in parts.branches.iter().enumerate() {
+                for count in 1..=branch.outbox.len() {
+                    growing[index].outbox = &branch.outbox[..count];
+                    let admitted = self.admits(
+                        &Parts {
+                            branches: &growing,
+                            ..*parts
+                        },
+                        channel_roots,
+                    );
+                    if !admitted {
+                        return Some(Entry {
+                            place: format!("v2/policy.json cases[{index}].outbox[{}]", count - 1),
+                            probe: "it admits the contract with only the deliveries before this one",
+                        });
+                    }
+                }
+            }
+        }
+        let declared = contract.declarations.laws.len();
+        for (index, law) in contract.laws.iter().enumerate() {
+            let laws: Vec<l::Law<'_>> = parts
+                .laws
+                .iter()
+                .enumerate()
+                .map(|(other, kept)| l::Law {
+                    id: kept.id,
+                    kind: kept.kind,
+                    scope: kept.scope,
+                    genesis: kept.genesis,
+                    program: if other == index {
+                        l::Program {
+                            nodes: TRUE_LAW,
+                            root: 0,
+                        }
+                    } else {
+                        l::Program {
+                            nodes: kept.program.nodes,
+                            root: kept.program.root,
+                        }
+                    },
+                })
+                .collect();
+            if self.admits(
+                &Parts {
+                    laws: &laws,
+                    ..*parts
+                },
+                channel_roots,
+            ) {
+                return Some(Entry {
+                    place: if index < declared {
+                        format!("project.zeno law {}", law.id)
+                    } else {
+                        format!(
+                            "v2/policy.json framework {} law {}",
+                            law.kind.name(),
+                            law.id
+                        )
+                    },
+                    probe: "it admits the contract when this law's formula is replaced by `true`",
+                });
+            }
+        }
+        for (index, channel) in parts.channels.iter().enumerate() {
+            let channels: Vec<c::Channel<'_>> = parts
+                .channels
+                .iter()
+                .enumerate()
+                .filter(|(other, _)| *other != index)
+                .map(|(_, kept)| *kept)
+                .collect();
+            let links: Vec<(u32, u32, u32)> = channel_roots
+                .iter()
+                .filter(|link| link.0 != channel.id)
+                .copied()
+                .collect();
+            let admitted = self.admits(
+                &Parts {
+                    branches: &bare,
+                    channels: &channels,
+                    ..*parts
+                },
+                &links,
+            );
+            if admitted {
+                return Some(Entry {
+                    place: format!("project.zeno channel {}", channel.id),
+                    probe: "it admits the contract when this channel and every delivery are left out",
+                });
+            }
+        }
+        None
+    }
+}
+
+/// A law program that always holds.
+const TRUE_LAW: &[l::Op<'static>] = &[l::Op::Literal(c::Atom::Bool(true))];
+
+/// The library's catalog refusal, at the entry it is about when one was found.
+fn catalog_refusal(failure: catalog::Failure, entry: Option<Entry>) -> ContractError {
+    match entry {
+        Some(entry) => ContractError::new(
+            entry.place,
+            format!(
+                "the library catalog refused the generated contract ({failure:?}); {}",
+                entry.probe
+            ),
+        ),
+        None => ContractError::new(
+            "library catalog",
+            format!("refused the generated contract: {failure:?}"),
+        ),
+    }
 }
 
 /// An owned root input schema the descriptor borrows.

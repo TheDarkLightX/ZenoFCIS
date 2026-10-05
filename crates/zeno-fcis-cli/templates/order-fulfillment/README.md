@@ -198,15 +198,22 @@ run:
 python3 tools/check_generated_application.py
 ```
 
-That gate creates a fresh application using the CLI, patches its dependencies
-to the exact checkout, checks dependency versions against the workspace lock,
-then compiles and runs its tests and demonstration as an isolated package.
-With these development dependencies available in a standalone checkout:
+That gate creates a fresh application using the CLI, checks the dependency
+binding `zeno-fcis new` wrote to the exact checkout, checks dependency
+versions against the workspace lock, then compiles and runs its tests and
+demonstration as an isolated package.
+`zeno-fcis new` binds the application to a ZenoFCIS source tree, the one it
+was built from or the one `--source` names: `Cargo.toml` ends with a
+`[patch.crates-io]` section, and the tree's `Cargo.lock` and
+`rust-toolchain.toml` are copied. From the application's directory:
 
 ```sh
-cargo +1.97.1 test --locked
-cargo +1.97.1 run --locked -- new-order.sqlite
+cargo +1.97.1 test --offline
+cargo +1.97.1 run --offline -- new-order.sqlite
 ```
+
+The first build adds the application to its lock, so `--locked` works only
+after it.
 
 The SQLite shell is the `sqlite` feature, on by default. Without it,
 `cargo +1.97.1 build --no-default-features` builds the V2 declarations,

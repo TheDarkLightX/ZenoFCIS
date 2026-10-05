@@ -760,7 +760,7 @@ def binary_artifact_inventory(
                 "archive": archive_name,
                 "prefix": stem,
                 "command": (
-                    "cargo +1.97.1 build --release --locked "
+                    "ZENO_FCIS_BUILD_TREE= cargo +1.97.1 build --release --locked "
                     f"-p {package_name} --bin {target_name}"
                 ),
             }
@@ -1274,6 +1274,8 @@ def build(output: Path) -> None:
     host = host_lines[0]
     host_targets = {host}
     binary_inventory = binary_artifact_inventory(configured, version, host)
+    # A released `zeno-fcis` records no build directory; `new` then needs `--source`.
+    build_environment["ZENO_FCIS_BUILD_TREE"] = ""
     for item in binary_inventory:
         package_name = item["package"]
         target_name = item["target"]

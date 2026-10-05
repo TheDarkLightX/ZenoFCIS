@@ -141,7 +141,7 @@ impl Delivered {
 }
 
 fn store(error: Error) -> String {
-    format!("store: {error:?}")
+    format!("store: {error} ({error:?})")
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -320,7 +320,7 @@ pub fn migrate(path: &Path) -> AppResult<Head> {
 pub struct Summary {
     /// Each decision's class, in order.
     pub decisions: Vec<&'static str>,
-    /// Bundles in the store, genesis included.
+    /// Committed decisions in the store; genesis is not counted.
     pub bundles: u64,
     /// Outbox entries still pending.
     pub pending: u64,
@@ -348,10 +348,19 @@ impl Summary {
 }
 
 fn replay_id(example: &Example) -> AppResult<Hash32> {
+    replay_key(format!("example-{}", example.line).as_bytes())
+}
+
+/// The replay key of an example decided on an existing store after
+/// `commits` commits: a key of its own, whichever keys the store holds.
+fn resumed_replay_id(example: &Example, commits: u64) -> AppResult<Hash32> {
+    replay_key(format!("example-{}-after-{commits}", example.line).as_bytes())
+}
+
+fn replay_key(message: &[u8]) -> AppResult<Hash32> {
     let domain = Domain::new(concat!(env!("CARGO_PKG_NAME"), "/replay"), 1)
         .map_err(|error| format!("replay domain: {error:?}"))?;
-    commitment::<RustCryptoSha256>(domain, format!("example-{}", example.line).as_bytes())
-        .map_err(|error| format!("replay id: {error:?}"))
+    commitment::<RustCryptoSha256>(domain, message).map_err(|error| format!("replay id: {error:?}"))
 }
 
 fn class_name(class: c::Class) -> &'static str {
@@ -373,7 +382,6 @@ fn session<'a, 'p>(
     authority: &'a Authority<'p>,
     examples: &[Example],
 ) -> AppResult<(V2SqliteShell<'a, 'p>, Vec<&'static str>)> {
-    let descriptor = authority.descriptor();
     let initial = genesis()?;
     let genesis = match authority.publish_genesis(&initial) {
         PublicationOutcome::Commit(publication) => publication,
@@ -388,55 +396,70 @@ fn session<'a, 'p>(
         .position(|example| example.inputs.get(..state.len()) == Some(state.as_slice()))
     {
         let example = remaining.remove(position);
-        let raw = wire(descriptor, &example.inputs)?;
-        let original = c::Raw {
-            state: &raw[0],
-            command: &raw[1],
-            context: &raw[2],
-        };
-        let before = shell.snapshot().map_err(store)?;
-        if before.state() != original.state {
-            return Err(format!("line {}: the stored state differs", example.line));
-        }
-        match authority.publish(original) {
-            PublicationOutcome::Commit(publication) => {
-                let candidate = publication
-                    .evaluation()
-                    .result()
-                    .map_err(|refusal| format!("line {}: {refusal:?}", example.line))?;
-                compare(descriptor, candidate, example)?;
-                let subject = publication.subject().to_vec();
-                let replay = replay_id(example)?;
-                if shell.commit(replay, publication).map_err(store)?.status()
-                    != CommitStatus::Committed
-                {
-                    return Err(format!("line {}: not a first publication", example.line));
-                }
-                let replayed = match authority.replay_publication(original, &subject) {
-                    PublicationOutcome::Commit(publication) => publication,
-                    other => return Err(format!("line {}: replay: {other:?}", example.line)),
-                };
-                if shell.commit(replay, replayed).map_err(store)?.status()
-                    != CommitStatus::IdempotentReplay
-                {
-                    return Err(format!("line {}: replay was not idempotent", example.line));
-                }
-                state.clone_from(&example.post);
-            }
-            PublicationOutcome::Reject(evaluation) => {
-                let candidate = evaluation
-                    .result()
-                    .map_err(|refusal| format!("line {}: {refusal:?}", example.line))?;
-                compare(descriptor, candidate, example)?;
-                if shell.snapshot().map_err(store)? != before {
-                    return Err(format!("line {}: a reject changed the store", example.line));
-                }
-            }
-            other => return Err(format!("line {}: {other:?}", example.line)),
+        if decide_example(&mut shell, authority, example, replay_id(example)?)? {
+            state.clone_from(&example.post);
         }
         decisions.push(class_name(example.class));
     }
     Ok((shell, decisions))
+}
+
+/// Decides one example on the store, whose state must be the example's
+/// pre-state: a reject must publish nothing, and another decision is
+/// committed under `replay`, then recomputed from the same inputs and
+/// committed again as an idempotent replay. Returns whether it committed.
+fn decide_example(
+    shell: &mut V2SqliteShell<'_, '_>,
+    authority: &Authority<'_>,
+    example: &Example,
+    replay: Hash32,
+) -> AppResult<bool> {
+    let descriptor = authority.descriptor();
+    let raw = wire(descriptor, &example.inputs)?;
+    let original = c::Raw {
+        state: &raw[0],
+        command: &raw[1],
+        context: &raw[2],
+    };
+    let before = shell.snapshot().map_err(store)?;
+    if before.state() != original.state {
+        return Err(format!("line {}: the stored state differs", example.line));
+    }
+    match authority.publish(original) {
+        PublicationOutcome::Commit(publication) => {
+            let candidate = publication
+                .evaluation()
+                .result()
+                .map_err(|refusal| format!("line {}: {refusal:?}", example.line))?;
+            compare(descriptor, candidate, example)?;
+            let subject = publication.subject().to_vec();
+            if shell.commit(replay, publication).map_err(store)?.status() != CommitStatus::Committed
+            {
+                return Err(format!("line {}: not a first publication", example.line));
+            }
+            let replayed = match authority.replay_publication(original, &subject) {
+                PublicationOutcome::Commit(publication) => publication,
+                other => return Err(format!("line {}: replay: {other:?}", example.line)),
+            };
+            if shell.commit(replay, replayed).map_err(store)?.status()
+                != CommitStatus::IdempotentReplay
+            {
+                return Err(format!("line {}: replay was not idempotent", example.line));
+            }
+            Ok(true)
+        }
+        PublicationOutcome::Reject(evaluation) => {
+            let candidate = evaluation
+                .result()
+                .map_err(|refusal| format!("line {}: {refusal:?}", example.line))?;
+            compare(descriptor, candidate, example)?;
+            if shell.snapshot().map_err(store)? != before {
+                return Err(format!("line {}: a reject changed the store", example.line));
+            }
+            Ok(false)
+        }
+        other => Err(format!("line {}: {other:?}", example.line)),
+    }
 }
 
 /// Runs the examples as one session in a new database at `path`, then
@@ -476,12 +499,24 @@ pub fn journey(path: &Path, examples: &[Example]) -> AppResult<Summary> {
     })
 }
 
-/// Runs the examples as one session in a new database at `path` and leaves
-/// every outbox entry pending, for `--deliver` to send later.
+/// Runs the examples as one session and leaves every outbox entry pending,
+/// for `--deliver` to send later. Without a file at `path`, the session
+/// starts at genesis in a new database there. An existing store must run
+/// this build's version, after `--upgrade` when it ran an earlier one; the
+/// session then continues from the store's state: while one remains, the
+/// first example whose pre-state is that state is decided, a commit and its
+/// replay recorded under a key of its own.
 ///
 /// # Errors
-/// Returns the first refusal, difference or store failure.
+/// Returns the first refusal, difference or store failure, or a store at
+/// an earlier version.
 pub fn decide(path: &Path, examples: &[Example]) -> AppResult<Summary> {
+    if path
+        .try_exists()
+        .map_err(|error| format!("{}: {error}", path.display()))?
+    {
+        return resume(path, examples);
+    }
     let contract = v2_contract::Contract::new();
     let descriptor = contract.descriptor();
     let authority = authority(&descriptor)?;
@@ -492,5 +527,45 @@ pub fn decide(path: &Path, examples: &[Example]) -> AppResult<Summary> {
         bundles: snapshot.bundle_count(),
         pending: snapshot.pending(),
         deliveries: 0,
+    })
+}
+
+/// Continues a session on the existing store at `path`, which runs this
+/// build's version.
+fn resume(path: &Path, examples: &[Example]) -> AppResult<Summary> {
+    with_lineage(|lineage| match lineage.open(path).map_err(store)? {
+        Opened::V10(Store::Current(mut shell)) => {
+            let authority = shell.authority();
+            let mut remaining: Vec<&Example> = examples.iter().collect();
+            let mut decisions = Vec::new();
+            loop {
+                let snapshot = shell.snapshot().map_err(store)?;
+                let mut next = None;
+                for (position, example) in remaining.iter().enumerate() {
+                    if wire(authority.descriptor(), &example.inputs)?[0] == snapshot.state() {
+                        next = Some(position);
+                        break;
+                    }
+                }
+                let Some(position) = next else { break };
+                let example = remaining.remove(position);
+                let replay = resumed_replay_id(example, snapshot.version())?;
+                decide_example(&mut shell, authority, example, replay)?;
+                decisions.push(class_name(example.class));
+            }
+            let snapshot = shell.snapshot().map_err(store)?;
+            Ok(Summary {
+                decisions,
+                bundles: snapshot.bundle_count(),
+                pending: snapshot.pending(),
+                deliveries: 0,
+            })
+        }
+        Opened::V10(Store::Superseded(superseded)) => Err(format!(
+            "store: runs contract version {}; upgrade it to version {} before deciding",
+            superseded.version(),
+            lineage.versions()
+        )),
+        Opened::V9(_) => Err(store(Error::Schema(9))),
     })
 }

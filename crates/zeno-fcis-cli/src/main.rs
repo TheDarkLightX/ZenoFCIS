@@ -3,6 +3,7 @@
 
 mod account_lockout;
 mod agent_treasury_guard;
+mod binding;
 mod compliance_gateway;
 mod contract;
 mod contract_adopt;
@@ -118,13 +119,25 @@ struct Cli {
     command: Command,
 }
 
-/// The `contract` group: F2's advisory review and F6's checked adoption.
+/// The `contract` group: F2's advisory review, F6's checked adoption and the
+/// export of a contract's decision program.
 #[derive(Subcommand)]
 enum ContractCommand {
     #[command(flatten)]
     Review(review_command::Command),
     #[command(flatten)]
     Adopt(contract_adopt::Command),
+    /// Write the contract's current decision program in the canonical program encoding that optimize, transform and loop read.
+    ExportProgram {
+        /// Application or contract directory holding project.zeno, v2/policy.json and any adoptions.
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// New file for the canonical program bytes; an existing path is refused.
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+        format: OutputFormat,
+    },
 }
 
 #[derive(Subcommand)]
@@ -168,6 +181,9 @@ enum Command {
         /// Build the application from this directory's project.zeno, v2/policy.json and optional tests/decision-examples.txt.
         #[arg(long, conflicts_with = "template")]
         contract: Option<PathBuf>,
+        /// ZenoFCIS source tree a Cargo application's ZenoFCIS packages resolve to. Default: the tree this CLI was built from, while it exists.
+        #[arg(long)]
+        source: Option<PathBuf>,
     },
     /// Parse and elaborate a .zeno project with accumulated diagnostics.
     Check {
@@ -256,9 +272,9 @@ enum Command {
 
 #[derive(Subcommand)]
 enum GenerateTarget {
-    /// Generate an application's V2 contract, src/v2_contract.rs and v2/policy.zcve, or check for drift.
+    /// Generate an application's V2 contract, v2/schema.zcve, src/v2_contract.rs and v2/policy.zcve, or check for drift.
     Contract {
-        /// Application directory holding project.zeno, v2/policy.json and v2/schema.zcve.
+        /// Application directory holding project.zeno and v2/policy.json; the generated files are written there.
         #[arg(default_value = ".")]
         dir: PathBuf,
         /// Compare with the files on disk and change nothing.
@@ -353,12 +369,16 @@ fn run(command: Command) -> u8 {
         Command::Contract { command } => match command {
             ContractCommand::Review(command) => review_command::run(command),
             ContractCommand::Adopt(command) => contract_adopt::run(command),
+            ContractCommand::ExportProgram { dir, out, format } => {
+                contract_files::export_program(&dir, &out, format)
+            }
         },
         Command::New {
             dir,
             template,
             contract,
-        } => new_project(&dir, template, contract.as_deref()),
+            source,
+        } => new_project(&dir, template, contract.as_deref(), source.as_deref()),
         Command::Check {
             project,
             format,
@@ -619,6 +639,12 @@ fn describe_effects(path: &[String]) -> Value {
                 false,
                 None,
             ),
+            ["contract", "export-program"] => (
+                &["application-contract", "adopted-artifacts"],
+                &["decision-program"],
+                false,
+                None,
+            ),
             ["contract", "refresh-receipts"] => (
                 &["application-contract", "adopted-artifacts"],
                 &[
@@ -649,7 +675,12 @@ fn describe_effects(path: &[String]) -> Value {
     json!({"classification": "declared", "reads": reads, "writes": writes, "executes_tools": executes_tools, "read_only_flag": read_only_flag})
 }
 
-fn new_project(dir: &Path, template: Template, contract: Option<&Path>) -> u8 {
+fn new_project(
+    dir: &Path,
+    template: Template,
+    contract: Option<&Path>,
+    source: Option<&Path>,
+) -> u8 {
     if dir.exists() {
         match fs::read_dir(dir) {
             Ok(mut entries) => {
@@ -663,8 +694,13 @@ fn new_project(dir: &Path, template: Template, contract: Option<&Path>) -> u8 {
     } else if let Err(error) = fs::create_dir(dir) {
         return io_error("create target", error);
     }
+    new_files(dir, template, contract, source)
+}
+
+/// Writes a new project into the empty directory `dir`.
+fn new_files(dir: &Path, template: Template, contract: Option<&Path>, source: Option<&Path>) -> u8 {
     if let Some(contract) = contract {
-        return contract_files::scaffold(dir, contract);
+        return contract_files::scaffold(dir, contract, source);
     }
     // Exhaustive, so a new template cannot compile without choosing its files.
     let application = match template {
@@ -679,7 +715,31 @@ fn new_project(dir: &Path, template: Template, contract: Option<&Path>) -> u8 {
         Template::AgentTreasuryGuard => Some(agent_treasury_guard::FILES),
     };
     if let Some(files) = application {
-        for (relative, content) in files {
+        let manifest = files
+            .iter()
+            .find(|(name, _)| *name == "Cargo.toml")
+            .and_then(|(_, content)| std::str::from_utf8(content).ok())
+            .unwrap_or_default();
+        let binding = match binding::bind(manifest, source) {
+            Ok(binding) => binding,
+            Err(refusal) => return binding_refused(&refusal),
+        };
+        let manifest = format!("{manifest}{}", binding.patch);
+        let mut bound: Vec<(&str, &[u8])> = files
+            .iter()
+            .map(|(name, content)| {
+                if *name == "Cargo.toml" {
+                    (*name, manifest.as_bytes())
+                } else {
+                    (*name, *content)
+                }
+            })
+            .collect();
+        bound.push(("Cargo.lock", &binding.lock));
+        if let Some(toolchain) = &binding.toolchain {
+            bound.push(("rust-toolchain.toml", toolchain));
+        }
+        for (relative, content) in bound {
             let path = dir.join(relative);
             if let Some(parent) = path.parent()
                 && let Err(error) = fs::create_dir_all(parent)
@@ -691,9 +751,13 @@ fn new_project(dir: &Path, template: Template, contract: Option<&Path>) -> u8 {
             }
         }
         println!("created {}", dir.display());
+        println!(
+            "bound to the ZenoFCIS source tree {}",
+            binding.tree.display()
+        );
         return OK;
     }
-    let (source, readme) = match template {
+    let (project, readme) = match template {
         Template::Minimal => (
             MINIMAL,
             "# ZenoFCIS minimal project\n\nRun `zeno-fcis check`.\n",
@@ -711,7 +775,7 @@ fn new_project(dir: &Path, template: Template, contract: Option<&Path>) -> u8 {
         | Template::WithdrawalQueue
         | Template::AgentTreasuryGuard => unreachable!("application templates return above"),
     };
-    if let Err(error) = atomic_create(&dir.join("project.zeno"), source.as_bytes()) {
+    if let Err(error) = atomic_create(&dir.join("project.zeno"), project.as_bytes()) {
         return io_error("write project", error);
     }
     if let Err(error) = atomic_create(&dir.join("README.md"), readme.as_bytes()) {
@@ -719,6 +783,16 @@ fn new_project(dir: &Path, template: Template, contract: Option<&Path>) -> u8 {
     }
     println!("created {}", dir.display());
     OK
+}
+
+/// A binding refusal: no source tree is a missing prerequisite; a tree that
+/// cannot bind the application is invalid input.
+fn binding_refused(refusal: &binding::Refusal) -> u8 {
+    eprintln!("{}", refusal.message());
+    match refusal {
+        binding::Refusal::NoTree(_) => BLOCKED,
+        binding::Refusal::Unusable(_) => INVALID,
+    }
 }
 
 fn check(
@@ -2011,9 +2085,9 @@ mod tests {
             std::process::id(),
             TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
-        assert_eq!(new_project(&target, Template::Minimal, None), OK);
+        assert_eq!(new_project(&target, Template::Minimal, None, None), OK);
         assert!(target.join("project.zeno").is_file());
-        assert_eq!(new_project(&target, Template::Minimal, None), INVALID);
+        assert_eq!(new_project(&target, Template::Minimal, None, None), INVALID);
         assert!(fs::remove_file(target.join("project.zeno")).is_ok());
         assert!(fs::remove_file(target.join("README.md")).is_ok());
         assert!(fs::remove_dir(target).is_ok());

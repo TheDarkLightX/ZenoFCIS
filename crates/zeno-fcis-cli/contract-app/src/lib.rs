@@ -11,6 +11,7 @@
 /// The generated contract: schema, decision program, laws and genesis state.
 pub mod v2_contract;
 
+mod examples;
 #[cfg(feature = "sqlite")]
 mod session;
 #[cfg(feature = "sqlite")]
@@ -56,72 +57,33 @@ pub struct Example {
 }
 
 /// Parses decision examples, one per line: `inputs | class reason post |
-/// deliveries`. The class is `accept`, `reject` or `failure`; the reason is
-/// a number or `-`; deliveries are `-`, or each delivery's channel and
-/// payload fields, separated by `;`. Lines starting with `#` are comments.
+/// deliveries`, with the grammar of `src/examples.rs`, which `zeno-fcis
+/// contract review` compiles too, against the inputs, state fields and
+/// channels this contract declares. Lines whose first non-blank character
+/// is `#` are comments.
 ///
 /// # Errors
-/// Returns the first malformed line.
+/// Returns the first malformed line, or a number outside its domain.
 pub fn examples(text: &str) -> AppResult<Vec<Example>> {
-    let mut examples = Vec::new();
-    for (index, line) in text.lines().enumerate() {
-        let line_number = index + 1;
-        if line.trim().is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let error = |what: &str| format!("decision example line {line_number}: {what}");
-        let sections: Vec<&str> = line.split('|').map(str::trim).collect();
-        let [inputs, decision, deliveries] = sections[..] else {
-            return Err(error("expected `inputs | decision | deliveries`"));
-        };
-        let mut words = decision.split_whitespace();
-        let class = match words.next() {
-            Some("accept") => c::Class::Accept,
-            Some("reject") => c::Class::Reject,
-            Some("failure") => c::Class::CommittedFailure,
-            _ => return Err(error("the decision starts with accept, reject or failure")),
-        };
-        let reason = match words.next() {
-            Some("-") => None,
-            Some(reason) => Some(reason.parse().map_err(|_| error("bad reason"))?),
-            None => return Err(error("missing reason")),
-        };
-        let outbox = if deliveries == "-" {
-            Vec::new()
-        } else {
-            deliveries
-                .split(';')
-                .map(|delivery| {
-                    let numbers = numbers(delivery).map_err(|what| error(&what))?;
-                    let (channel, payload) = numbers
-                        .split_first()
-                        .ok_or_else(|| error("empty delivery"))?;
-                    let channel = u32::try_from(*channel).map_err(|_| error("bad channel"))?;
-                    Ok((channel, payload.to_vec()))
-                })
-                .collect::<AppResult<_>>()?
-        };
-        examples.push(Example {
-            line: line_number,
-            inputs: numbers(inputs).map_err(|what| error(&what))?,
-            class,
-            reason,
-            post: words
-                .map(|word| word.parse().map_err(|_| error("bad post-state number")))
-                .collect::<AppResult<_>>()?,
-            outbox,
-        });
-    }
-    Ok(examples)
-}
-
-fn numbers(text: &str) -> Result<Vec<i128>, String> {
-    text.split_whitespace()
-        .map(|word| {
-            word.parse()
-                .map_err(|_| format!("`{word}` is not a number"))
+    let contract = v2_contract::Contract::new();
+    let shape = examples::Shape::of(&contract.descriptor())?;
+    let lines = examples::parse(text, &shape)
+        .map_err(|error| format!("decision example line {}: {}", error.line, error.reason))?;
+    Ok(lines
+        .into_iter()
+        .map(|line| Example {
+            line: line.number,
+            inputs: line.inputs,
+            class: match line.class {
+                examples::Class::Accept => c::Class::Accept,
+                examples::Class::Reject => c::Class::Reject,
+                examples::Class::Failure => c::Class::CommittedFailure,
+            },
+            reason: line.reason,
+            post: line.post,
+            outbox: line.outbox,
         })
-        .collect()
+        .collect())
 }
 
 /// How many numbers a root takes: one per record field, or one.

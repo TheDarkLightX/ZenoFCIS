@@ -41,23 +41,32 @@ impl Binary {
     }
 
     fn from_token(token: &str) -> Option<Self> {
-        Some(match token {
-            "->" => Self::Implies,
-            "||" => Self::Or,
-            "&&" => Self::And,
-            "==" => Self::Eq,
-            "!=" => Self::Ne,
-            "<" => Self::Lt,
-            "<=" => Self::Le,
-            ">" => Self::Gt,
-            ">=" => Self::Ge,
-            "+" => Self::Add,
-            "-" => Self::Sub,
-            "*" => Self::Mul,
-            _ => return None,
-        })
+        OPERATORS
+            .iter()
+            .find(|(written, _)| *written == token)
+            .map(|(_, operator)| *operator)
     }
 }
+
+/// Every binary operator as written, from loosest to tightest binding;
+/// `docs/CONTRACT_RULES.md` documents each.
+pub(super) const OPERATORS: [(&str, Binary); 12] = [
+    ("->", Binary::Implies),
+    ("||", Binary::Or),
+    ("&&", Binary::And),
+    ("==", Binary::Eq),
+    ("!=", Binary::Ne),
+    ("<", Binary::Lt),
+    ("<=", Binary::Le),
+    (">", Binary::Gt),
+    (">=", Binary::Ge),
+    ("+", Binary::Add),
+    ("-", Binary::Sub),
+    ("*", Binary::Mul),
+];
+
+/// Every function with its number of arguments.
+pub(super) const FUNCTIONS: [(&str, usize); 3] = [("choose", 3), ("div_floor", 2), ("div_ceil", 2)];
 
 /// Rounding of `div_floor` and `div_ceil`.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -208,18 +217,29 @@ fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
     let count = arguments.len();
     let mut arguments = arguments.into_iter().map(Box::new);
     let mut next = || arguments.next();
-    match (name, count, next(), next(), next()) {
+    let call = match (name, count, next(), next(), next()) {
         ("choose", 3, Some(condition), Some(then), Some(otherwise)) => {
-            Ok(Ast::Choose(condition, then, otherwise))
+            Some(Ast::Choose(condition, then, otherwise))
         }
         ("div_floor", 2, Some(left), Some(right), None) => {
-            Ok(Ast::Div(Rounding::Floor, left, right))
+            Some(Ast::Div(Rounding::Floor, left, right))
         }
-        ("div_ceil", 2, Some(left), Some(right), None) => Ok(Ast::Div(Rounding::Ceil, left, right)),
-        _ => Err(format!(
-            "`{name}` with {count} arguments is not choose/3, div_floor/2 or div_ceil/2"
-        )),
-    }
+        ("div_ceil", 2, Some(left), Some(right), None) => {
+            Some(Ast::Div(Rounding::Ceil, left, right))
+        }
+        _ => None,
+    };
+    call.filter(|_| FUNCTIONS.contains(&(name, count)))
+        .ok_or_else(|| {
+            let known: Vec<String> = FUNCTIONS
+                .iter()
+                .map(|(function, arity)| format!("{function}/{arity}"))
+                .collect();
+            format!(
+                "`{name}` with {count} arguments is not {}",
+                known.join(", ")
+            )
+        })
 }
 
 /// Replaces rule variables by their definitions; a variable may not refer to

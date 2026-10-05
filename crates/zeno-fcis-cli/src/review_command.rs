@@ -86,10 +86,12 @@ fn review_directory(dir: &Path, out: Option<&Path>, max_tuples: u64, format: Out
         Err(failure) => return report_failure(dir, failure, format),
     };
     let summary = review.summary();
-    let status = if summary.disagreements == 0 {
-        "reviewed"
-    } else {
+    let status = if summary.disagreements > 0 {
         "disagreement"
+    } else if summary.law_refusals > 0 {
+        "law-refusal"
+    } else {
+        "reviewed"
     };
     match out {
         Some(path) => {
@@ -124,17 +126,13 @@ fn review_directory(dir: &Path, out: Option<&Path>, max_tuples: u64, format: Out
             }
         }
     }
-    if summary.disagreements == 0 {
-        OK
-    } else {
-        INVALID
-    }
+    if summary.findings == 0 { OK } else { INVALID }
 }
 
 /// The human summary.
 fn lines(review: &Review, status: &str) -> Vec<String> {
     let summary = review.summary();
-    vec![
+    let mut lines = vec![
         format!(
             "{status} {}: {} inputs ({}), {} examples compared, {} disagreements",
             summary.application,
@@ -143,6 +141,7 @@ fn lines(review: &Review, status: &str) -> Vec<String> {
             summary.examples,
             summary.disagreements
         ),
+        summary.refusals_line(),
         format!(
             "mutants {}: distinguished {}, refused by generator {}, refused by library {}, equivalent over the full domain {}, not distinguished within the boundary set {}",
             summary.mutants,
@@ -152,8 +151,10 @@ fn lines(review: &Review, status: &str) -> Vec<String> {
             summary.equivalent,
             summary.undistinguished
         ),
-        format!("findings {}", summary.findings),
-    ]
+    ];
+    lines.extend(review.law_refusal_lines());
+    lines.push(format!("findings {}", summary.findings));
+    lines
 }
 
 fn report_failure(dir: &Path, failure: Failure, format: OutputFormat) -> u8 {

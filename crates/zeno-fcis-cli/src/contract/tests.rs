@@ -8,15 +8,15 @@ use std::path::PathBuf;
 use serde_json::Value;
 use zeno_fcis_spec::LawScope;
 
-use zeno_fcis_synthesis::finite::{Op, Program};
+use zeno_fcis_synthesis::finite::{Op, Program, canonical_v2::output, v2_composition as c};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
-use super::declarations::{Declarations, Form, Kind, Leaf};
+use super::declarations::{Declarations, Form, Kind, Leaf, ROOTS};
 use super::expr::{self, Ast, Binary, Rounding};
 use super::model::{self, Contract, InputLeaf};
 use super::rules::{self, Adoption, Class, Rules, Usage};
 use super::{
-    AdoptionSources, ContractSources, StepBound, generate_contract, program_bytes,
+    AdoptionSources, ContractSources, StepBound, generate_contract, policy, program_bytes,
     refresh_receipts, schema, schema_commitment, with_adoption,
 };
 use crate::transform::{self, DEFAULT_MAX_INPUT_TUPLES, DEFAULT_STEP_LIMIT, Limits};
@@ -660,7 +660,7 @@ fn schema_and_library_disagreements_are_refused() {
 fn library_rules_are_refused_where_they_are_written() {
     let counter = template("durable-counter");
     type Edit = Box<dyn Fn(&mut Value)>;
-    let cases: [(&str, Edit, &str); 7] = [
+    let cases: [(&str, Edit, &str); 6] = [
         (
             "v2/policy.json cases[2].reason",
             Box::new(|rules| rules["cases"][2]["reason"] = 200.into()),
@@ -691,14 +691,6 @@ fn library_rules_are_refused_where_they_are_written() {
             Box::new(|rules| rules["law_kinds"]["500"] = "AssetConservation".into()),
             "needs a StateInvariant law, declared `on commit, genesis`",
         ),
-        (
-            "v2/policy.json",
-            Box::new(|rules| {
-                rules["law_kinds"]["502"] = "AssetConservation".into();
-                rules["framework_failure_law"] = 909.into();
-            }),
-            "the framework CommittedFailureEffects and AuthoritySubjectRecipient laws share ID 909",
-        ),
     ];
     for (expected_place, edit, expected_reason) in cases {
         let (place, reason) = counter.with_rules(|rules| edit(rules)).refusal();
@@ -707,6 +699,29 @@ fn library_rules_are_refused_where_they_are_written() {
             (expected_place, expected_reason)
         );
     }
+    for key in ["framework_failure_law", "framework_reject_law"] {
+        let zero = counter.with_rules(|rules| rules[key] = 0.into());
+        assert_eq!(
+            zero.refusal(),
+            (
+                format!("v2/policy.json {key}"),
+                "must be a nonzero law ID".to_owned()
+            )
+        );
+    }
+    // The withdrawal queue decides no committed failure, so its framework
+    // failure law applies; it may not share the structural reject law's ID.
+    let shared = template("withdrawal-queue").with_rules(|rules| {
+        rules["framework_failure_law"] = 509.into();
+    });
+    assert_eq!(
+        shared.refusal(),
+        (
+            "v2/policy.json".to_owned(),
+            "the framework CommittedFailureEffects and RejectNoAuthority laws share ID 509"
+                .to_owned()
+        )
+    );
 
     // Each project edit, with the rules edit that keeps the rest consistent.
     // A changed schema no longer matches the template's schema origin, so
@@ -1566,4 +1581,317 @@ fn a_step_limit_must_cover_each_program_and_every_law_node() {
         [steps.laws + nodes + 5, steps.laws + nodes + 1 + 5]
     );
     assert!(steps.never_binds());
+}
+
+/// The durable counter with a second delivery, ordinal 1 and idempotency
+/// ordinal 2, on its accepting case.
+fn counter_with_two_deliveries() -> Template {
+    template("durable-counter").with_rules(|rules| {
+        let mut second = rules["cases"][2]["outbox"][0].clone();
+        second["ordinal"] = 1.into();
+        second["idempotency_ordinal"] = 2.into();
+        if let Some(outbox) = rules["cases"][2]["outbox"].as_array_mut() {
+            outbox.push(second);
+        }
+    })
+}
+
+/// The counter's framed state, command and context.
+fn counter_input(commitment: &[u8; 32], count: i128, command: u16) -> [Vec<u8>; 3] {
+    let limit = 1 << 16;
+    let envelope = |index: usize, payload: Vec<u8>| {
+        output::encode_envelope(ROOTS[index].1, commitment, &payload, limit)
+            .unwrap_or_else(|error| panic!("{error:?}"))
+    };
+    let state = output::encode_record(
+        &[
+            c::Field {
+                id: 110,
+                value: c::Atom::I128(count),
+            },
+            c::Field {
+                id: 111,
+                value: c::Atom::I128(0),
+            },
+        ],
+        limit,
+    );
+    let command = output::encode_atom(
+        c::Atom::Sum {
+            type_id: 101,
+            variant: command,
+        },
+        limit,
+    );
+    let context = output::encode_atom(c::Atom::Bool(true), limit);
+    let encoded = |payload: Result<Vec<u8>, _>| payload.unwrap_or_else(|error| panic!("{error:?}"));
+    [
+        envelope(0, encoded(state)),
+        envelope(1, encoded(command)),
+        envelope(2, encoded(context)),
+    ]
+}
+
+/// The class and each delivery's ordinal and idempotency value the library
+/// Authority decides for one increment, or its refusal.
+fn increment(
+    contract: &Contract<'_>,
+    schema: &[u8],
+) -> Result<(c::Class, Vec<(u32, u128)>), String> {
+    let raw = counter_input(&contract.commitment, 0, 120);
+    policy::with_authority(contract, schema, |authority| {
+        let evaluation = authority.evaluate(c::Raw {
+            state: &raw[0],
+            command: &raw[1],
+            context: &raw[2],
+        });
+        evaluation
+            .result()
+            .map(|candidate| {
+                let outbox = candidate
+                    .outbox()
+                    .iter()
+                    .map(|delivery| match delivery.idempotency {
+                        c::Atom::U128(value) => (delivery.ordinal, value),
+                        other => panic!("idempotency {other:?}"),
+                    })
+                    .collect();
+                (candidate.class(), outbox)
+            })
+            .map_err(|refusal| format!("{refusal:?}"))
+    })
+    .unwrap_or_else(|error| panic!("{error}"))
+}
+
+#[test]
+fn deliveries_set_the_effect_limit_and_the_idempotency_domain() {
+    // One delivery with ordinal 0, as in every template: unchanged.
+    let counter = template("durable-counter");
+    let generated = generate_contract(counter.sources()).unwrap_or_else(|error| panic!("{error}"));
+    assert!(
+        generated
+            .source()
+            .contains(".with_limit(Resource::Effect, 1)")
+    );
+    assert!(
+        generated
+            .source()
+            .contains("idempotency: c::Domain::U128 { min: 0, max: 0 }")
+    );
+    // Two deliveries: the limit is 2 and the domain reaches ordinal 2.
+    let two = counter_with_two_deliveries();
+    let generated = generate_contract(two.sources()).unwrap_or_else(|error| panic!("{error}"));
+    assert!(
+        generated
+            .source()
+            .contains(".with_limit(Resource::Effect, 2)")
+    );
+    assert!(
+        generated
+            .source()
+            .contains("idempotency: c::Domain::U128 { min: 0, max: 2 }")
+    );
+    // The library Authority makes both deliveries.
+    let (rules, declarations) = (two.rules(), two.declarations());
+    let schema = schema::encode(&declarations).unwrap_or_else(|error| panic!("{error}"));
+    let commitment = schema_commitment(&schema).unwrap_or_else(|error| panic!("{error}"));
+    let mut contract = Contract::build(&declarations, &rules, commitment)
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(contract.budgets.effect, 2);
+    assert_eq!(
+        increment(&contract, &schema),
+        Ok((c::Class::Accept, vec![(0, 0), (1, 2)]))
+    );
+    // Planted control: the limit the generator used to render refuses it.
+    contract.budgets.effect = 1;
+    let refused = increment(&contract, &schema).err();
+    assert!(
+        refused
+            .as_deref()
+            .is_some_and(|refusal| refusal.contains("resource: Effect, limit: 1, attempted: 2")),
+        "{refused:?}"
+    );
+}
+
+#[test]
+fn a_case_delivers_in_increasing_ordinal_order() {
+    let repeated = counter_with_two_deliveries().with_rules(|rules| {
+        rules["cases"][2]["outbox"][1]["ordinal"] = 0.into();
+    });
+    assert_eq!(
+        repeated.refusal(),
+        (
+            "v2/policy.json cases[2].outbox[1].ordinal".to_owned(),
+            "must exceed the previous delivery's ordinal 0: a case's deliveries are in \
+             increasing ordinal order"
+                .to_owned()
+        )
+    );
+}
+
+#[test]
+fn a_committed_failure_needs_a_committed_failure_law() {
+    // Law 502 is the counter's only CommittedFailureEffects law; case 3 is
+    // its committed failure.
+    let unlawful = template("durable-counter").with_rules(|rules| {
+        rules["law_kinds"]["502"] = "AuthoritySubjectRecipient".into();
+    });
+    let (place, reason) = unlawful.refusal();
+    assert_eq!(place, "v2/policy.json cases[3]");
+    assert!(
+        reason.starts_with(
+            "is a committed failure, but no law has kind CommittedFailureEffects, so framework \
+             law 908 would refuse every committed failure at run time."
+        ),
+        "{reason}"
+    );
+    // Without committed failures, no failure law is needed: framework law 908
+    // then never applies.
+    let generated = generate_contract(template("withdrawal-queue").sources());
+    assert!(generated.is_ok());
+    assert!(
+        !template("withdrawal-queue")
+            .rules()
+            .law_kinds
+            .values()
+            .any(|kind| *kind == super::rules::LawKind::CommittedFailureEffects)
+    );
+}
+
+#[test]
+fn a_catalog_refusal_names_the_entry_it_is_about() {
+    let two = counter_with_two_deliveries();
+    let (rules, declarations) = (two.rules(), two.declarations());
+    let schema = schema::encode(&declarations).unwrap_or_else(|error| panic!("{error}"));
+    let commitment = schema_commitment(&schema).unwrap_or_else(|error| panic!("{error}"));
+    let build = || {
+        Contract::build(&declarations, &rules, commitment).unwrap_or_else(|error| panic!("{error}"))
+    };
+    let refusal = |contract: &Contract<'_>| {
+        let Err(error) = policy::encode(contract, &schema) else {
+            panic!("the planted contract must be refused")
+        };
+        (error.place().to_owned(), error.reason().to_owned())
+    };
+    // A delivery outside its channel's idempotency domain, as before the
+    // domain followed the rules.
+    let mut contract = build();
+    contract.channels[0].idempotency = 0;
+    assert_eq!(
+        refusal(&contract),
+        (
+            "v2/policy.json cases[2].outbox[1]".to_owned(),
+            "the library catalog refused the generated contract (Descriptor); it admits the \
+             contract with only the deliveries before this one"
+                .to_owned()
+        )
+    );
+    // A declared law, then a framework law, whose program has no root node.
+    for (index, place) in [
+        (0, "project.zeno law 500"),
+        (
+            contract.laws.len() - 1,
+            "v2/policy.json framework DecisionConformance law 991",
+        ),
+    ] {
+        let mut contract = build();
+        contract.laws[index].root = contract.laws[index].nodes.len();
+        let (refused, reason) = refusal(&contract);
+        assert_eq!(refused, place);
+        assert_eq!(
+            reason,
+            "the library catalog refused the generated contract (Descriptor); it admits the \
+             contract when this law's formula is replaced by `true`"
+        );
+    }
+    // A channel whose destination domain is empty.
+    let mut contract = build();
+    contract.channels[0].destination = model::Domain::I128 { min: 1, max: 0 };
+    assert_eq!(refusal(&contract).0, "project.zeno channel 300");
+    // A refusal no single entry accounts for keeps the library's own words.
+    let mut contract = build();
+    contract.reasons.clear();
+    assert_eq!(
+        refusal(&contract),
+        (
+            "library catalog".to_owned(),
+            "refused the generated contract: Descriptor".to_owned()
+        )
+    );
+}
+
+/// The rows of the table after `<!-- policy-keys: NAME -->` in
+/// `docs/CONTRACT_RULES.md`: its first cell without backticks, and its
+/// second cell.
+fn documented(name: &str) -> Vec<(String, String)> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/CONTRACT_RULES.md");
+    let page =
+        fs::read_to_string(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    let marker = format!("<!-- policy-keys: {name} -->\n");
+    let start = page
+        .find(&marker)
+        .unwrap_or_else(|| panic!("no table marked {name}"));
+    page[start + marker.len()..]
+        .lines()
+        .skip(2)
+        .take_while(|line| line.starts_with('|'))
+        .map(|line| {
+            let cells: Vec<String> = line
+                .replace("\\|", "\u{0}")
+                .split('|')
+                .map(|cell| cell.trim().replace('\u{0}', "|"))
+                .collect();
+            (cells[1].trim_matches('`').to_owned(), cells[2].clone())
+        })
+        .collect()
+}
+
+fn names(rows: &[(String, String)]) -> Vec<&str> {
+    rows.iter().map(|(name, _)| name.as_str()).collect()
+}
+
+#[test]
+fn the_rules_reference_documents_exactly_what_the_generator_reads() {
+    use super::expr::{FUNCTIONS, OPERATORS};
+    use super::model::required_declaration;
+    use super::rules::{
+        ADOPTION_KEYS, CASE_KEYS, DELIVERY_KEYS, FILE_KEYS, LEAVES, LawKind, ROOT_KEYS,
+    };
+    for (table, keys) in [
+        ("file", FILE_KEYS.as_slice()),
+        ("roots", ROOT_KEYS.as_slice()),
+        ("case", CASE_KEYS.as_slice()),
+        ("delivery", DELIVERY_KEYS.as_slice()),
+        ("adoption", ADOPTION_KEYS.as_slice()),
+        ("leaf-bindings", LEAVES.as_slice()),
+    ] {
+        assert_eq!(names(&documented(table)), keys, "{table}");
+    }
+    let classes: Vec<&str> = Class::ALL.iter().map(|class| class.name()).collect();
+    assert_eq!(names(&documented("classes")), classes);
+    let operators: Vec<&str> = OPERATORS.iter().map(|(written, _)| *written).collect();
+    assert_eq!(names(&documented("operators")), operators);
+    let functions: Vec<&str> = FUNCTIONS.iter().map(|(name, _)| *name).collect();
+    assert_eq!(names(&documented("functions")), functions);
+    // Each function's documented form parses with its documented arity.
+    for ((name, form), (_, arity)) in documented("functions").iter().zip(FUNCTIONS) {
+        let call = form
+            .split('`')
+            .nth(1)
+            .unwrap_or_else(|| panic!("{name} has no written form"));
+        assert!(expr::parse(call).is_ok(), "{call}");
+        assert_eq!(call.matches(',').count() + 1, arity, "{call}");
+    }
+    let kinds = documented("law-kinds");
+    let expected: Vec<(String, String)> = LawKind::ALL
+        .iter()
+        .map(|kind| {
+            let written = required_declaration(*kind)
+                .map_or("any scope".to_owned(), |(_, _, written)| {
+                    format!("`{written}`")
+                });
+            (kind.name().to_owned(), written)
+        })
+        .collect();
+    assert_eq!(kinds, expected);
 }

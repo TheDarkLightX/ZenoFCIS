@@ -103,6 +103,9 @@ pub(super) struct ChannelSchema {
     pub(super) payload_type: u32,
     pub(super) destination: Domain,
     pub(super) payload: Vec<(u16, Domain)>,
+    /// The largest idempotency ordinal any case delivers on the channel, 0
+    /// when none does: the channel's idempotency domain is `0..=idempotency`.
+    pub(super) idempotency: u128,
 }
 
 #[derive(Debug)]
@@ -128,6 +131,9 @@ pub(super) struct Budgets {
     pub(super) write: u64,
     pub(super) byte: u64,
     pub(super) step: u64,
+    /// Each delivery charges one Effect: the most deliveries of any case, at
+    /// least 1.
+    pub(super) effect: u64,
 }
 
 #[derive(Debug)]
@@ -264,9 +270,20 @@ impl<'d> Contract<'d> {
                     });
                 }
             }
-            let mut outbox = Vec::new();
+            let mut outbox: Vec<Plan> = Vec::new();
             for (number, delivery) in case.outbox.iter().enumerate() {
                 let place = format!("{place}.outbox[{number}]");
+                if let Some(previous) = outbox.last().map(|plan| plan.ordinal)
+                    && delivery.ordinal <= previous
+                {
+                    return Err(rules_error(
+                        &format!("{place}.ordinal"),
+                        format!(
+                            "must exceed the previous delivery's ordinal {previous}: a case's \
+                             deliveries are in increasing ordinal order"
+                        ),
+                    ));
+                }
                 let channel = declarations.channel(delivery.channel)?;
                 let Form::Leaf(Leaf::Text { min, max }) =
                     declarations.get(channel.destination)?.form
@@ -350,6 +367,13 @@ impl<'d> Contract<'d> {
                         .iter()
                         .map(|field| Ok((field.id, domain(declarations, field.type_id)?)))
                         .collect::<Result<_, ContractError>>()?,
+                    idempotency: branches
+                        .iter()
+                        .flat_map(|branch| &branch.outbox)
+                        .filter(|plan| plan.channel == channel.id)
+                        .map(|plan| plan.idempotency)
+                        .max()
+                        .unwrap_or(0),
                 })
             })
             .collect::<Result<Vec<_>, ContractError>>()?;
@@ -371,6 +395,12 @@ impl<'d> Contract<'d> {
             write: count(state_fields.len()),
             byte: frame_bytes.iter().sum(),
             step: step_budget(program.table.nodes.len(), &laws),
+            effect: branches
+                .iter()
+                .map(|branch| count(branch.outbox.len()))
+                .max()
+                .unwrap_or(0)
+                .max(1),
         };
         Ok(Self {
             declarations,
@@ -594,17 +624,7 @@ fn laws(
     for law in &declarations.laws {
         let place = format!("project.zeno law {}", law.id);
         let kind = rules.law_kinds[&law.id];
-        let required = match kind {
-            LawKind::StateInvariant => Some((LawScope::Committing, true, "on commit, genesis")),
-            LawKind::RejectNoAuthority => Some((LawScope::Reject, false, "on reject")),
-            LawKind::CommittedFailureEffects => {
-                Some((LawScope::CommittedFailure, false, "on failure"))
-            }
-            LawKind::DecisionConformance => Some((LawScope::Always, false, "on any")),
-            LawKind::InitialCondition => Some((LawScope::Always, true, "on any, genesis")),
-            _ => None,
-        };
-        if let Some((scope, genesis, written)) = required
+        if let Some((scope, genesis, written)) = required_declaration(kind)
             && (law.scope != scope || law.genesis != genesis)
         {
             return Err(ContractError::new(
@@ -648,7 +668,24 @@ fn laws(
         .iter()
         .any(|law| law.kind == LawKind::CommittedFailureEffects)
     {
-        // Without a committed-failure law, no committed failure is lawful.
+        // Without a committed-failure law, no committed failure is lawful,
+        // so a case that decides one could never commit.
+        if let Some(index) = rules
+            .cases
+            .iter()
+            .position(|case| case.class == Class::CommittedFailure)
+        {
+            return Err(rules_error(
+                &format!("cases[{index}]"),
+                format!(
+                    "is a committed failure, but no law has kind CommittedFailureEffects, so \
+                     framework law {} would refuse every committed failure at run time. Declare a \
+                     law `on failure` in project.zeno and give it kind CommittedFailureEffects in \
+                     law_kinds",
+                    rules.failure_law
+                ),
+            ));
+        }
         let mut graph = LawGraph::new(declarations);
         let root = graph.bool(false);
         laws.push(Law {
@@ -744,6 +781,23 @@ fn laws(
         }
     }
     Ok(laws)
+}
+
+/// The scope, whether genesis applies, and how `project.zeno` writes them,
+/// that a law of `kind` must be declared with; `None` for any scope.
+pub(super) fn required_declaration(kind: LawKind) -> Option<(LawScope, bool, &'static str)> {
+    match kind {
+        LawKind::StateInvariant => Some((LawScope::Committing, true, "on commit, genesis")),
+        LawKind::RejectNoAuthority => Some((LawScope::Reject, false, "on reject")),
+        LawKind::CommittedFailureEffects => Some((LawScope::CommittedFailure, false, "on failure")),
+        LawKind::DecisionConformance => Some((LawScope::Always, false, "on any")),
+        LawKind::InitialCondition => Some((LawScope::Always, true, "on any, genesis")),
+        LawKind::AssetConservation
+        | LawKind::MintBurnAuthorization
+        | LawKind::DebitCreditEffectEquality
+        | LawKind::FeeAndRounding
+        | LawKind::AuthoritySubjectRecipient => None,
+    }
 }
 
 /// Law 991: the first case whose `when` holds fixes the class, reason,

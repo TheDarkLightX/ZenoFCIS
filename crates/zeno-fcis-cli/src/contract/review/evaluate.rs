@@ -1,12 +1,16 @@
 //! Decisions through the library route. An input tuple is framed as the
 //! canonical envelopes the Authority admits, the bound Authority evaluates
 //! it, and the outcome is the complete decision, or the refusal, with digests
-//! of the successor state and of the outbox.
+//! of the successor state and of the outbox. A refusal keeps the law the
+//! library's own law diagnostics name as refusing, and whether a pre-state
+//! satisfies the contract's state laws is the library's law evaluator's
+//! verdict.
 
 use zeno_fcis_codec::CommitmentHasher;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_synthesis::finite::{
-    canonical_v2::output, v2_authority::Authority, v2_composition as c,
+    V2ExecutionFailure, canonical_v2::output, v2_authority, v2_authority::Authority,
+    v2_composition as c, v2_laws as laws,
 };
 
 use super::super::declarations::{ROOTS, Source};
@@ -109,8 +113,106 @@ pub(super) struct Decision {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum Outcome {
     Decision(Decision),
-    /// The library's refusal, as it reports it.
-    Refused(String),
+    Refused(Refusal),
+}
+
+/// A refusal of the library Authority.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(super) struct Refusal {
+    /// The refusal as the library reports it, such as `Core(Law(Violated))`.
+    pub(super) text: String,
+    pub(super) class: RefusalClass,
+    /// The law whose evaluation refused, as the library's law diagnostics
+    /// name it; `None` when no law evaluation refused.
+    pub(super) law: Option<u32>,
+}
+
+impl std::fmt::Display for Refusal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.law {
+            Some(law) => write!(formatter, "{} by law {law}", self.text),
+            None => formatter.write_str(&self.text),
+        }
+    }
+}
+
+/// The stage of the library route that refused.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(super) enum RefusalClass {
+    Law,
+    Domain,
+    Arithmetic,
+    Meter,
+    Input,
+    Other,
+}
+
+impl RefusalClass {
+    pub(super) const ALL: [Self; 6] = [
+        Self::Law,
+        Self::Domain,
+        Self::Arithmetic,
+        Self::Meter,
+        Self::Input,
+        Self::Other,
+    ];
+
+    pub(super) fn name(self) -> &'static str {
+        match self {
+            Self::Law => "law",
+            Self::Domain => "domain",
+            Self::Arithmetic => "arithmetic",
+            Self::Meter => "meter",
+            Self::Input => "input",
+            Self::Other => "other",
+        }
+    }
+
+    /// Which library refusals the class holds.
+    pub(super) fn meaning(self) -> &'static str {
+        match self {
+            Self::Law => {
+                "an applicable law refused the complete decision: Core(Law(..)), except a meter refusal"
+            }
+            Self::Domain => {
+                "a value left its declared domain: Core(Decision(Domain)), Core(Schema), Core(Output), Core(Execution(InputDomain)) or Core(Execution(OutputDomain))"
+            }
+            Self::Arithmetic => {
+                "checked arithmetic of the decision program overflowed: Core(Execution(Arithmetic))"
+            }
+            Self::Meter => "the shared meter refused work at any stage: a MeterFailure",
+            Self::Input => {
+                "the inputs were not admitted: Core(Ingress(..)), Core(Frame(..)) or Core(Binding)"
+            }
+            Self::Other => "any other refusal",
+        }
+    }
+}
+
+/// The class of a library refusal, given with its text. The library does not
+/// export the type of a decision or ingress failure, so those two are told
+/// apart by the text the library reports.
+fn class(refusal: &v2_authority::Refusal, text: &str) -> RefusalClass {
+    if text.contains("MeterFailure") {
+        return RefusalClass::Meter;
+    }
+    match refusal {
+        v2_authority::Refusal::Core(failure) => match failure {
+            c::Failure::Law(_) => RefusalClass::Law,
+            c::Failure::Schema
+            | c::Failure::Output
+            | c::Failure::Execution(
+                V2ExecutionFailure::InputDomain | V2ExecutionFailure::OutputDomain,
+            ) => RefusalClass::Domain,
+            c::Failure::Decision(_) if text == "Core(Decision(Domain))" => RefusalClass::Domain,
+            c::Failure::Execution(V2ExecutionFailure::Arithmetic) => RefusalClass::Arithmetic,
+            c::Failure::Ingress(..) | c::Failure::Frame(..) | c::Failure::Binding => {
+                RefusalClass::Input
+            }
+            _ => RefusalClass::Other,
+        },
+        _ => RefusalClass::Other,
+    }
 }
 
 /// The atom a position's number denotes.
@@ -180,21 +282,13 @@ impl Framer {
     }
 
     fn envelope(&self, root: &RootFrame, tuple: &[i64]) -> Vec<u8> {
-        let atom = |index: usize| atom(self.kinds[index], tuple[index]);
         let payload = if root.record {
-            let mut fields: Vec<c::Field<'static>> = root
-                .positions
-                .iter()
-                .map(|(id, index)| c::Field {
-                    id: *id,
-                    value: atom(*index),
-                })
-                .collect();
-            fields.sort_by_key(|field| field.id);
-            output::encode_record(&fields, root.max_bytes)
+            output::encode_record(&self.fields(root, tuple), root.max_bytes)
         } else {
             match root.positions.first() {
-                Some((_, index)) => output::encode_atom(atom(*index), root.max_bytes),
+                Some((_, index)) => {
+                    output::encode_atom(atom(self.kinds[*index], tuple[*index]), root.max_bytes)
+                }
                 None => Ok(Vec::new()),
             }
         };
@@ -205,6 +299,20 @@ impl Framer {
                 output::encode_envelope(root.root, &self.commitment, &payload, root.max_bytes)
             })
             .unwrap_or_default()
+    }
+
+    /// A record root's fields in field-ID order, as the library admits them.
+    fn fields(&self, root: &RootFrame, tuple: &[i64]) -> Vec<c::Field<'static>> {
+        let mut fields: Vec<c::Field<'static>> = root
+            .positions
+            .iter()
+            .map(|(id, index)| c::Field {
+                id: *id,
+                value: atom(self.kinds[*index], tuple[*index]),
+            })
+            .collect();
+        fields.sort_by_key(|field| field.id);
+        fields
     }
 }
 
@@ -229,8 +337,92 @@ pub(super) fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i64]
     });
     match evaluation.result() {
         Ok(candidate) => decision(candidate),
-        Err(refusal) => Outcome::Refused(format!("{refusal:?}")),
+        Err(refusal) => {
+            let text = format!("{refusal:?}");
+            Outcome::Refused(Refusal {
+                class: class(&refusal, &text),
+                text,
+                law: evaluation
+                    .diagnostics()
+                    .iter()
+                    .find(|diagnostic| matches!(diagnostic.verdict, laws::Verdict::Refused(_)))
+                    .map(|diagnostic| diagnostic.id),
+            })
+        }
     }
+}
+
+/// The contract's state laws, in its law order: each law that applies at
+/// genesis and to every committing decision, so that every committed state
+/// satisfies it, except an `InitialCondition` law, which applies at genesis
+/// only. In a generated contract they are the laws declared `on commit,
+/// genesis`, every `StateInvariant` among them, and those declared `on any,
+/// genesis` other than an `InitialCondition`.
+pub(super) fn state_laws(descriptor: &c::Descriptor<'_>) -> Vec<u32> {
+    descriptor
+        .laws
+        .iter()
+        .filter(|law| {
+            law.genesis
+                && matches!(law.scope, laws::Scope::Committing | laws::Scope::Always)
+                && !matches!(law.kind, laws::Kind::InitialCondition)
+        })
+        .map(|law| law.id)
+        .collect()
+}
+
+/// The first state law the tuple's pre-state does not satisfy, or `None`
+/// when it satisfies every one. The library's law evaluator runs the
+/// contract's own law programs on the pre-state as a genesis frame, where a
+/// law that reads the successor reads that state, with the state laws
+/// ordered first. A refusing verdict counts against the state: the
+/// Authority refuses to commit such a state. A state law the evaluator never
+/// reached, which only a refusal of the whole frame causes, leaves the state
+/// counted as satisfying it, so that a law refusal on it stays a finding.
+pub(super) fn first_unsatisfied_state_law(
+    descriptor: &c::Descriptor<'_>,
+    state_laws: &[u32],
+    framer: &Framer,
+    tuple: &[i64],
+) -> Option<u32> {
+    if state_laws.is_empty() {
+        return None;
+    }
+    let first = |law: &&laws::Law<'_>| state_laws.contains(&law.id);
+    let ordered: Vec<laws::Law<'_>> = state_laws
+        .iter()
+        .filter_map(|id| descriptor.laws.iter().find(|law| law.id == *id))
+        .chain(descriptor.laws.iter().filter(|law| !first(law)))
+        .map(|law| laws::Law {
+            id: law.id,
+            kind: law.kind,
+            scope: law.scope,
+            genesis: law.genesis,
+            program: laws::Program {
+                nodes: law.program.nodes,
+                root: law.program.root,
+            },
+        })
+        .collect();
+    let root = &framer.roots[0];
+    let fields = framer.fields(root, tuple);
+    let initial = match root.positions.first() {
+        Some((_, index)) if !root.record => {
+            laws::RootView::Leaf(atom(framer.kinds[*index], tuple[*index]))
+        }
+        _ => laws::RootView::Record(&fields),
+    };
+    let frame = laws::Frame::Genesis { initial };
+    let (_, _, diagnostics, _) =
+        laws::evaluate(&ordered, descriptor.required, &frame, descriptor.limits).into_parts();
+    for id in state_laws {
+        match diagnostics.iter().find(|diagnostic| diagnostic.id == *id) {
+            Some(diagnostic) if diagnostic.verdict == laws::Verdict::Satisfied => {}
+            Some(_) => return Some(*id),
+            None => return None,
+        }
+    }
+    None
 }
 
 fn decision(candidate: &c::Candidate<'_>) -> Outcome {
@@ -238,7 +430,13 @@ fn decision(candidate: &c::Candidate<'_>) -> Outcome {
         c::Class::Accept => Class::Accept,
         c::Class::Reject => Class::Reject,
         c::Class::CommittedFailure => Class::CommittedFailure,
-        other => return Outcome::Refused(format!("unknown decision class {other:?}")),
+        other => {
+            return Outcome::Refused(Refusal {
+                text: format!("unknown decision class {other:?}"),
+                class: RefusalClass::Other,
+                law: None,
+            });
+        }
     };
     Outcome::Decision(Decision {
         class,

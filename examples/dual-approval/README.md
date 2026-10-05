@@ -9,9 +9,14 @@ is needed to build the application:
 ```
 zeno-fcis new dual-approval --contract examples/dual-approval
 cd dual-approval
-cargo test
-cargo run -- approvals.sqlite
+cargo test --offline
+cargo run --offline -- approvals.sqlite
 ```
+
+`zeno-fcis new` binds the application to the ZenoFCIS source tree the CLI was
+built from, or to the one `--source` names, and the generated README says
+how. `--offline` uses only the crates already in Cargo's cache; `cargo fetch`
+in that tree fills it.
 
 ## Rules
 
