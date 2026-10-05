@@ -71,6 +71,36 @@ embedded in ZenoFCIS values.
   review grants no authority and changes no application file; a decision
   that contradicts an owner example exits 1. The review is pure code in the
   CLI crate; `Cargo.lock` and the verified core are unchanged.
+- Add `zeno-fcis contract adopt DIR --candidate C --receipt R --usage
+  preserved|new-version`: a checked candidate decision program becomes the
+  application's next contract version. The rules file records the adoption
+  (candidate and receipt SHA-256, claimed usage) in an `adoptions` list,
+  the candidate and receipt are kept under `v2/adoptions/N/`, and the
+  generator replays every receipt, in order, against the program it
+  re-derives from the declarations, rules and earlier adoptions before it
+  emits the last candidate as the descriptor's program. `preserved` is
+  accepted only when the receipt reports equal Step usage on every input.
+  Superseded versions are emitted beside the current one
+  (`src/v2_contract_vN.rs`, `v2/policy_vN.zcve`), and every generated
+  contract states `VERSION` and offers `with_lineage`, the checked catalogs
+  of all its versions; the eight templates regenerate byte for byte with
+  those two items added. The withdrawal-queue 106-to-100 node candidate is
+  adopted as version 2 in a committed fixture. A refusal writes nothing.
+- Add checked contract upgrades to the SQLite v2 shell. Schema v10 adds a
+  `v2_upgrades` table of chained records; `V2SqliteShell::upgrade(path,
+  catalogs)` audits the store, then requires, through the pure
+  `v2::upgrade::decide`, equal canonical state schema bytes, differing
+  identities and the new contract's genesis publication over the current
+  state (the library's genesis evaluation, so law 990 confines upgrades to
+  the declared genesis state), and records the upgrade as the next chain
+  link. `open_lineage` and `open_lineage_at_checkpoint` replay each history
+  segment under the Authority that published it; `open` keeps working for
+  stores that never upgraded. Pending deliveries keep their certificate-bound
+  IDs and order across an upgrade. A v9 store is refused until the explicit
+  `migrate_v9`, which adds the table after a complete audit; every other
+  mismatch refuses and writes nothing. `Snapshot::upgrades` counts the
+  records. Applications built from a contract gain `--audit`, `--upgrade`
+  and `--migrate`. The `zeno-fcis` binary does not open stores.
 - Add `zeno-fcis transform check --original P --candidate C [--receipt OUT]`
   and `zeno-fcis transform replay --receipt R --original P --candidate C`.
   Both programs must pass the library importer's full admission and have the

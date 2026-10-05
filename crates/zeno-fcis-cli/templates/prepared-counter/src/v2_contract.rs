@@ -647,3 +647,16 @@ pub fn checked_authority<'a>(
     let catalog = checked_catalog(descriptor).map_err(BindFailure::Catalog)?;
     authority::bind(&catalog).map_err(BindFailure::Authority)
 }
+/// Position in this application's contract lineage: 1 before any adoption.
+pub const VERSION: u32 = 1;
+/// Every contract version's checked catalog, oldest first and this one last,
+/// for a store upgrade or a lineage open. Each binding checks that version's
+/// complete retained schema and policy bytes.
+pub fn with_lineage<R>(
+    f: impl FnOnce(&[&catalog::BoundCatalog<'_>]) -> R,
+) -> Result<R, catalog::Failure> {
+    let contract = Contract::new();
+    let descriptor = contract.descriptor();
+    let catalog = checked_catalog(&descriptor)?;
+    Ok(f(&[&catalog]))
+}

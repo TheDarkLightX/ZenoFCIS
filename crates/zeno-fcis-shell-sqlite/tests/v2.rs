@@ -328,7 +328,7 @@ fn altered_delivery_bytes_and_schema_triggers_are_refused() {
         drop(external);
         assert!(matches!(
             V2SqliteShell::open(&file.0, a),
-            Err(Error::Schema(9))
+            Err(Error::Schema(10))
         ));
     });
 }
@@ -401,11 +401,11 @@ fn external_trigger_is_refused_by_live_operations_before_it_can_modify_a_commit(
         ok(external.execute_batch(
             "CREATE TRIGGER evil AFTER INSERT ON v2_commits BEGIN DELETE FROM v2_deliveries; END;",
         ));
-        assert!(matches!(db.snapshot(), Err(Error::Schema(9))));
-        assert!(matches!(db.checkpoint(), Err(Error::Schema(9))));
+        assert!(matches!(db.snapshot(), Err(Error::Schema(10))));
+        assert!(matches!(db.checkpoint(), Err(Error::Schema(10))));
         assert!(matches!(
             db.commit(Hash32::new([12; 32]), publication(a, &initial, &cmd, &ctx)),
-            Err(Error::Schema(9))
+            Err(Error::Schema(10))
         ));
         let sequence: i64 = ok(external.query_row(
             "SELECT sequence FROM v2_state WHERE singleton=1",

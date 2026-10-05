@@ -391,7 +391,7 @@ fn input_leaf(leaf: &model::InputLeaf) -> InputLeaf {
     }
 }
 
-fn scalar_domain(domain: &model::ScalarDomain) -> ScalarDomain {
+pub(super) fn scalar_domain(domain: &model::ScalarDomain) -> ScalarDomain {
     match domain {
         model::ScalarDomain::Bool => ScalarDomain::Bool,
         model::ScalarDomain::Int { min, max } => ScalarDomain::Int {
@@ -401,12 +401,12 @@ fn scalar_domain(domain: &model::ScalarDomain) -> ScalarDomain {
     }
 }
 
-fn small(index: usize) -> Result<u16, ContractError> {
+pub(super) fn small(index: usize) -> Result<u16, ContractError> {
     u16::try_from(index)
         .map_err(|_| ContractError::new("v2/policy.json", "the decision program is too large"))
 }
 
-fn scalar_op(op: &ScalarOp) -> Result<Op, ContractError> {
+pub(super) fn scalar_op(op: &ScalarOp) -> Result<Op, ContractError> {
     Ok(match *op {
         ScalarOp::Input(a) => Op::Input(small(a)?),
         ScalarOp::Int(value) => Op::Int(value),

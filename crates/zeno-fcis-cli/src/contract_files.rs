@@ -1,19 +1,24 @@
 //! Application contracts on disk.
 //!
-//! `zeno-fcis generate contract` reads an application's `project.zeno` and
-//! `v2/policy.json`, and writes or checks `v2/schema.zcve`,
-//! `src/v2_contract.rs` and `v2/policy.zcve`. `zeno-fcis new --contract`
-//! builds a new application around them. Generation is the pure
-//! `crate::contract::generate_contract`; this module only reads and writes
-//! files.
+//! `zeno-fcis generate contract` reads an application's `project.zeno`,
+//! `v2/policy.json` and the retained files of every adoption it lists, and
+//! writes or checks `v2/schema.zcve`, `src/v2_contract.rs`, `v2/policy.zcve`
+//! and each superseded version's `src/v2_contract_v{k}.rs` and
+//! `v2/policy_v{k}.zcve`. `zeno-fcis new --contract` builds a new application
+//! around them, and `zeno-fcis contract adopt` records one more adoption.
+//! Generation is the pure `crate::contract::generate_contract`; this module
+//! only reads and writes files.
 
 use std::fs::{self, OpenOptions};
 use std::io::Read;
 use std::path::Path;
 
-use serde_json::json;
+use serde_json::{Value, json};
 
-use crate::contract::{ContractError, ContractSources, GeneratedContract, generate_contract};
+use crate::contract::{
+    AdoptionSources, ContractError, ContractSources, GeneratedContract, adoption_directory,
+    generate_contract,
+};
 use crate::{
     FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, artifact_is_current, atomic_create,
     atomic_replace, print_json,
@@ -22,13 +27,16 @@ use crate::{
 /// Largest input file read; real declarations and rules are far smaller.
 const INPUT_LIMIT: u64 = 16 * 1024 * 1024;
 
-const PROJECT: &str = "project.zeno";
-const RULES: &str = "v2/policy.json";
-const SCHEMA_ORIGIN: &str = "v2/schema-origin.json";
+pub(crate) const PROJECT: &str = "project.zeno";
+pub(crate) const RULES: &str = "v2/policy.json";
+pub(crate) const SCHEMA_ORIGIN: &str = "v2/schema-origin.json";
 const EXAMPLES: &str = "tests/decision-examples.txt";
 const SCHEMA: &str = "v2/schema.zcve";
 const SOURCE: &str = "src/v2_contract.rs";
 const POLICY: &str = "v2/policy.zcve";
+/// An adoption's retained candidate and receipt, inside `adoption_directory`.
+pub(crate) const ADOPTED_PROGRAM: &str = "program.zcve";
+pub(crate) const ADOPTED_RECEIPT: &str = "receipt.json";
 
 /// The source every application built from a contract shares.
 const APPLICATION: &[(&str, &str)] = &[
@@ -49,7 +57,7 @@ const README: &str = include_str!("../contract-app/README.md.in");
 const NO_EXAMPLES: &str = include_str!("../contract-app/decision-examples.txt");
 
 /// Why no files were produced.
-enum Failure {
+pub(crate) enum Failure {
     /// An input could not be read: exit `FAILURE`.
     Read(String),
     /// The contract is invalid: exit `INVALID`.
@@ -65,29 +73,29 @@ impl From<ContractError> for Failure {
     }
 }
 
-fn invalid(place: &str, reason: impl std::fmt::Display) -> Failure {
+pub(crate) fn invalid(place: &str, reason: impl std::fmt::Display) -> Failure {
     Failure::Invalid {
         place: place.to_owned(),
         reason: reason.to_string(),
     }
 }
 
-/// The schema, contract source and policy for `project.zeno` and the rules.
-fn generate(
-    project: &str,
-    rules: &str,
-    origin: Option<&str>,
-) -> Result<GeneratedContract, Failure> {
-    Ok(generate_contract(ContractSources {
-        project,
-        rules,
-        schema_origin: origin,
-    })?)
+/// The retained files of one adoption, read from disk.
+pub(crate) struct AdoptionFiles {
+    pub(crate) candidate: Vec<u8>,
+    pub(crate) receipt: Vec<u8>,
 }
 
-/// `zeno-fcis generate contract`.
-pub(crate) fn run(dir: &Path, check_only: bool, format: OutputFormat) -> u8 {
-    let result = (|| {
+/// The inputs a contract is generated from, as read from `dir`.
+pub(crate) struct Inputs {
+    pub(crate) project: String,
+    pub(crate) rules: String,
+    pub(crate) origin: Option<String>,
+    pub(crate) adoptions: Vec<AdoptionFiles>,
+}
+
+impl Inputs {
+    pub(crate) fn read(dir: &Path) -> Result<Self, Failure> {
         let project = read_text(dir, PROJECT)?;
         let rules = read_text(dir, RULES)?;
         let origin = match read_input(&dir.join(SCHEMA_ORIGIN)) {
@@ -95,30 +103,95 @@ pub(crate) fn run(dir: &Path, check_only: bool, format: OutputFormat) -> u8 {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(Failure::Read(format!("read {SCHEMA_ORIGIN}: {error}"))),
         };
-        generate(&project, &rules, origin.as_deref())
-    })();
-    let generated = match result {
+        // The generator validates the rules; this only counts the adoptions
+        // whose retained files it must be given.
+        let count = serde_json::from_str::<Value>(&rules)
+            .ok()
+            .and_then(|rules| Some(rules.get("adoptions")?.as_array()?.len()))
+            .unwrap_or(0);
+        let adoptions = (1..=count)
+            .map(|ordinal| {
+                let directory = adoption_directory(ordinal);
+                Ok(AdoptionFiles {
+                    candidate: read_file(dir, &format!("{directory}/{ADOPTED_PROGRAM}"))?,
+                    receipt: read_file(dir, &format!("{directory}/{ADOPTED_RECEIPT}"))?,
+                })
+            })
+            .collect::<Result<_, Failure>>()?;
+        Ok(Self {
+            project,
+            rules,
+            origin,
+            adoptions,
+        })
+    }
+
+    pub(crate) fn sources<'a>(
+        &'a self,
+        rules: &'a str,
+        adoptions: &'a [AdoptionSources<'a>],
+    ) -> ContractSources<'a> {
+        ContractSources {
+            project: &self.project,
+            rules,
+            schema_origin: self.origin.as_deref(),
+            adoptions,
+        }
+    }
+
+    pub(crate) fn adoption_sources(&self) -> Vec<AdoptionSources<'_>> {
+        self.adoptions
+            .iter()
+            .map(|files| AdoptionSources {
+                candidate: &files.candidate,
+                receipt: &files.receipt,
+            })
+            .collect()
+    }
+
+    pub(crate) fn generate(&self) -> Result<GeneratedContract, Failure> {
+        let adoptions = self.adoption_sources();
+        Ok(generate_contract(self.sources(&self.rules, &adoptions))?)
+    }
+}
+
+/// The generated files in report order: the three every contract has, then
+/// each superseded version's source and policy.
+pub(crate) fn outputs(generated: &GeneratedContract) -> Vec<(String, &[u8])> {
+    let mut files = vec![
+        (SCHEMA.to_owned(), generated.schema()),
+        (SOURCE.to_owned(), generated.source().as_bytes()),
+        (POLICY.to_owned(), generated.policy()),
+    ];
+    for (index, previous) in generated.previous().iter().enumerate() {
+        let version = index + 1;
+        files.push((
+            format!("src/v2_contract_v{version}.rs"),
+            previous.source().as_bytes(),
+        ));
+        files.push((format!("v2/policy_v{version}.zcve"), previous.policy()));
+    }
+    files
+}
+
+/// `zeno-fcis generate contract`.
+pub(crate) fn run(dir: &Path, check_only: bool, format: OutputFormat) -> u8 {
+    let generated = match Inputs::read(dir).and_then(|inputs| inputs.generate()) {
         Ok(generated) => generated,
         Err(failure) => return report_failure(dir, failure, format),
     };
-    let files = [
-        (SCHEMA, generated.schema()),
-        (SOURCE, generated.source().as_bytes()),
-        (POLICY, generated.policy()),
-    ];
+    let files = outputs(&generated);
     let mut drift = Vec::new();
-    for (name, bytes) in files {
+    for (name, bytes) in &files {
         let path = dir.join(name);
         let result = if check_only {
             artifact_is_current(&path, bytes).map(|current| {
                 if !current {
-                    drift.push(name);
+                    drift.push(name.as_str());
                 }
             })
         } else {
-            path.parent()
-                .map_or(Ok(()), fs::create_dir_all)
-                .and_then(|()| atomic_replace(&path, bytes))
+            write_output(&path, bytes)
         };
         if let Err(error) = result {
             let action = if check_only { "read" } else { "write" };
@@ -130,19 +203,25 @@ pub(crate) fn run(dir: &Path, check_only: bool, format: OutputFormat) -> u8 {
     if drift.is_empty() { OK } else { INVALID }
 }
 
+pub(crate) fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    path.parent()
+        .map_or(Ok(()), fs::create_dir_all)
+        .and_then(|()| atomic_replace(path, bytes))
+}
+
 /// `zeno-fcis new <dir> --contract <contract>`: an application built from
-/// `project.zeno`, `v2/policy.json` and, when present,
-/// `tests/decision-examples.txt` in `contract`. `dir` exists and is empty.
+/// `project.zeno`, `v2/policy.json`, the adoptions it lists and, when
+/// present, `tests/decision-examples.txt` in `contract`. `dir` exists and is
+/// empty.
 pub(crate) fn scaffold(dir: &Path, contract: &Path) -> u8 {
     let result = (|| {
-        let project = read_text(contract, PROJECT)?;
-        let rules = read_text(contract, RULES)?;
+        let inputs = Inputs::read(contract)?;
         let examples = match read_input(&contract.join(EXAMPLES)) {
             Ok(bytes) => text(EXAMPLES, bytes)?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => NO_EXAMPLES.to_owned(),
             Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
         };
-        let generated = generate(&project, &rules, None)?;
+        let generated = inputs.generate()?;
         let package = generated.summary().application.clone();
         let valid_package = package.len() <= 64
             && package.starts_with(|first: char| first.is_ascii_lowercase())
@@ -161,20 +240,33 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path) -> u8 {
             .replace("{package}", &package)
             .replace("{version}", env!("CARGO_PKG_VERSION"));
         let readme = README.replace("{package}", &package);
-        let mut files: Vec<(&str, Vec<u8>)> = vec![
-            ("Cargo.toml", manifest.into_bytes()),
-            ("README.md", readme.into_bytes()),
-            (PROJECT, project.into_bytes()),
-            (RULES, rules.into_bytes()),
-            (EXAMPLES, examples.into_bytes()),
-            (SCHEMA, generated.schema().to_vec()),
-            (SOURCE, generated.source().as_bytes().to_vec()),
-            (POLICY, generated.policy().to_vec()),
+        let mut files: Vec<(String, Vec<u8>)> = vec![
+            ("Cargo.toml".to_owned(), manifest.into_bytes()),
+            ("README.md".to_owned(), readme.into_bytes()),
+            (PROJECT.to_owned(), inputs.project.clone().into_bytes()),
+            (RULES.to_owned(), inputs.rules.clone().into_bytes()),
+            (EXAMPLES.to_owned(), examples.into_bytes()),
         ];
+        for (index, adoption) in inputs.adoptions.iter().enumerate() {
+            let directory = adoption_directory(index + 1);
+            files.push((
+                format!("{directory}/{ADOPTED_PROGRAM}"),
+                adoption.candidate.clone(),
+            ));
+            files.push((
+                format!("{directory}/{ADOPTED_RECEIPT}"),
+                adoption.receipt.clone(),
+            ));
+        }
+        files.extend(
+            outputs(&generated)
+                .into_iter()
+                .map(|(name, bytes)| (name, bytes.to_vec())),
+        );
         files.extend(
             APPLICATION
                 .iter()
-                .map(|(name, source)| (*name, source.as_bytes().to_vec())),
+                .map(|(name, source)| ((*name).to_owned(), source.as_bytes().to_vec())),
         );
         Ok(files)
     })();
@@ -197,11 +289,31 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path) -> u8 {
     OK
 }
 
+/// The summary a report carries.
+pub(crate) fn summary_json(generated: &GeneratedContract) -> Value {
+    let summary = generated.summary();
+    json!({
+        "application": summary.application,
+        "version": summary.version,
+        "program_nodes": summary.program_nodes, "outputs": summary.outputs,
+        "law_nodes": summary.law_nodes, "law_ids": summary.law_ids,
+        "schema_types": summary.schema_types, "policy_bytes": generated.policy().len(),
+        "budgets": {"read": summary.read_budget, "step": summary.step_budget, "byte": summary.byte_budget},
+        "adoptions": summary.adoptions.iter().map(|adoption| json!({
+            "candidate_sha256": adoption.candidate_sha256,
+            "receipt_sha256": adoption.receipt_sha256,
+            "usage": adoption.usage.name(),
+            "usage_preserved": adoption.usage_preserved,
+            "program_nodes": {"before": adoption.program_nodes[0], "after": adoption.program_nodes[1]}
+        })).collect::<Vec<_>>()
+    })
+}
+
 fn report(
     dir: &Path,
     check_only: bool,
     drift: &[&str],
-    files: &[(&str, &[u8])],
+    files: &[(String, &[u8])],
     generated: &GeneratedContract,
     format: OutputFormat,
 ) {
@@ -210,21 +322,14 @@ fn report(
         (true, true) => "current",
         (true, false) => "drift",
     };
-    let names: Vec<&str> = files.iter().map(|(name, _)| *name).collect();
+    let names: Vec<&str> = files.iter().map(|(name, _)| name.as_str()).collect();
     match format {
         OutputFormat::Json => {
-            let summary = generated.summary();
             print_json(&json!({
                 "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
                 "authority": "none", "evidence": "generated-contract", "catalog_binding": "checked",
                 "artifacts": names, "drift": drift,
-                "summary": {
-                    "application": summary.application,
-                    "program_nodes": summary.program_nodes, "outputs": summary.outputs,
-                    "law_nodes": summary.law_nodes, "law_ids": summary.law_ids,
-                    "schema_types": summary.schema_types, "policy_bytes": generated.policy().len(),
-                    "budgets": {"read": summary.read_budget, "step": summary.step_budget, "byte": summary.byte_budget}
-                }
+                "summary": summary_json(generated)
             }));
         }
         OutputFormat::Human => match status {
@@ -235,7 +340,7 @@ fn report(
     }
 }
 
-fn report_failure(dir: &Path, failure: Failure, format: OutputFormat) -> u8 {
+pub(crate) fn report_failure(dir: &Path, failure: Failure, format: OutputFormat) -> u8 {
     let (code, place, message, exit) = match failure {
         Failure::Read(message) => ("contract-read-failed", None, message, FAILURE),
         Failure::Invalid { place, reason } => ("contract-invalid", Some(place), reason, INVALID),
@@ -254,9 +359,11 @@ fn report_failure(dir: &Path, failure: Failure, format: OutputFormat) -> u8 {
 }
 
 fn read_text(dir: &Path, name: &str) -> Result<String, Failure> {
-    let bytes = read_input(&dir.join(name))
-        .map_err(|error| Failure::Read(format!("read {name}: {error}")))?;
-    text(name, bytes)
+    text(name, read_file(dir, name)?)
+}
+
+pub(crate) fn read_file(dir: &Path, name: &str) -> Result<Vec<u8>, Failure> {
+    read_input(&dir.join(name)).map_err(|error| Failure::Read(format!("read {name}: {error}")))
 }
 
 fn text(name: &str, bytes: Vec<u8>) -> Result<String, Failure> {

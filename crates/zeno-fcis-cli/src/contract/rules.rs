@@ -1,5 +1,6 @@
 //! The reviewed rules file, `v2/policy.json`: leaf bindings, variables, the
-//! ordered decision cases, the genesis state and the kind of every law.
+//! ordered decision cases, the genesis state, the kind of every law and the
+//! adopted candidate programs.
 //!
 //! Unknown and duplicate keys are refused, so no entry is silently ignored
 //! or overridden.
@@ -13,8 +14,47 @@ use super::ContractError;
 use super::declarations::Leaf;
 use super::expr::{self, Ast};
 
-/// The rules file format this generator reads.
+/// The rules file format this generator reads. The optional `adoptions` list
+/// is part of this version: a reader that does not know it refuses the key.
 pub(super) const RULES_SCHEMA: &str = "zeno-fcis/template-declarative-policy/2";
+
+/// Whether an adopted candidate uses the same Steps as the program it
+/// replaced on every input, as its receipt reports.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Usage {
+    /// Equal Step usage everywhere: sealed publications observe no change.
+    Preserved,
+    /// Step usage differs on some input, so sealed usage observations change.
+    NewVersion,
+}
+
+impl Usage {
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Preserved => "preserved",
+            Self::NewVersion => "new-version",
+        }
+    }
+
+    fn parse(text: &str) -> Option<Self> {
+        match text {
+            "preserved" => Some(Self::Preserved),
+            "new-version" => Some(Self::NewVersion),
+            _ => None,
+        }
+    }
+}
+
+/// One adopted candidate program, in adoption order. Adoption `n` keeps its
+/// candidate at `v2/adoptions/n/program.zcve` and the equivalence receipt
+/// that compared it with the program it replaced at
+/// `v2/adoptions/n/receipt.json`; both files are bound by their SHA-256.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Adoption {
+    pub(crate) candidate_sha256: String,
+    pub(crate) receipt_sha256: String,
+    pub(crate) usage: Usage,
+}
 
 /// Framework law IDs used when the rules file names none.
 const FAILURE_LAW: u32 = 908;
@@ -128,12 +168,12 @@ pub(super) struct Rules {
     pub(super) law_kinds: BTreeMap<u32, LawKind>,
     pub(super) failure_law: u32,
     pub(super) reject_law: u32,
+    pub(super) adoptions: Vec<Adoption>,
 }
 
 impl Rules {
     pub(super) fn read(source: &str) -> Result<Self, ContractError> {
-        let json: Json = serde_json::from_str(source)
-            .map_err(|error| ContractError::new(FILE, error.to_string()))?;
+        let json = parse(source)?;
         let file = Object::new(&json, FILE)?;
         file.only(&[
             "schema",
@@ -146,6 +186,7 @@ impl Rules {
             "law_kinds",
             "framework_failure_law",
             "framework_reject_law",
+            "adoptions",
             // Reviewer notes; they do not affect the contract.
             "idempotency",
             "original_domain",
@@ -248,6 +289,15 @@ impl Rules {
             Some(_) => file.number(key),
             None => Ok(default),
         };
+        let adoptions = match file.optional("adoptions") {
+            None => Vec::new(),
+            Some(_) => file
+                .array("adoptions")?
+                .iter()
+                .enumerate()
+                .map(|(index, entry)| adoption(entry, &format!("{FILE} adoptions[{index}]")))
+                .collect::<Result<_, ContractError>>()?,
+        };
         Ok(Self {
             template: template.to_owned(),
             leaf_bindings,
@@ -257,11 +307,86 @@ impl Rules {
             law_kinds,
             failure_law: law("framework_failure_law", FAILURE_LAW)?,
             reject_law: law("framework_reject_law", REJECT_LAW)?,
+            adoptions,
         })
     }
 }
 
 const FILE: &str = "v2/policy.json";
+
+fn parse(source: &str) -> Result<Json, ContractError> {
+    serde_json::from_str(source).map_err(|error| ContractError::new(FILE, error.to_string()))
+}
+
+/// The file parsed and rendered again, for checking that `with_adoption`
+/// keeps a reviewed file's layout.
+#[cfg(test)]
+pub(super) fn reformat(source: &str) -> Result<String, ContractError> {
+    Ok(parse(source)?.render())
+}
+
+/// The rules file with one more adoption appended, in the file's own layout:
+/// object keys keep their order and `adoptions` is added last when absent.
+/// The result is validated separately when it is generated from.
+pub(crate) fn with_adoption(source: &str, adoption: &Adoption) -> Result<String, ContractError> {
+    let json = parse(source)?;
+    let Json::Object(mut entries) = json else {
+        return Err(ContractError::new(FILE, "must be an object"));
+    };
+    let entry = Json::Object(vec![
+        (
+            "candidate_sha256".to_owned(),
+            Json::Text(adoption.candidate_sha256.clone()),
+        ),
+        (
+            "receipt_sha256".to_owned(),
+            Json::Text(adoption.receipt_sha256.clone()),
+        ),
+        (
+            "usage".to_owned(),
+            Json::Text(adoption.usage.name().to_owned()),
+        ),
+    ]);
+    match entries.iter_mut().find(|(key, _)| key == "adoptions") {
+        Some((_, Json::Array(items))) => items.push(entry),
+        Some(_) => {
+            return Err(ContractError::new(
+                format!("{FILE} adoptions"),
+                "must be an array",
+            ));
+        }
+        None => entries.push(("adoptions".to_owned(), Json::Array(vec![entry]))),
+    }
+    Ok(Json::Object(entries).render())
+}
+
+fn adoption(json: &Json, place: &str) -> Result<Adoption, ContractError> {
+    let entry = Object::new(json, place)?;
+    entry.only(&["candidate_sha256", "receipt_sha256", "usage"])?;
+    let digest = |key: &str| {
+        let text = entry.text(key)?;
+        let hex = text.len() == 64
+            && text
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+        if hex {
+            Ok(text.to_owned())
+        } else {
+            Err(entry.error(key, "must be a lowercase hexadecimal SHA-256"))
+        }
+    };
+    let usage = entry.text("usage")?;
+    Ok(Adoption {
+        candidate_sha256: digest("candidate_sha256")?,
+        receipt_sha256: digest("receipt_sha256")?,
+        usage: Usage::parse(usage).ok_or_else(|| {
+            entry.error(
+                "usage",
+                format!("`{usage}` is not preserved or new-version"),
+            )
+        })?,
+    })
+}
 
 fn case(json: &Json, place: &str) -> Result<Case, ContractError> {
     let case = Object::new(json, place)?;
@@ -506,6 +631,61 @@ enum Json {
     Text(String),
     Array(Vec<Json>),
     Object(Vec<(String, Json)>),
+}
+
+impl Json {
+    /// The document as the templates are written: two-space indentation, one
+    /// entry per line, empty containers inline, and a final newline.
+    fn render(&self) -> String {
+        let mut text = String::new();
+        self.write(&mut text, 0);
+        text.push('\n');
+        text
+    }
+
+    fn write(&self, out: &mut String, indent: usize) {
+        let open = |out: &mut String, bracket: char| {
+            out.push(bracket);
+            out.push('\n');
+        };
+        let close = |out: &mut String, bracket: char| {
+            out.push('\n');
+            out.push_str(&" ".repeat(indent));
+            out.push(bracket);
+        };
+        match self {
+            Self::Null => out.push_str("null"),
+            Self::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
+            Self::Int(value) => out.push_str(&value.to_string()),
+            Self::Text(value) => out.push_str(&serde_json::Value::from(value.as_str()).to_string()),
+            Self::Array(items) if items.is_empty() => out.push_str("[]"),
+            Self::Object(entries) if entries.is_empty() => out.push_str("{}"),
+            Self::Array(items) => {
+                open(out, '[');
+                for (index, item) in items.iter().enumerate() {
+                    if index > 0 {
+                        out.push_str(",\n");
+                    }
+                    out.push_str(&" ".repeat(indent + 2));
+                    item.write(out, indent + 2);
+                }
+                close(out, ']');
+            }
+            Self::Object(entries) => {
+                open(out, '{');
+                for (index, (key, value)) in entries.iter().enumerate() {
+                    if index > 0 {
+                        out.push_str(",\n");
+                    }
+                    out.push_str(&" ".repeat(indent + 2));
+                    out.push_str(&serde_json::Value::from(key.as_str()).to_string());
+                    out.push_str(": ");
+                    value.write(out, indent + 2);
+                }
+                close(out, '}');
+            }
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Json {

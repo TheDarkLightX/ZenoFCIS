@@ -360,6 +360,12 @@ way. `zeno-fcis contract review DIR` writes an advisory packet: what the
 library decides on every input of a small domain, or on a boundary set of a
 large one; whether that agrees with `tests/decision-examples.txt`; and which
 rule mutants those inputs distinguish, each with a proposed example.
+`zeno-fcis contract adopt DIR --candidate C --receipt R --usage
+new-version` makes a candidate decision program that a `transform` receipt
+shows equivalent the contract's next version, keeping the superseded version
+beside it; the application then upgrades a live store with `--upgrade`,
+which the SQLite shell records as a chained, replayable upgrade. See the
+[CLI reference](docs/CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
 
 ## Authoring and checked synthesis
 

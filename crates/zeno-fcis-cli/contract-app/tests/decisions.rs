@@ -81,6 +81,12 @@ fn examples_run_as_one_persistent_session() {
     let path = directory.join("store.sqlite");
     let _ = std::fs::remove_file(&path);
     let summary = application::journey(&path, &examples).unwrap_or_else(|error| panic!("{error}"));
+    // The whole lineage replays the store, which already runs this version:
+    // there is nothing to upgrade it to, and a refusal writes nothing.
+    let head = application::audit(&path).unwrap_or_else(|error| panic!("{error}"));
+    let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("{error}"));
+    let refused = application::upgrade(&path);
+    assert_eq!(std::fs::read(&path).ok(), Some(bytes));
     let _ = std::fs::remove_dir_all(&directory);
     let committed = summary
         .decisions
@@ -90,5 +96,12 @@ fn examples_run_as_one_persistent_session() {
     // One bundle per committed decision; genesis is the store's anchor.
     assert_eq!(summary.bundles, committed as u64);
     assert_eq!(summary.pending, 0);
+    assert_eq!(head.contract_version, v2_contract::VERSION as usize);
+    assert_eq!(head.commits, summary.bundles);
+    assert_eq!(head.upgrades, 0);
+    assert!(
+        matches!(&refused, Err(error) if error.contains("SameContract")),
+        "{refused:?}"
+    );
     println!("session: {}", summary.json());
 }

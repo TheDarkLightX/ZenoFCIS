@@ -38,3 +38,13 @@ Feature: Check a candidate program before the factory may use it
     And every rule mutant of the fixed catalog is distinguished by a witness written as a decision example, refused, or classified without a claim of equivalence on a boundary set
     And a planted wrong constant yields a witness that contradicts an owner example
     And the packet is byte-identical on repeat and the application is unchanged
+
+  @atdd-checked-upgrade
+  Scenario: Adopt a checked candidate and upgrade a live store under its lineage
+    Given an application whose decision program a receipt shows equivalent to a candidate
+    When the owner adopts the candidate as the next contract version
+    Then the generator replays the receipt against the program it re-derives before emitting the candidate's graph
+    And the superseded version is kept beside the current one and the rules name the candidate and receipt digests
+    And a live store upgrades to the new version only with the same state schema and a current state its genesis laws admit
+    And each history segment replays under its own contract and pending deliveries are delivered exactly once with their original identifiers
+    And a different schema, a refused genesis, a missing old contract, an altered record, an unreplayable receipt and a false usage claim each refuse with nothing written

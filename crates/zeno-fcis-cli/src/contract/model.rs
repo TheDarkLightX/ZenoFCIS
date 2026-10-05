@@ -7,6 +7,7 @@
 //! 990 and decision-conformance law 991.
 
 use zeno_fcis_spec::LawScope;
+use zeno_fcis_synthesis::finite::{Op as LibraryOp, Program};
 
 use super::ContractError;
 use super::declarations::{Declarations, Form, Kind as TypeKind, Leaf, ROOTS, Source};
@@ -14,6 +15,7 @@ use super::expr::{self, Ast};
 use super::graph::{
     Atom, Graph, Kind, LawGraph, LawOp, Observation, Op, Ref, ScalarGraph, ScalarOp,
 };
+use super::policy::{scalar_domain as library_domain, scalar_op as library_op, small};
 use super::rules::{Class, Constant, LawKind, Rules};
 
 /// Limits the library's scalar program profile accepts.
@@ -359,7 +361,6 @@ impl<'d> Contract<'d> {
             ENVELOPE_BYTES + value_bytes(declarations, ROOTS[1].1)?,
             ENVELOPE_BYTES + value_bytes(declarations, ROOTS[2].1)?,
         ];
-        let law_nodes: usize = laws.iter().map(|law| law.nodes.len()).sum();
         let observations = laws
             .iter()
             .flat_map(|law| &law.nodes)
@@ -369,7 +370,7 @@ impl<'d> Contract<'d> {
             read: 3 * count(inputs.len()) + count(observations) + READ_ALLOWANCE,
             write: count(state_fields.len()),
             byte: frame_bytes.iter().sum(),
-            step: count(program.table.nodes.len() + law_nodes) + STEP_ALLOWANCE,
+            step: step_budget(program.table.nodes.len(), &laws),
         };
         Ok(Self {
             declarations,
@@ -395,6 +396,60 @@ impl<'d> Contract<'d> {
             budgets,
             genesis,
         })
+    }
+
+    /// The decision program as the library's admitted program, whose
+    /// canonical bytes a transform receipt names.
+    pub(super) fn program(&self) -> Result<Program, ContractError> {
+        let nodes = self
+            .nodes
+            .iter()
+            .map(library_op)
+            .collect::<Result<Vec<_>, _>>()?;
+        let roots = self
+            .program_roots
+            .iter()
+            .map(|root| small(*root))
+            .collect::<Result<Vec<_>, _>>()?;
+        Program::try_new(
+            self.input_domains.iter().map(library_domain).collect(),
+            self.output_domains.iter().map(library_domain).collect(),
+            nodes,
+            roots,
+        )
+        .map_err(|error| {
+            rules_error(
+                "",
+                format!("the library refuses the decision program: {error}"),
+            )
+        })
+    }
+
+    /// Replaces the decision program with an adopted candidate. The caller
+    /// has replayed the receipt that compares it with the current program, so
+    /// its input and output ABI is the current one; the Step budget follows
+    /// its node count as it follows the rules-compiled program's.
+    pub(super) fn adopt(&mut self, candidate: &Program, place: &str) -> Result<(), ContractError> {
+        let current = self.program()?;
+        if candidate.inputs() != current.inputs() || candidate.outputs() != current.outputs() {
+            return Err(rules_error(
+                place,
+                "the candidate's input or output domains differ from the contract's",
+            ));
+        }
+        let nodes = candidate
+            .nodes()
+            .iter()
+            .map(|op| contract_op(op, place))
+            .collect::<Result<Vec<_>, _>>()?;
+        self.nodes = nodes;
+        self.program_roots = candidate
+            .roots()
+            .iter()
+            .map(|root| usize::from(*root))
+            .collect();
+        self.budgets.step = step_budget(self.nodes.len(), &self.laws);
+        Ok(())
     }
 
     /// Declared types, the most fields of one type and the most variants of
@@ -1119,6 +1174,39 @@ fn check_program(
         .compile(ast)
         .map(|_| ())
         .map_err(|reason| rules_error(place, reason))
+}
+
+/// One Step per program and law node, plus the allowance.
+fn step_budget(program_nodes: usize, laws: &[Law]) -> u64 {
+    let law_nodes: usize = laws.iter().map(|law| law.nodes.len()).sum();
+    count(program_nodes + law_nodes) + STEP_ALLOWANCE
+}
+
+/// The contract form of an admitted library instruction. The library's
+/// instruction set may grow; an instruction this generator cannot render is
+/// refused rather than approximated.
+fn contract_op(op: &LibraryOp, place: &str) -> Result<ScalarOp, ContractError> {
+    let index = |value: u16| usize::from(value);
+    Ok(match *op {
+        LibraryOp::Input(a) => ScalarOp::Input(index(a)),
+        LibraryOp::Int(value) => ScalarOp::Int(value),
+        LibraryOp::Bool(value) => ScalarOp::Bool(value),
+        LibraryOp::Add(a, b) => ScalarOp::Add(index(a), index(b)),
+        LibraryOp::Sub(a, b) => ScalarOp::Sub(index(a), index(b)),
+        LibraryOp::Eq(a, b) => ScalarOp::Eq(index(a), index(b)),
+        LibraryOp::Lt(a, b) => ScalarOp::Lt(index(a), index(b)),
+        LibraryOp::And(a, b) => ScalarOp::And(index(a), index(b)),
+        LibraryOp::Not(a) => ScalarOp::Not(index(a)),
+        LibraryOp::Select(condition, a, b) => {
+            ScalarOp::Select(index(condition), index(a), index(b))
+        }
+        ref other => {
+            return Err(rules_error(
+                place,
+                format!("the candidate uses {other:?}, which contracts cannot hold"),
+            ));
+        }
+    })
 }
 
 fn rules_error(place: &str, reason: impl Into<String>) -> ContractError {

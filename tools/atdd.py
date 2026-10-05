@@ -233,6 +233,16 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "contract::review::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked")),
     ),
+    "checked-upgrade": AcceptanceScenario(
+        "Adopt a checked candidate and upgrade a live store under its lineage",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_adopt", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
+          "v2::upgrade::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "upgrade", "--locked"),
+         ("python3", "tools/check_contract_upgrade.py")),
+    ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",
         (("python3", "tools/test_record_gate_evidence.py"),),

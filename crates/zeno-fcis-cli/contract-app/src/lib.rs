@@ -14,7 +14,7 @@ pub mod v2_contract;
 #[cfg(feature = "sqlite")]
 mod session;
 #[cfg(feature = "sqlite")]
-pub use session::{Summary, journey};
+pub use session::{Head, Summary, Upgraded, audit, journey, migrate, upgrade};
 
 use zeno_fcis_codec::{CanonicalEncode, Envelope, Hash32};
 use zeno_fcis_synthesis::finite::{

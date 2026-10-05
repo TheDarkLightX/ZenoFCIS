@@ -1,5 +1,7 @@
 //! One persistent session: genuine genesis, publication, exact replay and
-//! outbox delivery through the library Authority and the SQLite v2 shell.
+//! outbox delivery through the library Authority and the SQLite v2 shell; and
+//! the operations on an existing store along the contract lineage: audit,
+//! checked upgrade and the explicit schema migration.
 
 use std::path::Path;
 
@@ -7,9 +9,148 @@ use zeno_fcis_codec::{Domain, Hash32, commitment};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_shell::CommitStatus;
 use zeno_fcis_shell_sqlite::{MemoryDestination, v2::V2SqliteShell};
-use zeno_fcis_synthesis::finite::{v2_authority::PublicationOutcome, v2_composition as c};
+use zeno_fcis_synthesis::finite::{
+    v2_authority::{self, Authority, PublicationOutcome},
+    v2_catalog::BoundCatalog,
+    v2_composition as c,
+};
 
 use crate::{AppResult, Example, authority, compare, genesis, genesis_numbers, v2_contract, wire};
+
+/// The audited head of a store opened under the whole contract lineage.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Head {
+    /// The contract version the store runs: its position in the lineage.
+    pub contract_version: usize,
+    /// Committed transitions after genesis.
+    pub commits: u64,
+    /// Outbox entries still pending.
+    pub pending: u64,
+    /// Recorded contract upgrades.
+    pub upgrades: u64,
+}
+
+impl Head {
+    /// One JSON object.
+    #[must_use]
+    pub fn json(&self) -> String {
+        format!(
+            "{{\"status\":\"audited\",\"contract_version\":{},\"commits\":{},\"pending\":{},\"upgrades\":{}}}",
+            self.contract_version, self.commits, self.pending, self.upgrades
+        )
+    }
+}
+
+/// A recorded contract upgrade and the head after it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Upgraded {
+    /// Position among the store's upgrades, from 1.
+    pub ordinal: u64,
+    /// The commit position the upgrade was recorded at.
+    pub at_commit: u64,
+    /// The hash chain tip after the upgrade, in hexadecimal.
+    pub chain: String,
+    /// The audited head under the whole lineage.
+    pub head: Head,
+}
+
+impl Upgraded {
+    /// One JSON object.
+    #[must_use]
+    pub fn json(&self) -> String {
+        format!(
+            "{{\"status\":\"upgraded\",\"ordinal\":{},\"at_commit\":{},\"chain\":\"{}\",\"contract_version\":{},\"commits\":{},\"pending\":{},\"upgrades\":{}}}",
+            self.ordinal,
+            self.at_commit,
+            self.chain,
+            self.head.contract_version,
+            self.head.commits,
+            self.head.pending,
+            self.head.upgrades
+        )
+    }
+}
+
+fn store(error: zeno_fcis_shell_sqlite::v2::Error) -> String {
+    format!("store: {error:?}")
+}
+
+/// Binds every version's catalog and Authority, oldest first, for `f`.
+fn with_lineage<R>(
+    f: impl FnOnce(&[&BoundCatalog<'_>], &[&Authority<'_>]) -> AppResult<R>,
+) -> AppResult<R> {
+    v2_contract::with_lineage(|catalogs| {
+        let authorities = catalogs
+            .iter()
+            .map(|catalog| v2_authority::bind(catalog).map_err(|error| format!("bind: {error:?}")))
+            .collect::<AppResult<Vec<_>>>()?;
+        let members: Vec<&Authority<'_>> = authorities.iter().collect();
+        f(catalogs, &members)
+    })
+    .map_err(|error| format!("catalog: {error:?}"))?
+}
+
+fn head(shell: &mut V2SqliteShell<'_, '_>) -> AppResult<Head> {
+    let snapshot = shell.snapshot().map_err(store)?;
+    Ok(Head {
+        contract_version: shell.lineage().len(),
+        commits: snapshot.version(),
+        pending: snapshot.pending(),
+        upgrades: snapshot.upgrades(),
+    })
+}
+
+/// Replays every history segment of the store at `path` under the contract
+/// version that published it, and reports the audited head.
+///
+/// # Errors
+/// Returns the store's refusal: a segment under no version of this
+/// application, a schema that needs `migrate`, or failed replay.
+pub fn audit(path: &Path) -> AppResult<Head> {
+    with_lineage(|_, members| {
+        let mut shell = V2SqliteShell::open_lineage(path, members).map_err(store)?;
+        shell.audit().map_err(store)?;
+        head(&mut shell)
+    })
+}
+
+/// Records the checked upgrade of the store at `path` to this application's
+/// contract version, then reopens it under the whole lineage.
+///
+/// # Errors
+/// Returns the store's refusal: a different state schema, the new contract's
+/// genesis laws refusing the current state, a store already at this version,
+/// a schema that needs `migrate`, or failed replay. A refusal writes nothing.
+pub fn upgrade(path: &Path) -> AppResult<Upgraded> {
+    with_lineage(|catalogs, members| {
+        let receipt = V2SqliteShell::upgrade(path, catalogs).map_err(store)?;
+        let mut shell = V2SqliteShell::open_lineage(path, members).map_err(store)?;
+        Ok(Upgraded {
+            ordinal: receipt.ordinal(),
+            at_commit: receipt.version(),
+            chain: receipt
+                .chain()
+                .as_bytes()
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect(),
+            head: head(&mut shell)?,
+        })
+    })
+}
+
+/// Converts a schema v9 store, created before upgrades were recorded, to the
+/// current schema after a complete audit under the version that created it.
+///
+/// # Errors
+/// Returns the store's refusal: not exactly a v9 store, or a store under no
+/// version of this application. A refusal writes nothing.
+pub fn migrate(path: &Path) -> AppResult<Head> {
+    with_lineage(|_, members| {
+        let mut shell = V2SqliteShell::migrate_v9(path, members).map_err(store)?;
+        head(&mut shell)
+    })
+}
 
 /// What a session did.
 #[derive(Clone, Debug, Eq, PartialEq)]

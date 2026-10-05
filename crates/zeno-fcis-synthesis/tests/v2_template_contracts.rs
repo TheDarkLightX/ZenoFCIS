@@ -2,32 +2,31 @@
 //! Numeric reference rules and retained owner examples do not call the emitter,
 //! its expression trees, or the generated scalar/law programs.
 #![allow(clippy::too_many_lines, clippy::unwrap_used, clippy::expect_used)]
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/account-lockout/src/v2_contract.rs"]
 mod account;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs"]
 mod counter;
 #[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/compliance-gateway/src/v2_contract.rs"]
 mod gateway;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/order-fulfillment/src/v2_contract.rs"]
 mod order;
-#[allow(dead_code)]
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../../verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/src/controller.rs"]
 mod original_controller;
 #[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/prepared-counter/src/v2_contract.rs"]
 mod prepared;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/inventory-reservation/src/v2_contract.rs"]
 mod stock;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/agent-treasury-guard/src/v2_contract.rs"]
 mod treasury;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/withdrawal-queue/src/v2_contract.rs"]
 mod vault;
 
