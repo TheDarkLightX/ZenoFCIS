@@ -99,7 +99,7 @@ pub(super) enum Constant {
     Int(i128),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Case {
     pub(super) when: Ast,
     pub(super) class: Class,
@@ -109,7 +109,7 @@ pub(super) struct Case {
     pub(super) outbox: Vec<Delivery>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Delivery {
     pub(super) ordinal: u32,
     pub(super) channel: u32,
@@ -118,7 +118,7 @@ pub(super) struct Delivery {
     pub(super) idempotency: u128,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct Rules {
     pub(super) template: String,
     pub(super) leaf_bindings: BTreeMap<u32, Leaf>,

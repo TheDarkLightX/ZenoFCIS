@@ -54,6 +54,23 @@ embedded in ZenoFCIS values.
   `docs/benchmarks/run_neural_loop_protocol.py` runs the available arms of the
   preregistered protocol, including the two e-graph arms, and reports every
   result.
+- Add `zeno-fcis contract review <app-dir> [--out PACKET.json] [--max-tuples N]`,
+  an advisory review of an application's contract. It binds the generated
+  contract to the library Authority as the application does and writes a
+  canonical packet, schema `zeno-fcis/contract-review/1`, byte-identical on
+  repeat: every input of a domain of at most `--max-tuples` tuples (default
+  2^20), or a documented boundary set of a larger one, each with the
+  library's class, reason, successor digest and outbox digest or refusal;
+  the agreement of those decisions with `tests/decision-examples.txt`; and
+  a fixed, versioned catalog of rule mutants (comparison flips, constants
+  moved by one, dropped guard conjuncts, swapped adjacent cases, changed
+  reasons, dropped deliveries), each regenerated and bound through the
+  library, then distinguished by a witness written as a proposed decision
+  example, refused by the generator or the library, equivalent over a fully
+  enumerated domain, or not distinguished within the boundary set. The
+  review grants no authority and changes no application file; a decision
+  that contradicts an owner example exits 1. The review is pure code in the
+  CLI crate; `Cargo.lock` and the verified core are unchanged.
 - Add `zeno-fcis transform check --original P --candidate C [--receipt OUT]`
   and `zeno-fcis transform replay --receipt R --original P --candidate C`.
   Both programs must pass the library importer's full admission and have the

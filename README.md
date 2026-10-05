@@ -356,7 +356,10 @@ contract: the library Authority makes each decision and checks each law,
 while the application frames inputs, keeps publications in SQLite and
 delivers the outbox. [Dual approval](examples/dual-approval/README.md), a
 payment released only after two different officers approve it, is built this
-way.
+way. `zeno-fcis contract review DIR` writes an advisory packet: what the
+library decides on every input of a small domain, or on a boundary set of a
+large one; whether that agrees with `tests/decision-examples.txt`; and which
+rule mutants those inputs distinguish, each with a proposed example.
 
 ## Authoring and checked synthesis
 
