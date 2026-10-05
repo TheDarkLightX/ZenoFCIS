@@ -194,6 +194,42 @@ embedded in ZenoFCIS values.
   the store already runs this contract version, so there is nothing to
   upgrade (Upgrade(SameContract))`.
 
+- Repair the V2 CI failures found on pull request 119. Every job that runs a
+  repository tool with `cargo --offline` first fetches the root, verification
+  and resolved-purity lockfiles through one shared action. The verus workflow
+  no longer reads the step-only `runner` context in job-level `env`, which made
+  GitHub reject the file, and the static workflow check now rejects any
+  context GitHub does not allow at its key. Miri interprets the synthesis
+  example through `miri run`, and its coverage check requires a row for every
+  example. The inventory-reservation bindings are regenerated through their
+  derivative test after the simplification changed the evaluator sources. The
+  candidate fuzz target admits its bundle through `decode_commit_bundle`. The
+  QEMU demo lock records the codec's `sha2` dependency at the root-lock
+  versions, the kernel handles the non-exhaustive `MiniDecision`, and the
+  soft-float guest selects sha2's portable backend.
+- Narrow the packaged release check, deliberately. Published crates still
+  build from their archives alone: every library, binary, example and build
+  script at `sources/<crate>-<version>/`. Packaged tests are no longer
+  standalone. They compile from the published archives laid out as in the
+  repository, plus the repository files the manifest pins, copied from the
+  commit: nine from `verification/` and, in 2.1, the benchmark artifacts under
+  `docs/benchmarks/` that the CLI's checker, optimizer and loop tests include.
+  Every file a test target reads outside its own package must equal
+  `release/packaged-test-inputs.json` (target, path, SHA-256). Any such read by
+  a non-test target fails. The whole-repository source archive runs every test.
+  Two frozen, pinned references force this: the `#[cfg(test)]` `#[path]`
+  include in `crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs` and
+  the `verification/verus/` includes in
+  `crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs`. Open item:
+  restore standalone packaged tests when the verified sources next change, at
+  the identity regeneration planned for 2.1.0.
+- Skip one test under Miri, deliberately:
+  `legal_leaf_above_default_payload_remains_constructible_and_encodable`
+  scans 64 MiB values byte by byte and does not finish under Miri. It is skipped
+  only in the values group through `.github/miri-exclusions.json`, which must
+  equal the workflow's skips, name exactly one test, and name the native job
+  that still runs it (`ci`, `rust`). The calls it makes still run under Miri at
+  small sizes.
 - Fix the SQLite v2 shell's exact-schema check, which skipped objects whose
   names matched `LIKE 'sqlite_%'`. In `LIKE`, `_` matches any character and
   ASCII case is ignored, so a user trigger named, for example, `sqlitex`

@@ -104,11 +104,13 @@ class RepairedRegistryTests(unittest.TestCase):
         source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
         rows = json.loads(source.split("        include: ", 1)[1].split("    env:", 1)[0])
         rows = [row for row in rows if row["packages"] == "-p zeno-fcis-synthesis"]
-        actual = [tuple(shlex.split(row["target"])) for row in rows if "test" not in row]
-        expected = [("--lib",), ("--doc",)] + [
-            ("--test", path.stem)
-            for path in (atdd.ROOT / "crates/zeno-fcis-synthesis/tests").glob("*.rs")
-        ]
+        actual = [(row.get("command", "test"), *shlex.split(row["target"]))
+                  for row in rows if "test" not in row]
+        synthesis = atdd.ROOT / "crates/zeno-fcis-synthesis"
+        # Examples have no test harness, so Miri interprets each one with `miri run`.
+        expected = [("test", "--lib"), ("test", "--doc")] + [
+            ("test", "--test", path.stem) for path in (synthesis / "tests").glob("*.rs")
+        ] + [("run", "--example", path.stem) for path in (synthesis / "examples").glob("*.rs")]
         self.assertEqual(collections.Counter(actual), collections.Counter(expected))
         template = [row for row in rows if row["target"] == "--test v2_template_contracts"]
         self.assertEqual(len(template), 1)
