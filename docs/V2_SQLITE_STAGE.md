@@ -70,8 +70,10 @@ validated prefix; it does not newly audit the prefix's historical storage bytes.
 `audit()` performs a full replay when that is required. A database row alone
 cannot create a checkpoint capability.
 
-Schema opening compares the actual table/index/trigger definitions with the
-library's fixed schema. Legacy schema v5 is explicitly refused. No unreviewed
+Schema opening compares every `sqlite_master` object (type, name, table and
+SQL, with no name filter) with the same objects built from the library's
+fixed schema, so an added trigger or index is refused whatever its name.
+Legacy schema v5 is explicitly refused. No unreviewed
 automatic rewrite or reinterpretation of old certificates occurs.
 
 ## Qualification still required

@@ -419,23 +419,23 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 1370,
+      "production_lines": 1368,
       "rank": 2,
       "score": 98,
       "signals": [
         {
           "id": "canonical-commitment",
           "lines": [
-            1082,
-            1230,
-            1345,
-            1350
+            1087,
+            1235,
+            1350,
+            1355
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            1479
+            1484
           ]
         },
         {
@@ -443,36 +443,36 @@
           "lines": [
             111,
             252,
-            333,
-            363,
-            397,
-            409,
-            442,
-            451
+            331,
+            361,
+            395,
+            407,
+            440,
+            449
           ]
         },
         {
           "id": "sql-boundary",
           "lines": [
-            253,
-            258,
+            255,
+            256,
+            271,
             273,
-            275,
-            285,
-            293,
-            412,
-            417
+            283,
+            291,
+            410,
+            415
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
+            722,
             724,
-            726,
-            1079,
-            1080,
-            1342,
-            1347
+            1084,
+            1085,
+            1347,
+            1352
           ]
         }
       ],
@@ -5300,9 +5300,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 4893089,
+    "admitted_bytes": 4893501,
     "admitted_files": 365,
-    "inventory_sha256": "05bc3ddc51c01259b42d79c1639635be6dc814522846835f07bde2f0c603daf6",
+    "inventory_sha256": "38b8e1f94f224ace9f00c34cb69fddf161e3d4d407497e1fc096c7b45075f322",
     "ranked_above_minimum": 294,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
