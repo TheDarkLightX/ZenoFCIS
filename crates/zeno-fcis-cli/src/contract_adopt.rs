@@ -1,8 +1,14 @@
 //! `zeno-fcis contract adopt`: records one more adopted candidate decision
 //! program in an application's rules and regenerates its contract lineage.
-//! The pure generator replays the receipt against the application's current
-//! program, re-derived from its declarations and rules; this module only
-//! reads and writes files, and writes nothing unless everything generated.
+//! The pure transitions in `crate::contract` check the candidate, by
+//! replaying its receipt against the application's current program, and plan
+//! every file; this module only reads and writes files, and writes nothing
+//! unless everything generated.
+//!
+//! `zeno-fcis contract refresh-receipts` rebinds every adoption's receipt to
+//! this checker's identity after a deliberate change of its semantics
+//! version: each pair is checked again, and nothing but the checker identity
+//! may change.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -11,14 +17,14 @@ use clap::{Subcommand, ValueEnum};
 use serde_json::json;
 
 use crate::contract::{
-    Adoption, AdoptionSources, GeneratedContract, Usage, adoption_directory, generate_contract,
-    with_adoption,
+    Adopted, AdoptionPlan, CheckedCandidate, RefreshedReceipts, Usage, adoption_directory,
+    refresh_receipts,
 };
 use crate::contract_files::{
     ADOPTED_PROGRAM, ADOPTED_RECEIPT, Failure, Inputs, RULES, invalid, outputs, read_input,
     report_failure, summary_json, write_output,
 };
-use crate::transform::sha256_hex;
+use crate::transform::CHECKER;
 use crate::{FAILURE, JSON_SCHEMA, OK, OutputFormat, atomic_create, atomic_replace, print_json};
 
 /// The library importer refuses programs above 64 KiB, and receipts are far
@@ -44,6 +50,14 @@ pub(super) enum Command {
         #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
         format: OutputFormat,
     },
+    /// Check every adopted candidate again with this checker and rebind each receipt to its identity; refused when anything but the checker identity would change.
+    RefreshReceipts {
+        /// Application directory holding project.zeno and v2/policy.json.
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+        format: OutputFormat,
+    },
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -62,132 +76,172 @@ impl From<UsageArg> for Usage {
 }
 
 pub(super) fn run(command: Command) -> u8 {
-    let Command::Adopt {
-        dir,
-        candidate,
-        receipt,
-        usage,
-        format,
-    } = command;
-    adopt(&dir, &candidate, &receipt, usage.into(), format)
-}
-
-/// Everything an adoption writes, computed before any write.
-struct Plan {
-    ordinal: usize,
-    directory: String,
-    candidate: Vec<u8>,
-    receipt: Vec<u8>,
-    rules: String,
-    generated: GeneratedContract,
-}
-
-fn plan(dir: &Path, candidate: &Path, receipt: &Path, usage: Usage) -> Result<Plan, Failure> {
-    let inputs = Inputs::read(dir)?;
-    let candidate = read_attachment(candidate, "--candidate")?;
-    let receipt = read_attachment(receipt, "--receipt")?;
-    let ordinal = inputs.adoptions.len() + 1;
-    let directory = adoption_directory(ordinal);
-    // Unlike `exists`, `symlink_metadata` also sees a dangling link.
-    if dir.join(&directory).symlink_metadata().is_ok() {
-        return Err(invalid(
-            &directory,
-            "already exists, but the rules list fewer adoptions",
-        ));
+    match command {
+        Command::Adopt {
+            dir,
+            candidate,
+            receipt,
+            usage,
+            format,
+        } => adopt(&dir, &candidate, &receipt, usage.into(), format),
+        Command::RefreshReceipts { dir, format } => refresh(&dir, format),
     }
-    let adoption = Adoption {
-        candidate_sha256: sha256_hex(&candidate),
-        receipt_sha256: sha256_hex(&receipt),
-        usage,
-    };
-    let rules = with_adoption(&inputs.rules, &adoption)?;
-    let generated = {
-        let mut sources = inputs.adoption_sources();
-        sources.push(AdoptionSources {
-            candidate: &candidate,
-            receipt: &receipt,
-        });
-        generate_contract(inputs.sources(&rules, &sources))?
-    };
-    Ok(Plan {
-        ordinal,
-        directory,
-        candidate,
-        receipt,
-        rules,
-        generated,
-    })
+}
+
+/// Whether a retained file already holds the planned bytes, from an
+/// adoption that was interrupted before it wrote the rules.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Retained {
+    Absent,
+    Present,
 }
 
 fn adopt(dir: &Path, candidate: &Path, receipt: &Path, usage: Usage, format: OutputFormat) -> u8 {
-    let plan = match plan(dir, candidate, receipt, usage) {
-        Ok(plan) => plan,
+    let (plan, state) = match plan(dir, candidate, receipt, usage) {
+        Ok(planned) => planned,
         Err(failure) => return report_failure(dir, failure, format),
     };
-    // Retained files first, then the generated lineage, then the rules that
-    // name them, so an interrupted adoption leaves the rules describing the
-    // files that exist and `generate contract` can finish it.
-    let retained = dir.join(&plan.directory);
-    let program = format!("{}/{ADOPTED_PROGRAM}", plan.directory);
-    let receipt_file = format!("{}/{ADOPTED_RECEIPT}", plan.directory);
-    let mut writes: Vec<(String, Result<(), std::io::Error>)> = Vec::new();
-    writes.push((
-        program.clone(),
-        fs::create_dir_all(&retained)
-            .and_then(|()| atomic_create(&retained.join(ADOPTED_PROGRAM), &plan.candidate)),
-    ));
-    if writes.iter().all(|(_, result)| result.is_ok()) {
-        writes.push((
-            receipt_file.clone(),
-            atomic_create(&retained.join(ADOPTED_RECEIPT), &plan.receipt),
-        ));
-    }
-    let files = outputs(&plan.generated);
-    for (name, bytes) in &files {
-        if writes.iter().all(|(_, result)| result.is_ok()) {
-            writes.push((name.clone(), write_output(&dir.join(name), bytes)));
+    match write(dir, plan, state) {
+        Ok(adopted) => report(dir, &adopted, format),
+        Err((name, error)) => {
+            let message = format!("write {name}: {error}");
+            match format {
+                OutputFormat::Human => eprintln!("{message}"),
+                OutputFormat::Json => print_json(&json!({
+                    "schema": JSON_SCHEMA, "status": "error", "path": dir.display().to_string(),
+                    "authority": "none",
+                    "error": {"code": "adoption-write-failed", "place": name, "message": message}
+                })),
+            }
+            FAILURE
         }
     }
-    if writes.iter().all(|(_, result)| result.is_ok()) {
-        writes.push((
-            RULES.to_owned(),
-            atomic_replace(&dir.join(RULES), plan.rules.as_bytes()),
-        ));
+}
+
+/// Reads the application, both attachments and the next retained
+/// directory, then runs the pure transitions: the replayed check, then the
+/// plan.
+fn plan(
+    dir: &Path,
+    candidate: &Path,
+    receipt: &Path,
+    usage: Usage,
+) -> Result<(AdoptionPlan, [Retained; 2]), Failure> {
+    let inputs = Inputs::read(dir)?;
+    let candidate = read_attachment(candidate, "--candidate")?;
+    let receipt = read_attachment(receipt, "--receipt")?;
+    let adoptions = inputs.adoption_sources();
+    let sources = inputs.sources(&inputs.rules, &adoptions);
+    // A directory holding other files is refused before any replay.
+    let state = retained_state(
+        dir,
+        &adoption_directory(adoptions.len() + 1),
+        &candidate,
+        &receipt,
+    )?;
+    let checked = CheckedCandidate::check(sources, candidate, receipt)?;
+    Ok((checked.plan(sources, usage)?, state))
+}
+
+/// The next adoption's directory must be absent, or hold only this
+/// candidate and receipt, which an interrupted adoption of the same files
+/// left before it wrote the rules; running it again then finishes it.
+fn retained_state(
+    dir: &Path,
+    directory: &str,
+    candidate: &[u8],
+    receipt: &[u8],
+) -> Result<[Retained; 2], Failure> {
+    let refused = || {
+        invalid(
+            directory,
+            "already exists, but the rules list fewer adoptions and it holds other files than this candidate and receipt",
+        )
+    };
+    let path = dir.join(directory);
+    // Unlike `exists`, `symlink_metadata` also sees a dangling link.
+    let Ok(metadata) = path.symlink_metadata() else {
+        return Ok([Retained::Absent; 2]);
+    };
+    if !metadata.is_dir() {
+        return Err(refused());
     }
-    if let Some((name, Err(error))) = writes.iter().find(|(_, result)| result.is_err()) {
-        let message = format!("write {name}: {error}");
-        match format {
-            OutputFormat::Human => eprintln!("{message}"),
-            OutputFormat::Json => print_json(&json!({
-                "schema": JSON_SCHEMA, "status": "error", "path": dir.display().to_string(),
-                "authority": "none",
-                "error": {"code": "adoption-write-failed", "place": name, "message": message}
-            })),
+    let entries = fs::read_dir(&path)
+        .and_then(|entries| {
+            entries
+                .map(|entry| entry.map(|entry| entry.file_name()))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(|error| Failure::Read(format!("read {directory}: {error}")))?;
+    if entries
+        .iter()
+        .any(|name| name != ADOPTED_PROGRAM && name != ADOPTED_RECEIPT)
+    {
+        return Err(refused());
+    }
+    let state = |name: &str, expected: &[u8]| {
+        let file = path.join(name);
+        match file.symlink_metadata() {
+            Err(_) => Ok(Retained::Absent),
+            Ok(_) if read_input(&file).ok().as_deref() == Some(expected) => Ok(Retained::Present),
+            Ok(_) => Err(refused()),
         }
-        return FAILURE;
+    };
+    Ok([
+        state(ADOPTED_PROGRAM, candidate)?,
+        state(ADOPTED_RECEIPT, receipt)?,
+    ])
+}
+
+/// Writes the retained files first, then the generated lineage, then the
+/// rules that name them. An interruption leaves the rules unchanged:
+/// `generate contract` then regenerates the previous version, and the same
+/// `contract adopt` command finishes the adoption.
+fn write(
+    dir: &Path,
+    plan: AdoptionPlan,
+    retained: [Retained; 2],
+) -> Result<Adopted, (String, std::io::Error)> {
+    let mut artifacts = Vec::new();
+    fs::create_dir_all(dir.join(plan.directory()))
+        .map_err(|error| (plan.directory().to_owned(), error))?;
+    for ((name, bytes), state) in plan.retained().into_iter().zip(retained) {
+        if state == Retained::Absent {
+            atomic_create(&dir.join(&name), bytes).map_err(|error| (name.clone(), error))?;
+        }
+        artifacts.push(name);
     }
-    let summary = plan.generated.summary();
+    for (name, bytes) in outputs(plan.generated()) {
+        write_output(&dir.join(&name), bytes).map_err(|error| (name.clone(), error))?;
+        artifacts.push(name);
+    }
+    atomic_replace(&dir.join(RULES), plan.rules().as_bytes())
+        .map_err(|error| (RULES.to_owned(), error))?;
+    artifacts.push(RULES.to_owned());
+    Ok(plan.written(artifacts))
+}
+
+fn report(dir: &Path, adopted: &Adopted, format: OutputFormat) -> u8 {
+    let summary = adopted.generated.summary();
     let adoption = summary
         .adoptions
         .last()
         .unwrap_or_else(|| unreachable!("the generator recorded the adoption"));
-    let mut artifacts = vec![program, receipt_file];
-    artifacts.extend(files.iter().map(|(name, _)| name.clone()));
-    artifacts.push(RULES.to_owned());
     match format {
         OutputFormat::Json => print_json(&json!({
             "schema": JSON_SCHEMA, "status": "adopted", "path": dir.display().to_string(),
             "authority": "none", "evidence": "generated-contract", "catalog_binding": "checked",
             "adoption": {
-                "ordinal": plan.ordinal, "version": summary.version,
-                "directory": plan.directory,
+                "ordinal": adopted.ordinal, "version": summary.version,
+                "directory": adopted.directory,
                 "candidate_sha256": adoption.candidate_sha256,
                 "receipt_sha256": adoption.receipt_sha256,
+                "superseded_policy_sha256": adoption.superseded_policy_sha256,
                 "usage": adoption.usage.name(), "usage_preserved": adoption.usage_preserved,
                 "program_nodes": {"before": adoption.program_nodes[0], "after": adoption.program_nodes[1]}
             },
-            "artifacts": artifacts,
-            "summary": summary_json(&plan.generated)
+            "artifacts": adopted.artifacts,
+            "summary": summary_json(&adopted.generated)
         })),
         OutputFormat::Human => println!(
             "adopted candidate {} as contract version {} of {} in {}: {} -> {} program nodes, usage {}; wrote {}",
@@ -198,10 +252,87 @@ fn adopt(dir: &Path, candidate: &Path, receipt: &Path, usage: Usage, format: Out
             adoption.program_nodes[0],
             adoption.program_nodes[1],
             adoption.usage.name(),
+            adopted.artifacts.join(", ")
+        ),
+    }
+    OK
+}
+
+/// Rechecks every adoption and writes the rebound receipts, then the
+/// regenerated lineage, then the rules that name them. An interrupted refresh
+/// is finished by running it again. Nothing is written when every receipt is
+/// already this checker's.
+fn refresh(dir: &Path, format: OutputFormat) -> u8 {
+    let planned = Inputs::read(dir).and_then(|inputs| {
+        let adoptions = inputs.adoption_sources();
+        let refreshed = refresh_receipts(inputs.sources(&inputs.rules, &adoptions))?;
+        let rebound: Vec<usize> = inputs
+            .adoptions
+            .iter()
+            .zip(refreshed.receipts())
+            .enumerate()
+            .filter(|(_, (files, receipt))| files.receipt != **receipt)
+            .map(|(index, _)| index + 1)
+            .collect();
+        let current = rebound.is_empty() && inputs.rules == refreshed.rules();
+        Ok((refreshed, rebound, current))
+    });
+    let (refreshed, rebound, current) = match planned {
+        Ok(planned) => planned,
+        Err(failure) => return report_failure(dir, failure, format),
+    };
+    let mut artifacts = Vec::new();
+    if !current && let Err((name, error)) = write_refresh(dir, &refreshed, &mut artifacts) {
+        let message = format!("write {name}: {error}");
+        match format {
+            OutputFormat::Human => eprintln!("{message}"),
+            OutputFormat::Json => print_json(&json!({
+                "schema": JSON_SCHEMA, "status": "error", "path": dir.display().to_string(),
+                "authority": "none",
+                "error": {"code": "refresh-write-failed", "place": name, "message": message}
+            })),
+        }
+        return FAILURE;
+    }
+    let status = if current { "current" } else { "refreshed" };
+    match format {
+        OutputFormat::Json => print_json(&json!({
+            "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
+            "authority": "none", "evidence": "generated-contract", "catalog_binding": "checked",
+            "checker": CHECKER, "refreshed": rebound, "artifacts": artifacts,
+            "summary": summary_json(refreshed.generated())
+        })),
+        OutputFormat::Human if current => println!(
+            "every adoption receipt in {} is already this checker's ({CHECKER})",
+            dir.display()
+        ),
+        OutputFormat::Human => println!(
+            "rebound the receipts of adoptions {rebound:?} in {} to {CHECKER}; wrote {}",
+            dir.display(),
             artifacts.join(", ")
         ),
     }
     OK
+}
+
+fn write_refresh(
+    dir: &Path,
+    refreshed: &RefreshedReceipts,
+    artifacts: &mut Vec<String>,
+) -> Result<(), (String, std::io::Error)> {
+    for (index, receipt) in refreshed.receipts().iter().enumerate() {
+        let name = format!("{}/{ADOPTED_RECEIPT}", adoption_directory(index + 1));
+        atomic_replace(&dir.join(&name), receipt).map_err(|error| (name.clone(), error))?;
+        artifacts.push(name);
+    }
+    for (name, bytes) in outputs(refreshed.generated()) {
+        write_output(&dir.join(&name), bytes).map_err(|error| (name.clone(), error))?;
+        artifacts.push(name);
+    }
+    atomic_replace(&dir.join(RULES), refreshed.rules().as_bytes())
+        .map_err(|error| (RULES.to_owned(), error))?;
+    artifacts.push(RULES.to_owned());
+    Ok(())
 }
 
 /// A candidate or receipt file, bounded before it is hashed.

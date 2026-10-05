@@ -136,6 +136,7 @@ impl Inputs {
             rules,
             schema_origin: self.origin.as_deref(),
             adoptions,
+            replayed: &[],
         }
     }
 
@@ -304,7 +305,16 @@ pub(crate) fn summary_json(generated: &GeneratedContract) -> Value {
             "receipt_sha256": adoption.receipt_sha256,
             "usage": adoption.usage.name(),
             "usage_preserved": adoption.usage_preserved,
-            "program_nodes": {"before": adoption.program_nodes[0], "after": adoption.program_nodes[1]}
+            "program_nodes": {"before": adoption.program_nodes[0], "after": adoption.program_nodes[1]},
+            "premises": {
+                "decision_conformance_law": true, "receipt_equivalent": true,
+                "step_limits_never_bind": adoption.steps.never_binds(),
+                "steps": {
+                    "program": {"before": adoption.steps.program[0], "after": adoption.steps.program[1]},
+                    "laws": adoption.steps.laws,
+                    "limit": {"before": adoption.steps.limits[0], "after": adoption.steps.limits[1]}
+                }
+            }
         })).collect::<Vec<_>>()
     })
 }

@@ -452,6 +452,22 @@ impl<'d> Contract<'d> {
         Ok(())
     }
 
+    /// The Steps every law together can charge in one evaluation: one per
+    /// law node.
+    pub(super) fn law_steps(&self) -> u64 {
+        count(self.laws.iter().map(|law| law.nodes.len()).sum())
+    }
+
+    /// Whether the laws include decision-conformance law 991, which pins
+    /// every decision to the case table, on every decision.
+    pub(super) fn pins_decisions(&self) -> bool {
+        self.laws.iter().any(|law| {
+            law.id == CONFORMANCE_LAW
+                && law.kind == LawKind::DecisionConformance
+                && law.scope == LawScope::Always
+        })
+    }
+
     /// Declared types, the most fields of one type and the most variants of
     /// one type: the schema admission limits.
     pub(super) fn schema_counts(&self) -> (usize, usize, usize) {

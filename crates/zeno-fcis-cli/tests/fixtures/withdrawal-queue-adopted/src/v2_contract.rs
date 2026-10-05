@@ -2426,11 +2426,17 @@ pub const VERSION: u32 = 2;
 /// Contract version 1, superseded by adoption 1 in v2/policy.json.
 #[path = "v2_contract_v1.rs"]
 pub mod v1;
+/// The SHA-256 of each adoption's `transform` receipt, oldest first: adoption
+/// `k`'s receipt compares version `k`'s decision program with version
+/// `k + 1`'s. `zeno-fcis generate contract` replayed every one before writing
+/// this list, and a program-successor store upgrade binds the ones it spans.
+pub const ADOPTION_RECEIPTS: &[&str] =
+    &["d050dc81e8dc450e6a15a06d3f5828bbbac9f53db1edec3f87d56d2811d319eb"];
 /// Every contract version's checked catalog, oldest first and this one last,
-/// for a store upgrade or a lineage open. Each binding checks that version's
-/// complete retained schema and policy bytes.
+/// and `ADOPTION_RECEIPTS`, for a store upgrade or a lineage open. Each
+/// binding checks that version's complete retained schema and policy bytes.
 pub fn with_lineage<R>(
-    f: impl FnOnce(&[&catalog::BoundCatalog<'_>]) -> R,
+    f: impl FnOnce((&[&catalog::BoundCatalog<'_>], &[&str])) -> R,
 ) -> Result<R, catalog::Failure> {
     let contract_1 = v1::Contract::new();
     let descriptor_1 = contract_1.descriptor();
@@ -2438,5 +2444,5 @@ pub fn with_lineage<R>(
     let contract = Contract::new();
     let descriptor = contract.descriptor();
     let catalog = checked_catalog(&descriptor)?;
-    Ok(f(&[&catalog_1, &catalog]))
+    Ok(f((&[&catalog_1, &catalog], ADOPTION_RECEIPTS)))
 }

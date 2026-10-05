@@ -4,7 +4,7 @@
 use super::{
     Counterexample, DEFAULT_MAX_INPUT_TUPLES, DEFAULT_STEP_LIMIT, ENUMERATION, Equivalence,
     FULL_BUDGET, Inconclusive, Limits, Observation, Refusal, Rejection, Replay, Side, Usage,
-    advance, check, domain_size, failure_tag, first_tuple, replay,
+    advance, check, domain_size, failure_tag, first_tuple, refreshed, replay,
 };
 use serde_json::{Value, json};
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher};
@@ -367,9 +367,8 @@ fn receipt_is_canonical_and_deterministic() {
         concat!(
             "{{\"authority\":\"none\",",
             "\"candidate\":{{\"bytes\":{},\"nodes\":1,\"sha256\":\"{}\"}},",
-            "\"checker\":{{\"crate\":\"zeno-fcis-cli\",\"evaluator_identity\":\"{}\",",
-            "\"source\":\"crates/zeno-fcis-cli/src/transform.rs\",",
-            "\"source_sha256\":\"{}\",\"version\":\"{}\"}},",
+            "\"checker\":{{\"evaluator_identity\":\"{}\",",
+            "\"semantics\":\"zeno-fcis/transform-check/1\"}},",
             "\"claim\":\"Functionally equal on the full declared input domain: every tuple ",
             "gives identical outputs or identical failures. The Step limit never binds: no ",
             "tuple needs more Steps than the limit in either program.\",",
@@ -393,8 +392,6 @@ fn receipt_is_canonical_and_deterministic() {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>(),
-        sha256(include_bytes!("transform.rs")),
-        env!("CARGO_PKG_VERSION"),
         original.len(),
         sha256(&original),
     );
@@ -452,8 +449,11 @@ fn replay_matches_only_the_exact_recomputed_receipt() {
         ("/domain/inputs/3/kind", json!("int")),
         ("/candidate/bytes", json!(762)),
         ("/original/nodes", json!(15)),
-        ("/checker/source_sha256", json!(sha256(b"older checker"))),
-        ("/checker/version", json!("1.0.0")),
+        ("/checker/semantics", json!("zeno-fcis/transform-check/0")),
+        (
+            "/checker/evaluator_identity",
+            json!(sha256(b"another evaluator")),
+        ),
     ] {
         let mut tampered = value.clone();
         *tampered
@@ -551,6 +551,71 @@ fn replay_matches_only_the_exact_recomputed_receipt() {
     assert_eq!(
         replay(&receipt, original, &swapped_kernel(), cap),
         Replay::Differs(vec!["candidate".to_owned()])
+    );
+}
+
+#[test]
+fn a_refresh_rebinds_only_the_checker_identity() {
+    let (original, candidate) = (
+        artifact("boolean-kernel-original"),
+        artifact("boolean-kernel-candidate"),
+    );
+    let receipt = equivalent(check(original, candidate, GENEROUS)).receipt();
+    let cap = DEFAULT_MAX_INPUT_TUPLES;
+    // This checker's own receipt refreshes to itself.
+    let same = refreshed(&receipt, original, candidate, cap)
+        .unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert_eq!(same.receipt(), receipt);
+    // A receipt from an older checker identity, as the crate version and
+    // source digest once bound, is rebound to this checker.
+    let value = parse(&receipt);
+    let mut older = value.clone();
+    older["checker"] = json!({
+        "crate": "zeno-fcis-cli", "version": "1.0.0",
+        "source": "crates/zeno-fcis-cli/src/transform.rs",
+        "source_sha256": sha256(b"older checker"),
+        "evaluator_identity": value["checker"]["evaluator_identity"]
+    });
+    let older = reencode(&older);
+    assert_eq!(
+        replay(&older, original, candidate, cap),
+        Replay::Differs(vec!["checker".to_owned()])
+    );
+    let rebound =
+        refreshed(&older, original, candidate, cap).unwrap_or_else(|refused| panic!("{refused:?}"));
+    assert_eq!(rebound.receipt(), receipt);
+    assert!(rebound.is_of(&receipt, original, candidate, cap));
+    // Anything else that would change is refused, never trusted.
+    for (pointer, replacement, field) in [
+        ("/usage/usage_preserved", json!(true), "usage"),
+        ("/verdict", json!("faster"), "verdict"),
+        ("/inputs_checked", json!(15), "inputs_checked"),
+    ] {
+        let mut tampered = parse(&older);
+        *tampered
+            .pointer_mut(pointer)
+            .unwrap_or_else(|| panic!("{pointer}")) = replacement;
+        assert_eq!(
+            refreshed(&reencode(&tampered), original, candidate, cap),
+            Err(Replay::Differs(vec![field.to_owned()])),
+            "{pointer}"
+        );
+    }
+    // The recorded limits are rerun, so they are kept as recorded; a pair
+    // that is no longer equivalent under them is refused.
+    let mut binding = parse(&older);
+    binding["limits"]["steps"] = json!(0);
+    assert!(matches!(
+        refreshed(&reencode(&binding), original, candidate, cap),
+        Err(Replay::NotEquivalent(_))
+    ));
+    // Other programs than the receipt names.
+    assert_eq!(
+        refreshed(&older, candidate, original, cap),
+        Err(Replay::Differs(vec![
+            "original".to_owned(),
+            "candidate".to_owned()
+        ]))
     );
 }
 

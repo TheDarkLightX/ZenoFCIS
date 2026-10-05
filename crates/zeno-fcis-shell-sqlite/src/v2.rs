@@ -6,13 +6,23 @@
 //! require trusted provenance and do not authenticate hostile stores.
 //!
 //! A store starts under one Authority. A checked upgrade appends a chained
-//! record that moves the head to another Authority with the same state schema,
-//! after the new contract's genesis laws admitted the current state. Each
-//! history segment replays under the Authority it was published with, so a
-//! store is opened with its whole lineage, oldest first.
+//! record that moves the head to a later contract of the application's
+//! lineage with the same state schema: a program successor at any state, and
+//! any other contract only when its genesis laws admit the current state (see
+//! [`upgrade`](crate::v2::upgrade)). Each history segment replays under the
+//! Authority it was published with, so a store with upgrades is opened through
+//! its [`Lineage`](crate::v2::Lineage), oldest version first, which yields a
+//! typed handle.
+//!
+//! The chain shows that every segment is valid under the lineage version it
+//! names. It is not keyed: anyone who can write the file can append a
+//! well-formed record or roll the store back to an earlier valid head, and
+//! detecting that needs a tip held outside the file, such as an
+//! [`UpgradeReceipt`](crate::v2::UpgradeReceipt) or a private
+//! [`Checkpoint`](crate::v2::Checkpoint).
 
 use crate::CrashPoint;
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use std::{fmt, path::Path};
 use zeno_fcis_codec::{
     CanonicalEncode, DecodeLimits, Domain, EncodeError, Hash32, commitment, decode_value,
@@ -21,15 +31,17 @@ use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
 use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_shell::{CommitStatus, IdempotentDestination, MemoryDestination};
 use zeno_fcis_synthesis::finite::{
-    v2_authority::{self as authority, Authority, Publication, PublicationOutcome, WireDelivery},
+    v2_authority::{Authority, Publication, PublicationOutcome, WireDelivery},
     v2_catalog::BoundCatalog,
     v2_composition::{Kind, Raw},
 };
 
 mod compact;
+mod lineage;
 /// The pure upgrade decision and the lineage assignment.
 pub mod upgrade;
 pub use compact::{compact_publication, expand_publication};
+pub use lineage::{Lineage, Opened, Store, Superseded, V9Store};
 
 /// The tables of schema v9, which v10 keeps unchanged.
 const HISTORY: &str = "
@@ -75,8 +87,10 @@ CREATE TABLE v2_checkpoints (
 ";
 /// Schema v10 adds the chained upgrade records. `ordinal` orders them;
 /// `sequence` is the head each one was recorded at; `identity` is the full
-/// identity of the contract upgraded to; `publication` is that contract's
-/// compact genesis publication over the state at the head.
+/// identity of the contract upgraded to; `publication` is the admission the
+/// record binds: that contract's compact genesis publication over the state
+/// at the head for a genesis admission, or the adoption receipt digests for a
+/// program successor. The record's magic names its kind.
 const UPGRADES: &str = "
 CREATE TABLE v2_upgrades (
  ordinal INTEGER PRIMARY KEY CHECK(ordinal>0),
@@ -195,17 +209,36 @@ impl CommitReceipt {
 /// A recorded contract upgrade: the chained record and what it binds.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UpgradeReceipt {
+    kind: upgrade::Kind,
+    premises: Option<upgrade::Premises>,
     ordinal: u64,
     sequence: u64,
     chain: Hash32,
     from_identity: Vec<u8>,
     identity: Vec<u8>,
+    receipts: Vec<Hash32>,
     record: Vec<u8>,
 }
 impl UpgradeReceipt {
+    /// How the new contract admitted the store's state.
+    pub fn kind(&self) -> upgrade::Kind {
+        self.kind
+    }
+    /// For a program successor, the premises the shell checked and the
+    /// record binds; `None` for a genesis admission.
+    pub fn premises(&self) -> Option<upgrade::Premises> {
+        self.premises
+    }
     /// Position among the store's upgrades, from 1.
     pub fn ordinal(&self) -> u64 {
         self.ordinal
+    }
+    /// For a program successor, the SHA-256 of each adoption receipt between
+    /// the two versions, oldest first, as the upgrading lineage carried them;
+    /// empty for a genesis admission. They name the evidence an auditor
+    /// replays; the shell itself replays no receipt.
+    pub fn receipts(&self) -> &[Hash32] {
+        &self.receipts
     }
     /// The commit position the upgrade was recorded at; later commits run
     /// under the new contract.
@@ -292,11 +325,45 @@ impl Pending {
     }
 }
 
-/// SQLite adapter bound to an immutable library Authority lineage, oldest
-/// first; the last member is the contract the store runs now. There is no
-/// application evaluator.
+/// The contract versions a handle replays with, oldest first; the last one is
+/// the contract the store runs now.
+#[derive(Clone, Copy)]
+enum Members<'a, 'p> {
+    /// Created or opened with one Authority: a store without upgrades.
+    One(&'a Authority<'p>),
+    /// Opened through a lineage, bound to its first `len` versions.
+    Lineage {
+        lineage: &'a Lineage<'a, 'p>,
+        len: usize,
+    },
+}
+impl<'a, 'p> Members<'a, 'p> {
+    fn authorities(self) -> &'a [Authority<'p>] {
+        match self {
+            Self::One(authority) => std::slice::from_ref(authority),
+            Self::Lineage { lineage, len } => &lineage.authorities()[..len],
+        }
+    }
+    /// Each version's checked catalog, which a program-successor record needs;
+    /// none for a handle opened with one Authority, whose store has no upgrade.
+    fn catalogs(self) -> &'a [&'a BoundCatalog<'p>] {
+        match self {
+            Self::One(_) => &[],
+            Self::Lineage { lineage, len } => &lineage.catalogs()[..len],
+        }
+    }
+    fn last(self) -> &'a Authority<'p> {
+        self.authorities()
+            .last()
+            .unwrap_or_else(|| unreachable!("a handle is bound to at least one Authority"))
+    }
+}
+
+/// SQLite adapter bound to immutable library Authorities: one, or a prefix of
+/// a contract lineage, oldest first. The last one is the contract the store
+/// runs now. There is no application evaluator.
 pub struct V2SqliteShell<'a, 'p> {
-    lineage: Vec<&'a Authority<'p>>,
+    members: Members<'a, 'p>,
     connection: Connection,
     anchor: Anchor,
     genesis: Hash32,
@@ -386,7 +453,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             chain,
         };
         Ok(Self {
-            lineage: vec![authority],
+            members: Members::One(authority),
             connection,
             anchor,
             genesis: chain,
@@ -395,18 +462,10 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         })
     }
     /// Re-admit genesis and recompute every complete decision and delivery on
-    /// reopening a store that never upgraded.
+    /// reopening a store that never upgraded. A store with upgrades opens
+    /// through its [`Lineage`]. A missing file is refused, never created.
     pub fn open(path: impl AsRef<Path>, authority: &'a Authority<'p>) -> Result<Self, Error> {
-        Self::open_lineage(path, &[authority])
-    }
-    /// Reopen a store under its contract lineage, oldest first. Every history
-    /// segment replays under the member that published it, and the store's
-    /// current contract must be the last member.
-    pub fn open_lineage(
-        path: impl AsRef<Path>,
-        lineage: &[&'a Authority<'p>],
-    ) -> Result<Self, Error> {
-        Self::reopen(Connection::open(path)?, lineage.to_vec(), None)
+        Self::reopen(open_existing(path)?, Members::One(authority), None).map(|(shell, _)| shell)
     }
     /// Check the tail after a privately validated prefix. The checkpoint is a trusted input.
     pub fn open_at_checkpoint(
@@ -414,28 +473,28 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         authority: &'a Authority<'p>,
         checkpoint: &Checkpoint,
     ) -> Result<Self, Error> {
-        Self::open_lineage_at_checkpoint(path, &[authority], checkpoint)
+        Self::reopen(
+            open_existing(path)?,
+            Members::One(authority),
+            Some(checkpoint),
+        )
+        .map(|(shell, _)| shell)
     }
-    /// `open_at_checkpoint` for a store with a lineage; see `open_lineage`.
-    pub fn open_lineage_at_checkpoint(
-        path: impl AsRef<Path>,
-        lineage: &[&'a Authority<'p>],
-        checkpoint: &Checkpoint,
-    ) -> Result<Self, Error> {
-        Self::reopen(Connection::open(path)?, lineage.to_vec(), Some(checkpoint))
-    }
+    /// Audit a schema v10 store under `members`: every history segment
+    /// replays under the member that published it. Returns the handle and the
+    /// position of the store's current segment among the members.
     fn reopen(
         mut connection: Connection,
-        lineage: Vec<&'a Authority<'p>>,
+        members: Members<'a, 'p>,
         checkpoint: Option<&Checkpoint>,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, usize), Error> {
         provider()?;
         configure(&connection)?;
         let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         check_schema(&tx)?;
-        let segments = Segments::load(&tx, &lineage, load_upgrades(&tx)?)?;
-        segments.require_current(&lineage)?;
-        let (genesis, initial) = genesis_anchor(&tx, segments.authority(&lineage, 0))?;
+        let authorities = members.authorities();
+        let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
+        let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
         let delivery_interpreter = MemoryDestination::interpreter_identity()?;
         let (start, consumed) = match checkpoint {
             None => (initial, 0),
@@ -443,186 +502,44 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
                 if c.genesis != genesis {
                     return Err(Error::Identity);
                 }
-                check_checkpoint(&tx, c)?;
-                let consumed = segments.consumed_at(&tx, &c.anchor)?;
-                if c.identity != segments.authority(&lineage, consumed).identity() {
+                let consumed = check_checkpoint(&tx, &segments, c)?;
+                if c.identity != segments.authority(authorities, consumed).identity() {
                     return Err(Error::Identity);
                 }
                 (c.anchor.clone(), consumed)
             }
         };
-        let anchor = audit_tail(&tx, &lineage, &segments, start, consumed)?;
+        let anchor = audit_tail(
+            &tx,
+            authorities,
+            members.catalogs(),
+            &segments,
+            start,
+            consumed,
+        )?;
+        let position = segments.position(segments.current());
         let data_version = data_version(&tx)?;
         tx.commit()?;
-        Ok(Self {
-            lineage,
+        let shell = Self {
+            members,
             connection,
             anchor,
             genesis,
             delivery_interpreter,
             data_version,
-        })
-    }
-    /// Convert a schema v9 store, which has no upgrade table, to v10 in one
-    /// transaction after a complete audit under the lineage member whose
-    /// identity it was created with. Any other schema, and a store under none
-    /// of the members, is refused and nothing is written. The returned handle
-    /// is bound to the lineage up to and including that member.
-    pub fn migrate_v9(
-        path: impl AsRef<Path>,
-        lineage: &[&'a Authority<'p>],
-    ) -> Result<Self, Error> {
-        provider()?;
-        let mut connection = Connection::open(path)?;
-        configure(&connection)?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_schema_v9(&tx)?;
-        let identity: Vec<u8> = tx.query_row(
-            "SELECT identity FROM v2_genesis WHERE singleton=1",
-            [],
-            |row| row.get(0),
-        )?;
-        let position = lineage
-            .iter()
-            .position(|member| member.identity() == identity)
-            .ok_or(Error::Identity)?;
-        let lineage = lineage[..=position].to_vec();
-        let segments = Segments::load(&tx, &lineage, Vec::new())?;
-        let (genesis, initial) = genesis_anchor(&tx, segments.authority(&lineage, 0))?;
-        let delivery_interpreter = MemoryDestination::interpreter_identity()?;
-        let anchor = audit_tail(&tx, &lineage, &segments, initial, 0)?;
-        tx.execute_batch(&migration_v9_to_v10())?;
-        check_schema(&tx)?;
-        let data_version = data_version(&tx)?;
-        tx.commit()?;
-        Ok(Self {
-            lineage,
-            connection,
-            anchor,
-            genesis,
-            delivery_interpreter,
-            data_version,
-        })
-    }
-    /// Record a checked upgrade of the store at `path` from the contract its
-    /// current segment runs to the last member of `lineage`, the application's
-    /// complete contract lineage as checked catalogs, oldest first.
-    ///
-    /// The store's segments must be published under members of `lineage`, in
-    /// order. After a full audit, the pure [`upgrade::decide`] requires the
-    /// two contracts' exact canonical state schemas to be equal, their
-    /// identities to differ, and the new contract's genesis publication to
-    /// admit the current state through the library. The record binds both
-    /// identities, that publication, the state root and the chain tip, and
-    /// becomes the next chain link. Pending deliveries keep their IDs and
-    /// order. Every refusal writes nothing.
-    ///
-    /// # Errors
-    /// `Schema` for a store that is not v10 (a v9 store needs `migrate_v9`
-    /// first), `Identity` for a segment under no member or out of order,
-    /// `Authority` when a catalog does not bind, `History` for a failed
-    /// audit, and `Upgrade` for the pure decision's refusals.
-    pub fn upgrade(
-        path: impl AsRef<Path>,
-        lineage: &[&BoundCatalog<'_>],
-    ) -> Result<UpgradeReceipt, Error> {
-        provider()?;
-        let authorities = lineage
-            .iter()
-            .map(|catalog| authority::bind(catalog).map_err(|_| Error::Authority))
-            .collect::<Result<Vec<_>, _>>()?;
-        let members: Vec<&Authority<'_>> = authorities.iter().collect();
-        let (Some(to), Some(to_catalog)) = (members.last(), lineage.last()) else {
-            return Err(Error::Identity);
         };
-        let mut connection = Connection::open(path)?;
-        configure(&connection)?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_schema(&tx)?;
-        let segments = Segments::load(&tx, &members, load_upgrades(&tx)?)?;
-        let (_, initial) = genesis_anchor(&tx, segments.authority(&members, 0))?;
-        let anchor = audit_tail(&tx, &members, &segments, initial, 0)?;
-        let current = segments.position(segments.current());
-        let from = members[current];
-        let outcome = to.publish_genesis(&anchor.state);
-        let (genesis, publication) = match &outcome {
-            PublicationOutcome::Commit(publication) => (
-                Some(upgrade::Genesis {
-                    subject: publication.subject(),
-                    poststate: publication.poststate(),
-                }),
-                Some(publication),
-            ),
-            _ => (None, None),
-        };
-        let ordinal = u64::try_from(segments.upgrades.len())
-            .ok()
-            .and_then(|count| count.checked_add(1))
-            .ok_or(Error::Range)?;
-        let sequence = u64::try_from(anchor.sequence).map_err(|_| Error::Range)?;
-        let plan = upgrade::decide(&upgrade::Facts {
-            ordinal,
-            sequence,
-            root: anchor.root,
-            previous_chain: anchor.chain,
-            from_identity: from.identity(),
-            from_schema: lineage[current].original_schema(),
-            identity: to.identity(),
-            schema: to_catalog.original_schema(),
-            state: &anchor.state,
-            genesis,
-        })?;
-        let publication = publication.ok_or(Error::Upgrade(upgrade::Refusal::Genesis))?;
-        let compact = compact_publication(to.identity(), publication.subject())?;
-        tx.execute(
-            "INSERT INTO v2_upgrades VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-            params![
-                i64::try_from(ordinal).map_err(|_| Error::Range)?,
-                anchor.sequence,
-                to.identity(),
-                compact,
-                anchor.root.as_bytes().as_slice(),
-                anchor.chain.as_bytes().as_slice(),
-                plan.record(),
-                plan.chain().as_bytes().as_slice()
-            ],
-        )?;
-        // The head keeps its sequence, state and root; only the chain tip moves.
-        let changed = tx.execute(
-            "UPDATE v2_state SET chain=?1 WHERE singleton=1 AND sequence=?2 AND root=?3 AND chain=?4",
-            params![
-                plan.chain().as_bytes().as_slice(),
-                anchor.sequence,
-                anchor.root.as_bytes().as_slice(),
-                anchor.chain.as_bytes().as_slice()
-            ],
-        )?;
-        if changed != 1 {
-            return Err(Error::Concurrent);
-        }
-        tx.commit()?;
-        Ok(UpgradeReceipt {
-            ordinal,
-            sequence,
-            chain: plan.chain(),
-            from_identity: from.identity().to_vec(),
-            identity: to.identity().to_vec(),
-            record: plan.record().to_vec(),
-        })
+        Ok((shell, position))
     }
-    /// The contract the store runs now: the last lineage member.
+    /// The contract the store runs now: the last member this handle is bound to.
     pub fn authority(&self) -> &'a Authority<'p> {
         self.current()
     }
-    /// Every lineage member this handle replays with, oldest first.
-    pub fn lineage(&self) -> &[&'a Authority<'p>] {
-        &self.lineage
+    /// Every contract version this handle replays with, oldest first.
+    pub fn lineage(&self) -> &'a [Authority<'p>] {
+        self.members.authorities()
     }
     fn current(&self) -> &'a Authority<'p> {
-        self.lineage
-            .last()
-            .copied()
-            .unwrap_or_else(|| unreachable!("a handle is bound to at least one Authority"))
+        self.members.last()
     }
     /// Revalidate all history explicitly, including acknowledged delivery data.
     pub fn audit(&mut self) -> Result<Checkpoint, Error> {
@@ -630,10 +547,18 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         check_schema(&tx)?;
-        let segments = Segments::load(&tx, &self.lineage, load_upgrades(&tx)?)?;
-        segments.require_current(&self.lineage)?;
-        let (genesis, initial) = genesis_anchor(&tx, segments.authority(&self.lineage, 0))?;
-        let anchor = audit_tail(&tx, &self.lineage, &segments, initial, 0)?;
+        let authorities = self.members.authorities();
+        let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
+        segments.require_current(authorities)?;
+        let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+        let anchor = audit_tail(
+            &tx,
+            authorities,
+            self.members.catalogs(),
+            &segments,
+            initial,
+            0,
+        )?;
         if genesis != self.genesis {
             return Err(Error::History);
         }
@@ -665,7 +590,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_cached_tip(&tx, &self.anchor, self.data_version, &self.lineage)?;
+        check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         save_checkpoint(&tx, &self.anchor)?;
         tx.commit()?;
         Ok(self.checkpoint_value())
@@ -677,7 +607,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let segments = check_cached_tip(&tx, &self.anchor, self.data_version, &self.lineage)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         let binding = segments.identity(segments.current()).to_vec();
         let (bundles, replays): (i64, i64) = tx.query_row(
             "SELECT count(*),count(DISTINCT replay_id) FROM v2_commits",
@@ -775,7 +710,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let segments = check_cached_tip(&tx, &self.anchor, self.data_version, &self.lineage)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         if expected_version.is_some_and(|expected| expected != self.anchor.sequence as u64) {
             return Err(Error::Concurrent);
         }
@@ -790,7 +730,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             let row = load_commit(&tx, sequence)?;
             check_commit(
                 &tx,
-                &self.lineage,
+                self.members.authorities(),
                 &segments,
                 &row,
                 publication.evaluation().raw().state,
@@ -880,7 +820,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let segments = check_cached_tip(&tx, &self.anchor, self.data_version, &self.lineage)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         let binding = segments.identity(segments.current()).to_vec();
         tx.commit()?;
         Ok(binding)
@@ -921,14 +866,19 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let segments = check_cached_tip(&tx, &self.anchor, self.data_version, &self.lineage)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         let position: Option<(i64,i64,i64)> = tx.query_row("SELECT sequence,lane,ordinal FROM v2_deliveries WHERE acknowledged=0 ORDER BY sequence,lane,ordinal LIMIT 1", [], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
         let result = match position {
             None => None,
             Some((sequence, lane, ordinal)) => {
                 let row = load_commit(&tx, sequence)?;
                 let state = previous_state(&tx, sequence)?;
-                check_commit(&tx, &self.lineage, &segments, &row, &state)?;
+                check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
                 Some(load_pending(&tx, sequence, lane, ordinal)?)
             }
         };
@@ -941,7 +891,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let segments = check_cached_tip(&tx, &self.anchor, self.data_version, &self.lineage)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         let sequence: i64 = tx
             .query_row(
                 "SELECT sequence FROM v2_deliveries WHERE delivery_id=?1",
@@ -952,7 +907,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             .ok_or(Error::Delivery)?;
         let row = load_commit(&tx, sequence)?;
         let state = previous_state(&tx, sequence)?;
-        check_commit(&tx, &self.lineage, &segments, &row, &state)?;
+        check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
         let expected: Vec<u8> = tx.query_row(
             "SELECT entry_hash FROM v2_deliveries WHERE delivery_id=?1",
             [delivery_id.as_bytes().as_slice()],
@@ -1088,7 +1043,7 @@ struct Segments {
 impl Segments {
     fn load(
         connection: &Connection,
-        lineage: &[&Authority<'_>],
+        lineage: &[Authority<'_>],
         upgrades: Vec<StoredUpgrade>,
     ) -> Result<Self, Error> {
         let genesis_identity: Vec<u8> = connection.query_row(
@@ -1121,12 +1076,8 @@ impl Segments {
     fn position(&self, segment: usize) -> usize {
         self.positions[segment]
     }
-    fn authority<'x, 'p>(
-        &self,
-        lineage: &[&'x Authority<'p>],
-        segment: usize,
-    ) -> &'x Authority<'p> {
-        lineage[self.position(segment)]
+    fn authority<'x, 'p>(&self, lineage: &'x [Authority<'p>], segment: usize) -> &'x Authority<'p> {
+        &lineage[self.position(segment)]
     }
     /// The segment a commit belongs to: after every upgrade recorded at an
     /// earlier head.
@@ -1136,12 +1087,14 @@ impl Segments {
             .take_while(|upgrade| upgrade.sequence < sequence)
             .count()
     }
-    /// The store runs the lineage's last member.
-    fn require_current(&self, lineage: &[&Authority<'_>]) -> Result<(), Error> {
-        if self.position(self.current()) + 1 != lineage.len() {
-            return Err(Error::Identity);
+    /// The store runs the lineage's last member. Identities, not positions,
+    /// decide: an identity binds the complete policy and the evaluator, so a
+    /// lineage that repeats one still opens a store that runs it.
+    fn require_current(&self, lineage: &[Authority<'_>]) -> Result<(), Error> {
+        match lineage.last() {
+            Some(last) if last.identity() == self.identity(self.current()) => Ok(()),
+            _ => Err(Error::Identity),
         }
-        Ok(())
     }
     /// How many upgrades a validated anchor already includes: all those at
     /// earlier heads, and those at its own head up to the one whose chain
@@ -1229,7 +1182,7 @@ fn load_commit(connection: &Connection, sequence: i64) -> Result<StoredCommit, E
 /// Replay one commit under the Authority of its own segment.
 fn check_commit(
     connection: &Connection,
-    lineage: &[&Authority<'_>],
+    lineage: &[Authority<'_>],
     segments: &Segments,
     row: &StoredCommit,
     pre: &[u8],
@@ -1274,10 +1227,14 @@ fn check_commit(
     }
     check_deliveries(connection, row.sequence, &p, &certificate)
 }
-/// Recompute one upgrade record at the head it was recorded at.
+/// Recompute one upgrade record at the head it was recorded at, re-checking
+/// the admission its kind claims: a genesis admission replays the stored
+/// genesis publication over the state, and a program successor re-derives
+/// the policy comparison from the two versions' catalogs.
 fn check_upgrade(
     connection: &Connection,
-    lineage: &[&Authority<'_>],
+    lineage: &[Authority<'_>],
+    catalogs: &[&BoundCatalog<'_>],
     segments: &Segments,
     index: usize,
     anchor: &Anchor,
@@ -1295,24 +1252,51 @@ fn check_upgrade(
         return Err(Error::History);
     }
     let from = segments.identity(index);
-    let authority = segments.authority(lineage, index + 1);
+    let (old, new) = (segments.position(index), segments.position(index + 1));
+    let authority = &lineage[new];
     if authority.identity() != upgrade.identity || from == upgrade.identity {
         return Err(Error::Identity);
     }
-    let full = expand_publication(&upgrade.identity, &upgrade.publication)?;
-    let PublicationOutcome::Commit(p) = authority.replay_genesis_publication(&anchor.state, &full)
-    else {
-        return Err(Error::History);
+    let sequence = u64::try_from(anchor.sequence).map_err(|_| Error::Range)?;
+    let kind = upgrade::Kind::of_record(&upgrade.record).ok_or(Error::History)?;
+    let admission = match kind {
+        upgrade::Kind::GenesisAdmission => {
+            let full = expand_publication(&upgrade.identity, &upgrade.publication)?;
+            let PublicationOutcome::Commit(p) =
+                authority.replay_genesis_publication(&anchor.state, &full)
+            else {
+                return Err(Error::History);
+            };
+            if p.poststate() != anchor.state {
+                return Err(Error::History);
+            }
+            full
+        }
+        upgrade::Kind::ProgramSuccessor => {
+            // A handle opened with one Authority holds no catalog, and its
+            // store cannot hold an upgrade.
+            let (Some(from_catalog), Some(to_catalog)) = (catalogs.get(old), catalogs.get(new))
+            else {
+                return Err(Error::Identity);
+            };
+            let receipts = upgrade::evidence_receipts(&upgrade.publication)?;
+            // The premises are re-derived from the two versions and must be
+            // the ones the record states.
+            match upgrade::Successor::establish(from_catalog, to_catalog, &receipts)? {
+                Some(successor) if receipts.len() == new - old => {
+                    upgrade::successor_admission(successor.premises(), &upgrade.publication)
+                }
+                _ => return Err(Error::History),
+            }
+        }
     };
-    if p.poststate() != anchor.state {
-        return Err(Error::History);
-    }
     let record = upgrade::record_bytes(
+        kind,
         ordinal,
-        u64::try_from(anchor.sequence).map_err(|_| Error::Range)?,
+        sequence,
         from,
         &upgrade.identity,
-        &full,
+        &admission,
         anchor.root,
         anchor.chain,
     )?;
@@ -1327,7 +1311,8 @@ fn check_upgrade(
 /// Check every upgrade recorded at the anchor's head and advance its chain.
 fn apply_upgrades(
     connection: &Connection,
-    lineage: &[&Authority<'_>],
+    lineage: &[Authority<'_>],
+    catalogs: &[&BoundCatalog<'_>],
     segments: &Segments,
     anchor: &mut Anchor,
     mut consumed: usize,
@@ -1336,7 +1321,7 @@ fn apply_upgrades(
         if upgrade.sequence > anchor.sequence {
             break;
         }
-        check_upgrade(connection, lineage, segments, consumed, anchor)?;
+        check_upgrade(connection, lineage, catalogs, segments, consumed, anchor)?;
         anchor.chain = upgrade.chain;
         consumed += 1;
     }
@@ -1346,7 +1331,8 @@ fn apply_upgrades(
 /// every upgrade at the heads passed, up to the stored head.
 fn audit_tail(
     connection: &Connection,
-    lineage: &[&Authority<'_>],
+    lineage: &[Authority<'_>],
+    catalogs: &[&BoundCatalog<'_>],
     segments: &Segments,
     mut anchor: Anchor,
     mut consumed: usize,
@@ -1357,7 +1343,14 @@ fn audit_tail(
         .query_map([anchor.sequence], |r| r.get::<_, i64>(0))?
         .collect::<Result<Vec<_>, _>>()?;
     for sequence in positions {
-        consumed = apply_upgrades(connection, lineage, segments, &mut anchor, consumed)?;
+        consumed = apply_upgrades(
+            connection,
+            lineage,
+            catalogs,
+            segments,
+            &mut anchor,
+            consumed,
+        )?;
         if sequence != anchor.sequence.checked_add(1).ok_or(Error::Range)? {
             return Err(Error::History);
         }
@@ -1376,7 +1369,14 @@ fn audit_tail(
             chain: row.chain,
         };
     }
-    consumed = apply_upgrades(connection, lineage, segments, &mut anchor, consumed)?;
+    consumed = apply_upgrades(
+        connection,
+        lineage,
+        catalogs,
+        segments,
+        &mut anchor,
+        consumed,
+    )?;
     // An upgrade recorded beyond the head, or one skipped, is not history.
     if consumed != segments.upgrades.len() || read_anchor(connection)? != anchor {
         return Err(Error::History);
@@ -1501,18 +1501,18 @@ fn check_tip(connection: &Connection, segments: &Segments, anchor: &Anchor) -> R
     }
     Ok(())
 }
-fn check_checkpoint(connection: &Connection, c: &Checkpoint) -> Result<(), Error> {
+/// Check a trusted checkpoint against the store and return how many upgrades
+/// its anchor already includes. Its chain link must be one the head holds;
+/// the stored marker is keyed by head alone, so a later save at the same head
+/// after an upgrade replaces it, which is `Error::Checkpoint`, not tampering.
+fn check_checkpoint(
+    connection: &Connection,
+    segments: &Segments,
+    c: &Checkpoint,
+) -> Result<usize, Error> {
     if c.anchor.sequence < 0
         || hash(zeno_fcis_codec::domains::V2_STATE, &c.anchor.state)? != c.anchor.root
     {
-        return Err(Error::History);
-    }
-    let (root, chain): (Vec<u8>, Vec<u8>) = connection.query_row(
-        "SELECT root,chain FROM v2_checkpoints WHERE sequence=?1",
-        [c.anchor.sequence],
-        |r| Ok((r.get(0)?, r.get(1)?)),
-    )?;
-    if parse_hash(&root)? != c.anchor.root || parse_hash(&chain)? != c.anchor.chain {
         return Err(Error::History);
     }
     if c.anchor.sequence > 0 {
@@ -1521,7 +1521,29 @@ fn check_checkpoint(connection: &Connection, c: &Checkpoint) -> Result<(), Error
             return Err(Error::History);
         }
     }
-    Ok(())
+    let consumed = segments.consumed_at(connection, &c.anchor)?;
+    let (root, chain): (Vec<u8>, Vec<u8>) = connection.query_row(
+        "SELECT root,chain FROM v2_checkpoints WHERE sequence=?1",
+        [c.anchor.sequence],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    if parse_hash(&root)? != c.anchor.root {
+        return Err(Error::History);
+    }
+    if parse_hash(&chain)? != c.anchor.chain {
+        return Err(Error::Checkpoint);
+    }
+    Ok(consumed)
+}
+/// Opens an existing database file. A missing one is refused and not
+/// created, so a refused operation on a mistyped path leaves nothing behind.
+fn open_existing(path: impl AsRef<Path>) -> Result<Connection, Error> {
+    Ok(Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_URI
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?)
 }
 fn configure(connection: &Connection) -> Result<(), Error> {
     // These connection settings must be established outside a transaction.
@@ -1554,7 +1576,7 @@ fn check_cached_tip(
     connection: &Connection,
     anchor: &Anchor,
     version: i64,
-    lineage: &[&Authority<'_>],
+    lineage: &[Authority<'_>],
 ) -> Result<Segments, Error> {
     check_schema(connection)?;
     let segments = Segments::load(connection, lineage, load_upgrades(connection)?)?;
@@ -1956,10 +1978,18 @@ pub enum Error {
     /// A different schema requires an explicit reviewed migration, never implicit replay.
     Schema(i64),
     /// The private capability or checkpoint belongs to another bound Authority, or a
-    /// history segment was published under no lineage member in order.
+    /// history segment was published under no lineage member in order, or the
+    /// store does not run the contract the operation needs.
     Identity,
     /// The library refused to bind a lineage catalog into an Authority.
     Authority,
+    /// A lineage needs at least one version and exactly one adoption receipt
+    /// between each version and the next.
+    Lineage,
+    /// The store no longer holds this checkpoint: its head was saved again
+    /// with a later chain link, after an upgrade recorded at the same head.
+    /// Open from a newer checkpoint or with a full audit.
+    Checkpoint,
     /// The genuine publication has the other verified invocation kind: genesis only
     /// initializes a store, and only a transition commits or forms a publication bundle.
     InvocationKind,

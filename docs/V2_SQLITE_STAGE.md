@@ -81,48 +81,137 @@ automatic rewrite or reinterpretation of old certificates occurs.
 ## Contract upgrades and the lineage
 
 Schema v10 adds `v2_upgrades`: chained records that move a store from the
-contract its current history segment ran to another contract with the same
-state schema. A store's segments are its genesis contract and one more per
-record, each identified by the full Authority identity stored with it. A handle
-is bound to a lineage of Authorities, oldest first; the segments must appear
-in that lineage in order (a store may skip a version it never ran), and for
-`open_lineage` the last segment must be the lineage's last member.
-`V2SqliteShell::open` is the one-member case for stores that never upgraded.
+contract its current history segment ran to a later contract of its lineage
+with the same state schema. A store's segments are its genesis contract and
+one more per record, each identified by the full Authority identity stored
+with it. `v2::Lineage::bind(catalogs, receipts)` binds an application's
+lineage from its checked catalogs, oldest first, with the SHA-256 of the
+adoption receipt between each version and the next. The segments must appear
+in the lineage in order; a store may skip a version it never ran. Each
+segment takes the earliest version that fits, which a lineage that grows at
+its end never changes. `Lineage::open` audits the store and returns a typed
+handle: a v9 store, whose only operation is `migrate`; a current v10 store,
+whose last segment has the last version's identity, which commits and
+delivers; or a superseded one, which can be audited and read, or upgraded.
+`V2SqliteShell::open` is the one-Authority case for stores that never
+upgraded.
 
-`V2SqliteShell::upgrade(path, catalogs)` takes the application's whole lineage
-as checked catalogs, binds their Authorities through the library, fully audits
-the store, and asks the pure `v2::upgrade::decide` for the record. The decision
-refuses, in order, differing canonical state schema bytes, equal identities,
-and a current state the new contract's genesis publication does not admit; the
-publication comes from the library's genesis evaluation, so the new contract's
-genesis-flagged laws must hold on the state. The record is
+`Superseded::upgrade` fully audits the store under the whole lineage and asks
+the pure `v2::upgrade::decide` for the record. The decision refuses, in
+order, differing canonical state schema bytes, equal identities, and a state
+the new contract does not admit. The record's magic is its kind tag, and the
+new contract admits the state in one of two ways:
+
+- `program-successor`. The shell computes the new contract's canonical policy
+  with the library's serializer after replacing its decision program's
+  instructions and roots and its Step limit with the old contract's. If that
+  is byte for byte the old policy, the schemas, framing, channel links,
+  bindings, branches, reasons, laws and every other limit are unchanged. The
+  state at the head was admitted under those same laws, so it is admitted at
+  any state with no genesis evaluation. Every adoption produces such a
+  successor. The record also states which further premises held (below) and
+  binds the digests of the adoption receipts, which `generate contract`
+  replayed; the shell replays no receipt.
+- `genesis-admission`. Any other contract must admit the state through the
+  library's genesis evaluation, so its genesis-applicable laws must hold on
+  it. A generated contract's initial-condition law 990 admits only the
+  declared genesis state, so such a contract upgrades only stores at that
+  state. A refusal carries the library's reason.
+
+A program successor and the version it supersedes have the same reachable
+states when five premises hold:
+
+1. Their canonical policies are byte-identical except for the decision
+   program's instructions and roots and the Step limit, so the genesis
+   literals, the laws and the case table are identical. The shell checks this
+   at the upgrade and again at every audit.
+2. The identical laws include generated law 991, which pins every committed
+   decision to the case table. Generation checks this for every adoption.
+3. Each adoption receipt is F3 `Equivalent`: on every tuple of the full
+   declared input domain the two programs give identical outputs or identical
+   failures, under a declared Step limit that never binds. `generate contract`
+   replays every receipt.
+4. Neither version's Step limit binds. Steps are charged only for program
+   instruction attempts and law nodes. The shell checks that each limit covers
+   one Step for every program node and every law node; generation checks that
+   each program's largest measured usage plus every law node fits its limit.
+5. No law observes Step usage, the one meter reading a program change can
+   alter. The shell checks this; generated laws cannot observe usage.
+
+Under these premises the two versions admit the same genesis states and
+commit the same decisions, with the same successor states, from the same
+states, so they reach the same states. An upgrade at any reachable state
+therefore keeps every property of reachable states: every law, every proved
+inductive claim and the meaning of every decision example, not only the laws
+evaluated on the current state. It does not keep the sealed Step usage. When
+the receipt reports that usage differs, the usage observations sealed into
+each publication change, and every sealed subject embeds the new contract
+identity, so an adoption is a versioned change. The record's premises byte
+states whether premises 4 and 5 held; premise 1 defines the kind, and premises
+2 and 3 rest on the generation of the build that recorded the upgrade. When a
+recorded premise did not hold, the record still shows that the laws are
+unchanged, so every later commit passes them, but not that the reachable
+states are.
+
+The records are
 
 ```text
+"ZFCISV2-SUCCESSOR\0" || ordinal:u64be || head_sequence:u64be
+  || frame(from_identity) || frame(identity)
+  || frame(premises:u8 || receipt_digests)
+  || frame(state_root) || frame(previous_chain)
+
 "ZFCISV2-UPGRADE\0" || ordinal:u64be || head_sequence:u64be
   || frame(from_identity) || frame(identity) || frame(genesis_publication)
   || frame(state_root) || frame(previous_chain)
 ```
 
-and the new chain tip is `HashV2Chain(record)`; certificates begin with
-`ZFCISV2-CERT\0`, so the two preimage sets are disjoint under one domain. The
-row stores the ordinal, the head sequence, the identity, the compact genesis
-publication, the root, the previous chain, the record and the chain; the head
-row's chain moves to the new tip while its sequence, state and root stay. The
-next commit's certificate extends the upgrade link. Replay walks events in
-order: the commits of a segment under that segment's Authority, then every
-record at the head it was taken at, recomputed from the stored fields and the
-Authority it names, including `replay_genesis_publication` over the state at
-that head. Pending deliveries keep their certificate-bound IDs and order, and
-are recomputed under their own segment's Authority before delivery.
-Checkpoints taken before or after an upgrade at the same head are told apart by
-the chain link they carry.
+where `premises` sets bit 0 for the policy comparison, bit 1 when both Step
+limits cover every node and bit 2 when no law observes Step usage, and
+`receipt_digests` concatenates the 32-byte SHA-256 of each adoption receipt
+between the two versions, oldest first. The new chain tip is
+`HashV2Chain(record)`. Certificates begin with `ZFCISV2-CERT\0`, and the three
+magics first differ at byte 8, so the preimage sets are disjoint under one
+domain. The row stores the ordinal, the head sequence, the identity, the
+admission (the compact genesis publication, or the receipt digests), the root,
+the previous chain, the record and the chain. The head row's chain moves to
+the new tip while its sequence, state and root stay, and the next commit's
+certificate extends the upgrade link. Replay walks events in order: the
+commits of a segment under that segment's Authority, then every record at the
+head it was taken at, recomputed from the stored fields and re-checked by its
+kind. A genesis admission replays its genesis publication over the state at
+that head; a program successor re-derives the policy comparison and its
+premises from the two versions' catalogs and needs one receipt digest per
+adoption it spans.
+Pending deliveries keep their certificate-bound IDs and order, and are
+recomputed under their own segment's Authority before delivery.
 
-A v9 store is exactly the previous shell's catalog; `open`, `open_lineage` and
-`upgrade` refuse it as `Schema(9)`. `migrate_v9(path, lineage)` adds the table
-and sets version 10 in one transaction after a complete audit under the member
-whose identity created the store; any other schema, or a store under none of
-the members, refuses and writes nothing. No data is migrated: a changed state
-schema is outside this upgrade.
+A replay key committed before an upgrade, retried with the same request
+under the new contract, is an idempotent replay only when the new contract
+seals the same publication apart from its identity, as after an adoption that
+preserves usage; otherwise the retry is refused as `Replay`. Neither commits
+twice.
+
+A private checkpoint carries the chain link it was taken at. Its stored
+marker is keyed by head alone, so a save at the same head after an upgrade
+replaces the marker. The earlier checkpoint then opens as
+`Error::Checkpoint`, and a full audit or a newer checkpoint opens the store.
+
+The chain shows that every segment is valid under the lineage version it
+names. It does not show who recorded an upgrade. Records and certificates are
+unkeyed SHA-256, so anyone who can write the file can append a correctly
+recomputed record, with any receipt digests, or roll the store back to an
+earlier valid head. Detecting that needs a tip held outside the file, such as
+an `UpgradeReceipt` or a private checkpoint.
+
+A v9 store is exactly the previous shell's catalog. `V2SqliteShell::open`
+refuses it as `Schema(9)`, and `Lineage::open` returns it as a v9 store.
+`V9Store::migrate` adds the table and sets version 10 in one transaction after
+a complete audit under the version whose identity created the store; any other
+schema, or a store under no version, refuses and writes nothing. No data is
+migrated: a changed state schema is outside this upgrade. Opening a store
+never creates a missing file. Upgrade and migration each run in one immediate
+transaction, with injected interruption points for the crash tests.
 
 ## Qualification still required
 

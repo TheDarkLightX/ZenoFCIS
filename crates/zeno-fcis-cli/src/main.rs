@@ -615,6 +615,16 @@ fn describe_effects(path: &[String]) -> Value {
                 false,
                 None,
             ),
+            ["contract", "refresh-receipts"] => (
+                &["application-contract", "adopted-artifacts"],
+                &[
+                    "application-contract",
+                    "adopted-artifacts",
+                    "generated-artifacts",
+                ],
+                false,
+                None,
+            ),
             ["backend", "inspect"] => (&["tools-manifest"], &[], false, None),
             ["backend", "inventory-lean"] => (&["toolchain-files"], &[], false, None),
             ["doctor"] | ["backend", "verify"] => (

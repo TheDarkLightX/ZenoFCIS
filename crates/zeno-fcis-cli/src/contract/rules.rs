@@ -19,10 +19,14 @@ use super::expr::{self, Ast};
 pub(super) const RULES_SCHEMA: &str = "zeno-fcis/template-declarative-policy/2";
 
 /// Whether an adopted candidate uses the same Steps as the program it
-/// replaced on every input, as its receipt reports.
+/// replaced on every input, as its receipt reports. The label only describes
+/// the adoption: generation refuses `preserved` when the receipt reports
+/// otherwise, and nothing else depends on it.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Usage {
-    /// Equal Step usage everywhere: sealed publications observe no change.
+    /// Equal Step usage on every input: the usage observations sealed into a
+    /// publication do not change, although every sealed subject embeds the
+    /// new contract identity.
     Preserved,
     /// Step usage differs on some input, so sealed usage observations change.
     NewVersion,
@@ -49,11 +53,15 @@ impl Usage {
 /// candidate at `v2/adoptions/n/program.zcve` and the equivalence receipt
 /// that compared it with the program it replaced at
 /// `v2/adoptions/n/receipt.json`; both files are bound by their SHA-256.
+/// It also binds the SHA-256 of the policy of version `n`, the version it
+/// superseded, as adoption wrote it: stores may run that version, so
+/// generation refuses any later edit that would change it.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Adoption {
     pub(crate) candidate_sha256: String,
     pub(crate) receipt_sha256: String,
     pub(crate) usage: Usage,
+    pub(crate) superseded_policy_sha256: String,
 }
 
 /// Framework law IDs used when the rules file names none.
@@ -346,6 +354,10 @@ pub(crate) fn with_adoption(source: &str, adoption: &Adoption) -> Result<String,
             "usage".to_owned(),
             Json::Text(adoption.usage.name().to_owned()),
         ),
+        (
+            "superseded_policy_sha256".to_owned(),
+            Json::Text(adoption.superseded_policy_sha256.clone()),
+        ),
     ]);
     match entries.iter_mut().find(|(key, _)| key == "adoptions") {
         Some((_, Json::Array(items))) => items.push(entry),
@@ -360,9 +372,49 @@ pub(crate) fn with_adoption(source: &str, adoption: &Adoption) -> Result<String,
     Ok(Json::Object(entries).render())
 }
 
+/// The rules file with each adoption's `receipt_sha256` replaced, in order,
+/// in the file's own layout. The result is validated when it is generated
+/// from.
+pub(super) fn with_receipt_digests(
+    source: &str,
+    digests: &[String],
+) -> Result<String, ContractError> {
+    let json = parse(source)?;
+    let Json::Object(mut entries) = json else {
+        return Err(ContractError::new(FILE, "must be an object"));
+    };
+    let place = format!("{FILE} adoptions");
+    let items = match entries.iter_mut().find(|(key, _)| key == "adoptions") {
+        Some((_, Json::Array(items))) if items.len() == digests.len() => items,
+        _ => {
+            return Err(ContractError::new(
+                place,
+                format!("must list {} adoptions", digests.len()),
+            ));
+        }
+    };
+    for (index, (item, digest)) in items.iter_mut().zip(digests).enumerate() {
+        let receipt = match item {
+            Json::Object(fields) => fields
+                .iter_mut()
+                .find(|(key, _)| key == "receipt_sha256")
+                .map(|(_, value)| value),
+            _ => None,
+        }
+        .ok_or_else(|| ContractError::new(format!("{place}[{index}]"), "has no receipt_sha256"))?;
+        *receipt = Json::Text(digest.clone());
+    }
+    Ok(Json::Object(entries).render())
+}
+
 fn adoption(json: &Json, place: &str) -> Result<Adoption, ContractError> {
     let entry = Object::new(json, place)?;
-    entry.only(&["candidate_sha256", "receipt_sha256", "usage"])?;
+    entry.only(&[
+        "candidate_sha256",
+        "receipt_sha256",
+        "usage",
+        "superseded_policy_sha256",
+    ])?;
     let digest = |key: &str| {
         let text = entry.text(key)?;
         let hex = text.len() == 64
@@ -385,6 +437,7 @@ fn adoption(json: &Json, place: &str) -> Result<Adoption, ContractError> {
                 format!("`{usage}` is not preserved or new-version"),
             )
         })?,
+        superseded_policy_sha256: digest("superseded_policy_sha256")?,
     })
 }
 

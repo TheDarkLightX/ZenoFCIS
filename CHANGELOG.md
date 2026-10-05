@@ -82,33 +82,53 @@ embedded in ZenoFCIS values.
 - Add `zeno-fcis contract adopt DIR --candidate C --receipt R --usage
   preserved|new-version`: a checked candidate decision program becomes the
   application's next contract version. The rules file records the adoption
-  (candidate and receipt SHA-256, claimed usage) in an `adoptions` list,
-  the candidate and receipt are kept under `v2/adoptions/N/`, and the
-  generator replays every receipt, in order, against the program it
-  re-derives from the declarations, rules and earlier adoptions before it
-  emits the last candidate as the descriptor's program. `preserved` is
-  accepted only when the receipt reports equal Step usage on every input.
-  Superseded versions are emitted beside the current one
-  (`src/v2_contract_vN.rs`, `v2/policy_vN.zcve`), and every generated
-  contract states `VERSION` and offers `with_lineage`, the checked catalogs
-  of all its versions; the eight templates regenerate byte for byte with
-  those two items added. The withdrawal-queue 106-to-100 node candidate is
-  adopted as version 2 in a committed fixture. A refusal writes nothing.
+  (candidate and receipt SHA-256, claimed usage, and the SHA-256 of the
+  superseded version's policy) in an `adoptions` list, the candidate and
+  receipt are kept under `v2/adoptions/N/`, and the generator replays every
+  receipt, in order, against the program it re-derives from the
+  declarations, rules and earlier adoptions before it emits the last
+  candidate as the descriptor's program. `preserved` is accepted only when
+  the receipt reports equal Step usage on every input. Superseded versions
+  are emitted beside the current one (`src/v2_contract_vN.rs`,
+  `v2/policy_vN.zcve`) and kept exactly: generation refuses any later edit
+  that would change one, an adoption that leaves the program unchanged, and
+  a lineage that would repeat a version. Every generated contract states
+  `VERSION` and offers `with_lineage`, the checked catalogs of all its
+  versions; a contract with adoptions also states `ADOPTION_RECEIPTS` and
+  passes them with the catalogs. The eight templates, which have no
+  adoptions, are byte-identical. The withdrawal-queue 106-to-100 node
+  candidate is adopted as version 2 in a committed fixture. A refusal writes
+  nothing, and running an interrupted adoption again finishes it.
+- Add `zeno-fcis contract refresh-receipts DIR`: after a change of the
+  transform checker's semantics version, every adoption is checked again
+  under its receipt's limits and each receipt rebound to the current
+  checker. It refuses, writing nothing, when anything but the checker
+  identity would change, and every new receipt must replay.
 - Add checked contract upgrades to the SQLite v2 shell. Schema v10 adds a
-  `v2_upgrades` table of chained records; `V2SqliteShell::upgrade(path,
-  catalogs)` audits the store, then requires, through the pure
-  `v2::upgrade::decide`, equal canonical state schema bytes, differing
-  identities and the new contract's genesis publication over the current
-  state (the library's genesis evaluation, so law 990 confines upgrades to
-  the declared genesis state), and records the upgrade as the next chain
-  link. `open_lineage` and `open_lineage_at_checkpoint` replay each history
-  segment under the Authority that published it; `open` keeps working for
-  stores that never upgraded. Pending deliveries keep their certificate-bound
-  IDs and order across an upgrade. A v9 store is refused until the explicit
-  `migrate_v9`, which adds the table after a complete audit; every other
-  mismatch refuses and writes nothing. `Snapshot::upgrades` counts the
-  records. Applications built from a contract gain `--audit`, `--upgrade`
-  and `--migrate`. The `zeno-fcis` binary does not open stores.
+  `v2_upgrades` table of chained records. `v2::Lineage::bind(catalogs,
+  receipts)` binds an application's lineage, and `Lineage::open` returns
+  typed handles: a v9 store, which only `migrate`s; a current v10 store; or a
+  superseded one, which can be audited, read, or upgraded with
+  `Superseded::upgrade`, which consumes it and returns the current handle.
+  After a full audit the pure `v2::upgrade::decide` requires equal canonical
+  state schema bytes and differing identities, and admits the state in one
+  of two record kinds. A `program-successor`, whose policy differs from the
+  old one only in its decision program and Step limit, as every adoption
+  does, is admitted at any state, states which premises held and binds the
+  adoption receipts' digests. With every premise (law 991, an `Equivalent`
+  receipt, Step limits that never bind, no law observing Step usage) the
+  two versions reach the same states. A
+  `genesis-admission` covers other contracts and needs the new contract's
+  genesis evaluation to admit the current state, which law 990 confines to
+  the declared genesis state. Each segment replays under the Authority that
+  published it; `open` keeps working for stores that never upgraded. Pending
+  deliveries keep their certificate-bound IDs and order across an upgrade.
+  A v9 store is refused until the explicit migration, which adds the table
+  after a complete audit; every other mismatch refuses and writes nothing,
+  and no open creates a missing file. `Snapshot::upgrades` counts the
+  records. Applications built from a contract gain `--audit` at any version,
+  `--upgrade`, `--deliver`, `--migrate` and `--decide`. The `zeno-fcis`
+  binary does not open stores.
 - Add `zeno-fcis transform check --original P --candidate C [--receipt OUT]`
   and `zeno-fcis transform replay --receipt R --original P --candidate C`.
   Both programs must pass the library importer's full admission and have the
@@ -119,7 +139,11 @@ embedded in ZenoFCIS values.
   - an equivalence, only when every tuple gives identical outputs or
     identical failures and the declared Step limit never binds. It writes a
     canonical receipt binding both programs, the domain, the limits, the
-    counts and the Step usage. Step usage is always reported, never compared;
+    counts, the Step usage and the checker identity: the checker's semantics
+    version, `zeno-fcis/transform-check/1`, which committed known answers
+    pin, and the library's evaluator digest. A new crate version or a
+    refactor of the checker changes no receipt. Step usage is always
+    reported, never compared;
   - the first differing tuple as a counterexample, with no receipt;
   - inconclusive, when the domain exceeds the cap (default 10^8 tuples) or
     the Step limit binds.
