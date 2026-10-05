@@ -878,10 +878,11 @@ macro_rules! with_app {
         $body(&authority, &$module::FRAMING)
     }};
 }
+/// `zeno-fcis generate contract` writes v2/policy.zcve from its own model;
+/// this recomputes the bytes from each compiled `v2_contract.rs`.
 #[test]
-#[ignore = "Explicit artifact generation: writes only eight owned policy files"]
-fn emit_library_policy_artifacts() {
-    macro_rules! emit {
+fn compiled_contracts_reproduce_their_committed_policy_bytes() {
+    macro_rules! check {
         ($module:ident,$name:literal) => {{
             let contract = $module::Contract::new();
             let d = contract.descriptor();
@@ -893,23 +894,20 @@ fn emit_library_policy_artifacts() {
                 $module::CHANNEL_ROOTS,
             )
             .expect("library policy encoding");
-            let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(concat!(
-                "../zeno-fcis-cli/templates/",
-                $name,
-                "/v2/policy.zcve"
-            ));
-            std::fs::write(file, &bytes).unwrap();
-            println!("{} policy bytes {}", $name, bytes.len());
+            assert!(
+                bytes == $module::ORIGINAL_POLICY,
+                concat!($name, " policy bytes")
+            );
         }};
     }
-    emit!(counter, "durable-counter");
-    emit!(stock, "inventory-reservation");
-    emit!(order, "order-fulfillment");
-    emit!(account, "account-lockout");
-    emit!(vault, "withdrawal-queue");
-    emit!(treasury, "agent-treasury-guard");
-    emit!(prepared, "prepared-counter");
-    emit!(gateway, "compliance-gateway");
+    check!(counter, "durable-counter");
+    check!(stock, "inventory-reservation");
+    check!(order, "order-fulfillment");
+    check!(account, "account-lockout");
+    check!(vault, "withdrawal-queue");
+    check!(treasury, "agent-treasury-guard");
+    check!(prepared, "prepared-counter");
+    check!(gateway, "compliance-gateway");
 }
 #[test]
 fn retained_complete_examples_genesis_and_replay() {
@@ -926,6 +924,17 @@ fn retained_complete_examples_genesis_and_replay() {
         ($module:ident,$index:expr) => {
             with_app!($module, |a: &a::Authority<'_>, f: &c::Framing| {
                 let app = &APPS[$index];
+                // The generated contract states the retained genesis.
+                let retained: Vec<c::Field<'static>> = app
+                    .state
+                    .iter()
+                    .zip(app.genesis)
+                    .map(|((id, kind), n)| c::Field {
+                        id: *id,
+                        value: atom(*kind, *n),
+                    })
+                    .collect();
+                assert_eq!($module::GENESIS, retained.as_slice(), "{}", app.name);
                 let raw = frame(&f.state, record(app.state, app.genesis));
                 let result = a.genesis(&raw);
                 assert!(result.result().is_ok(), "{:?}", result.result());

@@ -1,0 +1,28 @@
+# {package}
+
+This application was built from its contract by `zeno-fcis new --contract`.
+`project.zeno` declares its types, reasons, channels and laws, and
+`v2/policy.json` holds its decision rules and genesis state.
+
+- `src/v2_contract.rs`, `v2/schema.zcve` and `v2/policy.zcve` are generated
+  from those two files. `zeno-fcis generate contract .` rewrites them;
+  with `--check` it changes nothing and names each file that differs.
+- `src/lib.rs` and `src/session.rs` are the same for every application built
+  from a contract. They frame inputs, keep publications in SQLite and
+  deliver the outbox. The library Authority makes every decision and checks
+  every law; this application contains no decision or law code.
+- `tests/decision-examples.txt` lists decisions, one per line:
+  `inputs | class reason post-state | deliveries`. Inputs are the state
+  fields, then the command, then the context, in the order the program
+  reads them; booleans are 0 or 1 and sums are variant IDs.
+
+`cargo test` checks every example against the Authority's decision and
+publishes the contract's genesis state. With the `sqlite` feature it then
+runs the examples as one session from genesis: each example whose pre-state
+is the current state is published, committed and replayed, and the outbox is
+delivered across a reopen of the database. `cargo run -- NEW_DATABASE_PATH`
+runs the same session and prints its summary.
+
+These checks cover the listed examples and the laws in `project.zeno`, which
+the Authority enforces on every decision. They do not show that the rules
+match intent beyond those examples and laws.

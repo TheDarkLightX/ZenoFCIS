@@ -343,6 +343,21 @@ shell (`cargo build --no-default-features`), including for
 `wasm32-unknown-unknown`, which the same gate checks; `site/` runs the
 account-lockout example in the browser through that build.
 
+### An application from its contract
+
+`zeno-fcis new DIR --contract CONTRACT` builds an application from a contract
+directory alone: `project.zeno`, the decision rules and genesis state in
+`v2/policy.json`, and, optionally, `tests/decision-examples.txt`.
+`zeno-fcis generate contract DIR` regenerates `v2/schema.zcve`,
+`src/v2_contract.rs` and `v2/policy.zcve` from the first two; with `--check`
+it changes nothing and names each file that differs. Every template above is
+checked this way. The application's own source is the same for every
+contract: the library Authority makes each decision and checks each law,
+while the application frames inputs, keeps publications in SQLite and
+delivers the outbox. [Dual approval](examples/dual-approval/README.md), a
+payment released only after two different officers approve it, is built this
+way.
+
 ## Authoring and checked synthesis
 
 V1 includes the inert `.zeno` language, canonical typed project AST, accumulated

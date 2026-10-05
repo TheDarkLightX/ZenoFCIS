@@ -70,6 +70,31 @@ class ExampleApplicationTests(unittest.TestCase):
                                 template, Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
 
 
+class ContractApplicationTests(unittest.TestCase):
+    def test_contract_sessions_and_example_counts_are_compared(self):
+        for name, expected in application.CONTRACT_EXAMPLES.items():
+            with self.subTest(contract=name):
+                log = f"decision examples checked: {expected['examples']}\n"
+                passed = {"status": "passed", "demonstration": json.dumps(expected["summary"])}
+                with mock.patch.object(application, "exercise_rust_application", return_value=(passed, log)):
+                    result = application.exercise_contract_application(
+                        name, Path("app"), Path("work"), {}, "1.1.0", {})
+                self.assertEqual(result["contract"], name)
+                for key in expected["summary"]:
+                    changed = {"status": "passed",
+                               "demonstration": json.dumps({**expected["summary"], key: "different"})}
+                    with mock.patch.object(application, "exercise_rust_application",
+                                           return_value=(changed, log)):
+                        with self.assertRaisesRegex(RuntimeError, "session differs"):
+                            application.exercise_contract_application(
+                                name, Path("app"), Path("work"), {}, "1.1.0", {})
+                with mock.patch.object(application, "exercise_rust_application",
+                                       return_value=(passed, "decision examples checked: 0\n")):
+                    with self.assertRaisesRegex(RuntimeError, "not all checked"):
+                        application.exercise_contract_application(
+                            name, Path("app"), Path("work"), {}, "1.1.0", {})
+
+
 class OrbitControllerCheckTests(unittest.TestCase):
     def completed(self, returncode, record):
         return subprocess.CompletedProcess(args=[], returncode=returncode,

@@ -130,7 +130,7 @@ jobs:
           if selected['target'] == '--test v2_template_contracts':
               output = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--list', '--format', 'terse'])
               expected = {
-                  'emit_library_policy_artifacts',
+                  'compiled_contracts_reproduce_their_committed_policy_bytes',
                   'retained_complete_examples_genesis_and_replay',
                   'all_original_small_domains_and_unlawful_order_states',
                   'account_complete_clock_boundaries_without_domain_narrowing',
@@ -141,7 +141,7 @@ jobs:
               }
               assert collections.Counter(output.splitlines()) == collections.Counter(name + ': test' for name in expected), 'template semantic inventory differs'
               ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--ignored', '--list', '--format', 'terse'])
-              assert ignored.splitlines() == ['emit_library_policy_artifacts: test'], 'semantic template tests must not be ignored'
+              assert ignored.splitlines() == [], 'semantic template tests must not be ignored'
 
           if selected['target'] == '--test completion':
               if 'test' in selected:

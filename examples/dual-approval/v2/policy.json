@@ -1,0 +1,103 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "dual-approval",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": ["Text", 1, 32]
+  },
+  "variables": {
+    "status": "pre.100.110",
+    "first": "pre.100.111",
+    "second": "pre.100.112",
+    "action": "command.101",
+    "officer": "context.102.120"
+  },
+  "cases": [
+    {
+      "rule": "only a pending request can change",
+      "when": "status != 150",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "only an officer can act",
+      "when": "officer == 160",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "any officer can cancel a pending request",
+      "when": "action == 141",
+      "class": "CommittedFailure",
+      "reason": 202,
+      "post": {
+        "110": 152,
+        "111": "first",
+        "112": "second"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "an officer cannot approve twice",
+      "when": "officer == first",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "the first approval is recorded",
+      "when": "first == 160",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 150,
+        "111": "officer",
+        "112": "second"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "a second, different approval releases the payment",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "111": "first",
+        "112": "officer"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "treasury-desk",
+          "payload": {
+            "130": "officer",
+            "131": "first"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 150,
+    "111": 160,
+    "112": 160
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "CommittedFailureEffects"
+  },
+  "framework_reject_law": 509
+}

@@ -4,12 +4,16 @@
 mod account_lockout;
 mod agent_treasury_guard;
 mod compliance_gateway;
+mod contract;
+mod contract_files;
 mod durable_counter;
 mod inventory_reservation;
 mod order_fulfillment;
 mod prepared_counter;
 mod purity;
 mod synth;
+mod transform;
+mod transform_command;
 mod withdrawal_queue;
 
 use std::fs::{self, OpenOptions};
@@ -120,11 +124,19 @@ enum Command {
         #[command(subcommand)]
         command: synth::Command,
     },
+    /// Check a supplied replacement for a finite scalar program on every input tuple.
+    Transform {
+        #[command(subcommand)]
+        command: transform_command::Command,
+    },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
         dir: PathBuf,
         #[arg(long, value_enum, default_value_t = Template::Minimal)]
         template: Template,
+        /// Build the application from this directory's project.zeno, v2/policy.json and optional tests/decision-examples.txt.
+        #[arg(long, conflicts_with = "template")]
+        contract: Option<PathBuf>,
     },
     /// Parse and elaborate a .zeno project with accumulated diagnostics.
     Check {
@@ -140,11 +152,14 @@ enum Command {
         require_resolved_paths: bool,
     },
     /// Generate deterministic Rust and manifest artifacts, or check for drift.
+    #[command(args_conflicts_with_subcommands = true, subcommand_negates_reqs = true)]
     Generate {
+        #[command(subcommand)]
+        target: Option<GenerateTarget>,
         #[arg(default_value = "project.zeno")]
         project: PathBuf,
-        #[arg(long)]
-        out: PathBuf,
+        #[arg(long, required = true)]
+        out: Option<PathBuf>,
         #[arg(long)]
         check: bool,
         #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
@@ -205,6 +220,21 @@ enum Command {
     Backend {
         #[command(subcommand)]
         command: BackendCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum GenerateTarget {
+    /// Generate an application's V2 contract, src/v2_contract.rs and v2/policy.zcve, or check for drift.
+    Contract {
+        /// Application directory holding project.zeno, v2/policy.json and v2/schema.zcve.
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// Compare with the files on disk and change nothing.
+        #[arg(long)]
+        check: bool,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+        format: OutputFormat,
     },
 }
 
@@ -286,7 +316,12 @@ fn run(command: Command) -> u8 {
     match command {
         Command::Describe { command } => describe(&command),
         Command::Synth { command } => synth::run(command),
-        Command::New { dir, template } => new_project(&dir, template),
+        Command::Transform { command } => transform_command::run(command),
+        Command::New {
+            dir,
+            template,
+            contract,
+        } => new_project(&dir, template, contract.as_deref()),
         Command::Check {
             project,
             format,
@@ -299,11 +334,18 @@ fn run(command: Command) -> u8 {
             require_resolved_paths,
         ),
         Command::Generate {
+            target: Some(GenerateTarget::Contract { dir, check, format }),
+            ..
+        } => contract_files::run(&dir, check, format),
+        Command::Generate {
+            target: None,
             project,
-            out,
+            out: Some(out),
             check,
             format,
         } => generate(&project, &out, check, format),
+        // `--out` is required unless a target is named.
+        Command::Generate { out: None, .. } => USAGE,
         Command::Graph { project, format } => graph(&project, format),
         Command::Explain {
             project,
@@ -422,7 +464,7 @@ fn describe_effects(path: &[String]) -> Value {
     let path: Vec<_> = path.iter().map(String::as_str).collect();
     let (reads, writes, executes_tools, read_only_flag): (&[&str], &[&str], bool, Option<&str>) =
         match path.as_slice() {
-            [] | ["backend"] | ["synth"] | ["synth", "completion"] => {
+            [] | ["backend"] | ["synth"] | ["synth", "completion"] | ["transform"] => {
                 return json!({"classification": "command-group"});
             }
             ["describe"]
@@ -454,10 +496,37 @@ fn describe_effects(path: &[String]) -> Value {
                 true,
                 None,
             ),
-            ["new"] => (&["target-directory"], &["project-files"], false, None),
+            ["transform", "check"] => (
+                &["original-program", "candidate-program"],
+                &["optional-equivalence-receipt"],
+                false,
+                None,
+            ),
+            ["transform", "replay"] => (
+                &[
+                    "equivalence-receipt",
+                    "original-program",
+                    "candidate-program",
+                ],
+                &[],
+                false,
+                None,
+            ),
+            ["new"] => (
+                &["target-directory", "application-contract"],
+                &["project-files"],
+                false,
+                None,
+            ),
             ["check" | "graph" | "explain"] => (&["project"], &[], false, None),
             ["generate"] => (
                 &["project", "generated-artifacts"],
+                &["generated-artifacts"],
+                false,
+                Some("--check"),
+            ),
+            ["generate", "contract"] => (
+                &["application-contract", "generated-artifacts"],
                 &["generated-artifacts"],
                 false,
                 Some("--check"),
@@ -482,7 +551,7 @@ fn describe_effects(path: &[String]) -> Value {
     json!({"classification": "declared", "reads": reads, "writes": writes, "executes_tools": executes_tools, "read_only_flag": read_only_flag})
 }
 
-fn new_project(dir: &Path, template: Template) -> u8 {
+fn new_project(dir: &Path, template: Template, contract: Option<&Path>) -> u8 {
     if dir.exists() {
         match fs::read_dir(dir) {
             Ok(mut entries) => {
@@ -495,6 +564,9 @@ fn new_project(dir: &Path, template: Template) -> u8 {
         }
     } else if let Err(error) = fs::create_dir(dir) {
         return io_error("create target", error);
+    }
+    if let Some(contract) = contract {
+        return contract_files::scaffold(dir, contract);
     }
     // Exhaustive, so a new template cannot compile without choosing its files.
     let application = match template {
@@ -1841,9 +1913,9 @@ mod tests {
             std::process::id(),
             TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
-        assert_eq!(new_project(&target, Template::Minimal), OK);
+        assert_eq!(new_project(&target, Template::Minimal, None), OK);
         assert!(target.join("project.zeno").is_file());
-        assert_eq!(new_project(&target, Template::Minimal), INVALID);
+        assert_eq!(new_project(&target, Template::Minimal, None), INVALID);
         assert!(fs::remove_file(target.join("project.zeno")).is_ok());
         assert!(fs::remove_file(target.join("README.md")).is_ok());
         assert!(fs::remove_dir(target).is_ok());
