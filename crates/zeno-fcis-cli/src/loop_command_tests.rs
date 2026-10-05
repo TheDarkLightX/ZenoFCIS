@@ -7,15 +7,21 @@ use crate::neural_loop::incumbent::Incumbent;
 use crate::neural_loop::limits::Limits;
 use crate::neural_loop::profiles::Profile;
 use crate::neural_loop::request::{Policy, Request};
-use crate::neural_loop::session::{Resumed, Session, Status, StopReason, WorkerFailure};
+use crate::neural_loop::session::{
+    ResumePlan, ResumeRefusal, Resumed, Session, Status, StopReason, WorkerFailure,
+};
 use crate::neural_loop::strategy::{NoEngine, SearchReport, Strategy, StrategyEngine};
 use crate::optimize::strategy::{DEFAULT_STRATEGY_JSON, Phase};
 use serde_json::{Value, json};
+use std::convert::Infallible;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+
+#[path = "loop_command_resume_tests.rs"]
+mod resume;
 
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
@@ -78,16 +84,27 @@ fn open_store(dir: &Path) -> (Store, Session) {
     (store, session)
 }
 
-fn reopen(dir: &Path) -> Resumed {
+/// Resumes a stored session in memory. The replay reservation goes to a
+/// write that keeps nothing, so the directory stays exactly as the test left
+/// it; `load_session` is the durable route, which `resume_tests` covers.
+fn reopen(dir: &Path) -> Result<Session, ResumeRefusal> {
     let (_, loaded) = Store::open(dir).unwrap_or_else(|error| panic!("{error}"));
-    Session::resume(loaded.stored(), 0)
+    match Session::prepare_resume(loaded.stored(), 0) {
+        ResumePlan::Replay(pending) => {
+            let reserved = pending
+                .reserve(|_| Ok::<(), Infallible>(()))
+                .unwrap_or_else(|never| match never {});
+            match reserved.replay() {
+                Resumed::Session(session) => Ok(*session),
+                Resumed::Refused(reason) => Err(reason),
+            }
+        }
+        ResumePlan::Refused(reason) | ResumePlan::Inconclusive(reason) => Err(reason),
+    }
 }
 
 fn resumed(dir: &Path) -> Session {
-    match reopen(dir) {
-        Resumed::Session(session) => *session,
-        other => panic!("expected a session: {other:?}"),
-    }
+    reopen(dir).unwrap_or_else(|reason| panic!("expected a session: {reason:?}"))
 }
 
 fn script(dir: &Directory, steps: Value) -> Fake {
@@ -298,22 +315,13 @@ fn a_rolled_back_or_edited_ledger_is_refused_on_reopen() {
     fs::write(dir.join("ledger.jsonl"), shorter).unwrap_or_else(|error| panic!("{error}"));
     assert!(matches!(
         reopen(&dir),
-        Resumed::Refused(
-            crate::neural_loop::session::ResumeRefusal::RollbackSuspected { .. },
-            None
-        )
+        Err(ResumeRefusal::RollbackSuspected { .. })
     ));
     fs::write(dir.join("ledger.jsonl"), &ledger).unwrap_or_else(|error| panic!("{error}"));
-    assert!(matches!(reopen(&dir), Resumed::Session(_)));
+    assert!(reopen(&dir).is_ok());
     // A missing head is unverifiable.
     fs::remove_file(dir.join("ledger.head")).unwrap_or_else(|error| panic!("{error}"));
-    assert!(matches!(
-        reopen(&dir),
-        Resumed::Refused(
-            crate::neural_loop::session::ResumeRefusal::Unverifiable,
-            None
-        )
-    ));
+    assert!(matches!(reopen(&dir), Err(ResumeRefusal::Unverifiable)));
     fs::write(dir.join("ledger.head"), &head).unwrap_or_else(|error| panic!("{error}"));
     // An edited receipt file no longer matches the ledger's digest.
     let receipt = dir.join("receipts/0.json");
@@ -322,10 +330,7 @@ fn a_rolled_back_or_edited_ledger_is_refused_on_reopen() {
     fs::write(&receipt, &bytes).unwrap_or_else(|error| panic!("{error}"));
     assert!(matches!(
         reopen(&dir),
-        Resumed::Refused(
-            crate::neural_loop::session::ResumeRefusal::ReplacementDigest,
-            None
-        )
+        Err(ResumeRefusal::ReplacementDigest)
     ));
 }
 

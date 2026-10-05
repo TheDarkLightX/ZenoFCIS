@@ -6,6 +6,23 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Fix `zeno-fcis loop`, whose resume could run checker work without
+  charging it. `resume`, `candidate` and `run` first resume the session,
+  which replays its checked incumbent and stored counterexamples. The
+  replay's work reservation reached the ledger only after the replay
+  finished, so an interruption during the replay left the session's
+  allowance unchanged, and repeated interruptions repeated checker work for
+  free. A `run` refused for its `--script` or `--hosted-config` after the
+  replay also left it uncharged. The reservation is now written to the
+  ledger before any replay work runs, and the replay can start only after
+  that write succeeded; an interrupted replay stays charged. Every resume
+  still reserves and pays for its own replay and never reuses an earlier
+  one; when the remaining session work cannot cover it, the command exits 2
+  with `resume-inconclusive` (`insufficient-replay-allowance`) and writes
+  nothing. The ledger format is unchanged, and an uninterrupted session
+  writes the same ledger and report as before. This concerns work
+  accounting only: the loop still installs no memory caps and does not
+  cancel process trees.
 - `zeno-fcis new` now binds every Cargo application it writes, from
   `--contract` and from the `durable-counter`, `prepared-counter` and example
   templates, to a ZenoFCIS source tree. Before, a generated application

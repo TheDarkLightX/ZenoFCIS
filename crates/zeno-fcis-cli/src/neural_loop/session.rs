@@ -9,6 +9,14 @@
 //! refunding anything; only a completed `transform::check` equivalence that
 //! passes the selection rule changes the incumbent. A report for a stage that
 //! is no longer pending is late and changes nothing.
+//!
+//! Resume follows the same order in two steps. [`Session::prepare_resume`]
+//! verifies the persisted data and reserves the replay work without running
+//! any of it; [`PendingReplay::reserve`] hands that reservation to the
+//! shell's durable write; only the [`ReservedReplay`] it returns can run the
+//! replay. Every resume reserves and pays for its own replay: an earlier
+//! replay reservation, finished or interrupted, is only a charge, and no
+//! replay result is carried from one resume to the next.
 
 use super::feedback::{DuplicateOf, Feedback, Witness, WitnessFault, replay_witness};
 use super::incumbent::{Cost, Incumbent, Replacement, Selection, select};
@@ -910,63 +918,65 @@ impl Session {
         })
     }
 
-    /// NSR-007/NSR-008/NSR-009: resumes from persisted data. Binding and
-    /// ledger faults precede any reuse; a retained replacement is replayed
-    /// through the checker before it is trusted; stored witnesses are
-    /// replayed before they are reused; a failed resume returns no incumbent.
-    pub(crate) fn resume(stored: Stored<'_>, elapsed_ms: u64) -> Resumed {
+    /// NSR-007/NSR-008/NSR-009, the first of resume's two steps. Binding and
+    /// ledger faults precede any reuse. When the bindings hold, the replay
+    /// work for the retained replacement and the stored witnesses is computed
+    /// and reserved in the returned plan's ledger. No checker or witness
+    /// replay work runs here: the plan can replay only through
+    /// [`PendingReplay::reserve`], after the shell made that reservation
+    /// durable.
+    pub(crate) fn prepare_resume(stored: Stored<'_>, elapsed_ms: u64) -> ResumePlan {
         let request = match Request::readmit(stored.request, stored.original) {
             Ok(request) => request,
-            Err(refusal) => return Resumed::Refused(ResumeRefusal::Request(refusal), None),
+            Err(refusal) => return ResumePlan::Refused(ResumeRefusal::Request(refusal)),
         };
         let entries = match Ledger::parse_lines(stored.ledger) {
             Ok(entries) => entries,
-            Err(fault) => return Resumed::Refused(ResumeRefusal::Ledger(fault), None),
+            Err(fault) => return ResumePlan::Refused(ResumeRefusal::Ledger(fault)),
         };
         let mut ledger = match Ledger::from_entries(entries) {
             Ok(ledger) => ledger,
-            Err(fault) => return Resumed::Refused(ResumeRefusal::Ledger(fault), None),
+            Err(fault) => return ResumePlan::Refused(ResumeRefusal::Ledger(fault)),
         };
         let Some(expected) = stored.head else {
-            return Resumed::Refused(ResumeRefusal::Unverifiable, None);
+            return ResumePlan::Refused(ResumeRefusal::Unverifiable);
         };
         let found = ledger.head();
         if expected != found {
-            return Resumed::Refused(ResumeRefusal::RollbackSuspected { expected, found }, None);
+            return ResumePlan::Refused(ResumeRefusal::RollbackSuspected { expected, found });
         }
         match ledger.entries().first().map(|entry| &entry.kind) {
             Some(Kind::Opened {
                 request_id,
                 checker,
             }) if request_id == request.id() && checker == request.checker() => {}
-            _ => return Resumed::Refused(ResumeRefusal::RequestMismatch, None),
+            _ => return ResumePlan::Refused(ResumeRefusal::RequestMismatch),
         }
         let totals = ledger.accounting();
         let limits = *request.limits();
-        let mut incumbent = Incumbent::OriginalAdmitted;
         let mut replay_work = 0_u64;
         let mut witnesses = Vec::new();
         let mut dropped = Vec::new();
         if let Some((_, candidate_sha256, receipt_sha256, cost)) = &totals.replaced {
             let Some((candidate, receipt)) = stored.replacement else {
-                return Resumed::Refused(ResumeRefusal::ReplacementMissing, None);
+                return ResumePlan::Refused(ResumeRefusal::ReplacementMissing);
             };
             if sha256_hex(candidate) != *candidate_sha256 || sha256_hex(receipt) != *receipt_sha256
             {
-                return Resumed::Refused(ResumeRefusal::ReplacementDigest, None);
+                return ResumePlan::Refused(ResumeRefusal::ReplacementDigest);
             }
             let program = match import_program(candidate) {
                 Ok(program) => program,
-                Err(_) => return Resumed::Refused(ResumeRefusal::ReplacementNotAdmitted, None),
+                Err(_) => return ResumePlan::Refused(ResumeRefusal::ReplacementNotAdmitted),
             };
             let measured = Cost::measure(&program, candidate);
             if measured != *cost {
-                return Resumed::Refused(ResumeRefusal::ReplacementDigest, None);
+                return ResumePlan::Refused(ResumeRefusal::ReplacementDigest);
             }
             match request.check_work(measured) {
                 Some(work) if work <= limits.check_work => replay_work = work,
                 _ => {
-                    return Resumed::Inconclusive(ResumeRefusal::InsufficientReplayAllowance, None);
+                    return ResumePlan::Inconclusive(ResumeRefusal::InsufficientReplayAllowance);
                 }
             }
         }
@@ -982,17 +992,17 @@ impl Session {
                         .saturating_add(request.cost().nodes)
                         .saturating_add(2);
                     replay_work = replay_work.saturating_add(work);
-                    witnesses.push((*attempt, witness, candidate.as_slice()));
+                    witnesses.push((*attempt, witness, candidate.clone()));
                 }
                 None => dropped.push(*attempt),
             }
         }
         let session_remaining = limits.session_work.saturating_sub(totals.work_reserved);
         if replay_work > session_remaining {
-            return Resumed::Inconclusive(ResumeRefusal::InsufficientReplayAllowance, None);
+            return ResumePlan::Inconclusive(ResumeRefusal::InsufficientReplayAllowance);
         }
         if elapsed_ms >= limits.deadline_ms {
-            return Resumed::Inconclusive(ResumeRefusal::Deadline, None);
+            return ResumePlan::Inconclusive(ResumeRefusal::Deadline);
         }
         if replay_work > 0 {
             ledger.append(Kind::Reserved {
@@ -1000,44 +1010,145 @@ impl Session {
                 stage: Stage::Replay { work: replay_work },
             });
         }
-        if let (Some((attempt, _, _, cost)), Some((candidate, receipt))) =
-            (&totals.replaced, stored.replacement)
-        {
-            match transform::check(request.original(), candidate, request.transform_limits()) {
-                Ok(equivalence) if equivalence.receipt() == receipt => {
+        let replacement = match (&totals.replaced, stored.replacement) {
+            (Some((attempt, _, _, cost)), Some((candidate, receipt))) => {
+                Some(RetainedReplacement {
+                    attempt: *attempt,
+                    cost: *cost,
+                    candidate: candidate.to_vec(),
+                    receipt: receipt.to_vec(),
+                })
+            }
+            _ => None,
+        };
+        ResumePlan::Replay(Box::new(PendingReplay {
+            request,
+            ledger,
+            replacement,
+            witnesses,
+            dropped,
+            next_attempt: totals.attempts,
+            closed: totals.closed,
+        }))
+    }
+}
+
+/// What the first step of a resume decided, before any replay work.
+#[derive(Debug)]
+pub(crate) enum ResumePlan {
+    /// The bindings hold and the replay is reserved in the plan's ledger.
+    /// Boxed: the plan carries the session data, the refusals are small.
+    Replay(Box<PendingReplay>),
+    /// `ResumeRefused`: a binding or ledger fault. Nothing was reserved.
+    Refused(ResumeRefusal),
+    /// `ResumeInconclusive`: the allowance or the deadline cannot cover the
+    /// replay. Nothing was reserved.
+    Inconclusive(ResumeRefusal),
+}
+
+/// The retained replacement a resume replays, as the ledger binds it.
+#[derive(Debug)]
+struct RetainedReplacement {
+    attempt: u8,
+    cost: Cost,
+    candidate: Vec<u8>,
+    receipt: Vec<u8>,
+}
+
+/// A resume whose replay reservation is appended to its ledger but not yet
+/// known to be durable. It cannot replay: [`PendingReplay::reserve`] is its
+/// only way forward. Fields are private; only [`Session::prepare_resume`]
+/// builds one.
+#[derive(Debug)]
+pub(crate) struct PendingReplay {
+    request: Request,
+    ledger: Ledger,
+    replacement: Option<RetainedReplacement>,
+    witnesses: Vec<(u8, Witness, Vec<u8>)>,
+    dropped: Vec<u8>,
+    next_attempt: u8,
+    closed: Option<String>,
+}
+
+impl PendingReplay {
+    /// Hands the ledger, replay reservation included, to the shell's durable
+    /// write, and returns the [`ReservedReplay`] that may run the replay only
+    /// if that write succeeded (NSR-005, NSR-008). A failed write runs no
+    /// replay work and returns its error. The core performs no I/O itself:
+    /// `persist` is the shell's write, `Store::persist` in production.
+    pub(crate) fn reserve<E>(
+        self: Box<Self>,
+        persist: impl FnOnce(&Ledger) -> Result<(), E>,
+    ) -> Result<ReservedReplay, E> {
+        persist(&self.ledger)?;
+        Ok(ReservedReplay { plan: self })
+    }
+}
+
+/// A resume whose replay reservation the shell reported durable. Only
+/// [`PendingReplay::reserve`] builds one, and [`ReservedReplay::replay`]
+/// consumes it, so one durable reservation pays for one replay.
+#[derive(Debug)]
+pub(crate) struct ReservedReplay {
+    plan: Box<PendingReplay>,
+}
+
+impl ReservedReplay {
+    /// NSR-007/NSR-008/NSR-009, the second step: replays the retained
+    /// replacement through the checker before it is trusted, and replays
+    /// stored witnesses before they are reused. The replay appends nothing to
+    /// the ledger, so the returned session's ledger is the one the shell made
+    /// durable. A refused replay keeps its charge: nothing is refunded.
+    pub(crate) fn replay(self) -> Resumed {
+        let PendingReplay {
+            request,
+            ledger,
+            replacement,
+            witnesses,
+            mut dropped,
+            next_attempt,
+            closed,
+        } = *self.plan;
+        #[cfg(test)]
+        replay_probe::fire();
+        let mut incumbent = Incumbent::OriginalAdmitted;
+        if let Some(retained) = &replacement {
+            match transform::check(
+                request.original(),
+                &retained.candidate,
+                request.transform_limits(),
+            ) {
+                Ok(equivalence) if equivalence.receipt() == retained.receipt.as_slice() => {
                     match Replacement::from_equivalence(
                         &equivalence,
                         request.original(),
-                        candidate,
-                        *cost,
-                        *attempt,
+                        &retained.candidate,
+                        retained.cost,
+                        retained.attempt,
                     ) {
                         Ok(replacement) => incumbent = Incumbent::CheckedReplacement(replacement),
                         Err(mismatch) => {
-                            return Resumed::Refused(
-                                ResumeRefusal::ReceiptMismatch(mismatch.field.to_owned()),
-                                Some(ledger),
-                            );
+                            return Resumed::Refused(ResumeRefusal::ReceiptMismatch(
+                                mismatch.field.to_owned(),
+                            ));
                         }
                     }
                 }
                 Ok(_) => {
-                    return Resumed::Refused(
-                        ResumeRefusal::ReceiptMismatch("receipt-bytes".to_owned()),
-                        Some(ledger),
-                    );
+                    return Resumed::Refused(ResumeRefusal::ReceiptMismatch(
+                        "receipt-bytes".to_owned(),
+                    ));
                 }
                 Err(rejection) => {
-                    return Resumed::Refused(
-                        ResumeRefusal::ReceiptMismatch(format!("{rejection:?}")),
-                        Some(ledger),
-                    );
+                    return Resumed::Refused(ResumeRefusal::ReceiptMismatch(format!(
+                        "{rejection:?}"
+                    )));
                 }
             }
         }
         let mut verified = Vec::new();
         for (attempt, witness, candidate) in witnesses {
-            match replay_witness(&request, candidate, &witness) {
+            match replay_witness(&request, &candidate, &witness) {
                 Ok(()) => verified.push(witness),
                 Err(_) => dropped.push(attempt),
             }
@@ -1052,12 +1163,12 @@ impl Session {
                     .map(|digest| (digest, record.attempt))
             })
             .collect();
-        let status = match totals.closed {
+        let status = match closed {
             Some(reason) => Status::Closed(StopReason::parse(&reason)),
             None => Status::Open,
         };
         Resumed::Session(Box::new(Session {
-            next_attempt: totals.attempts,
+            next_attempt,
             request,
             incumbent,
             ledger,
@@ -1134,16 +1245,14 @@ impl ResumeRefusal {
     }
 }
 
-/// The result of a resume. Only `Session` carries an incumbent.
+/// The result of a resume's replay. Only `Session` carries an incumbent.
 #[derive(Debug)]
 pub(crate) enum Resumed {
     /// Boxed: a session is large and the refusals are small.
     Session(Box<Session>),
-    /// `ResumeRefused`; the ledger, when present, carries a replay charge to
-    /// persist.
-    Refused(ResumeRefusal, Option<Ledger>),
-    /// `ResumeInconclusive`: allowance or deadline prevented replay.
-    Inconclusive(ResumeRefusal, Option<Ledger>),
+    /// `ResumeRefused`: the replay did not reproduce the retained receipt.
+    /// Its reservation was durable before the replay ran and stays charged.
+    Refused(ResumeRefusal),
 }
 
 fn feedback_of(attempt: u8, outcome: &Outcome, cost: Option<Cost>) -> Feedback {
@@ -1266,5 +1375,31 @@ fn inconclusive_json(stop: &Inconclusive) -> Value {
         Inconclusive::CoverageMismatch { expected, visited } => json!({
             "cause": "coverage-mismatch", "expected": expected, "visited": visited
         }),
+    }
+}
+
+/// Test-only seam at the start of resume replay work: a test arms a probe that
+/// runs on this thread just before the first replay check, to inspect durable
+/// state or to simulate an interruption by panicking.
+#[cfg(test)]
+pub(crate) mod replay_probe {
+    use std::cell::RefCell;
+
+    type Probe = Box<dyn FnOnce()>;
+
+    thread_local! {
+        static PROBE: RefCell<Option<Probe>> = const { RefCell::new(None) };
+    }
+
+    /// Arms a probe for the next replay on this thread.
+    pub(crate) fn arm(probe: impl FnOnce() + 'static) {
+        PROBE.with(|slot| *slot.borrow_mut() = Some(Box::new(probe)));
+    }
+
+    pub(super) fn fire() {
+        let probe = PROBE.with(|slot| slot.borrow_mut().take());
+        if let Some(probe) = probe {
+            probe();
+        }
     }
 }
