@@ -511,9 +511,12 @@ fn the_wired_engine_is_the_optimizer_and_admits_exactly_its_phases() {
     // Exhaustive on purpose: a new optimizer phase fails to compile here
     // until the loop's phase table lists it.
     let listed = |phase: Phase| match phase {
-        Phase::Boolean | Phase::SemanticMerge | Phase::Select | Phase::Fold | Phase::Share => {
-            phases.contains(&phase.name())
-        }
+        Phase::Boolean
+        | Phase::SemanticMerge
+        | Phase::Select
+        | Phase::Fold
+        | Phase::Share
+        | Phase::CutRewrite => phases.contains(&phase.name()),
     };
     for phase in [
         Phase::Boolean,
@@ -521,10 +524,11 @@ fn the_wired_engine_is_the_optimizer_and_admits_exactly_its_phases() {
         Phase::Select,
         Phase::Fold,
         Phase::Share,
+        Phase::CutRewrite,
     ] {
         assert!(listed(phase), "{}", phase.name());
     }
-    assert_eq!(phases.len(), 5);
+    assert_eq!(phases.len(), 6);
 }
 
 #[test]
@@ -533,7 +537,7 @@ fn an_optimizer_strategy_improves_the_kernel_only_through_the_loops_own_check() 
         .unwrap_or_else(|error| panic!("default strategy: {error}"));
     // The engine's own verdict is provenance; the bytes are what it emits.
     let strategy = Strategy::from_json(&document).unwrap_or_else(|refusal| panic!("{refusal:?}"));
-    let report = OptimizeEngine.run(ORIGINAL, &strategy);
+    let report = OptimizeEngine.run(ORIGINAL, &strategy, Profile::FunctionalBoolV1, &[]);
     let SearchReport::Candidate { bytes, extraction } = report else {
         panic!("expected a candidate, got {report:?}");
     };
@@ -570,4 +574,133 @@ fn an_optimizer_strategy_improves_the_kernel_only_through_the_loops_own_check() 
     assert_eq!(outcomes, ["checked-improvement"]);
     assert_eq!(report["incumbent"]["cost"]["nodes"], 7);
     assert_eq!(session.ledger().accounting().checks, 1);
+}
+
+#[test]
+fn the_engine_searches_within_the_requests_profile() {
+    use zeno_fcis_codec::CanonicalEncode;
+    use zeno_fcis_synthesis::finite::{Domain, Op, Program};
+    // Parity of two inputs written with And and Not (the B06 seed's shape).
+    let parity = Program::try_new(
+        vec![Domain::Bool, Domain::Bool],
+        vec![Domain::Bool],
+        vec![
+            Op::Input(0),
+            Op::Input(1),
+            Op::Not(1),
+            Op::And(0, 2),
+            Op::Not(0),
+            Op::And(4, 1),
+            Op::Not(3),
+            Op::Not(5),
+            Op::And(6, 7),
+            Op::Not(8),
+        ],
+        vec![9],
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let original = parity
+        .value()
+        .and_then(|value| value.canonical_bytes())
+        .unwrap_or_else(|error| panic!("{error}"));
+    let document: Value = serde_json::from_str(DEFAULT_STRATEGY_JSON)
+        .unwrap_or_else(|error| panic!("default strategy: {error}"));
+    let strategy = Strategy::from_json(&document).unwrap_or_else(|refusal| panic!("{refusal:?}"));
+    for profile in Profile::ALL {
+        let SearchReport::Candidate { bytes, .. } =
+            OptimizeEngine.run(&original, &strategy, profile, &[])
+        else {
+            panic!("expected a candidate under {}", profile.name());
+        };
+        let program = zeno_fcis_synthesis::finite_runtime::import_program(&bytes)
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        assert_eq!(program.nodes().len(), 4, "{:?}", program.nodes());
+        // The request's profile is what the loop will admit the bytes under.
+        assert!(profile.admit(&program).is_ok(), "{}", profile.name());
+    }
+    // A strategy that names another profile than the request's is unavailable.
+    let mut named = document.clone();
+    named["profile"] = json!("checked-i64-v1");
+    let named = Strategy::from_json(&named).unwrap_or_else(|refusal| panic!("{refusal:?}"));
+    assert_eq!(
+        OptimizeEngine.run(&original, &named, Profile::FunctionalBoolV1, &[]),
+        SearchReport::Unavailable {
+            reason: String::from("engine:profile-mismatch:checked-i64-v1:functional-bool-v1")
+        }
+    );
+}
+
+#[test]
+fn the_engine_fuses_the_loops_checked_candidates() {
+    use zeno_fcis_codec::CanonicalEncode;
+    use zeno_fcis_synthesis::finite::{Domain, Op, Program};
+    let wide = Domain::Int {
+        min: 0,
+        max: 99_999,
+    };
+    let full = Domain::Int {
+        min: i64::MIN,
+        max: i64::MAX,
+    };
+    let encode = |nodes: Vec<Op>, roots: Vec<u16>| -> Vec<u8> {
+        Program::try_new(vec![wide], vec![full, full], nodes, roots)
+            .unwrap_or_else(|error| panic!("{error}"))
+            .value()
+            .and_then(|value| value.canonical_bytes())
+            .unwrap_or_else(|error| panic!("{error}"))
+    };
+    // Outputs (x - 7) + 7 and (x - 9) + 9; each checked candidate simplifies
+    // one of them.
+    let original = encode(
+        vec![
+            Op::Input(0),
+            Op::Int(7),
+            Op::Sub(0, 1),
+            Op::Add(2, 1),
+            Op::Int(9),
+            Op::Sub(0, 4),
+            Op::Add(5, 4),
+        ],
+        vec![3, 6],
+    );
+    let first = encode(
+        vec![Op::Input(0), Op::Int(9), Op::Sub(0, 1), Op::Add(2, 1)],
+        vec![0, 3],
+    );
+    let second = encode(
+        vec![Op::Input(0), Op::Int(7), Op::Sub(0, 1), Op::Add(2, 1)],
+        vec![3, 0],
+    );
+    let document: Value = serde_json::from_str(DEFAULT_STRATEGY_JSON)
+        .unwrap_or_else(|error| panic!("default strategy: {error}"));
+    let strategy = Strategy::from_json(&document).unwrap_or_else(|refusal| panic!("{refusal:?}"));
+    // With one checked candidate nothing beats it, so the engine has nothing
+    // new for the loop.
+    assert_eq!(
+        OptimizeEngine.run(
+            &original,
+            &strategy,
+            Profile::CheckedI64V1,
+            std::slice::from_ref(&first)
+        ),
+        SearchReport::Failed {
+            reason: String::from("engine:no-checked-improvement")
+        }
+    );
+    // With both, fusion makes each output x.
+    let SearchReport::Candidate { bytes, extraction } = OptimizeEngine.run(
+        &original,
+        &strategy,
+        Profile::CheckedI64V1,
+        &[first, second],
+    ) else {
+        panic!("expected a fused candidate");
+    };
+    assert!(
+        extraction.starts_with("engine-accepted:phase-"),
+        "{extraction}"
+    );
+    let program = zeno_fcis_synthesis::finite_runtime::import_program(&bytes)
+        .unwrap_or_else(|error| panic!("{error:?}"));
+    assert_eq!(program.nodes(), &[Op::Input(0)]);
 }

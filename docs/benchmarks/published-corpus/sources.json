@@ -1,0 +1,1254 @@
+{
+  "cases": [
+    {
+      "family": "small_gate",
+      "id": "small_gate-00",
+      "nvars": 3,
+      "outputs": [
+        "v0"
+      ],
+      "truth_signatures": [
+        "01010101"
+      ]
+    },
+    {
+      "family": "small_gate",
+      "id": "small_gate-01",
+      "nvars": 3,
+      "outputs": [
+        "(and v0 true)"
+      ],
+      "truth_signatures": [
+        "01010101"
+      ]
+    },
+    {
+      "family": "small_gate",
+      "id": "small_gate-02",
+      "nvars": 3,
+      "outputs": [
+        "(or v0 false)"
+      ],
+      "truth_signatures": [
+        "01010101"
+      ]
+    },
+    {
+      "family": "small_gate",
+      "id": "small_gate-03",
+      "nvars": 3,
+      "outputs": [
+        "(not (not v0))"
+      ],
+      "truth_signatures": [
+        "01010101"
+      ]
+    },
+    {
+      "family": "small_gate",
+      "id": "small_gate-04",
+      "nvars": 3,
+      "outputs": [
+        "(or (and v0 v1) (and v0 v2))"
+      ],
+      "truth_signatures": [
+        "00010101"
+      ]
+    },
+    {
+      "family": "small_gate",
+      "id": "small_gate-05",
+      "nvars": 3,
+      "outputs": [
+        "(ite v0 v1 v1)"
+      ],
+      "truth_signatures": [
+        "00110011"
+      ]
+    },
+    {
+      "family": "small_gate",
+      "id": "small_gate-06",
+      "nvars": 3,
+      "outputs": [
+        "(or v0 (not v0))"
+      ],
+      "truth_signatures": [
+        "11111111"
+      ]
+    },
+    {
+      "family": "small_gate",
+      "id": "small_gate-07",
+      "nvars": 3,
+      "outputs": [
+        "(and v0 v1)",
+        "(and v0 v1)",
+        "(not v0)"
+      ],
+      "truth_signatures": [
+        "00010001",
+        "00010001",
+        "10101010"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-00",
+      "nvars": 4,
+      "outputs": [
+        "(or (and v1 v3) (and v1 v2))"
+      ],
+      "truth_signatures": [
+        "0000001100110011"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-01",
+      "nvars": 5,
+      "outputs": [
+        "(and (or v0 v4) (or v0 v3))"
+      ],
+      "truth_signatures": [
+        "01010101010101010101010111111111"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-02",
+      "nvars": 6,
+      "outputs": [
+        "(or (and v1 v5) (and v2 v5))"
+      ],
+      "truth_signatures": [
+        "0000000000000000000000000000000000111111001111110011111100111111"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-03",
+      "nvars": 4,
+      "outputs": [
+        "(and (or v1 v2) (or v3 v2))"
+      ],
+      "truth_signatures": [
+        "0000111100111111"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-04",
+      "nvars": 5,
+      "outputs": [
+        "(or (and v1 v4) (and v1 (or v2 v0)))"
+      ],
+      "truth_signatures": [
+        "00010011000100110011001100110011"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-05",
+      "nvars": 6,
+      "outputs": [
+        "(and (or v1 v3) (or v1 (and v2 v0)))"
+      ],
+      "truth_signatures": [
+        "0011001100110111001100110011011100110011001101110011001100110111"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-06",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (not v1) v2) (and (not v1) v0))"
+      ],
+      "truth_signatures": [
+        "0100110001001100"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-07",
+      "nvars": 5,
+      "outputs": [
+        "(and (or (not v0) v1) (or (not v0) v3))"
+      ],
+      "truth_signatures": [
+        "10101010101110111010101010111011"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-08",
+      "nvars": 6,
+      "outputs": [
+        "(or (and v5 (not v3)) (and v4 (not v3)))"
+      ],
+      "truth_signatures": [
+        "0000000000000000111111110000000011111111000000001111111100000000"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-09",
+      "nvars": 4,
+      "outputs": [
+        "(and (or v3 (not v0)) (or v1 (not v0)))"
+      ],
+      "truth_signatures": [
+        "1010101010111011"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-10",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (not v2) v3) (and (not v2) (or v4 v1)))"
+      ],
+      "truth_signatures": [
+        "00110000111100001111000011110000"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-11",
+      "nvars": 6,
+      "outputs": [
+        "(and (or (not v3) v0) (or (not v3) (and v1 v5)))"
+      ],
+      "truth_signatures": [
+        "1111111100000000111111110000000011111111000100011111111100010001"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-12",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (and v0 v1) v3) (and (and v0 v1) v2))"
+      ],
+      "truth_signatures": [
+        "0000000100010001"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-13",
+      "nvars": 5,
+      "outputs": [
+        "(and (or (and v2 v1) v0) (or (and v2 v1) v4))"
+      ],
+      "truth_signatures": [
+        "00000011000000110101011101010111"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-14",
+      "nvars": 6,
+      "outputs": [
+        "(or (and v5 (and v3 v4)) (and v0 (and v3 v4)))"
+      ],
+      "truth_signatures": [
+        "0000000000000000000000000101010100000000000000000000000011111111"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-15",
+      "nvars": 4,
+      "outputs": [
+        "(and (or v3 (and v1 v0)) (or v2 (and v1 v0)))"
+      ],
+      "truth_signatures": [
+        "0001000100011111"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-16",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (and v2 v0) v4) (and (and v2 v0) (or v1 v0)))"
+      ],
+      "truth_signatures": [
+        "00000101000001010000010100000101"
+      ]
+    },
+    {
+      "family": "distributed_factoring",
+      "id": "distributed_factoring-17",
+      "nvars": 6,
+      "outputs": [
+        "(and (or (and v3 v4) v0) (or (and v3 v4) (and v2 v4)))"
+      ],
+      "truth_signatures": [
+        "0000000000000000000001011111111100000000000000000000010111111111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-00",
+      "nvars": 3,
+      "outputs": [
+        "(or v0 (and v0 v1))"
+      ],
+      "truth_signatures": [
+        "01010101"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-01",
+      "nvars": 4,
+      "outputs": [
+        "(and v3 (or v3 v1))"
+      ],
+      "truth_signatures": [
+        "0000000011111111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-02",
+      "nvars": 5,
+      "outputs": [
+        "(or v0 (not v0))"
+      ],
+      "truth_signatures": [
+        "11111111111111111111111111111111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-03",
+      "nvars": 6,
+      "outputs": [
+        "(and v1 (not v1))"
+      ],
+      "truth_signatures": [
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-04",
+      "nvars": 3,
+      "outputs": [
+        "(or (and v1 v2) (and v1 (not v2)))"
+      ],
+      "truth_signatures": [
+        "00110011"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-05",
+      "nvars": 4,
+      "outputs": [
+        "(and (or v1 v3) (or v1 (not v3)))"
+      ],
+      "truth_signatures": [
+        "0011001100110011"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-06",
+      "nvars": 5,
+      "outputs": [
+        "(or (not v2) (and (not v2) v0))"
+      ],
+      "truth_signatures": [
+        "11110000111100001111000011110000"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-07",
+      "nvars": 6,
+      "outputs": [
+        "(and (not v2) (or (not v2) v5))"
+      ],
+      "truth_signatures": [
+        "1111000011110000111100001111000011110000111100001111000011110000"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-08",
+      "nvars": 3,
+      "outputs": [
+        "(or (not v2) (not (not v2)))"
+      ],
+      "truth_signatures": [
+        "11111111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-09",
+      "nvars": 4,
+      "outputs": [
+        "(and (not v1) (not (not v1)))"
+      ],
+      "truth_signatures": [
+        "0000000000000000"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-10",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (not v2) v4) (and (not v2) (not v4)))"
+      ],
+      "truth_signatures": [
+        "11110000111100001111000011110000"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-11",
+      "nvars": 6,
+      "outputs": [
+        "(and (or (not v5) v4) (or (not v5) (not v4)))"
+      ],
+      "truth_signatures": [
+        "1111111111111111111111111111111100000000000000000000000000000000"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-12",
+      "nvars": 3,
+      "outputs": [
+        "(or (or v1 v0) (and (or v1 v0) v2))"
+      ],
+      "truth_signatures": [
+        "01110111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-13",
+      "nvars": 4,
+      "outputs": [
+        "(and (or v0 v3) (or (or v0 v3) v2))"
+      ],
+      "truth_signatures": [
+        "0101010111111111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-14",
+      "nvars": 5,
+      "outputs": [
+        "(or (or v4 v0) (not (or v4 v0)))"
+      ],
+      "truth_signatures": [
+        "11111111111111111111111111111111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-15",
+      "nvars": 6,
+      "outputs": [
+        "(and (or v2 v1) (not (or v2 v1)))"
+      ],
+      "truth_signatures": [
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-16",
+      "nvars": 3,
+      "outputs": [
+        "(or (and (or v2 v0) v1) (and (or v2 v0) (not v1)))"
+      ],
+      "truth_signatures": [
+        "01011111"
+      ]
+    },
+    {
+      "family": "absorption_complement",
+      "id": "absorption_complement-17",
+      "nvars": 4,
+      "outputs": [
+        "(and (or (or v2 v3) v1) (or (or v2 v3) (not v1)))"
+      ],
+      "truth_signatures": [
+        "0000111111111111"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-00",
+      "nvars": 3,
+      "outputs": [
+        "(ite v1 true false)"
+      ],
+      "truth_signatures": [
+        "00110011"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-01",
+      "nvars": 4,
+      "outputs": [
+        "(ite v3 v1 v1)"
+      ],
+      "truth_signatures": [
+        "0011001100110011"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-02",
+      "nvars": 5,
+      "outputs": [
+        "(ite (not v3) v2 v0)"
+      ],
+      "truth_signatures": [
+        "00001111010101010000111101010101"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-03",
+      "nvars": 6,
+      "outputs": [
+        "(not (and v2 v0))"
+      ],
+      "truth_signatures": [
+        "1111101011111010111110101111101011111010111110101111101011111010"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-04",
+      "nvars": 3,
+      "outputs": [
+        "(not (or v0 v2))"
+      ],
+      "truth_signatures": [
+        "10100000"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-05",
+      "nvars": 4,
+      "outputs": [
+        "(ite v2 (and v1 v0) (or v1 v0))"
+      ],
+      "truth_signatures": [
+        "0111000101110001"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-06",
+      "nvars": 5,
+      "outputs": [
+        "(ite v3 true false)"
+      ],
+      "truth_signatures": [
+        "00000000111111110000000011111111"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-07",
+      "nvars": 6,
+      "outputs": [
+        "(ite v2 (or v0 (not v1)) (or v0 (not v1)))"
+      ],
+      "truth_signatures": [
+        "1101110111011101110111011101110111011101110111011101110111011101"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-08",
+      "nvars": 3,
+      "outputs": [
+        "(ite (not v0) (or v1 (not v2)) v2)"
+      ],
+      "truth_signatures": [
+        "10100111"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-09",
+      "nvars": 4,
+      "outputs": [
+        "(not (and v3 (or v0 (not v1))))"
+      ],
+      "truth_signatures": [
+        "1111111100100010"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-10",
+      "nvars": 5,
+      "outputs": [
+        "(not (or v0 (or v2 (not v1))))"
+      ],
+      "truth_signatures": [
+        "00100000001000000010000000100000"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-11",
+      "nvars": 6,
+      "outputs": [
+        "(ite v0 (and (or v4 (not v2)) v2) (or (or v4 (not v2)) v2))"
+      ],
+      "truth_signatures": [
+        "1010101010101010101011111010111110101010101010101010111110101111"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-12",
+      "nvars": 3,
+      "outputs": [
+        "(ite (and v0 v1) true false)"
+      ],
+      "truth_signatures": [
+        "00010001"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-13",
+      "nvars": 4,
+      "outputs": [
+        "(ite (and v1 v3) (or v2 (not v3)) (or v2 (not v3)))"
+      ],
+      "truth_signatures": [
+        "1111111100001111"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-14",
+      "nvars": 5,
+      "outputs": [
+        "(ite (not (and v2 v4)) (or v0 (not v4)) v4)"
+      ],
+      "truth_signatures": [
+        "11111111111111110101111101011111"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-15",
+      "nvars": 6,
+      "outputs": [
+        "(not (and (and v3 v2) (or v5 (not v2))))"
+      ],
+      "truth_signatures": [
+        "1111111111111111111111111111111111111111111100001111111111110000"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-16",
+      "nvars": 3,
+      "outputs": [
+        "(not (or (and v1 v0) (or v2 (not v0))))"
+      ],
+      "truth_signatures": [
+        "01000000"
+      ]
+    },
+    {
+      "family": "mixed_ite_demorgan",
+      "id": "mixed_ite_demorgan-17",
+      "nvars": 4,
+      "outputs": [
+        "(ite (and v0 v2) (and (or v3 (not v2)) v2) (or (or v3 (not v2)) v2))"
+      ],
+      "truth_signatures": [
+        "1111101011111111"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-00",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (and v3 v0) v1) (and (and v3 v0) v2))",
+        "(and (and v3 v0) (or v1 v2))",
+        "(ite (and v3 v0) v1 v2)",
+        "(or (and (and v3 v0) v1) (and (and v3 v0) v2))"
+      ],
+      "truth_signatures": [
+        "0000000000010101",
+        "0000000000010101",
+        "0000111100011011",
+        "0000000000010101"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-01",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (or v3 v1) v0) (and (or v3 v1) v4))",
+        "(and (or v3 v1) (or v0 v4))",
+        "(ite (or v3 v1) v0 v4)",
+        "(not (or (or v3 v1) v0))"
+      ],
+      "truth_signatures": [
+        "00010001010101010011001111111111",
+        "00010001010101010011001111111111",
+        "00010001010101011101110101010101",
+        "10001000000000001000100000000000"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-02",
+      "nvars": 6,
+      "outputs": [
+        "(or (and (and v4 v3) v5) (and (and v4 v3) v0))",
+        "(and (and v4 v3) (or v5 v0))",
+        "(ite (and v4 v3) v5 v0)",
+        "(and (and v4 v3) v5)",
+        "(and (and v4 v3) v0)"
+      ],
+      "truth_signatures": [
+        "0000000000000000000000000101010100000000000000000000000011111111",
+        "0000000000000000000000000101010100000000000000000000000011111111",
+        "0101010101010101010101010000000001010101010101010101010111111111",
+        "0000000000000000000000000000000000000000000000000000000011111111",
+        "0000000000000000000000000101010100000000000000000000000001010101"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-03",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (or v2 v0) v3) (and (or v2 v0) v1))",
+        "(and (or v2 v0) (or v3 v1))",
+        "(ite (or v2 v0) v3 v1)",
+        "(or (and (or v2 v0) v3) (and (or v2 v0) v1))"
+      ],
+      "truth_signatures": [
+        "0001001101011111",
+        "0001001101011111",
+        "0010000001111111",
+        "0001001101011111"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-04",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (and v1 v2) v0) (and (and v1 v2) v3))",
+        "(and (and v1 v2) (or v0 v3))",
+        "(ite (and v1 v2) v0 v3)",
+        "(not (or (and v1 v2) v0))"
+      ],
+      "truth_signatures": [
+        "00000001000000110000000100000011",
+        "00000001000000110000000100000011",
+        "00000001111111010000000111111101",
+        "10101000101010001010100010101000"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-05",
+      "nvars": 6,
+      "outputs": [
+        "(or (and (or v0 v5) v2) (and (or v0 v5) v4))",
+        "(and (or v0 v5) (or v2 v4))",
+        "(ite (or v0 v5) v2 v4)",
+        "(and (or v0 v5) v2)",
+        "(and (or v0 v5) v4)"
+      ],
+      "truth_signatures": [
+        "0000010100000101010101010101010100001111000011111111111111111111",
+        "0000010100000101010101010101010100001111000011111111111111111111",
+        "0000010100000101101011111010111100001111000011110000111100001111",
+        "0000010100000101000001010000010100001111000011110000111100001111",
+        "0000000000000000010101010101010100000000000000001111111111111111"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-06",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (and v1 v0) v3) (and (and v1 v0) v2))",
+        "(and (and v1 v0) (or v3 v2))",
+        "(ite (and v1 v0) v3 v2)",
+        "(or (and (and v1 v0) v3) (and (and v1 v0) v2))"
+      ],
+      "truth_signatures": [
+        "0000000100010001",
+        "0000000100010001",
+        "0000111000011111",
+        "0000000100010001"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-07",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (or v1 v2) v0) (and (or v1 v2) v4))",
+        "(and (or v1 v2) (or v0 v4))",
+        "(ite (or v1 v2) v0 v4)",
+        "(not (or (or v1 v2) v0))"
+      ],
+      "truth_signatures": [
+        "00010101000101010011111100111111",
+        "00010101000101010011111100111111",
+        "00010101000101011101010111010101",
+        "10000000100000001000000010000000"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-08",
+      "nvars": 6,
+      "outputs": [
+        "(or (and (and v1 v0) v3) (and (and v1 v0) v5))",
+        "(and (and v1 v0) (or v3 v5))",
+        "(ite (and v1 v0) v3 v5)",
+        "(and (and v1 v0) v3)",
+        "(and (and v1 v0) v5)"
+      ],
+      "truth_signatures": [
+        "0000000000010001000000000001000100010001000100010001000100010001",
+        "0000000000010001000000000001000100010001000100010001000100010001",
+        "0000000000010001000000000001000111101110111111111110111011111111",
+        "0000000000010001000000000001000100000000000100010000000000010001",
+        "0000000000000000000000000000000000010001000100010001000100010001"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-09",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (or v3 v2) v1) (and (or v3 v2) v0))",
+        "(and (or v3 v2) (or v1 v0))",
+        "(ite (or v3 v2) v1 v0)",
+        "(or (and (or v3 v2) v1) (and (or v3 v2) v0))"
+      ],
+      "truth_signatures": [
+        "0000011101110111",
+        "0000011101110111",
+        "0101001100110011",
+        "0000011101110111"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-10",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (and v3 v4) v0) (and (and v3 v4) v2))",
+        "(and (and v3 v4) (or v0 v2))",
+        "(ite (and v3 v4) v0 v2)",
+        "(not (or (and v3 v4) v0))"
+      ],
+      "truth_signatures": [
+        "00000000000000000000000001011111",
+        "00000000000000000000000001011111",
+        "00001111000011110000111101010101",
+        "10101010101010101010101000000000"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-11",
+      "nvars": 6,
+      "outputs": [
+        "(or (and (or v3 v5) v4) (and (or v3 v5) v2))",
+        "(and (or v3 v5) (or v4 v2))",
+        "(ite (or v3 v5) v4 v2)",
+        "(and (or v3 v5) v4)",
+        "(and (or v3 v5) v2)"
+      ],
+      "truth_signatures": [
+        "0000000000001111000000001111111100001111000011111111111111111111",
+        "0000000000001111000000001111111100001111000011111111111111111111",
+        "0000111100000000000011111111111100000000000000001111111111111111",
+        "0000000000000000000000001111111100000000000000001111111111111111",
+        "0000000000001111000000000000111100001111000011110000111100001111"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-12",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (and v0 v2) v3) (and (and v0 v2) v1))",
+        "(and (and v0 v2) (or v3 v1))",
+        "(ite (and v0 v2) v3 v1)",
+        "(or (and (and v0 v2) v3) (and (and v0 v2) v1))"
+      ],
+      "truth_signatures": [
+        "0000000100000101",
+        "0000000100000101",
+        "0011001000110111",
+        "0000000100000101"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-13",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (or v3 v4) v0) (and (or v3 v4) v1))",
+        "(and (or v3 v4) (or v0 v1))",
+        "(ite (or v3 v4) v0 v1)",
+        "(not (or (or v3 v4) v0))"
+      ],
+      "truth_signatures": [
+        "00000000011101110111011101110111",
+        "00000000011101110111011101110111",
+        "00110011010101010101010101010101",
+        "10101010000000000000000000000000"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-14",
+      "nvars": 6,
+      "outputs": [
+        "(or (and (and v3 v2) v5) (and (and v3 v2) v1))",
+        "(and (and v3 v2) (or v5 v1))",
+        "(ite (and v3 v2) v5 v1)",
+        "(and (and v3 v2) v5)",
+        "(and (and v3 v2) v1)"
+      ],
+      "truth_signatures": [
+        "0000000000000011000000000000001100000000000011110000000000001111",
+        "0000000000000011000000000000001100000000000011110000000000001111",
+        "0011001100110000001100110011000000110011001111110011001100111111",
+        "0000000000000000000000000000000000000000000011110000000000001111",
+        "0000000000000011000000000000001100000000000000110000000000000011"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-15",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (or v2 v0) v1) (and (or v2 v0) v3))",
+        "(and (or v2 v0) (or v1 v3))",
+        "(ite (or v2 v0) v1 v3)",
+        "(or (and (or v2 v0) v1) (and (or v2 v0) v3))"
+      ],
+      "truth_signatures": [
+        "0001001101011111",
+        "0001001101011111",
+        "0001001110110011",
+        "0001001101011111"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-16",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (and v2 v0) v1) (and (and v2 v0) v3))",
+        "(and (and v2 v0) (or v1 v3))",
+        "(ite (and v2 v0) v1 v3)",
+        "(not (or (and v2 v0) v1))"
+      ],
+      "truth_signatures": [
+        "00000001000001010000000100000101",
+        "00000001000001010000000100000101",
+        "00000001111110110000000111111011",
+        "11001000110010001100100011001000"
+      ]
+    },
+    {
+      "family": "shared_guards",
+      "id": "shared_guards-17",
+      "nvars": 6,
+      "outputs": [
+        "(or (and (or v0 v5) v3) (and (or v0 v5) v2))",
+        "(and (or v0 v5) (or v3 v2))",
+        "(ite (or v0 v5) v3 v2)",
+        "(and (or v0 v5) v3)",
+        "(and (or v0 v5) v2)"
+      ],
+      "truth_signatures": [
+        "0000010101010101000001010101010100001111111111110000111111111111",
+        "0000010101010101000001010101010100001111111111110000111111111111",
+        "0000101001011111000010100101111100000000111111110000000011111111",
+        "0000000001010101000000000101010100000000111111110000000011111111",
+        "0000010100000101000001010000010100001111000011110000111100001111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-00",
+      "nvars": 4,
+      "outputs": [
+        "(and (and (and v0 v0) (and v1 v0)) (ite (and v1 v1) (not v2) (not v0)))",
+        "(not (and (or true v1) (or v3 v2)))"
+      ],
+      "truth_signatures": [
+        "0001000000010000",
+        "1111000000000000"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-01",
+      "nvars": 5,
+      "outputs": [
+        "(or (ite (or (not false) (and v2 v1)) (not (and v2 true)) (ite (not v2) (or v3 true) (and v4 v4))) (not (or (or v0 v2) (not v2))))"
+      ],
+      "truth_signatures": [
+        "11110000111100001111000011110000"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-02",
+      "nvars": 6,
+      "outputs": [
+        "(ite (and (and v4 v0) (and v0 v4)) (or (not true) (or v5 v2)) (ite (ite v2 false v4) (or true true) (not v2)))"
+      ],
+      "truth_signatures": [
+        "1111000011110000101001011010010111110000111100001111010111110101"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-03",
+      "nvars": 4,
+      "outputs": [
+        "(or (ite (and (or v1 true) (and v0 v3)) (and (and v3 v2) (ite v2 v3 v2)) (and (or v3 v3) (and v2 v2))) (or (and (or false v1) (and v2 v0)) (and (not v0) (or v1 false))))"
+      ],
+      "truth_signatures": [
+        "0010001100101111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-04",
+      "nvars": 5,
+      "outputs": [
+        "(ite (or (or false true) (ite false v2 v3)) (or (and v4 v3) (or true v2)) (or (or v3 false) (or true v0)))",
+        "(and (or (not v1) (or v0 v4)) (ite (or v1 true) (and v3 v2) (or v4 v1)))"
+      ],
+      "truth_signatures": [
+        "11111111111111111111111111111111",
+        "00000000000011010000000000001111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-05",
+      "nvars": 6,
+      "outputs": [
+        "(or (ite (or (and true v1) (and v4 v5)) (or (ite v1 v3 true) (and v2 v0)) (and (and v1 v5) (or v2 true))) (not (ite (not v4) (and v5 v3) (or false v4))))"
+      ],
+      "truth_signatures": [
+        "1111111111111111000000010011001111111111001100111100110111111111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-06",
+      "nvars": 4,
+      "outputs": [
+        "(and (or (not v0) (not v3)) (not (and false v0)))"
+      ],
+      "truth_signatures": [
+        "1111111110101010"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-07",
+      "nvars": 5,
+      "outputs": [
+        "(or (and (or (and v0 true) (and v3 v3)) (ite (ite false v3 v4) (ite v3 true v0) (and v4 v1))) (not (not (not v4))))"
+      ],
+      "truth_signatures": [
+        "11111111111111110101010111111111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-08",
+      "nvars": 6,
+      "outputs": [
+        "(or (and (not false) (not v3)) (and (or v4 false) (not true)))",
+        "(not (ite (or v3 false) (or v2 v3) (not v5)))"
+      ],
+      "truth_signatures": [
+        "1111111100000000111111110000000011111111000000001111111100000000",
+        "0000000000000000000000000000000011111111000000001111111100000000"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-09",
+      "nvars": 4,
+      "outputs": [
+        "(not (ite (or (and true true) (ite v3 v0 true)) (or (and true v0) (or false true)) (ite (or v3 false) (or v0 false) (or v3 v2))))"
+      ],
+      "truth_signatures": [
+        "0000000000000000"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-10",
+      "nvars": 5,
+      "outputs": [
+        "(or (or (and v0 v2) (and v4 false)) (ite (or v2 v3) (not v2) (not true)))"
+      ],
+      "truth_signatures": [
+        "00000101111101010000010111110101"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-11",
+      "nvars": 6,
+      "outputs": [
+        "(or (ite (or (ite false true v1) (and v3 v2)) (or (and v5 v3) (ite v5 true v2)) (or (or true v5) (ite v1 v2 v0))) (and (or (or v3 v2) (and v4 v0)) (and (and v3 v3) (ite v5 v0 v3))))"
+      ],
+      "truth_signatures": [
+        "1100111111111111110011111111111111111111111111111111111111111111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-12",
+      "nvars": 4,
+      "outputs": [
+        "(and (and (or v1 true) (ite v1 v0 v2)) (and (and v3 false) (not v1)))",
+        "(not (or (or true v1) (not v2)))"
+      ],
+      "truth_signatures": [
+        "0000000000000000",
+        "0000000000000000"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-13",
+      "nvars": 5,
+      "outputs": [
+        "(and (and (and (or v1 true) (and v3 v0)) (or (ite v3 false v0) (or v0 v1))) (not (and (ite v2 v0 true) (not v2))))"
+      ],
+      "truth_signatures": [
+        "00000000000001010000000000000101"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-14",
+      "nvars": 6,
+      "outputs": [
+        "(or (or (not v4) (and v4 v3)) (and (and v3 v2) (not v0)))"
+      ],
+      "truth_signatures": [
+        "1111111111111111000000001111111111111111111111110000000011111111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-15",
+      "nvars": 4,
+      "outputs": [
+        "(or (and (or (or v1 false) (or true v3)) (not (or v1 v1))) (and (or (and v0 true) (or v3 v2)) (ite (or false v2) (or true true) (or v3 true))))"
+      ],
+      "truth_signatures": [
+        "1101111111111111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-16",
+      "nvars": 5,
+      "outputs": [
+        "(ite (or (or v1 v3) (ite v1 v3 v0)) (or (or v4 v0) (or v2 v2)) (and (or v4 v2) (and v3 v1)))",
+        "(not (ite (ite v1 v1 false) (and v0 v2) (and v2 true)))"
+      ],
+      "truth_signatures": [
+        "01010111010111110111011111111111",
+        "11110010111100101111001011110010"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-17",
+      "nvars": 6,
+      "outputs": [
+        "(or (or (ite (not true) (and v4 true) (and v0 true)) (and (or v5 v0) (not v4))) (not (and (not v4) (or v2 v4))))"
+      ],
+      "truth_signatures": [
+        "1111010111110101111111111111111111111111111111111111111111111111"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-18",
+      "nvars": 4,
+      "outputs": [
+        "(not (not (not v3)))"
+      ],
+      "truth_signatures": [
+        "1111111100000000"
+      ]
+    },
+    {
+      "family": "balanced_general",
+      "id": "balanced_general-19",
+      "nvars": 5,
+      "outputs": [
+        "(and (ite (not (and true v2)) (or (or true v0) (ite v1 v0 v3)) (ite (or v2 true) (or v2 true) (or v0 v1))) (or (not (not v4)) (and (not v1) (or v4 v3))))"
+      ],
+      "truth_signatures": [
+        "00000000110011001111111111111111"
+      ]
+    }
+  ],
+  "schema": "zeno-fcis/published-corpus-sources/1",
+  "source": {
+    "branch": "research/semantic-egraphs",
+    "commit": "a69ed8db594d95279a46bff0f65185ef67d51f98",
+    "kept_fields": [
+      "id",
+      "family",
+      "nvars",
+      "outputs",
+      "truth_signatures"
+    ],
+    "path": "experiments/semantic-egraphs/corpus.json",
+    "repository": "https://github.com/TheDarkLightX/ZenoFCIS",
+    "seed": 20261003,
+    "sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18"
+  }
+}

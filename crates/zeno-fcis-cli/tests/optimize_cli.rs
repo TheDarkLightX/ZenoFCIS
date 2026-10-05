@@ -133,13 +133,34 @@ fn kernel_improves_to_seven_nodes_and_the_written_receipt_replays() {
         candidate.to_string_lossy().as_ref()
     );
     assert_eq!(detail["receipt_path"], receipt.to_string_lossy().as_ref());
+    // Without --strategy the fixed portfolio runs its three strategies.
     assert_eq!(
         detail["strategy"]["schema"],
+        "zeno-fcis/optimize-portfolio/1"
+    );
+    assert_eq!(
+        detail["strategy"]["strategies"][0]["schema"],
         "zeno-fcis/optimize-strategy/1"
     );
     assert_eq!(detail["domain"]["exact_signatures"], true);
-    assert_eq!(detail["search"]["phases_run"], 8);
-    assert_eq!(detail["search"]["any_limit_hit"], false);
+    assert_eq!(detail["search"]["phases_requested"], 36);
+    assert_eq!(detail["search"]["phases_run"], 36);
+    let runs = detail["search"]["runs"]
+        .as_array()
+        .unwrap_or_else(|| panic!("runs"));
+    assert_eq!(runs.len(), 3);
+    // Only the cycles strategy reaches a limit here, and the report names
+    // it on each phase concerned.
+    let limited: Vec<u64> = detail["search"]["phases"]
+        .as_array()
+        .unwrap_or_else(|| panic!("phases"))
+        .iter()
+        .filter(|phase| !phase["limit_hit"].is_null())
+        .map(|phase| phase["run"].as_u64().unwrap_or(u64::MAX))
+        .collect();
+    assert!(limited.iter().all(|run| *run == 2), "{limited:?}");
+    assert_eq!(detail["search"]["any_limit_hit"], !limited.is_empty());
+    assert_eq!(detail["best"]["run"], 0);
     // The written files are what the report describes.
     let bytes = read(&candidate);
     assert_eq!(detail["best"]["sha256"], sha256(&bytes));
@@ -162,27 +183,56 @@ fn kernel_improves_to_seven_nodes_and_the_written_receipt_replays() {
 
 #[test]
 fn repeated_runs_print_identical_reports() {
-    let original = artifact("retained-controller-original");
-    let first = run_raw(&[
-        "optimize".as_ref(),
-        "--program".as_ref(),
-        original.as_os_str(),
-    ]);
-    let second = run_raw(&[
-        "optimize".as_ref(),
-        "--program".as_ref(),
-        original.as_os_str(),
-    ]);
-    assert_eq!(first.status.code(), Some(0));
-    assert_eq!(first.stdout, second.stdout);
-    let report: Value =
-        serde_json::from_slice(&first.stdout).unwrap_or_else(|error| panic!("{error}"));
-    assert_eq!(report["status"], "improved");
-    assert_eq!(report["detail"]["best"]["nodes"], 46);
-    assert_eq!(report["detail"]["candidate_path"], Value::Null);
-    assert_eq!(report["detail"]["receipt_path"], Value::Null);
-    assert_eq!(report["detail"]["domain"]["exact_signatures"], false);
+    let directory = Directory::new();
+    // The default strategy alone on the controller, and the portfolio on
+    // the kernel; the portfolio takes tens of seconds on the controller in
+    // a debug build.
+    let strategy = directory.write("default.json", DEFAULT_STRATEGY.as_bytes());
+    for (name, extra) in [
+        (
+            "retained-controller-original",
+            vec![
+                "--strategy".to_owned(),
+                strategy.to_string_lossy().into_owned(),
+            ],
+        ),
+        ("boolean-kernel-original", Vec::new()),
+    ] {
+        let original = artifact(name);
+        let mut arguments: Vec<&std::ffi::OsStr> = vec![
+            "optimize".as_ref(),
+            "--program".as_ref(),
+            original.as_os_str(),
+        ];
+        arguments.extend(extra.iter().map(std::ffi::OsStr::new));
+        let first = run_raw(&arguments);
+        let second = run_raw(&arguments);
+        assert_eq!(first.status.code(), Some(0), "{name}");
+        assert_eq!(first.stdout, second.stdout, "{name}");
+        let report: Value =
+            serde_json::from_slice(&first.stdout).unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(report["status"], "improved");
+        assert_eq!(report["detail"]["candidate_path"], Value::Null);
+        assert_eq!(report["detail"]["receipt_path"], Value::Null);
+        assert_eq!(report["detail"]["domain"]["exact_signatures"], true);
+        let expected = if name == "boolean-kernel-original" {
+            7
+        } else {
+            36
+        };
+        assert_eq!(report["detail"]["best"]["nodes"], expected, "{name}");
+    }
 }
+
+/// The optimizer's default strategy document, version 1.
+const DEFAULT_STRATEGY: &str = r#"{"schema": "zeno-fcis/optimize-strategy/1", "phases": [
+    {"phase": "fold", "rounds": 1}, {"phase": "share", "rounds": 1},
+    {"phase": "boolean", "rounds": 3}, {"phase": "select", "rounds": 3},
+    {"phase": "semantic-merge", "rounds": 2}, {"phase": "boolean", "rounds": 2},
+    {"phase": "select", "rounds": 2}, {"phase": "fold", "rounds": 1}],
+  "limits": {"max_enodes": 20000, "max_classes": 10000,
+             "max_rewrites_per_round": 10000, "max_extraction_rounds": 8},
+  "extractor": "dag-greedy"}"#;
 
 #[test]
 fn a_minimal_program_has_no_checked_improvement() {
@@ -269,6 +319,96 @@ fn a_supplied_strategy_is_used_and_an_invalid_one_is_refused() {
 }
 
 #[test]
+fn a_profile_bounds_the_search_and_conflicts_are_refused() {
+    let directory = Directory::new();
+    let original = artifact("boolean-kernel-original");
+    let (exit, report) = optimize(&original, &["--profile", "functional-bool-v1"]);
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["detail"]["best"]["nodes"], 7);
+    // The profile applies to every strategy of the portfolio.
+    let strategies = report["detail"]["strategy"]["strategies"]
+        .as_array()
+        .unwrap_or_else(|| panic!("strategies"));
+    assert_eq!(strategies.len(), 3);
+    for strategy in strategies {
+        assert_eq!(strategy["profile"], "functional-bool-v1");
+    }
+    // A strategy naming another profile than --profile is refused.
+    let named = directory.write(
+        "named.json",
+        br#"{"schema": "zeno-fcis/optimize-strategy/1", "phases": [{"phase": "boolean", "rounds": 1}], "profile": "checked-i64-v1"}"#,
+    );
+    let (exit, report) = optimize(
+        &original,
+        &[
+            "--strategy",
+            &named.to_string_lossy(),
+            "--profile",
+            "functional-bool-v1",
+        ],
+    );
+    assert_eq!(exit, Some(1), "{report}");
+    assert_eq!(report["status"], "invalid-strategy");
+    // An original whose inputs the profile cannot hold (eight, one of them
+    // an integer) is refused before any search.
+    let controller = artifact("retained-controller-original");
+    let (exit, report) = optimize(&controller, &["--profile", "functional-bool-v1"]);
+    assert_eq!(exit, Some(1), "{report}");
+    assert_eq!(report["status"], "refused");
+    assert_eq!(report["detail"]["reason"], "original-outside-profile");
+    assert_eq!(report["detail"]["profile"]["reason"], "profile-inputs");
+    // An unknown profile name is a usage error.
+    let output = run_raw(&[
+        "optimize".as_ref(),
+        "--program".as_ref(),
+        original.as_os_str(),
+        "--profile".as_ref(),
+        "functional-bool-v2".as_ref(),
+    ]);
+    assert_ne!(output.status.code(), Some(0));
+}
+
+#[test]
+fn supplied_candidates_are_checked_before_they_are_fused() {
+    let directory = Directory::new();
+    let original = artifact("boolean-kernel-original");
+    let recorded = artifact("boolean-kernel-candidate");
+    let wrong = directory.write("wrong.zcve", &read(&artifact("boolean-kernel-padded")));
+    let strategy = directory.write("default.json", DEFAULT_STRATEGY.as_bytes());
+    let (exit, report) = optimize(
+        &original,
+        &[
+            "--strategy",
+            &strategy.to_string_lossy(),
+            "--with-candidate",
+            &recorded.to_string_lossy(),
+            "--with-candidate",
+            &wrong.to_string_lossy(),
+        ],
+    );
+    assert_eq!(exit, Some(0), "{report}");
+    let supplied = report["detail"]["supplied"]
+        .as_array()
+        .unwrap_or_else(|| panic!("supplied"));
+    assert_eq!(supplied.len(), 2);
+    assert_eq!(supplied[0]["sha256"], sha256(&read(&recorded)));
+    assert_eq!(supplied[0]["fused"], true);
+    // The padded kernel is equivalent but larger, so it is fused, not chosen.
+    assert_eq!(supplied[1]["verdict"], "accepted-not-better");
+    assert_eq!(report["detail"]["best"]["nodes"], 7);
+    // More than eight supplied programs are refused before any search.
+    let mut arguments = Vec::new();
+    for _ in 0..9 {
+        arguments.push("--with-candidate".to_owned());
+        arguments.push(recorded.to_string_lossy().into_owned());
+    }
+    let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
+    let (exit, report) = optimize(&original, &arguments);
+    assert_eq!(exit, Some(1), "{report}");
+    assert_eq!(report["detail"]["reason"], "too-many-candidates");
+}
+
+#[test]
 fn refusals_inconclusive_results_and_io_errors_have_distinct_exits() {
     let directory = Directory::new();
     let original = artifact("boolean-kernel-original");
@@ -330,7 +470,7 @@ fn describe_declares_optimize_effects() {
         command["effects"],
         json!({
             "classification": "declared", "executes_tools": false, "read_only_flag": null,
-            "reads": ["original-program", "optional-strategy"],
+            "reads": ["original-program", "optional-strategy", "optional-candidate-programs"],
             "writes": ["optional-candidate-program", "optional-equivalence-receipt"]
         })
     );
@@ -347,9 +487,11 @@ fn describe_declares_optimize_effects() {
             "candidate_out",
             "help",
             "max_input_tuples",
+            "profile",
             "program",
             "receipt",
-            "strategy"
+            "strategy",
+            "with_candidate"
         ]
     );
     let cap = arguments

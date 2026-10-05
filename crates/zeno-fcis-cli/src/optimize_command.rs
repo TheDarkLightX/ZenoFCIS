@@ -3,7 +3,8 @@
 //! application authority, and no candidate is reported as accepted unless the
 //! transform checker accepted it.
 
-use crate::optimize::strategy::Strategy;
+use crate::neural_loop::profiles::Profile;
+use crate::optimize::strategy::{DEFAULT_PORTFOLIO_JSON, Plan, Strategy};
 use crate::optimize::{self, Outcome, Refused};
 use crate::transform;
 use clap::Args;
@@ -16,6 +17,8 @@ use std::path::{Path, PathBuf};
 /// file is refused here before it is hashed or decoded.
 const PROGRAM_LIMIT: u64 = 64 * 1024;
 const STRATEGY_LIMIT: u64 = 64 * 1024;
+/// Most programs `--with-candidate` may supply.
+const MAX_SUPPLIED: usize = 8;
 
 #[derive(Args)]
 pub(super) struct Arguments {
@@ -23,7 +26,7 @@ pub(super) struct Arguments {
     #[arg(long)]
     program: PathBuf,
     /// Strategy document (JSON, schema zeno-fcis/optimize-strategy/1). The
-    /// fixed default strategy applies when absent.
+    /// fixed default portfolio of three strategies runs when absent.
     #[arg(long)]
     strategy: Option<PathBuf>,
     /// Create a new file holding the best accepted candidate's canonical bytes.
@@ -36,6 +39,16 @@ pub(super) struct Arguments {
     /// inconclusive before any search.
     #[arg(long, default_value_t = transform::DEFAULT_MAX_INPUT_TUPLES)]
     max_input_tuples: u64,
+    /// Artifact profile every candidate must stay within; instructions
+    /// outside it are never proposed or extracted. A strategy naming another
+    /// profile is refused.
+    #[arg(long, value_parser = ["functional-bool-v1", "checked-i64-v1"])]
+    profile: Option<String>,
+    /// A canonical program claimed equivalent to the original, to fuse into
+    /// the search (repeatable, at most 8). Each is checked against the
+    /// original first; only an accepted one is used.
+    #[arg(long)]
+    with_candidate: Vec<PathBuf>,
 }
 
 pub(super) fn run(arguments: Arguments) -> u8 {
@@ -45,6 +58,8 @@ pub(super) fn run(arguments: Arguments) -> u8 {
         arguments.candidate_out.as_deref(),
         arguments.receipt.as_deref(),
         arguments.max_input_tuples,
+        arguments.profile.as_deref().and_then(Profile::parse),
+        &arguments.with_candidate,
     );
     crate::print_json(&report);
     exit
@@ -56,6 +71,8 @@ fn optimize_files(
     candidate_out: Option<&Path>,
     receipt: Option<&Path>,
     max_input_tuples: u64,
+    profile: Option<Profile>,
+    with_candidate: &[PathBuf],
 ) -> (u8, Value) {
     // Unlike `exists`, `symlink_metadata` also sees a dangling link, which
     // exclusive creation would refuse after the whole search.
@@ -83,6 +100,32 @@ fn optimize_files(
         Ok(bytes) => bytes,
         Err(error) => return io_failure(&error),
     };
+    if with_candidate.len() > MAX_SUPPLIED {
+        return result(
+            crate::INVALID,
+            "refused",
+            json!({"reason": "too-many-candidates", "max": MAX_SUPPLIED}),
+        );
+    }
+    let mut supplied = Vec::with_capacity(with_candidate.len());
+    for path in with_candidate {
+        match read_bounded(path, PROGRAM_LIMIT) {
+            Ok(bytes) if over(&bytes, PROGRAM_LIMIT) => {
+                return result(
+                    crate::INVALID,
+                    "refused",
+                    json!({
+                        "reason": "candidate-not-admitted",
+                        "code": "program-too-large",
+                        "path": path.display().to_string(),
+                        "max_bytes": PROGRAM_LIMIT
+                    }),
+                );
+            }
+            Ok(bytes) => supplied.push(bytes),
+            Err(error) => return io_failure(&error),
+        }
+    }
     let strategy_bytes = match strategy {
         Some(path) => match read_bounded(path, STRATEGY_LIMIT) {
             Ok(bytes) if over(&bytes, STRATEGY_LIMIT) => {
@@ -95,10 +138,14 @@ fn optimize_files(
             Ok(bytes) => bytes,
             Err(error) => return io_failure(&error),
         },
-        None => Vec::from(optimize::strategy::DEFAULT_STRATEGY_JSON.as_bytes()),
+        None => Vec::from(DEFAULT_PORTFOLIO_JSON.as_bytes()),
     };
-    let strategy = match Strategy::parse(&strategy_bytes) {
-        Ok(strategy) => strategy,
+    let plan = match strategy {
+        Some(_) => Strategy::parse(&strategy_bytes).map(Plan::single),
+        None => Plan::default_portfolio(),
+    };
+    let mut plan = match plan {
+        Ok(plan) => plan,
         Err(error) => {
             return result(
                 crate::INVALID,
@@ -107,50 +154,66 @@ fn optimize_files(
             );
         }
     };
-    let (exit, mut report) = match optimize::optimize(&original, &strategy, max_input_tuples) {
-        Outcome::Refused(Refused::NotAdmitted { code }) => result(
+    if let Some(profile) = profile
+        && let Err(error) = plan.restrict(profile)
+    {
+        return result(
             crate::INVALID,
-            "refused",
-            json!({"reason": "original-not-admitted", "code": code}),
-        ),
-        Outcome::Refused(Refused::EmptyInputDomain) => result(
-            crate::INVALID,
-            "refused",
-            json!({"reason": "empty-input-domain"}),
-        ),
-        Outcome::Inconclusive(stop) => result(
-            crate::BLOCKED,
-            "inconclusive",
-            json!({
-                "cause": "domain-too-large",
-                "domain_size": stop.size.map(|size| size.to_string()),
-                "max_input_tuples": stop.limit
-            }),
-        ),
-        Outcome::Searched(search) => {
-            let mut detail = search.json();
-            match &search.best {
-                Some(best) => {
-                    let receipt_bytes = best.equivalence.receipt();
-                    if let Some(path) = candidate_out
-                        && let Err(error) = crate::atomic_create(path, &best.bytes)
-                    {
-                        return io_failure(&error);
+            "invalid-strategy",
+            json!({"message": error.message}),
+        );
+    }
+    let (exit, mut report) =
+        match optimize::optimize_plan(&original, &plan, &supplied, max_input_tuples) {
+            Outcome::Refused(Refused::NotAdmitted { code }) => result(
+                crate::INVALID,
+                "refused",
+                json!({"reason": "original-not-admitted", "code": code}),
+            ),
+            Outcome::Refused(Refused::EmptyInputDomain) => result(
+                crate::INVALID,
+                "refused",
+                json!({"reason": "empty-input-domain"}),
+            ),
+            Outcome::Refused(Refused::OutsideProfile(refusal)) => result(
+                crate::INVALID,
+                "refused",
+                json!({"reason": "original-outside-profile", "profile": refusal.json()}),
+            ),
+            Outcome::Inconclusive(stop) => result(
+                crate::BLOCKED,
+                "inconclusive",
+                json!({
+                    "cause": "domain-too-large",
+                    "domain_size": stop.size.map(|size| size.to_string()),
+                    "max_input_tuples": stop.limit
+                }),
+            ),
+            Outcome::Searched(search) => {
+                let mut detail = search.json();
+                match &search.best {
+                    Some(best) => {
+                        let receipt_bytes = best.equivalence.receipt();
+                        if let Some(path) = candidate_out
+                            && let Err(error) = crate::atomic_create(path, &best.bytes)
+                        {
+                            return io_failure(&error);
+                        }
+                        if let Some(path) = receipt
+                            && let Err(error) = crate::atomic_create(path, &receipt_bytes)
+                        {
+                            return io_failure(&error);
+                        }
+                        detail["candidate_path"] =
+                            json!(candidate_out.map(|path| path.display().to_string()));
+                        detail["receipt_path"] =
+                            json!(receipt.map(|path| path.display().to_string()));
+                        result(crate::OK, "improved", detail)
                     }
-                    if let Some(path) = receipt
-                        && let Err(error) = crate::atomic_create(path, &receipt_bytes)
-                    {
-                        return io_failure(&error);
-                    }
-                    detail["candidate_path"] =
-                        json!(candidate_out.map(|path| path.display().to_string()));
-                    detail["receipt_path"] = json!(receipt.map(|path| path.display().to_string()));
-                    result(crate::OK, "improved", detail)
+                    None => result(crate::BLOCKED, "no-checked-improvement", detail),
                 }
-                None => result(crate::BLOCKED, "no-checked-improvement", detail),
             }
-        }
-    };
+        };
     report["original_sha256"] = json!(transform::sha256_hex(&original));
     report["strategy_sha256"] = json!(transform::sha256_hex(&strategy_bytes));
     report["limits"] = json!({

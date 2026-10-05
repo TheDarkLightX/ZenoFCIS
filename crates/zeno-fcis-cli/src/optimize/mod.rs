@@ -7,10 +7,13 @@
 //! the declared input domain. No I/O, clock, randomness or environment is
 //! read here; the command layer owns files and printing.
 
+pub(crate) mod cut_table;
+pub(crate) mod cuts;
 pub(crate) mod egraph;
 pub(crate) mod extract;
 pub(crate) mod rules;
 pub(crate) mod semantics;
+pub(crate) mod signature;
 pub(crate) mod strategy;
 
 use serde_json::{Value, json};
@@ -18,12 +21,13 @@ use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_synthesis::finite::{Error, Program};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
+use crate::neural_loop::profiles::{Profile, ProfileRefusal};
 use crate::transform::{self, Equivalence, Inconclusive, Limits, Observation, Refusal, Rejection};
-use egraph::{AddError, EGraph};
+use egraph::{AddError, ClassId, EGraph, Merge, MergeReason};
 use extract::{ExtractError, Extraction};
 use rules::PhaseReport;
 use semantics::DomainInfo;
-use strategy::{Phase, Strategy};
+use strategy::{Phase, Plan, Strategy};
 
 /// Version of the result format.
 pub(crate) const RESULT_SCHEMA: &str = "zeno-fcis/optimize-result/1";
@@ -35,6 +39,9 @@ pub(crate) enum Refused {
     NotAdmitted { code: &'static str },
     /// An input domain has no values.
     EmptyInputDomain,
+    /// The strategy names a profile whose inputs, outputs or domain size the
+    /// original's ABI cannot meet, so no candidate could pass its gate.
+    OutsideProfile(ProfileRefusal),
 }
 
 /// The checker could never judge a candidate: the domain exceeds the cap.
@@ -86,6 +93,8 @@ impl Verdict {
 /// One extracted candidate and its fate.
 #[derive(Debug)]
 pub(crate) struct Candidate {
+    /// Index of the run (the strategy within the plan) that extracted it.
+    pub(crate) run: usize,
     pub(crate) phase_index: usize,
     pub(crate) phase: Phase,
     pub(crate) nodes: Option<usize>,
@@ -96,19 +105,102 @@ pub(crate) struct Candidate {
     pub(crate) verdict: Verdict,
 }
 
+/// Where an accepted candidate came from.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Source {
+    /// Extracted after phase `phase_index` of run `run`.
+    Phase { run: usize, phase_index: usize },
+    /// The `index`-th program supplied with the request.
+    Supplied { index: usize },
+}
+
 /// The best F3-accepted candidate.
 #[derive(Debug)]
 pub(crate) struct Accepted {
     pub(crate) bytes: Vec<u8>,
     pub(crate) nodes: usize,
     pub(crate) max_steps: u64,
-    pub(crate) phase_index: usize,
+    pub(crate) source: Source,
     pub(crate) equivalence: Equivalence,
+}
+
+/// A program supplied with the request and what became of it. Only a
+/// program the checker accepts is fused into the runs' e-graphs.
+#[derive(Debug)]
+pub(crate) struct Supplied {
+    pub(crate) sha256: String,
+    pub(crate) bytes: usize,
+    pub(crate) nodes: Option<usize>,
+    pub(crate) verdict: Verdict,
+}
+
+impl Supplied {
+    fn json(&self, index: usize) -> Value {
+        let detail = match &self.verdict {
+            Verdict::Rejected(rejection) => rejection_json(rejection),
+            Verdict::Unextractable(ExtractError::NotAdmitted(code)) => {
+                json!({"cause": "candidate-not-admitted", "code": code})
+            }
+            _ => Value::Null,
+        };
+        json!({
+            "index": index,
+            "sha256": self.sha256,
+            "bytes": self.bytes,
+            "nodes": self.nodes,
+            "verdict": self.verdict.name(),
+            "accepted": self.verdict.accepted(),
+            "fused": self.verdict.accepted(),
+            "detail": detail,
+        })
+    }
 }
 
 impl Accepted {
     fn key(&self) -> (usize, usize, u64, &[u8]) {
         (self.nodes, self.bytes.len(), self.max_steps, &self.bytes)
+    }
+}
+
+/// One strategy's run within a search, from its own e-graph.
+#[derive(Debug)]
+pub(crate) struct Run {
+    pub(crate) phases_requested: usize,
+    /// Why the run ended before its last phase, when it did.
+    pub(crate) stopped: Option<&'static str>,
+    pub(crate) enodes: u32,
+    pub(crate) classes: u32,
+    /// Merges the e-graph accepted and refused.
+    pub(crate) merges: u64,
+    pub(crate) refused_merges: u64,
+    /// Live classes with and without an exact table at the end, the table
+    /// work spent and whether the table budget ran out.
+    pub(crate) tables: (u32, u32, u64, bool),
+    /// Deterministic work spent (see `Limits::max_work`).
+    pub(crate) work: u64,
+    /// Roots of supplied programs merged with the original's, and refused.
+    pub(crate) fused_roots: (u64, u64),
+}
+
+impl Run {
+    fn json(&self, index: usize) -> Value {
+        json!({
+            "run": index,
+            "phases_requested": self.phases_requested,
+            "stopped": self.stopped,
+            "fused_roots": {"merged": self.fused_roots.0, "refused": self.fused_roots.1},
+            "enodes": self.enodes,
+            "classes": self.classes,
+            "merges": self.merges,
+            "refused_merges": self.refused_merges,
+            "tables": {
+                "exact_classes": self.tables.0,
+                "inexact_classes": self.tables.1,
+                "work": self.tables.2,
+                "budget_exhausted": self.tables.3,
+            },
+            "work": self.work,
+        })
     }
 }
 
@@ -119,19 +211,20 @@ pub(crate) struct Search {
     pub(crate) original_bytes: usize,
     pub(crate) original_sha256: String,
     pub(crate) domain_size: u64,
+    /// Whether every class of the original has an exact table.
     pub(crate) exact_signatures: bool,
     pub(crate) pinned_nodes: usize,
+    /// Every run's phases, in order.
     pub(crate) phases: Vec<PhaseReport>,
+    /// Every run's candidates, in order.
     pub(crate) candidates: Vec<Candidate>,
+    /// The programs supplied with the request, judged before any run.
+    pub(crate) supplied: Vec<Supplied>,
     pub(crate) best: Option<Accepted>,
-    /// Why the search ended before its last phase, when it did.
+    /// Why the first run that ended early did so.
     pub(crate) stopped: Option<&'static str>,
-    pub(crate) enodes: u32,
-    pub(crate) classes: u32,
-    /// Merges the e-graph accepted and refused over the whole search.
-    pub(crate) merges: u64,
-    pub(crate) refused_merges: u64,
-    pub(crate) strategy: Strategy,
+    pub(crate) runs: Vec<Run>,
+    pub(crate) plan: Plan,
     pub(crate) max_input_tuples: u64,
 }
 
@@ -144,7 +237,9 @@ impl Search {
                 .any(|candidate| candidate.extraction_limit_hit)
     }
 
-    /// The report fields. Every value is computed by this search.
+    /// The report fields. Every value is computed by this search. With one
+    /// run, `enodes`, `classes` and the merge counts are that run's; with a
+    /// portfolio, the largest e-graph and the merge totals over all runs.
     pub(crate) fn json(&self) -> Value {
         json!({
             "original": {
@@ -157,26 +252,30 @@ impl Search {
                 "exact_signatures": self.exact_signatures,
                 "max_input_tuples": self.max_input_tuples,
             },
-            "strategy": self.strategy.json(),
+            "strategy": self.plan.json(),
             "search": {
-                "phases_requested": self.strategy.phases.len(),
+                "phases_requested": self.runs.iter().map(|run| run.phases_requested).sum::<usize>(),
                 "phases_run": self.phases.len(),
                 "pinned_nodes": self.pinned_nodes,
-                "enodes": self.enodes,
-                "classes": self.classes,
-                "merges": self.merges,
-                "refused_merges": self.refused_merges,
+                "enodes": self.runs.iter().map(|run| run.enodes).max().unwrap_or(0),
+                "classes": self.runs.iter().map(|run| run.classes).max().unwrap_or(0),
+                "merges": self.runs.iter().map(|run| run.merges).sum::<u64>(),
+                "refused_merges": self.runs.iter().map(|run| run.refused_merges).sum::<u64>(),
                 "any_limit_hit": self.any_limit_hit(),
                 "stopped": self.stopped,
+                "runs": self.runs.iter().enumerate().map(|(index, run)| run.json(index)).collect::<Vec<_>>(),
                 "phases": self.phases.iter().map(phase_json).collect::<Vec<_>>(),
             },
             "candidates": self.candidates.iter().map(candidate_json).collect::<Vec<_>>(),
+            "supplied": self.supplied.iter().enumerate().map(|(index, supplied)| supplied.json(index)).collect::<Vec<_>>(),
             "best": self.best.as_ref().map(|best| json!({
                 "sha256": transform::sha256_hex(&best.bytes),
                 "bytes": best.bytes.len(),
                 "nodes": best.nodes,
                 "max_steps": best.max_steps,
-                "phase_index": best.phase_index,
+                "run": match best.source { Source::Phase { run, .. } => Some(run), Source::Supplied { .. } => None },
+                "phase_index": match best.source { Source::Phase { phase_index, .. } => Some(phase_index), Source::Supplied { .. } => None },
+                "supplied": match best.source { Source::Supplied { index } => Some(index), Source::Phase { .. } => None },
                 "receipt": best.equivalence.receipt_value(),
                 "receipt_sha256": transform::sha256_hex(&best.equivalence.receipt()),
             })),
@@ -186,6 +285,7 @@ impl Search {
 
 fn phase_json(phase: &PhaseReport) -> Value {
     json!({
+        "run": phase.run,
         "phase": phase.phase.name(),
         "rounds_requested": phase.rounds_requested,
         "rounds_run": phase.rounds_run,
@@ -196,6 +296,8 @@ fn phase_json(phase: &PhaseReport) -> Value {
         "nodes_added": phase.nodes_added,
         "merges": phase.merges,
         "refused_merges": phase.refused,
+        "cut_evaluations": phase.cut_evaluations,
+        "work": phase.work,
         "enodes": phase.enodes,
         "classes": phase.classes,
     })
@@ -213,6 +315,7 @@ fn candidate_json(candidate: &Candidate) -> Value {
         _ => Value::Null,
     };
     json!({
+        "run": candidate.run,
         "phase_index": candidate.phase_index,
         "phase": candidate.phase.name(),
         "nodes": candidate.nodes,
@@ -301,16 +404,50 @@ pub(crate) enum Outcome {
     Searched(Box<Search>),
 }
 
-/// Runs the strategy over the original program and judges every candidate.
-///
-/// Refusal order: admission, empty domain; then a domain above
-/// `max_input_tuples` is inconclusive before any search, since no candidate
-/// could be judged. Otherwise the e-graph of the original is built, each
-/// phase runs in order, and after each phase a candidate is extracted,
-/// re-encoded canonically, screened by cost and judged by the checker over
-/// the full domain. The best accepted candidate wins by (nodes, bytes,
-/// largest Step usage, canonical bytes).
+/// Runs one strategy over the original program and judges every candidate;
+/// the commands call [`optimize_plan`].
+#[cfg(test)]
 pub(crate) fn optimize(original: &[u8], strategy: &Strategy, max_input_tuples: u64) -> Outcome {
+    optimize_plan(
+        original,
+        &Plan::single(strategy.clone()),
+        &[],
+        max_input_tuples,
+    )
+}
+
+/// What every judgment in one search shares.
+struct Judging<'a> {
+    original: &'a [u8],
+    program: &'a Program,
+    limits: Limits,
+}
+
+/// Runs a plan over the original program and judges every candidate.
+///
+/// Refusal order: admission, empty domain, an ABI or domain a strategy's
+/// profile cannot hold; then a domain above `max_input_tuples` is
+/// inconclusive before any search, since no candidate could be judged.
+/// Otherwise each strategy runs in turn from the e-graph of the original:
+/// each phase runs in order, and after each phase a candidate is extracted,
+/// re-encoded canonically, screened by profile and cost and judged by the
+/// checker over the full domain. One incumbent spans every run; the best
+/// accepted candidate wins by (nodes, bytes, largest Step usage, canonical
+/// bytes).
+///
+/// Each `supplied` program is judged first, like a candidate: the checker
+/// must accept it against the original (and the profile's gate, when there
+/// is one), and it becomes the incumbent when it is better. Every accepted
+/// one is then fused into each run's e-graph: its instructions are added
+/// unpinned, and each root is merged with the original's when the original
+/// can never fail, so the checker's verdict makes the roots equal on every
+/// tuple, or when both roots have identical exact tables.
+pub(crate) fn optimize_plan(
+    original: &[u8],
+    plan: &Plan,
+    supplied: &[Vec<u8>],
+    max_input_tuples: u64,
+) -> Outcome {
     let program = match import_program(original) {
         Ok(program) => program,
         Err(error) => {
@@ -325,6 +462,18 @@ pub(crate) fn optimize(original: &[u8], strategy: &Strategy, max_input_tuples: u
     let Some(domain) = DomainInfo::new(program.inputs()) else {
         return Outcome::Refused(Refused::EmptyInputDomain);
     };
+    for profile in plan
+        .strategies
+        .iter()
+        .filter_map(|strategy| strategy.profile)
+    {
+        // Instructions outside the profile can be replaced by the search;
+        // the ABI and the domain size cannot.
+        match profile.admit(&program) {
+            Ok(_) | Err(ProfileRefusal::Opcode { .. }) => {}
+            Err(refusal) => return Outcome::Refused(Refused::OutsideProfile(refusal)),
+        }
+    }
     let domain_size = match domain.size() {
         Some(size) if size <= max_input_tuples => size,
         size => {
@@ -339,89 +488,159 @@ pub(crate) fn optimize(original: &[u8], strategy: &Strategy, max_input_tuples: u
         original_bytes: original.len(),
         original_sha256: transform::sha256_hex(original),
         domain_size,
-        exact_signatures: domain.exact(),
+        exact_signatures: false,
         pinned_nodes: 0,
         phases: Vec::new(),
         candidates: Vec::new(),
         best: None,
         stopped: None,
+        runs: Vec::new(),
+        plan: plan.clone(),
+        supplied: Vec::new(),
+        max_input_tuples,
+    };
+    let judging = Judging {
+        original,
+        program: &program,
+        limits: Limits {
+            steps: transform::DEFAULT_STEP_LIMIT,
+            input_tuples: max_input_tuples,
+        },
+    };
+    let profile = plan
+        .strategies
+        .first()
+        .and_then(|strategy| strategy.profile);
+    let mut fused: Vec<Program> = Vec::new();
+    for (index, bytes) in supplied.iter().enumerate() {
+        let (record, accepted, program) = judge_supplied(&search, &judging, index, bytes, profile);
+        if let Some(accepted) = accepted {
+            search.best = Some(accepted);
+        }
+        fused.extend(program);
+        search.supplied.push(record);
+    }
+    for (index, strategy) in plan.strategies.iter().enumerate() {
+        let run = run_strategy(&mut search, &judging, &domain, index, strategy, &fused);
+        if search.stopped.is_none() {
+            search.stopped = run.stopped;
+        }
+        search.runs.push(run);
+    }
+    Outcome::Searched(Box::new(search))
+}
+
+/// One strategy from the e-graph of the original; its phases and candidates
+/// join the search's, under the search's incumbent.
+fn run_strategy(
+    search: &mut Search,
+    judging: &Judging<'_>,
+    domain: &DomainInfo,
+    index: usize,
+    strategy: &Strategy,
+    fused: &[Program],
+) -> Run {
+    let mut run = Run {
+        phases_requested: strategy.phases.len(),
+        stopped: None,
         enodes: 0,
         classes: 0,
         merges: 0,
         refused_merges: 0,
-        strategy: strategy.clone(),
-        max_input_tuples,
+        tables: (0, 0, 0, false),
+        work: 0,
+        fused_roots: (0, 0),
     };
     let caps = strategy.limits.caps();
-    let (mut egraph, roots) = match EGraph::from_program(&program, domain, caps) {
+    let (mut egraph, roots) = match EGraph::from_program(judging.program, domain.clone(), caps) {
         Ok(built) => built,
         Err(AddError::Limit(limit)) => {
-            search.stopped = Some(match limit {
+            run.stopped = Some(match limit {
                 egraph::Limit::ENodes => "original-exceeds-max-enodes",
                 egraph::Limit::Classes => "original-exceeds-max-classes",
-                egraph::Limit::Rewrites => "original-exceeds-limits",
+                egraph::Limit::Rewrites | egraph::Limit::Work => "original-exceeds-limits",
             });
-            return Outcome::Searched(Box::new(search));
+            return run;
         }
         Err(AddError::Type(_)) => {
-            search.stopped = Some("original-not-typable");
-            return Outcome::Searched(Box::new(search));
+            run.stopped = Some("original-not-typable");
+            return run;
         }
     };
-    search.pinned_nodes = egraph.pinned().len();
-    let limits = Limits {
-        steps: transform::DEFAULT_STEP_LIMIT,
-        input_tuples: max_input_tuples,
-    };
+    if let Some(profile) = strategy.profile {
+        egraph.restrict(profile);
+    }
+    if index == 0 {
+        search.pinned_nodes = egraph.pinned().len();
+        search.exact_signatures = egraph.exactness().1 == 0;
+    }
+    match fuse(&mut egraph, &roots, fused, caps) {
+        Ok(counts) => run.fused_roots = counts,
+        Err(stop) => {
+            run.stopped = Some(stop);
+            return run;
+        }
+    }
     for (phase_index, spec) in strategy.phases.iter().enumerate() {
         match rules::run_phase(&mut egraph, spec.phase, spec.rounds, &strategy.limits) {
-            Ok(report) => search.phases.push(report),
+            Ok(mut report) => {
+                report.run = index;
+                search.phases.push(report);
+            }
             Err(_) => {
-                search.stopped = Some("inconsistent-egraph");
+                run.stopped = Some("inconsistent-egraph");
                 break;
             }
         }
         let extraction = extract::extract(
             &egraph,
             &roots,
-            program.inputs(),
-            program.outputs(),
+            judging.program.inputs(),
+            judging.program.outputs(),
             strategy.extractor,
             strategy.limits.max_extraction_rounds,
         );
-        let candidate = judge(
-            &search,
-            original,
-            &program,
-            phase_index,
-            spec.phase,
+        let (candidate, accepted) = judge(
+            search,
+            judging,
+            (index, phase_index, spec.phase),
             extraction,
-            limits,
+            strategy.profile,
         );
-        if let Some(accepted) = candidate.1 {
+        if let Some(accepted) = accepted {
             search.best = Some(accepted);
         }
-        search.candidates.push(candidate.0);
+        search.candidates.push(candidate);
     }
-    search.enodes = egraph.enode_count();
-    search.classes = egraph.class_count();
-    search.merges = egraph.merges();
-    search.refused_merges = egraph.refused_merges();
-    Outcome::Searched(Box::new(search))
+    let (exact, inexact) = egraph.exactness();
+    run.enodes = egraph.enode_count();
+    run.classes = egraph.class_count();
+    run.merges = egraph.merges();
+    run.refused_merges = egraph.refused_merges();
+    run.tables = (
+        exact,
+        inexact,
+        egraph.budget().work_spent,
+        egraph.budget().exhausted,
+    );
+    run.work = egraph.work();
+    run
 }
 
-/// Screens one extraction by cost, then asks the checker. Returns the
-/// candidate record and the new incumbent when this candidate is better.
+/// Screens one extraction by profile and cost, then asks the checker.
+/// Returns the candidate record and the new incumbent when this candidate is
+/// better. `at` is the run, phase index and phase that extracted it.
 fn judge(
     search: &Search,
-    original: &[u8],
-    program: &Program,
-    phase_index: usize,
-    phase: Phase,
+    judging: &Judging<'_>,
+    at: (usize, usize, Phase),
     extraction: Result<Extraction, ExtractError>,
-    limits: Limits,
+    profile: Option<Profile>,
 ) -> (Candidate, Option<Accepted>) {
+    let (run, phase_index, phase) = at;
+    let (original, program, limits) = (judging.original, judging.program, judging.limits);
     let mut candidate = Candidate {
+        run,
         phase_index,
         phase,
         nodes: None,
@@ -440,6 +659,12 @@ fn judge(
     };
     candidate.extraction_rounds = extraction.rounds_run;
     candidate.extraction_limit_hit = extraction.limit_hit;
+    if let Some(profile) = profile
+        && profile.admit(&extraction.program).is_err()
+    {
+        candidate.verdict = Verdict::Unextractable(ExtractError::NotAdmitted("outside-profile"));
+        return (candidate, None);
+    }
     let bytes = match extraction
         .program
         .value()
@@ -469,6 +694,10 @@ fn judge(
             .candidates
             .iter()
             .any(|earlier| earlier.sha256 == candidate.sha256)
+        || search
+            .supplied
+            .iter()
+            .any(|earlier| Some(&earlier.sha256) == candidate.sha256.as_ref())
     {
         candidate.verdict = Verdict::Duplicate;
         return (candidate, None);
@@ -488,7 +717,7 @@ fn judge(
                 bytes,
                 nodes,
                 max_steps,
-                phase_index,
+                source: Source::Phase { run, phase_index },
                 equivalence,
             };
             let better = search
@@ -508,6 +737,118 @@ fn judge(
             (candidate, None)
         }
     }
+}
+
+/// Judges one supplied program: the checker always runs, since only an
+/// accepted program may be fused; the program becomes the incumbent when it
+/// is smaller than the original and better than the incumbent. Returns the
+/// record, the new incumbent if any and the program to fuse if accepted.
+fn judge_supplied(
+    search: &Search,
+    judging: &Judging<'_>,
+    index: usize,
+    bytes: &[u8],
+    profile: Option<Profile>,
+) -> (Supplied, Option<Accepted>, Option<Program>) {
+    let mut record = Supplied {
+        sha256: transform::sha256_hex(bytes),
+        bytes: bytes.len(),
+        nodes: None,
+        verdict: Verdict::NotSmaller,
+    };
+    let program = match import_program(bytes) {
+        Ok(program) => program,
+        Err(error) => {
+            record.verdict = Verdict::Unextractable(ExtractError::NotAdmitted(match error {
+                Error::Invalid(code) | Error::Limit(code) => code,
+                _ => "unclassified",
+            }));
+            return (record, None, None);
+        }
+    };
+    record.nodes = Some(program.nodes().len());
+    if let Some(profile) = profile
+        && profile.admit(&program).is_err()
+    {
+        record.verdict = Verdict::Unextractable(ExtractError::NotAdmitted("outside-profile"));
+        return (record, None, None);
+    }
+    let equivalence = match transform::check(judging.original, bytes, judging.limits) {
+        Ok(equivalence) => equivalence,
+        Err(rejection) => {
+            record.verdict = Verdict::Rejected(rejection);
+            return (record, None, None);
+        }
+    };
+    let nodes = program.nodes().len();
+    let (original_nodes, original_bytes) = (judging.program.nodes().len(), judging.original.len());
+    let smaller = nodes <= original_nodes
+        && bytes.len() <= original_bytes
+        && (nodes < original_nodes || bytes.len() < original_bytes);
+    let max_steps = equivalence.receipt_value()["usage"]["max_steps"]["candidate"]
+        .as_u64()
+        .unwrap_or(u64::MAX);
+    let accepted = Accepted {
+        bytes: bytes.to_vec(),
+        nodes,
+        max_steps,
+        source: Source::Supplied { index },
+        equivalence,
+    };
+    let better = smaller
+        && search
+            .best
+            .as_ref()
+            .is_none_or(|best| accepted.key() < best.key());
+    if better {
+        record.verdict = Verdict::Accepted;
+        (record, Some(accepted), Some(program))
+    } else {
+        record.verdict = Verdict::AcceptedNotBetter;
+        (record, None, Some(program))
+    }
+}
+
+/// Adds every accepted supplied program to the e-graph and merges its roots
+/// with the original's: by the checker's verdict when the original has no
+/// instruction that may trap, so neither program fails on any tuple, and
+/// otherwise only when both roots have identical exact tables. Returns the
+/// roots merged and refused.
+fn fuse(
+    egraph: &mut EGraph,
+    roots: &[ClassId],
+    fused: &[Program],
+    caps: egraph::Caps,
+) -> Result<(u64, u64), &'static str> {
+    let failure_free = egraph.pinned().is_empty();
+    let (mut merged, mut refused) = (0, 0);
+    for program in fused {
+        let theirs = match egraph.add_equivalent(program, caps) {
+            Ok(theirs) => theirs,
+            Err(AddError::Limit(_)) => return Err("supplied-exceeds-limits"),
+            Err(AddError::Type(_)) => return Err("supplied-not-typable"),
+        };
+        for (&ours, &theirs) in roots.iter().zip(&theirs) {
+            let exact = egraph.data(ours).table.is_some() && egraph.data(theirs).table.is_some();
+            let reason = if failure_free {
+                MergeReason::Checked
+            } else if exact {
+                MergeReason::Rule
+            } else {
+                refused += 1;
+                continue;
+            };
+            match egraph.union(ours, theirs, reason) {
+                Ok(Merge::Merged | Merge::AlreadyEqual) => merged += 1,
+                Ok(Merge::Refused) => refused += 1,
+                Err(_) => return Err("inconsistent-egraph"),
+            }
+        }
+        if egraph.rebuild().is_err() {
+            return Err("inconsistent-egraph");
+        }
+    }
+    Ok((merged, refused))
 }
 
 #[cfg(test)]

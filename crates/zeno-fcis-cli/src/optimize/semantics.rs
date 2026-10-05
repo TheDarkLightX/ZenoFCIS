@@ -1,21 +1,24 @@
-//! Semantic annotations for e-classes: scalar kind, interval bounds, exact
-//! signatures over small domains, and the eager-trap flags.
+//! Semantic annotations for e-classes: scalar kind, interval bounds, support,
+//! an exact support-local table when the support is small enough, the values
+//! at fixed sample tuples, and the eager-trap flags.
 //!
 //! The library evaluates every instruction, so an `Add` or `Sub` that overflows
 //! on some input tuple traps the whole program there, whether or not its value
 //! is used. A node is *poisoned* on a tuple when an ancestor has trapped
-//! there. Signatures record the value on every tuple of the declared domain,
-//! with `None` at poisoned positions, and two classes merge only when their
-//! signatures are identical, poison included. Without exact signatures the
-//! annotations are conservative interval bounds and a may-poison flag.
+//! there. A class's table records its value or poison on every tuple of the
+//! product of its support's domains (see [`super::signature`]), and two
+//! classes merge by rule only when their tables are identical, poison
+//! included. A class without a table, because its support is too large or the
+//! table budget is spent, keeps conservative interval bounds and a may-poison
+//! flag, and merges by rule only when neither side may be poisoned.
+
+use std::sync::Arc;
 
 use zeno_fcis_synthesis::finite::{Domain, Op};
 
+use super::egraph::MergeReason;
+use super::signature::{self, Budget, EXHAUSTIVE_SAMPLES, Samples, Table};
 use crate::transform::{advance, domain_size, first_tuple};
-
-/// Largest domain, in tuples, for which signatures are exact. Six Boolean
-/// inputs give exactly this many tuples.
-pub(crate) const EXACT_SIGNATURE_TUPLES: u64 = 64;
 
 /// Scalar kind of a class; the library types Bool apart from Int.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -77,79 +80,20 @@ fn clamp(value: i128) -> (i64, bool) {
     }
 }
 
-/// Value of a class on every tuple of the declared domain, in the checker's
-/// enumeration order; `None` where eager evaluation has already trapped.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) struct Signature {
-    values: Vec<Option<i64>>,
-}
-
-impl Signature {
-    pub(crate) fn constant(value: i64, tuples: usize) -> Self {
-        Self {
-            values: vec![Some(value); tuples],
-        }
-    }
-
-    pub(crate) fn from_values(values: Vec<Option<i64>>) -> Self {
-        Self { values }
-    }
-
-    pub(crate) fn values(&self) -> &[Option<i64>] {
-        &self.values
-    }
-
-    /// Whether some tuple is poisoned.
-    pub(crate) fn poisoned(&self) -> bool {
-        self.values.iter().any(Option::is_none)
-    }
-
-    /// The single value taken on every tuple, when there is one and no
-    /// tuple is poisoned.
-    pub(crate) fn constant_value(&self) -> Option<i64> {
-        let first = (*self.values.first()?)?;
-        self.values
-            .iter()
-            .all(|value| *value == Some(first))
-            .then_some(first)
-    }
-
-    /// Bit `i` set when the value on tuple `i` is `1`. Only meaningful for
-    /// unpoisoned Boolean signatures over at most 64 tuples.
-    pub(crate) fn bits(&self) -> Option<u64> {
-        if self.values.len() > 64 {
-            return None;
-        }
-        let mut bits = 0_u64;
-        for (index, value) in self.values.iter().enumerate() {
-            match *value {
-                Some(1) => bits |= 1_u64 << index,
-                Some(0) => {}
-                _ => return None,
-            }
-        }
-        Some(bits)
-    }
-
-    /// Whether both signatures agree, poison included, on every tuple whose
-    /// bit is set in `mask`.
-    pub(crate) fn agrees_on(&self, other: &Self, mask: u64) -> bool {
-        self.values.len() == other.values.len()
-            && (0..self.values.len())
-                .filter(|index| mask & (1_u64 << index) != 0)
-                .all(|index| self.values[index] == other.values[index])
-    }
-}
-
-/// The declared input domain, with its tuples listed when it is small enough
-/// for exact signatures.
+/// The declared input domain: per-input bounds and the fixed sample tuples.
 #[derive(Clone, Debug)]
 pub(crate) struct DomainInfo {
     inputs: Vec<Domain>,
     /// Exact number of tuples; `None` above `u64::MAX`.
     size: Option<u64>,
-    /// Every tuple in enumeration order when `size <= EXACT_SIGNATURE_TUPLES`.
-    tuples: Option<Vec<Vec<i64>>>,
+    minima: Vec<i64>,
+    /// Number of values of each input, saturated at `u64::MAX`.
+    widths: Vec<u64>,
+    /// Every tuple in enumeration order when the domain has at most
+    /// [`EXHAUSTIVE_SAMPLES`] tuples; otherwise the fixed selection of
+    /// [`signature::sample_tuples`].
+    samples: Vec<Vec<i64>>,
+    exhaustive: bool,
 }
 
 impl DomainInfo {
@@ -157,8 +101,9 @@ impl DomainInfo {
     pub(crate) fn new(inputs: &[Domain]) -> Option<Self> {
         let size = domain_size(inputs).ok()?;
         let size = size.and_then(|size| u64::try_from(size).ok());
-        let tuples = match size {
-            Some(size) if size <= EXACT_SIGNATURE_TUPLES => {
+        let bounds: Vec<(i64, i64)> = inputs.iter().map(|domain| domain.bounds()).collect();
+        let (samples, exhaustive) = match size {
+            Some(size) if size <= EXHAUSTIVE_SAMPLES => {
                 let mut tuples = Vec::new();
                 let mut tuple = first_tuple(inputs);
                 loop {
@@ -167,14 +112,20 @@ impl DomainInfo {
                         break;
                     }
                 }
-                Some(tuples)
+                (tuples, true)
             }
-            _ => None,
+            _ => (signature::sample_tuples(&bounds), false),
         };
         Some(Self {
             inputs: inputs.to_vec(),
             size,
-            tuples,
+            minima: bounds.iter().map(|(min, _)| *min).collect(),
+            widths: bounds
+                .iter()
+                .map(|(min, max)| max.abs_diff(*min).saturating_add(1))
+                .collect(),
+            samples,
+            exhaustive,
         })
     }
 
@@ -182,21 +133,31 @@ impl DomainInfo {
         self.size
     }
 
-    /// Whether signatures are exact for this domain.
-    pub(crate) fn exact(&self) -> bool {
-        self.tuples.is_some()
+    pub(crate) fn widths(&self) -> &[u64] {
+        &self.widths
     }
 
-    pub(crate) fn tuple_count(&self) -> usize {
-        self.tuples.as_ref().map_or(0, Vec::len)
+    #[cfg(test)]
+    pub(crate) fn minima(&self) -> &[i64] {
+        &self.minima
     }
 
-    /// Mask of every tuple of an exact domain.
-    pub(crate) fn full_mask(&self) -> u64 {
-        match self.tuple_count() {
-            64 => u64::MAX,
-            count => (1_u64 << count) - 1,
-        }
+    /// Whether the samples are every tuple of the domain, so that equal
+    /// samples mean equal functions.
+    pub(crate) fn exhaustive(&self) -> bool {
+        self.exhaustive
+    }
+
+    pub(crate) fn sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
+    /// Mask of every sample, one bit per sample.
+    pub(crate) fn sample_mask(&self) -> Vec<u64> {
+        signature::words(
+            std::iter::repeat_n(true, self.samples.len()),
+            self.samples.len(),
+        )
     }
 
     fn input_kind(&self, index: u16) -> Option<Kind> {
@@ -214,45 +175,131 @@ impl DomainInfo {
 pub(crate) struct ClassData {
     pub(crate) kind: Kind,
     pub(crate) interval: Interval,
-    /// Exact signature; `None` when the domain is too large.
-    pub(crate) signature: Option<Signature>,
-    /// Whether some member may be poisoned on some tuple. Exact when
-    /// signatures are exact, otherwise conservative.
+    /// Exact table over the class's minimal support; `None` when the support
+    /// is too large or the table budget is spent.
+    pub(crate) table: Option<Arc<Table>>,
+    /// Inputs the class may depend on: the table's support when there is a
+    /// table, an upper bound otherwise.
+    pub(crate) support: Vec<u16>,
+    /// Values at the domain's sample tuples.
+    pub(crate) samples: Arc<Samples>,
+    /// Whether some member may be poisoned on some tuple. Exact with a table,
+    /// otherwise conservative.
     pub(crate) may_poison: bool,
+}
+
+/// Whether two classes may merge, and the merged data.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum MergeDecision {
+    Merged(ClassData),
+    /// A rule merge the guard does not admit.
+    Refused,
+    /// Disagreeing annotations where none can disagree.
+    Inconsistent,
 }
 
 impl ClassData {
     /// The value every member takes on every tuple, when known.
     pub(crate) fn constant(&self) -> Option<i64> {
-        match &self.signature {
-            Some(signature) => signature.constant_value(),
+        match &self.table {
+            Some(table) => table.constant_value(),
             None if self.may_poison => None,
             None => self.interval.constant(),
         }
     }
 
-    /// Whether this class may merge with `other` without changing any
-    /// result: equal kinds and, with exact signatures, identical signatures
-    /// including poison. Without signatures only unpoisoned classes merge,
-    /// since the rules preserve values but not necessarily poison.
-    pub(crate) fn compatible(&self, other: &Self) -> bool {
+    /// Decides a merge. A rule merge needs equal kinds and either identical
+    /// tables, poison included, or, when a side has no table, two classes
+    /// that no trap can poison. Different sample values refuse any rule
+    /// merge. A structural merge (congruence or commutativity) joins the
+    /// same computation twice, so any disagreement is an inconsistency. A
+    /// checked merge joins two roots the checker found equal on every tuple
+    /// of a program that never fails: it needs equal kinds, samples and, when
+    /// both have tables, tables, and the merged class is never poisoned.
+    pub(crate) fn merge(&self, other: &Self, reason: MergeReason) -> MergeDecision {
+        if reason == MergeReason::Checked {
+            return self.checked(other);
+        }
+        let structural = reason == MergeReason::Structural;
+        let disagree = if structural {
+            MergeDecision::Inconsistent
+        } else {
+            MergeDecision::Refused
+        };
         if self.kind != other.kind {
-            return false;
+            return disagree;
         }
-        match (&self.signature, &other.signature) {
-            (Some(left), Some(right)) => left == right,
-            (None, None) => !self.may_poison && !other.may_poison,
-            _ => false,
-        }
-    }
-
-    /// Data of a merged class. Both bounds are sound, so their meet is too.
-    pub(crate) fn merged(&self, other: &Self) -> Option<Self> {
-        Some(Self {
+        let table = match (&self.table, &other.table) {
+            (Some(left), Some(right)) if left != right => return disagree,
+            (Some(left), Some(_)) => {
+                if self.samples != other.samples {
+                    return MergeDecision::Inconsistent;
+                }
+                Some(Arc::clone(left))
+            }
+            (left, right) => {
+                if !structural && (self.may_poison || other.may_poison) {
+                    return MergeDecision::Refused;
+                }
+                if self.samples != other.samples {
+                    return disagree;
+                }
+                left.clone().or_else(|| right.clone())
+            }
+        };
+        let Some(interval) = self.interval.meet(other.interval) else {
+            return MergeDecision::Inconsistent;
+        };
+        let (support, may_poison) = match &table {
+            Some(table) => (table.support().to_vec(), table.poisoned()),
+            None => (
+                self.support
+                    .iter()
+                    .copied()
+                    .filter(|input| other.support.contains(input))
+                    .collect(),
+                self.may_poison || other.may_poison,
+            ),
+        };
+        MergeDecision::Merged(Self {
             kind: self.kind,
-            interval: self.interval.meet(other.interval)?,
-            signature: self.signature.clone(),
-            may_poison: self.may_poison || other.may_poison,
+            interval,
+            table,
+            support,
+            samples: Arc::clone(&self.samples),
+            may_poison,
+        })
+    }
+}
+
+impl ClassData {
+    fn checked(&self, other: &Self) -> MergeDecision {
+        let agree = self.kind == other.kind
+            && self.samples == other.samples
+            && match (&self.table, &other.table) {
+                (Some(left), Some(right)) => left == right,
+                _ => true,
+            };
+        let interval = self.interval.meet(other.interval);
+        let (true, Some(interval)) = (agree, interval) else {
+            return MergeDecision::Refused;
+        };
+        let table = self.table.clone().or_else(|| other.table.clone());
+        MergeDecision::Merged(Self {
+            kind: self.kind,
+            interval,
+            support: match &table {
+                Some(table) => table.support().to_vec(),
+                None => self
+                    .support
+                    .iter()
+                    .copied()
+                    .filter(|input| other.support.contains(input))
+                    .collect(),
+            },
+            table,
+            samples: Arc::clone(&self.samples),
+            may_poison: false,
         })
     }
 }
@@ -277,7 +324,7 @@ pub(crate) enum Shape<'a> {
 pub(crate) struct Analysis {
     pub(crate) data: ClassData,
     /// Whether the instruction itself may overflow on some tuple whose
-    /// operands are defined: exact with signatures, else from the bounds.
+    /// operands are defined: exact with tables, else from the bounds.
     pub(crate) may_trap: bool,
 }
 
@@ -288,24 +335,32 @@ pub(crate) enum TypeError {
     InputReference,
     /// Operand kinds disagree with the instruction's requirements.
     Mismatch,
+    /// The search's profile excludes the instruction.
+    Excluded,
 }
 
-/// Types one instruction and derives its annotations.
-pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis, TypeError> {
-    let tuples = domain.tuple_count();
-    let exact = domain.exact();
-    let require = |data: &ClassData, kind: Kind| {
-        if data.kind == kind {
-            Ok(())
-        } else {
-            Err(TypeError::Mismatch)
-        }
-    };
+fn require(data: &ClassData, kind: Kind) -> Result<(), TypeError> {
+    if data.kind == kind {
+        Ok(())
+    } else {
+        Err(TypeError::Mismatch)
+    }
+}
+
+/// Types one instruction and derives its annotations. Computing a table
+/// spends from `budget`; keeping it is the e-graph's decision.
+pub(crate) fn analyze(
+    domain: &DomainInfo,
+    shape: Shape<'_>,
+    budget: &mut Budget,
+) -> Result<Analysis, TypeError> {
     let constant = |kind: Kind, value: i64| Analysis {
         data: ClassData {
             kind,
             interval: Interval::point(value),
-            signature: exact.then(|| Signature::constant(value, tuples)),
+            table: Some(Arc::new(signature::constant(kind, value))),
+            support: Vec::new(),
+            samples: Arc::new(Samples::constant(kind, value, domain.sample_count())),
             may_poison: false,
         },
         may_trap: false,
@@ -313,18 +368,23 @@ pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis,
     match shape {
         Shape::Input(index) => {
             let kind = domain.input_kind(index).ok_or(TypeError::InputReference)?;
-            let interval = Interval::from_domain(domain.inputs[usize::from(index)]);
-            let signature = domain.tuples.as_ref().map(|tuples| Signature {
-                values: tuples
-                    .iter()
-                    .map(|tuple| tuple.get(usize::from(index)).copied())
-                    .collect(),
-            });
+            let position = usize::from(index);
+            let interval = Interval::from_domain(domain.inputs[position]);
+            let table =
+                signature::input(index, kind, domain.minima[position], &domain.widths, budget);
+            let samples = Samples::from_values(
+                kind,
+                domain.samples.iter().map(|tuple| tuple[position]).collect(),
+            );
             Ok(Analysis {
                 data: ClassData {
                     kind,
                     interval,
-                    signature,
+                    support: table
+                        .as_ref()
+                        .map_or_else(|| vec![index], |table| table.support().to_vec()),
+                    table: table.map(Arc::new),
+                    samples: Arc::new(samples),
                     may_poison: false,
                 },
                 may_trap: false,
@@ -349,24 +409,22 @@ pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis,
             };
             let (min, low_out) = clamp(low);
             let (max, high_out) = clamp(high);
-            let interval = Interval { min, max };
-            let mut bound_trap = low_out || high_out;
-            let mut exact_trap = false;
-            let signature = combine(a, b, |left, right| {
-                let result = if subtract {
-                    left.checked_sub(right)
+            let op = move |arguments: &[i64]| {
+                if subtract {
+                    arguments[0].checked_sub(arguments[1])
                 } else {
-                    left.checked_add(right)
-                };
-                if result.is_none() {
-                    exact_trap = true;
+                    arguments[0].checked_add(arguments[1])
                 }
-                result
-            });
-            if signature.is_some() {
-                bound_trap = exact_trap;
-            }
-            Ok(finish(Kind::Int, interval, signature, a, b, bound_trap))
+            };
+            Ok(derive(
+                domain,
+                budget,
+                Kind::Int,
+                Interval { min, max },
+                &[a, b],
+                low_out || high_out,
+                op,
+            ))
         }
         Shape::Eq(a, b) => {
             if a.kind != b.kind {
@@ -381,8 +439,15 @@ pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis,
             } else {
                 Interval::BOOL
             };
-            let signature = combine(a, b, |left, right| Some(i64::from(left == right)));
-            Ok(finish(Kind::Bool, interval, signature, a, b, false))
+            Ok(derive(
+                domain,
+                budget,
+                Kind::Bool,
+                interval,
+                &[a, b],
+                false,
+                |arguments| Some(i64::from(arguments[0] == arguments[1])),
+            ))
         }
         Shape::Lt(a, b) => {
             require(a, Kind::Int)?;
@@ -394,8 +459,15 @@ pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis,
             } else {
                 Interval::BOOL
             };
-            let signature = combine(a, b, |left, right| Some(i64::from(left < right)));
-            Ok(finish(Kind::Bool, interval, signature, a, b, false))
+            Ok(derive(
+                domain,
+                budget,
+                Kind::Bool,
+                interval,
+                &[a, b],
+                false,
+                |arguments| Some(i64::from(arguments[0] < arguments[1])),
+            ))
         }
         Shape::And(a, b) => {
             require(a, Kind::Bool)?;
@@ -407,8 +479,15 @@ pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis,
             } else {
                 Interval::BOOL
             };
-            let signature = combine(a, b, |left, right| Some(i64::from(left == 1 && right == 1)));
-            Ok(finish(Kind::Bool, interval, signature, a, b, false))
+            Ok(derive(
+                domain,
+                budget,
+                Kind::Bool,
+                interval,
+                &[a, b],
+                false,
+                |arguments| Some(i64::from(arguments[0] == 1 && arguments[1] == 1)),
+            ))
         }
         Shape::Not(a) => {
             require(a, Kind::Bool)?;
@@ -416,14 +495,15 @@ pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis,
                 min: 1 - a.interval.max,
                 max: 1 - a.interval.min,
             };
-            let signature = a.signature.as_ref().map(|signature| Signature {
-                values: signature
-                    .values
-                    .iter()
-                    .map(|value| value.map(|value| i64::from(value == 0)))
-                    .collect(),
-            });
-            Ok(finish(Kind::Bool, interval, signature, a, a, false))
+            Ok(derive(
+                domain,
+                budget,
+                Kind::Bool,
+                interval,
+                &[a],
+                false,
+                |arguments| Some(i64::from(arguments[0] == 0)),
+            ))
         }
         Shape::Select(c, a, b) => {
             require(c, Kind::Bool)?;
@@ -437,75 +517,82 @@ pub(crate) fn analyze(domain: &DomainInfo, shape: Shape<'_>) -> Result<Analysis,
             } else {
                 a.interval.hull(b.interval)
             };
-            let signature = match (&c.signature, &a.signature, &b.signature) {
-                (Some(c), Some(a), Some(b)) => Some(Signature {
-                    values: c
-                        .values
-                        .iter()
-                        .zip(&a.values)
-                        .zip(&b.values)
-                        .map(|((c, a), b)| match (*c, *a, *b) {
-                            (Some(c), Some(a), Some(b)) => Some(if c == 1 { a } else { b }),
-                            _ => None,
-                        })
-                        .collect(),
-                }),
-                _ => None,
-            };
-            let may_poison = c.may_poison || a.may_poison || b.may_poison;
-            Ok(Analysis {
-                data: ClassData {
-                    kind: a.kind,
-                    interval,
-                    may_poison: signature.as_ref().map_or(may_poison, Signature::poisoned),
-                    signature,
+            Ok(derive(
+                domain,
+                budget,
+                a.kind,
+                interval,
+                &[c, a, b],
+                false,
+                |arguments| {
+                    Some(if arguments[0] == 1 {
+                        arguments[1]
+                    } else {
+                        arguments[2]
+                    })
                 },
-                may_trap: false,
-            })
+            ))
         }
     }
 }
 
-/// Pointwise binary combination with poison propagation.
-fn combine(
-    a: &ClassData,
-    b: &ClassData,
-    mut op: impl FnMut(i64, i64) -> Option<i64>,
-) -> Option<Signature> {
-    let (left, right) = (a.signature.as_ref()?, b.signature.as_ref()?);
-    Some(Signature {
-        values: left
-            .values
-            .iter()
-            .zip(&right.values)
-            .map(|(left, right)| match (*left, *right) {
-                (Some(left), Some(right)) => op(left, right),
-                _ => None,
-            })
-            .collect(),
-    })
-}
-
-fn finish(
+/// The annotations of an instruction computing `op` over its operands with
+/// eager poison. `bound_trap` is the interval verdict on overflow, used when
+/// no table can be computed.
+fn derive(
+    domain: &DomainInfo,
+    budget: &mut Budget,
     kind: Kind,
     interval: Interval,
-    signature: Option<Signature>,
-    a: &ClassData,
-    b: &ClassData,
-    may_trap: bool,
+    operands: &[&ClassData],
+    bound_trap: bool,
+    op: impl Fn(&[i64]) -> Option<i64> + Copy,
 ) -> Analysis {
-    let may_poison = match &signature {
-        Some(signature) => signature.poisoned(),
-        None => a.may_poison || b.may_poison || may_trap,
-    };
-    Analysis {
-        data: ClassData {
-            kind,
-            interval,
-            signature,
-            may_poison,
-        },
-        may_trap,
+    let samples: Vec<&Samples> = operands.iter().map(|data| &*data.samples).collect();
+    let (samples, _) = Samples::combine(kind, &samples, op);
+    let combined = operands
+        .iter()
+        .map(|data| data.table.as_deref())
+        .collect::<Option<Vec<&Table>>>()
+        .and_then(|tables| signature::combine(kind, &tables, domain.widths(), budget, op));
+    match combined {
+        Some(combined) => {
+            let table = combined.table;
+            let interval = match table.range() {
+                Some((min, max)) => interval.meet(Interval { min, max }).unwrap_or(interval),
+                None => interval,
+            };
+            Analysis {
+                data: ClassData {
+                    kind,
+                    interval,
+                    support: table.support().to_vec(),
+                    may_poison: table.poisoned(),
+                    table: Some(Arc::new(table)),
+                    samples: Arc::new(samples),
+                },
+                may_trap: combined.trapped,
+            }
+        }
+        None => {
+            let mut support: Vec<u16> = operands
+                .iter()
+                .flat_map(|data| data.support.iter().copied())
+                .collect();
+            support.sort_unstable();
+            support.dedup();
+            Analysis {
+                data: ClassData {
+                    kind,
+                    interval,
+                    table: None,
+                    support,
+                    samples: Arc::new(samples),
+                    may_poison: operands.iter().any(|data| data.may_poison) || bound_trap,
+                },
+                may_trap: bound_trap,
+            }
+        }
     }
 }
 

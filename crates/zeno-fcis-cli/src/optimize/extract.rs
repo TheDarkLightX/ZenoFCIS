@@ -6,7 +6,9 @@
 //! `dag-greedy` extractor then tries, class by class, every alternative e-node
 //! and keeps a switch only when the whole shared candidate becomes strictly
 //! cheaper, so sharing is counted once and no cycle can be chosen. Every
-//! pinned (may-trap) e-node is emitted whether or not an output needs it.
+//! pinned (may-trap) e-node is emitted whether or not an output needs it. An
+//! e-node outside the search's profile has no finite cost and is never
+//! chosen.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -63,8 +65,19 @@ pub(crate) struct Extraction {
 pub(crate) type Choice = BTreeMap<ClassId, NodeId>;
 
 /// Cheapest tree per live class, bottom up, with pinned classes forced to
-/// their lowest pinned e-node. Classes with no finite tree are absent.
+/// their lowest pinned e-node. Classes with no finite tree are absent; an
+/// e-node outside the search's profile has no finite cost.
 pub(crate) fn tree_costs(egraph: &EGraph) -> BTreeMap<ClassId, (Cost, NodeId)> {
+    costs(egraph, true)
+}
+
+/// [`tree_costs`] over every e-node, the profile ignored: a structure to
+/// derive facts from, never a candidate.
+pub(crate) fn structure_costs(egraph: &EGraph) -> BTreeMap<ClassId, (Cost, NodeId)> {
+    costs(egraph, false)
+}
+
+fn costs(egraph: &EGraph, profiled: bool) -> BTreeMap<ClassId, (Cost, NodeId)> {
     let classes = egraph.classes();
     let mut forced: BTreeMap<ClassId, NodeId> = BTreeMap::new();
     for pinned in egraph.pinned() {
@@ -80,6 +93,9 @@ pub(crate) fn tree_costs(egraph: &EGraph) -> BTreeMap<ClassId, (Cost, NodeId)> {
             };
             for id in candidates {
                 let node = egraph.node(id);
+                if profiled && !egraph.admits(node) {
+                    continue;
+                }
                 let Some(cost) = node
                     .children()
                     .iter()
@@ -224,7 +240,7 @@ pub(crate) fn extract_with(
                         continue;
                     }
                     let node = egraph.node(alternative);
-                    if reaches(egraph, &choice, node, class) {
+                    if !egraph.admits(node) || reaches(egraph, &choice, node, class) {
                         continue;
                     }
                     choice.insert(class, alternative);
