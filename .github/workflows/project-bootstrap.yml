@@ -27,6 +27,9 @@ jobs:
       - name: Install pinned Rust
         run: rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
 
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
+
       - name: Format
         run: cargo +1.97.1 fmt --all -- --check
 

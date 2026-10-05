@@ -29,6 +29,9 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
+
       - name: Install pinned Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -43,9 +46,6 @@ jobs:
 
       - name: Check exact BDD to ATDD registry
         run: python3 tools/atdd.py check
-
-      - name: Provision the locked historical verification dependencies
-        run: cargo +1.97.1 fetch --manifest-path verification/Cargo.toml --locked
 
       - name: Run complete adopter acceptance portfolio
         run: python3 tools/atdd.py run --all

@@ -80,7 +80,8 @@ The CI workflows add:
   prompt-minimized review-card rendering, and public-link validation;
 - `wasm32-unknown-unknown` checks for every `no_std + alloc` crate;
 - independent SHA-256 provider and provider-parity checks;
-- Miri interpretation of the semantic boundary tests;
+- Miri interpretation of the semantic boundary tests, except the one pinned
+  exclusion described under deliberate narrowings;
 - compilation of the codec and candidate-bundle fuzz targets;
 - focused crash-atomic SQLite, authenticated-state, synthesis, mounted-adapter, and collection-backend tests;
 - strict validated-decision, canonical-domain-manifest, and exhaustive-coverage promotion tests;
@@ -182,6 +183,48 @@ nothing else modifies.
 Any failed gate blocks release. Repair occurs in a new commit, followed by a complete rerun from a clean checkout. Do not reuse a source manifest, generated artifact, refinement fixture, or checker certificate across changed source unless its content address and all bound identifiers are unchanged and independently verified.
 
 SQLite schema v5 creates a store only from nominal `CatalogAuthorizedGenesis`, persists the exact initial state/root/policy/law-evaluation/authorization identity, and revalidates that record on reopen without caller-supplied state. It consumes nominal `CatalogAuthorizedTransition` values and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. Reopen strictly decodes and reauthorizes the gap-free transition sequence, reconstructs exact row-set equality, and requires the resulting state/root/version to equal the current semantic row. Replay and pending delivery repeat exact persisted-candidate validation. Delivery identities are derived from the implementation-neutral candidate and canonical outbox entry in both reference and SQLite shells. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Schema v4 and earlier or populated unversioned stores fail closed pending explicit migration. Operators must never edit genesis, policy, authorization, replay, receipt, or outbox rows to force progress.
+
+## Deliberate narrowings
+
+### Packaged tests compile only in the repository layout
+
+The release packager builds every library, binary, example and build script of
+the published crates from their archives alone, each crate unpacked at
+`sources/<crate>-<version>/`. Packaged tests are not standalone. They compile
+only from the published archives laid out as in the repository
+(`crates/<crate>/`), plus the repository files the manifest pins, copied from
+the commit: nine from `verification/` and the benchmark artifacts under
+`docs/benchmarks/` that the CLI's tests include.
+`release/packaged-test-inputs.json` lists every file a packaged test target
+reads outside its own package, with its SHA-256. The packager derives that set
+from rustc dep-info and requires exact equality, and refuses any such read by a
+non-test target. A test target reading a sibling package's file is accepted
+only when the manifest lists it. The whole-repository source archive is what
+runs every test.
+
+Two frozen, pinned references force this allowance: the `#[cfg(test)]`
+`#[path]` include in `crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs`
+and the two `verification/verus/` includes in
+`crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs`. Open item: restore
+standalone packaged tests when the verified sources next change, which is the
+identity regeneration planned for the 2.1.0 release.
+
+### One test is not interpreted by Miri
+
+`.github/miri-exclusions.json` pins the only test Miri skips:
+`legal_leaf_above_default_payload_remains_constructible_and_encodable` in
+`crates/zeno-fcis-value/tests/construction.rs`. It builds 64 MiB + 1 byte
+values and scans them byte by byte, which under Miri runs for hours and grows
+to many gigabytes; the measured reason is recorded in that file. The test still
+runs natively in the `ci` workflow's `rust` job. The code it calls still runs
+under Miri at small sizes: the codec's decoder corpus and other value tests
+reach `bytes_with_limits`, `text_ascii_with_limits`, `zcve_bytes_with_limits`,
+`AdmittedValue::try_new_with_limits` and `AdmittedValue::encode_zcve_to`. The
+codec's 64 MiB + 1 byte map-key test still runs under Miri. Only this test's
+own property is not interpreted: a text or admitted value above the default
+payload limit, accepted under supplied limits. `tools/miri_exclusions.py`
+fails unless the list equals the workflow's skips, each name matches exactly
+one test, and the named native job runs it.
 
 ## Explicit non-claims
 

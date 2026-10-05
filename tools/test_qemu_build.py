@@ -54,6 +54,39 @@ class QemuBuildTests(unittest.TestCase):
                 self.assertEqual(image.read_bytes(), b"build path test")
                 self.assertEqual(os.environ["CARGO_TARGET_DIR"], str(target))
 
+    @unittest.skipUnless(os.name == "posix", "the QEMU runner targets Unix hosts")
+    def test_guest_build_selects_the_portable_sha2_backend(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="zeno-qemu-build-") as directory:
+            root = Path(directory)
+            cargo = root / "cargo"
+            cargo.write_text(
+                f"#!{sys.executable}\n"
+                "import os\n"
+                "from pathlib import Path\n"
+                "image = Path(os.environ['FAKE_IMAGE'])\n"
+                f"image.write_text(os.environ.get({qemu_demo.GUEST_RUSTFLAGS!r}, '<unset>'))\n"
+                "print(image)\n",
+                encoding="utf-8",
+            )
+            cargo.chmod(0o700)
+            image = root / "guest.img"
+            for existing, expected in (
+                (None, '--cfg sha2_backend="soft"'),
+                ("-C debuginfo=0", '-C debuginfo=0 --cfg sha2_backend="soft"'),
+            ):
+                with self.subTest(existing=existing):
+                    values = {"FAKE_IMAGE": str(image)}
+                    if existing is not None:
+                        values[qemu_demo.GUEST_RUSTFLAGS] = existing
+                    with patch.dict(os.environ, values), patch.object(
+                        qemu_demo, "executable", return_value=cargo
+                    ):
+                        os.environ.pop("CARGO_TARGET_DIR", None)
+                        if existing is None:
+                            os.environ.pop(qemu_demo.GUEST_RUSTFLAGS, None)
+                        self.assertEqual(qemu_demo.build_image(), image)
+                    self.assertEqual(image.read_text(), expected)
+
 
 if __name__ == "__main__":
     unittest.main()

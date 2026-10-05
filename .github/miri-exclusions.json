@@ -1,0 +1,17 @@
+{
+  "format": "zeno-fcis/miri-exclusions/1",
+  "exclusions": [
+    {
+      "group": "values",
+      "package": "zeno-fcis-value",
+      "test_binary": "construction",
+      "test": "legal_leaf_above_default_payload_remains_constructible_and_encodable",
+      "reason": "Builds three DEFAULT_MAX_PAYLOAD_BYTES + 1 (64 MiB + 1) values and scans two of them byte by byte. Under Miri on 2026-10-05 it never finished: both hosted values runs (jobs 111904274981 and 111905381871) were cut off by a runner shutdown after about 2 h 10 min in this test, and a local run under a 12 GB cap had no result after 90 min, with interpreter memory at 7.7 GB and still rising.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    }
+  ]
+}

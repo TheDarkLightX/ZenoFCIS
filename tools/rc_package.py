@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -556,6 +557,101 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
     )
 
 
+def run_packaged_layout_self_test() -> None:
+    """Planted controls for the consumer build and the cross-package test input manifest."""
+
+    def package(directory: Path, name: str, library: str, test: str | None = None) -> Path:
+        (directory / "src").mkdir(parents=True)
+        (directory / "Cargo.toml").write_text(
+            f'[package]\nname = "{name}"\nversion = "0.1.0"\nedition = "2024"\npublish = false\n',
+            encoding="utf-8",
+        )
+        (directory / "src" / "lib.rs").write_text(library, encoding="utf-8")
+        (directory / "data.txt").write_text(f"{name} data\n", encoding="utf-8")
+        if test is not None:
+            (directory / "tests").mkdir()
+            (directory / "tests" / "reads.rs").write_text(test, encoding="utf-8")
+        return directory
+
+    def workspace(root: Path, roots: dict[str, Path], environment: dict[str, str]) -> Path:
+        manifest = write_packaged_workspace_manifest(root, roots)
+        run(["cargo", "+1.97.1", "generate-lockfile", "--manifest-path", str(manifest), "--offline"],
+            environment=environment, cwd=root)
+        return manifest
+
+    def layout_reads(root: Path, roots: dict[str, Path], environment: dict[str, str]):
+        return repository_layout_reads(workspace(root, roots, environment), root, environment)
+
+    def refused(action, label: str) -> None:
+        try:
+            action()
+        except (RcError, subprocess.CalledProcessError):
+            return
+        raise RcError(f"packaged layout self-test accepted {label}")
+
+    sibling_read = 'pub const DATA: &str = include_str!("../../beta/data.txt");\n'
+    test_reads = (
+        "#[test]\nfn reads() {\n"
+        '    assert!(!include_str!("../../beta/data.txt").is_empty());\n'
+        '    assert!(!include_str!("../../../verification/fixture.txt").is_empty());\n}\n'
+    )
+    fixture = b"reviewed fixture\n"
+    with tempfile.TemporaryDirectory(prefix="zeno-fcis-packaged-layout-self-test-") as raw:
+        base = Path(raw)
+
+        def environment(name: str) -> dict[str, str]:
+            return dict(os.environ, CARGO_TARGET_DIR=str(base / f"target-{name}"),
+                        CARGO_INCREMENTAL="0", CARGO_PROFILE_DEV_DEBUG="0", CARGO_PROFILE_TEST_DEBUG="0")
+
+        # Control 1: a library reading a sibling file cannot build from the archives alone.
+        isolated = base / "isolated"
+        consumer_env = environment("consumer")
+        consumer_manifest = workspace(isolated, {
+            "alpha": package(isolated / "sources" / "alpha-0.1.0", "alpha", sibling_read),
+            "beta": package(isolated / "sources" / "beta-0.1.0", "beta", ""),
+        }, consumer_env)
+        refused(lambda: run(consumer_build_command(consumer_manifest), environment=consumer_env,
+                            cwd=isolated), "a library reading a sibling package file")
+
+        # Repository layout: one test reads a sibling archive file and a verification file.
+        layout = base / "layout"
+        roots = {"alpha": package(layout / "crates" / "alpha", "alpha", "", test_reads),
+                 "beta": package(layout / "crates" / "beta", "beta", "")}
+        sibling_digest = hashlib.sha256(b"beta data\n").hexdigest()
+        expected = [
+            {"package": "alpha", "target": "test:reads", "path": "crates/beta/data.txt",
+             "sha256": sibling_digest},
+            {"package": "alpha", "target": "test:reads", "path": "verification/fixture.txt",
+             "sha256": hashlib.sha256(fixture).hexdigest()},
+        ]
+        stage_repository_inputs(expected, layout, read_blob=lambda path: fixture)
+        messages, observed, non_test = layout_reads(layout, roots, environment("layout"))
+        require_packaged_test_inputs(observed, expected, non_test)
+
+        # Control 2: an unlisted cross-package read in a test fails the manifest check.
+        refused(lambda: require_packaged_test_inputs(observed, expected[1:], non_test),
+                "an unlisted cross-package test read")
+        # Control 3: a changed verification fixture fails, whether staged or read.
+        refused(lambda: stage_repository_inputs(expected, base / "restaged",
+                                                read_blob=lambda path: fixture + b"changed"),
+                "a verification input that differs from the manifest")
+        (layout / "verification" / "fixture.txt").write_bytes(fixture + b"changed")
+        changed, changed_non_test = observed_cross_package_inputs(
+            messages, layout, base / "target-layout")
+        refused(lambda: require_packaged_test_inputs(changed, expected, changed_non_test),
+                "a changed verification fixture")
+
+        # Control 4: a non-test target with any cross-package read fails, even when it compiles.
+        mixed = base / "mixed"
+        mixed_roots = {"gamma": package(mixed / "crates" / "gamma", "gamma", sibling_read),
+                       "beta": package(mixed / "crates" / "beta", "beta", "")}
+        _, mixed_observed, mixed_non_test = layout_reads(mixed, mixed_roots, environment("mixed"))
+        if not mixed_non_test:
+            raise RcError("packaged layout self-test missed a non-test cross-package read")
+        refused(lambda: require_packaged_test_inputs(mixed_observed, mixed_observed, mixed_non_test),
+                "a non-test cross-package read")
+
+
 def run_rustdoc_normalization_self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="zeno-fcis-rustdoc-self-test-") as raw:
         doc_root = Path(raw)
@@ -1012,10 +1108,233 @@ def compiler_flag_evidence(environment: dict[str, str], source: Path, label: str
             for key in ("CARGO_ENCODED_RUSTFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS")}
 
 
+PACKAGED_TEST_INPUTS_PATH = ROOT / "release" / "packaged-test-inputs.json"
+PACKAGED_TEST_INPUTS_FORMAT = "zeno-fcis/packaged-test-inputs/1"
+# Test inputs that are not in any published archive. They are copied from the
+# exact commit and must also appear, with their SHA-256, in the manifest. Only
+# these repository folders may hold them: the verification workspace, and the
+# benchmark artifacts that the CLI's checker, optimizer and loop tests read.
+REPOSITORY_INPUT_PREFIXES = ("verification/", "docs/benchmarks/")
+CONSUMER_TARGET_ARGUMENTS = ("--workspace", "--lib", "--bins", "--examples", "--all-features")
+PACKAGED_TEST_ARGUMENTS = ("--workspace", "--all-targets", "--all-features")
+
+
+def load_packaged_test_inputs(path: Path = PACKAGED_TEST_INPUTS_PATH) -> list[dict[str, str]]:
+    """Read the reviewed list of files each packaged test target reads outside its package."""
+
+    document = load_json_object(path)
+    if set(document) != {"format", "inputs"} or document["format"] != PACKAGED_TEST_INPUTS_FORMAT:
+        raise RcError(f"{path.name}: unexpected packaged test input format")
+    entries = document["inputs"]
+    if not isinstance(entries, list):
+        raise RcError(f"{path.name}: inputs must be a list")
+    keys = {"package", "target", "path", "sha256"}
+    checked: list[dict[str, str]] = []
+    hashes: dict[str, str] = {}
+    for entry in entries:
+        if not isinstance(entry, dict) or set(entry) != keys or not all(
+            isinstance(entry[key], str) for key in keys
+        ):
+            raise RcError(f"{path.name}: malformed input entry")
+        relative = PurePosixPath(entry["path"])
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.as_posix() != entry["path"]
+            or not (relative.parts[0] == "crates"
+                    or entry["path"].startswith(REPOSITORY_INPUT_PREFIXES))
+            or re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]) is None
+        ):
+            raise RcError(f"{path.name}: invalid input entry {entry['path']}")
+        if hashes.setdefault(entry["path"], entry["sha256"]) != entry["sha256"]:
+            raise RcError(f"{path.name}: one path has two digests: {entry['path']}")
+        checked.append(dict(entry))
+    if checked != sorted(checked, key=packaged_input_key) or len(
+        {packaged_input_key(entry) for entry in checked}
+    ) != len(checked):
+        raise RcError(f"{path.name}: inputs must be sorted and unique")
+    return checked
+
+
+def packaged_input_key(entry: dict[str, str]) -> tuple[str, str, str]:
+    return entry["package"], entry["target"], entry["path"]
+
+
+def git_blob(path: str) -> bytes:
+    data = run(["git", "cat-file", "blob", f"HEAD:{path}"], capture=True, binary=True)
+    if not isinstance(data, bytes):
+        raise RcError("git returned text for a blob")
+    return data
+
+
+def stage_repository_inputs(
+    entries: list[dict[str, str]], layout_root: Path, read_blob=git_blob,
+) -> list[dict[str, str]]:
+    """Copy the listed non-archive inputs from the commit into the repository layout."""
+
+    staged = []
+    for path, digest in sorted({(entry["path"], entry["sha256"]) for entry in entries}):
+        if not path.startswith(REPOSITORY_INPUT_PREFIXES):
+            continue
+        data = read_blob(path)
+        if hashlib.sha256(data).hexdigest() != digest:
+            raise RcError(f"repository test input differs from the reviewed manifest: {path}")
+        destination = layout_root / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(data)
+        staged.append({"path": path, "sha256": digest})
+    return staged
+
+
+def dep_info_prerequisites(path: Path) -> list[str] | None:
+    """Return the prerequisites of a rustc dep-info file, or None for any other dep-info.
+
+    Rustc's own file names itself as its first rule's target and lists only the
+    files of that one compilation. Cargo's uplifted dep-info (`target/debug/x.d`)
+    names the artifact instead and lists every dependency's sources; it is skipped.
+    """
+
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        separator = re.search(r"(?<!\\):(?:\s|$)", line)
+        if separator is None:
+            raise RcError(f"unreadable dep-info rule: {path.name}")
+        if Path(line[:separator.start()].replace("\\ ", " ")).name != path.name:
+            return None
+        return [item.replace("\\ ", " ") for item in re.split(r"(?<!\\)\s+", line[separator.end():].strip()) if item]
+    return None
+
+
+def observed_cross_package_inputs(
+    messages: str, layout_root: Path, target_dir: Path,
+) -> tuple[list[dict[str, str]], list[str]]:
+    """Derive, from rustc dep-info, every file a package target reads outside its package.
+
+    Returns the test-target entries and a list of non-test violations. Files under the
+    target directory are build-script output of the package itself.
+    """
+
+    test_targets: dict[str, tuple[str, str]] = {}
+    for line in messages.splitlines():
+        message = json.loads(line)
+        if message.get("reason") != "compiler-artifact" or not message["profile"]["test"]:
+            continue
+        manifest = Path(message["manifest_path"]).resolve()
+        if layout_root.resolve() not in manifest.parents:
+            continue
+        target = message["target"]
+        label = f"{target['kind'][0]}:{target['name']}"
+        test_targets[Path(message["filenames"][0]).name] = (message["target"]["src_path"], label)
+    resolved_target = target_dir.resolve()
+    dep_files = [*target_dir.glob("debug/deps/*.d"), *target_dir.glob("debug/examples/*.d"),
+                 *target_dir.glob("debug/build/*/*.d")]
+    entries: list[dict[str, str]] = []
+    violations: list[str] = []
+    seen_tests: set[str] = set()
+    for dep_file in sorted(dep_files):
+        prerequisites = dep_info_prerequisites(dep_file)
+        if not prerequisites:
+            continue
+        root = Path(os.path.normpath(layout_root / prerequisites[0]))
+        try:
+            relative_root = root.relative_to(layout_root)
+        except ValueError:
+            continue
+        if len(relative_root.parts) < 2 or relative_root.parts[0] != "crates":
+            continue
+        package = relative_root.parts[1]
+        package_root = layout_root / "crates" / package
+        test = test_targets.get(dep_file.stem)
+        if test is not None:
+            seen_tests.add(dep_file.stem)
+        label = test[1] if test is not None else f"non-test:{relative_root.as_posix()}"
+        for prerequisite in prerequisites:
+            read = Path(os.path.normpath(layout_root / prerequisite))
+            if read == package_root or package_root in read.parents:
+                continue
+            if resolved_target == read.resolve() or resolved_target in read.resolve().parents:
+                continue
+            try:
+                relative = read.relative_to(layout_root).as_posix()
+            except ValueError:
+                relative = read.as_posix()
+            if test is None:
+                violations.append(f"{package} {label} reads {relative}")
+                continue
+            if not read.is_file():
+                raise RcError(f"dep-info names a missing file: {relative}")
+            entries.append({"package": package, "target": label, "path": relative,
+                            "sha256": sha256(read)})
+    missing = sorted(set(test_targets) - seen_tests)
+    if missing:
+        raise RcError(f"dep-info is missing for packaged test targets: {', '.join(missing)}")
+    unique = {packaged_input_key(entry): entry for entry in entries}
+    return [unique[key] for key in sorted(unique)], violations
+
+
+def require_packaged_test_inputs(
+    observed: list[dict[str, str]], expected: list[dict[str, str]], non_test: list[str],
+) -> None:
+    problems = [f"non-test target has a cross-package read: {item}" for item in non_test]
+    expected_rows = {tuple(entry.values()) for entry in expected}
+    observed_rows = {tuple(entry.values()) for entry in observed}
+    problems.extend(f"unlisted cross-package test input: {' '.join(row)}"
+                    for row in sorted(observed_rows - expected_rows))
+    problems.extend(f"listed cross-package test input not read as listed: {' '.join(row)}"
+                    for row in sorted(expected_rows - observed_rows))
+    if problems:
+        raise RcError("packaged test inputs differ from release/packaged-test-inputs.json:\n  "
+                      + "\n  ".join(problems))
+
+
+def repository_layout_reads(
+    layout_manifest: Path, layout_root: Path, environment: dict[str, str],
+) -> tuple[str, list[dict[str, str]], list[str]]:
+    """Build every non-test and test target in the repository layout and derive cross-package reads.
+
+    The non-test build comes first so that every library, binary, example and build
+    script leaves its own dep-info, even when no test depends on it.
+    """
+
+    run(consumer_build_command(layout_manifest), environment=environment, cwd=layout_root)
+    messages = run(packaged_test_command(layout_manifest), capture=True,
+                   environment=environment, cwd=layout_root)
+    if not isinstance(messages, str):
+        raise RcError("packaged test build returned binary data")
+    observed, non_test = observed_cross_package_inputs(
+        messages, layout_root, Path(environment["CARGO_TARGET_DIR"]))
+    return messages, observed, non_test
+
+
+def write_packaged_workspace_manifest(root: Path, package_roots: dict[str, Path]) -> Path:
+    workspace_manifest = root / "Cargo.toml"
+    workspace_lines = ["[workspace]", 'resolver = "3"', "members = ["]
+    for package_root in sorted(package_roots.values()):
+        workspace_lines.append(f"  {json.dumps(package_root.relative_to(root).as_posix())},")
+    workspace_lines.extend(["]", "", "[patch.crates-io]"])
+    for name, package_root in sorted(package_roots.items()):
+        workspace_lines.append(f"{json.dumps(name)} = {{ path = {json.dumps(str(package_root))} }}")
+    workspace_manifest.write_text("\n".join(workspace_lines) + "\n", encoding="utf-8")
+    return workspace_manifest
+
+
+def consumer_build_command(workspace_manifest: Path) -> list[str]:
+    return ["cargo", "+1.97.1", "build", "--manifest-path", str(workspace_manifest),
+            *CONSUMER_TARGET_ARGUMENTS, "--locked", "--offline", "--jobs", "1"]
+
+
+def packaged_test_command(workspace_manifest: Path) -> list[str]:
+    return ["cargo", "+1.97.1", "test", "--manifest-path", str(workspace_manifest),
+            *PACKAGED_TEST_ARGUMENTS, "--locked", "--offline", "--no-run", "--jobs", "1",
+            "--message-format=json-render-diagnostics"]
+
+
 def packaged_checker_inputs() -> list[dict[str, str]]:
     return [{"path": name, "sha256": sha256(ROOT / name)} for name in (
         "tools/rc_package.py", "tools/check_generated_application.py", "tools/check_synthesis.py",
-        "Cargo.lock", "release/package-set.toml", "tools/check_v1_compatibility.py",
+        "Cargo.lock", "release/package-set.toml", "release/packaged-test-inputs.json",
+        "tools/check_v1_compatibility.py",
         "test-data/v1-compatibility/baseline.json",
         "test-projects/external-consumer/src/main.rs", "test-projects/external-consumer/Cargo.toml",
     )]
@@ -1067,23 +1386,13 @@ def check_packaged_workspace(
                                  "source_clean": not dirty})
         package_roots[name] = package_root
 
-    workspace_manifest = verification_root / "Cargo.toml"
-    workspace_lines = ["[workspace]", 'resolver = "3"', "members = ["]
-    for package_root in sorted(package_roots.values()):
-        workspace_lines.append(
-            f"  {json.dumps(package_root.relative_to(verification_root).as_posix())},"
-        )
-    workspace_lines.extend(["]", "", "[patch.crates-io]"])
-    for name, package_root in sorted(package_roots.items()):
-        workspace_lines.append(
-            f"{json.dumps(name)} = {{ path = {json.dumps(str(package_root))} }}"
-        )
-    workspace_manifest.write_text("\n".join(workspace_lines) + "\n", encoding="utf-8")
+    workspace_manifest = write_packaged_workspace_manifest(verification_root, package_roots)
 
     check_environment = remapped_compiler_environment(
         environment, verification_root, "/zeno-fcis-package-check",
     )
-    check_environment["CARGO_TARGET_DIR"] = str(verification_root / "target")
+    target_dir = verification_root / "target"
+    check_environment["CARGO_TARGET_DIR"] = str(target_dir)
     check_environment.update(CARGO_BUILD_JOBS="1", CARGO_INCREMENTAL="0",
                              CARGO_PROFILE_DEV_DEBUG="0", CARGO_PROFILE_TEST_DEBUG="0")
     graph = generated_application.resolve_reviewed_graph(
@@ -1091,25 +1400,33 @@ def check_packaged_workspace(
         {(name, version): root / "Cargo.toml" for name, root in package_roots.items()},
         check_environment,
     )
-    run(
-        [
-            "cargo",
-            "+1.97.1",
-            "test",
-            "--manifest-path",
-            str(workspace_manifest),
-            "--workspace",
-            "--all-targets",
-            "--all-features",
-            "--locked",
-            "--offline",
-            "--no-run",
-            "--jobs",
-            "1",
-        ],
-        environment=check_environment,
-        cwd=verification_root,
+    # 1. Consumer build, isolated layout: every target a consumer of a published
+    #    crate builds (libraries, binaries, examples, build scripts) from the
+    #    archives alone.
+    run(consumer_build_command(workspace_manifest), environment=check_environment,
+        cwd=verification_root)
+
+    # 2. Packaged tests, repository layout: the same archives at crates/<name>/,
+    #    plus only the verification files the reviewed manifest names. Every
+    #    file a test reads outside its own package must equal that manifest.
+    expected_test_inputs = load_packaged_test_inputs()
+    layout_root = verification_root / "repository-layout"
+    layout_roots = {name: layout_root / "crates" / name for name in package_roots}
+    for name, package_root in package_roots.items():
+        shutil.copytree(package_root, layout_roots[name])
+    repository_inputs = stage_repository_inputs(expected_test_inputs, layout_root)
+    layout_manifest = write_packaged_workspace_manifest(layout_root, layout_roots)
+    layout_graph = generated_application.resolve_reviewed_graph(
+        layout_root,
+        {(name, version): root / "Cargo.toml" for name, root in layout_roots.items()},
+        check_environment,
     )
+    if layout_graph != graph:
+        raise RcError("repository-layout graph differs from the isolated packaged graph")
+    _, observed_test_inputs, non_test_reads = repository_layout_reads(
+        layout_manifest, layout_root, check_environment,
+    )
+    require_packaged_test_inputs(observed_test_inputs, expected_test_inputs, non_test_reads)
     run(["cargo", "+1.97.1", "build", "--locked", "--offline", "-p", "zeno-fcis-cli",
          "--bin", "zeno-fcis"], environment=check_environment, cwd=verification_root)
     executable = verification_root / "target" / "debug" / ("zeno-fcis.exe" if os.name == "nt" else "zeno-fcis")
@@ -1153,6 +1470,20 @@ def check_packaged_workspace(
         "version": version, "compiler": compiler,
         "compiler_flags": compiler_flag_evidence(check_environment, verification_root, "<verification-root>"),
         "archives": package_evidence, "packaged_workspace_graph": graph,
+        "consumer_build": {
+            "layout": "sources/<crate>-<version>/, archives only",
+            "command": ["cargo", "+1.97.1", "build", "--manifest-path", "<isolated-workspace>/Cargo.toml",
+                        *CONSUMER_TARGET_ARGUMENTS, "--locked", "--offline", "--jobs", "1"],
+        },
+        "packaged_tests": {
+            "layout": "crates/<crate>/ from the same archives, plus the listed verification files",
+            "command": ["cargo", "+1.97.1", "test", "--manifest-path", "<repository-layout>/Cargo.toml",
+                        *PACKAGED_TEST_ARGUMENTS, "--locked", "--offline", "--no-run", "--jobs", "1"],
+            "test_inputs_manifest_sha256": sha256(PACKAGED_TEST_INPUTS_PATH),
+            "cross_package_inputs": observed_test_inputs,
+            "repository_inputs": repository_inputs,
+            "standalone_tests": False,
+        },
         "generator": {"package": "zeno-fcis-cli", "target": "zeno-fcis", "sha256": sha256(executable),
                       "command": ["<packaged-cli>", "new", "<new-application>", "--template", "durable-counter"]},
         "internal_manifests": [{"name": name, "version": version,
@@ -1163,6 +1494,8 @@ def check_packaged_workspace(
         "example_applications": examples,
         "v1_consumer": v1_consumer,
         "nonclaims": ["not a registry-only installation check", "not fresh external dependency resolution",
+                      "packaged tests are not standalone: they compile only in the repository layout "
+                      "with the listed verification files; the whole-repository source archive runs every test",
                       "not an independent review",
                       "not production deployment qualification", "not release authorization"],
     }
@@ -1328,6 +1661,7 @@ def build(output: Path) -> None:
         "rust_toolchain": "1.97.1",
         "host_targets": sorted(host_targets),
         "source_manifest_sha256": sha256(source_manifest),
+        "packaged_test_inputs_sha256": sha256(PACKAGED_TEST_INPUTS_PATH),
         "sbom_sha256": sha256(sbom_path),
         "compiler_flags": {
             "native": compiler_flag_evidence(build_environment, ROOT, "<source>"),
@@ -1337,9 +1671,10 @@ def build(output: Path) -> None:
         "commands": [
             "cargo +1.97.1 fetch --locked",
             " ".join(package_arguments),
-            "cargo +1.97.1 metadata --manifest-path <unpacked-workspace>/Cargo.toml --offline --format-version 1 (seeded and checked against the reviewed lock)",
-            "cargo +1.97.1 test --manifest-path <unpacked-workspace>/Cargo.toml --workspace --all-targets --all-features --locked --offline --no-run --jobs 1",
-            "cargo +1.97.1 build --manifest-path <unpacked-workspace>/Cargo.toml --locked --offline -p zeno-fcis-cli --bin zeno-fcis",
+            "cargo +1.97.1 metadata --manifest-path <isolated-workspace and repository-layout>/Cargo.toml --offline --format-version 1 (seeded and checked against the reviewed lock)",
+            "cargo +1.97.1 build --manifest-path <isolated-workspace>/Cargo.toml --workspace --lib --bins --examples --all-features --locked --offline --jobs 1 (sources/<crate>-<version>/, archives only)",
+            "cargo +1.97.1 test --manifest-path <repository-layout>/Cargo.toml --workspace --all-targets --all-features --locked --offline --no-run --jobs 1 (crates/<crate>/ plus the verification files in release/packaged-test-inputs.json; every cross-package read must equal that manifest)",
+            "cargo +1.97.1 build --manifest-path <isolated-workspace>/Cargo.toml --locked --offline -p zeno-fcis-cli --bin zeno-fcis",
             "<packaged-cli> new <new-application> --template durable-counter",
             "generated application: archive-only internal sources, reviewed external lock, formatting, Clippy, tests and durable demonstration; see PACKAGED-APPLICATION.json",
             *[item["command"] for item in binary_inventory],
@@ -1404,11 +1739,13 @@ def main() -> int:
             run([sys.executable, "tools/test_release_privacy.py"])
             run_self_test(configured, cargo_metadata(complete=False))
             run_rustdoc_normalization_self_test()
+            run_packaged_layout_self_test()
             run_tree_archive_mode_self_test()
             run_binary_inventory_self_test(configured)
             print(
                 "rc-package: self-test PASS "
-                "(12 hostile mutations rejected; rustdoc, archive modes, and binary inventory verified)"
+                "(12 hostile mutations rejected; 4 packaged layout controls refused; "
+                "rustdoc, archive modes, and binary inventory verified)"
             )
         elif args.command == "verify-packaged":
             verify_packaged(args.packages.resolve(), args.output.resolve(), require_string(configured, "version"))
