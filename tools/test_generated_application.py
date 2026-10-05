@@ -316,6 +316,86 @@ class DependencyAdmissionTests(unittest.TestCase):
             self.assertEqual(patched, {name: {"path": str(path)} for name, path in packages.items()})
 
 
+class GeneratedBindingTests(unittest.TestCase):
+    """The binding `zeno-fcis new` writes, as the gate admits it."""
+
+    def tree(self, root: Path) -> dict[str, Path]:
+        packages = {}
+        for name, dependencies in (("zeno-fcis-core", ""),
+                                   ("zeno-fcis-value", ""),
+                                   ("zeno-fcis-shell", 'zeno-fcis-core = "=1.1.0"\n'),
+                                   ("zeno-fcis-tests-only", "")):
+            packages[name] = root / "crates" / name
+            packages[name].mkdir(parents=True)
+            (packages[name] / "Cargo.toml").write_text(
+                f'[package]\nname = "{name}"\nversion = "1.1.0"\n[dependencies]\n{dependencies}'
+                '[dev-dependencies]\nzeno-fcis-tests-only = "=1.1.0"\n')
+        (root / "Cargo.lock").write_text("version = 4\n")
+        (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        return packages
+
+    def bound(self, root: Path, packages: dict[str, Path]) -> Path:
+        app = root / "app"
+        app.mkdir()
+        section = "".join(f'{name} = {{ path = {json.dumps(str(packages[name]))} }}\n'
+                          for name in ("zeno-fcis-core", "zeno-fcis-shell"))
+        (app / "Cargo.toml").write_text(
+            '[package]\nname = "app"\nversion = "0.0.0"\n[dependencies]\n'
+            'zeno-fcis-shell = "=1.1.0"\n\n[patch.crates-io]\n' + section)
+        (app / "Cargo.lock").write_text("version = 4\n")
+        (app / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        return app
+
+    def test_the_needed_closure_with_the_tree_lock_and_toolchain_is_admitted(self):
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-binding-") as directory:
+            root = Path(directory)
+            packages = self.tree(root)
+            app = self.bound(root, packages)
+            result = application.check_generated_binding(app, packages, "1.1.0")
+            self.assertEqual(result["packages"], ["zeno-fcis-core", "zeno-fcis-shell"])
+            # Binding is for a manifest no generator bound, such as the V1 consumer's.
+            manifest = (app / "Cargo.toml").read_text()
+            with self.assertRaisesRegex(RuntimeError, "already contains a resolver override"):
+                application.bind_generated_dependencies(app / "Cargo.toml", packages, "1.1.0")
+            self.assertEqual((app / "Cargo.toml").read_text(), manifest)
+
+    def test_every_other_binding_is_refused(self):
+        def missing(app: Path) -> None:
+            text = (app / "Cargo.toml").read_text()
+            (app / "Cargo.toml").write_text(text.split("\n[patch.crates-io]\n")[0])
+
+        def extra(app: Path) -> None:
+            with (app / "Cargo.toml").open("a") as manifest:
+                manifest.write('zeno-fcis-value = { path = "/elsewhere" }\n')
+
+        def moved(app: Path) -> None:
+            text = (app / "Cargo.toml").read_text()
+            (app / "Cargo.toml").write_text(text.replace("crates/zeno-fcis-core", "crates/other"))
+
+        def stale_lock(app: Path) -> None:
+            (app / "Cargo.lock").write_text("version = 3\n")
+
+        def no_toolchain(app: Path) -> None:
+            (app / "rust-toolchain.toml").unlink()
+
+        def replaced(app: Path) -> None:
+            text = (app / "Cargo.toml").read_text()
+            (app / "Cargo.toml").write_text(
+                text.replace("[dependencies]", '[replace]\n"x:1.0.0" = { path = "/x" }\n[dependencies]'))
+
+        for change, message in ((missing, "no single"), (extra, "differs"), (moved, "differs"),
+                                (stale_lock, "Cargo.lock"), (no_toolchain, "rust-toolchain"),
+                                (replaced, "another resolver override")):
+            with self.subTest(change=change.__name__), \
+                    tempfile.TemporaryDirectory(prefix="zeno-fcis-binding-") as directory:
+                root = Path(directory)
+                packages = self.tree(root)
+                app = self.bound(root, packages)
+                change(app)
+                with self.assertRaisesRegex(RuntimeError, message):
+                    application.check_generated_binding(app, packages, "1.1.0")
+
+
 class PackagedStagingTests(unittest.TestCase):
     def archive(self, root: Path, members: list[str]) -> Path:
         path = root / "example-1.0.0.crate"

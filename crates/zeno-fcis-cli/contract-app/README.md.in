@@ -3,6 +3,9 @@
 This application was built from its contract by `zeno-fcis new --contract`.
 `project.zeno` declares its types, reasons, channels and laws, and
 `v2/policy.json` holds its decision rules and genesis state.
+`docs/CONTRACT_RULES.md` in the ZenoFCIS source tree describes every key of
+`v2/policy.json`, the expressions, the law kinds and the laws generation
+adds.
 
 - `src/v2_contract.rs`, `v2/schema.zcve` and `v2/policy.zcve` are generated
   from those two files. `zeno-fcis generate contract .` rewrites them;
@@ -11,17 +14,48 @@ This application was built from its contract by `zeno-fcis new --contract`.
   from a contract. They frame inputs, keep publications in SQLite and
   deliver the outbox. The library Authority makes every decision and checks
   every law; this application contains no decision or law code.
+  `src/examples.rs` is the decision-examples grammar, shared with
+  `zeno-fcis contract review`.
 - `tests/decision-examples.txt` lists decisions, one per line:
   `inputs | class reason post-state | deliveries`. Inputs are the state
   fields, then the command, then the context, in the order the program
-  reads them; booleans are 0 or 1 and sums are variant IDs.
+  reads them; booleans are 0 or 1 and sums are variant IDs. The section
+  "Decision examples" of `docs/CLI_REFERENCE.md` in the ZenoFCIS source
+  tree gives the full grammar.
+
+## Build and run
+
+`zeno-fcis new` bound this application to a ZenoFCIS source tree: the one
+named by `--source`, or else the tree the CLI was built from.
+
+- `Cargo.toml` ends with a `[patch.crates-io]` section that resolves each
+  ZenoFCIS package the application needs to that tree. Without it, Cargo
+  would resolve the version pins to the crates published under the same
+  versions, which are a different release.
+- `Cargo.lock` is the tree's lock, so the external crates are the versions
+  the tree pins. The first build adds this application to it.
+- `rust-toolchain.toml`, copied when the tree has one, makes rustup select
+  the toolchain the tree pins.
+
+From this directory:
+
+```sh
+cargo test --offline
+cargo run --offline -- NEW_DATABASE_PATH
+```
+
+`--offline` builds only from crates already in Cargo's cache; `cargo fetch`
+in the source tree fills it. Without `--offline`, Cargo downloads the locked
+versions.
 
 `cargo test` checks every example against the Authority's decision and
 publishes the contract's genesis state. With the `sqlite` feature it then
 runs the examples as one session from genesis: each example whose pre-state
 is the current state is published, committed and replayed, and the outbox is
-delivered across a reopen of the database. `cargo run -- NEW_DATABASE_PATH`
-runs the same session and prints its summary.
+delivered across a reopen of the database. `cargo run` runs the same session
+in a new database at NEW_DATABASE_PATH and prints its summary: each
+decision's class; `bundles`, the number of committed decisions, genesis not
+counted; the `pending` outbox entries; and the `deliveries` made.
 
 ## Contract versions
 
@@ -55,8 +89,15 @@ catalogs of every version, which these commands use on an existing database:
   upgrades were recorded (SQLite schema v9) to the current schema after a
   complete audit. Nothing else is migrated implicitly.
 
-`cargo run -- --decide NEW_DATABASE_PATH` runs the same session as
-`NEW_DATABASE_PATH` but leaves the outbox pending for `--deliver`. After the
+`cargo run -- --decide DATABASE_PATH` runs the same session but leaves the
+outbox pending for `--deliver`. Without a file at DATABASE_PATH it starts at
+genesis in a new database. On an existing store, which must run this build's
+version (upgrade it first otherwise), it continues from the store's state:
+while one remains, the first example whose pre-state is that state is
+decided and committed. A store at another version is refused and left as it
+was. `--decide` is an aid for acceptance tests and maintenance, not an
+operational interface; an operational command line for applications is
+planned for 2.2. After the
 `transform` checker changes its semantics version, `zeno-fcis contract
 refresh-receipts .` checks every adoption again and rebinds each receipt to
 the new checker; it refuses if anything but the checker identity would change.

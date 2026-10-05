@@ -47,6 +47,7 @@ Feature: Adopt the ZenoFCIS core library
     And the agent-treasury-guard demonstration prints the scripted outcome of each of its 23 proposals and answers and ends with no swap outstanding
     And an application built with `zeno-fcis new --contract` from the dual-approval example contract builds as an isolated package
     And its tests check all 12 decision examples against the library Authority and run them as one SQLite session from genesis
+    And `zeno-fcis new` binds every application it writes to this source tree, and the gate checks that binding rather than writing it
 
   @atdd-example-templates
   Scenario: Emit example applications whose laws all constrain their transitions
@@ -64,6 +65,10 @@ Feature: Adopt the ZenoFCIS core library
     And the library's own catalog binding accepts the generated policy before it is written
     And a check names each drifted file and changes nothing
     And each planted rule, declaration or library-rule error is refused at the entry that holds it
+    And each channel's idempotency domain covers every ordinal the rules use, the Effect limit is the most deliveries of any case, and a committed failure without a failure law is refused at its case
+    And a refusal by the library's catalog names the delivery, law or channel without which the library admits the contract
+    And the rules reference documents exactly the keys, leaves, classes, operators, functions and law kinds the generator reads
+    And `contract export-program` writes the current decision program that optimize and transform read, and the optimizer's receipt for it replays
 
   @atdd-finite-synthesis
   Scenario: Synthesize and replay one contract across languages

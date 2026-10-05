@@ -204,7 +204,9 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "generated-contracts": AcceptanceScenario(
         "Regenerate each template's V2 contract from its declarations and rules",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "contract::"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_generation", "--locked")),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "binding::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_generation", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_export", "--locked")),
     ),
     "checked-transform": AcceptanceScenario(
         "Accept a candidate program only with an exhaustive equivalence receipt",
@@ -242,6 +244,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "v2::upgrade::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "upgrade", "--locked"),
          ("python3", "tools/check_contract_upgrade.py")),
+    ),
+    "app-journey": AcceptanceScenario(
+        "Build, optimize, adopt and upgrade applications through their command lines alone",
+        (("python3", "tools/test_check_app_journey.py"),
+         ("python3", "tools/check_app_journey.py")),
     ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",

@@ -42,6 +42,7 @@
 - [Schema and code-generation boundary](SCHEMA_CODEGEN_BOUNDARY.md)
 - [Schema-bound catalog](SCHEMA_BOUND_CATALOG.md)
 - [Project bootstrap generator](PROJECT_BOOTSTRAP_GENERATOR.md)
+- [Contract rules reference: `v2/policy.json`](CONTRACT_RULES.md)
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Catalogued transition builder](CATALOGUED_TRANSITION_BUILDER.md)

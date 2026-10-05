@@ -6,6 +6,129 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- `zeno-fcis new` now binds every Cargo application it writes, from
+  `--contract` and from the `durable-counter`, `prepared-counter` and example
+  templates, to a ZenoFCIS source tree. Before, a generated application
+  resolved its exact version pins to the crates published under the same
+  versions, which are a different release, and failed to build; only
+  `tools/check_generated_application.py` knew the binding. `new` appends a
+  `[patch.crates-io]` section with a path entry for every ZenoFCIS package
+  the application needs, directly or through other ZenoFCIS packages, copies
+  the tree's `Cargo.lock`, and copies its `rust-toolchain.toml`. The tree is
+  the one the new `--source TREE` option names, else the tree the CLI was
+  built from while it still exists; it must be a Cargo workspace whose
+  members provide every needed package at the CLI's version. Without a tree
+  `new` exits 2 and names `--source`; with a tree that cannot bind the
+  application it exits 1; either way it writes no file. A CLI built with
+  `ZENO_FCIS_BUILD_TREE` set records that path instead, or none when it is
+  empty. `tools/rc_package.py build` builds the release binaries with it
+  empty, so they hold no build directory; with an installed binary, pass
+  `--source <extracted source tree>`. The generated README lists
+  `cargo test --offline` and `cargo run --offline -- NEW_DATABASE_PATH`.
+  `tools/check_generated_application.py`, `tools/check_contract_upgrade.py`
+  and `site/build.py` now check the binding `new` wrote instead of writing
+  one; the site then leaves it out, since its own workspace resolves the
+  applications' pins. The template READMEs give the same steps.
+- Fix contracts the generator accepted but the library refused. Each
+  channel's idempotency domain now covers every `idempotency_ordinal` the
+  rules use on it, where it was fixed at 0, so a nonzero ordinal no longer
+  fails the catalog binding. The Effect limit is now the most deliveries any
+  case makes, at least 1, where it was fixed at 1, so a case with two
+  deliveries no longer has every decision refused at run time. Generation
+  refuses a case whose deliveries are not in increasing ordinal order, and a
+  contract with a committed-failure case but no `CommittedFailureEffects`
+  law, naming the case: framework law 908 would refuse every committed
+  failure. It also refuses framework law ID 0, which the library refuses.
+  When the library's catalog still refuses a contract, the error
+  names the case delivery, law or channel without which the library admits
+  it, beside the library's own error, found by binding the contract again
+  without each; the library's error types are unchanged. The eight
+  templates' generated contracts are byte-identical. The app study's
+  original escrow, whose split pays out in two deliveries with idempotency
+  ordinals 0 and 1, is a CLI test fixture and builds and runs its 23
+  examples.
+- Add `zeno-fcis contract export-program [DIR] --out FILE`: the contract's
+  current decision program, in the canonical encoding `optimize`,
+  `transform` and `loop` read, written to a new file. After an adoption it
+  is the adopted candidate. The output is a function of the contract's files.
+  `v2/policy.zcve` is a whole policy, which those commands refuse, so the
+  optimization journey needed a script that parsed generated Rust.
+- An application built from a contract can now keep deciding on an existing
+  store: `--decide DATABASE_PATH` on a store at this build's version
+  continues the session from the store's state, with a replay key of its own
+  for each commit; without a file it starts at genesis as before. A store at
+  another version is refused and left as it was. `--decide` is an aid for
+  acceptance tests and maintenance, not an operational interface, which is
+  planned for 2.2.
+- Add `tools/check_app_journey.py` and the ATDD scenario `app-journey`, with
+  the app study's escrow and spend-approval contracts as CLI test fixtures.
+  In new directories outside the repository, and with the command lines
+  alone:
+  - `zeno-fcis new` builds the escrow, whose split pays out in two
+    deliveries with idempotency ordinals 0 and 1, and the commands its
+    README lists, run exactly as written, build it, check its 23 examples
+    and run its session;
+  - `contract export-program`, `optimize`, `transform replay` and
+    `contract adopt` make the spend-approval contract's version 2;
+  - a version 1 store with four commits and a pending payment upgrades as a
+    program successor at commit 4 and delivers the payment under its
+    original identifier, after which the version 1 build refuses the store;
+  - a version 1 store at commit 2 upgrades and keeps committing under
+    version 2 with `--decide`, and its audit replays both segments;
+  - a CLI built as the release build builds it holds no path of the
+    checkout and refuses `new` without `--source`; the same build without
+    the variable, the control, holds it.
+- Add `docs/CONTRACT_RULES.md`, the reference for `v2/policy.json`: every
+  key, leaf bindings, expressions with `choose` and `div_floor`, the law
+  kinds and the scopes five of them require, framework laws 908, 909, 990
+  and 991, `idempotency_ordinal`, roots, full post-states and reasons. A test
+  checks its tables against the keys, leaves, classes, operators, functions
+  and law kinds the generator reads. The CLI reference recommends release
+  builds for review, transform and optimize, which the app study measured
+  4.7 to 7.5 times faster on reviews; documents that `contract adopt`
+  renders the whole rules file again; and `generate contract --help` now
+  lists `v2/schema.zcve` among the files it writes. The generated
+  application's `bundles` count is documented as the committed decisions,
+  without genesis.
+- `contract review` reports refusals, in packet schema
+  `zeno-fcis/contract-review/2`. Each refusal names its class (law, domain,
+  arithmetic, meter, input or other) and, when a law refused, the law the
+  library's own law diagnostics report. For each refused input, the
+  library's law evaluator runs the contract's law programs on the pre-state
+  as a genesis state and decides whether it satisfies every state law: each
+  law that applies at genesis and to every committing decision. A law
+  refusal on a pre-state that satisfies every state law is a finding: the
+  review exits 1 with status `law-refusal` and names the law, the number of
+  inputs, the first of them and the case the decision program selects for
+  it. Refusals on pre-states the state laws exclude are counted apart, and
+  refused rows name the state law they break. The summary counts refusals
+  by class and by pre-state. The review still does not decide reachability:
+  a pre-state that satisfies every state law may be unreachable. The
+  app-building study's planted bug in its spend-approval contract (the CFO
+  check moved from tier 1 to tier 2), which the review passed with no
+  finding, is now a finding: law 500 refuses 16 inputs. The unchanged
+  contract, now a test fixture, and the eight templates review with no
+  finding. Mutants still compare refusals as the library reports them, not
+  by law.
+- One decision-examples grammar. `contract-app/src/examples.rs`, which
+  `new --contract` copies into every application, parses the examples in
+  the application, and `contract review` compiles the same file. Both now
+  accept inputs split over several `|` sections, a delivery written as its
+  payload alone when the contract declares one channel, and indented
+  comment lines, and both refuse every other line with the same message.
+  Generated applications used to refuse all three, although the review
+  accepted them. Every number is checked against
+  its declared domain while parsing, the successor state's included. The
+  grammar is documented in `docs/CLI_REFERENCE.md`. Every template's
+  examples parse to the same examples as before.
+- The SQLite v2 shell's errors display as one line saying what happened and
+  what to do, instead of `V2 SQLite refinement refused: Identity` and the
+  like. `Debug` keeps the variant names. Applications built from a contract
+  print `store:`, that message and, in parentheses, the error's `Debug` form,
+  which starts with the variant name, for example `store: upgrade refused:
+  the store already runs this contract version, so there is nothing to
+  upgrade (Upgrade(SameContract))`.
+
 - Fix the SQLite v2 shell's exact-schema check, which skipped objects whose
   names matched `LIKE 'sqlite_%'`. In `LIKE`, `_` matches any character and
   ASCII case is ignored, so a user trigger named, for example, `sqlitex`

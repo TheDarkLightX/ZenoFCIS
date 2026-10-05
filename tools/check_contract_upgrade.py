@@ -57,8 +57,9 @@ def cli() -> str:
 
 
 def prepare(app: Path, packages: dict[str, Path], version: str) -> dict:
-    """Bind the generated manifest to this checkout and admit its resolved graph."""
-    applications.bind_generated_dependencies(app / "Cargo.toml", packages, version)
+    """Check the binding to this checkout that `zeno-fcis new` wrote and admit
+    the resolved graph."""
+    applications.check_generated_binding(app, packages, version)
     allowed = {(name, version): path / "Cargo.toml" for name, path in packages.items()}
     consumer = tomllib.loads((app / "Cargo.toml").read_text())["package"]
     allowed[(consumer["name"], consumer["version"])] = app / "Cargo.toml"
@@ -182,7 +183,7 @@ def check(directory: Path) -> dict:
     expect_refusal(run_app(adopted, ["--migrate", str(away)]), "Schema(10)", "migrating a v10 store")
     # The version 1 build cannot replay the version 2 segment.
     expect_refusal(run_app(first, ["--audit", str(away)]), "Identity", "version 1 over the upgraded store")
-    expect_refusal(run_app(first, ["--decide", str(away)]), "Schema", "a new session over the store")
+    expect_refusal(run_app(first, ["--decide", str(away)]), "Identity", "a session over the upgraded store")
 
     # The template's store at genesis upgrades the same way.
     genesis_audit = report(run_app(adopted, ["--audit", str(at_genesis)]), "audit at genesis")

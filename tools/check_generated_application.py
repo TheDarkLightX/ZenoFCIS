@@ -76,12 +76,15 @@ def generated_file_manifest(app: Path) -> list[dict]:
             for path in sorted(app.rglob("*")) if path.is_file()]
 
 
-def bind_generated_dependencies(manifest: Path, package_roots: dict[str, Path], version: str) -> None:
+def generated_dependency_closure(emitted: dict, package_roots: dict[str, Path], version: str) -> set[str]:
+    """Every local package a generated manifest needs, after checking its pins.
+
+    The manifest's own dependencies of every kind count; of each local package,
+    the build and runtime edges, since package tests are not part of the
+    consumer.
+    """
     packages = {name: (root, tomllib.loads((root / "Cargo.toml").read_text()))
                 for name, root in package_roots.items()}
-    emitted = tomllib.loads(manifest.read_text())
-    if emitted.get("patch") or emitted.get("replace"):
-        raise RuntimeError("generated manifest already contains a resolver override")
 
     def package_name(name: str, declaration: str | dict) -> str:
         return declaration.get("package", name) if isinstance(declaration, dict) else name
@@ -116,13 +119,62 @@ def bind_generated_dependencies(manifest: Path, package_roots: dict[str, Path], 
         name = pending.pop()
         if name not in selected:
             selected.add(name)
-            # Build/runtime edges suffice; package tests are not part of the consumer.
             document = {key: value for key, value in packages[name][1].items() if key != "dev-dependencies"}
             pending.update(dependencies(document) - selected)
+    return selected
+
+
+def bind_generated_dependencies(manifest: Path, package_roots: dict[str, Path], version: str) -> None:
+    """Bind a manifest that no generator bound: the V1 consumer's. A
+    manifest `zeno-fcis new` wrote carries its own binding, which
+    `check_generated_binding` checks."""
+    emitted = tomllib.loads(manifest.read_text())
+    if emitted.get("patch") or emitted.get("replace"):
+        raise RuntimeError("generated manifest already contains a resolver override")
+    selected = generated_dependency_closure(emitted, package_roots, version)
     with manifest.open("a") as output:
         output.write("\n[patch.crates-io]\n")
         for name in sorted(selected):
-            output.write(f'{name} = {{ path = {json.dumps(str(packages[name][0]))} }}\n')
+            output.write(f'{name} = {{ path = {json.dumps(str(package_roots[name]))} }}\n')
+
+
+def binding_tree(package_roots: dict[str, Path]) -> Path:
+    """The source tree that holds these packages: the parent of their common directory."""
+    return Path(os.path.commonpath([str(root.resolve()) for root in package_roots.values()])).parent
+
+
+def check_generated_binding(app: Path, package_roots: dict[str, Path], version: str) -> dict:
+    """Admit only the binding `zeno-fcis new` wrote.
+
+    The manifest must end with a `[patch.crates-io]` section that points
+    exactly the packages the application needs at these package roots, in
+    sorted order, with no other resolver override; `Cargo.lock` must be the
+    source tree's lock and `rust-toolchain.toml` its toolchain file, byte for
+    byte. Each check runs before any Cargo command can change a file.
+    """
+    manifest = app / "Cargo.toml"
+    text = manifest.read_text()
+    marker = "\n[patch.crates-io]\n"
+    if text.count(marker) != 1:
+        raise RuntimeError("generated manifest has no single [patch.crates-io] binding")
+    unbound, section = text.split(marker)
+    emitted = tomllib.loads(unbound)
+    if emitted.get("patch") or emitted.get("replace"):
+        raise RuntimeError("generated manifest contains another resolver override")
+    selected = generated_dependency_closure(emitted, package_roots, version)
+    expected = "".join(f'{name} = {{ path = {json.dumps(str(package_roots[name].resolve()), ensure_ascii=False)} }}\n'
+                       for name in sorted(selected))
+    if section != expected:
+        raise RuntimeError("generated binding differs from the needed packages and their source paths")
+    tree = binding_tree(package_roots)
+    if (app / "Cargo.lock").read_bytes() != (tree / "Cargo.lock").read_bytes():
+        raise RuntimeError("generated Cargo.lock differs from the source tree's lock")
+    toolchain = tree / "rust-toolchain.toml"
+    copied = app / "rust-toolchain.toml"
+    if toolchain.exists() != copied.exists() or (toolchain.exists() and toolchain.read_bytes() != copied.read_bytes()):
+        raise RuntimeError("generated rust-toolchain.toml differs from the source tree's")
+    return {"packages": sorted(selected),
+            "lock_sha256": hashlib.sha256((app / "Cargo.lock").read_bytes()).hexdigest()}
 
 
 def exercise_rust_application(app: Path, directory: Path, package_roots: dict[str, Path],
@@ -130,7 +182,7 @@ def exercise_rust_application(app: Path, directory: Path, package_roots: dict[st
     generated = generated_file_manifest(app)
     manifest = app / "Cargo.toml"
     consumer = tomllib.loads(manifest.read_text())["package"]
-    bind_generated_dependencies(manifest, package_roots, version)
+    binding = check_generated_binding(app, package_roots, version)
     allowed = {(name, version): path / "Cargo.toml" for name, path in package_roots.items()}
     allowed[(consumer["name"], consumer["version"])] = manifest
     graph = resolve_reviewed_graph(app, allowed, environment)
@@ -156,7 +208,7 @@ def exercise_rust_application(app: Path, directory: Path, package_roots: dict[st
     print(demonstration, end="")
     # Keep variable test timing/order in the private log, outside the reproducible
     # receipt. Callers may inspect its model identity before discarding it.
-    return {"generated_files": generated, "resolved_graph": graph,
+    return {"generated_files": generated, "binding": binding, "resolved_graph": graph,
             "commands": commands + [["cargo", "+1.97.1", "run", "--locked", "--offline", "--", "<new-database>"]],
             "demonstration": demonstration.strip(), "status": "passed"}, test_output
 

@@ -4,12 +4,16 @@
 use std::fs;
 use std::path::PathBuf;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
+use super::super::ContractError;
 use super::super::declarations::Declarations;
 use super::super::expr;
+use super::super::model::Contract;
 use super::super::rules::Rules;
+use super::super::{policy, schema, schema_commitment};
 use super::domain::{self, Construction};
+use super::examples::Example;
 use super::mutants::{self, OPERATORS};
 use super::{DEFAULT_MAX_TUPLES, PACKET_SCHEMA, Review, ReviewSources, review};
 
@@ -31,6 +35,11 @@ impl App {
 
     fn dual_approval() -> Self {
         Self::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../examples/dual-approval"))
+    }
+
+    /// The spend-approval contract of the 2026-10-05 app-building study.
+    fn spend_approval() -> Self {
+        Self::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/spend-approval"))
     }
 
     fn read(base: PathBuf) -> Self {
@@ -66,13 +75,23 @@ impl App {
         review(self.sources(), DEFAULT_MAX_TUPLES).unwrap_or_else(|error| panic!("{error}"))
     }
 
-    fn example_inputs(&self) -> Vec<Vec<i64>> {
+    /// `text` read as the review reads examples: against the descriptor of
+    /// the contract bound through the library.
+    fn parse_examples(&self, text: &str) -> Result<Vec<Example>, ContractError> {
+        let rules = self.rules();
         let declarations = self.declarations();
-        let positions = domain::positions(&declarations).unwrap_or_else(|error| panic!("{error}"));
+        let schema = schema::encode(&declarations)?;
+        let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
+        policy::with_authority(&contract, &schema, |authority| {
+            super::examples::parse(text, authority.descriptor())
+        })?
+    }
+
+    fn example_inputs(&self) -> Vec<Vec<i64>> {
         self.examples
             .as_deref()
             .map(|text| {
-                super::examples::parse(text, &positions, &declarations)
+                self.parse_examples(text)
                     .unwrap_or_else(|error| panic!("{error}"))
                     .into_iter()
                     .map(|example| example.inputs)
@@ -337,20 +356,95 @@ fn every_mutant_of_a_fully_enumerated_domain_is_classified() {
 
 #[test]
 fn a_mutant_the_library_refuses_is_classified_as_such() {
-    let packet = packet(&App::dual_approval().review());
-    let refused = find(
+    let app = App::dual_approval();
+    let packet = packet(&app.review());
+    // The generated channel's idempotency domain covers every ordinal the
+    // rules use, so the library binds this mutant and its decisions judge it.
+    let idempotency = find(
         &packet,
         "cases[5].outbox[0].idempotency_ordinal",
         "`0` -> `1`",
     );
-    assert_eq!(refused["classification"], "refused-by-library");
-    assert_eq!(refused["refusal"]["place"], "library catalog");
+    assert_eq!(idempotency["classification"], "distinguished");
     let generator = find(&packet, "cases[2].post.110", "`152` -> `153`");
     assert_eq!(generator["classification"], "refused-by-generator");
     assert_eq!(
         generator["refusal"]["reason"],
         "153 is not a variant of type 105"
     );
+
+    // No mutant of the catalog reaches the library's refusal any more, so the
+    // refusals below are constructed from that same mutant.
+    let (rules, declarations) = (app.rules(), app.declarations());
+    let schema =
+        super::super::schema::encode(&declarations).unwrap_or_else(|error| panic!("{error}"));
+    let commitment =
+        super::super::schema_commitment(&schema).unwrap_or_else(|error| panic!("{error}"));
+    let mutant = mutants::catalog(&rules, &declarations)
+        .into_iter()
+        .find(|mutant| {
+            mutant.site == "cases[5].outbox[0].idempotency_ordinal" && mutant.change == "`0` -> `1`"
+        })
+        .unwrap_or_else(|| panic!("the idempotency mutant"));
+    let build = |rules: &Rules| {
+        Contract::build(&declarations, rules, commitment).unwrap_or_else(|error| panic!("{error}"))
+    };
+    // Bound with the channel's idempotency domain fixed at 0, as the generator
+    // rendered it before, the library refuses the mutant at its delivery; the
+    // refusal names that entry and keeps the library's error.
+    let mut fixed = build(&mutant.rules);
+    fixed.channels[0].idempotency = 0;
+    let Err(refusal) = super::super::policy::with_authority(&fixed, &schema, |_| ()) else {
+        panic!("the library must refuse the delivery")
+    };
+    assert_eq!(refusal.place(), "v2/policy.json cases[5].outbox[0]");
+    assert!(
+        refusal
+            .reason()
+            .starts_with("the library catalog refused the generated contract (Descriptor)"),
+        "{}",
+        refusal.reason()
+    );
+    // Classification reports the binding's refusal as it is: driven through
+    // `classify` with a schema the library refuses, the mutant is
+    // refused-by-library with exactly the place and reason of that binding.
+    let mut refused_schema = schema.clone();
+    refused_schema.push(0);
+    let positions = domain::positions(&declarations).unwrap_or_else(|error| panic!("{error}"));
+    let inputs = domain::input_set(&positions, &rules, &declarations, &[], DEFAULT_MAX_TUPLES)
+        .unwrap_or_else(|error| panic!("{error}"));
+    let original = build(&rules);
+    let framer = super::evaluate::Framer::new(&positions, &original);
+    let table = super::table::Table::default();
+    let context = super::Context {
+        declarations: &declarations,
+        commitment,
+        schema: &refused_schema,
+        framer: &framer,
+        examples: &[],
+        at_examples: &[],
+        inputs: &inputs,
+        table: &table,
+        state_width: declarations
+            .state_fields()
+            .unwrap_or_else(|error| panic!("{error}"))
+            .len(),
+    };
+    let Err(expected) =
+        super::super::policy::with_authority(&build(&mutant.rules), &refused_schema, |_| ())
+    else {
+        panic!("the library must refuse the schema")
+    };
+    match super::classify(&mutant, &context) {
+        super::Classification::RefusedByLibrary { place, reason } => {
+            assert_eq!(
+                (place.as_str(), reason.as_str()),
+                (expected.place(), expected.reason())
+            );
+            assert!(reason.contains("Schema("), "{reason}");
+        }
+        other => panic!("classified {}", other.name()),
+    }
 }
 
 #[test]
@@ -437,12 +531,14 @@ fn a_planted_wrong_constant_contradicts_an_owner_example() {
         .as_array()
         .unwrap_or_else(|| panic!("disagreements"));
     assert_eq!(disagreements.len(), summary.disagreements);
-    // The third failed login now locks until `now + 901`, which law 503
-    // refuses; at the latest time the deadline also leaves its domain.
+    // The third failed login now locks until `now + 901`. Law 500, the
+    // first law in the contract's order to refuse it, bounds the lock by
+    // `last_seen + 900`; at the latest time the deadline also leaves its
+    // domain.
     assert_eq!(disagreements[0]["line"], 21);
     assert_eq!(
         disagreements[0]["difference"],
-        "the library refused: Core(Law(Violated))"
+        "the library refused: Core(Law(Violated)) by law 500"
     );
     assert!(disagreements.iter().any(|disagreement| {
         disagreement["line"] == 34
@@ -466,6 +562,151 @@ fn a_planted_wrong_constant_contradicts_an_owner_example() {
             }),
         "{}",
         packet["findings"]
+    );
+    // The same lock, from pre-states that satisfy state law 500, is a law
+    // refusal finding of its own; the deadline beyond its domain is a domain
+    // refusal, which is counted but is not a law refusal.
+    assert_eq!(summary.law_refusals, 1);
+    let found: Vec<&Value> = packet["findings"]
+        .as_array()
+        .unwrap_or_else(|| panic!("findings"))
+        .iter()
+        .filter(|finding| finding["kind"] == "law-refusal-on-law-consistent-state")
+        .collect();
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0]["law"], 500);
+    assert_eq!(found[0]["refusal"], "Core(Law(Violated))");
+    assert_eq!(found[0]["first"]["input"][0], "2", "{}", found[0]);
+    let classes: Vec<(&Value, &Value)> = packet["decision_table"]["refusals"]
+        .as_array()
+        .unwrap_or_else(|| panic!("refusals"))
+        .iter()
+        .map(|refusal| (&refusal["refusal"], &refusal["class"]))
+        .collect();
+    assert!(classes.contains(&(&json!("Core(Law(Violated))"), &json!("law"))));
+    assert!(classes.contains(&(&json!("Core(Decision(Domain))"), &json!("domain"))));
+}
+
+/// The study's planted bug: the CFO check of "execute: tier 1 and above need
+/// the CFO" moved from tier 1 to tier 2.
+const CFO_CHECK: &str = "\"action == 172 && tier >= 1 && !cfo_ok\"";
+
+#[test]
+fn a_law_refusal_on_a_pre_state_that_satisfies_every_state_law_is_a_finding() {
+    let review = App::spend_approval().review();
+    let summary = review.summary();
+    assert_eq!(
+        (
+            summary.disagreements,
+            summary.law_refusals,
+            summary.findings
+        ),
+        (0, 0, 0)
+    );
+    let unchanged = packet(&review);
+    assert_eq!(unchanged["refusals"]["state_laws"], json!([500]));
+    assert_eq!(unchanged["refusals"]["counts"]["count"], 0);
+
+    let mut planted = App::spend_approval();
+    assert_eq!(planted.rules.matches(CFO_CHECK).count(), 1);
+    planted.rules = planted
+        .rules
+        .replace(CFO_CHECK, &CFO_CHECK.replace("tier >= 1", "tier >= 2"));
+    let review = planted.review();
+    let summary = review.summary();
+    // No owner example covers a tier 1 execution without the CFO.
+    assert_eq!(
+        (
+            summary.disagreements,
+            summary.law_refusals,
+            summary.findings
+        ),
+        (0, 1, 1)
+    );
+    let packet = packet(&review);
+    let counts = &packet["refusals"]["counts"];
+    assert_eq!(counts["count"], 16);
+    assert_eq!(counts["by_class"], json!({"law": 16}));
+    assert_eq!(
+        counts["on_law_consistent_states"],
+        json!({"count": 16, "by_class": {"law": 16}})
+    );
+    assert_eq!(counts["on_states_the_laws_exclude"]["count"], 0);
+    // The library's law diagnostics name the refusing law.
+    assert_eq!(
+        packet["decision_table"]["refusals"],
+        json!([{"refusal": "Core(Law(Violated))", "class": "law", "law": 500}])
+    );
+    let finding = &packet["findings"][0];
+    assert_eq!(finding["kind"], "law-refusal-on-law-consistent-state");
+    assert_eq!(finding["law"], 500);
+    assert_eq!(finding["inputs"], 16);
+    // A pending tier 1 request without the CFO's approval, executed by the
+    // clerk within the limit, reaches the payment case; law 500 refuses an
+    // executed tier 1 request without the CFO.
+    assert_eq!(
+        finding["first"]["input"],
+        json!(["151", "1", "0", "0", "172", "0", "161", "0", "1"])
+    );
+    assert_eq!(finding["first"]["case"], 16);
+    assert_eq!(finding["first"]["case_when"], "action == 172");
+    let refused: Vec<&str> = packet["decision_table"]["rows"]
+        .as_array()
+        .unwrap_or_else(|| panic!("rows"))
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|row| row.contains("| refused"))
+        .collect();
+    assert_eq!(refused.len(), 16);
+    assert!(refused.iter().all(|row| row.ends_with("| refused 0")));
+    assert_eq!(
+        review.law_refusal_lines(),
+        [
+            "law refusal: law 500 refuses 16 inputs whose pre-state satisfies every state law (Core(Law(Violated))); first 151 1 0 0 172 0 161 0 1, decided by cases[16] `action == 172`"
+        ]
+    );
+}
+
+#[test]
+fn refusals_on_pre_states_the_state_laws_exclude_are_reported_apart() {
+    let review = App::template("order-fulfillment").review();
+    let summary = review.summary();
+    assert_eq!((summary.law_refusals, summary.findings), (0, 0));
+    assert!(review.law_refusal_lines().is_empty());
+    let packet = packet(&review);
+    let refusals = &packet["refusals"];
+    assert_eq!(refusals["state_laws"], json!([500]));
+    assert_eq!(
+        refusals["counts"],
+        json!({
+            "count": 9,
+            "by_class": {"law": 9},
+            "on_law_consistent_states": {"count": 0, "by_class": {}},
+            "on_states_the_laws_exclude": {"count": 9, "by_class": {"law": 9}},
+        })
+    );
+    assert_eq!(refusals["by_unsatisfied_state_law"], json!({"500": 9}));
+    // Law 500 asks an order awaiting payment for at least one payment
+    // attempt; these pre-states have none, so no committed state is one.
+    let group = &refusals["groups"][0];
+    assert_eq!(group["unsatisfied_state_law"], 500);
+    assert_eq!(group["law"], 500);
+    assert_eq!(
+        (&group["first"]["input"][0], &group["first"]["input"][1]),
+        (&json!("161"), &json!("0"))
+    );
+    let refused: Vec<&str> = packet["decision_table"]["rows"]
+        .as_array()
+        .unwrap_or_else(|| panic!("rows"))
+        .iter()
+        .filter_map(Value::as_str)
+        .filter(|row| row.contains("| refused"))
+        .collect();
+    assert_eq!(refused.len(), 9);
+    assert!(
+        refused
+            .iter()
+            .all(|row| row.ends_with("| refused 0 unsatisfied 500"))
     );
 }
 
@@ -500,26 +741,27 @@ fn examples_parse_in_both_delivery_forms_and_name_a_bad_line() {
         .examples
         .as_deref()
         .unwrap_or_else(|| panic!("examples"));
-    let examples = super::examples::parse(text, &positions, &declarations)
+    let examples = app
+        .parse_examples(text)
         .unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(examples.len(), 30);
     // Inputs split over three sections; a payload-only delivery on the only channel.
     assert_eq!(examples[0].inputs.len(), positions.len());
     assert_eq!(examples[0].outbox, vec![(300, vec![1, 183, 184, 2, 2, 3])]);
     let app = App::template("compliance-gateway");
-    let declarations = app.declarations();
-    let positions = domain::positions(&declarations).unwrap_or_else(|error| panic!("{error}"));
     let text = app
         .examples
         .as_deref()
         .unwrap_or_else(|| panic!("examples"));
-    let examples = super::examples::parse(text, &positions, &declarations)
+    let examples = app
+        .parse_examples(text)
         .unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(examples.len(), 28);
     assert_eq!(examples[1].outbox, vec![(300, vec![176, 2])]);
     assert_eq!(examples[2].outbox, vec![(301, vec![170, 1])]);
     let bad = format!("{text}\n0 150 160 1 165 2 0 | accept - 0 | 300 176\n");
-    let error = super::examples::parse(&bad, &positions, &declarations)
+    let error = app
+        .parse_examples(&bad)
         .err()
         .unwrap_or_else(|| panic!("a bad delivery is refused"));
     assert!(
@@ -528,10 +770,130 @@ fn examples_parse_in_both_delivery_forms_and_name_a_bad_line() {
             .ends_with(&format!("line {}", bad.lines().count()))
     );
     let out = format!("{text}\n9 150 160 1 165 2 0 | accept - 9 | -\n");
-    let error = super::examples::parse(&out, &positions, &declarations)
+    let error = app
+        .parse_examples(&out)
         .err()
         .unwrap_or_else(|| panic!("an input outside its domain is refused"));
-    assert_eq!(error.reason(), "`9` is outside the domain of `pre.100.120`");
+    assert_eq!(
+        error.reason(),
+        "`9` is outside the domain of state field 120"
+    );
+}
+
+/// What an example says, without the text it was written as.
+fn meaning(examples: &[Example]) -> Vec<Example> {
+    examples
+        .iter()
+        .map(|example| Example {
+            text: String::new(),
+            ..example.clone()
+        })
+        .collect()
+}
+
+#[test]
+fn the_study_example_forms_parse_alike_and_malformed_lines_are_refused() {
+    // Dual approval: three state fields, a scalar command, one context
+    // field, and one channel whose payload has two fields.
+    let app = App::dual_approval();
+    let text = app.examples.clone().unwrap_or_else(|| panic!("examples"));
+    let written = app
+        .parse_examples(&text)
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(written.len(), 12);
+    // The three forms the study found read differently by the review and
+    // the application: inputs split over sections, payload-only deliveries
+    // on the only channel, and indented comments.
+    let rewritten: String = text
+        .lines()
+        .map(|line| {
+            if line.starts_with('#') {
+                return format!(" \t{line}\n");
+            }
+            let sections: Vec<&str> = line.split('|').map(str::trim).collect();
+            let inputs: Vec<&str> = sections[0].split_whitespace().collect();
+            let deliveries = sections[2].strip_prefix("300 ").unwrap_or(sections[2]);
+            format!(
+                "{} | {} | {} | {} | {deliveries}\n",
+                inputs[..3].join(" "),
+                inputs[3],
+                inputs[4],
+                sections[1]
+            )
+        })
+        .collect();
+    assert!(rewritten.contains("150 161 160 | 140 | 162 | accept - 151 161 162 | 162 161"));
+    let reread = app
+        .parse_examples(&rewritten)
+        .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(meaning(&reread), meaning(&written));
+    // Malformed lines, each refused with the line and the reason.
+    for (line, reason) in [
+        (
+            "150 161 160 140 162 | accept - 151 161 162",
+            "expected `inputs | class reason post | deliveries`",
+        ),
+        (
+            "150 161 160 140 | accept - 151 161 162 | -",
+            "4 input numbers; the contract reads 5",
+        ),
+        (
+            "150 161 160 142 162 | accept - 151 161 162 | -",
+            "`142` is outside the domain of command",
+        ),
+        (
+            "150 161 160 140 162 | approve - 151 161 162 | -",
+            "the decision starts with accept, reject or failure",
+        ),
+        (
+            "150 161 160 140 162 | accept x 151 161 162 | -",
+            "`x` is not a reason",
+        ),
+        (
+            "150 161 160 140 162 | accept - 151 161 | -",
+            "2 post-state numbers; the state has 3 fields",
+        ),
+        (
+            "150 161 160 140 162 | accept - 153 161 162 | -",
+            "`153` is outside the domain of post-state field 110",
+        ),
+        (
+            "150 161 160 140 162 | accept - 151 161 162 | 301 162 161",
+            "a delivery is a declared channel followed by its payload numbers, or the payload numbers alone when one channel is declared",
+        ),
+        (
+            "150 161 160 140 162 | accept - 151 161 162 | 300 162 161;",
+            "a delivery is a declared channel followed by its payload numbers, or the payload numbers alone when one channel is declared",
+        ),
+        (
+            "150 161 160 140 162 | accept - 151 161 162 | 300 162 164",
+            "`164` is outside the domain of channel 300 field 131",
+        ),
+        (
+            "150 161 160 140 162 | accept - 151 161 162 # trailing note | -",
+            "`#` is not a number",
+        ),
+    ] {
+        let error = app
+            .parse_examples(&format!("# a comment\n\n{line}\n"))
+            .err()
+            .unwrap_or_else(|| panic!("{line} is refused"));
+        assert_eq!(
+            (error.place(), error.reason()),
+            ("tests/decision-examples.txt line 3", reason),
+            "{line}"
+        );
+    }
+    // With two channels declared, a delivery names its channel.
+    let gateway = App::template("compliance-gateway");
+    let error = gateway
+        .parse_examples("0 150 161 2 165 2 0 | accept - 0 | 176 2\n")
+        .err()
+        .unwrap_or_else(|| panic!("a payload-only delivery is refused"));
+    assert_eq!(
+        error.reason(),
+        "a delivery is a declared channel followed by its payload numbers, or the payload numbers alone when one channel is declared"
+    );
 }
 
 #[test]
@@ -550,4 +912,89 @@ fn packets_are_byte_identical_on_repeat() {
     );
     assert_eq!(packet["inputs"]["construction"], "full-domain");
     assert_eq!(packet["examples"]["file"], "tests/decision-examples.txt");
+}
+
+#[test]
+fn every_template_examples_file_reads_as_it_did_before_the_shared_grammar() {
+    // Each count and SHA-256 was recorded with the review's own parser,
+    // before the grammar shared with the applications replaced it, over one
+    // line per example: `line inputs class reason post outbox`, the lists in
+    // Rust's debug form.
+    for (name, count, digest) in [
+        (
+            "account-lockout",
+            20,
+            "6ba24a33a0af574bcb117cac023ac8a81f456a01c0a852426e4b02aea59e398d",
+        ),
+        (
+            "agent-treasury-guard",
+            30,
+            "5b44fe7b3375d6c3000c43584c007cad5f03795ddef7f7053c8aef72ce6d5ba8",
+        ),
+        (
+            "compliance-gateway",
+            28,
+            "7d8023f39df7e26164638e3278b63061d2445aacdb44b6b3fc468c2667590b28",
+        ),
+        (
+            "durable-counter",
+            12,
+            "969b3741aae0f6d309c132c39aeb3f6b0670a043374f04b79b7b26fcdb7bec44",
+        ),
+        (
+            "inventory-reservation",
+            20,
+            "ca5707742a88826188424434718bd19c7544f76cc50619f3c5fcb9213c13a7af",
+        ),
+        (
+            "order-fulfillment",
+            23,
+            "7412c3a48dc7e19640b3a63b4d9b6110418c491e28b565377001752a42163fb7",
+        ),
+        (
+            "withdrawal-queue",
+            26,
+            "140fcaa2b9bc97fec4962797c4906c3c87b46516666df80ebcf032df7af85249",
+        ),
+        (
+            "dual-approval",
+            12,
+            "dd2442de6e541755dae1d2fcf14bccf0e52fa2cd16d91b5caae055309406b593",
+        ),
+    ] {
+        let app = if name == "dual-approval" {
+            App::dual_approval()
+        } else {
+            App::template(name)
+        };
+        let text = app
+            .examples
+            .as_deref()
+            .unwrap_or_else(|| panic!("{name} examples"));
+        let examples = app
+            .parse_examples(text)
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        let rendered: String = examples
+            .iter()
+            .map(|example| {
+                format!(
+                    "{} {:?} {} {:?} {:?} {:?}\n",
+                    example.line,
+                    example.inputs,
+                    example.class.name(),
+                    example.reason,
+                    example.post,
+                    example.outbox
+                )
+            })
+            .collect();
+        assert_eq!(examples.len(), count, "{name}");
+        assert_eq!(
+            super::evaluate::hex(&super::evaluate::digest(rendered.as_bytes())),
+            digest,
+            "{name}"
+        );
+    }
+    // The eighth template keeps no examples file.
+    assert!(App::template("prepared-counter").examples.is_none());
 }

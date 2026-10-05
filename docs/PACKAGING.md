@@ -46,7 +46,11 @@ and binary target with `--locked --offline`. This catches source, build, binary,
 or test files that exist in the repository and are absent from a packaged
 archive. The same run builds both declared binaries in release mode,
 generates warning-denied rustdoc, records the Cargo dependency graph as
-CycloneDX 1.6, and content-addresses every retained artifact.
+CycloneDX 1.6, and content-addresses every retained artifact. The binaries
+are built with `ZENO_FCIS_BUILD_TREE` empty, so `zeno-fcis` holds no build
+directory: `zeno-fcis new` from an installed binary needs `--source
+<extracted source tree>`, for example the extracted
+`source/zeno-fcis-<version>-source.tar.gz`.
 
 Before deleting the unpacked workspace, the packager also builds its CLI and
 uses that executable to emit fresh durable-counter, prepared-counter,

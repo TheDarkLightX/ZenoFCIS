@@ -1,6 +1,6 @@
 //! Runs the decision examples as one session in a new database, or audits,
-//! delivers, upgrades or migrates an existing database along the contract
-//! lineage.
+//! decides on, delivers, upgrades or migrates an existing database along the
+//! contract lineage.
 
 use std::path::Path;
 
@@ -29,7 +29,7 @@ fn main() {
         _ => {
             let name = env!("CARGO_PKG_NAME");
             eprintln!(
-                "usage: {name} NEW_DATABASE_PATH\n       {name} --decide NEW_DATABASE_PATH\n       {name} --audit DATABASE_PATH\n       {name} --deliver DATABASE_PATH\n       {name} --upgrade DATABASE_PATH\n       {name} --migrate DATABASE_PATH"
+                "usage: {name} NEW_DATABASE_PATH\n       {name} --decide DATABASE_PATH\n       {name} --audit DATABASE_PATH\n       {name} --deliver DATABASE_PATH\n       {name} --upgrade DATABASE_PATH\n       {name} --migrate DATABASE_PATH"
             );
             std::process::exit(2);
         }

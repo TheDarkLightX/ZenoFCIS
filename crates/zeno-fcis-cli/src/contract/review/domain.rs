@@ -39,14 +39,6 @@ impl LeafDomain {
         }
     }
 
-    pub(super) fn contains(&self, value: i128) -> bool {
-        match self {
-            Self::Bool => value == 0 || value == 1,
-            Self::Int { min, max } => (i128::from(*min)..=i128::from(*max)).contains(&value),
-            Self::Sum { variants, .. } => variants.iter().any(|id| i128::from(*id) == value),
-        }
-    }
-
     /// Every value in ascending order. Callers enumerate only domains whose
     /// size fits the tuple limit.
     fn values(&self) -> Vec<i64> {
