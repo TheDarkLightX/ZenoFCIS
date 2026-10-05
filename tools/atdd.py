@@ -218,6 +218,15 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "optimize::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "optimize_cli", "--locked")),
     ),
+    "neural-loop": AcceptanceScenario(
+        "Improve a program only through checked proposals in the bounded loop",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "neural_loop::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "loop_command::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "loop_cli", "--locked"),
+         ("python3", "integrations/mcp/test_transform_tools.py")),
+    ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",
         (("python3", "tools/test_record_gate_evidence.py"),),

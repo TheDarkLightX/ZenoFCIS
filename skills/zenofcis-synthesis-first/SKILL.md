@@ -56,6 +56,18 @@ not proof acceptance. Preserve artifact drift refusals and exact source/tool
 identities. A Wasm compilation does not establish native/Wasm execution parity or
 a universal Rust code-generation theorem.
 
+To shrink an admitted finite program, use `transform_request`,
+`transform_candidate` and `transform_replay` (or `zeno-fcis loop`). Propose
+complete programs with exactly the original's inputs and outputs; the loop
+checks each one against the original on every input tuple and keeps a
+replacement only when it is equivalent and smaller in nodes or bytes within the
+original's bounds. Read the typed feedback as checker facts and your own
+reasoning as advisory: a replayed counterexample names the first differing
+tuple, a refusal names the admission rule, and `best-checked-so-far` means
+equal on the declared domain and no larger, not optimal and not adopted by any
+application. At most eight attempts and eight checks are available per session;
+duplicates and malformed proposals consume them.
+
 Use the local [MCP server](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/integrations/mcp/zeno_fcis_synthesis.py) or the same
 CLI directly. Installation and tool usage are documented in
 [docs/LLM_SYNTHESIS.md](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/docs/LLM_SYNTHESIS.md). Neither the skill nor MCP

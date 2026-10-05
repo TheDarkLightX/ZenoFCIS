@@ -426,6 +426,74 @@ domains get algebraic rules under conservative trap bounds, and an accepted
 candidate changes Step usage, so adopting one into an application remains a
 separate reviewed step that this command does not perform.
 
+## Bounded optimization loop
+
+`zeno-fcis loop` runs the bounded adaptive loop specified in
+[docs/neurosymbolic-loop](neurosymbolic-loop/README.md): a proposer suggests
+complete candidate programs and `transform check` judges every one against the
+admitted original on its whole declared input domain. The loop keeps an
+incumbent that is either the original, with no receipt, or a checked
+replacement built from a genuine equivalence; a model, a user, a receipt file
+or a "passed" flag cannot build one. Proposals are data, never code.
+
+| Command | Effect |
+| --- | --- |
+| `loop open --original P --session DIR [--profile functional-bool-v1\|checked-i64-v1] [--attempts N] [--checks N] [--model-calls N] [--check-work N] [--session-work N] [--deadline-ms N]` | Admits the original under the profile, freezes the canonical request (`zeno-fcis/transform-request/1`) and its `request_id`, and creates the session directory. Limits above the compiled ceilings (8 attempts, 8 checks, 4 model calls, 1,000,000 work units per check, 8,000,000 per session, 20,000 ms) are refused; lower limits win. Hosted providers, source disclosure and spending are fixed disabled. |
+| `loop candidate --session DIR (--candidate C \| --candidate-json J) [--provenance FILE]` | Spends one attempt on a supplied candidate (canonical bytes, or the fixture vocabulary `{inputs, outputs, nodes, roots}` encoded canonically first) and prints typed feedback: a replayed counterexample, an admission refusal, an incomplete check, or an equivalence with its actual cost and selection reason. |
+| `loop run --session DIR --proposer local\|fake\|hosted [--script S] [--hosted-config H]` | Drives attempts until the proposer is exhausted or a limit stops the session. `local` is a deterministic rewriter; `fake` replays a script (`zeno-fcis/fake-provider-script/1`) and is metered as a model; `hosted` is the provider adapter, which is disabled in this build and answers "unavailable" without any network, credential or spending path. |
+| `loop resume --session DIR` | Re-admits the request, verifies the ledger chain against its head, replays the incumbent through the checker and prints the report. Any failure leaves no trusted incumbent. |
+| `loop encode --program J --out P` | Encodes a fixture-vocabulary program as canonical bytes after library admission; the output file is never overwritten. |
+
+Results use schema `zeno-fcis/transform-loop/1` with `authority: none`.
+`open` exits 0 when the request is admitted and 1 when it is refused.
+`candidate` exits 0 for an equivalent candidate (improvement or not), 1 for a
+difference, refusal or duplicate, and 2 for an inconclusive check or a closed
+session. `run` exits 0 when the loop completed; `resume` exits 0 with a
+replayed incumbent and 2 (`resume-refused`, `resume-inconclusive`) otherwise.
+I/O failures exit 3. The report (`zeno-fcis/transform-loop-report/1`) states
+`no-checked-improvement` or `best-checked-so-far`, the actual stop reason, the
+receipt status, every attempt's outcome and cost, the accounting (attempts,
+checks, model calls, tokens, work, unresolved reservations) and the claims the
+result does not make: global optimality, convergence, success probability,
+model learning, application authority, wall-time speedup.
+
+Selection is strictly lexicographic on (stored nodes, canonical bytes): a
+candidate replaces the incumbent only if neither component exceeds the
+original's, at least one is below it, and the pair is below the incumbent's.
+Ties keep the incumbent. Every incumbent is therefore componentwise no more
+costly than the original and updates descend strictly; nothing stronger is
+claimed. The equivalence is functional equality on the declared domain under
+eager semantics; Step usage is reported, never compared, so adopting a
+candidate remains an application decision outside this command.
+
+The session directory holds `request.json`, `original.zcve`, the append-only
+`ledger.jsonl` with its separately written `ledger.head`, `artifacts/` by
+digest, `receipts/`, `witnesses/` and a transcript capped at 512 KiB. Every
+attempt, model call and check is reserved in the ledger before its work and
+never refunded; a crash leaves the reservation charged as unresolved. The
+ledger's hash chain detects truncation and edits relative to the head; a host
+that rolls back both files together is outside its detection, which is the
+documented host-integrity assumption. The `--deadline-ms` limit bounds one
+`run` or `candidate` invocation's loop work; an agent's thinking time between
+`candidate` calls is not loop work, while attempts, checks and work caps are
+session-wide and persisted. Check workers run on a supervised thread with a
+two-second deadline and panic capture; memory caps are not installed by this
+shell, the checker's allocation being bounded by the admitted artifact limits.
+
+Strategy proposals in the optimizer's grammar (`zeno-fcis/optimize-strategy/1`:
+named phases with bounded rounds, optional limits, a fixed extractor) are
+admitted as data and run by the wired engine, the checked e-graph optimizer
+(engine `zeno-fcis/optimize/1`, searching domains of at most 1,000,000
+tuples under the search worker's deadline). A phase outside the optimizer's
+table is `strategy-unavailable`. The optimizer's own checker verdict is only
+provenance: the bytes it emits enter the same admission and check path as
+any candidate, and only the loop's check can replace the incumbent. The MCP tools
+`transform_request`, `transform_candidate` and `transform_replay` in
+[LLM synthesis](LLM_SYNTHESIS.md) call `open`, `candidate` and `resume`.
+[`docs/benchmarks/run_neural_loop_protocol.py`](benchmarks/run_neural_loop_protocol.py)
+runs the local and fake arms of the preregistered protocol over a cases file
+and reports every result, including failures.
+
 ## Bounded completion in 1.1.0
 
 `zeno-fcis describe synth completion` lists the exact options and filesystem
