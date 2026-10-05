@@ -362,9 +362,16 @@ large one; whether that agrees with `tests/decision-examples.txt`; and which
 rule mutants those inputs distinguish, each with a proposed example.
 `zeno-fcis contract adopt DIR --candidate C --receipt R --usage
 new-version` makes a candidate decision program that a `transform` receipt
-shows equivalent the contract's next version, keeping the superseded version
-beside it; the application then upgrades a live store with `--upgrade`,
-which the SQLite shell records as a chained, replayable upgrade. See the
+shows equivalent the contract's next version, and keeps the superseded version
+unchanged beside it. An adoption changes only the decision program and its
+Step limit, so the application's `--upgrade` moves a store at any state to the
+new version. The SQLite shell records a chained, replayable upgrade that binds
+the adoption's receipt digest and states which premises held. Under those
+premises the two versions reach the same states, so the upgrade keeps every
+law and proved inductive claim; Step usage can change, which makes it a new
+contract version. A contract that changes anything else, such as
+a law, upgrades only a store whose state its genesis laws admit; for a
+generated contract that is the declared genesis state. See the
 [CLI reference](docs/CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
 
 ## Authoring and checked synthesis

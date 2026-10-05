@@ -44,7 +44,9 @@ Feature: Check a candidate program before the factory may use it
     Given an application whose decision program a receipt shows equivalent to a candidate
     When the owner adopts the candidate as the next contract version
     Then the generator replays the receipt against the program it re-derives before emitting the candidate's graph
-    And the superseded version is kept beside the current one and the rules name the candidate and receipt digests
-    And a live store upgrades to the new version only with the same state schema and a current state its genesis laws admit
+    And the superseded version is kept exactly beside the current one and the rules name the candidate, receipt and superseded policy digests
+    And a store at any state, with a delivery pending, upgrades to the adopted program successor, whose policy differs only in its decision program and Step limit, and the record binds the adoption's receipt digest and states which premises held
+    And with law 991, an equivalent receipt, Step limits that never bind and no law observing Step usage, both versions take every further command alike
+    And a contract that changes a law upgrades only a store whose state its genesis laws admit, which for a generated contract is the declared genesis state
     And each history segment replays under its own contract and pending deliveries are delivered exactly once with their original identifiers
-    And a different schema, a refused genesis, a missing old contract, an altered record, an unreplayable receipt and a false usage claim each refuse with nothing written
+    And a different schema, a refused genesis, a missing old contract, an altered record, an unreplayable receipt, a false usage claim, an unchanged program and an edit to a superseded version each refuse with nothing written

@@ -16,8 +16,8 @@ use super::expr::{self, Ast, Binary, Rounding};
 use super::model::{self, Contract, InputLeaf};
 use super::rules::{self, Adoption, Class, Rules, Usage};
 use super::{
-    AdoptionSources, ContractSources, generate_contract, program_bytes, schema, schema_commitment,
-    with_adoption,
+    AdoptionSources, ContractSources, StepBound, generate_contract, program_bytes,
+    refresh_receipts, schema, schema_commitment, with_adoption,
 };
 use crate::transform::{self, DEFAULT_MAX_INPUT_TUPLES, DEFAULT_STEP_LIMIT, Limits};
 
@@ -68,6 +68,7 @@ impl Template {
             rules: &self.rules,
             schema_origin: Some(&self.origin),
             adoptions: &[],
+            replayed: &[],
         }
     }
 
@@ -822,6 +823,7 @@ merge [400];
         rules,
         schema_origin: None,
         adoptions: &[],
+        replayed: &[],
     }) else {
         panic!("a scalar state must be refused")
     };
@@ -840,18 +842,19 @@ fn rules_files_render_back_byte_for_byte() {
     }
 }
 
-fn adoption(candidate: &[u8], receipt: &[u8], usage: Usage) -> Adoption {
+fn adoption(candidate: &[u8], receipt: &[u8], usage: Usage, superseded: &[u8]) -> Adoption {
     Adoption {
         candidate_sha256: transform::sha256_hex(candidate),
         receipt_sha256: transform::sha256_hex(receipt),
         usage,
+        superseded_policy_sha256: transform::sha256_hex(superseded),
     }
 }
 
 #[test]
 fn with_adoption_appends_one_entry_in_the_file_layout() {
     let counter = template("durable-counter");
-    let first = adoption(b"candidate", b"receipt", Usage::NewVersion);
+    let first = adoption(b"candidate", b"receipt", Usage::NewVersion, b"policy 1");
     let once = with_adoption(&counter.rules, &first).unwrap_or_else(|error| panic!("{error}"));
     let head = counter
         .rules
@@ -861,8 +864,9 @@ fn with_adoption_appends_one_entry_in_the_file_layout() {
         once,
         format!(
             "{head},\n  \"adoptions\": [\n    {{\n      \"candidate_sha256\": \"{}\",\n      \
-             \"receipt_sha256\": \"{}\",\n      \"usage\": \"new-version\"\n    }}\n  ]\n}}\n",
-            first.candidate_sha256, first.receipt_sha256
+             \"receipt_sha256\": \"{}\",\n      \"usage\": \"new-version\",\n      \
+             \"superseded_policy_sha256\": \"{}\"\n    }}\n  ]\n}}\n",
+            first.candidate_sha256, first.receipt_sha256, first.superseded_policy_sha256
         )
     );
     assert_eq!(
@@ -871,7 +875,7 @@ fn with_adoption_appends_one_entry_in_the_file_layout() {
             .adoptions,
         std::slice::from_ref(&first)
     );
-    let second = adoption(b"other", b"later", Usage::Preserved);
+    let second = adoption(b"other", b"later", Usage::Preserved, b"policy 2");
     let twice = with_adoption(&once, &second).unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(
         Rules::read(&twice)
@@ -879,27 +883,40 @@ fn with_adoption_appends_one_entry_in_the_file_layout() {
             .adoptions,
         [first, second]
     );
+    let (a, b, c) = ("a".repeat(64), "b".repeat(64), "c".repeat(64));
     let planted = [
         (
             "adoptions[0].candidate_sha256",
-            r#"{"candidate_sha256": "abc", "receipt_sha256": "", "usage": "preserved"}"#,
+            format!(
+                r#"{{"candidate_sha256": "abc", "receipt_sha256": "", "usage": "preserved", "superseded_policy_sha256": "{c}"}}"#
+            ),
             "must be a lowercase hexadecimal SHA-256",
         ),
         (
             "adoptions[0].usage",
-            &format!(
-                r#"{{"candidate_sha256": "{}", "receipt_sha256": "{}", "usage": "same"}}"#,
-                "a".repeat(64),
-                "b".repeat(64)
+            format!(
+                r#"{{"candidate_sha256": "{a}", "receipt_sha256": "{b}", "usage": "same", "superseded_policy_sha256": "{c}"}}"#
             ),
             "`same` is not preserved or new-version",
         ),
         (
+            "adoptions[0].superseded_policy_sha256",
+            format!(
+                r#"{{"candidate_sha256": "{a}", "receipt_sha256": "{b}", "usage": "preserved", "superseded_policy_sha256": "C"}}"#
+            ),
+            "must be a lowercase hexadecimal SHA-256",
+        ),
+        (
             "adoptions[0]",
-            &format!(
-                r#"{{"candidate_sha256": "{}", "receipt_sha256": "{}", "usage": "preserved", "nodes": 1}}"#,
-                "a".repeat(64),
-                "b".repeat(64)
+            format!(
+                r#"{{"candidate_sha256": "{a}", "receipt_sha256": "{b}", "usage": "preserved"}}"#
+            ),
+            "missing key `superseded_policy_sha256`",
+        ),
+        (
+            "adoptions[0]",
+            format!(
+                r#"{{"candidate_sha256": "{a}", "receipt_sha256": "{b}", "usage": "preserved", "superseded_policy_sha256": "{c}", "nodes": 1}}"#
             ),
             "unknown key `nodes`",
         ),
@@ -927,6 +944,21 @@ fn current_program(files: &Template) -> (Program, Vec<u8>) {
     (program, bytes)
 }
 
+/// `program` with `count` unused constants: equal results, and each costs
+/// one more Step on every input.
+fn padded(program: &Program, count: usize) -> Vec<u8> {
+    let mut nodes = program.nodes().to_vec();
+    nodes.extend(std::iter::repeat_n(Op::Int(0), count));
+    let padded = Program::try_new(
+        program.inputs().to_vec(),
+        program.outputs().to_vec(),
+        nodes,
+        program.roots().to_vec(),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    program_bytes(&padded).unwrap_or_else(|error| panic!("{error}"))
+}
+
 fn receipt(original: &[u8], candidate: &[u8]) -> Vec<u8> {
     let limits = Limits {
         steps: DEFAULT_STEP_LIMIT,
@@ -942,25 +974,20 @@ fn receipt(original: &[u8], candidate: &[u8]) -> Vec<u8> {
 fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
     let counter = template("durable-counter");
     let (program, original) = current_program(&counter);
-    // One unused constant costs one Step on every input: equal results, more usage.
-    let mut padded_nodes = program.nodes().to_vec();
-    padded_nodes.push(Op::Int(0));
-    let padded = Program::try_new(
-        program.inputs().to_vec(),
-        program.outputs().to_vec(),
-        padded_nodes,
-        program.roots().to_vec(),
-    )
-    .unwrap_or_else(|error| panic!("{error}"));
-    let padded = program_bytes(&padded).unwrap_or_else(|error| panic!("{error}"));
-    let padded_receipt = receipt(&original, &padded);
+    let padded_once = padded(&program, 1);
+    let padded_receipt = receipt(&original, &padded_once);
     let claimed = with_adoption(
         &counter.rules,
-        &adoption(&padded, &padded_receipt, Usage::Preserved),
+        &adoption(
+            &padded_once,
+            &padded_receipt,
+            Usage::Preserved,
+            &counter.policy,
+        ),
     )
     .unwrap_or_else(|error| panic!("{error}"));
     let first = [AdoptionSources {
-        candidate: &padded,
+        candidate: &padded_once,
         receipt: &padded_receipt,
     }];
     let refused = generate_contract(ContractSources {
@@ -980,7 +1007,12 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
 
     let adopted = with_adoption(
         &counter.rules,
-        &adoption(&padded, &padded_receipt, Usage::NewVersion),
+        &adoption(
+            &padded_once,
+            &padded_receipt,
+            Usage::NewVersion,
+            &counter.policy,
+        ),
     )
     .unwrap_or_else(|error| panic!("{error}"));
     let generated = generate_contract(ContractSources {
@@ -1009,6 +1041,7 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
     );
     assert_eq!(generated.previous()[0].policy(), counter.policy);
     assert_ne!(generated.policy(), counter.policy, "the program changed");
+    assert_eq!(generated.program(), padded_once);
     assert!(generated.source().contains("pub const VERSION: u32 = 2;"));
     assert!(
         generated
@@ -1020,32 +1053,44 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
             .source()
             .contains("let catalog_1 = v1::checked_catalog(&descriptor_1)?;")
     );
+    // The lineage passes the replayed receipt's digest with the catalogs.
+    assert!(generated.source().contains(&format!(
+        "pub const ADOPTION_RECEIPTS: &[&str] =\n    &[\"{}\"];",
+        transform::sha256_hex(&padded_receipt)
+    )));
     assert!(
         generated
             .source()
-            .contains("Ok(f(&[&catalog_1, &catalog]))")
+            .contains("Ok(f((&[&catalog_1, &catalog], ADOPTION_RECEIPTS)))")
     );
     assert!(generated.source().contains("Op::Int(0)"));
     assert_eq!(
-        import_program(&padded)
+        import_program(&padded_once)
             .unwrap_or_else(|error| panic!("{error}"))
             .nodes()
             .len(),
         summary.program_nodes
     );
 
-    // A second adoption replays against the adopted program, not the rules-compiled one.
-    let same_receipt = receipt(&padded, &padded);
+    // A second adoption replays against the adopted program, not the
+    // rules-compiled one, and binds the policy of version 2.
+    let padded_twice = padded(&program, 2);
+    let twice_receipt = receipt(&padded_once, &padded_twice);
     let chained = with_adoption(
         &adopted,
-        &adoption(&padded, &same_receipt, Usage::Preserved),
+        &adoption(
+            &padded_twice,
+            &twice_receipt,
+            Usage::NewVersion,
+            generated.policy(),
+        ),
     )
     .unwrap_or_else(|error| panic!("{error}"));
     let both = [
         first[0],
         AdoptionSources {
-            candidate: &padded,
-            receipt: &same_receipt,
+            candidate: &padded_twice,
+            receipt: &twice_receipt,
         },
     ];
     let generated = generate_contract(ContractSources {
@@ -1055,12 +1100,13 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
     })
     .unwrap_or_else(|error| panic!("{error}"));
     assert_eq!(generated.summary().version, 3);
-    assert!(generated.summary().adoptions[1].usage_preserved);
+    assert!(!generated.summary().adoptions[1].usage_preserved);
     assert_eq!(generated.previous().len(), 2);
+    assert_eq!(generated.replayed().len(), 2);
     assert!(
         generated
             .source()
-            .contains("Ok(f(&[&catalog_1, &catalog_2, &catalog]))")
+            .contains("Ok(f((&[&catalog_1, &catalog_2, &catalog], ADOPTION_RECEIPTS)))")
     );
     assert!(
         generated.previous()[1]
@@ -1073,16 +1119,40 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
             .contains("pub const VERSION: u32 = 2;")
     );
     assert!(!generated.previous()[1].source().contains("pub mod v1;"));
+    assert!(
+        !generated.previous()[1]
+            .source()
+            .contains("ADOPTION_RECEIPTS")
+    );
+    // The same generation reuses its witnesses and enumerates nothing again.
+    let again = generate_contract(ContractSources {
+        rules: &chained,
+        adoptions: &both,
+        replayed: generated.replayed(),
+        ..counter.sources()
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(again, generated);
 
     // The receipt of the first adoption does not replay against the adopted program.
     let misordered = [both[1], both[0]];
     let misordered_rules = with_adoption(
         &with_adoption(
             &counter.rules,
-            &adoption(&padded, &same_receipt, Usage::Preserved),
+            &adoption(
+                &padded_twice,
+                &twice_receipt,
+                Usage::NewVersion,
+                &counter.policy,
+            ),
         )
         .unwrap_or_else(|error| panic!("{error}")),
-        &adoption(&padded, &padded_receipt, Usage::NewVersion),
+        &adoption(
+            &padded_once,
+            &padded_receipt,
+            Usage::NewVersion,
+            &counter.policy,
+        ),
     )
     .unwrap_or_else(|error| panic!("{error}"));
     let refused = generate_contract(ContractSources {
@@ -1103,11 +1173,164 @@ fn adoptions_replay_their_receipts_in_order_and_emit_every_version() {
 }
 
 #[test]
+fn an_adoption_must_change_the_program_and_never_repeat_a_version() {
+    let counter = template("durable-counter");
+    let (program, original) = current_program(&counter);
+    let refusal = |rules: &str, files: &[AdoptionSources<'_>]| {
+        generate_contract(ContractSources {
+            rules,
+            adoptions: files,
+            ..counter.sources()
+        })
+        .err()
+        .map(|error| (error.place().to_owned(), error.reason().to_owned()))
+    };
+    // The identical candidate would leave the identity unchanged.
+    let same_receipt = receipt(&original, &original);
+    let unchanged = with_adoption(
+        &counter.rules,
+        &adoption(&original, &same_receipt, Usage::Preserved, &counter.policy),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        refusal(
+            &unchanged,
+            &[AdoptionSources {
+                candidate: &original,
+                receipt: &same_receipt
+            }]
+        ),
+        Some((
+            "v2/policy.json adoptions[0]".to_owned(),
+            "v2/adoptions/1/program.zcve is version 1's own program; an adoption must change it"
+                .to_owned()
+        ))
+    );
+    // Adopting version 1's program back would repeat version 1.
+    let padded_once = padded(&program, 1);
+    let padded_receipt = receipt(&original, &padded_once);
+    let adopted = with_adoption(
+        &counter.rules,
+        &adoption(
+            &padded_once,
+            &padded_receipt,
+            Usage::NewVersion,
+            &counter.policy,
+        ),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let first = AdoptionSources {
+        candidate: &padded_once,
+        receipt: &padded_receipt,
+    };
+    let generated = generate_contract(ContractSources {
+        rules: &adopted,
+        adoptions: &[first],
+        ..counter.sources()
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
+    let back = receipt(&padded_once, &original);
+    let reverted = with_adoption(
+        &adopted,
+        &adoption(&original, &back, Usage::NewVersion, generated.policy()),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        refusal(
+            &reverted,
+            &[
+                first,
+                AdoptionSources {
+                    candidate: &original,
+                    receipt: &back
+                }
+            ]
+        ),
+        Some((
+            "v2/policy.json adoptions[1]".to_owned(),
+            "version 3 would repeat version 1: a contract's identity binds its policy, so stores \
+             could not tell them apart. Adopt a program no earlier version ran"
+                .to_owned()
+        ))
+    );
+}
+
+#[test]
+fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
+    let counter = template("durable-counter");
+    let (program, original) = current_program(&counter);
+    let padded_once = padded(&program, 1);
+    let padded_receipt = receipt(&original, &padded_once);
+    let adopted = with_adoption(
+        &counter.rules,
+        &adoption(
+            &padded_once,
+            &padded_receipt,
+            Usage::NewVersion,
+            &counter.policy,
+        ),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    let files = [AdoptionSources {
+        candidate: &padded_once,
+        receipt: &padded_receipt,
+    }];
+    let generated = generate_contract(ContractSources {
+        rules: &adopted,
+        adoptions: &files,
+        ..counter.sources()
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(generated.previous()[0].policy(), counter.policy);
+    // A law edit leaves the cases, so the program and the receipt, unchanged,
+    // but it would change version 1, which stores may run.
+    let edited = counter.with_project("post.100.110 <= 3", "post.100.110 <= 2");
+    let fresh = generate_contract(edited.sources()).unwrap_or_else(|error| panic!("{error}"));
+    assert_ne!(
+        fresh.policy(),
+        counter.policy,
+        "the edit changes the policy"
+    );
+    assert_eq!(fresh.program(), original, "but not the decision program");
+    let refused = generate_contract(ContractSources {
+        rules: &adopted,
+        adoptions: &files,
+        ..edited.sources()
+    })
+    .err()
+    .unwrap_or_else(|| panic!("an edit after adoption is refused"));
+    assert_eq!(
+        refused.place(),
+        "v2/policy.json adoptions[0].superseded_policy_sha256"
+    );
+    assert_eq!(
+        refused.reason(),
+        "differs from version 1's policy as these declarations and rules produce it: an edit \
+         after adoption 1 changes version 1, which existing stores may run. Once a version is \
+         superseded, only another adoption changes the contract"
+    );
+    // The unedited inputs still give version 1 exactly.
+    let kept = generate_contract(ContractSources {
+        rules: &adopted,
+        adoptions: &files,
+        ..counter.sources()
+    })
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(kept.previous()[0].policy(), counter.policy);
+}
+
+#[test]
 fn adoptions_bind_their_retained_files() {
     let counter = template("durable-counter");
-    let (_, original) = current_program(&counter);
-    let same_receipt = receipt(&original, &original);
-    let entry = adoption(&original, &same_receipt, Usage::Preserved);
+    let (program, original) = current_program(&counter);
+    let padded_once = padded(&program, 1);
+    let padded_receipt = receipt(&original, &padded_once);
+    let entry = adoption(
+        &padded_once,
+        &padded_receipt,
+        Usage::NewVersion,
+        &counter.policy,
+    );
     let adopted = with_adoption(&counter.rules, &entry).unwrap_or_else(|error| panic!("{error}"));
     let refusal = |files: &[AdoptionSources<'_>]| {
         generate_contract(ContractSources {
@@ -1125,23 +1348,23 @@ fn adoptions_bind_their_retained_files() {
             "lists 1 adoptions but 0 retained candidate/receipt pairs were supplied".to_owned()
         ))
     );
-    let mut other = original.clone();
+    let mut other = padded_once.clone();
     other.push(0);
     assert_eq!(
         refusal(&[AdoptionSources {
             candidate: &other,
-            receipt: &same_receipt
+            receipt: &padded_receipt
         }]),
         Some((
             "v2/policy.json adoptions[0].candidate_sha256".to_owned(),
             "differs from v2/adoptions/1/program.zcve".to_owned()
         ))
     );
-    let mut tampered = same_receipt.clone();
+    let mut tampered = padded_receipt.clone();
     tampered.extend_from_slice(b" ");
     assert_eq!(
         refusal(&[AdoptionSources {
-            candidate: &original,
+            candidate: &padded_once,
             receipt: &tampered
         }]),
         Some((
@@ -1150,13 +1373,13 @@ fn adoptions_bind_their_retained_files() {
         ))
     );
     // A receipt with the right digest that names other programs does not replay.
-    let foreign = adoption(&original, b"{}", Usage::Preserved);
+    let foreign = adoption(&padded_once, b"{}", Usage::Preserved, &counter.policy);
     let foreign_rules =
         with_adoption(&counter.rules, &foreign).unwrap_or_else(|error| panic!("{error}"));
     let refused = generate_contract(ContractSources {
         rules: &foreign_rules,
         adoptions: &[AdoptionSources {
-            candidate: &original,
+            candidate: &padded_once,
             receipt: b"{}",
         }],
         ..counter.sources()
@@ -1167,17 +1390,180 @@ fn adoptions_bind_their_retained_files() {
         refused.reason(),
         "v2/adoptions/1/receipt.json does not replay against version 1's program and the candidate: not a transform receipt with readable bindings"
     );
-    // The identical candidate adopts with preserved usage and an unchanged policy.
+    // A superseded policy digest that is not version 1's is refused before
+    // any replay.
+    let misbound = adoption(
+        &padded_once,
+        &padded_receipt,
+        Usage::NewVersion,
+        b"another policy",
+    );
+    let misbound_rules =
+        with_adoption(&counter.rules, &misbound).unwrap_or_else(|error| panic!("{error}"));
+    let refused = generate_contract(ContractSources {
+        rules: &misbound_rules,
+        adoptions: &[AdoptionSources {
+            candidate: &padded_once,
+            receipt: &padded_receipt,
+        }],
+        ..counter.sources()
+    })
+    .err()
+    .unwrap_or_else(|| panic!("a wrong superseded policy is refused"));
+    assert_eq!(
+        refused.place(),
+        "v2/policy.json adoptions[0].superseded_policy_sha256"
+    );
+}
+
+/// `receipt` as an older checker identity wrote it: the crate version and
+/// the checker's source digest instead of its semantics version.
+fn older_checker(receipt: &[u8]) -> Vec<u8> {
+    let mut value: Value =
+        serde_json::from_slice(receipt).unwrap_or_else(|error| panic!("{error}"));
+    value["checker"] = serde_json::json!({
+        "crate": "zeno-fcis-cli", "version": "1.1.0",
+        "source": "crates/zeno-fcis-cli/src/transform.rs",
+        "source_sha256": transform::sha256_hex(b"older checker source"),
+        "evaluator_identity": value["checker"]["evaluator_identity"]
+    });
+    transform::canonical_json(&value).into_bytes()
+}
+
+#[test]
+fn a_refresh_rebinds_receipts_to_this_checker_and_nothing_else() {
+    let counter = template("durable-counter");
+    let (program, original) = current_program(&counter);
+    let padded_once = padded(&program, 1);
+    let current = receipt(&original, &padded_once);
+    let older = older_checker(&current);
+    let rules_naming = |receipt: &[u8]| {
+        with_adoption(
+            &counter.rules,
+            &adoption(&padded_once, receipt, Usage::NewVersion, &counter.policy),
+        )
+        .unwrap_or_else(|error| panic!("{error}"))
+    };
+    let (old_rules, new_rules) = (rules_naming(&older), rules_naming(&current));
+    let with = |rules: &str, receipt: &[u8], refresh: bool| {
+        let sources = ContractSources {
+            rules,
+            adoptions: &[AdoptionSources {
+                candidate: &padded_once,
+                receipt,
+            }],
+            ..counter.sources()
+        };
+        if refresh {
+            refresh_receipts(sources).map(|refreshed| {
+                (
+                    refreshed.rules().to_owned(),
+                    refreshed.receipts().to_vec(),
+                    refreshed.generated().clone(),
+                )
+            })
+        } else {
+            generate_contract(sources).map(|generated| (rules.to_owned(), Vec::new(), generated))
+        }
+    };
+    // The older identity no longer replays.
+    let refused = with(&old_rules, &older, false)
+        .err()
+        .unwrap_or_else(|| panic!("an older checker identity does not replay"));
+    assert_eq!(refused.place(), "v2/policy.json adoptions[0]");
+    assert!(
+        refused
+            .reason()
+            .ends_with("`checker` differ from the record"),
+        "{}",
+        refused.reason()
+    );
+    // A refresh rebinds the receipt and the rules, and the result replays.
+    let (_, _, expected) =
+        with(&new_rules, &current, false).unwrap_or_else(|error| panic!("{error}"));
+    let rebound = with(&old_rules, &older, true).unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(
+        rebound,
+        (new_rules.clone(), vec![current.clone()], expected.clone())
+    );
+    // A current receipt is left as it is.
+    assert_eq!(
+        with(&new_rules, &current, true).unwrap_or_else(|error| panic!("{error}")),
+        (new_rules.clone(), vec![current.clone()], expected.clone())
+    );
+    // An interrupted refresh wrote the receipt but not the rules: running it
+    // again finishes it.
+    assert_eq!(
+        with(&old_rules, &current, true).unwrap_or_else(|error| panic!("{error}")),
+        (new_rules.clone(), vec![current.clone()], expected)
+    );
+    // Anything but the checker identity that would change is refused.
+    let mut claimed: Value =
+        serde_json::from_slice(&older).unwrap_or_else(|error| panic!("{error}"));
+    claimed["usage"]["usage_preserved"] = Value::Bool(true);
+    let claimed = transform::canonical_json(&claimed).into_bytes();
+    let refused = with(&rules_naming(&claimed), &claimed, true)
+        .err()
+        .unwrap_or_else(|| panic!("a changed usage report is refused"));
+    assert_eq!(
+        refused.reason(),
+        "v2/adoptions/1/receipt.json does not refresh against version 1's program and the candidate: `usage` differ from the record"
+    );
+    // A receipt the rules do not name is refused as before.
+    let refused = with(&old_rules, &claimed, true)
+        .err()
+        .unwrap_or_else(|| panic!("an unbound receipt is refused"));
+    assert_eq!(refused.place(), "v2/policy.json adoptions[0]");
+}
+
+#[test]
+fn a_step_limit_must_cover_each_program_and_every_law_node() {
+    let fits = StepBound {
+        program: [10, 12],
+        laws: 4,
+        limits: [14, 16],
+    };
+    assert!(fits.never_binds());
+    for limits in [[13, 16], [14, 15]] {
+        assert!(!StepBound { limits, ..fits }.never_binds(), "{limits:?}");
+    }
+    // No overflow: the sum is taken in u128.
+    let saturated = StepBound {
+        program: [u64::MAX; 2],
+        laws: u64::MAX,
+        limits: [u64::MAX; 2],
+    };
+    assert!(!saturated.never_binds());
+    // The adopted durable-counter padding reports its bound.
+    let counter = template("durable-counter");
+    let (program, original) = current_program(&counter);
+    let padded_once = padded(&program, 1);
+    let padded_receipt = receipt(&original, &padded_once);
+    let adopted = with_adoption(
+        &counter.rules,
+        &adoption(
+            &padded_once,
+            &padded_receipt,
+            Usage::NewVersion,
+            &counter.policy,
+        ),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
     let generated = generate_contract(ContractSources {
         rules: &adopted,
         adoptions: &[AdoptionSources {
-            candidate: &original,
-            receipt: &same_receipt,
+            candidate: &padded_once,
+            receipt: &padded_receipt,
         }],
         ..counter.sources()
     })
     .unwrap_or_else(|error| panic!("{error}"));
-    assert!(generated.summary().adoptions[0].usage_preserved);
-    assert_eq!(generated.policy(), counter.policy);
-    assert_eq!(generated.previous()[0].policy(), counter.policy);
+    let steps = generated.summary().adoptions[0].steps;
+    let nodes = program.nodes().len() as u64;
+    assert_eq!(steps.program, [nodes, nodes + 1]);
+    assert_eq!(
+        steps.limits,
+        [steps.laws + nodes + 5, steps.laws + nodes + 1 + 5]
+    );
+    assert!(steps.never_binds());
 }

@@ -385,3 +385,78 @@ fn describe_declares_transform_effects() {
         .unwrap_or_else(|| panic!("replay declares its own tuple cap"));
     assert_eq!(cap["defaults"], json!(["100000000"]));
 }
+
+/// The checker's known answers for its semantics version: every pair under
+/// `tests/fixtures/transform-check/<version>/` gives exactly the committed
+/// report, and each equivalent pair exactly the committed receipt. A change
+/// that alters any answer fails here until it names a new semantics version
+/// with its own answers; a refactor or a new crate version changes nothing.
+#[test]
+fn known_answers_pin_the_checker_semantics() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/transform-check");
+    let probe = root.join("1");
+    let (_, report) = check(
+        &probe.join("program-1.zcve"),
+        &probe.join("program-2.zcve"),
+        &[],
+    );
+    let semantics = report["detail"]["receipt"]["checker"]["semantics"]
+        .as_str()
+        .unwrap_or_else(|| panic!("an equivalent pair's receipt names the checker: {report}"))
+        .to_owned();
+    let version = semantics
+        .strip_prefix("zeno-fcis/transform-check/")
+        .unwrap_or_else(|| panic!("{semantics} is a transform-check version"));
+    let directory = root.join(version);
+    let manifest: Value = serde_json::from_slice(&read(&directory.join("vectors.json")))
+        .unwrap_or_else(|error| panic!("{semantics} has no known answers: {error}"));
+    assert_eq!(manifest["semantics"], json!(semantics));
+    let vectors = manifest["vectors"]
+        .as_array()
+        .unwrap_or_else(|| panic!("vectors"));
+    assert_eq!(vectors.len(), 7);
+    let mut receipts = 0;
+    for vector in vectors {
+        let name = vector["name"].as_str().unwrap_or_default();
+        let file = |key: &str| directory.join(vector[key].as_str().unwrap_or_default());
+        let (exit, report) = check(
+            &file("original"),
+            &file("candidate"),
+            &[
+                "--step-limit",
+                &vector["step_limit"].to_string(),
+                "--max-input-tuples",
+                &vector["max_input_tuples"].to_string(),
+            ],
+        );
+        let expected: Value = serde_json::from_slice(&read(&file("expected")))
+            .unwrap_or_else(|error| panic!("{name}: {error}"));
+        assert_eq!(report, expected, "{name}");
+        assert_eq!(exit.map(i64::from), vector["exit"].as_i64(), "{name}");
+        if vector.get("receipt").is_some() {
+            let receipt = read(&file("receipt"));
+            assert_eq!(
+                json!(sha256(&receipt)),
+                report["detail"]["receipt_sha256"],
+                "{name}"
+            );
+            let written = Directory::new();
+            let path = written.0.join("receipt.json");
+            check(
+                &file("original"),
+                &file("candidate"),
+                &[
+                    "--step-limit",
+                    &vector["step_limit"].to_string(),
+                    "--max-input-tuples",
+                    &vector["max_input_tuples"].to_string(),
+                    "--receipt",
+                    &path.to_string_lossy(),
+                ],
+            );
+            assert_eq!(read(&path), receipt, "{name}");
+            receipts += 1;
+        }
+    }
+    assert_eq!(receipts, 3);
+}

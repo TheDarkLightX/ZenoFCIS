@@ -3,7 +3,7 @@
 //!
 //! Admission freezes the exact original bytes, the complete ordered domain and
 //! ABI derived from the admitted original, the semantic and enumeration
-//! versions, the checker's source identity, the cost objective, the limits and
+//! versions, the checker's identity, the cost objective, the limits and
 //! the provider/disclosure policy in one canonical JSON record. `RequestId`
 //! is a domain-separated commitment to that record. The record never replaces
 //! exact binding: resume re-admits the bytes and recomputes the record.
@@ -13,7 +13,7 @@ use super::limits::{LimitRefusal, Limits, RECEIPT_WORK};
 use super::profiles::{Profile, ProfileRefusal};
 use super::program_json::program_to_json;
 use super::{canonical_json, json_u64, only_fields, tagged_sha256};
-use crate::transform::{self, DEFAULT_STEP_LIMIT, ENUMERATION, sha256_hex};
+use crate::transform::{self, CHECKER, DEFAULT_STEP_LIMIT, ENUMERATION, sha256_hex};
 use serde_json::{Value, json};
 use zeno_fcis_synthesis::finite::{Error, PROFILE, Program, V2_EXECUTION_PROFILE, v2_authority};
 use zeno_fcis_synthesis::finite_runtime::import_program;
@@ -24,15 +24,13 @@ pub(crate) const VIEW_SCHEMA: &str = "zeno-fcis/transform-request-view/1";
 /// component guards (NSC-006, NSL-005).
 pub(crate) const OBJECTIVE: &str = "lexicographic-nodes-bytes-v1";
 const REQUEST_ID_TAG: &str = "zeno-fcis/transform-request-id/1";
-/// The checker whose receipts this request binds: F3's `transform.rs`.
-const CHECKER_SOURCE: &[u8] = include_bytes!("../transform.rs");
-const CHECKER_SOURCE_PATH: &str = "crates/zeno-fcis-cli/src/transform.rs";
 
-/// The checker's source identity, as the transform receipt records it.
+/// The identity of the checker whose receipts this request binds, F3's
+/// transform checker, as its receipts record it: the checker's semantics
+/// version and the library's evaluator identity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct CheckerIdentity {
-    pub(crate) version: String,
-    pub(crate) source_sha256: String,
+    pub(crate) semantics: String,
     pub(crate) evaluator_identity: String,
 }
 
@@ -40,8 +38,7 @@ impl CheckerIdentity {
     /// The checker compiled into this binary.
     pub(crate) fn current() -> CheckerIdentity {
         CheckerIdentity {
-            version: env!("CARGO_PKG_VERSION").to_owned(),
-            source_sha256: sha256_hex(CHECKER_SOURCE),
+            semantics: CHECKER.to_owned(),
             evaluator_identity: v2_authority::EVALUATOR
                 .iter()
                 .map(|byte| format!("{byte:02x}"))
@@ -51,34 +48,18 @@ impl CheckerIdentity {
 
     pub(crate) fn json(&self) -> Value {
         json!({
-            "crate": env!("CARGO_PKG_NAME"),
-            "version": self.version,
-            "source": CHECKER_SOURCE_PATH,
-            "source_sha256": self.source_sha256,
+            "semantics": self.semantics,
             "evaluator_identity": self.evaluator_identity,
         })
     }
 
     pub(crate) fn from_json(value: &Value) -> Option<CheckerIdentity> {
-        if !only_fields(
-            value,
-            &[
-                "crate",
-                "version",
-                "source",
-                "source_sha256",
-                "evaluator_identity",
-            ],
-        ) {
+        if !only_fields(value, &["semantics", "evaluator_identity"]) {
             return None;
         }
         let text = |field: &str| Some(value.get(field)?.as_str()?.to_owned());
-        if text("crate")? != env!("CARGO_PKG_NAME") || text("source")? != CHECKER_SOURCE_PATH {
-            return None;
-        }
         Some(CheckerIdentity {
-            version: text("version")?,
-            source_sha256: text("source_sha256")?,
+            semantics: text("semantics")?,
             evaluator_identity: text("evaluator_identity")?,
         })
     }

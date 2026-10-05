@@ -52,8 +52,9 @@ come from the library's encoder, and the library's catalog binding must accept
 them first. When the rules list adoptions (see [Contract adoption and store
 upgrades](#contract-adoption-and-store-upgrades)) it also reads each
 `v2/adoptions/N/program.zcve` and `receipt.json`, replays every receipt in
-order, and replaces each superseded version's `src/v2_contract_vN.rs` and
-`v2/policy_vN.zcve`. With `--check` it writes nothing, names each drifted
+order, checks each superseded version's policy against the digest its
+adoption bound, and replaces each superseded version's `src/v2_contract_vN.rs`
+and `v2/policy_vN.zcve`. With `--check` it writes nothing, names each drifted
 file and exits 1. An invalid contract exits 1 and writes nothing. The
 generator's own checks name the file and entry at fault. Among them: an
 accept has no reason, and a reject or committed failure has one; constants lie
@@ -296,8 +297,12 @@ bounds are decimal strings; Boolean positions are `"0"` or `"1"`.
 schema `zeno-fcis/transform-receipt/1`, is compact JSON with sorted keys and a
 final newline. It records both programs' SHA-256 digests, sizes and node
 counts, the domains, both limits, the tuples checked, the Step usage report
-and the checker identity: crate version, SHA-256 of
-`crates/zeno-fcis-cli/src/transform.rs`, and the library's evaluator digest.
+and the checker identity: the checker's semantics version,
+`zeno-fcis/transform-check/1`, and the library's evaluator digest. The
+semantics version changes only with a deliberate change of what the check
+means. Known answers under `crates/zeno-fcis-cli/tests/fixtures/transform-check/`
+pin it, so a refactor of the checker or a new crate version changes no
+receipt.
 `transform replay` first checks the receipt's program digests and domain size
 against the supplied files, and the domain against its own tuple cap. Only then
 does it rerun the check with the receipt's limits; it accepts the receipt only
@@ -572,53 +577,122 @@ the domain; it does not replace the owner's review of the rules file.
 `contract adopt DIR --candidate C.zcve --receipt R.json --usage
 preserved|new-version` makes a checked candidate the next version of an
 application's contract. `DIR` holds `project.zeno` and `v2/policy.json`.
-The command regenerates the contract through the same pure generator as
-`generate contract`, with the rules extended by one `adoptions` entry naming
-the candidate's SHA-256, the receipt's SHA-256 and the claimed usage. The
-generator re-derives the application's current decision program from its
-declarations, rules and earlier adoptions, never from a file on disk, and
-replays the receipt against that program and the candidate exactly as
-`transform replay` does; only a byte-identical receipt is accepted. Since
-each receipt binds the checker's identity, changing the checker invalidates
-recorded receipts until they are regenerated. `--usage preserved` is
-accepted only when the receipt reports `usage_preserved: true`; otherwise
-`--usage new-version` is required, because the sealed usage observations
-change. Either way the policy bytes, and so the contract identity, change,
-and a store that ran the previous version must be upgraded (below) before
-the new build can open it.
+The command first regenerates the current contract and replays the receipt
+against its decision program and the candidate, exactly as `transform replay`
+does; only a byte-identical receipt is accepted. It then regenerates the
+contract through the same pure generator as `generate contract`, with the
+rules extended by one `adoptions` entry naming the candidate's SHA-256, the
+receipt's SHA-256, the claimed usage and the SHA-256 of the superseded
+version's policy. The generator re-derives each version's decision program
+from the declarations, rules and earlier adoptions, never from a file on
+disk, and replays every receipt against it; within one command a receipt it
+already replayed is not enumerated again. `--usage preserved` is accepted
+only when the receipt reports `usage_preserved: true`; otherwise `--usage
+new-version` is required, because the usage observations sealed into each
+publication change. Either way the policy bytes, and so the contract
+identity, change, and a store that ran the previous version must be upgraded
+(below) before the new build commits to it.
+
+Generation also refuses:
+
+- an adoption whose candidate is the program it replaces, and a lineage in
+  which a version would repeat an earlier version's policy, and so its
+  identity;
+- any edit to the declarations or rules that would change a superseded
+  version. Each adoption binds the superseded version's policy digest, and
+  stores may run that version. Once a version is superseded, only another
+  adoption changes the contract; any other change needs a new application;
+- an adoption in a contract without decision-conformance law 991, and an
+  adoption whose receipt's measured largest Step usage of either program,
+  plus one Step for every law node, exceeds that version's Step limit, which
+  could then refuse a decision. These are premises of a program successor's guarantee (below).
+  Each adoption in the summary reports them as `premises`, with the Step
+  usage, law Steps and limits behind them.
 
 On success the command writes, in this order, `v2/adoptions/N/program.zcve`
-and `v2/adoptions/N/receipt.json` (new files; an existing directory is
-refused), the generated contract, and last `v2/policy.json` with the new
-entry appended in the file's own layout. The generated contract now consists
-of the current version, `src/v2_contract.rs` and `v2/policy.zcve`, and every
-superseded version `k`, `src/v2_contract_vk.rs` and `v2/policy_vk.zcve`,
-emitted from the same inputs, so `generate contract --check` checks them all.
-Each generated contract states `pub const VERSION: u32`, declares the
-superseded versions as modules `v1`, `v2`, .. and offers
-`with_lineage(|catalogs| ..)`, the checked catalogs of every version, oldest
-first. Any refusal, including an unreplayable receipt, a candidate or receipt
-whose digest differs from the entry, a candidate above 64 KiB, or a usage
-claim the receipt does not support, exits 1 and writes nothing.
+and `v2/adoptions/N/receipt.json`, the generated contract, and last
+`v2/policy.json` with the new entry appended in the file's own layout. An
+interruption leaves the rules unchanged: `generate contract` then regenerates
+the previous version, and running the same `contract adopt` again finishes
+the adoption, accepting an adoption directory that holds only this candidate
+and receipt. Any other existing directory is refused. The generated contract
+consists of the current version, `src/v2_contract.rs` and `v2/policy.zcve`,
+and every superseded version `k`, `src/v2_contract_vk.rs` and
+`v2/policy_vk.zcve`, so `generate contract --check` checks them all. Each
+generated contract states `pub const VERSION: u32` and offers
+`with_lineage`, the checked catalogs of every version, oldest first. A
+contract with adoptions also declares the superseded versions as modules
+`v1`, `v2`, .., states `ADOPTION_RECEIPTS`, each adoption's receipt SHA-256,
+and passes it to `with_lineage`'s caller with the catalogs. Any refusal,
+including an unreplayable receipt, a candidate or receipt whose digest
+differs from the entry, a candidate above 64 KiB, or a usage claim the
+receipt does not support, exits 1 and writes nothing.
 
 Results use schema `zeno-fcis/cli/1`: `adopted` with the adoption's ordinal,
 version, digests, usage, `usage_preserved` and node counts before and after,
 or `error` with `contract-invalid` (exit 1), `contract-read-failed` (exit 3)
 or `adoption-write-failed` (exit 3).
 
+Each receipt binds the transform checker's semantics version and the
+library's evaluator digest, not the checker's source or the crate version, so
+a new crate version or a refactor of the checker leaves recorded receipts
+valid. After a deliberate change of the checker's semantics version, or of
+the evaluator, recorded receipts no longer replay. `contract refresh-receipts
+DIR` then checks every adoption again with the current checker, under its
+receipt's limits, and requires the new receipt to record exactly what the old
+one does in every field but `checker`. It writes the new receipts, the
+regenerated contract and last the rules with the new digests, after
+generating the result again with every new receipt replayed from scratch. It
+never reuses the old verdict, and it refuses, writing nothing, when a pair is
+no longer equivalent or anything else would change. Running it again
+finishes an interrupted refresh. Its result is `refreshed` with the rebound
+adoptions, or `current` when every receipt already was this checker's.
+
 An application built from a contract (`new --contract`) operates on an
 existing SQLite store with its whole lineage:
 
 | Command | Effect |
 | --- | --- |
-| `<app> --audit DB` | Reopens the store under every contract version, replays each history segment under the version that published it, and prints the head: contract version, commits, pending deliveries, recorded upgrades. |
-| `<app> --upgrade DB` | Records a checked upgrade from the version the store runs to this build's version, then reopens under the lineage. Preconditions, checked after a full audit: the two versions' canonical state schema bytes are equal; the identities differ; and the new contract's genesis laws admit the current state through the library's genesis evaluation. For generated contracts those laws include the initial-condition law 990, so the store must be at its declared genesis state. The record binds both identities, that genesis publication, the state root and the chain tip, and becomes the next chain link; the head's chain moves to it. Pending deliveries keep their IDs and commit order. Any refusal writes nothing. |
+| `<app> --audit DB` | Replays each history segment under the version that published it and prints the head: the contract version the store runs, commits, pending deliveries and recorded upgrades. A store at any version of the application is audited, under the versions up to its own. |
+| `<app> --upgrade DB` | Records a checked upgrade from the version the store runs to this build's version. After a full audit, the two versions must have equal canonical state schema bytes and different identities. If the new contract's canonical policy, with its decision program's instructions and roots and its Step limit replaced by the old contract's, is byte for byte the old policy, the record is a `program-successor`. It is admitted at any state, because every law and every other part of the policy is unchanged; it states which further premises held (below) and binds the receipt digests of the adoptions between the two versions. Every adoption makes such a successor. Otherwise the new contract's genesis laws must admit the current state through the library's genesis evaluation, and the record is a `genesis-admission` that binds that genesis publication. For generated contracts those laws include the initial-condition law 990, so the store must then be at its declared genesis state. Either record binds both identities, the state root and the chain tip, and becomes the next chain link; the head's chain moves to it. Pending deliveries keep their IDs and commit order. The report names the kind. Any refusal writes nothing. |
+| `<app> --deliver DB` | Delivers every pending outbox entry of a store at this build's version, acknowledges each and prints their IDs. A store at an earlier version must be upgraded first. |
 | `<app> --migrate DB` | Converts a store created before upgrades were recorded (SQLite schema v9) to the current schema v10, after a complete audit under the version that created it. Any other schema, or a store under no version of the application, is refused and nothing is written. Opening or upgrading a v9 store without this step is refused. |
+| `<app> --decide NEW_DB` | Runs the decision examples as one session in a new database, like `<app> NEW_DB`, and leaves the outbox pending. |
 
-The library crate exposes the same operations as
-`V2SqliteShell::open_lineage`, `V2SqliteShell::upgrade`,
-`V2SqliteShell::migrate_v9` and the pure `v2::upgrade::decide`; the `zeno-fcis`
-binary itself does not open stores.
+A program successor and the version it supersedes have the same reachable
+states when five premises hold: (1) their canonical policies differ only in
+the decision program's instructions and roots and the Step limit, so the
+genesis literals, laws and case table are identical, which the shell checks
+at the upgrade and at every audit; (2) the identical laws include generated
+law 991, which pins every committed decision to the case table; (3) each
+adoption receipt is F3 `Equivalent`, under a declared Step limit that never
+binds, which `generate contract` checks by replaying it; (4) neither
+version's Step limit binds, because each covers one Step for every program
+and law node, which the shell checks, and each program's measured usage plus
+every law node, which generation checks; and (5) no law observes Step usage,
+which the shell checks. Under these premises the two versions admit the same
+genesis states and commit the same decisions from the same states, so an
+upgrade at any reachable state keeps every property of reachable states:
+every law, every proved inductive claim and the meaning of every decision
+example, not only the laws evaluated on the current state. Step usage is not
+kept: when the receipt reports that it differs, the sealed usage
+observations change and every sealed subject names the new identity, so an
+adoption is a versioned change. The upgrade report's `premises` states
+whether premises 4 and 5 held as the shell checked them; premises 2 and 3
+rest on the generation of the build that ran the upgrade. A program successor
+without every premise still keeps the laws for every later commit, but not
+the reachable states.
+
+Commands on an existing store open it without creating it, so a mistyped path
+is refused and leaves no file.
+
+The library crate exposes the same operations as typed handles.
+`v2::Lineage::bind(catalogs, receipts)` binds a lineage, and `Lineage::open`
+returns either a v9 store, whose only operation is `migrate`, or a v10 store
+that is current or superseded. `Superseded::upgrade` consumes its handle and
+returns the current one with the `UpgradeReceipt`. The pure
+`v2::upgrade::decide` and `v2::upgrade::program_successor` make the
+decisions; the `zeno-fcis` binary itself does not open stores.
 
 ## Bounded completion in 1.1.0
 

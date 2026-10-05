@@ -54,6 +54,23 @@ pub fn with_lineage<R>(
 ) -> Result<R, catalog::Failure> {
 ";
 
+/// A contract with adoptions also passes their receipt digests.
+const ADOPTED_LINEAGE_DOC: &str = "\
+/// Every contract version's checked catalog, oldest first and this one last,
+/// and `ADOPTION_RECEIPTS`, for a store upgrade or a lineage open. Each
+/// binding checks that version's complete retained schema and policy bytes.
+pub fn with_lineage<R>(
+    f: impl FnOnce((&[&catalog::BoundCatalog<'_>], &[&str])) -> R,
+) -> Result<R, catalog::Failure> {
+";
+
+const RECEIPTS_DOC: &str = "\
+/// The SHA-256 of each adoption's `transform` receipt, oldest first: adoption
+/// `k`'s receipt compares version `k`'s decision program with version
+/// `k + 1`'s. `zeno-fcis generate contract` replayed every one before writing
+/// this list, and a program-successor store upgrade binds the ones it spans.
+";
+
 /// Which version of a contract to render and where it sits in the lineage.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Options<'a> {
@@ -62,9 +79,10 @@ pub(super) struct Options<'a> {
     pub(super) policy: &'a str,
     /// Position in the lineage, from 1.
     pub(super) version: u32,
-    /// Superseded versions the rendered file declares as modules `v1`..;
-    /// zero for a superseded version, which is a leaf.
-    pub(super) previous: u32,
+    /// The current version's adoption receipt digests in hexadecimal, one per
+    /// superseded version, which the file declares as modules `v1`..; none
+    /// for a superseded version, which is a leaf.
+    pub(super) receipts: &'a [String],
 }
 
 const BINDING: &str = "\
@@ -219,7 +237,8 @@ pub(super) fn source(
     Ok(text)
 }
 
-/// The version number, the superseded versions as modules and `with_lineage`.
+/// The version number, the superseded versions as modules, the adoption
+/// receipts and `with_lineage`.
 fn lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError> {
     let _ = write!(
         text,
@@ -227,7 +246,8 @@ fn lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError>
          pub const VERSION: u32 = {};\n",
         options.version
     );
-    for version in 1..=options.previous {
+    let previous = options.receipts.len();
+    for version in 1..=previous {
         let _ = write!(
             text,
             "/// Contract version {version}, superseded by adoption {version} in v2/policy.json.\n\
@@ -235,9 +255,26 @@ fn lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError>
              pub mod v{version};\n"
         );
     }
-    text.push_str(LINEAGE_DOC);
+    if previous == 0 {
+        text.push_str(LINEAGE_DOC);
+    } else {
+        text.push_str(RECEIPTS_DOC);
+        item(
+            text,
+            None,
+            "pub const ADOPTION_RECEIPTS: &[&str] =",
+            &Syntax::slice(
+                options
+                    .receipts
+                    .iter()
+                    .map(|receipt| Syntax::literal(format!("{receipt:?}")))
+                    .collect(),
+            ),
+        )?;
+        text.push_str(ADOPTED_LINEAGE_DOC);
+    }
     let mut catalogs = Vec::new();
-    for version in 1..=options.previous {
+    for version in 1..=previous {
         let _ = write!(
             text,
             "    let contract_{version} = v{version}::Contract::new();\n    \
@@ -254,7 +291,15 @@ fn lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError>
          let catalog = checked_catalog(&descriptor)?;\n",
     );
     catalogs.push(Syntax::reference(Syntax::path("catalog")));
-    let result = Syntax::call("Ok", vec![Syntax::call("f", vec![Syntax::slice(catalogs)])]);
+    let lineage = if previous == 0 {
+        Syntax::slice(catalogs)
+    } else {
+        Syntax::tuple(vec![
+            Syntax::slice(catalogs),
+            Syntax::path("ADOPTION_RECEIPTS"),
+        ])
+    };
+    let result = Syntax::call("Ok", vec![Syntax::call("f", vec![lineage])]);
     let tail = statement(4, &result).ok_or_else(|| unrenderable("with_lineage"))?;
     let _ = writeln!(text, "    {tail}\n}}");
     Ok(())

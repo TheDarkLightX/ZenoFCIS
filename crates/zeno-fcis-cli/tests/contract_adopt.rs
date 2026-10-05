@@ -154,7 +154,8 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
     let root = TempRoot::new("fixture");
     let dir = inputs_only(&root);
     // The committed receipt is what `transform check` produces for the two
-    // artifacts with this checker, so the fixture is reproducible from scratch.
+    // artifacts with this checker's semantics version, so the fixture is
+    // reproducible from scratch.
     let receipt = root.path().join("receipt.json");
     let checked = zeno(&[
         "transform".as_ref(),
@@ -170,7 +171,7 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
     assert_eq!(
         read(&receipt),
         read(fixture().join("v2/adoptions/1/receipt.json")),
-        "the committed receipt is this checker's; regenerate the fixture after changing the checker"
+        "the committed receipt is this checker's; after a new semantics version, rebind it with `contract refresh-receipts`"
     );
 
     let output = adopt(
@@ -212,6 +213,20 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
     );
     assert_eq!(report["summary"]["version"], 2);
     assert_eq!(report["summary"]["program_nodes"], 100);
+    // The premises of a program succession that generation checks, with the
+    // Step bounds: each program's measured usage plus every law node fits
+    // its version's Step limit.
+    assert_eq!(
+        report["summary"]["adoptions"][0]["premises"],
+        json!({
+            "decision_conformance_law": true, "receipt_equivalent": true,
+            "step_limits_never_bind": true,
+            "steps": {
+                "program": {"before": 106, "after": 100}, "laws": 969,
+                "limit": {"before": 1080, "after": 1074}
+            }
+        })
+    );
 
     let produced = snapshot(&dir);
     let mut committed = snapshot(&fixture());
@@ -247,7 +262,7 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
         read(template().join("v2/policy.zcve")),
         "the adopted program changes the policy bytes and so the identity"
     );
-    // A second adoption needs a receipt against version 2; this one names version 1.
+    // Adopting the same program again would change nothing.
     let again = adopt(
         &dir,
         &artifact("current-decision-scalars-candidate"),
@@ -258,6 +273,10 @@ fn adopting_the_withdrawal_queue_candidate_reproduces_the_committed_fixture() {
     assert_eq!(
         json(&again)["error"]["place"],
         "v2/policy.json adoptions[1]"
+    );
+    assert_eq!(
+        json(&again)["error"]["message"],
+        "v2/adoptions/2/program.zcve is version 2's own program; an adoption must change it"
     );
     assert_eq!(
         snapshot(&dir),
@@ -485,4 +504,167 @@ fn describe_declares_contract_adopt_effects() {
         .unwrap_or_else(|| panic!("usage argument"));
     assert_eq!(usage["required"], true);
     assert_eq!(usage["choices"], json!(["preserved", "new-version"]));
+    let refresh = &group["subcommands"][1];
+    assert_eq!(refresh["name"], "refresh-receipts");
+    assert_eq!(
+        refresh["effects"],
+        json!({
+            "classification": "declared", "executes_tools": false, "read_only_flag": null,
+            "reads": ["application-contract", "adopted-artifacts"],
+            "writes": ["application-contract", "adopted-artifacts", "generated-artifacts"]
+        })
+    );
+}
+
+/// A copy of the committed fixture in a fresh directory.
+fn fixture_copy(root: &TempRoot) -> PathBuf {
+    let dir = root.path().join("app");
+    for (name, bytes) in snapshot(&fixture()) {
+        write(dir.join(name), &bytes);
+    }
+    dir
+}
+
+fn generate(dir: &Path, check: bool) -> Output {
+    let mut arguments = vec![
+        "generate".as_ref(),
+        "contract".as_ref(),
+        dir.as_os_str(),
+        "--format".as_ref(),
+        "json".as_ref(),
+    ];
+    if check {
+        arguments.push("--check".as_ref());
+    }
+    zeno(&arguments)
+}
+
+#[test]
+fn refresh_rebinds_a_receipt_from_an_older_checker_identity() {
+    let root = TempRoot::new("refresh");
+    let dir = fixture_copy(&root);
+    // The receipt as the checker wrote it when it bound its crate version and
+    // source digest, and the rules naming that receipt.
+    let receipt_path = dir.join("v2/adoptions/1/receipt.json");
+    let committed = read(&receipt_path);
+    let mut older: Value =
+        serde_json::from_slice(&committed).unwrap_or_else(|error| panic!("{error}"));
+    older["checker"] = json!({
+        "crate": "zeno-fcis-cli", "version": "1.1.0",
+        "source": "crates/zeno-fcis-cli/src/transform.rs",
+        "source_sha256": "e383d51827bc4a6328535aae28c762ea84d5a5c5ed71534fb48271520889fe65",
+        "evaluator_identity": older["checker"]["evaluator_identity"]
+    });
+    let older = format!("{}\n", serde_json::to_string(&older).unwrap_or_default());
+    write(&receipt_path, older.as_bytes());
+    let digest = |bytes: &[u8]| {
+        use std::fmt::Write as _;
+        let hash =
+            <zeno_fcis_crypto::RustCryptoSha256 as zeno_fcis_codec::CommitmentHasher>::hash(bytes);
+        hash.as_bytes()
+            .iter()
+            .fold(String::new(), |mut text, byte| {
+                let _ = write!(text, "{byte:02x}");
+                text
+            })
+    };
+    let rules_path = dir.join("v2/policy.json");
+    let rules = String::from_utf8(read(&rules_path)).unwrap_or_default();
+    assert_eq!(rules.matches(&digest(&committed)).count(), 1);
+    write(
+        &rules_path,
+        rules
+            .replace(&digest(&committed), &digest(older.as_bytes()))
+            .as_bytes(),
+    );
+    let before = snapshot(&dir);
+    let refused = generate(&dir, true);
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(
+        json(&refused)["error"]["message"],
+        "v2/adoptions/1/receipt.json does not replay against version 1's program and the candidate: `checker` differ from the record"
+    );
+    assert_eq!(snapshot(&dir), before);
+
+    let output = zeno(&[
+        "contract".as_ref(),
+        "refresh-receipts".as_ref(),
+        dir.as_os_str(),
+        "--format".as_ref(),
+        "json".as_ref(),
+    ]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report = json(&output);
+    assert_eq!(report["status"], "refreshed");
+    assert_eq!(report["checker"], "zeno-fcis/transform-check/1");
+    assert_eq!(report["refreshed"], json!([1]));
+    // The application is the committed fixture again, which is current.
+    assert_eq!(snapshot(&dir), snapshot(&fixture()));
+    assert_eq!(generate(&dir, true).status.code(), Some(0));
+}
+
+#[test]
+fn an_interrupted_adoption_is_finished_by_running_it_again() {
+    let root = TempRoot::new("resume");
+    let dir = inputs_only(&root);
+    let candidate = artifact("current-decision-scalars-candidate");
+    let receipt = fixture().join("v2/adoptions/1/receipt.json");
+    // Another program left in the next adoption's directory is refused.
+    write(dir.join("v2/adoptions/1/program.zcve"), b"another program");
+    let occupied = snapshot(&dir);
+    let refused = adopt(&dir, &candidate, &receipt, "new-version");
+    assert_eq!(refused.status.code(), Some(1));
+    assert_eq!(json(&refused)["error"]["place"], "v2/adoptions/1");
+    assert_eq!(snapshot(&dir), occupied);
+    // The candidate itself, as an adoption interrupted before the receipt
+    // and the rules were written left it.
+    write(dir.join("v2/adoptions/1/program.zcve"), &read(&candidate));
+    let output = adopt(&dir, &candidate, &receipt, "new-version");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let mut committed = snapshot(&fixture());
+    committed.remove(EXAMPLES);
+    assert_eq!(snapshot(&dir), committed);
+}
+
+#[test]
+fn an_edit_after_adoption_is_refused_and_version_one_is_kept() {
+    let root = TempRoot::new("edit");
+    let dir = fixture_copy(&root);
+    // Law 500 bounds the vault by its capacity of 4; raise it to 5.
+    let project = String::from_utf8(read(dir.join("project.zeno"))).unwrap_or_default();
+    let anchor = "= post.100.120 <= 4 &&";
+    assert_eq!(project.matches(anchor).count(), 1);
+    write(
+        dir.join("project.zeno"),
+        project.replace(anchor, "= post.100.120 <= 5 &&").as_bytes(),
+    );
+    let before = snapshot(&dir);
+    for check in [false, true] {
+        let refused = generate(&dir, check);
+        assert_eq!(refused.status.code(), Some(1));
+        let report = json(&refused);
+        assert_eq!(
+            report["error"]["place"],
+            "v2/policy.json adoptions[0].superseded_policy_sha256"
+        );
+        assert!(
+            report["error"]["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("changes version 1, which existing stores may run"),
+            "{report}"
+        );
+        // Version 1 keeps its source and policy, so its identity.
+        assert_eq!(snapshot(&dir), before);
+    }
 }

@@ -27,23 +27,39 @@ runs the same session and prints its summary.
 
 `zeno-fcis contract adopt . --candidate C.zcve --receipt R.json --usage
 new-version` adopts a checked replacement for the decision program as the
-next contract version: the rules record the candidate and its `transform`
-receipt under `adoptions`, both are kept under `v2/adoptions/N/`, and the
-superseded version stays beside the current one as `src/v2_contract_vN.rs`
-and `v2/policy_vN.zcve`. `src/v2_contract.rs` states `VERSION` and offers
-`with_lineage`, the checked catalogs of every version, which these commands
-use on an existing database:
+next contract version. The rules record the candidate, its `transform`
+receipt and the policy of the version it supersedes under `adoptions`; the
+candidate and receipt are kept under `v2/adoptions/N/`; and the superseded
+version stays beside the current one as `src/v2_contract_vN.rs` and
+`v2/policy_vN.zcve`. Stores may run a superseded version, so generation
+refuses any later edit that would change one: once a version is superseded,
+only another adoption changes the contract. `src/v2_contract.rs` states
+`VERSION`, the adoptions' receipt digests and `with_lineage`, the checked
+catalogs of every version, which these commands use on an existing database:
 
 - `cargo run -- --audit DATABASE_PATH` replays each history segment under
-  the version that published it and prints the head.
+  the version that published it and prints the head with the version the
+  store runs, whichever version of this application that is.
 - `cargo run -- --upgrade DATABASE_PATH` records the checked upgrade to this
-  build's version: the state schema must be the same, the new contract's
-  genesis laws must admit the current state, and the chained record binds
-  both identities. Pending outbox entries keep their IDs and order. A
-  refusal writes nothing.
+  build's version. An adopted version differs from the one it replaced only
+  in its decision program and Step limit, so a store at any state upgrades,
+  and the chained record binds both identities and the adoption receipts'
+  digests and states which premises held. Under those premises the two
+  versions reach the same states, so every law and proved inductive claim
+  still holds; only the sealed Step usage can change. Pending outbox entries keep their IDs and order. A refusal writes
+  nothing. A store that runs an earlier version commits and delivers nothing
+  until it is upgraded.
+- `cargo run -- --deliver DATABASE_PATH` delivers the pending outbox entries
+  of a store at this build's version and prints their IDs.
 - `cargo run -- --migrate DATABASE_PATH` converts a database created before
   upgrades were recorded (SQLite schema v9) to the current schema after a
   complete audit. Nothing else is migrated implicitly.
+
+`cargo run -- --decide NEW_DATABASE_PATH` runs the same session as
+`NEW_DATABASE_PATH` but leaves the outbox pending for `--deliver`. After the
+`transform` checker changes its semantics version, `zeno-fcis contract
+refresh-receipts .` checks every adoption again and rebinds each receipt to
+the new checker; it refuses if anything but the checker identity would change.
 
 These checks cover the listed examples and the laws in `project.zeno`, which
 the Authority enforces on every decision. They do not show that the rules

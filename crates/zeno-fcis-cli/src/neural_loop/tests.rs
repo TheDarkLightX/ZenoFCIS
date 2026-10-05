@@ -499,7 +499,7 @@ fn request_admission_follows_the_precedence_and_freezes_the_identity() {
         Ok(request.clone())
     );
     let mut stale = record.clone();
-    stale["checker"]["source_sha256"] = json!(sha256_hex(b"older checker"));
+    stale["checker"]["semantics"] = json!("zeno-fcis/transform-check/0");
     assert!(matches!(
         Request::readmit(&super::canonical_json(&stale), original),
         Err(ReadmitRefusal::StaleChecker { .. })
@@ -1805,7 +1805,7 @@ fn stale_or_tampered_resume_yields_no_trusted_incumbent() {
     // Stale checker in the stored request.
     let mut stale_checker = Persisted::of(&session);
     let mut record: Value = serde_json::from_slice(&stale_checker.request).unwrap_or_default();
-    record["checker"]["version"] = json!("0.0.1");
+    record["checker"]["semantics"] = json!("zeno-fcis/transform-check/0");
     stale_checker.request = super::canonical_json(&record);
     assert!(matches!(
         resume_refusal(&stale_checker),

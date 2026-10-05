@@ -35,9 +35,15 @@ pub(crate) const FULL_BUDGET: u64 = MAX_NODES as u64;
 pub(crate) const DEFAULT_STEP_LIMIT: u64 = FULL_BUDGET;
 /// Default ceiling on the number of input tuples one check may enumerate.
 pub(crate) const DEFAULT_MAX_INPUT_TUPLES: u64 = 100_000_000;
-/// The receipt binds these exact bytes as the checker's source identity.
-const SOURCE: &[u8] = include_bytes!("transform.rs");
-const SOURCE_PATH: &str = "crates/zeno-fcis-cli/src/transform.rs";
+/// The checker's semantics version, which every receipt binds with the
+/// library's evaluator identity. It names what a verdict means: admission
+/// and ABI checks, the enumeration, full-budget evaluation, Step-limit and
+/// usage accounting, and the receipt's fields. A change that could alter any
+/// receipt or rejection needs a new version and new known answers under
+/// `tests/fixtures/transform-check/`, which the tests compare with this
+/// checker's output; refactoring the source, or a new crate version, changes
+/// no receipt.
+pub(crate) const CHECKER: &str = "zeno-fcis/transform-check/1";
 
 /// Limits that fix the meaning of one check.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -134,7 +140,7 @@ pub(crate) enum Refusal {
 
 /// A complete equivalence. Only [`check`] constructs one, so a receipt always
 /// describes a finished enumeration whose limit never binds.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Equivalence {
     original: Artifact,
     candidate: Artifact,
@@ -145,7 +151,7 @@ pub(crate) struct Equivalence {
     usage: Usage,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct Artifact {
     sha256: String,
     bytes: usize,
@@ -372,6 +378,11 @@ impl Tally {
 }
 
 impl Equivalence {
+    /// The true Step usage of both programs over the whole domain.
+    pub(crate) fn usage(&self) -> Usage {
+        self.usage
+    }
+
     /// Canonical receipt bytes: compact JSON with object keys in byte order,
     /// followed by one newline.
     pub(crate) fn receipt(&self) -> Vec<u8> {
@@ -401,10 +412,7 @@ impl Equivalence {
             "inputs_checked": self.inputs_checked,
             "usage": usage_json(&self.usage),
             "checker": {
-                "crate": env!("CARGO_PKG_NAME"),
-                "version": env!("CARGO_PKG_VERSION"),
-                "source": SOURCE_PATH,
-                "source_sha256": sha256_hex(SOURCE),
+                "semantics": CHECKER,
                 "evaluator_identity": hex(&EVALUATOR),
             },
         })
@@ -438,8 +446,114 @@ pub(crate) fn replay(
     candidate: &[u8],
     max_input_tuples: u64,
 ) -> Replay {
+    match replayed(receipt, original, candidate, max_input_tuples) {
+        Ok(_) => Replay::Matched,
+        Err(refused) => refused,
+    }
+}
+
+/// A receipt that replayed: the exact receipt, original and candidate bytes,
+/// the verifier's tuple cap, and the equivalence the check recomputed. Only
+/// [`replayed`] constructs one, so a value shows that replay matched and can
+/// stand for it again over the same bytes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Replayed {
+    receipt: Vec<u8>,
+    original: Vec<u8>,
+    candidate: Vec<u8>,
+    max_input_tuples: u64,
+    equivalence: Equivalence,
+}
+
+impl Replayed {
+    /// Whether this is the replay of exactly these bytes under this cap.
+    pub(crate) fn is_of(
+        &self,
+        receipt: &[u8],
+        original: &[u8],
+        candidate: &[u8],
+        max_input_tuples: u64,
+    ) -> bool {
+        self.receipt == receipt
+            && self.original == original
+            && self.candidate == candidate
+            && self.max_input_tuples == max_input_tuples
+    }
+
+    /// The replayed receipt's bytes.
+    pub(crate) fn receipt(&self) -> &[u8] {
+        &self.receipt
+    }
+
+    /// The equivalence the replay recomputed.
+    pub(crate) fn equivalence(&self) -> &Equivalence {
+        &self.equivalence
+    }
+}
+
+/// [`replay`], keeping the evidence of a match. `Err` is never
+/// `Replay::Matched`.
+pub(crate) fn replayed(
+    receipt: &[u8],
+    original: &[u8],
+    candidate: &[u8],
+    max_input_tuples: u64,
+) -> Result<Replayed, Replay> {
+    let (recorded, equivalence) = rerun(receipt, original, candidate, max_input_tuples)?;
+    if equivalence.receipt() != receipt {
+        return Err(Replay::Differs(differing_fields(
+            &recorded.value,
+            &equivalence.receipt_value(),
+        )));
+    }
+    Ok(Replayed {
+        receipt: receipt.to_vec(),
+        original: original.to_vec(),
+        candidate: candidate.to_vec(),
+        max_input_tuples,
+        equivalence,
+    })
+}
+
+/// Rechecks the pair a receipt names, under the receipt's limits, and returns
+/// the replay witness of the receipt this checker writes for it. Refused,
+/// like a replay, unless every field but `checker` is the one the old
+/// receipt records: a refresh only rebinds a receipt to this checker's
+/// identity and never changes a verdict, a usage report or what was checked.
+/// Nothing of the old receipt is trusted beyond its bindings and limits.
+pub(crate) fn refreshed(
+    receipt: &[u8],
+    original: &[u8],
+    candidate: &[u8],
+    max_input_tuples: u64,
+) -> Result<Replayed, Replay> {
+    let (recorded, equivalence) = rerun(receipt, original, candidate, max_input_tuples)?;
+    let fields: Vec<String> = differing_fields(&recorded.value, &equivalence.receipt_value())
+        .into_iter()
+        .filter(|field| field != "checker")
+        .collect();
+    if !fields.is_empty() {
+        return Err(Replay::Differs(fields));
+    }
+    Ok(Replayed {
+        receipt: equivalence.receipt(),
+        original: original.to_vec(),
+        candidate: candidate.to_vec(),
+        max_input_tuples,
+        equivalence,
+    })
+}
+
+/// Reads a receipt's bindings, checks them against both programs and the
+/// cap before any evaluation, and reruns the check with its limits.
+fn rerun(
+    receipt: &[u8],
+    original: &[u8],
+    candidate: &[u8],
+    max_input_tuples: u64,
+) -> Result<(Recorded, Equivalence), Replay> {
     let Some(recorded) = read_receipt(receipt) else {
-        return Replay::Unreadable;
+        return Err(Replay::Unreadable);
     };
     let mut fields = Vec::new();
     if sha256_hex(original) != recorded.original_sha256 {
@@ -449,24 +563,20 @@ pub(crate) fn replay(
         fields.push(String::from("candidate"));
     }
     if !fields.is_empty() {
-        return Replay::Differs(fields);
+        return Err(Replay::Differs(fields));
     }
     // The verifier's cap bounds the work; the receipt cannot raise it.
     match admit(original, candidate, max_input_tuples) {
         Ok(pair) if pair.size == recorded.domain_size => {}
-        Ok(_) => return Replay::Differs(vec![String::from("domain")]),
+        Ok(_) => return Err(Replay::Differs(vec![String::from("domain")])),
         Err(Rejection::Inconclusive(Inconclusive::DomainTooLarge { size, limit })) => {
-            return Replay::OverCap { size, cap: limit };
+            return Err(Replay::OverCap { size, cap: limit });
         }
-        Err(rejection) => return Replay::NotEquivalent(rejection),
+        Err(rejection) => return Err(Replay::NotEquivalent(rejection)),
     }
     match check(original, candidate, recorded.limits) {
-        Ok(equivalence) if equivalence.receipt() == receipt => Replay::Matched,
-        Ok(equivalence) => Replay::Differs(differing_fields(
-            &recorded.value,
-            &equivalence.receipt_value(),
-        )),
-        Err(rejection) => Replay::NotEquivalent(rejection),
+        Ok(equivalence) => Ok((recorded, equivalence)),
+        Err(rejection) => Err(Replay::NotEquivalent(rejection)),
     }
 }
 
