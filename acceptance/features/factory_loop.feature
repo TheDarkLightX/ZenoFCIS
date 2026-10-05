@@ -20,3 +20,12 @@ Feature: Check a candidate program before the factory may use it
     And the result is the best accepted candidate with a replayable receipt, or no checked improvement
     And an instruction that may trap is never removed, merged away or folded, and an unsound rule yields only refused candidates
     And the same program and strategy give byte-identical output
+
+  @atdd-neural-loop
+  Scenario: Improve a program only through checked proposals in the bounded loop
+    Given an admitted original program frozen in a request with resource limits
+    When proposers suggest candidates and the loop checks each one against the original on every input tuple
+    Then only a complete equivalence with fewer nodes or bytes, never above the original's, replaces the incumbent
+    And every other outcome, including a worker panic, a timeout or a late report, leaves the incumbent unchanged
+    And every attempt, model call and check is reserved before its work and never refunded
+    And a stale, tampered or rolled-back session resumes with no trusted incumbent

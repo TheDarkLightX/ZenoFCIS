@@ -8,6 +8,9 @@ mod contract;
 mod contract_files;
 mod durable_counter;
 mod inventory_reservation;
+mod loop_command;
+mod loop_proposers;
+mod neural_loop;
 mod optimize;
 mod optimize_command;
 mod order_fulfillment;
@@ -135,6 +138,11 @@ enum Command {
     Optimize {
         #[command(flatten)]
         arguments: optimize_command::Arguments,
+    },
+    /// Run the bounded optimization loop: proposers suggest, the transform checker judges.
+    Loop {
+        #[command(subcommand)]
+        command: loop_command::Command,
     },
     /// Create a bounded project without overwriting a nonempty directory.
     New {
@@ -325,6 +333,7 @@ fn run(command: Command) -> u8 {
         Command::Synth { command } => synth::run(command),
         Command::Transform { command } => transform_command::run(command),
         Command::Optimize { arguments } => optimize_command::run(arguments),
+        Command::Loop { command } => loop_command::run(command),
         Command::New {
             dir,
             template,
@@ -472,7 +481,7 @@ fn describe_effects(path: &[String]) -> Value {
     let path: Vec<_> = path.iter().map(String::as_str).collect();
     let (reads, writes, executes_tools, read_only_flag): (&[&str], &[&str], bool, Option<&str>) =
         match path.as_slice() {
-            [] | ["backend"] | ["synth"] | ["synth", "completion"] | ["transform"] => {
+            [] | ["backend"] | ["synth"] | ["synth", "completion"] | ["transform"] | ["loop"] => {
                 return json!({"classification": "command-group"});
             }
             ["describe"]
@@ -526,6 +535,21 @@ fn describe_effects(path: &[String]) -> Value {
                 false,
                 None,
             ),
+            ["loop", "open"] => (&["original-program"], &["session-directory"], false, None),
+            ["loop", "candidate"] => (
+                &["session-directory", "candidate-program"],
+                &["session-directory"],
+                false,
+                None,
+            ),
+            ["loop", "run"] => (
+                &["session-directory", "proposer-configuration"],
+                &["session-directory"],
+                false,
+                None,
+            ),
+            ["loop", "resume"] => (&["session-directory"], &["session-directory"], false, None),
+            ["loop", "encode"] => (&["program-json"], &["canonical-program"], false, None),
             ["new"] => (
                 &["target-directory", "application-contract"],
                 &["project-files"],

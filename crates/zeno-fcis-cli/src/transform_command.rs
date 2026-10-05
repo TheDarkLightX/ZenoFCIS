@@ -197,8 +197,8 @@ fn read_programs(original: &Path, candidate: &Path) -> Result<(Vec<u8>, Vec<u8>)
 }
 
 /// Reads at most `limit + 1` bytes from a regular file. A FIFO cannot block
-/// the open.
-fn read_bounded(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
+/// the open. The loop command shares this reader.
+pub(super) fn read_bounded(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -218,7 +218,7 @@ fn read_bounded(path: &Path, limit: u64) -> std::io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn over(bytes: &[u8], limit: u64) -> bool {
+pub(super) fn over(bytes: &[u8], limit: u64) -> bool {
     u64::try_from(bytes.len()).unwrap_or(u64::MAX) > limit
 }
 

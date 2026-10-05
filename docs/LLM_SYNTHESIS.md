@@ -62,6 +62,27 @@ The original independent transition comparisons remain required. These results
 are finite behavior evidence relative to reviewed contracts, not a universal
 code-generation theorem or automatic authority for generated native code.
 
+Three transform-loop tools drive the bounded optimization loop
+(`zeno-fcis loop`, see the [CLI reference](CLI_REFERENCE.md)):
+`transform_request(original_path, session_path, profile, attempts, checks,
+deadline_ms)` admits an original and opens a session; `transform_candidate
+(session_path, candidate_path | candidate_json_path)` spends one attempt on a
+candidate the agent supplies, as canonical bytes or in the fixture vocabulary,
+and returns checker-derived feedback (a replayed counterexample, an admission
+refusal, an incomplete check, or an equivalence with its cost and selection
+reason) together with the current incumbent's program; `transform_replay
+(session_path)` re-admits the session, verifies its ledger and replays the
+incumbent before reporting it. The tools accept typed paths, closed profile
+names and bounded integers only; there is no argument by which a caller can
+assert that a candidate passed, and an agent's explanations are provenance,
+not evidence. Hosted model providers stay disabled. A `best-checked-so-far`
+incumbent is functionally equal to the original on its declared domain under
+eager semantics and no more costly in nodes and bytes; it is not optimal,
+not a new application version, and grants no authority. The handlers live in
+`integrations/mcp/zeno_fcis_transform.py` and are tested without the MCP SDK by
+`python3 integrations/mcp/test_transform_tools.py` (set `ZENO_FCIS_CLI` or build
+the CLI first); `test_server.py` lists them with the other tools.
+
 Install the skill in Codex from this checkout:
 
 ```sh

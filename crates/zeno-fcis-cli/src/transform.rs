@@ -566,8 +566,9 @@ pub(crate) fn failure_tag(failure: V2ExecutionFailure) -> &'static str {
 }
 
 /// Compact JSON with object keys sorted by their bytes, independent of the
-/// map order `serde_json` was built with.
-fn write_canonical(value: &Value, out: &mut String) {
+/// map order `serde_json` was built with. The neural loop's request, ledger
+/// and witness records use the same canonical form.
+pub(crate) fn write_canonical(value: &Value, out: &mut String) {
     match value {
         Value::Object(map) => {
             let mut entries: Vec<_> = map.iter().collect();

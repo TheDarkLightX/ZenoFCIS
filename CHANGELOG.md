@@ -32,6 +32,28 @@ embedded in ZenoFCIS values.
   domain above the cap 2, refusals 1, I/O failure 3. Nothing is adopted into
   an application; the result is a bounded search, not a minimality claim.
   Pure code in the CLI crate; `Cargo.lock` and the verified core are unchanged.
+- Add `zeno-fcis loop open|candidate|run|resume|encode`: the bounded adaptive
+  optimization loop of `docs/neurosymbolic-loop`. A frozen canonical request
+  binds the original, its domain and ABI, the profile (`functional-bool-v1`
+  or `checked-i64-v1`), the cost objective, the limits, the disabled provider
+  policy and the checker identity. Proposers (a deterministic local rewriter,
+  a scripted fake provider, agent-supplied candidates through the MCP tools
+  `transform_request`, `transform_candidate` and `transform_replay`, and a
+  hosted adapter that is disabled with a zero allowance) only produce data;
+  every candidate is judged by `transform check` on the whole domain, and only
+  a complete equivalence that lowers (nodes, bytes) within the original's
+  bounds replaces the incumbent. Attempts, model calls and checks are reserved
+  in a hash-chained ledger before work and never refunded; resume re-admits
+  the request, verifies the ledger against its head and replays the incumbent,
+  returning no trusted incumbent on any failure. Strategy proposals in the
+  optimizer's grammar are admitted as data and run by the checked e-graph
+  optimizer. Its bytes re-enter the loop's admission and check, and its own
+  verdict is only provenance. The loop core is pure code in the CLI crate;
+  `Cargo.lock` and the verified core are unchanged. No convergence,
+  optimality or neural benefit is claimed.
+  `docs/benchmarks/run_neural_loop_protocol.py` runs the available arms of the
+  preregistered protocol, including the two e-graph arms, and reports every
+  result.
 - Add `zeno-fcis transform check --original P --candidate C [--receipt OUT]`
   and `zeno-fcis transform replay --receipt R --original P --candidate C`.
   Both programs must pass the library importer's full admission and have the
