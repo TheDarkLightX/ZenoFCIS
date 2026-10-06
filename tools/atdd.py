@@ -103,6 +103,16 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "synthesis_javascript", "--locked", "--", "--ignored"),
          ("python3", "tools/check_synthesis.py")),
     ),
+    "zal-dialogue": AcceptanceScenario(
+        "Review finite behavior through deterministic language help and exact revisions",
+        (("python3", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
+         ("node", "integrations/zal/test_workspace.cjs"),
+         ("python3", "integrations/zal/oracles/independent_oracle.py"),
+         ("python3", "integrations/zal/oracles/formula_oracle.py"),
+         ("python3", "integrations/zal/oracles/explanation_oracle.py"),
+         ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked"),
+         ("python3", "integrations/zal/run.py", "qualify", "integrations/zal/examples/order.zal")),
+    ),
     "bounded-completion": AcceptanceScenario(
         "Verify finite exits and prepare bounded chunks without publication authority",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--test", "completion", "--locked"),

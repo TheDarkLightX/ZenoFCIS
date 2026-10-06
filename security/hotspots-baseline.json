@@ -5125,9 +5125,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 6213098,
+    "admitted_bytes": 6213783,
     "admitted_files": 430,
-    "inventory_sha256": "37119d195c9b4c65d6e6f48f77f43c13f01d10b41a014f64d6ab2df2b35cdc78",
+    "inventory_sha256": "be386b9d3aa978ba80f89763d4bddaab0b1416b0313889f9a287171a877aa76f",
     "ranked_above_minimum": 359,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
