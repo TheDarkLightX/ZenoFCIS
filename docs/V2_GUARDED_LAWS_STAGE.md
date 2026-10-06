@@ -63,10 +63,12 @@ program state is introduced. The existing single dispatcher now chooses a
 protected observation or returns the exact inactive default; both observing
 variants share one Read/trace/frame block. One default-admission helper and one
 pure read specification name the added obligations. No acceptance check is
-removed. Legacy regressions and all 26 legacy semantic/coverage controls are
-retained alongside 15 guarded controls.
-The 41 stable controls comprise 35 intended proof refusals, five genuinely
-verifying raw-coverage refusals and one independent native ordinal refusal.
+removed. Legacy regressions and all 28 legacy semantic/coverage controls are
+retained alongside 15 guarded controls, every specimen byte-identical to its
+source.
+The 43 stable controls comprise 36 intended proof refusals, five genuinely
+verifying raw-coverage refusals and two independent native refusals: the
+delivery ordinal and the declared law order (below).
 The ordinal control retains the exact legacy runtime mutation and requires its
 unchanged named regression to pass on the baseline and fail specifically with
 Err(Frame) versus Ok(()) on the mutant. It is a declared control kind, never a
@@ -95,11 +97,52 @@ bytes, exact law reads and the producer-to-law shared usage delta. It is a
 bounded law/bridge corpus, not a migrated inventory application.
 
 The gate classifies SMT semantic refusal only on a diagnostic in the intended
-actual function, with compile/VIR/resource failures excluded. Coverage controls
-must genuinely verify before their intended raw function contract/spec/body or
-inventory mismatch counts. Embedded source-array length adjustments do not
-constitute a semantic kill or the intended coverage refusal. Every specimen,
-stdout, stderr, command and exit status is retained.
+actual function, with compile/VIR/resource failures excluded. Every proof run
+records its solver budget, the default 10; exhaustion remains a refusal.
+
+`change_declared_law_order` checks that evaluation slot `i` runs the `i`-th
+declared law. Its specimen is the exact legacy mutant, which runs
+`laws[0].program` in slot `i` (SHA-256
+`55021af79009d390af1935f979047fd591c938ac0e3f238c33f3045f07647702`). The
+control is declared native before any run, with a fixed oracle, as an explicit
+change of evidence type. It is not an SMT result and not a fallback after a
+failed proof; no proof is run for it.
+
+Symbolic probes of this control remain inconclusive and are not counted. The
+legacy mutant exhausted the solver at budgets 10 (hosted run 37404295156) and
+40 at `laws.rs:199`. A `laws[0].id` diagnostic retarget (`7ce5b1d5…a11d`)
+mixed a postcondition error with loop exhaustion at both budgets. A
+`laws[i].id ^ 1` identity flip (`789a2e2c…87f4`) only exhausted the loop at
+budget 10. Neither retarget is used.
+
+The oracle is the public test
+`guarded_declared_law_order_refuses_with_the_later_applicable_law` in
+`tests/v2_guarded_laws.rs`, which the harness includes as
+`public_guarded_laws`. Through the actual `bind`/`execute` API, an
+authorized reservation of 1 from an available 2 (an otherwise accepted input)
+meets law 1 first, true and applicable, then the later applicable law 60,
+whose program is false. One assertion compares the refusal and ordered
+diagnostics with literal expectations: `Law(Violated)` and verdicts
+1 Satisfied, 2-3 Skipped, 4 Satisfied, 5 Skipped, 60 `Refused(Violated)`.
+A dedicated classifier requires the baseline run to exit 0 with this exact test
+passing. The mutant must build, exit 101 and run exactly this one test with
+0 passed/1 failed/0 ignored. It must also show one panic at that assertion's
+line, with the exact message and the mutant's literal left value (law 60
+Satisfied, no refusal). Compiler errors, crashes, timeouts, absent or ignored
+tests, unrelated or multiple failures and any other diagnostic refuse. The
+receipt records the actual native argv, exit and intended target.
+
+This native oracle is a concrete regression control. It shows this one input
+catches this specific mutant. It is not a universal proof that the mutant is
+wrong for every input, and not evidence that a symbolic run of the legacy
+mutant completed. The positive whole-source formal proof of `evaluate_into`
+against `law_execution`, with raw coverage, custody and no_std checks, is
+unchanged at the default budget 10.
+
+Coverage controls must genuinely verify before their intended raw function
+contract/spec/body or inventory mismatch counts. Embedded source-array length
+adjustments do not constitute a semantic kill or the intended coverage
+refusal. Every specimen, stdout, stderr, command and exit status is retained.
 
 Replay (all commands are offline and heavy suites keep one shared lock):
 

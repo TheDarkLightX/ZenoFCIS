@@ -1941,31 +1941,31 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 171,
+      "production_lines": 202,
       "rank": 17,
       "score": 81,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            57
+            63
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
-            61
+            67
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
             15,
-            63,
-            73,
-            81,
-            179,
-            189
+            69,
+            79,
+            87,
+            216,
+            226
           ]
         }
       ],
@@ -2948,54 +2948,54 @@
         {
           "id": "ambient-context",
           "lines": [
-            185
+            187
           ]
         },
         {
           "id": "external-verifier-result",
           "lines": [
-            210,
-            253
+            212,
+            255
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            91,
-            92,
-            116,
-            117,
-            208,
-            232,
-            273
+            93,
+            94,
+            118,
+            119,
+            210,
+            234,
+            275
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            183,
-            201,
-            217,
-            224,
-            232,
-            236,
-            244,
-            245
+            185,
+            203,
+            219,
+            226,
+            234,
+            238,
+            246,
+            247
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            90,
-            115
+            92,
+            117
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            94,
-            183,
-            217
+            96,
+            185,
+            219
           ]
         },
         {
@@ -3202,70 +3202,70 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 261,
+      "production_lines": 277,
       "rank": 33,
       "score": 81,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            54,
-            173
+            66,
+            187
           ]
         },
         {
           "id": "external-verifier-result",
           "lines": [
-            255
+            277
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            128,
-            133,
-            137,
-            138,
-            139,
-            141,
             142,
-            143
+            147,
+            151,
+            152,
+            153,
+            155,
+            156,
+            157
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            168,
-            170,
-            171,
-            187,
-            190,
-            219,
-            224,
-            245
+            182,
+            184,
+            185,
+            201,
+            204,
+            233,
+            238,
+            266
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            135
+            149
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            157,
-            170,
             171,
-            190
+            184,
+            185,
+            204
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            36,
-            42,
-            45
+            47,
+            53,
+            56
           ]
         }
       ],
@@ -5303,17 +5303,17 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 4949151,
-    "admitted_files": 368,
-    "inventory_sha256": "6559965baecb5fb13fa0cd546034e30f7e723df0f647a4f8ca5048a749032946",
-    "ranked_above_minimum": 297,
+    "admitted_bytes": 5029572,
+    "admitted_files": 370,
+    "inventory_sha256": "ff74fdb4852af94f7d56d4ee86215ee905dc90ebebbae4e3a3eb8a85d75012ae",
+    "ranked_above_minimum": 299,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 13,
-      "priority-2": 82,
-      "priority-3": 142,
-      "priority-4": 33,
+      "priority-2": 84,
+      "priority-3": 141,
+      "priority-4": 34,
       "priority-5": 98
     }
   }

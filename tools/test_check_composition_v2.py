@@ -78,8 +78,13 @@ class CompositionGate(unittest.TestCase):
     def test_control_anchors_are_unique_owned_and_semantically_classified(self):
         controls = gate.mutations()
         self.assertEqual(len(controls), 32)
+        # Only the two descriptor coverage controls leave the owned files.
+        retargeted = {'weaken_descriptor_contract', 'narrow_descriptor_domain'}
         for name, (path, changed, expected, native) in controls.items():
-            self.assertTrue(path == gate.OWNED.with_suffix('.rs') or path.is_relative_to(gate.OWNED), name)
+            if name in retargeted:
+                self.assertEqual((path, expected), (gate.AUTHORITY_DESCRIPTOR, 'coverage'), name)
+            else:
+                self.assertTrue(path == gate.OWNED.with_suffix('.rs') or path.is_relative_to(gate.OWNED), name)
             self.assertNotEqual(changed, (gate.ROOT/path).read_text(), name)
             self.assertEqual(native, expected == 'proof' and not name.startswith('record_'), name)
         self.assertEqual(sum(row[2] == 'proof' for row in controls.values()), 25)
@@ -87,6 +92,43 @@ class CompositionGate(unittest.TestCase):
             gate.once('x x', 'x', 'y')
         with self.assertRaises(ValueError):
             gate.once('x', 'z', 'y')
+
+    def test_descriptor_controls_change_only_the_unconsumed_public_getter_contract(self):
+        # BoundCore::descriptor's postcondition is consumed by Authority::descriptor,
+        # whose own contract has no verified caller and must still be covered.
+        source = (gate.ROOT/gate.AUTHORITY_DESCRIPTOR).read_text()
+        contract = '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.view().0,))]'
+        self.assertEqual(source.count(contract), 1)
+        start = source.index(contract)
+        self.assertTrue(source[start+len(contract):].startswith('\n    pub fn descriptor(&self)'))
+        controls = gate.mutations()
+        for name, replacement in (
+                ('weaken_descriptor_contract', '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures true,))]'),
+                ('narrow_descriptor_domain', '#[cfg_attr(verus_keep_ghost,verus_spec(result=>requires false,'
+                                             'ensures result==self.view().0,))]')):
+            self.assertEqual(controls[name][1], source[:start]+replacement+source[start+len(contract):], name)
+        row = json.loads((gate.ROOT/gate.PROFILE).read_text())['functions'][
+            'composition::execution_v2::authority::bound::impl&%0::descriptor']
+        self.assertEqual((row['mode'], row['requires'], row['ensures'], 'body_sha256' in row), ('Exec', 0, 1, True))
+
+    def test_descriptor_controls_require_the_intended_coverage_refusal(self):
+        target = 'composition::execution_v2::authority::bound::impl&%0::descriptor'
+        other = 'composition::execution_v2::composition::outcome::impl&%0::descriptor'
+        vir = ''.join(VIR.replace('composition::example', name) for name in (other, target))
+        names = (other, target)
+        p = dict(namespace='composition::', body_covered_functions=list(names),
+                 functions=inventory(vir, 'composition::', names))
+        at = vir.index(target)
+        for name, old, new in (('weaken_descriptor_contract', ':ensure (true)', ':ensure (false)'),
+                               ('narrow_descriptor_domain', ':require ()', ':require (true)')):
+            for start, intended in ((at, True), (0, False)):
+                changed = vir[:start] + vir[start:].replace(old, new, 1)
+                with self.assertRaises(ValueError) as refused:
+                    gate.coverage(changed, p)
+                ok, detail = gate.intended_refusal(changed, p, name, str(refused.exception))
+                self.assertEqual((ok, detail['function']), (intended, target), (name, start))
+            self.assertEqual(gate.intended_refusal(vir, p, name, None)[0], False)
+        self.assertEqual(gate.intended_refusal(vir, p, 'uncontracted_helper', None), (True, None))
 
 
 class RecordStageMigration(unittest.TestCase):

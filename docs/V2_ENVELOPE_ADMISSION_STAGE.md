@@ -24,9 +24,11 @@ result alone is neither a schema-admitted value nor authorization.
 
 Required evidence is exact contracts on every executable helper, whole-source
 pinned Verus and translated body/contract inventory, independent standard-
-library framing oracles, truncation/length/identity negatives, proof mutations
-and separately verifying coverage controls. Full native/Miri/no-std/Clippy,
-template regeneration, acceptance and independent review follow integration.
+library framing oracles, truncation/length/identity negatives, proof mutations,
+frame-contract controls that the verified framed caller must reject, and
+separately verifying specification/inventory coverage controls. Full
+native/Miri/no-std/Clippy, template regeneration, acceptance and independent
+review follow integration.
 Catalog extraction, typed payload admission, encoding/hashing, complete
 decisions, laws/genesis and mandatory authority/replay remain open until their
 actual bridges are implemented and qualified.
