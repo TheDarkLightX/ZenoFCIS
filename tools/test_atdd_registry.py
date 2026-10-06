@@ -105,10 +105,19 @@ TEMPLATE_NATIVE_ONLY = {
     "withdrawal_complete_raw_domain_and_certified_controller": ("assert_eq!(cases, 1_296_000);", 1),
     "treasury_guard_arithmetic_callbacks_and_unlawful_prestates": ("assert_eq!(counts, [103_680, 677_376, 82_944]);", 3),
 }
-TEMPLATE_CORPORA = [("COUNTER_CORPUS", 64), ("STOCK_CORPUS", 864), ("ORDER_CORPUS", 1728),
-                    ("ACCOUNT_CORPUS", 13_122), ("WITHDRAWAL_CORPUS", 1_296_000),
-                    ("TREASURY_PROPOSALS", 103_680), ("TREASURY_CALLBACKS", 677_376),
-                    ("TREASURY_GUARDS", 82_944)]
+# Corpus, native cases, bounded-profile test suffix and application module.
+TEMPLATE_CORPORA = [("COUNTER_CORPUS", 64, "durable_counter", "counter"),
+                    ("STOCK_CORPUS", 864, "inventory_reservation", "stock"),
+                    ("ORDER_CORPUS", 1728, "order_fulfillment", "order"),
+                    ("ACCOUNT_CORPUS", 13_122, "account_lockout", "account"),
+                    ("WITHDRAWAL_CORPUS", 1_296_000, "withdrawal_queue", "vault"),
+                    ("TREASURY_PROPOSALS", 103_680, "treasury_proposals", "treasury"),
+                    ("TREASURY_CALLBACKS", 677_376, "treasury_callbacks", "treasury"),
+                    ("TREASURY_GUARDS", 82_944, "treasury_guards", "treasury")]
+TEMPLATE_PROFILE_TESTS = ["miri_bounded_profile_" + suffix for _, _, suffix, _ in TEMPLATE_CORPORA]
+TEMPLATE_RETAINED = [('durable_counter', 'counter', 0, 12), ('inventory_reservation', 'stock', 1, 20), ('order_fulfillment', 'order', 2, 23), ('account_lockout', 'account', 3, 20), ('withdrawal_queue', 'vault', 4, 26), ('agent_treasury_guard', 'treasury', 5, 30)]
+TEMPLATE_RETAINED_TESTS = ["retained_complete_examples_genesis_and_replay_" + suffix
+                           for suffix, _, _, _ in TEMPLATE_RETAINED]
 
 
 def template_profile_problems(source):
@@ -133,14 +142,21 @@ def template_profile_problems(source):
             problems.append(f"{name} must keep its native count and check every observation")
         if text.count("Observation::new(&") != corpora:
             problems.append(f"{name} must observe its {corpora} corpora")
-    bounded = body("miri_bounded_template_domain_profiles")
-    if "check_observations(&observed, true);" not in bounded:
-        problems.append("the bounded profile must check its observations")
-    pinned = re.search(r"assert_eq!\(counts, \[([\d, ]*)\]\);", bounded)
+    helper = re.findall(r"^fn check_bounded\(observed: Observation<'_>, cases: usize\) \{\n(.*?)^\}", source, re.M | re.S)
+    if len(helper) != 1 or "check_observations(std::slice::from_ref(&observed), true);" not in helper[0] \
+            or "assert_eq!(observed.cases, cases);" not in helper[0]:
+        problems.append("the bounded profile must check its observations and pinned count")
+    for suffix, module, index, count in TEMPLATE_RETAINED:
+        name = "retained_complete_examples_genesis_and_replay_" + suffix
+        expected = f"retained_examples_and_genesis!({module}, {index}, {count});"
+        if body(name).strip() != expected:
+            problems.append(f"{name} must retain its application and all {count} examples")
     cases = []
-    for const, size in TEMPLATE_CORPORA:
+    for const, size, suffix, module in TEMPLATE_CORPORA:
         block = re.search(r"^const " + const + r": Corpus = Corpus \{\n(.*?)^\};", source, re.M | re.S)
-        if block is None or "&" + const not in bounded:
+        pinned = re.fullmatch(r"\s*check_bounded\(\s*with_app!\(" + module + r", \|a, f\| bounded\(&" + const
+                              + r", a, f\)\),\s*(\d+),?\s*\);\s*", body("miri_bounded_profile_" + suffix))
+        if block is None or pinned is None:
             problems.append(f"{const} must be defined and bounded")
             cases.append(-1)
             continue
@@ -165,9 +181,11 @@ def template_profile_problems(source):
         if not profile or profile != sorted(profile) or len({tuple(c) for c in profile}) != len(profile) \
                 or any(len(c) != len(dimensions) or any(v not in d for v, d in zip(c, dimensions)) for c in profile):
             problems.append(f"{const} bounded cases must be ascending, distinct native cases")
+        if int(pinned.group(1)) != len(profile):
+            problems.append(f"{const} bounded count must be pinned as {len(profile)}")
         cases.append(len(profile))
-    if pinned is None or [int(n) for n in pinned.group(1).split(",") if n.strip()] != cases:
-        problems.append(f"bounded counts must be pinned as {cases}")
+    if sum(cases) != 92:
+        problems.append(f"the bounded profile must keep 92 cases, not {cases}")
     if re.search(r"cfg!?\(\s*(?:not\(\s*)?miri|cfg_attr\(\s*(?:not\(\s*)?miri|env::var", source):
         problems.append("template tests must not branch on Miri or the environment")
     return problems
@@ -255,9 +273,9 @@ class RepairedRegistryTests(unittest.TestCase):
         ] + [("run", "--example", path.stem) for path in (synthesis / "examples").glob("*.rs")]
         self.assertEqual(collections.Counter(actual), collections.Counter(expected))
         template = [row for row in rows if row["target"] == "--test v2_template_contracts"]
-        self.assertEqual(len(template), 1)
-        self.assertNotIn("test", template[0])
-        self.assertNotIn("--skip", template[0]["target"])
+        self.assertEqual(len(template), 15)
+        self.assertEqual(sum("test" not in row for row in template), 1)
+        self.assertTrue(all("--skip" not in row["target"] for row in template))
 
     def test_miri_split_targets_run_each_listed_test_exactly_once(self):
         source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
@@ -266,7 +284,7 @@ class RepairedRegistryTests(unittest.TestCase):
         remainder = [row for row in library if "test" not in row]
         isolated = [row["test"] for row in library if "test" in row]
         self.assertEqual([row["group"] for row in remainder], ["synthesis-library"])
-        self.assertEqual(len(isolated), 6)
+        self.assertEqual(len(isolated), 9)
         # Each isolated name is one real library unit test, so CI cannot be
         # first to discover a misspelt selector.
         sources = "\n".join(path.read_text() for path in
@@ -310,63 +328,114 @@ class RepairedRegistryTests(unittest.TestCase):
             run_miri_coverage_check(planted(dict(library[1], group="run", test="other", command="run")),
                                     remainder[0], inventories)
 
-    def test_miri_template_runs_bounded_profile_and_skips_only_native_corpora(self):
+        # A remainder with pinned exclusions composes them with its exact-test
+        # skips: the exclusion step's arguments stay first and unchanged, and each
+        # exclusion must name a listed test that no group runs.
+        excluded = dict(completion, miri_skip=["native_only_completion"])
+        skipping = source.replace(json.dumps(completion), json.dumps(excluded), 1)
+        self.assertNotEqual(skipping, source)
+        exclusion = miri_exclusions.miri_test_arguments(excluded)
+        inventories = dict(inventories, **{"--test completion": sorted(graphs + ["common_completion",
+                                                                                  "native_only_completion"])})
+        self.assertEqual(run_miri_coverage_check(skipping, excluded, inventories, test_args=exclusion),
+                         exclusion + " " + shlex.join([a for name in graphs for a in ("--skip", name)]))
+        discarding = skipping.replace("row.get('miri_skip', []) + isolated", "isolated", 1)
+        self.assertNotEqual(discarding, skipping)
+        for workflow, args in ((discarding, exclusion), (skipping, ""), (skipping, exclusion + " --skip extra")):
+            with self.assertRaisesRegex(AssertionError, "composed Miri arguments must retain every exclusion"):
+                run_miri_coverage_check(workflow, excluded, inventories, test_args=args)
+        invented = dict(completion, miri_skip=["invented_completion"])
+        with self.assertRaisesRegex(AssertionError, "split target tests must run exactly once"):
+            run_miri_coverage_check(source.replace(json.dumps(completion), json.dumps(invented), 1), invented,
+                                    inventories, test_args=miri_exclusions.miri_test_arguments(invented))
+
+    def test_miri_template_partitions_run_bounded_profile_and_skip_only_native_corpora(self):
         source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
         rows = miri_rows(source)
-        template = next(row for row in rows if row.get("target") == "--test v2_template_contracts")
+        target = "--test v2_template_contracts"
+        template = [row for row in rows if row.get("target") == target]
+        remainder = next(row for row in template if "test" not in row)
+        exact = [row for row in template if "test" in row]
         native_only = list(TEMPLATE_NATIVE_ONLY)
-        self.assertEqual(template["miri_skip"], native_only)
+        self.assertEqual(remainder["miri_skip"], native_only)
+        self.assertTrue(all("miri_skip" not in row for row in exact))
+        isolated = [row["test"] for row in exact]
+        self.assertEqual(isolated, TEMPLATE_RETAINED_TESTS + TEMPLATE_PROFILE_TESTS)
         entries = miri_exclusions.load_exclusions()
-        self.assertEqual([e["test"] for e in entries if e["group"] == template["group"]], native_only)
+        self.assertEqual([e["test"] for e in entries if e["group"] == remainder["group"]], native_only)
         self.assertEqual(len(entries), 5)
         rust = (atdd.ROOT / TEMPLATE_TESTS).read_text()
         self.assertEqual(template_profile_problems(rust), [])
-        sum_native = sum(size for _, size in TEMPLATE_CORPORA)
+        sum_native = sum(size for _, size, _, _ in TEMPLATE_CORPORA)
         self.assertEqual(sum_native, 2_175_778)
 
         inventory = sorted(re.findall(r"#\[test\]\s*(?:#\[ignore[^\n]*\n\s*)?fn (\w+)\(", rust))
-        self.assertEqual(len(inventory), 9)
-        target = "--test v2_template_contracts"
+        self.assertEqual(len(inventory), 21)
         inventories = {target: inventory}
         ignored = {target: []}
-        arguments = miri_exclusions.miri_test_arguments(template)
+        arguments = miri_exclusions.miri_test_arguments(remainder)
 
-        def coverage(row=template, workflow=source, args=arguments, names=inventories, skip=True, ignore=ignored):
+        def coverage(row=remainder, workflow=source, args=None, names=inventories, skip=True, ignore=ignored):
+            if args is None:
+                args = miri_exclusions.miri_test_arguments(row)
             return run_miri_coverage_check(workflow, row, names, honour_skip=skip, ignored=ignore, test_args=args)
-        self.assertEqual(coverage(), "")
+        # The remainder keeps the four native-only skips first, then skips the
+        # fourteen exact-test groups; each exact-test group runs its one test.
+        self.assertEqual(coverage(), arguments + " " + shlex.join([a for name in isolated for a in ("--skip", name)]))
+        for row in exact:
+            self.assertEqual(coverage(row), "-- " + shlex.join(["--exact", row["test"]]))
 
         # Planted controls: each must be refused by the workflow's own check.
-        def planted(row):
-            changed = source.replace(json.dumps(template), json.dumps(row), 1)
-            self.assertNotEqual(changed, source)
-            return changed
-        wrong = dict(template, miri_skip=native_only[:3] + ["retained_complete_examples_genesis_and_replay"])
-        undeclared = dict(template, miri_skip=native_only + ["policy_schema_law_and_meter_mutations_refuse"])
-        absent = {k: v for k, v in template.items() if k != "miri_skip"}
-        for row in (wrong, undeclared, absent):
+        def with_rows(changed_rows):
+            head, rest = source.split("        include: ", 1)
+            return head + "        include: " + json.dumps(changed_rows) + "\n    env:" + rest.split("    env:", 1)[1]
+
+        def replaced(old, new):
+            return [new if row == old else row for row in rows]
+        wrong = dict(remainder, miri_skip=native_only[:3] + ["policy_schema_law_and_meter_mutations_refuse"])
+        undeclared = dict(remainder, miri_skip=native_only + ["policy_schema_law_and_meter_mutations_refuse"])
+        absent = {k: v for k, v in remainder.items() if k != "miri_skip"}
+        repeated = dict(remainder, miri_skip=native_only + native_only[:1])
+        for row in (wrong, undeclared, absent, repeated):
             with self.assertRaisesRegex(AssertionError, "template native-only workloads differ"):
-                coverage(row, planted(row), miri_exclusions.miri_test_arguments(row))
+                coverage(row, with_rows(replaced(remainder, row)))
+        for row in (wrong, undeclared, absent):
             with self.assertRaises(miri_exclusions.ExclusionError):
-                miri_exclusions.check_static(atdd.ROOT, entries, miri_rows(planted(row)))
-        for args in ("", arguments + " --skip miri_bounded_template_domain_profiles",
+                miri_exclusions.check_static(atdd.ROOT, entries, replaced(remainder, row))
+        moved = dict(exact[1], miri_skip=native_only[:1])
+        with self.assertRaisesRegex(AssertionError, "only a remainder row can carry Miri exclusions"):
+            coverage(moved, with_rows(replaced(exact[1], moved)))
+        native_group = dict(exact[1], group="synthesis-v2-template-native", test=native_only[0])
+        with self.assertRaisesRegex(AssertionError, "an exact test row selects a Miri exclusion"):
+            coverage(workflow=with_rows(rows + [native_group]))
+        with self.assertRaisesRegex(AssertionError, "duplicate exact test row"):
+            coverage(workflow=with_rows(rows + [dict(exact[1], group="synthesis-v2-template-again")]))
+        for changed in ([row for row in rows if row != exact[1]], [row for row in rows if row != exact[0]],
+                        rows + [dict(exact[1], group="synthesis-v2-template-invented", test="invented_profile")]):
+            with self.assertRaisesRegex(AssertionError, "template exact-test groups differ"):
+                coverage(workflow=with_rows(changed))
+        for args in ("", arguments + " --skip miri_bounded_profile_durable_counter",
                      arguments.replace("--exact ", "")):
             with self.assertRaisesRegex(AssertionError, "skip exactly the native-only corpora"):
                 coverage(args=args)
-        with self.assertRaisesRegex(AssertionError, "template Miri selection must run"):
+        with self.assertRaisesRegex(AssertionError, "skip exactly the native-only corpora"):
+            coverage(exact[1], args=arguments)
+        with self.assertRaisesRegex(AssertionError, "template Miri remainder must run"):
             coverage(skip=False)
-        for name in ("miri_bounded_template_domain_profiles", "compiled_contracts_reproduce_their_committed_policy_bytes"):
-            missing = {target: [n for n in inventory if n != name]}
-            with self.assertRaisesRegex(AssertionError, "template semantic inventory differs"):
-                coverage(names=missing)
-            with self.assertRaisesRegex(AssertionError, "must not be ignored"):
-                coverage(ignore={target: [name]})
-        split = source.replace(json.dumps(template) + ",\n",
-                               json.dumps(template) + ",\n          " + json.dumps(
-                                   {"group": "synthesis-v2-template-bounded", "packages": "-p zeno-fcis-synthesis",
-                                    "target": target, "test": "miri_bounded_template_domain_profiles"}) + ",\n", 1)
-        self.assertNotEqual(split, source)
-        with self.assertRaisesRegex(AssertionError, "split target cannot carry Miri exclusions"):
-            coverage(workflow=split)
+        discarding = source.replace("row.get('miri_skip', []) + isolated", "isolated", 1)
+        self.assertNotEqual(discarding, source)
+        with self.assertRaisesRegex(AssertionError, "template Miri remainder must run"):
+            coverage(workflow=discarding)
+        for names in ([n for n in inventory if n != TEMPLATE_PROFILE_TESTS[0]],
+                      [n for n in inventory if n != "compiled_contracts_reproduce_their_committed_policy_bytes"],
+                      inventory + ["invented_test"]):
+            for row in (remainder, exact[1]):
+                with self.assertRaisesRegex(AssertionError, "template semantic inventory differs"):
+                    coverage(row, names={target: names})
+        for row in (remainder, exact[1]):
+            for ignored_name in (TEMPLATE_PROFILE_TESTS[0], "compiled_contracts_reproduce_their_committed_policy_bytes"):
+                with self.assertRaisesRegex(AssertionError, "must not be ignored"):
+                    coverage(row, ignore={target: [ignored_name]})
 
         # Planted source controls for the pinned counts, signatures, values,
         # boundaries and bounded cases.
@@ -382,12 +451,24 @@ class RepairedRegistryTests(unittest.TestCase):
                                  '    boundaries: &[],\n    unnamed: &[\n        ("allowed increment reaches 3"'))
         self.assertTrue(problems("        &[0, 1, 120, 1],\n", ""))
         self.assertTrue(problems("        &[0, 1, 120, 1],\n", "        &[0, 1, 122, 1],\n"))
-        self.assertTrue(problems("[5, 7, 11, 9, 10, 12, 22, 16]", "[5, 7, 11, 9, 9, 12, 22, 16]"))
+        self.assertTrue(problems("bounded(&WITHDRAWAL_CORPUS, a, f)),\n        10,", "bounded(&WITHDRAWAL_CORPUS, a, f)),\n        9,"))
+        self.assertTrue(problems("bounded(&ORDER_CORPUS, a, f)), 11);", "bounded(&ORDER_CORPUS, a, f)), 12);"))
+        self.assertTrue(problems("with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS",
+                                 "with_app!(account, |a, f| bounded(&WITHDRAWAL_CORPUS"))
         self.assertTrue(problems("        &[0, 180, 0, 181, 1, 0, 0, 170, 162, 170, 1, 193, 0],\n", ""))
-        self.assertTrue(problems("check_observations(&observed, true);", ""))
-        self.assertTrue(problems("#[test]\nfn miri_bounded_template_domain_profiles", "#[test]\n#[ignore]\nfn miri_bounded_template_domain_profiles"))
-        self.assertTrue(problems("fn miri_bounded_template_domain_profiles() {\n",
-                                 "fn miri_bounded_template_domain_profiles() {\n    if cfg!(miri) {}\n"))
+        self.assertTrue(problems("    check_observations(std::slice::from_ref(&observed), true);\n", ""))
+        self.assertTrue(problems("    assert_eq!(observed.cases, cases);\n", ""))
+        self.assertTrue(problems("#[test]\nfn miri_bounded_profile_withdrawal_queue",
+                                 "#[test]\n#[ignore]\nfn miri_bounded_profile_withdrawal_queue"))
+        self.assertTrue(problems("fn miri_bounded_profile_withdrawal_queue() {\n",
+                                 "fn miri_bounded_profile_withdrawal_queue() {\n    if cfg!(miri) {}\n"))
+        self.assertTrue(problems("fn miri_bounded_profile_treasury_guards()", "fn miri_bounded_profile_treasury_guard()"))
+        self.assertTrue(problems("retained_examples_and_genesis!(treasury, 5, 30);",
+                                 "retained_examples_and_genesis!(treasury, 5, 29);"))
+        self.assertTrue(problems("retained_examples_and_genesis!(account, 3, 20);",
+                                 "retained_examples_and_genesis!(stock, 3, 20);"))
+        self.assertTrue(problems("#[test]\nfn retained_complete_examples_genesis_and_replay_durable_counter",
+                                 "#[test]\n#[ignore]\nfn retained_complete_examples_genesis_and_replay_durable_counter"))
 
     def test_current_authority_is_bound_to_real_admission_and_public_api_tests(self):
         commands = atdd.SCENARIOS["production-authority"].commands
