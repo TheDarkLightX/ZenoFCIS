@@ -31,6 +31,9 @@ EVALUATOR=SUBJECT.parent/'authority/evaluator.rs'
 SOURCE_MANIFEST=Path('verification/verus/authority_v2_sources.json')
 PUBLIC_TEST=Path('crates/zeno-fcis-synthesis/tests/v2_authority.rs')
 APPROVED_SOURCE_CLOSURE_SHA256='2120fdb44abf017910f29cb6b34a74fb27ca67a636f4f38c58f124c6696cf10f'
+# This unchanged command-substitution control needs more than the default
+# solver budget. Exhaustion still refuses qualification; it is not a kill.
+CONTROL_RLIMITS={'sealed_command':40}
 
 def source_manifest(path):
     if verifier.digest(path)!=APPROVED_SOURCE_CLOSURE_SHA256:
@@ -220,7 +223,8 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
     command=[str(tool/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads','2','-V','spinoff-all','--output-json','--triggers-mode','silent','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
     out.mkdir(parents=True,exist_ok=True)
     def proof(cwd,name):
-        proc=verifier.run([*command,'--log-dir',str(out/name),str(HARNESS)],cwd,env,timeout=600)
+        proc=verifier.run([*command,'--rlimit',str(CONTROL_RLIMITS.get(name,10)),
+            '--log-dir',str(out/name),str(HARNESS)],cwd,env,timeout=600)
         (out/(name+'.stdout')).write_text(proc.stdout);(out/(name+'.stderr')).write_text(proc.stderr)
         return proc,json.loads(proc.stdout)
     positive,report=proof(ROOT,'positive');verifier.require_success(positive)
@@ -291,6 +295,7 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
             if n is not None:killed=killed and n.returncode!=0 and 'test result: FAILED' in n.stdout and bool(failed_tests)
             if name.startswith(('getter_','constructor_','approved_source_')) and n is not None:killed=killed and any(t.startswith('public_authority::') for t in failed_tests)
             row={'name':name,'expected':expected,'killed':killed,'proof_exit':proc.returncode,'verification_results':r,'coverage_refusal':refusal,'intended_coverage_control':intended,'source_array_length_adjustments':adjustments,'native_exit':None if n is None else n.returncode};results.append(row)
+            row['proof_command']=proc.args
             row['mutated_path']=str(path);row['mutated_sha256']=verifier.digest(specimen/path);row['native_failed_tests']=failed_tests
             retained=out/'specimens'/name;retained.mkdir(parents=True)
             row['retained_source_sha256']={}

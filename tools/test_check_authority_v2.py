@@ -2,6 +2,7 @@
 """Check source custody and the authority gate's intended negative controls."""
 import copy
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -10,6 +11,22 @@ import check_authority_v2 as gate
 
 
 class GateTests(unittest.TestCase):
+    def test_solver_exhaustion_does_not_count_as_a_semantic_refusal(self):
+        report = {'verification-results': {'success': False, 'errors': 1,
+                                          'encountered-vir-error': False}}
+        path = Path('outcome.rs')
+        for diagnostic in ('Resource limit (rlimit) exceeded', 'timed out', 'out of memory'):
+            proc = subprocess.CompletedProcess([], 1, '', f'outcome.rs:64: {diagnostic}')
+            with self.subTest(diagnostic=diagnostic):
+                self.assertFalse(gate.semantic_refusal(proc, report, path))
+        proc = subprocess.CompletedProcess([], 1, '', 'outcome.rs:63: postcondition not satisfied')
+        self.assertTrue(gate.semantic_refusal(proc, report, path))
+        proc = subprocess.CompletedProcess([], 1, '', 'unrelated.rs:63: postcondition not satisfied')
+        self.assertFalse(gate.semantic_refusal(proc, report, path))
+        report['verification-results']['encountered-vir-error'] = True
+        self.assertFalse(gate.semantic_refusal(
+            subprocess.CompletedProcess([], 1, '', 'outcome.rs:64: type error'), report, path))
+
     def test_mutations_are_distinct_exact_subjects(self):
         controls = gate.mutations()
         self.assertEqual(len(controls), 42)

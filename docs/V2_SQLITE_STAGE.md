@@ -229,10 +229,12 @@ No comparison runs while a write transaction is open. What a comparison
 establishes depends only on two catalogs, so an upgrade or a full open first
 finds the pairs it needs with plain reads and establishes them. Its
 immediate transaction then re-reads the store, as before, and only looks the
-pairs up. If another connection changed the store in between so that a pair
-is missing, the attempt writes nothing, the pair is established with no
-transaction open, and the attempt runs again, at most once per lineage
-version; beyond that the operation ends with `Error::Unsettled`. The write
+pairs up without waiting for the shared memo. If another connection changed
+the store so that a pair is missing, or a comparison has the memo locked,
+the attempt writes nothing and releases its transaction before establishing
+or waiting for the pair. It then retries within the existing lineage-length
+bound; repeated store changes or comparison-cache contention can exhaust
+that bound and return `Error::Unsettled`. The write
 lock is therefore held about as long as before comparisons existed: tens of
 milliseconds for an upgrade or an open of the withdrawal queue in the
 measurements.

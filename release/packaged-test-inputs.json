@@ -117,6 +117,24 @@
     },
     {
       "package": "zeno-fcis-shell-sqlite",
+      "target": "lib:zeno_fcis_shell_sqlite",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
+      "sha256": "f2aa16e9b29e2b81d20ad28a01ec5222c3f4340d43ca804291f9b13d39454e1d"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "lib:zeno_fcis_shell_sqlite",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/policy.zcve",
+      "sha256": "3169d8ffe59338cce7b4c0ce1701042ed671bcaf104cd6fba764007285cf6ade"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "lib:zeno_fcis_shell_sqlite",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve",
+      "sha256": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
       "target": "test:compact",
       "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
       "sha256": "f2aa16e9b29e2b81d20ad28a01ec5222c3f4340d43ca804291f9b13d39454e1d"

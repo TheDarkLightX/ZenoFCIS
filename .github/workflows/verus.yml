@@ -70,7 +70,7 @@ jobs:
           persist-credentials: false
       - name: Install application and verifier toolchains
         run: |
-          rustup toolchain install 1.97.1 --profile minimal --component clippy
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup toolchain install 1.98.1 --profile minimal
       - name: Fetch locked crates for offline repository tools
         uses: ./.github/actions/fetch-locked-crates
@@ -86,7 +86,7 @@ jobs:
           pin = json.loads((check_verus.ROOT / check_verus.PIN).read_text())
           check_verus.prepare_tools(Path.home() / '.cache/zeno-fcis/verus', pin, True)
           PY
-          mkdir -p "$EVIDENCE_DIRECTORY"
+          mkdir -p "$EVIDENCE_DIRECTORY" "$CARGO_TARGET_DIR"
       - name: Check gate admission and failure controls
         run: python3 "tools/test_${GATE_SCRIPT}"
       - name: Require the complete exact-source proof and control suite
