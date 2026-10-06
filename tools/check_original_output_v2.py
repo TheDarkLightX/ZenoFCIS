@@ -21,6 +21,7 @@ import tempfile
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
+from verus_contract_controls import contract_rejected
 from verus_coverage import require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +29,16 @@ HARNESS = Path('verification/verus/original_output.rs')
 PROFILE = Path('verification/verus/original-output.json')
 SUBJECT = Path('crates/zeno-fcis-synthesis/src/finite/canonical_v2/output.rs')
 SPEC = SUBJECT.parent / 'output/spec.rs'
+PUBLICATION = 'crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication.rs'
+# Rejections at the verified publication callers: `state_bytes` (postcondition line 118)
+# encodes a record and then its envelope; `delivery_bytes` (line 134) encodes a record.
+# The omitted record contract was observed on hosted run 37404295156; the weakened
+# envelope contract awaits its selected run.
+CONTRACT_REJECTIONS = {
+    'omit_unused_record_contract': frozenset({('postcondition not satisfied', PUBLICATION, 118),
+                                              ('postcondition not satisfied', PUBLICATION, 134)}),
+    'weaken_unused_envelope_contract': frozenset({('postcondition not satisfied', PUBLICATION, 118)}),
+}
 TESTS = SUBJECT.parent / 'output/tests.rs'
 PUBLIC_TEST = Path('crates/zeno-fcis-synthesis/tests/v2_original_output.rs')
 STAGE = Path('docs/V2_ORIGINAL_OUTPUT_STAGE.md')
@@ -50,7 +61,8 @@ SOURCES = tuple(sorted(set((*UNIT_SOURCES, *ORACLE_SOURCES, *NATIVE_SOURCES, PRO
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("tools/v2_native_dependencies.py"),
-                                Path("verification/verus/authority_v2_sources.json"))))
+                                Path("verification/verus/authority_v2_sources.json"),
+                                Path("tools/verus_contract_controls.py"))))
 TARGET = Path(os.environ.get('CARGO_TARGET_DIR', str(ROOT / 'target')))
 
 
@@ -113,9 +125,11 @@ def mutation_sources(source: str, specification: str) -> dict[str, tuple[Path, s
         ('envelope_header_cap', 'payload.len().checked_add(48)', 'payload.len().checked_add(47)', 'native'),
     ):
         rows[name] = (SUBJECT, once(source, old, new), kind)
-    rows['omit_unused_record_contract'] = (SUBJECT, replace_contract(source, 'encode_record', ''), 'coverage')
+    # Legacy identifiers: these encoder contracts are no longer unused. Verified
+    # publication callers consume them, so the changes must fail those callers.
+    rows['omit_unused_record_contract'] = (SUBJECT, replace_contract(source, 'encode_record', ''), 'proof_contract')
     rows['weaken_unused_envelope_contract'] = (SUBJECT, replace_contract(source, 'encode_envelope',
-        '#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n'), 'coverage')
+        '#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n'), 'proof_contract')
     rows['equivalent_spec_body'] = (SPEC, once(specification,
         'else { Ok((b@.len() + 5) as usize) }', 'else { Ok((b@.len() + 4 + 1) as usize) }'), 'coverage')
     rows['uncontracted_inventory'] = (SUBJECT, source + '\npub fn uncontracted_output_probe(n: usize) -> usize { n }\n', 'coverage')
@@ -224,6 +238,8 @@ def check(directory: Path, positive_only: bool = False) -> dict:
                 dest.write_bytes(changed.encode() if unit == path else (source / unit).read_bytes())
             adjust_specimen_source_lengths(specimen)
             refusal = None
+            outcome = None
+            proof_command = None
             if kind == 'native':
                 binary = specimen / 'native-tests'
                 verifier.require_success(run(native_build_command(specimen, binary, libraries), specimen, env, specimen, 'build'))
@@ -231,10 +247,15 @@ def check(directory: Path, positive_only: bool = False) -> dict:
                 killed = result.returncode == 101 and 'test result: FAILED' in result.stdout and 'assertion' in result.stdout
                 detail = {'native_stdout': str(specimen / 'native.stdout')}
             else:
-                result = run([*command, '--log-dir', str(specimen / 'logs'), str(specimen / HARNESS)], specimen, env, specimen, 'verus')
+                proof_command = [*command, '--log-dir', str(specimen / 'logs'), str(specimen / HARNESS)]
+                result = run(proof_command, specimen, env, specimen, 'verus')
                 parsed = parsed_report(result)
                 detail = parsed.get('verification-results', {})
-                if kind == 'proof':
+                if kind == 'proof_contract':
+                    outcome = contract_rejected(result.returncode, result.stdout, result.stderr,
+                                                pin, CONTRACT_REJECTIONS[name])
+                    killed = outcome['accepted']
+                elif kind == 'proof':
                     errors = re.findall(r'(?m)^error:.*(?:\n(?!error:|note:).*)*', result.stderr)
                     killed = (result.returncode != 0 and detail.get('errors', 0) > 0
                         and detail.get('encountered-vir-error') is False
@@ -246,8 +267,9 @@ def check(directory: Path, positive_only: bool = False) -> dict:
                         except ValueError as e: refusal = str(e)
                     killed = result.returncode == 0 and detail.get('success') is True and detail.get('errors') == 0 and refusal is not None
             row = {'name':name, 'kind':kind, 'killed':bool(killed), 'exit_code':result.returncode,
-                   'changed_source':str(path), 'changed_sha256':verifier.digest(specimen / path),
-                   'coverage_refusal':refusal, 'result':detail, 'logs':str(specimen)}
+                   'changed_source':str(path), 'original_sha256':before[str(path)],
+                   'changed_sha256':verifier.digest(specimen / path), 'command':proof_command,
+                   'coverage_refusal':refusal, 'contract_outcome':outcome, 'result':detail, 'logs':str(specimen)}
             mutations.append(row)
             (directory / 'mutations.json').write_text(json.dumps(mutations, indent=2, sort_keys=True) + '\n')
             print(f'Original output: {name}: {"caught" if killed else "FAILED"} ({kind})', flush=True)

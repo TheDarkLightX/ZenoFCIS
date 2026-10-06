@@ -87,6 +87,13 @@ def test_definitions(root: Path, name: str) -> list[Path]:
     return found
 
 
+def test_attributes(path: Path, name: str) -> str:
+    """The attribute lines directly above each definition of `name` in `path`."""
+    pattern = re.compile(r"((?:^[ \t]*#\[[^\n]*\n)+)[ \t]*(?:pub(?:\([^)]*\))?\s+)?fn\s+"
+                         + re.escape(name) + r"\s*\(", re.M)
+    return "".join(match.group(1) for match in pattern.finditer(path.read_text(encoding="utf-8")))
+
+
 def job_block(text: str, job: str) -> str:
     lines = text.splitlines()
     try:
@@ -132,6 +139,9 @@ def check_static(root: Path, entries: list[dict], rows: list[dict]) -> None:
             raise ExclusionError(
                 f"{entry['test']} must name exactly one test, in {expected.relative_to(root)}; "
                 f"found {[str(path.relative_to(root)) for path in definitions]}")
+        # An ignored or conditionally compiled exclusion would run nowhere.
+        if re.search(r"#\[\s*(?:ignore|cfg|cfg_attr)\b", test_attributes(expected, entry["test"])):
+            raise ExclusionError(f"{entry['test']} must run natively, not ignored or conditionally compiled")
         check_native(root, entry)
 
 
@@ -215,6 +225,10 @@ def self_test() -> None:
         refused(lambda: check_listing([entry], "values", "huge_case: test\nhuge_case: test\n"),
                 "a skip that matches two listed tests")
         (tests / "other.rs").unlink()
+        for attributes in ("#[test]\n#[ignore]\n", "#[cfg_attr(not(miri), ignore)]\n#[test]\n"):
+            (tests / "big.rs").write_text(f"{attributes}fn huge_case() {{}}\n#[test]\nfn small_case() {{}}\n")
+            refused(lambda: check_static(root, [entry], [row]), "a native-only test that does not run natively")
+        (tests / "big.rs").write_text("#[test]\nfn huge_case() {}\n#[test]\nfn small_case() {}\n")
         refused(lambda: check_static(root, [dict(entry, native=dict(entry["native"], job="docs"))], [row]),
                 "a native job that does not exist")
         filtered = "cargo +1.97.1 test -p demo --locked -- --skip huge_case"
@@ -233,7 +247,7 @@ def main() -> int:
     try:
         if arguments.mode == "self-test":
             self_test()
-            print("miri-exclusions: self-test PASS (9 planted controls refused)")
+            print("miri-exclusions: self-test PASS (11 planted controls refused)")
             return 0
         selected = json.loads(arguments.selected) if arguments.selected else None
         test_arguments = check(selected)

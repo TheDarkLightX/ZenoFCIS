@@ -15,6 +15,7 @@ from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import once
+from verus_contract_controls import contract_rejected
 from verus_coverage import require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,10 +25,26 @@ SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema.rs")
 ADMISSION = SUBJECT.parent / "schema/admission.rs"
 SPEC = SUBJECT.parent / "schema/spec.rs"
 CANONICAL = SUBJECT.parent
+CATALOG = "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs"
+# Rejections at the verified catalog callers of `Checked::original`: `original_schema`
+# (postcondition line 67, call line 71) and `bind_checked` (postcondition line 120,
+# call line 149). The omitted contract was observed for this same admission.rs
+# mutation in the canonical-bytes harness on hosted run 37404295156; each control
+# still needs its own selected schema-binding run.
+CONTRACT_REJECTIONS = {
+    "omit_original_getter_contract": frozenset({("postcondition not satisfied", CATALOG, 67),
+                                                ("postcondition not satisfied", CATALOG, 120)}),
+    "weaken_original_getter_contract": frozenset({("postcondition not satisfied", CATALOG, 67),
+                                                  ("postcondition not satisfied", CATALOG, 120)}),
+    "narrow_original_getter_domain": frozenset({("precondition not satisfied", CATALOG, 71),
+                                                ("precondition not satisfied", CATALOG, 149)}),
+}
 UNIT_SOURCES = (HARNESS, *sorted(path.relative_to(ROOT)
     for path in (ROOT / CANONICAL).rglob("*.rs")))
 
-UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
+# Native mutant tests compile this existing #[path] fixture from execution_v2.
+ORDER_FIXTURE = Path("crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs")
+UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT), ORDER_FIXTURE)))
 PUBLIC_TEST = Path("crates/zeno-fcis-authority/tests/v2_schema_binding.rs")
 NATIVE_SOURCES = tuple(sorted(path.relative_to(ROOT)
     for crate in ("zeno-fcis-schema", "zeno-fcis-codec", "zeno-fcis-value")
@@ -44,7 +61,8 @@ SOURCES = (*UNIT_SOURCES, *NATIVE_SOURCES, PUBLIC_TEST, PROFILE, verifier.PIN,
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
 
-SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"),
+                                Path("tools/verus_contract_controls.py"))))
 
 
 def snapshot() -> dict[str, str]:
@@ -103,7 +121,9 @@ def mutation_sources(source: str, admission: str, spec: str) -> dict[str, tuple[
          "        requires self.view().0.len() > 0,\n"
          "        ensures result@ == self.view().0,\n    ))]\n"),
     ):
-        mutations[name] = (ADMISSION, getter_contract(admission, replacement), "coverage")
+        # The catalog proofs consume this getter's contract, so these contract-only
+        # changes must fail those callers rather than verify for a coverage refusal.
+        mutations[name] = (ADMISSION, getter_contract(admission, replacement), "proof_contract")
     mutations["equivalent_schema_specification_change"] = (SPEC,
         once(spec, "bytes.len() as u64 <= max_bytes", "!(bytes.len() as u64 > max_bytes)"), "coverage")
     mutations["add_uncontracted_schema_function"] = (SUBJECT,
@@ -175,7 +195,8 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
         adjust_specimen_source_lengths(specimen)
-        mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"), str(HARNESS)], specimen, environment)
+        mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(HARNESS)]
+        mutant = verifier.run(mutant_command, specimen, environment)
         (specimen / "verus.json").write_text(mutant.stdout)
         (specimen / "verus.stderr").write_text(mutant.stderr)
         try:
@@ -184,12 +205,19 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
             result = {}
         refusal = None
         mutant_native = None
+        outcome = None
         if expected == "proof":
             killed = (mutant.returncode != 0 and result.get("success") is False
                 and type(result.get("errors")) is int and result["errors"] > 0
                 and result.get("encountered-vir-error") is False)
             mutant_native = native_check(specimen, specimen, pin, environment)
             killed = killed and mutant_native["build_exit"] == 0 and mutant_native["exit_code"] not in (None, 0)
+        elif expected == "proof_contract":
+            # Runtime code is unchanged, so no native test can fail; the positive
+            # native comparison above remains required.
+            outcome = contract_rejected(mutant.returncode, mutant.stdout, mutant.stderr,
+                pin, CONTRACT_REJECTIONS[name])
+            killed = outcome["accepted"]
         else:
             if mutant.returncode == 0:
                 try:
@@ -199,9 +227,11 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
             killed = (mutant.returncode == 0 and result.get("success") is True
                 and result.get("errors") == 0 and refusal is not None)
         row = {"name": name, "expected_failure": expected, "killed": killed,
-            "changed_source": str(path), "changed_sha256": verifier.digest(specimen / path),
+            "changed_source": str(path), "original_sha256": before[str(path)],
+            "changed_sha256": verifier.digest(specimen / path), "command": mutant_command,
             "exit_code": mutant.returncode, "verification_results": result,
-            "coverage_refusal": refusal, "native": mutant_native, "logs": str(specimen)}
+            "coverage_refusal": refusal, "contract_outcome": outcome,
+            "native": mutant_native, "logs": str(specimen)}
         mutations.append(row)
         (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
         if not killed:

@@ -99,11 +99,15 @@ The gate retains complete source, tool pins, commands, stdout/stderr, exits,
 whole-harness reports, translated function inventory, executable contract/body
 and spec-body fingerprints, and each mutation specimen. Mutations challenge
 wire tags, widths, sign conversion, IDs/order, payload flags, blob/record counts,
-ASCII, caps, original header identity/length and payload custody. Genuine
-verification of weakened/omitted unused contracts and equivalent spec changes
-must be rejected by the separate coverage guard. Compiler, VIR, timeout and
-resource failures never count as semantic kills. The coverage guard is a
-reviewed development check, not an additional proof checker.
+ASCII, caps, original header identity/length and payload custody. The record
+and envelope encoder contracts are no longer unused: verified publication
+callers consume them, so omitting or weakening them must fail those callers
+with the demonstrated obligation and location (the legacy control names keep
+"unused"). Genuine verification of equivalent spec changes and an added
+uncontracted function must be rejected by the separate coverage guard.
+Compiler, VIR, timeout and resource failures never count as semantic kills.
+The coverage guard is a reviewed development check, not an additional proof
+checker.
 
 Replay, offline and serialized against other workers:
 

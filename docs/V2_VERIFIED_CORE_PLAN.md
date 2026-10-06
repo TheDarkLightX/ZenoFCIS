@@ -252,8 +252,17 @@ The local pre-commit gate for V2 is:
 
 Every retained control, or its reviewed replacement, must still fail for its
 intended reason in CI. A control that does not is an open defect, not a pass.
-One is already known: in a stopped local run, the guarded-laws control
-`change_declared_law_order` did not report as caught. The CI run decides it.
+One is already known: the guarded-laws control `change_declared_law_order`
+exhausted the solver at budget 10 (hosted run 37404295156) and 40, an
+inconclusive result the gate correctly refused. A `laws[0].id` diagnostic
+retarget gave a postcondition error mixed with loop exhaustion at 10 and 40,
+and a `laws[i].id ^ 1` identity flip only exhausted the loop at 10; both are
+also inconclusive and withdrawn. The guarded gate keeps the original mutant and
+declares it native before any run, with a fixed oracle: one public test through
+`bind`/`execute` (V2_GUARDED_LAWS_STAGE.md). That is a concrete regression
+control, not a universal proof of the mutant or a completed symbolic run. The
+positive whole-source proof is unchanged, and the actual native runs decide the
+control.
 
 ## Trusted base and evidence strength
 

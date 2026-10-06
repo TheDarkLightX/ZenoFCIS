@@ -531,6 +531,62 @@ fn guarded_original_inventory_864_actual_frames_and_conditional_delivery_law() {
 }
 
 #[test]
+fn guarded_declared_law_order_refuses_with_the_later_applicable_law() {
+    with_inventory(|d| {
+        // Law 1 applies first and is true; the later applicable law 60 is false.
+        let truth = [l::Op::Literal(l::Atom::Bool(true))];
+        let refusing = [l::Op::Literal(l::Atom::Bool(false))];
+        let definitions = laws(&truth, &refusing, 0);
+        let probe = c::Descriptor {
+            state: d.state,
+            command: d.command,
+            context: d.context,
+            program: ScalarProgram {
+                inputs: d.program.inputs,
+                outputs: d.program.outputs,
+                nodes: d.program.nodes,
+                roots: d.program.roots,
+            },
+            bindings: d.bindings,
+            output_types: d.output_types,
+            decision_output: d.decision_output,
+            branches: d.branches,
+            reasons: d.reasons,
+            channels: d.channels,
+            laws: &definitions,
+            required: d.required,
+            limits: d.limits,
+        };
+        let Ok(core) = c::bind(&probe) else {
+            panic!("law-order descriptor must bind");
+        };
+        // Authorized reserve of 1 from available 2: an otherwise accepted transition.
+        let s = record(&[(110, integer(2)), (111, integer(0))]);
+        let cmd = command(150, 1);
+        let ctx = record(&[(130, vec![2])]);
+        let out = core.execute(c::Raw {
+            state: &s,
+            command: &cmd,
+            context: &ctx,
+        });
+        let expected = [
+            (1, l::Verdict::Satisfied),
+            (2, l::Verdict::Skipped),
+            (3, l::Verdict::Skipped),
+            (4, l::Verdict::Satisfied),
+            (5, l::Verdict::Skipped),
+            (60, l::Verdict::Refused(l::Failure::Violated)),
+        ]
+        .map(|(id, verdict)| l::Diagnostic { id, verdict });
+        assert_eq!(
+            (out.result().err(), out.diagnostics()),
+            (Some(c::Failure::Law(l::Failure::Violated)), &expected[..]),
+            "declared law order: later law 60 must refuse"
+        );
+    });
+}
+
+#[test]
 fn guarded_default_admission_matches_original_literal_text_standard_even_when_inactive() {
     with_inventory(|d| {
         let truth = [l::Op::Literal(l::Atom::Bool(true))];

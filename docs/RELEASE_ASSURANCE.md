@@ -80,8 +80,8 @@ The CI workflows add:
   prompt-minimized review-card rendering, and public-link validation;
 - `wasm32-unknown-unknown` checks for every `no_std + alloc` crate;
 - independent SHA-256 provider and provider-parity checks;
-- Miri interpretation of the semantic boundary tests, except the one pinned
-  exclusion described under deliberate narrowings;
+- Miri interpretation of the semantic boundary tests, except the five pinned
+  exclusions described under deliberate narrowings;
 - compilation of the codec and candidate-bundle fuzz targets;
 - focused crash-atomic SQLite, authenticated-state, synthesis, mounted-adapter, and collection-backend tests;
 - strict validated-decision, canonical-domain-manifest, and exhaustive-coverage promotion tests;
@@ -209,9 +209,9 @@ and the two `verification/verus/` includes in
 standalone packaged tests when the verified sources next change, which is the
 identity regeneration planned for the 2.1.0 release.
 
-### One test is not interpreted by Miri
+### Five tests are not interpreted by Miri
 
-`.github/miri-exclusions.json` pins the only test Miri skips:
+`.github/miri-exclusions.json` pins the five tests Miri skips. The first is
 `legal_leaf_above_default_payload_remains_constructible_and_encodable` in
 `crates/zeno-fcis-value/tests/construction.rs`. It builds 64 MiB + 1 byte
 values and scans them byte by byte, which under Miri runs for hours and grows
@@ -224,7 +224,57 @@ codec's 64 MiB + 1 byte map-key test still runs under Miri. Only this test's
 own property is not interpreted: a text or admitted value above the default
 payload limit, accepted under supplied limits. `tools/miri_exclusions.py`
 fails unless the list equals the workflow's skips, each name matches exactly
-one test, and the named native job runs it.
+one test that is neither ignored nor conditionally compiled, and the named
+native job runs it.
+
+The other four are the finite native corpora in
+`crates/zeno-fcis-synthesis/tests/v2_template_contracts.rs`. Together they hold
+2,175,778 native cases:
+
+- `all_original_small_domains_and_unlawful_order_states`: 2,656 (counter 64,
+  inventory 864, order 1,728);
+- `account_complete_clock_boundaries_without_domain_narrowing`: 13,122;
+- `withdrawal_complete_raw_domain_and_certified_controller`: 1,296,000;
+- `treasury_guard_arithmetic_callbacks_and_unlawful_prestates`: 103,680,
+  677,376 and 82,944.
+
+These are the finite corpora the tests enumerate, not every value a production
+descriptor admits. Account covers nine selected clock and deadline values, not
+the timestamp range. Treasury covers three partitions, not the full Cartesian
+domain. In the hosted Miri run of 916b28e none of the target's tests finished
+within its 180-minute budget. The tests still run natively, unchanged in bounds
+and independent comparisons, in the `ci` workflow's `rust` job.
+
+Under Miri, `miri_bounded_template_domain_profiles` runs 92 pinned cases from
+the eight corpora through the same checked path and independent comparison. The same
+cases run natively. For each corpus, the cases come in a fixed ascending order
+with a pinned count, and each is an actual native case. The test fails unless
+the bounded cases reach every outcome signature the complete native corpus
+produces (class and reason, or the actual refusal variant). They must also
+reach every value of each loop dimension and every named boundary relation,
+such as a clock just before, at and after a deadline. The native tests enforce
+the same signature, value and boundary pins over their complete corpora. This
+is finite sampling. It does not cover every internal path, every combination
+of values, or undefined behaviour in the omitted cases. **Miri's UB, provenance
+and aliasing checks are lost for every omitted execution.** No claim is made
+that only values are lost while paths are preserved. The 131 retained examples
+(12, 20, 23, 20, 26 and 30 per application) still run under Miri, with genesis
+and replay, in `retained_complete_examples_genesis_and_replay`. They are not
+drawn from these corpora and are not counted in them. The template job checks
+that its effective Miri arguments skip exactly these four tests. The bounded
+profile, `compiled_contracts_reproduce_their_committed_policy_bytes` and the
+three other semantic tests must run, and the target must have no ignored test.
+V2's ignored artifact writer `emit_library_policy_artifacts` is gone in 2.1:
+that pure, nonignored test recomputes each template's policy bytes from its
+compiled contract under Miri and writes no files.
+
+Splitting a test binary across Miri groups is not an exclusion. To keep each
+job under the workflow's configured 180-minute budget, the synthesis `completion` tests run their
+eight graph-seed groups separately, and the synthesis library runs six
+byte-by-byte replay and comparison tests each in its own group. Each split
+target keeps one remainder group that skips exactly those tests. That job lists
+every group's selection under Miri and fails unless each listed test runs
+exactly once.
 
 ## Explicit non-claims
 

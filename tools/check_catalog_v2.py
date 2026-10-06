@@ -76,8 +76,10 @@ def mutations() -> list[tuple[str, Path, str, str, str]]:
         ("omit_unused_outbox", MATCHING, " || !deliveries(defs, bs[i].outbox, ls)", "", "proof"),
         ("discard_text_upper_bound", MATCHING, "\n                    && b.len() as u64 <= max as u64\n                    && super::super::util::ascii(b)", "\n                    && super::super::util::ascii(b)", "proof"),
         ("omit_channel_links", SUBJECT, "if !matching::channels(description.definitions, descriptor.channels, channel_roots)", "if false", "proof"),
-        ("weaken_getter_contract", SUBJECT, "ensures result@ == self.view().1,", "ensures true,", "coverage"),
-        ("narrow_getter_domain", SUBJECT, "ensures result@ == self.view().1,", "requires self.view().1.len()>0, ensures result@ == self.view().1,", "coverage"),
+        # Authority binding consumes original_contract's postcondition; these
+        # verify-then-coverage controls target the unconsumed original_schema getter.
+        ("weaken_getter_contract", SUBJECT, "ensures result@ == self.view().0,", "ensures true,", "coverage"),
+        ("narrow_getter_domain", SUBJECT, "ensures result@ == self.view().0,", "requires self.view().0.len()>0, ensures result@ == self.view().0,", "coverage"),
         ("add_uncontracted_work", MATCHING, "//! Total correspondence checks", "pub fn uncovered_catalog_work()->u64{1}\n// Total correspondence checks", "coverage"),
         ("cached_policy_before_admission", SUBJECT, "    let checked = match schema::admit(original_schema, description, limits.schema) {", "    let _cached = authority::policy_bytes(descriptor, original_schema, framing, channel_roots);\n    let checked = match schema::admit(original_schema, description, limits.schema) {", "coverage"),
     ]
@@ -161,7 +163,7 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
     else:
         if name in ("weaken_getter_contract", "narrow_getter_domain"):
             getters = [n for n, f in expected.items()
-                       if n.startswith(prefix) and n.endswith("::original_contract") and f["mode"] == "Exec"]
+                       if n.startswith(prefix) and n.endswith("::original_schema") and f["mode"] == "Exec"]
             if len(getters) != 1:
                 raise ValueError("reviewed catalog getter is missing or ambiguous")
             target = getters[0]
