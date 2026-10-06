@@ -243,9 +243,9 @@ domain. In the hosted Miri run of 916b28e none of the target's tests finished
 within its 180-minute budget. The tests still run natively, unchanged in bounds
 and independent comparisons, in the `ci` workflow's `rust` job.
 
-Under Miri, `miri_bounded_template_domain_profiles` runs 92 pinned cases from
-the eight corpora through the same checked path and independent comparison. The same
-cases run natively. For each corpus, the cases come in a fixed ascending order
+Under Miri, eight `miri_bounded_profile_*` tests, one per corpus, run 92
+pinned cases from the eight corpora through the same checked path and
+independent comparison. The same cases run natively. For each corpus, the cases come in a fixed ascending order
 with a pinned count, and each is an actual native case. The test fails unless
 the bounded cases reach every outcome signature the complete native corpus
 produces (class and reason, or the actual refusal variant). They must also
@@ -257,19 +257,28 @@ of values, or undefined behaviour in the omitted cases. **Miri's UB, provenance
 and aliasing checks are lost for every omitted execution.** No claim is made
 that only values are lost while paths are preserved. The 131 retained examples
 (12, 20, 23, 20, 26 and 30 per application) still run under Miri, with genesis
-and replay, in `retained_complete_examples_genesis_and_replay`. They are not
-drawn from these corpora and are not counted in them. The template job checks
-that its effective Miri arguments skip exactly these four tests. The bounded
-profile and the three other semantic tests must run, and the artifact generator
+and replay, in six `retained_complete_examples_genesis_and_replay_*` tests,
+one per application. They are not
+drawn from these corpora and are not counted in them. The template
+remainder job checks that the exclusion step's Miri arguments skip exactly
+these four tests, and that its composed arguments keep those skips unchanged
+before skipping the exact-test groups. Every profile test, the retained
+examples and the two other semantic tests must run, and the artifact generator
 must remain the only ignored test.
 
 Splitting a test binary across Miri groups is not an exclusion. To keep each
 job under the workflow's configured 180-minute budget, the synthesis `completion` tests run their
-eight graph-seed groups separately, and the synthesis library runs six
-byte-by-byte replay and comparison tests each in its own group. Each split
-target keeps one remainder group that skips exactly those tests. That job lists
-every group's selection under Miri and fails unless each listed test runs
-exactly once.
+eight graph-seed groups separately. The synthesis library runs nine tests
+each in its own group: six byte-by-byte replay and comparison tests, and the
+three tests that the hosted run of 8eda309 measured at about 101 and 26
+minutes, or still running after more than 10 minutes. The template contracts run each
+bounded-profile corpus and each application’s retained examples in separate
+groups. The earlier combined genesis-and-replay test also exceeded the
+180-minute limit at 8eda309; these partitions retain every case and assertion. Each split
+target keeps one remainder group that skips exactly those tests and, for the
+template contracts, the four native-only tests. That job lists every group's
+selection under Miri and fails unless each listed test runs exactly once or is
+one of the remainder's pinned exclusions.
 
 ## Explicit non-claims
 

@@ -1633,19 +1633,12 @@ fn emit_library_policy_artifacts() {
     emit!(prepared, "prepared-counter");
     emit!(gateway, "compliance-gateway");
 }
-#[test]
-fn retained_complete_examples_genesis_and_replay() {
-    let counts = [
-        with_app!(counter, |a, f| examples(0, a, f)),
-        with_app!(stock, |a, f| examples(1, a, f)),
-        with_app!(order, |a, f| examples(2, a, f)),
-        with_app!(account, |a, f| examples(3, a, f)),
-        with_app!(vault, |a, f| examples(4, a, f)),
-        with_app!(treasury, |a, f| examples(5, a, f)),
-    ];
-    assert_eq!(counts, [12, 20, 23, 20, 26, 30]);
-    macro_rules! genesis {
-        ($module:ident,$index:expr) => {
+// Separate jobs retain all 131 examples and all six genesis/replay checks.
+// The previous combined test exceeded the hosted Miri job's time limit.
+macro_rules! retained_examples_and_genesis {
+    ($module:ident,$index:expr,$count:expr) => {{
+        let count = with_app!($module, |a, f| examples($index, a, f));
+        assert_eq!(count, $count);
             with_app!($module, |a: &a::Authority<'_>, f: &c::Framing| {
                 let app = &APPS[$index];
                 let raw = frame(&f.state, record(app.state, app.genesis));
@@ -1661,17 +1654,35 @@ fn retained_complete_examples_genesis_and_replay() {
                 let raw = frame(&f.state, record(app.state, &bad));
                 assert!(a.genesis(&raw).result().is_err());
             });
-        };
-    }
-    genesis!(counter, 0);
-    genesis!(stock, 1);
-    genesis!(order, 2);
-    genesis!(account, 3);
-    genesis!(vault, 4);
-    genesis!(treasury, 5);
-    println!(
-        "retained examples=131; genesis/replay=6; eight examples retain owner-review-pending provenance"
-    );
+        println!(
+            "retained examples={}; genesis/replay=1; eight examples retain owner-review-pending provenance",
+            count
+        );
+    }};
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_durable_counter() {
+    retained_examples_and_genesis!(counter, 0, 12);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_inventory_reservation() {
+    retained_examples_and_genesis!(stock, 1, 20);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_order_fulfillment() {
+    retained_examples_and_genesis!(order, 2, 23);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_account_lockout() {
+    retained_examples_and_genesis!(account, 3, 20);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_withdrawal_queue() {
+    retained_examples_and_genesis!(vault, 4, 26);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_agent_treasury_guard() {
+    retained_examples_and_genesis!(treasury, 5, 30);
 }
 #[test]
 fn all_original_small_domains_and_unlawful_order_states() {
@@ -1935,39 +1946,68 @@ fn treasury_guard_arithmetic_callbacks_and_unlawful_prestates() {
     );
 }
 
-/// Pinned deterministic cases from each native corpus above, run identically
-/// natively and under Miri, which skips those four corpora. Every case passes the
-/// same independent comparison; the bounded cases must reach every outcome
-/// signature, every dimension value and every named boundary relation of the
-/// complete native corpus. That is finite sampling, not path, interaction or
-/// undefined-behaviour coverage of the omitted cases.
-#[test]
-fn miri_bounded_template_domain_profiles() {
-    let mut observed = vec![
-        with_app!(counter, |a, f| bounded(&COUNTER_CORPUS, a, f)),
-        with_app!(stock, |a, f| bounded(&STOCK_CORPUS, a, f)),
-        with_app!(order, |a, f| bounded(&ORDER_CORPUS, a, f)),
-        with_app!(account, |a, f| bounded(&ACCOUNT_CORPUS, a, f)),
-        with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS, a, f)),
-    ];
-    observed.extend(with_app!(treasury, |a, f| {
-        [&TREASURY_PROPOSALS, &TREASURY_CALLBACKS, &TREASURY_GUARDS]
-            .map(|corpus| bounded(corpus, a, f))
-    }));
-    check_observations(&observed, true);
-    let counts: Vec<_> = observed.iter().map(|observed| observed.cases).collect();
-    assert_eq!(counts, [5, 7, 11, 9, 10, 12, 22, 16]);
-    for observed in &observed {
-        println!(
-            "bounded Miri profile: {} {} of {} native cases",
-            observed.corpus.name, observed.cases, observed.corpus.size
-        );
-    }
-    // The 131 retained examples run under Miri in their own test; they are not
-    // drawn from these corpora and are not counted against them.
+/// Checks one corpus's bounded profile against its pins and its pinned count.
+/// The eight profile tests below together run 92 cases: 5, 7, 11, 9, 10, 12, 22
+/// and 16. The 131 retained examples run under Miri in their six tests; they are
+/// not drawn from these corpora and are not counted against them.
+fn check_bounded(observed: Observation<'_>, cases: usize) {
+    check_observations(std::slice::from_ref(&observed), true);
+    assert_eq!(observed.cases, cases);
     println!(
-        "bounded Miri profile cases={}; retained examples [12, 20, 23, 20, 26, 30] run in retained_complete_examples_genesis_and_replay",
-        counts.iter().sum::<usize>()
+        "bounded Miri profile: {} {} of {} native cases",
+        observed.corpus.name, observed.cases, observed.corpus.size
+    );
+}
+
+// Pinned deterministic cases from each native corpus above, run identically
+// natively and under Miri, which skips those four corpora. Every case passes the
+// same independent comparison; the bounded cases must reach every outcome
+// signature, every dimension value and every named boundary relation of the
+// complete native corpus. That is finite sampling, not path, interaction or
+// undefined-behaviour coverage of the omitted cases. Each corpus is its own test
+// so that Miri can interpret each in a separate job.
+#[test]
+fn miri_bounded_profile_durable_counter() {
+    check_bounded(with_app!(counter, |a, f| bounded(&COUNTER_CORPUS, a, f)), 5);
+}
+#[test]
+fn miri_bounded_profile_inventory_reservation() {
+    check_bounded(with_app!(stock, |a, f| bounded(&STOCK_CORPUS, a, f)), 7);
+}
+#[test]
+fn miri_bounded_profile_order_fulfillment() {
+    check_bounded(with_app!(order, |a, f| bounded(&ORDER_CORPUS, a, f)), 11);
+}
+#[test]
+fn miri_bounded_profile_account_lockout() {
+    check_bounded(with_app!(account, |a, f| bounded(&ACCOUNT_CORPUS, a, f)), 9);
+}
+#[test]
+fn miri_bounded_profile_withdrawal_queue() {
+    check_bounded(
+        with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS, a, f)),
+        10,
+    );
+}
+#[test]
+fn miri_bounded_profile_treasury_proposals() {
+    check_bounded(
+        with_app!(treasury, |a, f| bounded(&TREASURY_PROPOSALS, a, f)),
+        12,
+    );
+}
+#[test]
+fn miri_bounded_profile_treasury_callbacks() {
+    check_bounded(
+        with_app!(treasury, |a, f| bounded(&TREASURY_CALLBACKS, a, f)),
+        22,
+    );
+}
+#[test]
+fn miri_bounded_profile_treasury_guards() {
+    check_bounded(
+        with_app!(treasury, |a, f| bounded(&TREASURY_GUARDS, a, f)),
+        16,
     );
 }
 

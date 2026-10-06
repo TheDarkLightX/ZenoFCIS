@@ -1941,31 +1941,31 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 202,
+      "production_lines": 244,
       "rank": 17,
       "score": 81,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            63
+            80
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
-            67
+            84
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
             15,
-            69,
-            79,
-            87,
-            216,
-            226
+            86,
+            96,
+            104,
+            266,
+            276
           ]
         }
       ],
@@ -5303,9 +5303,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 5029572,
+    "admitted_bytes": 5042709,
     "admitted_files": 370,
-    "inventory_sha256": "ff74fdb4852af94f7d56d4ee86215ee905dc90ebebbae4e3a3eb8a85d75012ae",
+    "inventory_sha256": "e91d73baca965885c022865e6f225bbb48e1fc93917b1bb1990177136c73315a",
     "ranked_above_minimum": 299,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
