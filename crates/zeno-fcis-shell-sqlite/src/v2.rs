@@ -421,9 +421,9 @@ fn prepare(connection: &Connection, members: Members<'_, '_>, to_last: bool) {
 /// until no comparison it needs is missing. After an attempt that ended
 /// with `Error::Unsettled`, and so wrote nothing, the missing pair is
 /// established with no transaction open and the attempt runs again. A store
-/// that keeps needing new pairs, which takes another connection changing it
-/// each time, ends after one attempt per lineage version with
-/// `Error::Unsettled`.
+/// whose pairs remain unavailable, because other connections change it or
+/// comparisons keep the shared memo busy, ends when the bounded retries
+/// are exhausted with `Error::Unsettled`.
 fn settle<T>(
     connection: &mut Connection,
     members: Members<'_, '_>,
@@ -2161,9 +2161,9 @@ pub enum Error {
     /// opened with does not support; see [`upgrade::Unsupported`]. The store
     /// may be intact. Nothing was written.
     Succession(upgrade::Unsupported),
-    /// The store needed program comparisons that were not yet established
-    /// each time the transaction began, once per lineage version: another
-    /// connection kept changing it. Nothing was written.
+    /// Needed program comparisons stayed unavailable across the bounded
+    /// transaction retries: another connection changed the store, or the
+    /// shared comparison cache stayed busy. Nothing was written.
     Unsettled,
     /// An explicitly requested interruption was injected.
     InjectedCrash(CrashPoint),
@@ -2267,7 +2267,7 @@ impl fmt::Display for Error {
                 "the store holds a program-successor upgrade that this application does not support: {unsupported}; nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too"
             ),
             Self::Unsettled => f.write_str(
-                "the store kept changing while the shell compared the decision programs it needs, so nothing was written: try again when other connections are idle",
+                "the store or its shared comparison cache stayed busy while the shell checked the decision programs it needs, so nothing was written: try again when other connections and comparisons are idle",
             ),
             Self::InjectedCrash(point) => write!(
                 f,
@@ -2485,7 +2485,7 @@ mod message_tests {
             ),
             (
                 Error::Unsettled,
-                "the store kept changing while the shell compared the decision programs it needs, so nothing was written: try again when other connections are idle",
+                "the store or its shared comparison cache stayed busy while the shell checked the decision programs it needs, so nothing was written: try again when other connections and comparisons are idle",
             ),
             (
                 Error::InjectedCrash(CrashPoint::AfterCommit),

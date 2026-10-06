@@ -11,17 +11,16 @@
 //! it establishes depends only on two of the lineage's catalogs, so the
 //! lineage keeps each pair's outcome in memory, and an operation establishes
 //! the pairs it needs from plain reads before it takes the lock. Inside the
-//! transaction the shell only looks a pair up; a pair still missing there,
-//! because another connection changed the store in between, ends the
-//! attempt with nothing written, and the pair is established before the next
-//! one.
+//! transaction the shell only looks a pair up without waiting for the memo;
+//! a missing pair or a busy memo ends the attempt with nothing written.
+//! Establishing or waiting for the pair happens before the next transaction.
 
 use std::{
     cell::Cell,
     collections::BTreeMap,
     path::Path,
     sync::{
-        Mutex, PoisonError,
+        Mutex, PoisonError, TryLockError,
         atomic::{AtomicUsize, Ordering},
     },
 };
@@ -52,6 +51,9 @@ enum Settled {
     /// A policy could not be encoded: `Error::Range`.
     Unencodable,
 }
+
+#[cfg(test)]
+mod tests;
 
 impl Settled {
     fn result(self) -> Result<Result<Premises, Premise>, Error> {
@@ -189,13 +191,20 @@ impl<'c, 'p> Lineage<'c, 'p> {
     }
 
     /// The remembered outcome for the pair, if this lineage established it;
-    /// never computes one.
+    /// never computes one or waits for a comparison. A busy memo is
+    /// unavailable, so the caller releases SQLite before establishing it.
     pub(super) fn settled(
         &self,
         from: usize,
         to: usize,
     ) -> Option<Result<Result<Premises, Premise>, Error>> {
-        self.memo().get(&(from, to)).copied().map(Settled::result)
+        let memo = match self.settled.try_lock() {
+            Ok(memo) => memo,
+            Err(TryLockError::WouldBlock) => return None,
+            // As in memo(), only complete entries can survive a panic.
+            Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+        };
+        memo.get(&(from, to)).copied().map(Settled::result)
     }
 
     /// The cap on the input tuples one comparison may enumerate.

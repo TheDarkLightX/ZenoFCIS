@@ -18,6 +18,37 @@ import rc_package
 
 
 class ReproducibleApplicationReceiptTests(unittest.TestCase):
+    def test_completion_identity_survives_the_single_threaded_test_prefix(self):
+        digest = "a" * 64
+        for output in (f"completion_problem={digest}\n",
+                       f"test domain::eligible_exit ... completion_problem={digest}\nok\n"):
+            with self.subTest(output=output):
+                self.assertEqual(application.completion_identities(output), [digest])
+        self.assertEqual(application.completion_identities(
+            f"completion_problem={digest}\ncompletion_problem={digest}\n"), [digest, digest])
+        for value in ("", "short", f"{digest}extra", digest.upper()):
+            for prefix in ("", "test eligible_exit ... "):
+                with self.subTest(value=value, prefix=prefix):
+                    self.assertEqual(application.completion_identities(
+                        f"{prefix}completion_problem={value}\ncompletion_problem={digest}\n"),
+                        [value, digest])
+        self.assertEqual(application.completion_identities(f"note completion_problem={digest}"), [])
+
+    def test_malformed_or_duplicate_completion_markers_cannot_pass_with_a_correct_one(self):
+        report = {"schema": "zeno-fcis/completion-result/1", "status": "verified",
+                  "authority": "none", "assurance": "complete-finite", "states_checked": 4,
+                  "commands_per_state": 27, "maximum_exit_steps": 1,
+                  "problem": "a" * 64, "plan_sha256": "b" * 64}
+        for marker in ("short", "", "a" * 64, "A" * 64):
+            for prefix in ("", "test eligible_exit ... "):
+                log = f"{prefix}completion_problem={marker}\ncompletion_problem={'a' * 64}\n"
+                with self.subTest(marker=marker, prefix=prefix), \
+                        mock.patch.object(application, "exercise_rust_application", return_value=({}, log)), \
+                        mock.patch.object(application, "run", side_effect=[json.dumps(report), json.dumps(report),
+                                         json.dumps({**report, "replay": "matched"})]), \
+                        self.assertRaisesRegex(RuntimeError, "CLI completion model differs"):
+                    application.exercise_prepared_application(Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+
     def test_variable_test_logs_are_checked_but_never_exported(self):
         report = {"schema": "zeno-fcis/completion-result/1", "status": "verified",
                   "authority": "none", "assurance": "complete-finite", "states_checked": 4,
@@ -93,6 +124,32 @@ class ContractApplicationTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, "not all checked"):
                         application.exercise_contract_application(
                             name, Path("app"), Path("work"), {}, "1.1.0", {})
+
+    def test_single_threaded_libtest_prefix_is_normalized_but_counts_stay_exact(self):
+        prefix = "test every_example_is_the_authority_decision ... "
+        for name, expected in application.CONTRACT_EXAMPLES.items():
+            count = expected["examples"]
+            passed = {"status": "passed", "demonstration": json.dumps(expected["summary"])}
+            # Actual hosted/ATDD shape: the marker follows libtest's test-name prefix.
+            accepted = f"running 4 tests\n{prefix}decision examples checked: {count}\nok\n"
+            refused = {
+                "absent": "running 4 tests\ntest result: ok.\n",
+                "other marker only": f"{prefix}decision example forms read alike: {count}\n",
+                "wrong count": f"{prefix}decision examples checked: {count - 1}\n",
+                "malformed count": f"{prefix}decision examples checked: {count}x\n",
+                "embedded mid-line": f"note decision examples checked: {count}\n",
+                "duplicate": f"{prefix}decision examples checked: {count}\ndecision examples checked: {count}\n",
+                "malformed beside correct": f"{prefix}decision examples checked: \ndecision examples checked: {count}\n",
+            }
+            with self.subTest(contract=name, case="prefixed"), \
+                    mock.patch.object(application, "exercise_rust_application", return_value=(passed, accepted)):
+                self.assertEqual(application.exercise_contract_application(
+                    name, Path("app"), Path("work"), {}, "1.1.0", {})["contract"], name)
+            for label, log in refused.items():
+                with self.subTest(contract=name, case=label), \
+                        mock.patch.object(application, "exercise_rust_application", return_value=(passed, log)), \
+                        self.assertRaisesRegex(RuntimeError, "not all checked"):
+                    application.exercise_contract_application(name, Path("app"), Path("work"), {}, "1.1.0", {})
 
 
 class OrbitControllerCheckTests(unittest.TestCase):
