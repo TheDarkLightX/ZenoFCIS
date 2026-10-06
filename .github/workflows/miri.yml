@@ -32,6 +32,9 @@ jobs:
           {"group": "synthesis-library-publication-replay-bytes", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::authority::bound::publication_tests::publication_replay_checks_every_byte_and_original_input_without_losing_work"},
           {"group": "synthesis-library-genesis-replay-bytes", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::authority::bound::tests::genesis_methods_recompute_initial_laws_and_keep_phase_distinct"},
           {"group": "synthesis-library-transition-replay-bytes", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::authority::bound::tests::methods_recompute_before_exact_replay_for_every_class_and_changed_byte"},
+          {"group": "synthesis-library-catalog-original-wire", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::catalog::tests::original_wire_generic_ids_roots_and_private_borrowed_custody"},
+          {"group": "synthesis-library-account-boundary-grid", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::composition::account_tests::complete_boundary_grid_matches_independent_raw_rules"},
+          {"group": "synthesis-library-law-count", "packages": "-p zeno-fcis-synthesis", "target": "--lib", "test": "finite::execution_v2::laws::tests::no_law_count_cap_and_structural_frame_refusals"},
           {"group": "synthesis-documentation", "packages": "-p zeno-fcis-synthesis", "target": "--doc"},
           {"group": "synthesis-example-checked-continuation", "packages": "-p zeno-fcis-synthesis", "target": "--example checked_continuation", "command": "run"},
           {"group": "synthesis-finite", "packages": "-p zeno-fcis-synthesis", "target": "--test finite"},
@@ -46,6 +49,20 @@ jobs:
           {"group": "synthesis-v2-authority", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_authority"},
           {"group": "synthesis-v2-evaluator-identity", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_evaluator_identity"},
           {"group": "synthesis-v2-template-contracts", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "miri_skip": ["all_original_small_domains_and_unlawful_order_states", "account_complete_clock_boundaries_without_domain_narrowing", "withdrawal_complete_raw_domain_and_certified_controller", "treasury_guard_arithmetic_callbacks_and_unlawful_prestates"]},
+          {"group": "synthesis-v2-template-retained-durable-counter", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_durable_counter"},
+          {"group": "synthesis-v2-template-retained-inventory-reservation", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_inventory_reservation"},
+          {"group": "synthesis-v2-template-retained-order-fulfillment", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_order_fulfillment"},
+          {"group": "synthesis-v2-template-retained-account-lockout", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_account_lockout"},
+          {"group": "synthesis-v2-template-retained-withdrawal-queue", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_withdrawal_queue"},
+          {"group": "synthesis-v2-template-retained-agent-treasury-guard", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_agent_treasury_guard"},
+          {"group": "synthesis-v2-template-profile-durable-counter", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_durable_counter"},
+          {"group": "synthesis-v2-template-profile-inventory-reservation", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_inventory_reservation"},
+          {"group": "synthesis-v2-template-profile-order-fulfillment", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_order_fulfillment"},
+          {"group": "synthesis-v2-template-profile-account-lockout", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_account_lockout"},
+          {"group": "synthesis-v2-template-profile-withdrawal-queue", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_withdrawal_queue"},
+          {"group": "synthesis-v2-template-profile-treasury-proposals", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_treasury_proposals"},
+          {"group": "synthesis-v2-template-profile-treasury-callbacks", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_treasury_callbacks"},
+          {"group": "synthesis-v2-template-profile-treasury-guards", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_treasury_guards"},
           {"group": "synthesis-v2-original-output", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_original_output"},
           {"group": "synthesis-v2-publication", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_publication"},
           {"group": "synthesis-v2-guarded-laws", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_guarded_laws"},
@@ -123,15 +140,17 @@ jobs:
           actual_targets = [(row.get('command', 'test'), *shlex.split(row['target'])) for row in rows if 'test' not in row]
           assert collections.Counter(actual_targets) == collections.Counter(expected_targets), 'synthesis target coverage differs'
           # A split target has one remainder row plus rows that each run one exact
-          # test; the remainder skips exactly those tests.
+          # test; the remainder skips exactly those tests and its pinned exclusions.
           exact_rows = [row for row in rows if 'test' in row]
           split_targets = {row['target'] for row in exact_rows}
           assert all(row.get('command', 'test') == 'test' for row in exact_rows), 'exact tests need miri test'
           assert len({(row['target'], row['test']) for row in exact_rows}) == len(exact_rows), 'duplicate exact test row'
           assert all(sum(row['target'] == target and 'test' not in row for row in rows) == 1 for target in split_targets), 'split target needs one remainder row'
-          # This step writes MIRI_TEST_ARGS for split targets and would replace the
-          # exclusion step's skips, so a target cannot have both.
-          assert not any(row.get('miri_skip') and row['target'] in split_targets for row in rows), 'split target cannot carry Miri exclusions'
+          # This step writes MIRI_TEST_ARGS for split targets after the exclusion
+          # step wrote its skips. It composes both, so only a remainder row may
+          # carry exclusions and no exact row may select an excluded test.
+          assert not any(row.get('miri_skip') and 'test' in row for row in rows), 'only a remainder row can carry Miri exclusions'
+          assert not any(row['test'] in other.get('miri_skip', []) for row in exact_rows for other in rows if other['target'] == row['target']), 'an exact test row selects a Miri exclusion'
           groups = {f'larger_branching_graphs_seeds_{g * 4:02}_to_{g * 4 + 3:02}': str(g) for g in range(8)}
           graph_rows = [row for row in exact_rows if row['target'] == '--test completion']
           assert collections.Counter(row['test'] for row in graph_rows) == collections.Counter(groups.keys()), 'graph group coverage differs'
@@ -139,10 +158,12 @@ jobs:
           wrappers = re.findall(r'#\[test\]\s+fn (larger_branching_graphs_seeds_\d{2}_to_\d{2})\(\) \{\s+check_larger_branching_graph_group\((\d+)\);\s+\}', tests)
           assert len(wrappers) == 8 and dict(wrappers) == groups, 'graph groups must each run their four seeds'
 
+          # A remainder's arguments begin with the exclusion step's own arguments.
           def arguments(row):
               if 'test' in row:
                   return ['--exact', row['test']]
-              return ['--exact'] + [arg for other in exact_rows if other['target'] == row['target'] for arg in ('--skip', other['test'])]
+              isolated = [other['test'] for other in exact_rows if other['target'] == row['target']]
+              return ['--exact'] + [arg for name in row.get('miri_skip', []) + isolated for arg in ('--skip', name)]
 
           def listed(target, arguments):
               output = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', *shlex.split(target), '--'] + arguments + ['--list', '--format', 'terse'])
@@ -157,40 +178,67 @@ jobs:
               assert output.splitlines() == ['fixed_encoding_vector: test'], 'Miri identity vector must execute'
           if selected['target'] == '--test v2_template_contracts':
               output = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--list', '--format', 'terse'])
-              expected = {
-                  'compiled_contracts_reproduce_their_committed_policy_bytes',
-                  'miri_bounded_template_domain_profiles',
-                  'retained_complete_examples_genesis_and_replay',
-                  'all_original_small_domains_and_unlawful_order_states',
-                  'account_complete_clock_boundaries_without_domain_narrowing',
-                  'withdrawal_complete_raw_domain_and_certified_controller',
-                  'treasury_guard_arithmetic_callbacks_and_unlawful_prestates',
-                  'policy_schema_law_and_meter_mutations_refuse',
-                  'original_conservation_and_required_delivery_checks_remain_independent',
+              # The bounded profile runs as one exact-test group per corpus.
+              profile = {
+                  'miri_bounded_profile_durable_counter',
+                  'miri_bounded_profile_inventory_reservation',
+                  'miri_bounded_profile_order_fulfillment',
+                  'miri_bounded_profile_account_lockout',
+                  'miri_bounded_profile_withdrawal_queue',
+                  'miri_bounded_profile_treasury_proposals',
+                  'miri_bounded_profile_treasury_callbacks',
+                  'miri_bounded_profile_treasury_guards',
               }
-              assert collections.Counter(output.splitlines()) == collections.Counter(name + ': test' for name in expected), 'template semantic inventory differs'
-              ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--ignored', '--list', '--format', 'terse'])
-              assert ignored.splitlines() == [], 'semantic template tests must not be ignored'
-              # The exclusion step's arguments, as the interpret step will receive
-              # them, skip exactly the four native-only corpora and nothing else.
               native_only = {
                   'all_original_small_domains_and_unlawful_order_states',
                   'account_complete_clock_boundaries_without_domain_narrowing',
                   'withdrawal_complete_raw_domain_and_certified_controller',
                   'treasury_guard_arithmetic_callbacks_and_unlawful_prestates',
               }
-              assert set(selected.get('miri_skip', [])) == native_only, 'template native-only workloads differ'
+              retained_examples = {
+                  'retained_complete_examples_genesis_and_replay_durable_counter',
+                  'retained_complete_examples_genesis_and_replay_inventory_reservation',
+                  'retained_complete_examples_genesis_and_replay_order_fulfillment',
+                  'retained_complete_examples_genesis_and_replay_account_lockout',
+                  'retained_complete_examples_genesis_and_replay_withdrawal_queue',
+                  'retained_complete_examples_genesis_and_replay_agent_treasury_guard',
+              }
+              retained = retained_examples | {
+                  'compiled_contracts_reproduce_their_committed_policy_bytes',
+                  'policy_schema_law_and_meter_mutations_refuse',
+                  'original_conservation_and_required_delivery_checks_remain_independent',
+              }
+              expected = profile | native_only | retained
+              assert collections.Counter(output.splitlines()) == collections.Counter(name + ': test' for name in expected), 'template semantic inventory differs'
+              ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--ignored', '--list', '--format', 'terse'])
+              assert ignored.splitlines() == [], 'semantic template tests must not be ignored'
+              template_rows = [row for row in rows if row['target'] == selected['target']]
+              remainder = [row for row in template_rows if 'test' not in row]
+              assert len(remainder) == 1 and sorted(remainder[0].get('miri_skip', [])) == sorted(native_only), 'template native-only workloads differ'
+              isolated = [row['test'] for row in template_rows if 'test' in row]
+              assert collections.Counter(isolated) == collections.Counter(profile | retained_examples), 'template exact-test groups differ'
+              # The exclusion step's arguments, as this step receives them, skip
+              # exactly the four native-only corpora in the remainder and nothing
+              # in an exact-test group.
               effective = shlex.split(os.environ.get('MIRI_TEST_ARGS', ''))
-              assert effective[:2] == ['--', '--exact'] and effective[2::2] == ['--skip'] * len(native_only) and set(effective[3::2]) == native_only and len(effective) == 2 + 2 * len(native_only), 'template Miri arguments must skip exactly the native-only corpora'
-              runs = listed('--test v2_template_contracts', effective[1:])
-              skipped_ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--'] + effective[1:] + ['--ignored', '--list', '--format', 'terse'])
-              assert skipped_ignored.splitlines() == [], 'template Miri selection must not run ignored tests'
-              interpreted = set(runs)
-              assert len(runs) == len(set(runs)) and interpreted == expected - native_only, 'template Miri selection must run the policy-bytes check, the bounded profile and three retained semantic tests'
-              print(f'Template Miri runs {sorted(interpreted)}; native-only {sorted(native_only)}; no ignored tests.')
+              if 'test' in selected:
+                  assert effective == [], 'template Miri arguments must skip exactly the native-only corpora'
+              else:
+                  assert effective[:2] == ['--', '--exact'] and effective[2::2] == ['--skip'] * len(native_only) and set(effective[3::2]) == native_only and len(effective) == 2 + 2 * len(native_only), 'template Miri arguments must skip exactly the native-only corpora'
+                  runs = listed(selected['target'], arguments(selected))
+                  skipped_ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--'] + arguments(selected) + ['--ignored', '--list', '--format', 'terse'])
+                  assert skipped_ignored.splitlines() == [], 'template Miri selection must not run ignored tests'
+                  interpreted = set(runs)
+                  assert len(runs) == len(set(runs)) and interpreted == retained - set(isolated), 'template Miri remainder must run the policy-bytes check and two other retained semantic tests'
+                  print(f'Template Miri remainder runs {sorted(interpreted)}; exact-test groups {sorted(isolated)}; native-only {sorted(native_only)}; no ignored tests.')
 
           if selected['target'] in split_targets:
               target = selected['target']
+              # The exclusion step's arguments must survive unchanged at the start
+              # of the arguments this step writes.
+              excluded = shlex.split(os.environ.get('MIRI_TEST_ARGS', ''))
+              expected_excluded = ['--', '--exact'] + [arg for name in selected['miri_skip'] for arg in ('--skip', name)] if selected.get('miri_skip') else []
+              assert excluded == expected_excluded and (['--'] + arguments(selected))[:len(excluded)] == excluded, 'composed Miri arguments must retain every exclusion'
               if 'test' in selected:
                   assert listed(target, arguments(selected)) == [selected['test']], 'exact selector must run one test'
               else:
@@ -200,14 +248,17 @@ jobs:
                       assert {name for name in all_tests if name.startswith('larger_branching_graphs_seeds_')} == set(groups), 'declared graph tests differ'
                   target_rows = [row for row in exact_rows if row['target'] == target]
                   isolated = {row['test'] for row in target_rows}
+                  excluded_names = selected.get('miri_skip', [])
                   chosen = []
                   for row in [selected] + target_rows:
                       names = listed(target, arguments(row))
-                      expected = [row['test']] if 'test' in row else sorted(set(all_tests) - isolated)
+                      expected = [row['test']] if 'test' in row else sorted(set(all_tests) - isolated - set(excluded_names))
                       assert sorted(names) == expected, 'split selector coverage differs'
                       chosen.extend(names)
-                  assert collections.Counter(chosen) == collections.Counter(all_tests), 'split target tests must run exactly once'
-                  print(f'Checked {len(all_tests)} tests of {target}: {len(all_tests) - len(isolated)} in the remainder and {len(isolated)} in exact-test groups.')
+                  # Each test runs in exactly one group or is one of the remainder's
+                  # pinned exclusions, which must each name a listed test.
+                  assert collections.Counter(chosen + excluded_names) == collections.Counter(all_tests), 'split target tests must run exactly once'
+                  print(f'Checked {len(all_tests)} tests of {target}: {len(all_tests) - len(isolated) - len(excluded_names)} in the remainder, {len(isolated)} in exact-test groups and {len(excluded_names)} native-only exclusions.')
               with Path(os.environ['GITHUB_ENV']).open('a') as output:
                   output.write('MIRI_TEST_ARGS=-- ' + shlex.join(arguments(selected)) + '\n')
           PY
