@@ -29,6 +29,39 @@ class CanonicalByteCoverage(unittest.TestCase):
             self.assertNotEqual(changed, (gate.ROOT / path).read_text())
             self.assertIn(expected, ("proof", "proof_contract", "coverage"))
 
+    def test_unused_getter_controls_change_only_the_envelope_original_contract(self):
+        envelope = (gate.ROOT / gate.ENVELOPE).read_text()
+        self.assertEqual(envelope.count("pub fn original(&self)"), 1)
+        getter = envelope.index("    pub fn original(&self)")
+        contract = ("    #[cfg_attr(verus_keep_ghost, verus_spec(result =>\n"
+                    "        ensures result@ == self.view().0,\n    ))]\n")
+        start = getter - len(contract)
+        self.assertEqual(envelope[start:getter], contract)
+        payload_getter = ("    #[cfg_attr(verus_keep_ghost, verus_spec(result =>\n"
+                          "        ensures result@ == self.view().1,\n    ))]\n    pub fn bytes(&self)")
+        self.assertEqual(envelope.count(payload_getter), 1)
+        self.assertGreater(envelope.index(payload_getter), getter)
+        replacements = {
+            "omit_unused_getter_contract": "",
+            "weaken_unused_getter_contract":
+                "    #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n",
+            "narrow_unused_getter_domain": ("    #[cfg_attr(verus_keep_ghost, verus_spec(result =>\n"
+                                            "        requires self.view().0.len() > 0,\n"
+                                            "        ensures result@ == self.view().0,\n    ))]\n"),
+        }
+        mutations = gate.mutation_sources((gate.ROOT / gate.SUBJECT).read_text(),
+                                           (gate.ROOT / gate.SPEC).read_text())
+        for name, replacement in replacements.items():
+            path, changed, expected = mutations[name]
+            self.assertEqual((path, expected), (gate.ENVELOPE, "coverage"))
+            # Only the original getter's contract differs; its body, the
+            # payload getter and every other function keep their exact text.
+            self.assertEqual(changed, envelope[:start] + replacement + envelope[getter:])
+            self.assertEqual(changed.count(payload_getter), 1)
+        # Catalog proofs call the schema getter, so no control may target it.
+        self.assertNotIn(gate.SUBJECT.parent / "schema/admission.rs",
+                         {path for path, _, _ in mutations.values()})
+
     def test_simulated_success_cannot_omit_the_actual_byte_functions(self):
         pin = json.loads((gate.ROOT / verifier.PIN).read_text())
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())

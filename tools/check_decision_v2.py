@@ -12,6 +12,7 @@ from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_metered_execution import UNIT_SOURCES as BASE
+from verus_contract_controls import contract_rejected
 from verus_coverage import require_coverage
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -20,6 +21,15 @@ PROFILE=Path('verification/verus/decision.json')
 SUBJECT=Path('crates/zeno-fcis-synthesis/src/finite/execution_v2/decision.rs')
 SPEC=SUBJECT.parent/'decision/spec.rs'
 TESTS=SUBJECT.parent/'decision/tests.rs'
+PRODUCER='crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/producer.rs'
+# Rejections at the verified production caller `producer::from_atoms`. The weakened
+# contract was observed on hosted run 37404295156 (postconditions at lines 185-186);
+# the narrowed domain's call-site precondition (line 217) awaits its selected run.
+CONTRACT_REJECTIONS={
+    'weaken_construct_contract':frozenset({('postcondition not satisfied',PRODUCER,185),
+                                           ('postcondition not satisfied',PRODUCER,186)}),
+    'narrow_construct_domain':frozenset({('precondition not satisfied',PRODUCER,217)}),
+}
 UNIT_SOURCES=(HARNESS,*BASE[1:],SUBJECT,SPEC)
 
 UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
@@ -31,7 +41,8 @@ SOURCES=(*UNIT_SOURCES,*TEST_SOURCES,PROFILE,verifier.PIN,Path('tools/check_deci
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
 
-SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"),
+                                Path("tools/verus_contract_controls.py"))))
 
 def once(source,before,after):
     tokens=re.findall(r'\w+|[^\w\s]',before)
@@ -71,8 +82,10 @@ def mutations(source,specification):
     header=source.index("pub(super) fn construct<'a>")
     start=source.rindex('#[cfg_attr(verus_keep_ghost, verus_spec(result =>',0,header)
     end=source.index('#[cfg_attr(verus_keep_ghost, verifier::rlimit',start)
-    rows['weaken_construct_contract']=(SUBJECT,source[:start]+'#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n'+source[end:],'coverage',False)
-    rows['narrow_construct_domain']=(SUBJECT,source[:start]+source[start:].replace('    ensures final(meter).limits','    requires code >= 0,\n    ensures final(meter).limits',1),'coverage',False)
+    # The verified producer consumes construct's contract, so these contract-only
+    # changes must fail that caller rather than verify for a coverage refusal.
+    rows['weaken_construct_contract']=(SUBJECT,source[:start]+'#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n'+source[end:],'proof_contract',False)
+    rows['narrow_construct_domain']=(SUBJECT,source[:start]+source[start:].replace('    ensures final(meter).limits','    requires code >= 0,\n    ensures final(meter).limits',1),'proof_contract',False)
     rows['uncontracted_helper']=(SUBJECT,source+'\npub fn uncontracted_decision_probe() -> u64 { 42 }\n','coverage',False)
     rows['specification_body']=(SPEC,once(specification,'let c = charge(limits,used,Resource::Candidate,1);','let c = { let first = charge(limits,used,Resource::Candidate,1); first };'),'coverage',False)
     cached=once(source,'        let charge = meter.charge(Resource::Write,1);','        let cached = resolve(inputs,output,plan[i].value);\n        let charge = meter.charge(Resource::Write,1);')
@@ -116,12 +129,17 @@ def check(out:Path,positive_only=False):
                     target=specimen/unit;target.parent.mkdir(parents=True,exist_ok=True)
                     target.write_text(changed) if unit==path else target.write_bytes((ROOT/unit).read_bytes())
                 adjust_specimen_source_lengths(specimen)
-                proof=verifier.run([*command,'--log-dir',str(specimen/'logs'),str(HARNESS)],specimen,env,timeout=300)
+                proof_command=[*command,'--log-dir',str(specimen/'logs'),str(HARNESS)]
+                proof=verifier.run(proof_command,specimen,env,timeout=300)
                 (evidence/f'{name}.stdout').write_text(proof.stdout);(evidence/f'{name}.stderr').write_text(proof.stderr)
                 parsed=json.loads(proof.stdout).get('verification-results',{})
                 refusal=None
+                outcome=None
                 if expected=='proof':
                     killed=proof.returncode!=0 and parsed.get('success') is False and parsed.get('errors',0)>0 and parsed.get('encountered-vir-error') is False
+                elif expected=='proof_contract':
+                    outcome=contract_rejected(proof.returncode,proof.stdout,proof.stderr,pin,CONTRACT_REJECTIONS[name])
+                    killed=outcome['accepted']
                 else:
                     try:require_coverage((specimen/'logs/crate.vir').read_text(),profile)
                     except ValueError as e:refusal=str(e)
@@ -131,7 +149,8 @@ def check(out:Path,positive_only=False):
                     n=native(specimen,env,specimen,True);native_status=n.returncode
                     (evidence/f'{name}.native.stdout').write_text(n.stdout);(evidence/f'{name}.native.stderr').write_text(n.stderr)
                     killed=killed and n.returncode!=0 and 'test result: FAILED' in n.stdout
-                results.append(dict(name=name,expected=expected,killed=killed,exit_code=proof.returncode,verification_results=parsed,coverage_refusal=refusal,native_exit_code=native_status))
+                results.append(dict(name=name,expected=expected,killed=killed,exit_code=proof.returncode,verification_results=parsed,coverage_refusal=refusal,native_exit_code=native_status,
+                    command=proof_command,changed_source=str(path),original_sha256=before[str(path)],changed_sha256=verifier.digest(specimen/path),contract_outcome=outcome))
                 if not killed:raise RuntimeError(f'mutation {name} survived or failed for unrelated reason: {results[-1]}')
                 print(f'Caught {name} ({expected}; native={native_status})',flush=True)
     if before!=snapshot():raise RuntimeError('source drift during gate')

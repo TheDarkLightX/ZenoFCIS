@@ -28,7 +28,7 @@ PROFILE = Path("verification/verus/canonical-bytes.json")
 HARNESS = Path("verification/verus/canonical_bytes.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/canonical_v2/mod.rs")
 SPEC = SUBJECT.parent / "spec.rs"
-ADMISSION = SUBJECT.parent / "schema/admission.rs"
+ENVELOPE = SUBJECT.parent / "envelope.rs"
 UNIT_SOURCES = (HARNESS, Path("verification/verus/canonical_bytes_tests.rs"),
                 *sorted(path.relative_to(ROOT) for path in (ROOT / SUBJECT.parent).rglob("*.rs")))
 
@@ -84,9 +84,12 @@ def mutation_sources(source: str, spec: str) -> dict[str, tuple[Path, str, str]]
         # The schema reader consumes this postcondition. Removing it now
         # fails caller proofs, so retain these as explicit contract controls.
         mutations[name] = (SUBJECT, signed_contract(source, replacement), "proof_contract")
-    admission = (ROOT / ADMISSION).read_text()
-    end = admission.index("    pub fn original(&self)")
-    start = admission.rindex("    #[cfg_attr(verus_keep_ghost, verus_spec(result =>", 0, end)
+    # Catalog proofs now consume the schema getter's postcondition. The
+    # envelope payload's original getter has no verified caller, so changing
+    # only its contract must still verify and then fail coverage.
+    envelope = (ROOT / ENVELOPE).read_text()
+    end = envelope.index("    pub fn original(&self)")
+    start = envelope.rindex("    #[cfg_attr(verus_keep_ghost, verus_spec(result =>", 0, end)
     for name, replacement in (
         ("omit_unused_getter_contract", ""),
         ("weaken_unused_getter_contract", "    #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n"),
@@ -94,7 +97,7 @@ def mutation_sources(source: str, spec: str) -> dict[str, tuple[Path, str, str]]
          "        requires self.view().0.len() > 0,\n"
          "        ensures result@ == self.view().0,\n    ))]\n"),
     ):
-        mutations[name] = (ADMISSION, admission[:start] + replacement + admission[end:], "coverage")
+        mutations[name] = (ENVELOPE, envelope[:start] + replacement + envelope[end:], "coverage")
     mutations["change_signed_specification"] = (SPEC,
         once(spec, "value as int - (u128::MAX as int + 1)",
              "value as int - u128::MAX as int - 1"), "coverage")
