@@ -18,6 +18,37 @@ import rc_package
 
 
 class ReproducibleApplicationReceiptTests(unittest.TestCase):
+    def test_completion_identity_survives_the_single_threaded_test_prefix(self):
+        digest = "a" * 64
+        for output in (f"completion_problem={digest}\n",
+                       f"test domain::eligible_exit ... completion_problem={digest}\nok\n"):
+            with self.subTest(output=output):
+                self.assertEqual(application.completion_identities(output), [digest])
+        self.assertEqual(application.completion_identities(
+            f"completion_problem={digest}\ncompletion_problem={digest}\n"), [digest, digest])
+        for value in ("", "short", f"{digest}extra", digest.upper()):
+            for prefix in ("", "test eligible_exit ... "):
+                with self.subTest(value=value, prefix=prefix):
+                    self.assertEqual(application.completion_identities(
+                        f"{prefix}completion_problem={value}\ncompletion_problem={digest}\n"),
+                        [value, digest])
+        self.assertEqual(application.completion_identities(f"note completion_problem={digest}"), [])
+
+    def test_malformed_or_duplicate_completion_markers_cannot_pass_with_a_correct_one(self):
+        report = {"schema": "zeno-fcis/completion-result/1", "status": "verified",
+                  "authority": "none", "assurance": "complete-finite", "states_checked": 4,
+                  "commands_per_state": 27, "maximum_exit_steps": 1,
+                  "problem": "a" * 64, "plan_sha256": "b" * 64}
+        for marker in ("short", "", "a" * 64, "A" * 64):
+            for prefix in ("", "test eligible_exit ... "):
+                log = f"{prefix}completion_problem={marker}\ncompletion_problem={'a' * 64}\n"
+                with self.subTest(marker=marker, prefix=prefix), \
+                        mock.patch.object(application, "exercise_rust_application", return_value=({}, log)), \
+                        mock.patch.object(application, "run", side_effect=[json.dumps(report), json.dumps(report),
+                                         json.dumps({**report, "replay": "matched"})]), \
+                        self.assertRaisesRegex(RuntimeError, "CLI completion model differs"):
+                    application.exercise_prepared_application(Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
+
     def test_variable_test_logs_are_checked_but_never_exported(self):
         report = {"schema": "zeno-fcis/completion-result/1", "status": "verified",
                   "authority": "none", "assurance": "complete-finite", "states_checked": 4,
