@@ -132,6 +132,8 @@ def mutations():
         '(match result{Ok(a)=>Ok(a.view()),Err(e)=>Err(e)}) ==\n        super::bind_value(catalog),','true,'),'coverage',False)
     constructor_start=bound.rfind('#[cfg_attr',0,bound.index("pub fn bind<'p>"))
     constructor_end=bound.index("\n\nimpl<'p> Authority<'p>",constructor_start)
+    # The synthetic bypass keeps its signature, contract and empty roots. Its checked
+    # extensional assertion only lets the bypass prove its own contract; no assumption.
     raw_constructor="""#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures
     (match result{Ok(a)=>Ok(a.view()),Err(e)=>Err(e)}) ==
     (if composition::descriptor_admitted(descriptor){Ok((descriptor,framing,identity@,Seq::empty()))}
@@ -139,8 +141,9 @@ def mutations():
 ))]
 pub fn bind<'p>(descriptor:&'p Descriptor<'p>,framing:Framing,identity:Vec<u8>)->Result<Authority<'p>,Refusal>{
     let core=match composition::bind(descriptor){Ok(core)=>core,Err(e)=>return Err(Refusal::Core(e))};
-    #[cfg(verus_keep_ghost)]proof!{reveal(Authority::view);}
-    Ok(Authority{core,framing,identity,channel_roots:&[]})
+    let channel_roots:&[(u32,u32,u32)]=&[];
+    #[cfg(verus_keep_ghost)]proof!{reveal(Authority::view);assert(channel_roots@=~=Seq::<(u32,u32,u32)>::empty());}
+    Ok(Authority{core,framing,identity,channel_roots})
 }
 """
     controls['unchecked_constructor_bypass']=(BOUND,bound[:constructor_start]+raw_constructor+bound[constructor_end:],'coverage',False)

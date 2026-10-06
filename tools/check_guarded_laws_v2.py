@@ -32,6 +32,24 @@ SPEC = legacy.DIRECTORY / 'spec.rs'
 METADATA = authority.METADATA
 NAMESPACE = 'guarded_laws::'
 ORDINAL_TEST = 'execution_v2::laws::tests::explicit_delivery_ordinals_preserve_gaps_nonzero_starts_and_maximum'
+# Public test through the actual bind/execute API; the harness includes TEST as this module.
+LAW_ORDER_TEST = 'public_guarded_laws::guarded_declared_law_order_refuses_with_the_later_applicable_law'
+LAW_ORDER_MESSAGE = 'declared law order: later law 60 must refuse'
+LAW_ORDER_REQUIRED = ('(Some(Law(Violated)), [Diagnostic { id: 1, verdict: Satisfied }, '
+    'Diagnostic { id: 2, verdict: Skipped }, Diagnostic { id: 3, verdict: Skipped }, '
+    'Diagnostic { id: 4, verdict: Satisfied }, Diagnostic { id: 5, verdict: Skipped }, '
+    'Diagnostic { id: 60, verdict: Refused(Violated) }])')
+# The legacy mutant runs laws[0].program (true) in slot 60, so law 60 is Satisfied.
+LAW_ORDER_ACTUAL = LAW_ORDER_REQUIRED.replace('Some(Law(Violated))', 'None').replace(
+    'id: 60, verdict: Refused(Violated)', 'id: 60, verdict: Satisfied')
+# Every proof run records the default solver budget. Exhaustion is never a kill.
+RLIMIT = 10
+SEMANTIC_FAILURES = ('postcondition not satisfied', 'assertion failed', 'invariant not satisfied', 'precondition not satisfied')
+
+
+def proof_command(command, log_dir):
+    """Exact recorded proof argv, including the solver budget."""
+    return [*command, '--rlimit', str(RLIMIT), '--log-dir', str(log_dir), str(HARNESS)]
 
 
 def sources():
@@ -50,7 +68,7 @@ def snapshot(skip_profile=False):
 
 
 def controls():
-    """Retain every legacy runtime mutation; declare the ordinal native oracle."""
+    """Retain every legacy runtime mutation; declare the two fixed native oracles."""
     targets = {
         'skip_applicable_law': 'applies', 'skip_mandatory_genesis': 'applies',
         'omit_required_initial_family': 'metadata', 'ignore_required_law': 'metadata',
@@ -77,6 +95,9 @@ def controls():
     # A fixed independent semantic oracle, never a fallback after proof failure.
     # Historical ordinal SMT resource failures remain inconclusive evidence.
     result['shrink_delivery_ordinals'].update(kind='native', native=True)
+    # The original law-order mutant, declared native before any run. Its symbolic probes
+    # (this mutant and two retargets, rlimit 10 and 40) stayed inconclusive, never kills.
+    result['change_declared_law_order'].update(kind='native', native=True)
     predicate = (ROOT / PREDICATE).read_text()
     metadata = (ROOT / METADATA).read_text()
     additions = [
@@ -123,8 +144,10 @@ def target_lines(source, name):
 def semantic_refusal(proc, report, control):
     result = report.get('verification-results', {})
     lines = target_lines(control['changed'], control['target'])
-    # Only actual proof failures count; compiler/VIR/resource failures do not.
-    failure = bool(re.search(r'error: (?:postcondition not satisfied|assertion failed|invariant not satisfied|precondition not satisfied)', proc.stderr))
+    # Only actual proof failures count; compiler/VIR/resource failures do not. A control
+    # that declares its intended obligations accepts no other failure kind.
+    reported = set(re.findall(r'error: (' + '|'.join(SEMANTIC_FAILURES) + ')', proc.stderr))
+    failure = bool(reported) and reported <= set(control.get('obligations', SEMANTIC_FAILURES))
     locations = [int(n) for n in re.findall(re.escape(control['path'].name) + r':(\d+):\d+', proc.stderr)]
     matched = [n for n in locations if lines[0] <= n <= lines[1]]
     accepted = (proc.returncode != 0 and result.get('success') is False
@@ -165,6 +188,30 @@ def native_ordinal_refusal(baseline, proc):
         and 'left: Err(Frame)' in proc.stdout and 'right: Ok(())' in proc.stdout
         and re.search(r'laws/tests\.rs:\d+:\d+', proc.stdout) is not None)
     return killed, intended
+
+
+def native_law_order_refusal(baseline, proc):
+    """Exact public assertion refusal; the mutant build already succeeded or raised."""
+    source = (ROOT / TEST).read_text()
+    line = source.count('\n', 0, source.rfind('assert_eq!(', 0, source.index(LAW_ORDER_MESSAGE))) + 1
+    failures = re.findall(r'^test (\S+) \.\.\. FAILED$', proc.stdout, re.M)
+    intended = {'function': 'laws::evaluate_into', 'test': LAW_ORDER_TEST,
+        'assertion': f'{TEST}:{line}', 'expected_actual': LAW_ORDER_ACTUAL,
+        'expected_required': LAW_ORDER_REQUIRED}
+    killed = (baseline.returncode == 0 and f'test {LAW_ORDER_TEST} ... ok' in baseline.stdout.splitlines()
+        and proc.returncode == 101 and failures == [LAW_ORDER_TEST]
+        and 'running 1 test' in proc.stdout.splitlines()
+        and re.search(r'^test result: FAILED\. 0 passed; 1 failed; 0 ignored;', proc.stdout, re.M) is not None
+        and len(re.findall(r'panicked at ', proc.stdout)) == 1
+        and re.search(r'panicked at \S*tests/v2_guarded_laws\.rs:' + str(line) + r':\d+:\n'
+            + re.escape(f'assertion `left == right` failed: {LAW_ORDER_MESSAGE}\n'
+                f'  left: {LAW_ORDER_ACTUAL}\n right: {LAW_ORDER_REQUIRED}\n'), proc.stdout) is not None)
+    return killed, intended
+
+
+# Fixed independent native oracles, selected by declared control name.
+NATIVE_ORACLES = {'shrink_delivery_ordinals': (ORDINAL_TEST, native_ordinal_refusal),
+    'change_declared_law_order': (LAW_ORDER_TEST, native_law_order_refusal)}
 
 
 def native_commands(out, env, cwd, name, filtered=False, exact=None):
@@ -236,7 +283,7 @@ def check(out, refresh=False, positive_only=False, selected=None):
     command = [str(tool / 'verus'), '--crate-type=lib', '--edition=2024', '--no-cheating',
         '--no-external-by-default', '--num-threads', '2', '--output-json', '--triggers-mode', 'silent',
         '-V', 'spinoff-all', '--log', 'vir', '--log', 'vir-option=no_span+no_type+no_fn_details']
-    positive = saved_run([*command, '--log-dir', str(out / 'positive'), str(HARNESS)], ROOT, env, out, 'positive')
+    positive = saved_run(proof_command(command, out / 'positive'), ROOT, env, out, 'positive')
     verifier.require_success(positive)
     report = json.loads(positive.stdout)
     vr = report['verification-results']
@@ -287,10 +334,11 @@ def check(out, refresh=False, positive_only=False, selected=None):
             n = None
             refusal = None
             if control['kind'] == 'native':
-                n = native_commands(out, env, specimen, name, exact=ORDINAL_TEST)
-                killed, intended = native_ordinal_refusal(native, n)
+                test, oracle = NATIVE_ORACLES[name]
+                n = native_commands(out, env, specimen, name, exact=test)
+                killed, intended = oracle(native, n)
             else:
-                proc = saved_run([*command, '--log-dir', str(out / name), str(HARNESS)], specimen, env, out, name)
+                proc = saved_run(proof_command(command, out / name), specimen, env, out, name)
                 parsed = json.loads(proc.stdout)
                 if control['kind'] == 'proof':
                     killed, intended = semantic_refusal(proc, parsed, control)
@@ -306,9 +354,12 @@ def check(out, refresh=False, positive_only=False, selected=None):
                 killed = killed and bool(failed_tests)
             row = {'name': name, 'expected': control['kind'], 'killed': killed,
                 'proof_exit': None if proc is None else proc.returncode,
+                'proof_command': None if proc is None else proc.args,
+                'rlimit': None if proc is None else RLIMIT,
                 'verification_results': None if parsed is None else parsed['verification-results'],
                 'intended_target': intended, 'coverage_refusal': refusal,
                 'source_array_length_adjustments': adjustments, 'native_exit': None if n is None else n.returncode,
+                'native_command': None if n is None else n.args,
                 'native_failed_tests': failed_tests, 'mutated_path': str(control['path']),
                 'mutated_sha256': verifier.digest(specimen / control['path']),
                 'generated_sha256': verifier.digest(specimen / authority.EVALUATOR)}

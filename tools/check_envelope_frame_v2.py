@@ -20,6 +20,7 @@ from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import once
+from verus_contract_controls import contract_rejected
 from verus_coverage import require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +29,14 @@ HARNESS = Path("verification/verus/envelope_frame.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope.rs")
 SPEC = SUBJECT.parent / "envelope/spec.rs"
 PARENT = SUBJECT.parent / "mod.rs"
+FRAMED = "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/framed.rs"
+# Demonstrated rejections at the verified production caller `framed::project`:
+# its postcondition (line 42) consumes frame's, and it frames every length (line 56).
+CONTRACT_REJECTIONS = {
+    "omit_frame_contract": frozenset({("postcondition not satisfied", FRAMED, 42)}),
+    "weaken_frame_contract": frozenset({("postcondition not satisfied", FRAMED, 42)}),
+    "narrow_frame_input": frozenset({("precondition not satisfied", FRAMED, 56)}),
+}
 UNIT_SOURCES = (HARNESS, *sorted(path.relative_to(ROOT)
                 for path in (ROOT / SUBJECT.parent).rglob("*.rs")))
 
@@ -43,7 +52,8 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
 
-SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"),
+                                Path("tools/verus_contract_controls.py"))))
 
 
 def snapshot() -> dict[str, str]:
@@ -80,7 +90,9 @@ def mutation_sources(source: str, spec: str) -> dict[str, tuple[Path, str, str]]
          "    ensures (match result { Ok(p) => Ok(p.view()), Err(e) => Err(e) })\n"
          "        == spec::frame(bytes@, root_type, schema_hash@, max_bytes),\n))]\n"),
     ):
-        mutations[name] = (SUBJECT, frame_contract(source, replacement), "coverage")
+        # The framed projection consumes this contract, so changing it must fail
+        # that verified caller rather than verify for a coverage refusal.
+        mutations[name] = (SUBJECT, frame_contract(source, replacement), "proof_contract")
     mutations["change_frame_specification"] = (SPEC,
         once(spec, "(bytes.len() - 48) as u128", "(bytes.len() - 24 - 24) as u128"), "coverage")
     mutations["add_uncontracted_function"] = (SUBJECT,
@@ -142,8 +154,8 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed if unit == path else (ROOT / unit).read_text())
             adjust_specimen_source_lengths(specimen)
-            mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"),
-                                   str(specimen / HARNESS)], ROOT, environment)
+            mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(specimen / HARNESS)]
+            mutant = verifier.run(mutant_command, ROOT, environment)
             (specimen / "verus.json").write_text(mutant.stdout)
             (specimen / "verus.stderr").write_text(mutant.stderr)
             try:
@@ -151,9 +163,14 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
             except ValueError:
                 result = {}
             refusal = None
+            outcome = None
             if expected == "proof":
                 killed = (mutant.returncode != 0 and result.get("errors", 0) > 0
                           and result.get("encountered-vir-error") is False)
+            elif expected == "proof_contract":
+                outcome = contract_rejected(mutant.returncode, mutant.stdout, mutant.stderr,
+                                            pin, CONTRACT_REJECTIONS[name])
+                killed = outcome["accepted"]
             else:
                 if mutant.returncode == 0:
                     try:
@@ -163,9 +180,10 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
                 killed = (mutant.returncode == 0 and result.get("success") is True
                           and result.get("errors") == 0 and refusal is not None)
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
-                              "changed_source": str(path), "changed_sha256": verifier.digest(specimen / path),
+                              "changed_source": str(path), "original_sha256": before[str(path)],
+                              "changed_sha256": verifier.digest(specimen / path), "command": mutant_command,
                               "exit_code": mutant.returncode, "verification_results": result,
-                              "coverage_refusal": refusal, "logs": str(specimen)})
+                              "coverage_refusal": refusal, "contract_outcome": outcome, "logs": str(specimen)})
             (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
             if not killed:
                 raise RuntimeError(f"envelope mutation {name} survived or failed for an unrelated reason")

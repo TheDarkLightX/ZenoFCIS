@@ -20,6 +20,7 @@ from verus_coverage import inventory, require_coverage
 ROOT = Path(__file__).resolve().parents[1]
 FINITE = Path('crates/zeno-fcis-synthesis/src/finite')
 OWNED = FINITE / 'execution_v2/composition'
+AUTHORITY_DESCRIPTOR = FINITE / 'execution_v2/authority/bound.rs'
 HARNESS = Path('verification/verus/composition.rs')
 PROFILE = Path('verification/verus/composition.json')
 TEST = Path('crates/zeno-fcis-synthesis/tests/v2_composition.rs')
@@ -68,6 +69,25 @@ def coverage(vir: str, profile: dict) -> dict:
     return observed
 
 
+# The retargeted descriptor controls must be refused for their intended getter field.
+INTENDED_COVERAGE = {
+    'weaken_descriptor_contract': ('composition::execution_v2::authority::bound::impl&%0::descriptor', 'ensures_sha256'),
+    'narrow_descriptor_domain': ('composition::execution_v2::authority::bound::impl&%0::descriptor', 'requires_sha256'),
+}
+
+
+def intended_refusal(vir: str, profile: dict, name: str, refusal: str | None) -> tuple[bool, dict | None]:
+    """An unrelated coverage refusal cannot satisfy a retargeted descriptor control."""
+    if name not in INTENDED_COVERAGE:
+        return True, None
+    target, field = INTENDED_COVERAGE[name]
+    actual = inventory(vir, profile['namespace'], tuple(profile['body_covered_functions']))
+    expected = profile['functions']
+    intended = (refusal is not None and target in refusal and target in actual and target in expected
+                and actual[target][field] != expected[target][field])
+    return intended, {'function': target, 'field': field, 'intended_refusal': intended}
+
+
 def once(source: str, before: str, after: str) -> str:
     tokens = re.findall(r'\w+|[^\w\s]', before)
     pattern = r'\s*'.join(re.escape(token) for token in tokens)
@@ -94,9 +114,12 @@ def mutations(root: Path = ROOT) -> dict[str, tuple[Path, str, str, bool]]:
     add('header_charge_omission', 'framed.rs', 'meter.charge(Resource::Byte, header)', 'meter.charge(Resource::Byte, 0)')
     add('all_law_literal_admission', 'admission.rs', '&& schema_validation::law_literals(d.laws)', '&& true')
     add('binary_map_boundary', 'admission.rs', '*min == 0 && *max == 1', '*min == 0 || *max == 1')
-    contract = '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.descriptor_view(),descriptor_admitted(result),))]'
-    add('weaken_descriptor_contract', 'outcome.rs', contract, '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures true,))]', 'coverage', False)
-    add('narrow_descriptor_domain', 'outcome.rs', contract, '#[cfg_attr(verus_keep_ghost,verus_spec(result=>requires false,ensures result==self.descriptor_view(),descriptor_admitted(result),))]', 'coverage', False)
+    # Authority::descriptor's proof consumes BoundCore::descriptor's postcondition.
+    # These verify-then-coverage controls target that unconsumed public getter.
+    path = AUTHORITY_DESCRIPTOR
+    contract = '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.view().0,))]'
+    rows['weaken_descriptor_contract'] = (path, once((root/path).read_text(), contract, '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures true,))]'), 'coverage', False)
+    rows['narrow_descriptor_domain'] = (path, once((root/path).read_text(), contract, '#[cfg_attr(verus_keep_ghost,verus_spec(result=>requires false,ensures result==self.view().0,))]'), 'coverage', False)
     path = OWNED/'outcome.rs'
     rows['uncontracted_helper'] = (path, (root/path).read_text()+'\npub fn uncontracted_composition_control() -> u64 { 42 }\n', 'coverage', False)
     path = OWNED.with_suffix('.rs')
@@ -261,14 +284,17 @@ def check(out: Path, positive_only=False):
                 report_control = json.loads(proof.stdout)
                 parsed = report_control.get('verification-results', {})
                 refusal = None
+                intended = None
                 if expected == 'proof':
                     caught = proof_killed(proof, report_control, path, pin)
                 else:
+                    vir = (control/'vir/crate.vir').read_text()
                     try:
-                        coverage((control/'vir/crate.vir').read_text(), profile)
+                        coverage(vir, profile)
                     except ValueError as error:
                         refusal = str(error)
-                    caught = (proof.returncode == 0 and parsed.get('success') is True
+                    on_target, intended = intended_refusal(vir, profile, name, refusal)
+                    caught = (on_target and proof.returncode == 0 and parsed.get('success') is True
                               and parsed.get('errors') == 0 and refusal is not None
                               and parsed.get('encountered-vir-error') is False
                               and parsed.get('is-verifying-entire-crate') is True
@@ -282,7 +308,8 @@ def check(out: Path, positive_only=False):
                 item = dict(name=name, path=str(path), before_sha256=before[str(path)],
                             after_sha256=verifier.digest(control/'mutation.rs'), expected=expected,
                             killed=caught, proof_exit_code=proof.returncode, verification_results=parsed,
-                            coverage_refusal=refusal, native_exit_code=native_status)
+                            coverage_refusal=refusal, intended_coverage_control=intended,
+                            native_exit_code=native_status)
                 results.append(item)
                 (control/'result.json').write_text(json.dumps(item, indent=2)+'\n')
                 if not caught:

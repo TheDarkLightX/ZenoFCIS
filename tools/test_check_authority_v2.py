@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Check source custody and the authority gate's intended negative controls."""
 import copy
+import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 import tempfile
@@ -89,6 +91,59 @@ class GateTests(unittest.TestCase):
             killed, _refusal, intended = gate.coverage_control('', profile, 'serialize_before_size_check')
         self.assertFalse(killed)
         self.assertEqual(intended['function'], target)
+
+    def test_unchecked_bypass_changes_only_its_proof_aid_and_keeps_the_bypass(self):
+        bound = (gate.ROOT / gate.BOUND).read_text()
+        start = bound.rfind('#[cfg_attr', 0, bound.index("pub fn bind<'p>"))
+        end = bound.index("\n\nimpl<'p> Authority<'p>", start)
+        path, changed, expected, native = gate.mutations()['unchecked_constructor_bypass']
+        self.assertEqual((path, expected, native), (gate.BOUND, 'coverage', False))
+        self.assertTrue(changed.startswith(bound[:start]) and changed.endswith(bound[end:]))
+        replacement = changed[start:len(changed) - len(bound) + end]
+        # Raw descriptor/framing/identity signature, unchanged contract, descriptor-only
+        # admission and empty roots: the catalog checks remain bypassed.
+        for text in ("pub fn bind<'p>(descriptor:&'p Descriptor<'p>,framing:Framing,identity:Vec<u8>)"
+                     "->Result<Authority<'p>,Refusal>{",
+                     "(if composition::descriptor_admitted(descriptor){Ok((descriptor,framing,identity@,Seq::empty()))}",
+                     "let core=match composition::bind(descriptor){",
+                     "let channel_roots:&[(u32,u32,u32)]=&[];",
+                     "assert(channel_roots@=~=Seq::<(u32,u32,u32)>::empty());",
+                     "Ok(Authority{core,framing,identity,channel_roots})"):
+            self.assertEqual(replacement.count(text), 1, text)
+        self.assertNotIn('catalog', replacement)
+        self.assertNotIn('requires', replacement)
+        # No assumption, admitted obligation, trusted body, axiom or verifier attribute.
+        for escape in (r'\bassume\s*\(', r'\badmit\s*\(', r'\bexternal_(?:body|fn)', r'\baxiom', r'#\[\s*verifier'):
+            self.assertIsNone(re.search(escape, replacement), escape)
+        # Reverting only the typed binding and checked assertion reproduces the retained
+        # failed hosted mutant (run 37404295156), so nothing else changed.
+        aid = ("    let channel_roots:&[(u32,u32,u32)]=&[];\n"
+               "    #[cfg(verus_keep_ghost)]proof!{reveal(Authority::view);"
+               "assert(channel_roots@=~=Seq::<(u32,u32,u32)>::empty());}\n"
+               "    Ok(Authority{core,framing,identity,channel_roots})")
+        retained = changed.replace(aid, "    #[cfg(verus_keep_ghost)]proof!{reveal(Authority::view);}\n"
+                                        "    Ok(Authority{core,framing,identity,channel_roots:&[]})")
+        self.assertEqual(changed.count(aid), 1)
+        self.assertEqual(hashlib.sha256(retained.encode()).hexdigest(),
+                         '4f6705b0a12737af9928bc8604e9fd1b52ebfc2101e2c2a8ecd3b7374e373bed')
+
+    def test_unrelated_refusal_cannot_satisfy_the_bypass_coverage_control(self):
+        prefix = 'authority_v2::execution_v2::authority::'
+        bind = prefix + 'bound::bind'
+        other = prefix + 'evaluator::EVALUATOR'
+        record = {'body_sha256': 'body', 'signature_sha256': 'signature',
+                  'requires_sha256': 'requires', 'ensures_sha256': 'ensures'}
+        profile = {'functions': {bind: record, other: {'body_sha256': 'old'}},
+                   'namespace': 'authority_v2::', 'body_covered_functions': [bind]}
+        for actual, refused, intended in (
+                ({bind: record, other: {'body_sha256': 'changed'}}, other, False),
+                ({bind: {**record, 'ensures_sha256': 'other'}, other: {'body_sha256': 'old'}}, bind, False),
+                ({bind: {**record, 'signature_sha256': 'raw'}, other: {'body_sha256': 'old'}}, bind, True)):
+            with patch.object(gate, 'require_coverage', side_effect=ValueError(f"changed: ['{refused}']")), \
+                 patch.object(gate, 'inventory', return_value=actual):
+                matched, _refusal, detail = gate.coverage_control('', profile, 'unchecked_constructor_bypass')
+            self.assertEqual((matched, detail['function'], detail['field'], detail['intended_refusal']),
+                             (intended, bind, 'signature_sha256', intended))
 
 
 if __name__ == '__main__':
