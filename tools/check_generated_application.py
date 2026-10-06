@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -21,6 +22,13 @@ import check_synthesis
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def completion_identities(test_output: str) -> list[str]:
+    """Normalize libtest's prefix, preserving every marker for exact comparison."""
+    return [match[1] for line in test_output.splitlines()
+            if (match := re.fullmatch(
+                r"(?:test \S+ \.\.\. )?completion_problem=(.*)", line))]
 
 
 def run(command: list[str], cwd: Path, *, capture: bool = False,
@@ -316,8 +324,7 @@ def exercise_prepared_application(app: Path, directory: Path, package_roots: dic
         len({report.get("plan_sha256") for report in reports}) != 1):
         raise RuntimeError("prepared application completion replay differs")
     result, test_output = exercise_rust_application(app, directory, package_roots, version, environment)
-    identities = [line.removeprefix("completion_problem=") for line in test_output.splitlines()
-                  if line.startswith("completion_problem=")]
+    identities = completion_identities(test_output)
     if identities != [reports[0]["problem"]]:
         raise RuntimeError("CLI completion model differs from the exhaustive runtime comparison model: "
                            f"runtime {identities}, CLI {reports[0]['problem']}")

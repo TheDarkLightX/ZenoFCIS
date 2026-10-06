@@ -3072,73 +3072,73 @@
       "path_roles": [
         "host-tool"
       ],
-      "production_lines": 344,
+      "production_lines": 348,
       "rank": 32,
       "score": 81,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            366,
-            367,
-            371,
             373,
+            374,
+            378,
             380,
-            381,
-            389,
-            390
+            387,
+            388,
+            396,
+            397
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
-            69,
-            75,
-            350
+            77,
+            83,
+            357
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            343
+            350
           ]
         },
         {
           "id": "filesystem-read-path",
           "lines": [
-            64,
-            65,
-            69,
-            75,
-            80,
-            82,
-            132,
-            341
+            72,
+            73,
+            77,
+            83,
+            88,
+            90,
+            140,
+            348
           ]
         },
         {
           "id": "host-process-execution",
           "lines": [
-            28,
-            257
+            36,
+            265
           ]
         },
         {
           "id": "json-or-line-protocol",
           "lines": [
-            61,
-            262,
-            290,
-            306,
-            324
+            69,
+            270,
+            298,
+            314,
+            331
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            76,
-            115,
-            358
+            84,
+            123,
+            365
           ]
         }
       ],
@@ -5303,9 +5303,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 4945212,
+    "admitted_bytes": 4949151,
     "admitted_files": 368,
-    "inventory_sha256": "4ced18929287c4e45ced18b409f715a7af29023a7db30f394dcf8e8e8b952872",
+    "inventory_sha256": "6559965baecb5fb13fa0cd546034e30f7e723df0f647a4f8ca5048a749032946",
     "ranked_above_minimum": 297,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
