@@ -1,4 +1,4 @@
-"""Local MCP tools for finite synthesis. The CLI remains the checker."""
+"""Local declaration authoring and finite synthesis tools using the actual CLI."""
 
 import json
 import os
@@ -14,6 +14,9 @@ from mcp.server.mcpserver.exceptions import ToolError
 mcp = MCPServer("ZenoFCIS synthesis")
 PROFILE = "zeno-fcis/finite-i64/1"
 TARGETS = {"rust", "python", "javascript"}
+PROGRAM_TEMPLATES = {"durable-counter", "account-lockout", "order-fulfillment",
+                     "inventory-reservation", "withdrawal-queue", "agent-treasury-guard",
+                     "prepared-counter", "compliance-gateway"}
 
 
 def _absolute(path: str) -> Path:
@@ -68,6 +71,51 @@ def _cli() -> str:
     if not path.is_file():
         raise ToolError(f"CLI does not exist: {path}")
     return str(path)
+
+
+def _program_command(arguments: list[str], json_report: bool) -> dict[str, Any]:
+    try:
+        result = subprocess.run([_cli(), *arguments], capture_output=True, text=True,
+                                timeout=180, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ToolError(f"authoring process did not complete: {error}") from error
+    if json_report:
+        try:
+            report = json.loads(result.stdout)
+        except ValueError as error:
+            raise ToolError(f"CLI returned invalid JSON (exit {result.returncode}): {result.stderr[:1000]}") from error
+        if report.get("authority") not in {"none", "diagnostic-only"}:
+            raise ToolError("Unexpected authority claim from CLI")
+    else:
+        report = {"status": "created" if result.returncode == 0 else "refused",
+                  "stdout": result.stdout, "authority": "none",
+                  "runtime_admission": "not-run"}
+    return {"exit_code": result.returncode, "report": report,
+            "stderr": result.stderr[:1000], "authority": "none",
+            "note": "Authoring declarations only. Review complete original schema, policy, branches, footprints and laws; bind and execute through the checked library before a Publication can exist."}
+
+
+@mcp.tool()
+def discover_program_authoring() -> dict[str, Any]:
+    """Discover the actual CLI and normal checked Program declaration workflow."""
+    return _program_command(["describe"], True)
+
+
+@mcp.tool()
+def create_program_project(output_path: str, template: str = "durable-counter") -> dict[str, Any]:
+    """Copy a supported complete declaration example; refuse a nonempty destination."""
+    if template not in PROGRAM_TEMPLATES:
+        raise ToolError(f"Unsupported checked program template: {template}")
+    return _program_command(["new", str(_absolute(output_path)), "--template", template], False)
+
+
+@mcp.tool()
+def check_project_spec(project_path: str, require_substantive: bool = False) -> dict[str, Any]:
+    """Check .zeno declarations and diagnostics; this does not admit or publish a Program."""
+    arguments = ["check", str(_absolute(project_path)), "--format", "json"]
+    if require_substantive:
+        arguments.append("--require-substantive")
+    return _program_command(arguments, True)
 
 
 def _invoke(operation: str, problem_path: str, output_path: str, target: str, check: bool) -> dict[str, Any]:

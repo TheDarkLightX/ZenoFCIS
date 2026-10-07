@@ -1,6 +1,6 @@
 use agent_treasury_guard::{
-    Authority, Shell, authority, context, create, delivery::Destination, failed, generated::*,
-    invoke, journey, propose, settled, treasury,
+    Authority, Shell, authority, context, create, failed, generated::*, invoke, journey, propose,
+    settled, treasury,
 };
 use std::{
     fs,
@@ -34,8 +34,8 @@ impl Drop for Temp {
 
 /// Sends one command at `now` with a fresh price and the approved model.
 fn send(
-    shell: &mut Shell,
-    authority: &Authority,
+    shell: &mut Shell<'_, '_>,
+    authority: &Authority<'_>,
     command: &TreasuryCommand,
     caller: Caller,
     now: i128,
@@ -52,8 +52,8 @@ fn send(
     .unwrap()
 }
 
-fn state(shell: &Shell) -> Treasury {
-    Treasury::try_from_value(shell.snapshot().unwrap().state().clone()).unwrap()
+fn state(shell: &mut Shell<'_, '_>) -> Treasury {
+    agent_treasury_guard::decode_state(shell.snapshot().unwrap().state()).unwrap()
 }
 
 #[test]
@@ -76,9 +76,10 @@ fn complete_treasury_journey() {
 fn a_pending_swap_survives_a_restart() {
     let temp = Temp::new();
     let path = temp.0.join("treasury.sqlite");
-    let authority = authority().unwrap();
-    let destination = Destination::default();
-    let mut shell = create(&path, &authority, destination.clone()).unwrap();
+    let contract = agent_treasury_guard::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let mut shell = create(&path, &authority).unwrap();
     assert_eq!(
         send(
             &mut shell,
@@ -94,13 +95,8 @@ fn a_pending_swap_survives_a_restart() {
     drop(shell);
     // The reopened store re-executes the history; the swap is still
     // outstanding, so a second proposal is refused and the settlement lands.
-    let mut shell = Shell::open_existing(
-        &path,
-        &authority,
-        authority.bind_delivery_interpreter(destination),
-    )
-    .unwrap();
-    assert_eq!(state(&shell), treasury(4, 1, 2, 1, PendingBuy, 2, 2));
+    let mut shell = agent_treasury_guard::Shell::open(&path, &authority).unwrap();
+    assert_eq!(state(&mut shell), treasury(4, 1, 2, 1, PendingBuy, 2, 2));
     assert_eq!(
         send(
             &mut shell,
@@ -117,19 +113,16 @@ fn a_pending_swap_survives_a_restart() {
         send(&mut shell, &authority, &settled(1, 2), Dex, 2, 1, "settle"),
         "Accept"
     );
-    assert_eq!(state(&shell), treasury(4, 3, 2, 2, NoSwap, 0, 0));
+    assert_eq!(state(&mut shell), treasury(4, 3, 2, 2, NoSwap, 0, 0));
 }
 
 #[test]
 fn a_late_settlement_cannot_settle_a_newer_swap() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("treasury.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = agent_treasury_guard::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("treasury.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -185,13 +178,10 @@ fn a_late_settlement_cannot_settle_a_newer_swap() {
 #[test]
 fn a_failure_refunds_but_does_not_restore_the_budget() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("treasury.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = agent_treasury_guard::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("treasury.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -260,13 +250,10 @@ fn a_failure_refunds_but_does_not_restore_the_budget() {
 #[test]
 fn a_repeated_settlement_changes_nothing_and_queues_nothing() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("treasury.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = agent_treasury_guard::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("treasury.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -291,6 +278,6 @@ fn a_repeated_settlement_changes_nothing_and_queues_nothing() {
         "Reject"
     );
     let snapshot = shell.snapshot().unwrap();
-    assert_eq!((snapshot.bundle_count(), snapshot.pending_outbox()), (2, 1));
+    assert_eq!((snapshot.version(), snapshot.pending()), (2, 1));
     assert_eq!(state(shell), treasury(9, 0, 2, 2, NoSwap, 0, 0));
 }

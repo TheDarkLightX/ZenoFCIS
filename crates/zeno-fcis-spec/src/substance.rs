@@ -355,6 +355,9 @@ type 101 command Command;
 type 102 context Context;
 type 103 destination Destination;
 type 104 payload Payload;
+type 105 int Count;
+field 110 100 count 105;
+field 111 100 failures 105;
 reason 200 invalid precedence 0;
 component 300 machine {
   owns 100;

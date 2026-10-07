@@ -1,7 +1,7 @@
 //! Differential tests for persistent collection backends.
 //!
 //! Every backend must produce identical logical entries, canonical bytes, and
-//! `Value::Map` values for the same operations, regardless of insertion
+//! canonical map values for the same operations, regardless of insertion
 //! history. These tests verify insertion-history independence, deletion,
 //! zero-removal, alias resistance, snapshot retention, and old-version
 //! stability.
@@ -11,7 +11,7 @@ use alloc::string::String;
 use alloc::vec;
 
 fn encoded_key_for(byte: u8) -> Vec<u8> {
-    Value::U128(u128::from(byte))
+    Value::unsigned(u128::from(byte))
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode key: {e}"))
 }
@@ -24,11 +24,11 @@ fn encoded_key_for_text(text: &str) -> Vec<u8> {
 }
 
 fn make_entry(key_byte: u8, value_byte: u8) -> LogicalEntry {
-    let key = Value::U128(u128::from(key_byte));
+    let key = Value::unsigned(u128::from(key_byte));
     let encoded_key = key
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode key: {e}"));
-    LogicalEntry::try_new(encoded_key, key, Value::U128(u128::from(value_byte)))
+    LogicalEntry::try_new(encoded_key, key, Value::unsigned(u128::from(value_byte)))
         .unwrap_or_else(|error| panic!("logical entry: {error}"))
 }
 
@@ -37,7 +37,7 @@ fn make_entry_text(key_text: &str, value_byte: u8) -> LogicalEntry {
     let encoded_key = key
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode key: {e}"));
-    LogicalEntry::try_new(encoded_key, key, Value::U128(u128::from(value_byte)))
+    LogicalEntry::try_new(encoded_key, key, Value::unsigned(u128::from(value_byte)))
         .unwrap_or_else(|error| panic!("logical entry: {error}"))
 }
 
@@ -66,7 +66,7 @@ fn btreemap_empty_is_empty() {
 fn btreemap_insert_and_get() {
     let map = BTreeMapBackend::empty().insert(make_entry(1, 10));
     assert_eq!(map.len(), 1);
-    assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::U128(10)));
+    assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::unsigned(10)));
 }
 
 #[test]
@@ -83,7 +83,7 @@ fn btreemap_update_replaces_value() {
         .insert(make_entry(1, 10))
         .insert(make_entry(1, 20));
     assert_eq!(map.len(), 1);
-    assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::U128(20)));
+    assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::unsigned(20)));
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn btreemap_remove_nonexistent_is_noop() {
         .insert(make_entry(1, 10))
         .remove(&encoded_key_for(99));
     assert_eq!(map.len(), 1);
-    assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::U128(10)));
+    assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::unsigned(10)));
 }
 
 #[test]
@@ -252,7 +252,7 @@ mod rpds_tests {
     fn rpds_insert_and_get() {
         let map = RpdsBackend::empty().insert(make_entry(1, 10));
         assert_eq!(map.len(), 1);
-        assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::U128(10)));
+        assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::unsigned(10)));
     }
 
     #[test]
@@ -325,7 +325,7 @@ mod ordered_map_tests {
     fn ordered_insert_and_get() {
         let map = OrderedMap::empty().insert(make_entry(1, 10));
         assert_eq!(map.len(), 1);
-        assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::U128(10)));
+        assert_eq!(map.get(&encoded_key_for(1)), Some(&Value::unsigned(10)));
     }
 
     #[test]
@@ -478,8 +478,8 @@ impl PersistentMap for CorruptStoredKeyBackend {
     fn to_entries(&self) -> Vec<LogicalEntry> {
         vec![LogicalEntry::from_stored_parts(
             vec![0xff],
-            Value::U128(42),
-            Value::Unit,
+            Value::unsigned(42),
+            Value::unit(),
         )]
     }
 }
@@ -496,28 +496,28 @@ fn materialization_rejects_a_backend_stored_key_mismatch() {
 
 #[test]
 fn logical_entry_try_new_accepts_matching_encoding() {
-    let key = Value::U128(42);
+    let key = Value::unsigned(42);
     let encoded = key
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode: {e}"));
-    let result = LogicalEntry::try_new(encoded, key.clone(), Value::U128(99));
+    let result = LogicalEntry::try_new(encoded, key.clone(), Value::unsigned(99));
     assert!(result.is_ok());
     let entry = result.unwrap_or_else(|e| panic!("entry: {e}"));
-    assert_eq!(entry.key(), &Value::U128(42));
+    assert_eq!(entry.key(), &Value::unsigned(42));
 }
 
 #[test]
 fn logical_entry_try_new_rejects_mismatched_encoding() {
-    let key = Value::U128(42);
+    let key = Value::unsigned(42);
     let wrong_encoded = vec![0_u8, 1, 2, 3];
-    let result = LogicalEntry::try_new(wrong_encoded, key, Value::U128(99));
+    let result = LogicalEntry::try_new(wrong_encoded, key, Value::unsigned(99));
     assert!(matches!(result, Err(MapError::KeyEncodingMismatch { .. })));
 }
 
 #[test]
 fn logical_entry_try_new_rejects_empty_encoding() {
-    let key = Value::U128(42);
-    let result = LogicalEntry::try_new(vec![], key, Value::U128(99));
+    let key = Value::unsigned(42);
+    let result = LogicalEntry::try_new(vec![], key, Value::unsigned(99));
     assert!(matches!(result, Err(MapError::KeyEncodingMismatch { .. })));
 }
 

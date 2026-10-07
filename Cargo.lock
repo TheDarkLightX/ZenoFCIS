@@ -1245,15 +1245,18 @@ version = "1.1.0"
 dependencies = [
  "zeno-fcis-catalog",
  "zeno-fcis-codec",
+ "zeno-fcis-compose",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
  "zeno-fcis-evidence",
  "zeno-fcis-laws",
  "zeno-fcis-patch",
+ "zeno-fcis-plan",
  "zeno-fcis-project",
  "zeno-fcis-receipt",
  "zeno-fcis-schema",
  "zeno-fcis-shell",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -1314,6 +1317,8 @@ dependencies = [
 name = "zeno-fcis-codec"
 version = "1.1.0"
 dependencies = [
+ "libcrux-sha2",
+ "sha2",
  "zeno-fcis-value",
 ]
 
@@ -1372,8 +1377,6 @@ name = "zeno-fcis-crypto"
 version = "1.1.0"
 dependencies = [
  "criterion",
- "libcrux-sha2",
- "sha2",
  "zeno-fcis-codec",
 ]
 
@@ -1426,6 +1429,7 @@ dependencies = [
  "zeno-fcis-plan",
  "zeno-fcis-project",
  "zeno-fcis-schema",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -1558,6 +1562,7 @@ dependencies = [
  "zeno-fcis-receipt",
  "zeno-fcis-schema",
  "zeno-fcis-shell",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]

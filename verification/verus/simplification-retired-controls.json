@@ -1,0 +1,60 @@
+{
+  "schema": "zeno-fcis/retired-mutation-controls/1",
+  "scope": "Mutation controls retired by the V2 simplification (S1-S5), with the reason each fault class no longer exists. Restorable from refs/simplify/baseline.",
+  "controls": [
+    {
+      "gate": "authority",
+      "control": "genesis_after_refusal",
+      "reason": "S5: genesis and transition share Evaluation::result; candidate_after_refusal covers the shared body."
+    },
+    {
+      "gate": "composition",
+      "control": "law_delivery_destination",
+      "reason": "S4 removed law_bridge; laws read decision deliveries directly, so no destination copy exists to corrupt."
+    },
+    {
+      "gate": "composition",
+      "control": "law_delivery_payload",
+      "reason": "S4 removed law_bridge; no payload copy exists."
+    },
+    {
+      "gate": "composition",
+      "control": "law_delivery_idempotency",
+      "reason": "S4 removed law_bridge; no idempotency copy exists."
+    },
+    {
+      "gate": "composition",
+      "control": "law_delivery_ordinal",
+      "reason": "S4 removed law_bridge; no ordinal copy exists."
+    },
+    {
+      "gate": "composition",
+      "control": "record_before_admission",
+      "reason": "S5: produce takes the admitted BoundCore; pre-admission work is not expressible."
+    },
+    {
+      "gate": "schema-binding",
+      "control": "accept_nested_record",
+      "reason": "Schema admission accepts compound definitions for the V2.1 profile; descriptor InputLeaf cannot name a nested record."
+    }
+  ],
+  "replaced_or_added": [
+    {
+      "gate": "publication",
+      "control": "reject_replay_comparison",
+      "replaces": "genesis_replay_comparison",
+      "reason": "Genesis replay now uses the artifact comparison covered by full_replay_comparison; the remaining separate comparison is the Reject replay."
+    },
+    {
+      "gate": "protected-input",
+      "control": "wrong_unsigned_value",
+      "reason": "New control for the U128 leaf arm added in the integration tree."
+    },
+    {
+      "gate": "laws",
+      "control": "root_read_alias, law_effect_lane",
+      "replaces": "composition root_read_alias, law_effect_lane",
+      "reason": "S4 moved the Root selector id and effect/outbox lane tagging from law_bridge into laws/frame.rs, which the laws gate owns."
+    }
+  ]
+}

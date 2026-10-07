@@ -3,6 +3,21 @@
 use super::*;
 use alloc::vec;
 
+use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
+
+const ARTIFACT: &[u8] = b"retained native evidence fixture";
+fn inputs(envelopes: Vec<EvidenceEnvelope>) -> Vec<EvidenceInput> {
+    envelopes
+        .into_iter()
+        .map(|envelope| {
+            EvidenceInput::new(
+                envelope,
+                EvidenceArtifact::new::<TestHasher>(ARTIFACT.to_vec()),
+            )
+        })
+        .collect()
+}
+
 fn nonzero_hash(byte: u8) -> Hash32 {
     let mut bytes = [0_u8; 32];
     bytes[0] = byte;
@@ -10,13 +25,8 @@ fn nonzero_hash(byte: u8) -> Hash32 {
 }
 
 fn valid_bindings() -> SourceBindings {
-    SourceBindings::try_new(
-        nonzero_hash(1),
-        nonzero_hash(2),
-        nonzero_hash(3),
-        nonzero_hash(4),
-    )
-    .unwrap_or_else(|e| panic!("bindings: {e}"))
+    SourceBindings::try_new(nonzero_hash(2), nonzero_hash(3), nonzero_hash(4))
+        .unwrap_or_else(|e| panic!("bindings: {e}"))
 }
 
 fn valid_tool() -> ToolIdentity {
@@ -25,14 +35,14 @@ fn valid_tool() -> ToolIdentity {
 }
 
 fn valid_envelope(
-    kind: ToolKind,
+    kind: EvidenceKind,
     result: EvidenceResult,
     coverage: CoverageDeclaration,
     bindings: SourceBindings,
 ) -> EvidenceEnvelope {
     let query_id = "query_001";
     let claim_hash = nonzero_hash(10);
-    let artifact_digest = nonzero_hash(7);
+    let artifact_digest = TestHasher::hash(ARTIFACT);
     EvidenceEnvelope::try_new(
         valid_tool(),
         kind,
@@ -85,24 +95,8 @@ fn tool_identity_accepts_valid_fields() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn source_bindings_reject_zero_source_commit() {
-    let error = SourceBindings::try_new(
-        Hash32::ZERO,
-        nonzero_hash(2),
-        nonzero_hash(3),
-        nonzero_hash(4),
-    );
-    assert_eq!(error, Err(EvidenceError::UnboundSourceCommit));
-}
-
-#[test]
 fn source_bindings_reject_zero_profile() {
-    let error = SourceBindings::try_new(
-        nonzero_hash(1),
-        Hash32::ZERO,
-        nonzero_hash(3),
-        nonzero_hash(4),
-    );
+    let error = SourceBindings::try_new(Hash32::ZERO, nonzero_hash(3), nonzero_hash(4));
     assert_eq!(error, Err(EvidenceError::UnboundProfile));
 }
 
@@ -116,9 +110,9 @@ fn source_bindings_accept_all_nonzero() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn proven_is_conclusive_success() {
-    assert!(EvidenceResult::Proven.is_conclusive_success());
-    assert!(!EvidenceResult::Proven.is_blocking());
+fn attestation_is_reported_as_success() {
+    assert!(EvidenceResult::Attested.is_conclusive_success());
+    assert!(!EvidenceResult::Attested.is_blocking());
 }
 
 #[test]
@@ -169,7 +163,7 @@ fn unbounded_coverage_returns_none_for_refine() {
 fn envelope_rejects_blocking_result() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
@@ -190,12 +184,12 @@ fn envelope_rejects_blocking_result() {
 fn envelope_rejects_unbounded_coverage() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::Unbounded,
     );
@@ -206,12 +200,12 @@ fn envelope_rejects_unbounded_coverage() {
 fn envelope_rejects_zero_artifact_digest() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         Hash32::ZERO,
         CoverageDeclaration::Bounded { case_budget: 10 },
     );
@@ -222,12 +216,12 @@ fn envelope_rejects_zero_artifact_digest() {
 fn envelope_rejects_zero_claim_hash() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         Hash32::ZERO,
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::Bounded { case_budget: 10 },
     );
@@ -238,12 +232,12 @@ fn envelope_rejects_zero_claim_hash() {
 fn envelope_rejects_empty_query_id() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::Bounded { case_budget: 10 },
     );
@@ -253,20 +247,20 @@ fn envelope_rejects_empty_query_id() {
 #[test]
 fn envelope_accepts_valid_construction() {
     let envelope = valid_envelope(
-        ToolKind::Kani,
-        EvidenceResult::Proven,
+        EvidenceKind::Kani,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         valid_bindings(),
     );
-    assert_eq!(envelope.result(), EvidenceResult::Proven);
-    assert_eq!(envelope.kind(), ToolKind::Kani);
+    assert_eq!(envelope.result(), EvidenceResult::Attested);
+    assert_eq!(envelope.kind(), EvidenceKind::Kani);
 }
 
 #[test]
-fn envelope_round_trips_canonical_encoding() {
+fn envelope_has_exact_v2_bytes_without_a_source_commit_placeholder() {
     let envelope = valid_envelope(
-        ToolKind::Lean,
-        EvidenceResult::Proven,
+        EvidenceKind::Lean,
+        EvidenceResult::Attested,
         CoverageDeclaration::ProofAssisted {
             theorem_claim: nonzero_hash(8),
         },
@@ -275,8 +269,29 @@ fn envelope_round_trips_canonical_encoding() {
     let bytes = envelope
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode: {e}"));
-    assert!(!bytes.is_empty());
-    assert!(bytes.len() > 100);
+    let mut expected = Vec::from(&b"ZFCIS-EVIDENCE\0"[..]);
+    expected.extend_from_slice(&2_u16.to_be_bytes());
+    expected.extend_from_slice(&4_u32.to_be_bytes());
+    expected.extend_from_slice(b"kani");
+    expected.extend_from_slice(&6_u32.to_be_bytes());
+    expected.extend_from_slice(b"0.62.0");
+    expected.extend_from_slice(nonzero_hash(5).as_bytes());
+    expected.push(2); // Lean evidence kind.
+    for binding in [2, 3, 4] {
+        expected.extend_from_slice(nonzero_hash(binding).as_bytes());
+    }
+    expected.extend_from_slice(&9_u32.to_be_bytes());
+    expected.extend_from_slice(b"query_001");
+    expected.extend_from_slice(nonzero_hash(10).as_bytes());
+    expected.extend_from_slice(&1_u16.to_be_bytes());
+    expected.extend_from_slice(&7_u32.to_be_bytes());
+    expected.extend_from_slice(b"axiom_1");
+    expected.extend_from_slice(nonzero_hash(6).as_bytes());
+    expected.push(0); // Attested, with no kernel-proof claim.
+    expected.extend_from_slice(TestHasher::hash(ARTIFACT).as_bytes());
+    expected.push(2); // Declared proof-assisted coverage.
+    expected.extend_from_slice(nonzero_hash(8).as_bytes());
+    assert_eq!(bytes, expected);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,46 +299,19 @@ fn envelope_round_trips_canonical_encoding() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn importer_rejects_stale_source_commit() {
-    let bindings = valid_bindings();
-    let mut importer =
-        EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
-    let stale_bindings = SourceBindings::try_new(
-        nonzero_hash(99),
-        nonzero_hash(2),
-        nonzero_hash(3),
-        nonzero_hash(4),
-    )
-    .unwrap_or_else(|e| panic!("stale bindings: {e}"));
-    let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
-        CoverageDeclaration::Bounded { case_budget: 10 },
-        stale_bindings,
-    );
-    let result = importer.import(vec![envelope], &StructuralChecker);
-    assert_eq!(result, Err(EvidenceError::StaleSourceCommit));
-}
-
-#[test]
 fn importer_rejects_profile_mismatch() {
     let bindings = valid_bindings();
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
-    let bad_bindings = SourceBindings::try_new(
-        nonzero_hash(1),
-        nonzero_hash(88),
-        nonzero_hash(3),
-        nonzero_hash(4),
-    )
-    .unwrap_or_else(|e| panic!("bad bindings: {e}"));
+    let bad_bindings = SourceBindings::try_new(nonzero_hash(88), nonzero_hash(3), nonzero_hash(4))
+        .unwrap_or_else(|e| panic!("bad bindings: {e}"));
     let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bad_bindings,
     );
-    let result = importer.import(vec![envelope], &StructuralChecker);
+    let result = importer.import::<TestHasher, _>(inputs(vec![envelope]), &StructuralChecker);
     assert_eq!(result, Err(EvidenceError::ProfileMismatch));
 }
 
@@ -333,15 +321,17 @@ fn importer_rejects_failed_artifact_check() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
-    let result = importer.import(vec![envelope], &RejectAllChecker);
+    let result = importer.import::<TestHasher, _>(inputs(vec![envelope]), &RejectAllChecker);
     assert_eq!(
         result,
-        Err(EvidenceError::ArtifactCheckFailed { kind: ToolKind::Z3 })
+        Err(EvidenceError::ArtifactCheckFailed {
+            kind: EvidenceKind::Z3
+        })
     );
 }
 
@@ -351,24 +341,26 @@ fn importer_rejects_duplicate_tool_kind() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
     importer
-        .import(vec![envelope], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![envelope]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("first import: {e}"));
     let duplicate = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 20 },
         bindings,
     );
-    let result = importer.import(vec![duplicate], &StructuralChecker);
+    let result = importer.import::<TestHasher, _>(inputs(vec![duplicate]), &StructuralChecker);
     assert_eq!(
         result,
-        Err(EvidenceError::DuplicateToolKind { kind: ToolKind::Z3 })
+        Err(EvidenceError::DuplicateEvidenceKind {
+            kind: EvidenceKind::Z3
+        })
     );
 }
 
@@ -378,21 +370,21 @@ fn importer_accepts_valid_envelopes() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let z3 = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
     let lean = valid_envelope(
-        ToolKind::Lean,
-        EvidenceResult::Proven,
+        EvidenceKind::Lean,
+        EvidenceResult::Attested,
         CoverageDeclaration::ProofAssisted {
             theorem_claim: nonzero_hash(8),
         },
         bindings,
     );
     importer
-        .import(vec![z3, lean], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![z3, lean]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     assert_eq!(importer.envelopes().len(), 2);
 }
@@ -404,8 +396,8 @@ fn importer_tracks_runtime_refinement() {
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     assert!(!importer.has_runtime_refinement());
     let runtime = valid_envelope(
-        ToolKind::RuntimeRefinement,
-        EvidenceResult::Proven,
+        EvidenceKind::RuntimeRefinement,
+        EvidenceResult::Attested,
         CoverageDeclaration::ExhaustiveFinite {
             domain_hash: nonzero_hash(9),
             cardinality: 1,
@@ -413,7 +405,7 @@ fn importer_tracks_runtime_refinement() {
         bindings,
     );
     importer
-        .import(vec![runtime], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![runtime]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     assert!(importer.has_runtime_refinement());
 }
@@ -424,17 +416,19 @@ fn importer_converts_to_tool_evidence() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let z3 = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
     importer
-        .import(vec![z3], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![z3]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     let tool_evidence = importer.to_tool_evidence();
     assert_eq!(tool_evidence.len(), 1);
-    assert_eq!(tool_evidence[0].kind(), ToolKind::Z3);
+    assert_eq!(tool_evidence[0].kind(), EvidenceKind::Z3);
+    assert_eq!(tool_evidence[0].artifact_bytes(), ARTIFACT);
+    assert_eq!(tool_evidence[0].artifact(), TestHasher::hash(ARTIFACT));
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +449,7 @@ fn promotion_gate_requires_runtime_refinement() {
 fn promotion_gate_requires_all_tools() {
     let bindings = valid_bindings();
     let importer = EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
-    let gate = PromotionGate::try_new(vec![ToolKind::Z3, ToolKind::Lean], false)
+    let gate = PromotionGate::try_new(vec![EvidenceKind::Z3, EvidenceKind::Lean], false)
         .unwrap_or_else(|e| panic!("gate: {e}"));
     let blockers = gate.evaluate(&importer);
     assert_eq!(blockers.len(), 2);
@@ -467,14 +461,14 @@ fn promotion_gate_satisfied_with_all_evidence() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let z3 = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
     let runtime = valid_envelope(
-        ToolKind::RuntimeRefinement,
-        EvidenceResult::Proven,
+        EvidenceKind::RuntimeRefinement,
+        EvidenceResult::Attested,
         CoverageDeclaration::ExhaustiveFinite {
             domain_hash: nonzero_hash(9),
             cardinality: 1,
@@ -482,16 +476,16 @@ fn promotion_gate_satisfied_with_all_evidence() {
         bindings,
     );
     importer
-        .import(vec![z3, runtime], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![z3, runtime]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
-    let gate =
-        PromotionGate::try_new(vec![ToolKind::Z3], true).unwrap_or_else(|e| panic!("gate: {e}"));
+    let gate = PromotionGate::try_new(vec![EvidenceKind::Z3], true)
+        .unwrap_or_else(|e| panic!("gate: {e}"));
     assert!(gate.is_satisfied(&importer));
 }
 
 #[test]
 fn promotion_gate_rejects_duplicate_tools() {
-    let error = PromotionGate::try_new(vec![ToolKind::Z3, ToolKind::Z3], false);
+    let error = PromotionGate::try_new(vec![EvidenceKind::Z3, EvidenceKind::Z3], false);
     assert_eq!(error, Err(EvidenceError::InvalidPromotionGate));
 }
 
@@ -505,17 +499,17 @@ fn best_coverage_prefers_exhaustive_over_bounded() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let bounded = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
     importer
-        .import(vec![bounded], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![bounded]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     let exhaustive = valid_envelope(
-        ToolKind::Lean,
-        EvidenceResult::Proven,
+        EvidenceKind::Lean,
+        EvidenceResult::Attested,
         CoverageDeclaration::ExhaustiveFinite {
             domain_hash: nonzero_hash(9),
             cardinality: 100,
@@ -523,7 +517,7 @@ fn best_coverage_prefers_exhaustive_over_bounded() {
         bindings,
     );
     importer
-        .import(vec![exhaustive], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![exhaustive]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     let best = importer.best_coverage();
     assert!(matches!(
@@ -565,12 +559,12 @@ fn assumption_rejects_zero_hash() {
 #[test]
 fn reject_all_checker_always_returns_false() {
     let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         valid_bindings(),
     );
-    assert!(!RejectAllChecker.check(&envelope));
+    assert!(!RejectAllChecker.check(&envelope, ARTIFACT));
 }
 
 #[test]
@@ -579,14 +573,14 @@ fn structural_checker_validates_artifact_and_result() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
-    assert!(StructuralChecker.check(&envelope));
+    assert!(StructuralChecker.check(&envelope, ARTIFACT));
     importer
-        .import(vec![envelope], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![envelope]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     assert_eq!(importer.envelopes().len(), 1);
 }
@@ -598,18 +592,18 @@ fn structural_checker_validates_artifact_and_result() {
 #[test]
 fn all_tool_kinds_can_be_enveloped() {
     let kinds = [
-        ToolKind::Z3,
-        ToolKind::Cvc5,
-        ToolKind::Lean,
-        ToolKind::Kani,
-        ToolKind::TranslationValidation,
-        ToolKind::CodecVectors,
-        ToolKind::RuntimeRefinement,
+        EvidenceKind::Z3,
+        EvidenceKind::Cvc5,
+        EvidenceKind::Lean,
+        EvidenceKind::Kani,
+        EvidenceKind::TranslationValidation,
+        EvidenceKind::CodecVectors,
+        EvidenceKind::RuntimeRefinement,
     ];
     for kind in kinds {
         let envelope = valid_envelope(
             kind,
-            EvidenceResult::Proven,
+            EvidenceResult::Attested,
             CoverageDeclaration::Bounded { case_budget: 10 },
             valid_bindings(),
         );
@@ -638,20 +632,15 @@ fn importer_rejects_schema_mismatch() {
     let bindings = valid_bindings();
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
-    let bad_bindings = SourceBindings::try_new(
-        nonzero_hash(1),
-        nonzero_hash(2),
-        nonzero_hash(99),
-        nonzero_hash(4),
-    )
-    .unwrap_or_else(|e| panic!("bad bindings: {e}"));
+    let bad_bindings = SourceBindings::try_new(nonzero_hash(2), nonzero_hash(99), nonzero_hash(4))
+        .unwrap_or_else(|e| panic!("bad bindings: {e}"));
     let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bad_bindings,
     );
-    let result = importer.import(vec![envelope], &StructuralChecker);
+    let result = importer.import::<TestHasher, _>(inputs(vec![envelope]), &StructuralChecker);
     assert_eq!(result, Err(EvidenceError::SchemaMismatch));
 }
 
@@ -660,20 +649,15 @@ fn importer_rejects_algorithm_mismatch() {
     let bindings = valid_bindings();
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
-    let bad_bindings = SourceBindings::try_new(
-        nonzero_hash(1),
-        nonzero_hash(2),
-        nonzero_hash(3),
-        nonzero_hash(99),
-    )
-    .unwrap_or_else(|e| panic!("bad bindings: {e}"));
+    let bad_bindings = SourceBindings::try_new(nonzero_hash(2), nonzero_hash(3), nonzero_hash(99))
+        .unwrap_or_else(|e| panic!("bad bindings: {e}"));
     let envelope = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bad_bindings,
     );
-    let result = importer.import(vec![envelope], &StructuralChecker);
+    let result = importer.import::<TestHasher, _>(inputs(vec![envelope]), &StructuralChecker);
     assert_eq!(result, Err(EvidenceError::AlgorithmMismatch));
 }
 
@@ -688,12 +672,12 @@ fn envelope_rejects_too_many_assumptions() {
     }
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         assumptions,
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::Bounded { case_budget: 10 },
     );
@@ -706,26 +690,26 @@ fn importer_rejects_too_many_envelopes() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let all_kinds = [
-        ToolKind::Z3,
-        ToolKind::Cvc5,
-        ToolKind::Lean,
-        ToolKind::Kani,
-        ToolKind::TranslationValidation,
-        ToolKind::CodecVectors,
-        ToolKind::RuntimeRefinement,
+        EvidenceKind::Z3,
+        EvidenceKind::Cvc5,
+        EvidenceKind::Lean,
+        EvidenceKind::Kani,
+        EvidenceKind::TranslationValidation,
+        EvidenceKind::CodecVectors,
+        EvidenceKind::RuntimeRefinement,
     ];
     let mut envelopes = Vec::new();
     for i in 0..65u8 {
         let kind = all_kinds[i as usize % all_kinds.len()];
         let env = valid_envelope(
             kind,
-            EvidenceResult::Proven,
+            EvidenceResult::Attested,
             CoverageDeclaration::Bounded { case_budget: 10 },
             bindings,
         );
         envelopes.push(env);
     }
-    let result = importer.import(envelopes, &StructuralChecker);
+    let result = importer.import::<TestHasher, _>(inputs(envelopes), &StructuralChecker);
     assert_eq!(result, Err(EvidenceError::TooManyEnvelopes));
 }
 
@@ -735,24 +719,24 @@ fn best_coverage_prefers_proof_assisted_over_bounded() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let bounded = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         bindings,
     );
     importer
-        .import(vec![bounded], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![bounded]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     let proof = valid_envelope(
-        ToolKind::Lean,
-        EvidenceResult::Proven,
+        EvidenceKind::Lean,
+        EvidenceResult::Attested,
         CoverageDeclaration::ProofAssisted {
             theorem_claim: nonzero_hash(8),
         },
         bindings,
     );
     importer
-        .import(vec![proof], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![proof]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     let best = importer.best_coverage();
     assert!(matches!(best, Some(CoverageMode::ProofAssisted { .. })));
@@ -764,8 +748,8 @@ fn best_coverage_keeps_exhaustive_over_proof_assisted() {
     let mut importer =
         EvidenceImporter::try_new(bindings).unwrap_or_else(|e| panic!("importer: {e}"));
     let exhaustive = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::ExhaustiveFinite {
             domain_hash: nonzero_hash(9),
             cardinality: 100,
@@ -773,18 +757,18 @@ fn best_coverage_keeps_exhaustive_over_proof_assisted() {
         bindings,
     );
     importer
-        .import(vec![exhaustive], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![exhaustive]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     let proof = valid_envelope(
-        ToolKind::Lean,
-        EvidenceResult::Proven,
+        EvidenceKind::Lean,
+        EvidenceResult::Attested,
         CoverageDeclaration::ProofAssisted {
             theorem_claim: nonzero_hash(8),
         },
         bindings,
     );
     importer
-        .import(vec![proof], &StructuralChecker)
+        .import::<TestHasher, _>(inputs(vec![proof]), &StructuralChecker)
         .unwrap_or_else(|e| panic!("import: {e}"));
     let best = importer.best_coverage();
     assert!(matches!(
@@ -800,12 +784,12 @@ fn best_coverage_keeps_exhaustive_over_proof_assisted() {
 fn envelope_rejects_zero_domain_hash() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::ExhaustiveFinite {
             domain_hash: Hash32::ZERO,
@@ -819,12 +803,12 @@ fn envelope_rejects_zero_domain_hash() {
 fn envelope_rejects_zero_cardinality() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::ExhaustiveFinite {
             domain_hash: nonzero_hash(1),
@@ -838,12 +822,12 @@ fn envelope_rejects_zero_cardinality() {
 fn envelope_rejects_zero_case_budget() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::Bounded { case_budget: 0 },
     );
@@ -854,12 +838,12 @@ fn envelope_rejects_zero_case_budget() {
 fn envelope_rejects_zero_theorem_claim() {
     let error = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::ProofAssisted {
             theorem_claim: Hash32::ZERO,
@@ -870,23 +854,13 @@ fn envelope_rejects_zero_theorem_claim() {
 
 #[test]
 fn source_bindings_reject_zero_schema() {
-    let error = SourceBindings::try_new(
-        nonzero_hash(1),
-        nonzero_hash(2),
-        Hash32::ZERO,
-        nonzero_hash(4),
-    );
+    let error = SourceBindings::try_new(nonzero_hash(2), Hash32::ZERO, nonzero_hash(4));
     assert_eq!(error, Err(EvidenceError::UnboundSchema));
 }
 
 #[test]
 fn source_bindings_reject_zero_algorithm() {
-    let error = SourceBindings::try_new(
-        nonzero_hash(1),
-        nonzero_hash(2),
-        nonzero_hash(3),
-        Hash32::ZERO,
-    );
+    let error = SourceBindings::try_new(nonzero_hash(2), nonzero_hash(3), Hash32::ZERO);
     assert_eq!(error, Err(EvidenceError::UnboundAlgorithm));
 }
 
@@ -896,24 +870,24 @@ fn source_bindings_reject_zero_algorithm() {
 
 #[test]
 fn builder_creates_valid_envelope() {
-    let envelope = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let envelope = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .query_id("theorem_001")
         .claim_hash(nonzero_hash(10))
         .artifact_digest(nonzero_hash(7))
-        .result(EvidenceResult::Proven)
+        .result(EvidenceResult::Attested)
         .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
         .build()
         .unwrap_or_else(|e| panic!("builder: {e}"));
-    assert_eq!(envelope.kind(), ToolKind::Kani);
+    assert_eq!(envelope.kind(), EvidenceKind::Kani);
     assert_eq!(envelope.query_id(), "theorem_001");
 }
 
 #[test]
 fn builder_rejects_missing_query_id() {
-    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .claim_hash(nonzero_hash(10))
         .artifact_digest(nonzero_hash(7))
-        .result(EvidenceResult::Proven)
+        .result(EvidenceResult::Attested)
         .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
         .build();
     assert_eq!(error, Err(EvidenceError::MissingQueryId));
@@ -921,10 +895,10 @@ fn builder_rejects_missing_query_id() {
 
 #[test]
 fn builder_rejects_missing_claim_hash() {
-    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .query_id("theorem_001")
         .artifact_digest(nonzero_hash(7))
-        .result(EvidenceResult::Proven)
+        .result(EvidenceResult::Attested)
         .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
         .build();
     assert_eq!(error, Err(EvidenceError::MissingClaimHash));
@@ -932,7 +906,7 @@ fn builder_rejects_missing_claim_hash() {
 
 #[test]
 fn builder_rejects_missing_result() {
-    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .query_id("theorem_001")
         .claim_hash(nonzero_hash(10))
         .artifact_digest(nonzero_hash(7))
@@ -943,10 +917,10 @@ fn builder_rejects_missing_result() {
 
 #[test]
 fn builder_rejects_missing_artifact_digest() {
-    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .query_id("theorem_001")
         .claim_hash(nonzero_hash(10))
-        .result(EvidenceResult::Proven)
+        .result(EvidenceResult::Attested)
         .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
         .build();
     assert_eq!(error, Err(EvidenceError::MissingArtifactDigest));
@@ -954,18 +928,18 @@ fn builder_rejects_missing_artifact_digest() {
 
 #[test]
 fn builder_rejects_missing_coverage() {
-    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .query_id("theorem_001")
         .claim_hash(nonzero_hash(10))
         .artifact_digest(nonzero_hash(7))
-        .result(EvidenceResult::Proven)
+        .result(EvidenceResult::Attested)
         .build();
     assert_eq!(error, Err(EvidenceError::MissingCoverage));
 }
 
 #[test]
 fn builder_propagates_validation_errors() {
-    let error = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let error = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .query_id("theorem_001")
         .claim_hash(nonzero_hash(10))
         .artifact_digest(nonzero_hash(7))
@@ -986,11 +960,11 @@ fn builder_adds_assumptions() {
         .unwrap_or_else(|e| panic!("assumption: {e}"));
     let a2 = Assumption::try_new("axiom_2", nonzero_hash(7))
         .unwrap_or_else(|e| panic!("assumption: {e}"));
-    let envelope = EvidenceEnvelopeBuilder::new(valid_tool(), ToolKind::Kani, valid_bindings())
+    let envelope = EvidenceEnvelopeBuilder::new(valid_tool(), EvidenceKind::Kani, valid_bindings())
         .query_id("theorem_001")
         .claim_hash(nonzero_hash(10))
         .artifact_digest(nonzero_hash(7))
-        .result(EvidenceResult::Proven)
+        .result(EvidenceResult::Attested)
         .coverage(CoverageDeclaration::Bounded { case_budget: 100 })
         .assumption(a1)
         .assumption(a2)
@@ -1034,7 +1008,7 @@ fn query_id_display_matches_inner() {
 
 #[test]
 fn evidence_result_try_from_valid_tags() {
-    assert_eq!(EvidenceResult::try_from(0), Ok(EvidenceResult::Proven));
+    assert_eq!(EvidenceResult::try_from(0), Ok(EvidenceResult::Attested));
     assert_eq!(EvidenceResult::try_from(1), Ok(EvidenceResult::Disproven));
     assert_eq!(
         EvidenceResult::try_from(2),
@@ -1067,8 +1041,8 @@ fn evidence_result_try_from_invalid_tag() {
 #[test]
 fn envelope_canonical_bytes_are_deterministic() {
     let envelope = valid_envelope(
-        ToolKind::Kani,
-        EvidenceResult::Proven,
+        EvidenceKind::Kani,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         valid_bindings(),
     );
@@ -1084,19 +1058,19 @@ fn envelope_canonical_bytes_are_deterministic() {
 #[test]
 fn envelope_canonical_bytes_differ_for_different_claims() {
     let envelope_a = valid_envelope(
-        ToolKind::Kani,
-        EvidenceResult::Proven,
+        EvidenceKind::Kani,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         valid_bindings(),
     );
     let envelope_b = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Kani,
+        EvidenceKind::Kani,
         valid_bindings(),
         "query_001",
         nonzero_hash(99),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::Bounded { case_budget: 10 },
     )
@@ -1116,19 +1090,19 @@ fn envelope_canonical_bytes_differ_for_different_claims() {
 #[test]
 fn envelope_canonical_bytes_differ_for_different_results() {
     let envelope_proven = valid_envelope(
-        ToolKind::Z3,
-        EvidenceResult::Proven,
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         valid_bindings(),
     );
     let envelope_disproven = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Z3,
+        EvidenceKind::Z3,
         valid_bindings(),
         "query_002",
         nonzero_hash(11),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(8),
         CoverageDeclaration::Bounded { case_budget: 20 },
     )
@@ -1148,14 +1122,14 @@ fn envelope_canonical_bytes_differ_for_different_results() {
 #[test]
 fn envelope_canonical_bytes_differ_for_different_coverage() {
     let bounded = valid_envelope(
-        ToolKind::Kani,
-        EvidenceResult::Proven,
+        EvidenceKind::Kani,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         valid_bindings(),
     );
     let exhaustive = valid_envelope(
-        ToolKind::Kani,
-        EvidenceResult::Proven,
+        EvidenceKind::Kani,
+        EvidenceResult::Attested,
         CoverageDeclaration::ExhaustiveFinite {
             domain_hash: nonzero_hash(9),
             cardinality: 100,
@@ -1177,19 +1151,19 @@ fn envelope_canonical_bytes_differ_for_different_coverage() {
 #[test]
 fn envelope_canonical_bytes_include_assumptions() {
     let with_assumptions = valid_envelope(
-        ToolKind::Kani,
-        EvidenceResult::Proven,
+        EvidenceKind::Kani,
+        EvidenceResult::Attested,
         CoverageDeclaration::Bounded { case_budget: 10 },
         valid_bindings(),
     );
     let without_assumptions = EvidenceEnvelope::try_new(
         valid_tool(),
-        ToolKind::Kani,
+        EvidenceKind::Kani,
         valid_bindings(),
         "query_001",
         nonzero_hash(10),
         vec![],
-        EvidenceResult::Proven,
+        EvidenceResult::Attested,
         nonzero_hash(7),
         CoverageDeclaration::Bounded { case_budget: 10 },
     )
@@ -1213,4 +1187,71 @@ fn evidence_result_round_trips_through_u8() {
             EvidenceResult::try_from(tag).unwrap_or_else(|e| panic!("decode tag {tag}: {e}"));
         assert_eq!(result as u8, tag, "round-trip tag {tag} failed");
     }
+}
+
+#[test]
+fn importer_checks_actual_bytes_before_external_checker_and_preserves_prior_state() {
+    use core::cell::Cell;
+    struct Checker(Cell<usize>);
+    impl EvidenceChecker for Checker {
+        fn check(&self, _: &EvidenceEnvelope, bytes: &[u8]) -> bool {
+            self.0.set(self.0.get() + 1);
+            bytes == ARTIFACT
+        }
+    }
+    let envelope = valid_envelope(
+        EvidenceKind::Z3,
+        EvidenceResult::Attested,
+        CoverageDeclaration::Bounded { case_budget: 1 },
+        valid_bindings(),
+    );
+    let altered = EvidenceInput::new(
+        envelope.clone(),
+        EvidenceArtifact::new::<TestHasher>(b"altered artifact bytes".to_vec()),
+    );
+    let checker = Checker(Cell::new(0));
+    let mut importer =
+        EvidenceImporter::try_new(valid_bindings()).unwrap_or_else(|e| panic!("importer: {e}"));
+    let before = importer.clone();
+    assert_eq!(
+        importer.import::<TestHasher, _>(vec![altered], &checker),
+        Err(EvidenceError::ArtifactDigestMismatch {
+            kind: EvidenceKind::Z3
+        })
+    );
+    assert_eq!(checker.0.get(), 0);
+    assert_eq!(importer, before);
+    importer
+        .import::<TestHasher, _>(inputs(vec![envelope]), &checker)
+        .unwrap_or_else(|e| panic!("valid artifact: {e}"));
+    assert_eq!(checker.0.get(), 1);
+    assert_eq!(importer.inputs()[0].artifact().bytes(), ARTIFACT);
+}
+
+#[test]
+fn importer_rejects_artifact_bound_to_different_bytes() {
+    let artifact = EvidenceArtifact::new::<TestHasher>([ARTIFACT, &[0]].concat());
+    let envelope = EvidenceEnvelope::try_new(
+        valid_tool(),
+        EvidenceKind::Lean,
+        valid_bindings(),
+        "query_001",
+        nonzero_hash(10),
+        vec![],
+        EvidenceResult::Attested,
+        TestHasher::hash(ARTIFACT),
+        CoverageDeclaration::Bounded { case_budget: 1 },
+    )
+    .unwrap_or_else(|e| panic!("declared envelope: {e}"));
+    assert_ne!(artifact.digest(), envelope.artifact_digest());
+    assert_ne!(artifact.digest(), TestHasher::hash(ARTIFACT));
+    let input = EvidenceInput::new(envelope, artifact);
+    let mut importer =
+        EvidenceImporter::try_new(valid_bindings()).unwrap_or_else(|e| panic!("importer: {e}"));
+    assert_eq!(
+        importer.import::<TestHasher, _>(vec![input], &StructuralChecker),
+        Err(EvidenceError::ArtifactDigestMismatch {
+            kind: EvidenceKind::Lean
+        })
+    );
 }

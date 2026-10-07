@@ -1,4 +1,4 @@
-//! Bounded `.zeno` authoring, typed project specifications, and executable logic.
+//! Bounded `.zeno` authoring, typed project specifications, and inert logic declarations.
 //!
 //! This crate is a pure `no_std + alloc` compiler layer. It parses inert source
 //! text into a typed, canonically ordered [`ProjectSpec`]. It cannot execute
@@ -15,7 +15,6 @@ mod diagnostic;
 mod elaborate;
 mod induction;
 mod lexer;
-mod logic;
 mod mini_determinator;
 mod parser;
 mod paths;
@@ -28,11 +27,7 @@ pub use diagnostic::{
     AstPath, Diagnostic, DiagnosticCode, DiagnosticSet, DiagnosticStage, SourceSpan,
 };
 pub use elaborate::elaborate_project;
-pub use induction::{evaluate_invariant, invariant_at};
-pub use logic::{
-    EvalLimits, EvalOutcome, EvaluationContext, IndeterminateReason, NamedPredicate, Observation,
-    PredicateProvider, TemporalEvaluation, TraceStep, evaluate_relational, evaluate_temporal,
-};
+pub use induction::invariant_at;
 pub use mini_determinator::{
     MergeConflict, MiniBlocker, MiniBudget, MiniCommand, MiniDecision, MiniDeterminator, MiniRun,
     MiniState, PrivateWork, WorkerInstruction, WorkerProgram, WorkerTrace, WorkspaceCell,
@@ -65,7 +60,7 @@ pub const MAX_SOURCE_TOKENS: usize = 262_144;
 pub const MAX_RETAINED_DIAGNOSTICS: usize = 256;
 /// Maximum recursive expression nesting admitted by the language parser.
 pub const MAX_FORMULA_DEPTH: usize = 256;
-/// Maximum total formula nodes admitted by elaboration and direct evaluation.
+/// Maximum total formula nodes admitted by elaboration.
 pub const MAX_FORMULA_NODES: usize = 1_000_000;
 /// Maximum finite logical-trace horizon admitted by language version 1.
 pub const MAX_FINITE_HORIZON: u32 = 256;

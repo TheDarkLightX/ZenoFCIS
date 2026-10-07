@@ -19,7 +19,8 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, Domain, EncodeError, Hash32, commitment};
+pub use zeno_fcis_codec::EvidenceArtifact;
+use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::DecisionKind;
 use zeno_fcis_crypto::{ApprovedCommitmentProvider, ApprovedProviderId, VerifiedProvider};
 use zeno_fcis_patch::{PatchError, hash_value};
@@ -120,6 +121,7 @@ impl NormalizedDecision {
                     return Err(RefineError::CommittedArtifactMissing);
                 }
             }
+            _ => return Err(RefineError::UnsupportedDecisionKind),
         }
         Ok(Self { artifacts })
     }
@@ -210,9 +212,10 @@ impl NormalizedDecision {
     }
 }
 
-impl CanonicalEncode for NormalizedDecision {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
-        output.push(decision_tag(self.artifacts.kind));
+impl NormalizedDecision {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.push(decision_tag(self.artifacts.kind)?);
         put_optional_text(output, self.artifacts.reason_code.as_deref())?;
         for hash in [
             self.artifacts.profile_hash,
@@ -238,6 +241,13 @@ impl CanonicalEncode for NormalizedDecision {
         put_optional_blob(output, self.artifacts.outbox_plan_bytes.as_deref())?;
         put_blob(output, &self.artifacts.receipt_bytes)?;
         put_optional_blob(output, self.artifacts.bundle_bytes.as_deref())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -296,8 +306,9 @@ impl DecisionValidationBinding {
     }
 }
 
-impl CanonicalEncode for DecisionValidationBinding {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DecisionValidationBinding {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&REFINEMENT_PROTOCOL_VERSION.to_be_bytes());
         encode_candidate_bindings(self.bindings, output);
         output.extend_from_slice(self.pre_root.as_bytes());
@@ -305,6 +316,13 @@ impl CanonicalEncode for DecisionValidationBinding {
         output.extend_from_slice(&self.state_domain_version.to_be_bytes());
         output.extend_from_slice(&self.provider_id.code().to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -375,6 +393,7 @@ impl ValidatedNormalizedDecision {
                 }
                 NormalizedDecision::from_bundle(&bundle)?
             }
+            _ => return Err(RefineError::UnsupportedDecisionKind),
         };
         if rebuilt != untrusted {
             return Err(RefineError::ArtifactReconstructionMismatch);
@@ -405,10 +424,18 @@ impl ValidatedNormalizedDecision {
     }
 }
 
-impl CanonicalEncode for ValidatedNormalizedDecision {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValidatedNormalizedDecision {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_blob(output, &self.validation.canonical_bytes()?)?;
         put_blob(output, &self.decision.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -667,14 +694,14 @@ impl ValidatedRefinementCase {
             return Err(RefineError::ProviderBindingMismatch);
         }
         let input_hash = commitment::<H>(
-            refinement_domain("zeno-fcis/refinement-input")?,
+            zeno_fcis_codec::domains::REFINEMENT_INPUT,
             &model.validation().canonical_bytes()?,
         )?;
         let mut case_body = Vec::new();
         case_body.extend_from_slice(input_hash.as_bytes());
         put_blob(&mut case_body, &model.canonical_bytes()?)?;
         put_blob(&mut case_body, &runtime.canonical_bytes()?)?;
-        let case_id = commitment::<H>(refinement_domain("zeno-fcis/refinement-case")?, &case_body)?;
+        let case_id = commitment::<H>(zeno_fcis_codec::domains::REFINEMENT_CASE, &case_body)?;
         Ok(Self {
             case_id,
             input_hash,
@@ -726,12 +753,20 @@ impl ValidatedRefinementCase {
     }
 }
 
-impl CanonicalEncode for ValidatedRefinementCase {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValidatedRefinementCase {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.case_id.as_bytes());
         output.extend_from_slice(self.input_hash.as_bytes());
         put_blob(output, &self.model.canonical_bytes()?)?;
         put_blob(output, &self.runtime.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -786,7 +821,7 @@ impl ExhaustiveDomainManifest {
             empty_domain_claim,
         };
         manifest.manifest_id = commitment::<H>(
-            refinement_domain("zeno-fcis/exhaustive-domain")?,
+            zeno_fcis_codec::domains::EXHAUSTIVE_DOMAIN,
             &manifest.body_bytes()?,
         )?;
         Ok(manifest)
@@ -864,11 +899,19 @@ impl ExhaustiveDomainManifest {
     }
 }
 
-impl CanonicalEncode for ExhaustiveDomainManifest {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ExhaustiveDomainManifest {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.manifest_id.as_bytes());
         output.extend_from_slice(&self.body_bytes()?);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -897,12 +940,12 @@ pub enum CoverageMode {
 /// Formal or differential evidence kind.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
-pub enum ToolKind {
+pub enum EvidenceKind {
     /// Z3 theorem result.
     Z3 = 0,
     /// CVC5 theorem result.
     Cvc5 = 1,
-    /// Lean-checked theorem.
+    /// Declared Lean artifact; the selected external verifier must check it.
     Lean = 2,
     /// Kani bounded model-checking result.
     Kani = 3,
@@ -916,19 +959,24 @@ pub enum ToolKind {
     DomainEnumeration = 7,
 }
 
-/// One tool-bound proof artifact.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+/// One untrusted tool attestation with exact retained artifact bytes.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ToolEvidence {
-    kind: ToolKind,
+    kind: EvidenceKind,
     claim: Hash32,
-    artifact: Hash32,
+    artifact: EvidenceArtifact,
     toolchain: Hash32,
 }
 
 impl ToolEvidence {
-    /// Creates a content-bound tool result.
+    /// Pairs a declared claim and toolchain with an owned byte artifact.
     #[must_use]
-    pub const fn new(kind: ToolKind, claim: Hash32, artifact: Hash32, toolchain: Hash32) -> Self {
+    pub const fn new(
+        kind: EvidenceKind,
+        claim: Hash32,
+        artifact: EvidenceArtifact,
+        toolchain: Hash32,
+    ) -> Self {
         Self {
             kind,
             claim,
@@ -937,61 +985,83 @@ impl ToolEvidence {
         }
     }
 
-    /// Returns the evidence kind.
+    /// Returns the declared evidence kind.
     #[must_use]
-    pub const fn kind(self) -> ToolKind {
+    pub const fn kind(&self) -> EvidenceKind {
         self.kind
     }
 
-    /// Returns the proved claim.
+    /// Returns the declared claim.
     #[must_use]
-    pub const fn claim(self) -> Hash32 {
+    pub const fn claim(&self) -> Hash32 {
         self.claim
     }
 
-    /// Returns the artifact commitment.
+    /// Returns the computed artifact digest.
     #[must_use]
-    pub const fn artifact(self) -> Hash32 {
-        self.artifact
+    pub const fn artifact(&self) -> Hash32 {
+        self.artifact.digest()
     }
 
-    /// Returns the pinned toolchain commitment.
+    /// Borrows the exact retained artifact bytes.
     #[must_use]
-    pub const fn toolchain(self) -> Hash32 {
+    pub const fn artifact_bytes(&self) -> &[u8] {
+        self.artifact.bytes()
+    }
+
+    /// Returns the declared toolchain commitment.
+    #[must_use]
+    pub const fn toolchain(&self) -> Hash32 {
         self.toolchain
     }
 }
 
-impl CanonicalEncode for ToolEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ToolEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(self.kind as u8);
         output.extend_from_slice(self.claim.as_bytes());
-        output.extend_from_slice(self.artifact.as_bytes());
+        output.extend_from_slice(self.artifact.digest().as_bytes());
         output.extend_from_slice(self.toolchain.as_bytes());
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
-/// External verifier for formal/differential artifacts.
+/// External attester for formal/differential artifacts.
+/// The library checks the digest and bindings; the answer is not kernel proof.
 pub trait ProofVerifier {
     /// Returns the exact verifier implementation/configuration identity.
     fn verifier_hash(&self) -> Hash32;
 
-    /// Returns true only when the exact toolchain artifact establishes the claim.
-    fn verify(&self, evidence: ToolEvidence) -> bool;
+    /// Reports whether these exact bytes establish the declared claim.
+    fn verify(&self, evidence: &ToolEvidence, artifact: &[u8]) -> bool;
+}
+
+fn accepted_tool_evidence<H: CommitmentHasher, V: ProofVerifier>(
+    evidence: &ToolEvidence,
+    verifier: &V,
+) -> bool {
+    evidence.artifact.matches::<H>() && verifier.verify(evidence, evidence.artifact.bytes())
 }
 
 /// Fail-closed promotion requirements.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PromotionPolicy {
-    required_tools: Box<[ToolKind]>,
+    required_tools: Box<[EvidenceKind]>,
     require_exact_cases: bool,
 }
 
 impl PromotionPolicy {
     /// Creates a policy with a canonical, duplicate-free required-tool set.
     pub fn try_new(
-        mut required_tools: Vec<ToolKind>,
+        mut required_tools: Vec<EvidenceKind>,
         require_exact_cases: bool,
     ) -> Result<Self, RefineError> {
         required_tools.sort();
@@ -1008,7 +1078,7 @@ impl PromotionPolicy {
 
     /// Returns required evidence kinds.
     #[must_use]
-    pub const fn required_tools(&self) -> &[ToolKind] {
+    pub const fn required_tools(&self) -> &[EvidenceKind] {
         &self.required_tools
     }
 
@@ -1019,14 +1089,22 @@ impl PromotionPolicy {
     }
 }
 
-impl CanonicalEncode for PromotionPolicy {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl PromotionPolicy {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_length(output, self.required_tools.len())?;
         for kind in &self.required_tools {
             output.push(*kind as u8);
         }
         output.push(u8::from(self.require_exact_cases));
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1117,8 +1195,9 @@ pub enum ValidatedCoverage {
     },
 }
 
-impl CanonicalEncode for ValidatedCoverage {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValidatedCoverage {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Exhaustive {
                 manifest,
@@ -1139,6 +1218,13 @@ impl CanonicalEncode for ValidatedCoverage {
                 Ok(())
             }
         }
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1189,7 +1275,7 @@ impl ValidatedPromotionEvidence {
                     || cases
                         .iter()
                         .any(|case| case.provider_id() != manifest.provider_id())
-                    || coverage_evidence.kind() != ToolKind::DomainEnumeration
+                    || coverage_evidence.kind() != EvidenceKind::DomainEnumeration
                     || !manifest
                         .input_hashes()
                         .iter()
@@ -1245,8 +1331,9 @@ impl ValidatedPromotionEvidence {
     }
 }
 
-impl CanonicalEncode for ValidatedPromotionEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValidatedPromotionEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&REFINEMENT_PROTOCOL_VERSION.to_be_bytes());
         output.extend_from_slice(self.profile_hash.as_bytes());
         put_blob(output, &self.coverage.canonical_bytes()?)?;
@@ -1259,6 +1346,13 @@ impl CanonicalEncode for ValidatedPromotionEvidence {
             evidence.encode_to(output)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1294,16 +1388,25 @@ impl PromotionEvaluationContext {
     }
 }
 
-impl CanonicalEncode for PromotionEvaluationContext {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl PromotionEvaluationContext {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.source_revision.as_bytes());
         output.extend_from_slice(self.importer_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
 /// One fail-closed promotion blocker.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum PromotionBlocker {
     /// Legacy cases contain structurally normalized but unvalidated artifacts.
     UnvalidatedDecisionArtifacts,
@@ -1332,7 +1435,7 @@ pub enum PromotionBlocker {
     /// Policy-required tool evidence is absent or invalid.
     MissingToolEvidence {
         /// Required evidence kind.
-        kind: ToolKind,
+        kind: EvidenceKind,
     },
 }
 
@@ -1411,11 +1514,19 @@ impl ValidatedPromotionReport {
     }
 }
 
-impl CanonicalEncode for ValidatedPromotionReport {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValidatedPromotionReport {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.report_id.as_bytes());
         output.extend_from_slice(&validated_report_body(self)?);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1438,7 +1549,7 @@ impl PromotionReport {
 /// Cardinality-only exhaustive claims always fail closed. Use
 /// [`evaluate_validated_promotion`] for production promotion evidence.
 #[must_use]
-pub fn evaluate_promotion<V: ProofVerifier>(
+pub fn evaluate_promotion<H: CommitmentHasher, V: ProofVerifier>(
     policy: &PromotionPolicy,
     evidence: &PromotionEvidence,
     verifier: &V,
@@ -1478,12 +1589,9 @@ pub fn evaluate_promotion<V: ProofVerifier>(
             }
         }
         CoverageMode::ProofAssisted { theorem_claim } => {
-            if !evidence
-                .tools()
-                .iter()
-                .copied()
-                .any(|item| item.claim() == theorem_claim && verifier.verify(item))
-            {
+            if !evidence.tools().iter().any(|item| {
+                item.claim() == theorem_claim && accepted_tool_evidence::<H, V>(item, verifier)
+            }) {
                 blockers.push(PromotionBlocker::MissingTheoremEvidence);
             }
         }
@@ -1493,8 +1601,7 @@ pub fn evaluate_promotion<V: ProofVerifier>(
         if !evidence
             .tools()
             .iter()
-            .copied()
-            .any(|item| item.kind() == *kind && verifier.verify(item))
+            .any(|item| item.kind() == *kind && accepted_tool_evidence::<H, V>(item, verifier))
         {
             blockers.push(PromotionBlocker::MissingToolEvidence { kind: *kind });
         }
@@ -1551,23 +1658,20 @@ where
                 provider,
                 verifier.verifier_hash(),
             )?;
-            if coverage_evidence.kind() != ToolKind::DomainEnumeration
+            if coverage_evidence.kind() != EvidenceKind::DomainEnumeration
                 || coverage_evidence.claim() != claim
                 || coverage_evidence.toolchain() != manifest.toolchain_hash()
                 || coverage_evidence.artifact() == Hash32::ZERO
-                || !verifier.verify(*coverage_evidence)
+                || !accepted_tool_evidence::<H, V>(coverage_evidence, verifier)
             {
                 blockers.push(PromotionBlocker::MissingCoverageEvidence);
             }
         }
         ValidatedCoverage::Bounded { .. } => {}
         ValidatedCoverage::ProofAssisted { theorem_claim } => {
-            if !evidence
-                .tools()
-                .iter()
-                .copied()
-                .any(|item| item.claim() == *theorem_claim && verifier.verify(item))
-            {
+            if !evidence.tools().iter().any(|item| {
+                item.claim() == *theorem_claim && accepted_tool_evidence::<H, V>(item, verifier)
+            }) {
                 blockers.push(PromotionBlocker::MissingTheoremEvidence);
             }
         }
@@ -1579,25 +1683,24 @@ where
             ValidatedCoverage::Exhaustive {
                 coverage_evidence,
                 ..
-            } if coverage_evidence.kind() == *kind && verifier.verify(*coverage_evidence)
+            } if coverage_evidence.kind() == *kind && accepted_tool_evidence::<H, V>(coverage_evidence, verifier)
         );
         if !coverage_matches
             && !evidence
                 .tools()
                 .iter()
-                .copied()
-                .any(|item| item.kind() == *kind && verifier.verify(item))
+                .any(|item| item.kind() == *kind && accepted_tool_evidence::<H, V>(item, verifier))
         {
             blockers.push(PromotionBlocker::MissingToolEvidence { kind: *kind });
         }
     }
 
     let policy_hash = commitment::<H>(
-        refinement_domain("zeno-fcis/promotion-policy")?,
+        zeno_fcis_codec::domains::PROMOTION_POLICY,
         &policy.canonical_bytes()?,
     )?;
     let evidence_hash = commitment::<H>(
-        refinement_domain("zeno-fcis/promotion-evidence")?,
+        zeno_fcis_codec::domains::PROMOTION_EVIDENCE,
         &evidence.canonical_bytes()?,
     )?;
     let mut report = ValidatedPromotionReport {
@@ -1611,7 +1714,7 @@ where
         blockers: blockers.into_boxed_slice(),
     };
     report.report_id = commitment::<H>(
-        refinement_domain("zeno-fcis/promotion-report")?,
+        zeno_fcis_codec::domains::PROMOTION_REPORT,
         &validated_report_body(&report)?,
     )?;
     Ok(report)
@@ -1657,11 +1760,8 @@ pub fn exhaustive_coverage_claim<H: ApprovedCommitmentProvider>(
     context.encode_to(&mut body)?;
     body.extend_from_slice(&provider.provider_id().code().to_be_bytes());
     body.extend_from_slice(verifier_hash.as_bytes());
-    commitment::<H>(
-        refinement_domain("zeno-fcis/exhaustive-coverage-claim")?,
-        &body,
-    )
-    .map_err(RefineError::Encode)
+    commitment::<H>(zeno_fcis_codec::domains::EXHAUSTIVE_COVERAGE_CLAIM, &body)
+        .map_err(RefineError::Encode)
 }
 
 fn validated_report_body(report: &ValidatedPromotionReport) -> Result<Vec<u8>, EncodeError> {
@@ -1739,10 +1839,6 @@ fn mismatch_tag(mismatch: Mismatch) -> u8 {
     }
 }
 
-fn refinement_domain(name: &str) -> Result<Domain<'_>, EncodeError> {
-    Domain::new(name, REFINEMENT_PROTOCOL_VERSION)
-}
-
 fn encode_candidate_bindings(bindings: CandidateBindings, output: &mut Vec<u8>) {
     for hash in [
         bindings.profile_hash,
@@ -1784,15 +1880,19 @@ fn validate_reason(kind: DecisionKind, reason: Option<&str>) -> Result<(), Refin
         (DecisionKind::Accept, None)
         | (DecisionKind::Reject, Some(_))
         | (DecisionKind::CommittedFailure, Some(_)) => Ok(()),
-        _ => Err(RefineError::InvalidReasonCode),
+        (DecisionKind::Accept | DecisionKind::Reject | DecisionKind::CommittedFailure, _) => {
+            Err(RefineError::InvalidReasonCode)
+        }
+        _ => Err(RefineError::UnsupportedDecisionKind),
     }
 }
 
-fn decision_tag(kind: DecisionKind) -> u8 {
+fn decision_tag(kind: DecisionKind) -> Result<u8, EncodeError> {
     match kind {
-        DecisionKind::Accept => 0,
-        DecisionKind::Reject => 1,
-        DecisionKind::CommittedFailure => 2,
+        DecisionKind::Accept => Ok(0),
+        DecisionKind::Reject => Ok(1),
+        DecisionKind::CommittedFailure => Ok(2),
+        _ => Err(EncodeError::UnsupportedProtocolVariant("DecisionKind")),
     }
 }
 
@@ -1833,6 +1933,7 @@ fn put_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
 
 /// Decision normalization or promotion-evidence construction failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum RefineError {
     /// Reason is absent, present in the wrong decision, non-ASCII, empty, or too long.
     InvalidReasonCode,
@@ -1886,12 +1987,15 @@ pub enum RefineError {
     InvalidVerifierIdentity,
     /// More than one artifact claims the same evidence kind.
     DuplicateToolEvidence,
+    /// This protocol version does not support the decision kind.
+    UnsupportedDecisionKind,
 }
 
 impl fmt::Display for RefineError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidReasonCode => formatter.write_str("invalid decision reason code"),
+            Self::UnsupportedDecisionKind => formatter.write_str("unsupported decision kind"),
             Self::RejectedStateChanged => formatter.write_str("rejected decision changed state"),
             Self::RejectedCandidatePresent => {
                 formatter.write_str("rejected decision carried candidate artifacts")
@@ -1951,717 +2055,5 @@ impl fmt::Display for RefineError {
 impl From<EncodeError> for RefineError {
     fn from(error: EncodeError) -> Self {
         Self::Encode(error)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloc::vec;
-    #[cfg(feature = "libcrux")]
-    use zeno_fcis_crypto::LibcruxSha256;
-    use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
-    use zeno_fcis_patch::{CanonicalPatch, PatchOp, PathSegment, ValuePath};
-    use zeno_fcis_plan::{CommitPlan, OutboxPlan};
-    use zeno_fcis_receipt::{CandidateBuilder, RejectReceipt};
-
-    struct ExactVerifier(Hash32);
-
-    impl ProofVerifier for ExactVerifier {
-        fn verifier_hash(&self) -> Hash32 {
-            self.0
-        }
-
-        fn verify(&self, evidence: ToolEvidence) -> bool {
-            evidence.claim() == evidence.artifact() && evidence.toolchain() != Hash32::ZERO
-        }
-    }
-
-    fn hash(byte: u8) -> Hash32 {
-        Hash32::new([byte; 32])
-    }
-
-    fn provider() -> VerifiedProvider<RustCryptoSha256> {
-        verify_approved_provider::<RustCryptoSha256>()
-            .unwrap_or_else(|error| panic!("provider: {error}"))
-    }
-
-    fn domain() -> Domain<'static> {
-        Domain::new("test/refine-state", 1).unwrap_or_else(|error| panic!("domain: {error}"))
-    }
-
-    fn state() -> Value {
-        Value::record_canonical(Vec::new()).unwrap_or_else(|error| panic!("state: {error}"))
-    }
-
-    fn bindings(command: u8) -> CandidateBindings {
-        CandidateBindings {
-            profile_hash: hash(1),
-            command_hash: hash(command),
-            context_hash: hash(3),
-            precedence_hash: hash(4),
-            algorithm_hash: hash(5),
-            budget_hash: hash(6),
-        }
-    }
-
-    fn rejection(profile: Hash32, reason: &str) -> NormalizedDecision {
-        NormalizedDecision::try_new(DecisionArtifacts {
-            kind: DecisionKind::Reject,
-            reason_code: Some(Box::from(reason)),
-            profile_hash: profile,
-            command_hash: hash(2),
-            context_hash: hash(3),
-            precedence_hash: hash(4),
-            algorithm_hash: hash(5),
-            budget_hash: hash(6),
-            pre_root: hash(7),
-            post_root: hash(7),
-            candidate_id: None,
-            patch_bytes: None,
-            commit_plan_bytes: None,
-            outbox_plan_bytes: None,
-            receipt_bytes: vec![1].into_boxed_slice(),
-            bundle_bytes: None,
-        })
-        .unwrap_or_else(|error| panic!("decision: {error}"))
-    }
-
-    fn admitted_rejection(command: u8, reason: &str) -> NormalizedDecision {
-        let pre_state = state();
-        let pre_root = hash_value::<RustCryptoSha256>(domain(), &pre_state)
-            .unwrap_or_else(|error| panic!("root: {error}"));
-        let receipt = RejectReceipt::new(bindings(command), pre_root, reason)
-            .unwrap_or_else(|error| panic!("receipt: {error}"));
-        NormalizedDecision::from_reject(&receipt)
-            .unwrap_or_else(|error| panic!("normalize: {error}"))
-    }
-
-    fn validate_rejection(command: u8, reason: &str) -> ValidatedNormalizedDecision {
-        ValidatedNormalizedDecision::try_from_untrusted(
-            admitted_rejection(command, reason),
-            &state(),
-            domain(),
-            bindings(command),
-            DecisionValidationLimits::default(),
-            &provider(),
-        )
-        .unwrap_or_else(|error| panic!("validate: {error}"))
-    }
-
-    fn validated_case(command: u8, runtime_reason: &str) -> ValidatedRefinementCase {
-        ValidatedRefinementCase::try_new(
-            validate_rejection(command, "model_reason"),
-            validate_rejection(command, runtime_reason),
-            &provider(),
-        )
-        .unwrap_or_else(|error| panic!("case: {error}"))
-    }
-
-    fn admitted_bundle() -> (NormalizedDecision, CandidateBindings, Value) {
-        let pre_state = state();
-        let exact_bindings = bindings(2);
-        let pre_root = hash_value::<RustCryptoSha256>(domain(), &pre_state)
-            .unwrap_or_else(|error| panic!("root: {error}"));
-        let patch = CanonicalPatch::try_new(
-            1,
-            pre_root,
-            vec![PatchOp::Insert {
-                path: ValuePath::new(vec![PathSegment::Field(1)]),
-                map_key: None,
-                value: Value::U128(9),
-            }],
-        )
-        .unwrap_or_else(|error| panic!("patch: {error}"));
-        let bundle = CandidateBuilder::seal::<RustCryptoSha256>(
-            &pre_state,
-            domain(),
-            DecisionKind::Accept,
-            None,
-            exact_bindings,
-            patch,
-            CommitPlan::empty(),
-            OutboxPlan::empty(),
-        )
-        .unwrap_or_else(|error| panic!("bundle: {error}"));
-        (
-            NormalizedDecision::from_bundle(&bundle)
-                .unwrap_or_else(|error| panic!("normalize: {error}")),
-            exact_bindings,
-            pre_state,
-        )
-    }
-
-    fn exact_policy() -> PromotionPolicy {
-        PromotionPolicy::try_new(vec![ToolKind::DomainEnumeration], true)
-            .unwrap_or_else(|error| panic!("policy: {error}"))
-    }
-
-    fn exhaustive_report(
-        source_revision: Hash32,
-        importer_hash: Hash32,
-        verifier: &ExactVerifier,
-    ) -> ValidatedPromotionReport {
-        let exact_provider = provider();
-        let cases = vec![validated_case(2, "model_reason")];
-        let manifest = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            vec![cases[0].input_hash()],
-            None,
-            &exact_provider,
-        )
-        .unwrap_or_else(|error| panic!("manifest: {error}"));
-        let context = PromotionEvaluationContext::try_new(source_revision, importer_hash)
-            .unwrap_or_else(|error| panic!("context: {error}"));
-        let claim = exhaustive_coverage_claim::<RustCryptoSha256>(
-            &manifest,
-            &cases,
-            context,
-            &exact_provider,
-            verifier.verifier_hash(),
-        )
-        .unwrap_or_else(|error| panic!("claim: {error}"));
-        let evidence = ValidatedPromotionEvidence::try_new(
-            hash(1),
-            ValidatedCoverage::Exhaustive {
-                manifest: Box::new(manifest),
-                coverage_evidence: ToolEvidence::new(
-                    ToolKind::DomainEnumeration,
-                    claim,
-                    claim,
-                    hash(82),
-                ),
-            },
-            cases,
-            Vec::new(),
-        )
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
-        evaluate_validated_promotion::<RustCryptoSha256, _>(
-            &exact_policy(),
-            &evidence,
-            context,
-            &exact_provider,
-            verifier,
-        )
-        .unwrap_or_else(|error| panic!("promotion: {error}"))
-    }
-
-    #[test]
-    fn rejected_decisions_cannot_carry_candidates() {
-        let error = NormalizedDecision::try_new(DecisionArtifacts {
-            kind: DecisionKind::Reject,
-            reason_code: Some(Box::from("bad")),
-            profile_hash: hash(1),
-            command_hash: hash(2),
-            context_hash: hash(3),
-            precedence_hash: hash(4),
-            algorithm_hash: hash(5),
-            budget_hash: hash(6),
-            pre_root: hash(7),
-            post_root: hash(7),
-            candidate_id: Some(hash(8)),
-            patch_bytes: None,
-            commit_plan_bytes: None,
-            outbox_plan_bytes: None,
-            receipt_bytes: vec![1].into_boxed_slice(),
-            bundle_bytes: None,
-        });
-        assert_eq!(error, Err(RefineError::RejectedCandidatePresent));
-    }
-
-    #[test]
-    fn exact_comparison_reports_artifact_differences() {
-        let left = rejection(hash(1), "reason_a");
-        let right = rejection(hash(1), "reason_b");
-        assert_eq!(
-            compare_exact(&left, &right).mismatches(),
-            [Mismatch::ReasonCode]
-        );
-    }
-
-    #[test]
-    fn strict_reconstruction_rejects_fabricated_equal_decisions() {
-        let fabricated = rejection(hash(1), "fabricated");
-        assert!(compare_exact(&fabricated, &fabricated).is_exact());
-        let validated = ValidatedNormalizedDecision::try_from_untrusted(
-            fabricated,
-            &state(),
-            domain(),
-            bindings(2),
-            DecisionValidationLimits::default(),
-            &provider(),
-        );
-        assert!(matches!(validated, Err(RefineError::UnexpectedPreRoot)));
-    }
-
-    #[test]
-    fn strict_reconstruction_binds_exact_invocation_and_domain() {
-        let decision = admitted_rejection(2, "denied");
-        assert!(
-            ValidatedNormalizedDecision::try_from_untrusted(
-                decision.clone(),
-                &state(),
-                domain(),
-                bindings(2),
-                DecisionValidationLimits::default(),
-                &provider(),
-            )
-            .is_ok()
-        );
-        assert!(matches!(
-            ValidatedNormalizedDecision::try_from_untrusted(
-                decision.clone(),
-                &state(),
-                domain(),
-                bindings(9),
-                DecisionValidationLimits::default(),
-                &provider(),
-            ),
-            Err(RefineError::InvocationBindingMismatch)
-        ));
-        let wrong_domain =
-            Domain::new("test/other-state", 1).unwrap_or_else(|error| panic!("domain: {error}"));
-        assert!(matches!(
-            ValidatedNormalizedDecision::try_from_untrusted(
-                decision,
-                &state(),
-                wrong_domain,
-                bindings(2),
-                DecisionValidationLimits::default(),
-                &provider(),
-            ),
-            Err(RefineError::UnexpectedPreRoot)
-        ));
-    }
-
-    #[test]
-    fn every_committed_artifact_substitution_fails_reconstruction() {
-        let (decision, exact_bindings, pre_state) = admitted_bundle();
-        assert!(
-            ValidatedNormalizedDecision::try_from_untrusted(
-                decision.clone(),
-                &pre_state,
-                domain(),
-                exact_bindings,
-                DecisionValidationLimits::default(),
-                &provider(),
-            )
-            .is_ok()
-        );
-
-        let mut mutations = Vec::new();
-        let mut candidate = decision.artifacts().clone();
-        candidate.candidate_id = Some(hash(99));
-        mutations.push(candidate);
-        let mut pre_root = decision.artifacts().clone();
-        pre_root.pre_root = hash(99);
-        mutations.push(pre_root);
-        let mut post_root = decision.artifacts().clone();
-        post_root.post_root = hash(99);
-        mutations.push(post_root);
-        for select in 0..5 {
-            let mut artifact = decision.artifacts().clone();
-            let bytes = match select {
-                0 => artifact.patch_bytes.as_mut(),
-                1 => artifact.commit_plan_bytes.as_mut(),
-                2 => artifact.outbox_plan_bytes.as_mut(),
-                3 => Some(&mut artifact.receipt_bytes),
-                _ => artifact.bundle_bytes.as_mut(),
-            }
-            .unwrap_or_else(|| panic!("artifact {select}"));
-            let last = bytes.len().saturating_sub(1);
-            bytes[last] ^= 1;
-            mutations.push(artifact);
-        }
-
-        for mutation in mutations {
-            let untrusted = NormalizedDecision::try_new(mutation)
-                .unwrap_or_else(|error| panic!("untrusted shape: {error}"));
-            assert!(
-                ValidatedNormalizedDecision::try_from_untrusted(
-                    untrusted,
-                    &pre_state,
-                    domain(),
-                    exact_bindings,
-                    DecisionValidationLimits::default(),
-                    &provider(),
-                )
-                .is_err()
-            );
-        }
-    }
-
-    #[test]
-    fn legacy_bounded_evidence_remains_diagnostic_only() {
-        let profile = hash(1);
-        let model = rejection(profile, "reason");
-        let runtime = model.clone();
-        let case = RefinementCase::new(hash(2), hash(3), model, runtime);
-        let tools = vec![ToolEvidence::new(
-            ToolKind::RuntimeRefinement,
-            hash(4),
-            hash(4),
-            hash(5),
-        )];
-        let evidence = PromotionEvidence::try_new(
-            profile,
-            CoverageMode::Bounded { case_budget: 1 },
-            vec![case],
-            tools,
-        )
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
-        let policy = PromotionPolicy::try_new(vec![ToolKind::RuntimeRefinement], true)
-            .unwrap_or_else(|error| panic!("policy: {error}"));
-        assert_eq!(
-            evaluate_promotion(&policy, &evidence, &ExactVerifier(hash(90))).blockers(),
-            [PromotionBlocker::UnvalidatedDecisionArtifacts]
-        );
-    }
-
-    #[test]
-    fn legacy_cardinality_only_exhaustive_coverage_fails_closed() {
-        let model = rejection(hash(1), "reason");
-        let case = RefinementCase::new(hash(2), hash(3), model.clone(), model);
-        let evidence = PromotionEvidence::try_new(
-            hash(1),
-            CoverageMode::Exhaustive {
-                domain_hash: hash(44),
-                cardinality: 1,
-            },
-            vec![case],
-            Vec::new(),
-        )
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
-        assert!(matches!(
-            evaluate_promotion(
-                &PromotionPolicy::try_new(Vec::new(), true)
-                    .unwrap_or_else(|error| panic!("policy: {error}")),
-                &evidence,
-                &ExactVerifier(hash(90)),
-            )
-            .blockers(),
-            [
-                PromotionBlocker::UnvalidatedDecisionArtifacts,
-                PromotionBlocker::UnverifiedLegacyExhaustiveCoverage,
-            ]
-        ));
-    }
-
-    #[test]
-    fn duplicate_inputs_fail_even_when_derived_case_ids_differ() {
-        let exact = validated_case(2, "model_reason");
-        let mismatch = validated_case(2, "different_runtime_reason");
-        assert_ne!(exact.case_id(), mismatch.case_id());
-        assert_eq!(exact.input_hash(), mismatch.input_hash());
-        assert!(matches!(
-            ValidatedPromotionEvidence::try_new(
-                hash(1),
-                ValidatedCoverage::Bounded { case_budget: 2 },
-                vec![exact, mismatch],
-                Vec::new(),
-            ),
-            Err(RefineError::DuplicateCaseInput)
-        ));
-    }
-
-    #[test]
-    #[cfg(feature = "libcrux")]
-    fn validated_cases_cannot_cross_approved_provider_bindings() {
-        let model = validate_rejection(2, "model_reason");
-        let runtime = model.clone();
-        let other_provider = verify_approved_provider::<LibcruxSha256>()
-            .unwrap_or_else(|error| panic!("provider: {error}"));
-        assert!(matches!(
-            ValidatedRefinementCase::try_new(model, runtime, &other_provider),
-            Err(RefineError::ProviderBindingMismatch)
-        ));
-    }
-
-    #[test]
-    fn exhaustive_manifest_rejects_duplicate_and_reordered_members() {
-        let exact_provider = provider();
-        let duplicate = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            vec![hash(10), hash(10)],
-            None,
-            &exact_provider,
-        );
-        assert!(matches!(duplicate, Err(RefineError::InvalidDomainManifest)));
-        let reordered = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            vec![hash(11), hash(10)],
-            None,
-            &exact_provider,
-        );
-        assert!(matches!(reordered, Err(RefineError::InvalidDomainManifest)));
-    }
-
-    #[test]
-    fn exhaustive_evidence_rejects_missing_and_extra_members() {
-        let exact_provider = provider();
-        let cases = vec![
-            validated_case(2, "model_reason"),
-            validated_case(7, "model_reason"),
-        ];
-        let mut exact_inputs = cases
-            .iter()
-            .map(ValidatedRefinementCase::input_hash)
-            .collect::<Vec<_>>();
-        exact_inputs.sort();
-        let missing = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            vec![exact_inputs[0]],
-            None,
-            &exact_provider,
-        )
-        .unwrap_or_else(|error| panic!("manifest: {error}"));
-        assert!(matches!(
-            ValidatedPromotionEvidence::try_new(
-                hash(1),
-                ValidatedCoverage::Exhaustive {
-                    manifest: Box::new(missing),
-                    coverage_evidence: ToolEvidence::new(
-                        ToolKind::DomainEnumeration,
-                        hash(1),
-                        hash(1),
-                        hash(82),
-                    ),
-                },
-                cases.clone(),
-                Vec::new(),
-            ),
-            Err(RefineError::DomainCaseMismatch)
-        ));
-
-        let mut extra_inputs = exact_inputs;
-        extra_inputs.push(hash(200));
-        extra_inputs.sort();
-        let extra = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            extra_inputs,
-            None,
-            &exact_provider,
-        )
-        .unwrap_or_else(|error| panic!("manifest: {error}"));
-        assert!(matches!(
-            ValidatedPromotionEvidence::try_new(
-                hash(1),
-                ValidatedCoverage::Exhaustive {
-                    manifest: Box::new(extra),
-                    coverage_evidence: ToolEvidence::new(
-                        ToolKind::DomainEnumeration,
-                        hash(1),
-                        hash(1),
-                        hash(82),
-                    ),
-                },
-                cases,
-                Vec::new(),
-            ),
-            Err(RefineError::DomainCaseMismatch)
-        ));
-    }
-
-    #[test]
-    fn exhaustive_promotion_requires_exact_independent_coverage_evidence() {
-        let verifier = ExactVerifier(hash(90));
-        let report = exhaustive_report(hash(91), hash(92), &verifier);
-        assert!(report.is_promotable());
-
-        let exact_provider = provider();
-        let cases = vec![validated_case(2, "model_reason")];
-        let manifest = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            vec![cases[0].input_hash()],
-            None,
-            &exact_provider,
-        )
-        .unwrap_or_else(|error| panic!("manifest: {error}"));
-        let context = PromotionEvaluationContext::try_new(hash(91), hash(92))
-            .unwrap_or_else(|error| panic!("context: {error}"));
-        let evidence = ValidatedPromotionEvidence::try_new(
-            hash(1),
-            ValidatedCoverage::Exhaustive {
-                manifest: Box::new(manifest),
-                coverage_evidence: ToolEvidence::new(
-                    ToolKind::DomainEnumeration,
-                    hash(93),
-                    hash(93),
-                    hash(82),
-                ),
-            },
-            cases,
-            Vec::new(),
-        )
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
-        let rejected = evaluate_validated_promotion::<RustCryptoSha256, _>(
-            &exact_policy(),
-            &evidence,
-            context,
-            &exact_provider,
-            &verifier,
-        )
-        .unwrap_or_else(|error| panic!("promotion: {error}"));
-        assert!(
-            rejected
-                .blockers()
-                .contains(&PromotionBlocker::MissingCoverageEvidence)
-        );
-    }
-
-    #[test]
-    fn empty_domain_requires_explicit_verified_declaration() {
-        let exact_provider = provider();
-        assert!(matches!(
-            ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-                hash(1),
-                hash(80),
-                hash(81),
-                hash(82),
-                Vec::new(),
-                None,
-                &exact_provider,
-            ),
-            Err(RefineError::InvalidDomainManifest)
-        ));
-        let manifest = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            Vec::new(),
-            Some(hash(83)),
-            &exact_provider,
-        )
-        .unwrap_or_else(|error| panic!("manifest: {error}"));
-        let verifier = ExactVerifier(hash(90));
-        let context = PromotionEvaluationContext::try_new(hash(91), hash(92))
-            .unwrap_or_else(|error| panic!("context: {error}"));
-        let claim = exhaustive_coverage_claim::<RustCryptoSha256>(
-            &manifest,
-            &[],
-            context,
-            &exact_provider,
-            verifier.verifier_hash(),
-        )
-        .unwrap_or_else(|error| panic!("claim: {error}"));
-        let evidence = ValidatedPromotionEvidence::try_new(
-            hash(1),
-            ValidatedCoverage::Exhaustive {
-                manifest: Box::new(manifest),
-                coverage_evidence: ToolEvidence::new(
-                    ToolKind::DomainEnumeration,
-                    claim,
-                    claim,
-                    hash(82),
-                ),
-            },
-            Vec::new(),
-            Vec::new(),
-        )
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
-        let report = evaluate_validated_promotion::<RustCryptoSha256, _>(
-            &exact_policy(),
-            &evidence,
-            context,
-            &exact_provider,
-            &verifier,
-        )
-        .unwrap_or_else(|error| panic!("promotion: {error}"));
-        assert!(report.is_promotable());
-    }
-
-    #[test]
-    fn report_identity_binds_source_importer_and_verifier() {
-        let first = exhaustive_report(hash(91), hash(92), &ExactVerifier(hash(90)));
-        let changed_source = exhaustive_report(hash(93), hash(92), &ExactVerifier(hash(90)));
-        let changed_importer = exhaustive_report(hash(91), hash(94), &ExactVerifier(hash(90)));
-        let changed_verifier = exhaustive_report(hash(91), hash(92), &ExactVerifier(hash(95)));
-        assert_ne!(first.report_id(), changed_source.report_id());
-        assert_ne!(first.report_id(), changed_importer.report_id());
-        assert_ne!(first.report_id(), changed_verifier.report_id());
-    }
-
-    #[test]
-    fn unidentified_verifier_cannot_issue_a_promotion_report() {
-        let exact_provider = provider();
-        let manifest = ExhaustiveDomainManifest::try_new::<RustCryptoSha256>(
-            hash(1),
-            hash(80),
-            hash(81),
-            hash(82),
-            Vec::new(),
-            Some(hash(83)),
-            &exact_provider,
-        )
-        .unwrap_or_else(|error| panic!("manifest: {error}"));
-        let evidence = ValidatedPromotionEvidence::try_new(
-            hash(1),
-            ValidatedCoverage::Exhaustive {
-                manifest: Box::new(manifest),
-                coverage_evidence: ToolEvidence::new(
-                    ToolKind::DomainEnumeration,
-                    hash(84),
-                    hash(84),
-                    hash(82),
-                ),
-            },
-            Vec::new(),
-            Vec::new(),
-        )
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
-        assert!(matches!(
-            evaluate_validated_promotion::<RustCryptoSha256, _>(
-                &exact_policy(),
-                &evidence,
-                PromotionEvaluationContext::try_new(hash(91), hash(92))
-                    .unwrap_or_else(|error| panic!("context: {error}")),
-                &exact_provider,
-                &ExactVerifier(Hash32::ZERO),
-            ),
-            Err(RefineError::InvalidVerifierIdentity)
-        ));
-    }
-
-    #[test]
-    fn proof_assisted_promotion_requires_theorem_evidence() {
-        let profile = hash(1);
-        let theorem = hash(9);
-        let evidence = PromotionEvidence::try_new(
-            profile,
-            CoverageMode::ProofAssisted {
-                theorem_claim: theorem,
-            },
-            Vec::new(),
-            Vec::new(),
-        )
-        .unwrap_or_else(|error| panic!("evidence: {error}"));
-        let policy = PromotionPolicy::try_new(Vec::new(), false)
-            .unwrap_or_else(|error| panic!("policy: {error}"));
-        assert!(matches!(
-            evaluate_promotion(&policy, &evidence, &ExactVerifier(hash(90))).blockers(),
-            [
-                PromotionBlocker::UnvalidatedDecisionArtifacts,
-                PromotionBlocker::MissingTheoremEvidence,
-            ]
-        ));
     }
 }

@@ -5,7 +5,7 @@
 //! [`BackendVerifier`] decides whether the response earns a certificate.
 
 #[cfg(feature = "backend")]
-use zeno_fcis::prelude::*;
+use zeno_fcis::legacy::prelude::*;
 
 /// Executes one mounted engine request and requires a separate verifier.
 ///
@@ -43,9 +43,9 @@ fn main() -> Result<(), BackendError> {
         example_hash(1), // stable request identity
         example_hash(2), // exact ProjectProfile commitment
         BackendOperation::Verify,
-        example_hash(3), // reviewed specification commitment
-        example_hash(4), // authenticated context commitment
-        Value::U128(7),  // closed canonical input
+        example_hash(3),    // reviewed specification commitment
+        example_hash(4),    // authenticated context commitment
+        Value::unsigned(7), // closed canonical input
         limits,
     )?;
 

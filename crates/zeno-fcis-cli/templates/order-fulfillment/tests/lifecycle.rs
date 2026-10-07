@@ -1,6 +1,5 @@
 use order_fulfillment::{
-    Authority, Shell, authority, command, create, delivery::Destination, generated::*, invoke,
-    journey,
+    Authority, Shell, authority, command, create, generated::*, invoke, journey,
 };
 use std::{
     fs,
@@ -29,8 +28,8 @@ impl Drop for Temp {
 
 /// Sends one command and returns the outcome.
 fn send(
-    shell: &mut Shell,
-    authority: &Authority,
+    shell: &mut Shell<'_, '_>,
+    authority: &Authority<'_>,
     action: OrderAction,
     callback_attempt: i128,
     caller: Caller,
@@ -65,13 +64,10 @@ fn complete_order_journey() {
 #[test]
 fn a_late_decline_cannot_decline_a_newer_attempt() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("order.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = order_fulfillment::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("order.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -132,20 +128,17 @@ fn a_late_decline_cannot_decline_a_newer_attempt() {
         ),
         "Accept"
     );
-    let order = Order::try_from_value(shell.snapshot().unwrap().state().clone()).unwrap();
+    let order = order_fulfillment::decode_state(shell.snapshot().unwrap().state()).unwrap();
     assert_eq!(order.status, OrderStatus::Paid);
 }
 
 #[test]
 fn a_repeated_capture_queues_no_second_shipping_request() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("order.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = order_fulfillment::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("order.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -182,19 +175,16 @@ fn a_repeated_capture_queues_no_second_shipping_request() {
         "Reject"
     );
     let snapshot = shell.snapshot().unwrap();
-    assert_eq!((snapshot.bundle_count(), snapshot.pending_outbox()), (2, 2));
+    assert_eq!((snapshot.version(), snapshot.pending()), (2, 2));
 }
 
 #[test]
 fn cancelling_while_awaiting_payment_voids_that_attempt() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let shell = &mut create(
-        &temp.0.join("order.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = order_fulfillment::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let shell = &mut create(&temp.0.join("order.sqlite"), &authority).unwrap();
     assert_eq!(
         send(
             shell,
@@ -231,7 +221,7 @@ fn cancelling_while_awaiting_payment_voids_that_attempt() {
         "Reject"
     );
     let snapshot = shell.snapshot().unwrap();
-    let order = Order::try_from_value(snapshot.state().clone()).unwrap();
+    let order = order_fulfillment::decode_state(snapshot.state()).unwrap();
     assert_eq!(order.status, OrderStatus::Cancelled);
-    assert_eq!((snapshot.bundle_count(), snapshot.pending_outbox()), (2, 2));
+    assert_eq!((snapshot.version(), snapshot.pending()), (2, 2));
 }

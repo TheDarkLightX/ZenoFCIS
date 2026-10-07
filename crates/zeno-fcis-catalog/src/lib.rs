@@ -20,7 +20,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::DecisionKind;
 use zeno_fcis_plan::{CommitPlan, Effect, OutboxEntry, OutboxPlan};
 use zeno_fcis_project::{
@@ -71,10 +71,18 @@ impl NonZeroHash {
     }
 }
 
-impl CanonicalEncode for NonZeroHash {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl NonZeroHash {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.0.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -109,8 +117,9 @@ impl HashRequirement {
     }
 }
 
-impl CanonicalEncode for HashRequirement {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl HashRequirement {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Any => output.push(0),
             Self::Absent => output.push(1),
@@ -121,6 +130,13 @@ impl CanonicalEncode for HashRequirement {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -148,10 +164,18 @@ pub enum ValueFlowKind {
     Custom = 8,
 }
 
-impl CanonicalEncode for ValueFlowKind {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValueFlowKind {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -211,8 +235,9 @@ impl ValueFlow {
     }
 }
 
-impl CanonicalEncode for ValueFlow {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ValueFlow {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.kind.encode_to(output)?;
         self.asset_domain.encode_to(output)?;
         match self.custom_claim {
@@ -224,6 +249,13 @@ impl CanonicalEncode for ValueFlow {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -283,8 +315,9 @@ impl OperationSemantics {
     }
 }
 
-impl CanonicalEncode for OperationSemantics {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl OperationSemantics {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(u8::from(self.is_value_moving()));
         if self.is_value_moving() {
             put_length(output, self.flows.len())?;
@@ -293,6 +326,13 @@ impl CanonicalEncode for OperationSemantics {
             }
         }
         self.classification_hash.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -308,15 +348,24 @@ pub enum CommitEffectSemantics {
     EvidenceOnly = 0,
 }
 
-impl CanonicalEncode for CommitEffectSemantics {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CommitEffectSemantics {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
 /// Decision class to which a stable reason belongs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ReasonDisposition {
     /// Ordinary rejection with no candidate or authoritative transition.
     Reject,
@@ -334,13 +383,21 @@ impl ReasonDisposition {
     }
 }
 
-impl CanonicalEncode for ReasonDisposition {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ReasonDisposition {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(match self {
             Self::Reject => 0,
             Self::CommittedFailure => 1,
         });
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -404,17 +461,28 @@ impl ReasonDefinition {
 
     /// Computes the definition commitment used by the project registry entry.
     pub fn definition_hash<H: CommitmentHasher>(&self) -> Result<Hash32, CatalogError> {
-        hash_canonical::<H>("zeno-fcis/reason-definition", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::REASON_DEFINITION,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for ReasonDefinition {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ReasonDefinition {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.id.encode_to(output)?;
         self.name.encode_to(output)?;
         self.disposition.encode_to(output)?;
         output.extend_from_slice(&self.precedence.to_be_bytes());
         self.predicate_hash.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -504,12 +572,16 @@ impl EffectDefinition {
 
     /// Computes the definition commitment used by the project registry entry.
     pub fn definition_hash<H: CommitmentHasher>(&self) -> Result<Hash32, CatalogError> {
-        hash_canonical::<H>("zeno-fcis/effect-definition", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::EFFECT_DEFINITION,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for EffectDefinition {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl EffectDefinition {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.id.encode_to(output)?;
         self.name.encode_to(output)?;
         output.extend_from_slice(&self.payload_type.get().to_be_bytes());
@@ -518,6 +590,13 @@ impl CanonicalEncode for EffectDefinition {
         self.commit_semantics.encode_to(output)?;
         self.semantics.encode_to(output)?;
         self.policy_hash.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -590,18 +669,29 @@ impl ChannelDefinition {
 
     /// Computes the definition commitment used by the project registry entry.
     pub fn definition_hash<H: CommitmentHasher>(&self) -> Result<Hash32, CatalogError> {
-        hash_canonical::<H>("zeno-fcis/channel-definition", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::CHANNEL_DEFINITION,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for ChannelDefinition {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ChannelDefinition {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.id.encode_to(output)?;
         self.name.encode_to(output)?;
         output.extend_from_slice(&self.destination_type.get().to_be_bytes());
         output.extend_from_slice(&self.payload_type.get().to_be_bytes());
         self.semantics.encode_to(output)?;
         self.delivery_policy_hash.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -631,10 +721,14 @@ impl CatalogManifest {
         let channels = normalize_channels(channels)?;
 
         let precedence_hash = reason_registry_hash::<H>(&reasons)?;
-        let effect_registry_hash =
-            definition_registry_hash::<H, _>("zeno-fcis/effect-registry", &effects)?;
-        let channel_registry_hash =
-            definition_registry_hash::<H, _>("zeno-fcis/channel-registry", &channels)?;
+        let effect_registry_hash = definition_registry_hash::<H>(
+            zeno_fcis_codec::domains::EFFECT_REGISTRY,
+            effects.iter().map(|item| item.canonical_bytes()),
+        )?;
+        let channel_registry_hash = definition_registry_hash::<H>(
+            zeno_fcis_codec::domains::CHANNEL_REGISTRY,
+            channels.iter().map(|item| item.canonical_bytes()),
+        )?;
         let mut entries = Vec::with_capacity(reasons.len() + effects.len() + channels.len());
         for reason in &reasons {
             entries.push(
@@ -763,21 +857,41 @@ impl CatalogManifest {
         if self.hash_algorithm_id() != H::ALGORITHM_ID {
             return Err(CatalogError::HashAlgorithmMismatch);
         }
-        hash_canonical::<H>("zeno-fcis/catalog-manifest", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::CATALOG_MANIFEST,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for CatalogManifest {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CatalogManifest {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-CATALOG-MANIFEST\0");
         output.extend_from_slice(&CATALOG_FORMAT_VERSION.to_be_bytes());
         put_blob(output, self.hash_algorithm_id.as_bytes())?;
         output.extend_from_slice(self.precedence_hash.as_bytes());
         output.extend_from_slice(self.effect_registry_hash.as_bytes());
         output.extend_from_slice(self.channel_registry_hash.as_bytes());
-        put_definitions(output, &self.reasons)?;
-        put_definitions(output, &self.effects)?;
-        put_definitions(output, &self.channels)
+        put_definitions(
+            output,
+            self.reasons.iter().map(|item| item.canonical_bytes()),
+        )?;
+        put_definitions(
+            output,
+            self.effects.iter().map(|item| item.canonical_bytes()),
+        )?;
+        put_definitions(
+            output,
+            self.channels.iter().map(|item| item.canonical_bytes()),
+        )
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -894,8 +1008,9 @@ impl Default for CatalogLimits {
     }
 }
 
-impl CanonicalEncode for CatalogLimits {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CatalogLimits {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.max_effects.to_be_bytes());
         output.extend_from_slice(&self.max_outbox_entries.to_be_bytes());
         output.extend_from_slice(&self.max_value_depth.to_be_bytes());
@@ -904,6 +1019,13 @@ impl CanonicalEncode for CatalogLimits {
         output.extend_from_slice(&self.max_total_payload_bytes.to_be_bytes());
         output.extend_from_slice(&self.max_collection_len.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -949,14 +1071,22 @@ impl CatalogMetrics {
     }
 }
 
-impl CanonicalEncode for CatalogMetrics {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CatalogMetrics {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.effects.to_be_bytes());
         output.extend_from_slice(&self.outbox_entries.to_be_bytes());
         output.extend_from_slice(&self.value_nodes.to_be_bytes());
         output.extend_from_slice(&self.payload_bytes.to_be_bytes());
         output.extend_from_slice(&self.maximum_depth.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1165,7 +1295,10 @@ impl ProjectCatalog {
         if self.manifest.hash_algorithm_id() != H::ALGORITHM_ID {
             return Err(CatalogError::HashAlgorithmMismatch);
         }
-        hash_canonical::<H>("zeno-fcis/project-catalog", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::PROJECT_CATALOG,
+            (self).canonical_bytes(),
+        )
     }
 
     fn validate_effect(
@@ -1266,14 +1399,22 @@ impl ProjectCatalog {
     }
 }
 
-impl CanonicalEncode for ProjectCatalog {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ProjectCatalog {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT-CATALOG\0");
         output.extend_from_slice(&CATALOG_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.profile_hash.as_bytes());
         output.extend_from_slice(self.schema_hash.as_bytes());
         put_blob(output, &self.manifest.canonical_bytes()?)?;
         self.limits.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1376,12 +1517,12 @@ fn reason_registry_hash<H: CommitmentHasher>(
     for reason in ordered {
         put_blob(&mut bytes, &reason.canonical_bytes()?)?;
     }
-    hash_bytes::<H>("zeno-fcis/reason-registry", &bytes)
+    hash_bytes::<H>(zeno_fcis_codec::domains::REASON_REGISTRY, &bytes)
 }
 
-fn definition_registry_hash<H: CommitmentHasher, T: CanonicalEncode>(
-    domain: &'static str,
-    definitions: &[T],
+fn definition_registry_hash<H: CommitmentHasher>(
+    domain: Domain<'static>,
+    definitions: impl ExactSizeIterator<Item = Result<Vec<u8>, EncodeError>>,
 ) -> Result<Hash32, CatalogError> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&CATALOG_FORMAT_VERSION.to_be_bytes());
@@ -1478,18 +1619,17 @@ fn add_value_metrics(
 }
 
 fn hash_canonical<H: CommitmentHasher>(
-    domain: &'static str,
-    value: &impl CanonicalEncode,
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, CatalogError> {
-    let bytes = value.canonical_bytes().map_err(CatalogError::Encode)?;
+    let bytes = value.map_err(CatalogError::Encode)?;
     hash_bytes::<H>(domain, &bytes)
 }
 
 fn hash_bytes<H: CommitmentHasher>(
-    domain: &'static str,
+    domain: Domain<'static>,
     bytes: &[u8],
 ) -> Result<Hash32, CatalogError> {
-    let domain = Domain::new(domain, CATALOG_FORMAT_VERSION).map_err(CatalogError::Encode)?;
     let hash = commitment::<H>(domain, bytes).map_err(CatalogError::Encode)?;
     if hash == Hash32::ZERO {
         Err(CatalogError::ZeroDerivedCommitment)
@@ -1498,13 +1638,13 @@ fn hash_bytes<H: CommitmentHasher>(
     }
 }
 
-fn put_definitions<T: CanonicalEncode>(
+fn put_definitions(
     output: &mut Vec<u8>,
-    definitions: &[T],
+    definitions: impl ExactSizeIterator<Item = Result<Vec<u8>, EncodeError>>,
 ) -> Result<(), EncodeError> {
     put_length(output, definitions.len())?;
     for definition in definitions {
-        put_blob(output, &definition.canonical_bytes()?)?;
+        put_blob(output, &definition?)?;
     }
     Ok(())
 }
@@ -1523,6 +1663,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 
 /// Catalog construction or plan-admission failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CatalogError {
     /// A caller supplied the all-zero commitment where absence was not permitted.
     ZeroCommitment,
@@ -1811,26 +1952,7 @@ mod tests {
     use zeno_fcis_project::{DomainPrefix, ProfileBindings};
     use zeno_fcis_schema::{SchemaLimits, TypeDef, TypeKind};
 
-    #[derive(Clone, Copy, Debug)]
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test/catalog/1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(byte)
-                    .rotate_left((index % 7) as u32);
-            }
-            if output == [0_u8; 32] {
-                output[0] = 1;
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
     fn hash(byte: u8) -> Hash32 {
         Hash32::new([byte; 32])
@@ -2256,7 +2378,7 @@ mod tests {
             20,
             hash(50),
             Hash32::ZERO,
-            Value::U128(50),
+            Value::unsigned(50),
         )])
         .unwrap_or_else(|error| panic!("commit: {error}"));
         let outbox = OutboxPlan::try_new(vec![OutboxEntry::new(
@@ -2264,7 +2386,7 @@ mod tests {
             30,
             Value::text_ascii(String::from("mail"))
                 .unwrap_or_else(|error| panic!("destination: {error}")),
-            Value::Bool(true),
+            Value::boolean(true),
         )])
         .unwrap_or_else(|error| panic!("outbox: {error}"));
         let metrics = catalog
@@ -2283,7 +2405,7 @@ mod tests {
             999,
             hash(50),
             Hash32::ZERO,
-            Value::U128(50),
+            Value::unsigned(50),
         )])
         .unwrap_or_else(|error| panic!("commit: {error}"));
         assert_eq!(
@@ -2299,7 +2421,7 @@ mod tests {
             20,
             Hash32::ZERO,
             Hash32::ZERO,
-            Value::U128(50),
+            Value::unsigned(50),
         )])
         .unwrap_or_else(|error| panic!("commit: {error}"));
         assert_eq!(
@@ -2318,7 +2440,7 @@ mod tests {
             20,
             hash(50),
             hash(51),
-            Value::U128(50),
+            Value::unsigned(50),
         )])
         .unwrap_or_else(|error| panic!("commit: {error}"));
         assert_eq!(
@@ -2337,7 +2459,7 @@ mod tests {
             20,
             hash(50),
             Hash32::ZERO,
-            Value::Bool(true),
+            Value::boolean(true),
         )])
         .unwrap_or_else(|error| panic!("commit: {error}"));
         assert!(matches!(
@@ -2366,8 +2488,9 @@ mod tests {
 
     #[test]
     fn channels_fail_closed_for_unknown_ids_and_wrong_shapes() {
-        let unknown = OutboxPlan::try_new(vec![OutboxEntry::new(1, 999, Value::Unit, Value::Unit)])
-            .unwrap_or_else(|error| panic!("unknown outbox: {error}"));
+        let unknown =
+            OutboxPlan::try_new(vec![OutboxEntry::new(1, 999, Value::unit(), Value::unit())])
+                .unwrap_or_else(|error| panic!("unknown outbox: {error}"));
         assert_eq!(
             catalog().validate_outbox_plan(&unknown),
             Err(CatalogError::UnknownChannel(999))
@@ -2376,8 +2499,8 @@ mod tests {
         let wrong_destination = OutboxPlan::try_new(vec![OutboxEntry::new(
             2,
             30,
-            Value::Bool(true),
-            Value::Bool(true),
+            Value::boolean(true),
+            Value::boolean(true),
         )])
         .unwrap_or_else(|error| panic!("destination outbox: {error}"));
         assert!(matches!(
@@ -2394,7 +2517,7 @@ mod tests {
             30,
             Value::text_ascii(String::from("mail"))
                 .unwrap_or_else(|error| panic!("destination: {error}")),
-            Value::U128(1),
+            Value::unsigned(1),
         )])
         .unwrap_or_else(|error| panic!("payload outbox: {error}"));
         assert!(matches!(
@@ -2422,14 +2545,14 @@ mod tests {
                 30,
                 Value::text_ascii(String::from("one"))
                     .unwrap_or_else(|error| panic!("first destination: {error}")),
-                Value::Bool(true),
+                Value::boolean(true),
             ),
             OutboxEntry::new(
                 2,
                 30,
                 Value::text_ascii(String::from("two"))
                     .unwrap_or_else(|error| panic!("second destination: {error}")),
-                Value::Bool(false),
+                Value::boolean(false),
             ),
         ])
         .unwrap_or_else(|error| panic!("outbox: {error}"));

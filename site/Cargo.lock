@@ -21,6 +21,7 @@ dependencies = [
  "zeno-fcis-schema",
  "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -44,6 +45,7 @@ dependencies = [
  "zeno-fcis-schema",
  "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -82,6 +84,7 @@ dependencies = [
  "zeno-fcis-schema",
  "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -142,6 +145,7 @@ dependencies = [
  "zeno-fcis-schema",
  "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -183,6 +187,7 @@ dependencies = [
  "zeno-fcis-schema",
  "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -300,6 +305,7 @@ dependencies = [
  "zeno-fcis-schema",
  "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
  "zeno-fcis-value",
 ]
@@ -310,15 +316,19 @@ version = "1.1.0"
 dependencies = [
  "zeno-fcis-catalog",
  "zeno-fcis-codec",
+ "zeno-fcis-compose",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
  "zeno-fcis-laws",
  "zeno-fcis-patch",
+ "zeno-fcis-plan",
  "zeno-fcis-project",
  "zeno-fcis-receipt",
  "zeno-fcis-schema",
  "zeno-fcis-shell",
+ "zeno-fcis-synthesis",
  "zeno-fcis-transition",
+ "zeno-fcis-value",
 ]
 
 [[package]]
@@ -349,6 +359,7 @@ dependencies = [
 name = "zeno-fcis-codec"
 version = "1.1.0"
 dependencies = [
+ "sha2",
  "zeno-fcis-value",
 ]
 
@@ -377,7 +388,6 @@ version = "1.1.0"
 name = "zeno-fcis-crypto"
 version = "1.1.0"
 dependencies = [
- "sha2",
  "zeno-fcis-codec",
 ]
 
@@ -538,6 +548,16 @@ name = "zeno-fcis-spec"
 version = "1.1.0"
 dependencies = [
  "zeno-fcis-codec",
+]
+
+[[package]]
+name = "zeno-fcis-synthesis"
+version = "1.1.0"
+dependencies = [
+ "zeno-fcis-codec",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-value",
 ]
 
 [[package]]

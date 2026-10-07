@@ -1,140 +1,36 @@
 use alloc::{vec, vec::Vec};
-use zeno_fcis_value::Value;
+use zeno_fcis_codec::EncodeError;
+use zeno_fcis_value::{Value, ValueLimits};
 
 use super::Error;
+use super::evaluation::admission::{self, AdmissionFailure};
+use super::evaluation::{self, Failure};
+
+pub use super::evaluation::{Domain, MAX_FIELDS, MAX_NODES, Op};
 
 /// Versioned eager, acyclic, checked-i64 semantic profile.
 pub const PROFILE: &str = "zeno-fcis/finite-i64/1";
-/// Maximum nodes in either an implementation or a relation.
-pub const MAX_NODES: usize = 256;
-/// Maximum fields on either side of a synthesis relation.
-pub const MAX_FIELDS: usize = 16;
-
-/// Closed scalar domain. Boolean wire values are exactly the integers 0 and 1.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Domain {
-    /// Logical values, distinct from integers during type checking.
-    Bool,
-    /// Inclusive integer bounds.
-    Int {
-        /// Smallest admitted value.
-        min: i64,
-        /// Largest admitted value.
-        max: i64,
-    },
-}
 
 impl Domain {
-    /// Returns the inclusive wire bounds.
-    #[must_use]
-    pub const fn bounds(self) -> (i64, i64) {
-        match self {
-            Self::Bool => (0, 1),
-            Self::Int { min, max } => (min, max),
-        }
-    }
-    pub(super) fn valid(self) -> bool {
-        let (min, max) = self.bounds();
-        min <= max
-    }
-    pub(super) fn boolean(self) -> bool {
-        matches!(self, Self::Bool)
-    }
-    /// Checks an exact wire scalar against this domain.
-    #[must_use]
-    pub fn contains(self, value: i64) -> bool {
-        let (min, max) = self.bounds();
-        value >= min && value <= max
-    }
-    pub(super) fn value(self) -> Value {
+    pub(super) fn value(self) -> Result<Value, EncodeError> {
         let (min, max) = self.bounds();
         tuple(vec![
-            Value::Bool(self.boolean()),
-            Value::I128(min.into()),
-            Value::I128(max.into()),
+            Value::boolean(self.boolean()),
+            Value::signed(min.into()),
+            Value::signed(max.into()),
         ])
     }
 }
 
-/// One typed instruction. Node operands refer strictly to earlier instructions.
-/// Evaluation is eager, including both arms of `Select`; every add/sub is checked.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Op {
-    /// Read a declared input by its zero-based position.
-    Input(u16),
-    /// An integer constant.
-    Int(i64),
-    /// A Boolean constant.
-    Bool(bool),
-    /// Checked signed addition.
-    Add(u16, u16),
-    /// Checked signed subtraction.
-    Sub(u16, u16),
-    /// Equality between values of the same scalar kind.
-    Eq(u16, u16),
-    /// Signed integer less-than.
-    Lt(u16, u16),
-    /// Boolean conjunction.
-    And(u16, u16),
-    /// Boolean negation.
-    Not(u16),
-    /// Select between equal-kind values using a Boolean condition.
-    Select(u16, u16, u16),
-}
-
 impl Op {
     pub(super) fn kind(&self, inputs: &[Domain], previous: &[bool]) -> Result<bool, Error> {
-        let node = |id: u16| {
-            previous
-                .get(usize::from(id))
-                .copied()
-                .ok_or(Error::Invalid("node-reference"))
-        };
-        let require = |actual: bool, expected: bool| {
-            if actual == expected {
-                Ok(())
-            } else {
-                Err(Error::Invalid("type-mismatch"))
-            }
-        };
-        match *self {
-            Self::Input(id) => inputs
-                .get(usize::from(id))
-                .map(|d| d.boolean())
-                .ok_or(Error::Invalid("input-reference")),
-            Self::Int(_) => Ok(false),
-            Self::Bool(_) => Ok(true),
-            Self::Add(a, b) | Self::Sub(a, b) | Self::Lt(a, b) => {
-                require(node(a)?, false)?;
-                require(node(b)?, false)?;
-                Ok(matches!(self, Self::Lt(..)))
-            }
-            Self::And(a, b) => {
-                require(node(a)?, true)?;
-                require(node(b)?, true)?;
-                Ok(true)
-            }
-            Self::Eq(a, b) => {
-                require(node(a)?, node(b)?)?;
-                Ok(true)
-            }
-            Self::Not(a) => {
-                require(node(a)?, true)?;
-                Ok(true)
-            }
-            Self::Select(c, a, b) => {
-                require(node(c)?, true)?;
-                let kind = node(a)?;
-                require(node(b)?, kind)?;
-                Ok(kind)
-            }
-        }
+        admission::kind(self, inputs, previous).map_err(admission_error)
     }
-    pub(super) fn value(&self) -> Value {
+    pub(super) fn value(&self) -> Result<Value, EncodeError> {
         let ints = |tag: i128, args: &[i128]| {
             tuple(
-                core::iter::once(Value::I128(tag))
-                    .chain(args.iter().copied().map(Value::I128))
+                core::iter::once(Value::signed(tag))
+                    .chain(args.iter().copied().map(Value::signed))
                     .collect(),
             )
         };
@@ -170,12 +66,7 @@ impl Program {
         nodes: Vec<Op>,
         roots: Vec<u16>,
     ) -> Result<Self, Error> {
-        validate_shape(&inputs, &outputs, nodes.len(), &roots)?;
-        let mut kinds = Vec::with_capacity(nodes.len());
-        for op in &nodes {
-            kinds.push(op.kind(&inputs, &kinds)?);
-        }
-        validate_roots(&outputs, &roots, &kinds)?;
+        admission::validate_program(&inputs, &outputs, &nodes, &roots).map_err(admission_error)?;
         Ok(Self {
             inputs,
             outputs,
@@ -210,6 +101,22 @@ impl Program {
         self.evaluate_into(input, &mut values, &mut output)?;
         Ok(output)
     }
+    /// Executes with a fresh library-owned V2 instruction meter.
+    ///
+    /// Returns usage on success and refusal. This convenience adapter delegates
+    /// to the verified `execute_v2` entry point; the adapter itself is not in
+    /// the current Verus proof subject. It grants no transition authority.
+    #[must_use]
+    pub fn execute_v2(&self, input: &[i64], limits: super::V2Limits) -> super::V2ExecutionOutcome {
+        super::execution_v2::execute(
+            &self.inputs,
+            &self.outputs,
+            &self.nodes,
+            &self.roots,
+            input,
+            limits,
+        )
+    }
     /// Evaluates into caller-owned buffers, reusing their existing capacity.
     ///
     /// Both buffers are cleared before use and again on every failure, so a
@@ -221,114 +128,91 @@ impl Program {
         values: &mut Vec<i64>,
         output: &mut Vec<i64>,
     ) -> Result<(), Error> {
-        let result = self.evaluate_nodes(input, values, output);
-        if result.is_err() {
-            values.clear();
-            output.clear();
-        }
-        result
-    }
-    fn evaluate_nodes(
-        &self,
-        input: &[i64],
-        values: &mut Vec<i64>,
-        output: &mut Vec<i64>,
-    ) -> Result<(), Error> {
-        values.clear();
-        output.clear();
-        if !admitted(&self.inputs, input) {
-            return Err(Error::Invalid("input-domain"));
-        }
-        values.reserve_exact(self.nodes.len());
-        for op in &self.nodes {
-            let at = |id: u16| values[usize::from(id)];
-            let value = match *op {
-                Op::Input(id) => input[usize::from(id)],
-                Op::Int(v) => v,
-                Op::Bool(v) => i64::from(v),
-                Op::Add(a, b) => at(a).checked_add(at(b)).ok_or(Error::Arithmetic)?,
-                Op::Sub(a, b) => at(a).checked_sub(at(b)).ok_or(Error::Arithmetic)?,
-                Op::Eq(a, b) => i64::from(at(a) == at(b)),
-                Op::Lt(a, b) => i64::from(at(a) < at(b)),
-                Op::And(a, b) => i64::from(at(a) == 1 && at(b) == 1),
-                Op::Not(a) => i64::from(at(a) == 0),
-                Op::Select(c, a, b) => {
-                    if at(c) == 1 {
-                        at(a)
-                    } else {
-                        at(b)
-                    }
-                }
-            };
-            values.push(value);
-        }
-        output.reserve_exact(self.roots.len());
-        for id in &self.roots {
-            output.push(values[usize::from(*id)]);
-        }
-        if !admitted(&self.outputs, output) {
-            return Err(Error::Invalid("output-domain"));
-        }
-        Ok(())
+        evaluation::evaluate_into(
+            &self.inputs,
+            &self.outputs,
+            &self.nodes,
+            &self.roots,
+            input,
+            values,
+            output,
+        )
+        .map_err(|failure| match failure {
+            Failure::InputDomain => Error::Invalid("input-domain"),
+            Failure::Reference => Error::Invalid("node-reference"),
+            Failure::Arithmetic => Error::Arithmetic,
+            Failure::OutputDomain => Error::Invalid("output-domain"),
+        })
     }
     /// Canonical, language-neutral program data, including the semantic profile.
-    #[must_use]
-    pub fn value(&self) -> Value {
+    pub fn value(&self) -> Result<Value, EncodeError> {
         tuple(vec![
-            Value::Text(PROFILE.into()),
-            schema_value(&self.inputs, &self.outputs),
-            tuple(self.nodes.iter().map(Op::value).collect()),
+            Value::text_ascii_with_limits(PROFILE.into(), ValueLimits::default())
+                .map_err(EncodeError::InvalidValue)?,
+            schema_value(&self.inputs, &self.outputs)?,
+            tuple(
+                self.nodes
+                    .iter()
+                    .map(Op::value)
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?,
             tuple(
                 self.roots
                     .iter()
-                    .map(|id| Value::U128((*id).into()))
+                    .map(|id| Value::unsigned((*id).into()))
                     .collect(),
-            ),
+            )?,
         ])
     }
 }
 
 pub(super) fn admitted(domains: &[Domain], values: &[i64]) -> bool {
-    domains.len() == values.len() && domains.iter().zip(values).all(|(d, v)| d.contains(*v))
+    evaluation::admitted(domains, values)
 }
+
+fn admission_error(failure: AdmissionFailure) -> Error {
+    Error::Invalid(match failure {
+        AdmissionFailure::Shape => "program-shape",
+        AdmissionFailure::InputReference => "input-reference",
+        AdmissionFailure::NodeReference => "node-reference",
+        AdmissionFailure::TypeMismatch => "type-mismatch",
+        AdmissionFailure::OutputType => "output-type",
+    })
+}
+
 pub(super) fn validate_shape(
     inputs: &[Domain],
     outputs: &[Domain],
     nodes: usize,
     roots: &[u16],
 ) -> Result<(), Error> {
-    if inputs.len() > 2 * MAX_FIELDS
-        || outputs.is_empty()
-        || outputs.len() > MAX_FIELDS
-        || nodes == 0
-        || nodes > MAX_NODES
-        || outputs.len() != roots.len()
-        || !inputs.iter().chain(outputs).all(|d| d.valid())
-    {
-        return Err(Error::Invalid("program-shape"));
-    }
-    Ok(())
+    admission::validate_shape(inputs, outputs, nodes, roots).map_err(admission_error)
 }
 pub(super) fn validate_roots(
     outputs: &[Domain],
     roots: &[u16],
     kinds: &[bool],
 ) -> Result<(), Error> {
-    for (domain, id) in outputs.iter().zip(roots) {
-        if kinds.get(usize::from(*id)) != Some(&domain.boolean()) {
-            return Err(Error::Invalid("output-type"));
-        }
-    }
-    Ok(())
+    admission::validate_roots(outputs, roots, kinds).map_err(admission_error)
 }
-pub(super) fn schema_value(inputs: &[Domain], outputs: &[Domain]) -> Value {
+pub(super) fn schema_value(inputs: &[Domain], outputs: &[Domain]) -> Result<Value, EncodeError> {
     tuple(vec![
-        tuple(inputs.iter().map(|d| d.value()).collect()),
-        tuple(outputs.iter().map(|d| d.value()).collect()),
+        tuple(
+            inputs
+                .iter()
+                .map(|d| d.value())
+                .collect::<Result<Vec<_>, _>>()?,
+        )?,
+        tuple(
+            outputs
+                .iter()
+                .map(|d| d.value())
+                .collect::<Result<Vec<_>, _>>()?,
+        )?,
     ])
 }
-pub(super) fn tuple(values: Vec<Value>) -> Value {
-    Value::Tuple(values.into_boxed_slice())
+pub(super) fn tuple(values: Vec<Value>) -> Result<Value, EncodeError> {
+    Value::tuple(values).map_err(EncodeError::InvalidValue)
 }
 
 #[cfg(test)]

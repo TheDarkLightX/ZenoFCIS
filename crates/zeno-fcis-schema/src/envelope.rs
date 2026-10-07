@@ -17,6 +17,7 @@ use crate::{
 /// The variants record the fixed local admission order. They are not protocol
 /// rejection reasons and do not define application-level precedence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SchemaEnvelopeError {
     /// The value failed validation against the selected schema type.
     SchemaValidation(ValueValidationError),
@@ -147,9 +148,17 @@ impl SchemaAdmittedEnvelope {
     }
 }
 
-impl CanonicalEncode for SchemaAdmittedEnvelope {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SchemaAdmittedEnvelope {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.envelope.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -226,9 +235,17 @@ impl SchemaAdmittedTypeEnvelope {
     }
 }
 
-impl CanonicalEncode for SchemaAdmittedTypeEnvelope {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SchemaAdmittedTypeEnvelope {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.envelope.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -255,27 +272,12 @@ mod tests {
     use alloc::boxed::Box;
     use alloc::vec;
 
-    use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Envelope, Hash32, decode_envelope};
+    use zeno_fcis_codec::{DecodeLimits, Envelope, decode_envelope};
 
     use super::*;
     use crate::{SchemaLimits, TypeDef, TypeKind};
 
-    struct TestHash;
-
-    impl CommitmentHasher for TestHash {
-        const ALGORITHM_ID: &'static str = "test/noncryptographic";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(byte)
-                    .rotate_left((slot % 7) as u32);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHash;
 
     fn type_def(id: u32, name: &str, kind: TypeKind) -> TypeDef {
         match TypeDef::try_new(TypeId::new(id), name, kind, SchemaLimits::default()) {
@@ -309,7 +311,7 @@ mod tests {
         let schema = amount_schema(1);
         let admitted = match SchemaAdmittedEnvelope::try_new::<TestHash>(
             &schema,
-            Value::U128(42),
+            Value::unsigned(42),
             ValidationLimits::default(),
         ) {
             Ok(value) => value,
@@ -329,7 +331,7 @@ mod tests {
                 maximum_depth: 0,
             }
         );
-        assert_eq!(admitted.value().value(), &Value::U128(42));
+        assert_eq!(admitted.value().value(), &Value::unsigned(42));
 
         let bytes = match admitted.canonical_bytes() {
             Ok(value) => value,
@@ -355,7 +357,7 @@ mod tests {
         let admitted = SchemaAdmittedTypeEnvelope::try_new::<TestHash>(
             &schema,
             TypeId::new(8),
-            Value::Bool(true),
+            Value::boolean(true),
             ValidationLimits::default(),
         )
         .unwrap_or_else(|error| panic!("typed envelope rejected: {error}"));
@@ -374,13 +376,17 @@ mod tests {
                 maximum_depth: 0,
             }
         );
-        assert_eq!(admitted.value().value(), &Value::Bool(true));
+        assert_eq!(admitted.value().value(), &Value::boolean(true));
         let bytes = admitted
             .canonical_bytes()
             .unwrap_or_else(|error| panic!("encoding failed: {error}"));
         assert_eq!(
             decode_envelope(&bytes, DecodeLimits::default()),
-            Ok(Envelope::new(8, admitted.schema_hash(), Value::Bool(true)))
+            Ok(Envelope::new(
+                8,
+                admitted.schema_hash(),
+                Value::boolean(true)
+            ))
         );
         assert_eq!(
             admitted.encoded_length(),
@@ -397,7 +403,7 @@ mod tests {
             SchemaAdmittedTypeEnvelope::try_new::<TestHash>(
                 &schema,
                 TypeId::new(7),
-                Value::Bool(true),
+                Value::boolean(true),
                 ValidationLimits::default(),
             ),
             Err(SchemaEnvelopeError::SchemaValidation(
@@ -412,7 +418,7 @@ mod tests {
         assert_eq!(
             SchemaAdmittedEnvelope::try_new::<TestHash>(
                 &schema,
-                Value::U128(0),
+                Value::unsigned(0),
                 ValidationLimits::default(),
             ),
             Err(SchemaEnvelopeError::SchemaValidation(
@@ -427,7 +433,7 @@ mod tests {
         assert_eq!(
             SchemaAdmittedEnvelope::try_new::<TestHash>(
                 &schema,
-                Value::Bool(true),
+                Value::boolean(true),
                 ValidationLimits::default(),
             ),
             Err(SchemaEnvelopeError::SchemaValidation(
@@ -438,25 +444,41 @@ mod tests {
 
     #[test]
     fn rejects_structurally_invalid_value_after_schema_shape_validation() {
-        let schema = schema(
-            1,
-            vec![type_def(
-                7,
-                "Label",
-                TypeKind::Text {
-                    min_len: 1,
-                    max_len: 8,
-                },
-            )],
+        // Invalid ASCII cannot enter the private Value representation.
+        assert_eq!(
+            Value::text_ascii_with_limits("é".into(), zeno_fcis_value::ValueLimits::default()),
+            Err(ValueError::NonAsciiText)
         );
+        // A legal tree can still exceed admission limits. The schema admits
+        // all 66 nodes before default structural admission rejects depth 65.
+        let mut definitions = vec![type_def(72, "Leaf", TypeKind::Unit)];
+        let mut value = Value::unit();
+        for id in (7..72).rev() {
+            definitions.push(type_def(
+                id,
+                &alloc::format!("Layer{id}"),
+                TypeKind::Tuple {
+                    items: Box::new([TypeId::new(id + 1)]),
+                },
+            ));
+            value =
+                Value::tuple(vec![value]).unwrap_or_else(|error| panic!("tuple rejected: {error}"));
+        }
+        let schema = schema(1, definitions);
         assert_eq!(
             SchemaAdmittedEnvelope::try_new::<TestHash>(
                 &schema,
-                Value::Text(Box::<str>::from("é")),
-                ValidationLimits::default(),
+                value,
+                ValidationLimits {
+                    max_depth: 65,
+                    max_nodes: 66
+                },
             ),
             Err(SchemaEnvelopeError::ValueAdmission(
-                ValueError::NonAsciiText
+                ValueError::DepthLimit {
+                    limit: 64,
+                    attempted: 65
+                }
             ))
         );
     }
@@ -467,7 +489,7 @@ mod tests {
         assert_eq!(
             SchemaAdmittedEnvelope::try_new::<TestHash>(
                 &schema,
-                Value::U128(42),
+                Value::unsigned(42),
                 ValidationLimits {
                     max_depth: 0,
                     max_nodes: 0,
@@ -488,12 +510,12 @@ mod tests {
 
         let left = SchemaAdmittedEnvelope::try_new::<TestHash>(
             &left,
-            Value::U128(42),
+            Value::unsigned(42),
             ValidationLimits::default(),
         );
         let right = SchemaAdmittedEnvelope::try_new::<TestHash>(
             &right,
-            Value::U128(42),
+            Value::unsigned(42),
             ValidationLimits::default(),
         );
         let (left, right) = match (left, right) {
@@ -508,12 +530,12 @@ mod tests {
     fn schema_version_changes_bound_envelope_bytes() {
         let first = SchemaAdmittedEnvelope::try_new::<TestHash>(
             &amount_schema(1),
-            Value::U128(42),
+            Value::unsigned(42),
             ValidationLimits::default(),
         );
         let second = SchemaAdmittedEnvelope::try_new::<TestHash>(
             &amount_schema(2),
-            Value::U128(42),
+            Value::unsigned(42),
             ValidationLimits::default(),
         );
         let (first, second) = match (first, second) {

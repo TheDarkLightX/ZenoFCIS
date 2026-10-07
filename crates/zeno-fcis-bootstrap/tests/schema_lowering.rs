@@ -2,7 +2,6 @@
 #![forbid(unsafe_code)]
 
 use zeno_fcis_bootstrap::{SchemaLoweringError, lower_schema};
-use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_schema::{
     FieldDef, FieldId, Schema, SchemaLimits, SumVariantDef, TypeDef, TypeId, TypeKind, VariantId,
 };

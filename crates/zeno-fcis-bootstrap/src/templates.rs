@@ -37,7 +37,7 @@ pub(crate) fn render_rust_project(
     output.push_str(
         "//\n// The private generated project reconstructs the exact reviewed catalog.\n",
     );
-    output.push_str("// Catalog validation and candidate sealing remain authoritative.\n\n");
+    output.push_str("// Declarations and typed adapters are proposals; checked library binding grants capabilities.\n\n");
     output.push_str("extern crate alloc;\n\n");
     output.push_str("use alloc::vec;\n");
     output.push_str("use core::fmt;\n");
@@ -49,8 +49,8 @@ pub(crate) fn render_rust_project(
     output.push_str(
         "use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};\n",
     );
-    output.push_str("use zeno_fcis_compose::{AccessPath, PathAtom};\n");
-    output.push_str("use zeno_fcis_core::BudgetUsed;\n");
+    output.push_str("use zeno_fcis_synthesis::finite::{canonical_v2::schema as checked_schema, v2_authority as checked_authority, v2_catalog as checked_catalog, v2_composition as checked};\n");
+    output.push_str("use checked::{Assignment, Binding as DeclaredBinding, Class as DecisionClass, Domain as DeclaredDomain, Expr, Reason, Selector, Source};\n");
     output.push_str("use zeno_fcis_plan::{Effect, OutboxEntry};\n");
     output.push_str("use zeno_fcis_project::{\n");
     output.push_str(
@@ -63,11 +63,6 @@ pub(crate) fn render_rust_project(
         "    SchemaAdmittedEnvelope, SchemaAdmittedTypeEnvelope, SchemaEnvelopeError, SchemaError,\n",
     );
     output.push_str("    TypeId, ValidationLimits, ValidationReport,\n");
-    output.push_str("};\n");
-    output.push_str("use zeno_fcis_transition::{\n");
-    output.push_str(
-        "    CataloguedTransitionBuilder, TransitionDecision, TransitionError, TransitionLimits,\n",
-    );
     output.push_str("};\n");
     output.push('\n');
     writeln!(
@@ -158,6 +153,7 @@ pub(crate) fn render_rust_project(
     .map_err(|_| BootstrapError::Render)?;
 
     output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    output.push_str("#[non_exhaustive]\n");
     output.push_str("pub enum ReasonClass { Reject, CommittedFailure }\n\n");
     render_reason_enum(&mut output, catalog)?;
     render_effect_enum(&mut output, catalog)?;
@@ -170,6 +166,7 @@ pub(crate) fn render_rust_project(
 }
 
 fn render_id_attributes(output: &mut String, empty: bool) {
+    output.push_str("/// Closed identifiers for this exact versioned catalog, not extensible library diagnostics.\n");
     output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
     if !empty {
         output.push_str("#[repr(u32)]\n");
@@ -208,6 +205,7 @@ fn render_reason_enum(output: &mut String, catalog: &ProjectCatalog) -> Result<(
         let class = match reason.disposition() {
             ReasonDisposition::Reject => "ReasonClass::Reject",
             ReasonDisposition::CommittedFailure => "ReasonClass::CommittedFailure",
+            _ => return Err(BootstrapError::UnsupportedReasonDisposition),
         };
         writeln!(
             output,
@@ -236,6 +234,7 @@ fn render_typed_reason_enum(
     let class = match disposition {
         ReasonDisposition::Reject => "ordinary rejection",
         ReasonDisposition::CommittedFailure => "committed failure",
+        _ => return Err(BootstrapError::UnsupportedReasonDisposition),
     };
     writeln!(output, "/// Stable catalogued {class} identifiers.")
         .map_err(|_| BootstrapError::Render)?;
@@ -330,14 +329,21 @@ fn render_effect_helpers(
 ) -> Result<(), BootstrapError> {
     for effect in catalog.manifest().effects() {
         let payload = schema_type_name(catalog, effect.payload_type())?;
+        let mut parameters = vec!["ordinal: u32".to_owned()];
+        push_hash_requirement_parameter(
+            &mut parameters,
+            "authority",
+            effect.authority_requirement(),
+        );
+        push_hash_requirement_parameter(&mut parameters, "subject", effect.subject_requirement());
+        parameters.push(format!("payload: &crate::generated::{payload}"));
+        let authority = hash_requirement_argument("authority", effect.authority_requirement());
+        let subject = hash_requirement_argument("subject", effect.subject_requirement());
         writeln!(
             output,
-            "/// Constructs catalog effect `{}`.\npub fn effect_{}(\n    ordinal: u32,\n    authority: Hash32,\n    subject: Hash32,\n    payload: &crate::generated::{payload},\n) -> Result<Effect, crate::generated::AdapterError> {{\n    Ok(Effect::new(\n        ordinal,\n        EffectKind::Effect{}.get(),\n        authority,\n        subject,\n        payload.to_value()?,\n    ))\n}}\n",
-            effect.name().as_str(),
-            effect.id().get(),
-            effect.id().get()
-        )
-        .map_err(|_| BootstrapError::Render)?;
+            "/// Constructs inert catalog effect `{}`; this is not a Publication.\npub fn effect_{}(\n    {},\n) -> Result<Effect, crate::generated::AdapterError> {{\n    Ok(Effect::new(\n        ordinal,\n        EffectKind::Effect{}.get(),\n        {authority},\n        {subject},\n        payload.to_value()?,\n    ))\n}}\n",
+            effect.name().as_str(), effect.id().get(), parameters.join(",\n    "), effect.id().get(),
+        ).map_err(|_| BootstrapError::Render)?;
     }
     Ok(())
 }
@@ -351,7 +357,7 @@ fn render_channel_helpers(
         let payload = schema_type_name(catalog, channel.payload_type())?;
         writeln!(
             output,
-            "/// Constructs catalog channel entry `{}`.\npub fn channel_{}(\n    ordinal: u32,\n    destination: &crate::generated::{destination},\n    payload: &crate::generated::{payload},\n) -> Result<OutboxEntry, crate::generated::AdapterError> {{\n    Ok(OutboxEntry::new(\n        ordinal,\n        ChannelKind::Channel{}.get(),\n        destination.to_value()?,\n        payload.to_value()?,\n    ))\n}}\n",
+            "/// Constructs inert catalog channel entry `{}`; this is not a Publication.\npub fn channel_{}(\n    ordinal: u32,\n    destination: &crate::generated::{destination},\n    payload: &crate::generated::{payload},\n) -> Result<OutboxEntry, crate::generated::AdapterError> {{\n    Ok(OutboxEntry::new(\n        ordinal,\n        ChannelKind::Channel{}.get(),\n        destination.to_value()?,\n        payload.to_value()?,\n    ))\n}}\n",
             channel.name().as_str(),
             channel.id().get(),
             channel.id().get()
@@ -364,6 +370,7 @@ fn render_channel_helpers(
 fn render_generated_input_envelopes(output: &mut String) {
     output.push_str("/// Generated input role used only by local admission diagnostics.\n");
     output.push_str("#[derive(Clone, Copy, Debug, Eq, PartialEq)]\n");
+    output.push_str("#[non_exhaustive]\n");
     output.push_str("pub enum GeneratedInputKind { Command, Context }\n\n");
     output.push_str("/// Schema-admitted generated command plus its derived commitment.\n");
     output.push_str("#[derive(Clone, Debug, Eq, PartialEq)]\n");
@@ -399,176 +406,89 @@ fn render_generated_input_envelopes(output: &mut String) {
     output.push_str("}\n\n");
 }
 
-fn render_generated_transition(
+fn render_generated_declarations(
     output: &mut String,
     catalog: &ProjectCatalog,
 ) -> Result<(), BootstrapError> {
-    output.push_str(
-        "/// Generated high-level transition with typed state access, reasons, effects, and channels.\n",
-    );
-    output.push_str("///\n");
-    output.push_str(
-        "/// The private generic builder prevents raw path mutation, reason, effect, and outbox staging.\n",
-    );
-    output.push_str("pub struct GeneratedTransition<'a, H: CommitmentHasher> {\n");
-    output.push_str("    inner: CataloguedTransitionBuilder<'a, H>,\n");
-    output.push_str("}\n\n");
-    output.push_str("impl<'a, H: CommitmentHasher> GeneratedTransition<'a, H> {\n");
-    render_generated_root_read_methods(output, catalog)?;
-    render_generated_root_update_methods(output, catalog)?;
-    render_generated_context_observation_methods(output, catalog)?;
-    render_generated_effect_methods(output, catalog)?;
-    render_generated_channel_methods(output, catalog)?;
-    output.push_str("    /// Records an ordinary rejection when `condition` is false.\n");
-    output.push_str("    pub fn require(&mut self, condition: bool, reason: RejectReasonId) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str(
-        "        self.inner.require(condition, reason.try_semantic_id()?)?;\n        Ok(self)\n",
-    );
-    output.push_str("    }\n\n");
-    output.push_str("    /// Records a committed failure when `condition` is true.\n");
-    output.push_str("    pub fn fail_if(&mut self, condition: bool, reason: CommittedFailureReasonId) -> Result<&mut Self, GeneratedProjectError> {\n");
-    output.push_str(
-        "        self.inner.fail_if(condition, reason.try_semantic_id()?)?;\n        Ok(self)\n",
-    );
-    output.push_str("    }\n\n");
-    output.push_str("    /// Canonicalizes, validates, resource-binds, and seals one decision.\n");
-    output
-        .push_str("    pub fn seal(self) -> Result<TransitionDecision, GeneratedProjectError> {\n");
-    output.push_str("        Ok(self.inner.seal()?)\n");
-    output.push_str("    }\n");
-    output.push_str("}\n\n");
-    Ok(())
-}
-
-fn render_generated_context_observation_methods(
-    output: &mut String,
-    catalog: &ProjectCatalog,
-) -> Result<(), BootstrapError> {
-    let context_type = zeno_fcis_schema::TypeId::new(catalog.profile().context_type().get());
+    output.push_str("/// Original-field declaration helpers. Only library evaluation records actual reads/writes.\n");
+    output.push_str("pub struct GeneratedDeclarations;\n\nimpl GeneratedDeclarations {\n");
+    let root = catalog
+        .schema()
+        .type_by_id(catalog.schema().root_type())
+        .ok_or(BootstrapError::UnknownSchemaType(
+            catalog.schema().root_type(),
+        ))?;
+    if let TypeKind::Record { fields } = root.kind() {
+        for field in fields {
+            let name = field.name().as_str();
+            let id = field.id().get();
+            let ty = catalog
+                .schema()
+                .type_by_id(field.type_id())
+                .ok_or(BootstrapError::UnknownSchemaType(field.type_id()))?;
+            writeln!(output, "    /// Proposes the exact original state field `{name}`.\n    pub fn read_{name}() -> Result<Expr<'static>, GeneratedProjectError> {{\n        Ok(Expr::Input(Source::State, {id}))\n    }}\n")
+                .map_err(|_| BootstrapError::Render)?;
+            let body = declaration_domain_expression(ty.kind(), ty.id().get()).map_or_else(
+                || {
+                    format!(
+                        "let _ = value; Err(GeneratedProjectError::UnsupportedStateField({id}))"
+                    )
+                },
+                |domain| format!("Ok(Assignment {{ field: {id}, value, domain: {domain} }})"),
+            );
+            writeln!(output, "    /// Proposes a successor for `{name}`; admission/evaluation check the complete schema.\n    pub fn update_{name}<'a>(value: Expr<'a>) -> Result<Assignment<'a>, GeneratedProjectError> {{\n        {body}\n    }}\n")
+                .map_err(|_| BootstrapError::Render)?;
+        }
+    }
+    let context_id = zeno_fcis_schema::TypeId::new(catalog.profile().context_type().get());
     let context = catalog
         .schema()
-        .type_by_id(context_type)
-        .ok_or(BootstrapError::UnknownSchemaType(context_type))?;
-    let TypeKind::Record { fields } = context.kind() else {
-        output
-            .push_str("    /// Records observation of the complete schema-typed context value.\n");
-        output.push_str("    pub fn observe_context_root(&mut self) -> Result<&mut Self, GeneratedProjectError> {\n");
-        output.push_str("        let path = AccessPath::try_new(CONTEXT_TYPE_ID, vec![])\n");
-        output.push_str("            .map_err(TransitionError::from)?;\n");
-        output.push_str("        self.inner.observe_context(path)?;\n        Ok(self)\n");
-        output.push_str("    }\n\n");
-        return Ok(());
-    };
-    for field in fields {
-        let field_name = field.name().as_str();
-        writeln!(
-            output,
-            "    /// Records observation of context field `{field_name}`.\n    pub fn observe_context_{field_name}(\n        &mut self,\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        let path = AccessPath::try_new(\n            CONTEXT_TYPE_ID,\n            vec![PathAtom::Field({})],\n        )\n        .map_err(TransitionError::from)?;\n        self.inner.observe_context(path)?;\n        Ok(self)\n    }}\n",
-            field.id().get()
-        )
-        .map_err(|_| BootstrapError::Render)?;
+        .type_by_id(context_id)
+        .ok_or(BootstrapError::UnknownSchemaType(context_id))?;
+    if let TypeKind::Record { fields } = context.kind() {
+        for field in fields {
+            let name = field.name().as_str();
+            let id = field.id().get();
+            writeln!(output, "    /// Proposes observation of original context field `{name}`.\n    pub const fn context_{name}_binding() -> DeclaredBinding {{\n        DeclaredBinding {{ source: Source::Context, selector: Selector::Field({id}) }}\n    }}\n")
+                .map_err(|_| BootstrapError::Render)?;
+        }
+    } else {
+        output.push_str("    /// Proposes observation of the original scalar context root.\n    pub const fn context_root_binding() -> DeclaredBinding {\n        DeclaredBinding { source: Source::Context, selector: Selector::Root }\n    }\n\n");
     }
+    output.push_str("    /// Declares a catalogued ordinary rejection reason.\n    pub const fn reject_reason(reason: RejectReasonId) -> Reason {\n        Reason { id: reason.reason_id().get(), class: DecisionClass::Reject }\n    }\n\n");
+    output.push_str("    /// Declares a catalogued committing failure reason.\n    pub const fn committed_failure_reason(reason: CommittedFailureReasonId) -> Reason {\n        Reason { id: reason.reason_id().get(), class: DecisionClass::CommittedFailure }\n    }\n}\n\n");
     Ok(())
 }
 
-fn render_generated_root_read_methods(
-    output: &mut String,
-    catalog: &ProjectCatalog,
-) -> Result<(), BootstrapError> {
-    let root = catalog
-        .schema()
-        .type_by_id(catalog.schema().root_type())
-        .ok_or(BootstrapError::UnknownSchemaType(
-            catalog.schema().root_type(),
-        ))?;
-    let TypeKind::Record { fields } = root.kind() else {
-        return Ok(());
-    };
-    let root_name = root.name().as_str();
-    for field in fields {
-        let field_name = field.name().as_str();
-        let field_type = schema_type_name(catalog, field.type_id())?;
-        writeln!(
-            output,
-            "    /// Reads root field `{field_name}` and records its exact read footprint.\n    pub fn read_{field_name}(\n        &mut self,\n    ) -> Result<crate::generated::{field_type}, GeneratedProjectError> {{\n        let value = self\n            .inner\n            .read(crate::generated::{root_name}::{field_name}_path())?\n            .clone();\n        Ok(crate::generated::{field_type}::try_from_value(value)?)\n    }}\n",
-        )
-        .map_err(|_| BootstrapError::Render)?;
-    }
-    Ok(())
-}
-
-fn render_generated_root_update_methods(
-    output: &mut String,
-    catalog: &ProjectCatalog,
-) -> Result<(), BootstrapError> {
-    let root = catalog
-        .schema()
-        .type_by_id(catalog.schema().root_type())
-        .ok_or(BootstrapError::UnknownSchemaType(
-            catalog.schema().root_type(),
-        ))?;
-    let TypeKind::Record { fields } = root.kind() else {
-        return Ok(());
-    };
-    let root_name = root.name().as_str();
-    for field in fields {
-        let field_name = field.name().as_str();
-        let field_type = schema_type_name(catalog, field.type_id())?;
-        writeln!(
-            output,
-            "    /// Stages a preconditioned update of root field `{field_name}`.\n    pub fn update_{field_name}(\n        &mut self,\n        value: &crate::generated::{field_type},\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        self.inner.update(\n            crate::generated::{root_name}::{field_name}_path(),\n            value.to_value()?,\n        )?;\n        Ok(self)\n    }}\n",
-        )
-        .map_err(|_| BootstrapError::Render)?;
-    }
-    Ok(())
-}
-
-fn render_generated_effect_methods(
-    output: &mut String,
-    catalog: &ProjectCatalog,
-) -> Result<(), BootstrapError> {
-    for effect in catalog.manifest().effects() {
-        let payload = schema_type_name(catalog, effect.payload_type())?;
-        let mut parameters = vec!["ordinal: u32".to_owned()];
-        push_hash_requirement_parameter(
-            &mut parameters,
-            "authority",
-            effect.authority_requirement(),
-        );
-        push_hash_requirement_parameter(&mut parameters, "subject", effect.subject_requirement());
-        parameters.push(format!("payload: &crate::generated::{payload}"));
-        let authority = hash_requirement_argument("authority", effect.authority_requirement());
-        let subject = hash_requirement_argument("subject", effect.subject_requirement());
-        writeln!(
-            output,
-            "    /// Stages catalog effect `{}` with its reviewed payload and authority shape.\n    pub fn emit_effect_{}(\n        &mut self,\n        {},\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        let effect = effect_{}(\n            ordinal,\n            {authority},\n            {subject},\n            payload,\n        )?;\n        self.inner.emit(effect)?;\n        Ok(self)\n    }}\n",
-            effect.name().as_str(),
-            effect.id().get(),
-            parameters.join(",\n        "),
-            effect.id().get(),
-        )
-        .map_err(|_| BootstrapError::Render)?;
-    }
-    Ok(())
-}
-
-fn render_generated_channel_methods(
-    output: &mut String,
-    catalog: &ProjectCatalog,
-) -> Result<(), BootstrapError> {
-    for channel in catalog.manifest().channels() {
-        let destination = schema_type_name(catalog, channel.destination_type())?;
-        let payload = schema_type_name(catalog, channel.payload_type())?;
-        writeln!(
-            output,
-            "    /// Stages catalog channel `{}` with reviewed destination and payload types.\n    pub fn enqueue_channel_{}(\n        &mut self,\n        ordinal: u32,\n        destination: &crate::generated::{destination},\n        payload: &crate::generated::{payload},\n    ) -> Result<&mut Self, GeneratedProjectError> {{\n        let entry = channel_{}(ordinal, destination, payload)?;\n        self.inner.enqueue(entry)?;\n        Ok(self)\n    }}\n",
-            channel.name().as_str(),
-            channel.id().get(),
-            channel.id().get(),
-        )
-        .map_err(|_| BootstrapError::Render)?;
-    }
-    Ok(())
+fn declaration_domain_expression(kind: &TypeKind, type_id: u32) -> Option<String> {
+    Some(match kind {
+        TypeKind::Bool => "DeclaredDomain::Bool".to_owned(),
+        TypeKind::I128 { min, max } => {
+            format!("DeclaredDomain::I128 {{ min: {min}i128, max: {max}i128 }}")
+        }
+        TypeKind::U128 { min, max } => {
+            format!("DeclaredDomain::U128 {{ min: {min}u128, max: {max}u128 }}")
+        }
+        TypeKind::Bytes { .. } => "DeclaredDomain::Bytes".to_owned(),
+        TypeKind::Text { .. } => "DeclaredDomain::Text".to_owned(),
+        TypeKind::Enum { variants } => {
+            let ids = variants
+                .iter()
+                .map(|v| v.id().get().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("DeclaredDomain::Enum {{ type_id: {type_id}, variants: &[{ids}] }}")
+        }
+        TypeKind::Sum { variants } if variants.iter().all(|v| v.payload().is_none()) => {
+            let ids = variants
+                .iter()
+                .map(|v| v.id().get().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("DeclaredDomain::Sum {{ type_id: {type_id}, variants: &[{ids}] }}")
+        }
+        _ => return None,
+    })
 }
 
 fn push_hash_requirement_parameter(
@@ -594,6 +514,66 @@ fn hash_requirement_argument(name: &str, requirement: HashRequirement) -> String
     }
 }
 
+fn render_program_proposal(
+    output: &mut String,
+    catalog: &ProjectCatalog,
+) -> Result<(), BootstrapError> {
+    output.push_str(r#"/// Complete borrowed proposal. Public fields are declaration data, never capabilities.
+#[derive(Debug)]
+pub struct GeneratedProgramProposal<'a> {
+    /// Exact retained original named schema bytes.
+    pub original_schema: &'a [u8],
+    /// Complete original schema description, including unused definitions.
+    pub description: &'a checked_schema::Description<'a>,
+    /// Construction limits, separate from the private invocation meter.
+    pub catalog_limits: checked_catalog::Limits,
+    /// Exact retained complete policy bytes; serialization alone grants no authority.
+    pub original_policy: &'a [u8],
+    /// Complete closed control, decision, input and required law declarations.
+    pub definition: &'a checked::Descriptor<'a>,
+    /// Exact original state/command/context frame links.
+    pub framing: &'a checked::Framing,
+    /// Every original channel/destination/payload root link.
+    pub channel_roots: &'a [(u32, u32, u32)],
+}
+
+/// Owned complete original input envelopes. This grants no publication authority.
+#[derive(Debug)]
+pub struct GeneratedInvocation { state: alloc::vec::Vec<u8>, command: alloc::vec::Vec<u8>, context: alloc::vec::Vec<u8> }
+
+impl GeneratedInvocation {
+    /// Borrows the complete envelopes for actual library-owned evaluation/publication.
+    pub fn original(&self) -> checked::Raw<'_> {
+        checked::Raw { state: &self.state, command: &self.command, context: &self.context }
+    }
+}
+
+"#);
+    output.push_str("const DECLARED_REASONS: &[(u32, DecisionClass)] = &[\n");
+    for reason in catalog.manifest().reasons() {
+        let class = match reason.disposition() {
+            ReasonDisposition::Reject => "DecisionClass::Reject",
+            ReasonDisposition::CommittedFailure => "DecisionClass::CommittedFailure",
+            _ => return Err(BootstrapError::UnsupportedReasonDisposition),
+        };
+        writeln!(output, "    ({}, {class}),", reason.id().get())
+            .map_err(|_| BootstrapError::Render)?;
+    }
+    output.push_str("];\n\nconst DECLARED_CHANNEL_ROOTS: &[(u32, u32, u32)] = &[\n");
+    for channel in catalog.manifest().channels() {
+        writeln!(
+            output,
+            "    ({}, {}, {}),",
+            channel.id().get(),
+            channel.destination_type().get(),
+            channel.payload_type().get()
+        )
+        .map_err(|_| BootstrapError::Render)?;
+    }
+    output.push_str("];\n\n");
+    Ok(())
+}
+
 #[allow(clippy::too_many_lines)]
 fn render_generated_project(
     output: &mut String,
@@ -603,11 +583,13 @@ fn render_generated_project(
     context_type: &str,
 ) -> Result<(), BootstrapError> {
     render_generated_input_envelopes(output);
-    render_generated_transition(output, catalog)?;
+    render_generated_declarations(output, catalog)?;
+    render_program_proposal(output, catalog)?;
     output.push_str("/// Local generated-binding construction or admission failure.\n");
     output.push_str("///\n");
     output.push_str("/// This diagnostic order is not application rejection precedence.\n");
     output.push_str("#[derive(Clone, Debug, Eq, PartialEq)]\n");
+    output.push_str("#[non_exhaustive]\n");
     output.push_str("pub enum GeneratedProjectError {\n");
     output.push_str("    HashAlgorithmMismatch,\n");
     output.push_str("    SchemaHashMismatch { expected: Hash32, actual: Hash32 },\n");
@@ -626,7 +608,13 @@ fn render_generated_project(
     output.push_str("    Envelope(SchemaEnvelopeError),\n");
     output.push_str("    Profile(ProfileError),\n");
     output.push_str("    Schema(SchemaError),\n");
-    output.push_str("    Transition(TransitionError),\n");
+    output.push_str("    OriginalSchemaMismatch,\n");
+    output.push_str("    FramingMismatch,\n");
+    output.push_str("    ReasonSetMismatch,\n");
+    output.push_str("    ChannelSetMismatch,\n");
+    output.push_str("    UnsupportedStateField(u16),\n");
+    output.push_str("    CheckedCatalog(checked_catalog::Failure),\n");
+    output.push_str("    Program(checked_authority::Refusal),\n");
     output.push_str("}\n\n");
     output.push_str("impl From<CatalogError> for GeneratedProjectError {\n");
     output.push_str("    fn from(error: CatalogError) -> Self { Self::Catalog(error) }\n");
@@ -648,9 +636,6 @@ fn render_generated_project(
     output.push_str("impl From<SchemaError> for GeneratedProjectError {\n");
     output.push_str("    fn from(error: SchemaError) -> Self { Self::Schema(error) }\n");
     output.push_str("}\n\n");
-    output.push_str("impl From<TransitionError> for GeneratedProjectError {\n");
-    output.push_str("    fn from(error: TransitionError) -> Self { Self::Transition(error) }\n");
-    output.push_str("}\n\n");
     output.push_str("impl fmt::Display for GeneratedProjectError {\n");
     output.push_str("    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {\n");
     output.push_str("        match self {\n");
@@ -669,7 +654,15 @@ fn render_generated_project(
     output.push_str("            Self::Envelope(error) => write!(formatter, \"generated schema envelope rejected: {error}\"),\n");
     output.push_str("            Self::Profile(error) => write!(formatter, \"generated profile rejected: {error}\"),\n");
     output.push_str("            Self::Schema(error) => write!(formatter, \"generated schema rejected: {error}\"),\n");
-    output.push_str("            Self::Transition(error) => write!(formatter, \"generated transition rejected: {error}\"),\n");
+    output.push_str("            Self::OriginalSchemaMismatch => formatter.write_str(\"generated project original schema differs\"),\n");
+    output.push_str("            Self::FramingMismatch => formatter.write_str(\"generated project original frame links differ\"),\n");
+    output.push_str("            Self::ReasonSetMismatch => formatter.write_str(\"generated project complete reason set differs\"),\n");
+    output.push_str("            Self::ChannelSetMismatch => formatter.write_str(\"generated project complete channel links differ\"),\n");
+    output.push_str("            Self::UnsupportedStateField(id) => write!(formatter, \"unsupported checked state field {id}\"),\n");
+    output.push_str("            Self::CheckedCatalog(error) => write!(formatter, \"checked catalog: {error:?}\"),\n");
+    output.push_str(
+        "            Self::Program(error) => write!(formatter, \"checked program: {error:?}\"),\n",
+    );
     output.push_str("        }\n");
     output.push_str("    }\n");
     output.push_str("}\n\n");
@@ -773,58 +766,69 @@ fn render_generated_project(
     output.push_str("        let commitment = Self::input_commitment::<H>(GeneratedInputKind::Context, &admitted)?;\n");
     output.push_str("        Ok(GeneratedContextEnvelope { admitted, commitment })\n");
     output.push_str("    }\n\n");
-    output.push_str("    /// Starts a catalog-aware transition from schema-admitted inputs.\n");
-    output.push_str("    pub fn begin_transition<'a, H: CommitmentHasher>(\n");
-    output.push_str("        &'a self,\n");
-    output.push_str("        pre_state: &'a SchemaAdmittedEnvelope,\n");
-    output.push_str("        state_domain: Domain<'a>,\n");
-    output.push_str("        command: &GeneratedCommandEnvelope,\n");
-    output.push_str("        context: &GeneratedContextEnvelope,\n");
-    output.push_str("        budget_used: BudgetUsed,\n");
-    output.push_str("        limits: TransitionLimits,\n");
-    output.push_str("    ) -> Result<GeneratedTransition<'a, H>, GeneratedProjectError> {\n");
-    output.push_str("        let expected = zeno_fcis_transition::ExpectedInvocationBindings::try_new(command.commitment(), context.commitment())?;\n");
-    output.push_str("        self.begin_bound_transition::<H>(pre_state, state_domain, command, context, expected, budget_used, limits)\n");
-    output.push_str("    }\n\n");
-    output.push_str(
-        "    /// Starts a transition using the shell-owned complete invocation bindings.\n",
-    );
-    output.push_str("    ///\n");
-    output.push_str("    /// Pass `ReviewedTransitionInput::expected_bindings()` inside the reviewed program.\n");
-    output.push_str("    /// The command must match its admitted value. The complete context binding includes\n");
-    output.push_str("    /// authentication and replay data; only the authority can validate that relationship.\n");
-    output.push_str(
-        "    /// This constructor creates a candidate builder and grants no commit authority.\n",
-    );
-    output.push_str("    pub fn begin_bound_transition<'a, H: CommitmentHasher>(\n");
-    output.push_str("        &'a self,\n");
-    output.push_str("        pre_state: &'a SchemaAdmittedEnvelope,\n");
-    output.push_str("        state_domain: Domain<'a>,\n");
-    output.push_str("        command: &GeneratedCommandEnvelope,\n");
-    output.push_str("        context: &GeneratedContextEnvelope,\n");
-    output.push_str("        expected: zeno_fcis_transition::ExpectedInvocationBindings,\n");
-    output.push_str("        budget_used: BudgetUsed,\n");
-    output.push_str("        limits: TransitionLimits,\n");
-    output.push_str("    ) -> Result<GeneratedTransition<'a, H>, GeneratedProjectError> {\n");
-    output.push_str("        self.validate_catalog::<H>()?;\n");
-    output.push_str("        if pre_state.schema_hash() != SCHEMA_HASH {\n");
-    output.push_str("            return Err(GeneratedProjectError::SchemaHashMismatch { expected: SCHEMA_HASH, actual: pre_state.schema_hash() });\n");
+    output.push_str(r#"    /// Binds a complete untrusted proposal through the actual library constructors.
+    /// Catalog metadata alone cannot supply branches, footprints, laws or policy adequacy.
+    pub fn bind_program<'a, H: CommitmentHasher>(
+        &self,
+        proposal: GeneratedProgramProposal<'a>,
+    ) -> Result<checked_authority::Authority<'a>, GeneratedProjectError> {
+        self.validate_catalog::<H>()?;
+        if self.catalog.schema().canonical_bytes()?.as_slice() != proposal.original_schema {
+            return Err(GeneratedProjectError::OriginalSchemaMismatch);
+        }
+        let framing = proposal.framing;
+        if framing.state.root != STATE_TYPE_ID || framing.command.root != COMMAND_TYPE_ID
+            || framing.context.root != CONTEXT_TYPE_ID
+            || framing.state.schema != *SCHEMA_HASH.as_bytes()
+            || framing.command.schema != *SCHEMA_HASH.as_bytes()
+            || framing.context.schema != *SCHEMA_HASH.as_bytes()
+        {
+            return Err(GeneratedProjectError::FramingMismatch);
+        }
+        if proposal.definition.reasons.len() != DECLARED_REASONS.len()
+            || !DECLARED_REASONS.iter().all(|(id, class)| proposal.definition.reasons.iter()
+                .any(|actual| actual.id == *id && actual.class == *class))
+        {
+            return Err(GeneratedProjectError::ReasonSetMismatch);
+        }
+        if proposal.channel_roots != DECLARED_CHANNEL_ROOTS {
+            return Err(GeneratedProjectError::ChannelSetMismatch);
+        }
+        let catalog = checked_catalog::bind_original(
+            proposal.original_schema, proposal.description, proposal.catalog_limits,
+            proposal.original_policy, proposal.definition, framing, proposal.channel_roots,
+        ).map_err(GeneratedProjectError::CheckedCatalog)?;
+        checked_authority::bind(&catalog).map_err(GeneratedProjectError::Program)
+    }
+
+    /// Retains complete original envelopes; the library independently admits them on execution.
+    /// Authentication, version/replay selection and physical effects remain host responsibilities.
+    pub fn invocation<H: CommitmentHasher>(
+        &self,
+        pre_state: &SchemaAdmittedEnvelope,
+        command: &GeneratedCommandEnvelope,
+        context: &GeneratedContextEnvelope,
+    ) -> Result<GeneratedInvocation, GeneratedProjectError> {
+        self.validate_catalog::<H>()?;
+        Self::validate_root_binding(pre_state.schema_hash(), pre_state.root_type())?;
+        Self::validate_input::<H>(GeneratedInputKind::Command, command.admitted(), command.commitment())?;
+        Self::validate_input::<H>(GeneratedInputKind::Context, context.admitted(), context.commitment())?;
+        Ok(GeneratedInvocation {
+            state: pre_state.envelope().canonical_bytes()?,
+            command: command.admitted().envelope().canonical_bytes()?,
+            context: context.admitted().envelope().canonical_bytes()?,
+        })
+    }
+
+"#);
+    output.push_str("    fn validate_root_binding(schema_hash: Hash32, root_type: TypeId) -> Result<(), GeneratedProjectError> {\n");
+    output.push_str("        if schema_hash != SCHEMA_HASH {\n");
+    output.push_str("            return Err(GeneratedProjectError::SchemaHashMismatch { expected: SCHEMA_HASH, actual: schema_hash });\n");
     output.push_str("        }\n");
-    output.push_str("        if pre_state.root_type() != TypeId::new(STATE_TYPE_ID) {\n");
-    output.push_str("            return Err(GeneratedProjectError::RootTypeMismatch { expected: STATE_TYPE_ID, actual: pre_state.root_type().get() });\n");
+    output.push_str("        if root_type != TypeId::new(STATE_TYPE_ID) {\n");
+    output.push_str("            return Err(GeneratedProjectError::RootTypeMismatch { expected: STATE_TYPE_ID, actual: root_type.get() });\n");
     output.push_str("        }\n");
-    output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Command, command.admitted(), command.commitment())?;\n");
-    output.push_str("        Self::validate_input::<H>(GeneratedInputKind::Context, context.admitted(), context.commitment())?;\n");
-    output.push_str("        if expected.command_hash() != command.commitment() {\n");
-    output.push_str("            return Err(GeneratedProjectError::InputCommitmentMismatch { kind: GeneratedInputKind::Command, expected: expected.command_hash(), actual: command.commitment() });\n");
-    output.push_str("        }\n");
-    output.push_str("        let inner = CataloguedTransitionBuilder::try_new(\n");
-    output.push_str(
-        "            &self.catalog, pre_state.value().value(), state_domain, command.commitment(),\n",
-    );
-    output.push_str("            expected.context_hash(), budget_used, limits,\n");
-    output.push_str("        )?;\n");
-    output.push_str("        Ok(GeneratedTransition { inner })\n");
+    output.push_str("        Ok(())\n");
     output.push_str("    }\n\n");
     output.push_str("    fn validate_input<H: CommitmentHasher>(\n");
     output.push_str("        kind: GeneratedInputKind,\n");
@@ -897,6 +901,7 @@ fn render_catalog_manifest_construction(
         let disposition = match reason.disposition() {
             ReasonDisposition::Reject => "ReasonDisposition::Reject",
             ReasonDisposition::CommittedFailure => "ReasonDisposition::CommittedFailure",
+            _ => return Err(BootstrapError::UnsupportedReasonDisposition),
         };
         writeln!(
             output,
@@ -1158,7 +1163,7 @@ pub(crate) fn render_ci(spec: &BootstrapSpec) -> String {
 
 pub(crate) fn render_architecture(catalog: &ProjectCatalog, spec: &BootstrapSpec) -> String {
     format!(
-        "# {} bootstrap architecture\n\nGenerated by `{}` from the reviewed `{}/{}` catalog.\n\n## Authority boundary\n\nThe schema, profile, catalog, stable identifiers, policies, and resource limits are inputs. This package only renders them into inspectable starter artifacts. Runtime execution, migration activation, evidence acceptance, proof claims, promotion, and release remain outside generator authority.\n\nThe generated private-field `GeneratedProject` reconstructs the exact catalog and rechecks its schema, profile, complete catalog, and provider commitments. Its transition entry point accepts exact schema-admitted root, command, and context witnesses rather than raw values, caller-supplied commitments, or a caller-supplied catalog. Command and context commitments use visible role-separated domains derived from the reviewed profile prefix.\n\n## Pure transition path\n\n```text\nexact generated catalog + schema-admitted root/command/context\n  -> derived command/context commitments\n  -> typed helpers\n  -> CataloguedTransitionBuilder\n  -> catalog validation\n  -> Accept | Reject | CommittedFailure\n  -> candidate-bound CommitBundle\n```\n\n## Explicit nonclaims\n\n- The runtime skeleton is not a mounted runtime.\n- The migration stub authorizes no migration.\n- The evidence manifest contains no satisfied evidence.\n- Exact catalog reconstruction does not prove business-policy correctness.\n- Schema admission does not authenticate context provenance.\n- Generation is not a proof or production-readiness claim.\n\n## Deterministic output bounds\n\n- Files: at most {}.\n- Bytes per file: at most {}.\n- Aggregate bytes: at most {}.\n",
+        "# {} bootstrap architecture\n\nGenerated by `{}` from the `{}/{}` catalog.\n\n## Authority boundary\n\nThe schema, profile, catalog, stable identifiers, policies, and resource limits are inputs. Generation renders inspectable starter artifacts; it does not admit business intent or authorize execution, migration, proof acceptance, promotion or release.\n\nThe private-field `GeneratedProject` reconstructs the exact catalog and rechecks its schema, profile, complete catalog and provider commitments. Typed input helpers retain complete original envelopes and derive command/context commitments in explicit profile-separated domains. Inert effect/channel helpers cannot authorize a decision.\n\n## Checked program path\n\n```text\ncomplete original schema + policy + ProgramDefinition + original frame/channel links\n  -> exact catalog correspondence\n  -> library bind_catalog\n  -> library bind_program (derived identity)\n  -> actual original envelope admission, private meter, complete decision and required laws\n  -> Accept | Reject | CommittedFailure | technical refusal\n  -> private Publication for committing outcomes\n  -> trusted host persistence and physical delivery\n```\n\n`GeneratedDeclarations` supplies untrusted original-field proposals. The catalog does not contain a complete business policy: callers must supply the full supported closed control graph, branches, footprints, required laws and genuine genesis declarations. Unsupported schema/profile combinations return named refusals and grant no publication capability.\n\n## Explicit nonclaims\n\n- The runtime skeleton is not a mounted runtime.\n- The migration stub authorizes no migration.\n- The evidence manifest contains no satisfied evidence.\n- Exact catalog reconstruction does not prove business-policy correctness.\n- Schema admission does not authenticate context provenance.\n- Generation is not a proof or production-readiness claim.\n\n## Deterministic output bounds\n\n- Files: at most {}.\n- Bytes per file: at most {}.\n- Aggregate bytes: at most {}.\n",
         spec.package_name(),
         BOOTSTRAP_GENERATOR_ID,
         catalog.profile().project().as_str(),

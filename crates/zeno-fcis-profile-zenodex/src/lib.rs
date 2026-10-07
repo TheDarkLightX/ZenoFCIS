@@ -10,15 +10,14 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::StableReason;
-use zeno_fcis_refine::{PromotionPolicy, RefineError, ToolKind};
-use zeno_fcis_value::{Field, Value};
+use zeno_fcis_refine::{EvidenceKind, PromotionPolicy, RefineError};
+use zeno_fcis_value::{Field, Value, ValueRef};
 
 /// Decimal E8 scale used by the initial zUSD profile.
 pub const E8: u128 = 100_000_000;
@@ -152,8 +151,9 @@ impl ZenoDexProfileV1 {
     }
 }
 
-impl CanonicalEncode for ZenoDexProfileV1 {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ZenoDexProfileV1 {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(self.lane as u8);
         output.extend_from_slice(&self.profile_version.to_be_bytes());
         output.extend_from_slice(&self.state_type.to_be_bytes());
@@ -165,6 +165,13 @@ impl CanonicalEncode for ZenoDexProfileV1 {
         output.extend_from_slice(self.precedence_hash.as_bytes());
         output.extend_from_slice(self.algorithm_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -322,7 +329,7 @@ impl ZusdStateV1 {
 
     /// Parses the canonical reference record representation.
     pub fn try_from_value(value: &Value) -> Result<Self, ZusdStateError> {
-        let Value::Record(fields) = value else {
+        let ValueRef::Record(fields) = value.view() else {
             return Err(ZusdStateError::WrongValueKind);
         };
         if fields.len() != ZusdStateFieldV1::COUNT {
@@ -334,14 +341,14 @@ impl ZusdStateV1 {
                 return Err(ZusdStateError::WrongFieldOrder);
             }
             values[index] = if index == ZusdStateFieldV1::OracleSeen.index() {
-                match field.value() {
-                    Value::Bool(false) => 0,
-                    Value::Bool(true) => 1,
+                match field.value().view() {
+                    ValueRef::Bool(false) => 0,
+                    ValueRef::Bool(true) => 1,
                     _ => return Err(ZusdStateError::WrongFieldKind),
                 }
             } else {
-                match field.value() {
-                    Value::U128(value) => *value,
+                match field.value().view() {
+                    ValueRef::U128(value) => value,
                     _ => return Err(ZusdStateError::WrongFieldKind),
                 }
             };
@@ -354,9 +361,9 @@ impl ZusdStateV1 {
         let mut output = Vec::with_capacity(ZusdStateFieldV1::COUNT);
         for (index, value) in self.fields.iter().copied().enumerate() {
             let field_value = if index == ZusdStateFieldV1::OracleSeen.index() {
-                Value::Bool(value == 1)
+                Value::boolean(value == 1)
             } else {
-                Value::U128(value)
+                Value::unsigned(value)
             };
             output.push(Field::new(
                 u16::try_from(index).map_err(|_| ZusdStateError::ArithmeticOverflow)?,
@@ -615,13 +622,13 @@ impl ZusdCommandV1 {
             Self::BootstrapOracle { auth_ok, price_e8 }
             | Self::OracleReport { auth_ok, price_e8 } => Some(
                 Value::record_canonical(vec![
-                    Field::new(0, Value::Bool(auth_ok)),
-                    Field::new(1, Value::U128(price_e8)),
+                    Field::new(0, Value::boolean(auth_ok)),
+                    Field::new(1, Value::unsigned(price_e8)),
                 ])
                 .map_err(|_| ZusdStateError::WrongFieldOrder)?,
             ),
             Self::OracleCommit { auth_ok } => Some(
-                Value::record_canonical(vec![Field::new(0, Value::Bool(auth_ok))])
+                Value::record_canonical(vec![Field::new(0, Value::boolean(auth_ok))])
                     .map_err(|_| ZusdStateError::WrongFieldOrder)?,
             ),
             Self::DepositCollateral { amount_e8 }
@@ -633,11 +640,7 @@ impl ZusdCommandV1 {
             | Self::RedeemZusd { amount_e8 } => Some(single_u128_payload(amount_e8)?),
             Self::Liquidate => None,
         };
-        Ok(Value::Sum {
-            type_id: ZUSD_COMMAND_TYPE_V1,
-            variant: self.tag() as u16,
-            payload: payload.map(Box::new),
-        })
+        Ok(Value::sum(ZUSD_COMMAND_TYPE_V1, self.tag() as u16, payload))
     }
 }
 
@@ -877,13 +880,13 @@ pub fn zusd_precedence_hash_v1<H: CommitmentHasher>() -> Result<Hash32, ProfileE
 pub fn zusd_promotion_policy_v1() -> Result<PromotionPolicy, RefineError> {
     PromotionPolicy::try_new(
         vec![
-            ToolKind::Z3,
-            ToolKind::Cvc5,
-            ToolKind::Lean,
-            ToolKind::Kani,
-            ToolKind::TranslationValidation,
-            ToolKind::CodecVectors,
-            ToolKind::RuntimeRefinement,
+            EvidenceKind::Z3,
+            EvidenceKind::Cvc5,
+            EvidenceKind::Lean,
+            EvidenceKind::Kani,
+            EvidenceKind::TranslationValidation,
+            EvidenceKind::CodecVectors,
+            EvidenceKind::RuntimeRefinement,
         ],
         true,
     )
@@ -972,7 +975,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 }
 
 fn single_u128_payload(value: u128) -> Result<Value, ZusdStateError> {
-    Value::record_canonical(vec![Field::new(0, Value::U128(value))])
+    Value::record_canonical(vec![Field::new(0, Value::unsigned(value))])
         .map_err(|_| ZusdStateError::WrongFieldOrder)
 }
 
@@ -980,19 +983,7 @@ fn single_u128_payload(value: u128) -> Result<Value, ZusdStateError> {
 mod tests {
     use super::*;
 
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test/fold/v1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                output[index % 32] = output[index % 32].wrapping_add(byte);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
     fn default_fields() -> [u128; ZusdStateFieldV1::COUNT] {
         let mut fields = [0_u128; ZusdStateFieldV1::COUNT];

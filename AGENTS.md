@@ -5,6 +5,19 @@ For any handoff or referenced brief, use
 before editing. Read the complete source, state the definition of done and
 required checks, then inspect every final check before claiming completion.
 
+Review functional-core purity at each declared authoritative invocation
+boundary. Inputs and bound policy must remain transitively immutable, and
+checked results must not expose mutable aliases. Internal mutation needs
+explicit exclusive ownership, caller flow, lifetime and refusal accounting;
+invocation scratch must not become retained state. A mutable reference is a
+review lead, not by itself a purity defect.
+
+Classify stateful preparation handles and caller-buffer serialization utilities
+separately from the pure decision API. They cannot supply decision, resource
+usage or publication authority. Source-pin the ownership review for any new
+mutable interface or escaping alias. Preserve measured work on refusal and
+retry; changing an interface's syntax does not establish verification.
+
 Choose the smallest understandable design that preserves the required
 assurance, with demonstrated behavior preservation for each simplification.
 

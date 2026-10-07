@@ -2,6 +2,7 @@
 
 use super::*;
 use alloc::vec;
+use zeno_fcis_codec::CanonicalEncode;
 
 fn identity() -> Program {
     Program::try_new(
@@ -11,6 +12,61 @@ fn identity() -> Program {
         vec![0],
     )
     .unwrap_or_else(|error| panic!("identity program: {error}"))
+}
+
+#[test]
+fn canonical_program_import_rejects_hostile_artifacts() {
+    let program = identity();
+    let bytes = program
+        .value()
+        .and_then(|value| value.canonical_bytes())
+        .unwrap_or_else(|error| panic!("canonical program: {error}"));
+    assert_eq!(
+        crate::finite_runtime::import_program(&bytes),
+        Ok(program.clone())
+    );
+
+    let mut trailing = bytes.clone();
+    trailing.push(0);
+    assert!(crate::finite_runtime::import_program(&trailing).is_err());
+    assert!(crate::finite_runtime::import_program(&bytes[..bytes.len() - 1]).is_err());
+
+    let source = program
+        .value()
+        .unwrap_or_else(|error| panic!("program: {error}"));
+    let zeno_fcis_value::ValueRef::Tuple(fields) = source.view() else {
+        panic!("program tuple")
+    };
+    let mut changed = fields.to_vec();
+    changed[0] = Value::text_ascii("other-profile".into())
+        .unwrap_or_else(|error| panic!("profile: {error}"));
+    let wrong_profile = Value::tuple(changed).unwrap_or_else(|error| panic!("tuple: {error}"));
+    assert!(
+        crate::finite_runtime::import_program(
+            &wrong_profile
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("changed profile: {error}"))
+        )
+        .is_err()
+    );
+
+    let mut changed = fields.to_vec();
+    let zeno_fcis_value::ValueRef::Tuple(nodes) = changed[2].view() else {
+        panic!("nodes tuple")
+    };
+    let mut nodes = nodes.to_vec();
+    nodes[0] = Value::tuple(vec![Value::signed(0), Value::signed(99)])
+        .unwrap_or_else(|error| panic!("node: {error}"));
+    changed[2] = Value::tuple(nodes).unwrap_or_else(|error| panic!("nodes: {error}"));
+    let bad_reference = Value::tuple(changed).unwrap_or_else(|error| panic!("tuple: {error}"));
+    assert!(
+        crate::finite_runtime::import_program(
+            &bad_reference
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("changed node: {error}"))
+        )
+        .is_err()
+    );
 }
 
 #[test]

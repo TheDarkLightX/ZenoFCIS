@@ -26,7 +26,7 @@ cannot state. The template shows four patterns:
   pause in range, for every integer. CVC5 attests each induction step, and
   `tests/claims.rs` checks the rest of the argument.
 
-`src/program.rs` decides deposits and requests by hand-written rules and
+The original privately retained `src/program.rs` decides deposits and requests by hand-written rules and
 ticks by the synthesized step in `synthesized/transition.rs`. The law checker
 in `src/laws.rs` evaluates the formulas in `project.zeno` against every
 decision and refuses any decision that breaks them, including a tick that
@@ -39,6 +39,23 @@ bindings. `profile.rs` binds the exact source, including the synthesis
 problem and its selected step, the controller's contract, its pin, the
 certified strategy, and the model that wrote them, and the runtime-only law
 manifest.
+
+## V2 execution and retained legacy evidence
+
+The normal `src/lib.rs` and demonstration use `v2_contract::Contract`, its
+complete original-schema descriptor, and the checked library V2 Authority.
+The library reads the original envelopes, evaluates the declared typed graph,
+constructs the complete decision, and checks the original law programs with
+one meter. The SQLite shell consumes genuine `Publication` and
+`Publication` capabilities; exact replay recomputes the same original inputs.
+
+The hand-written adapters, legacy law engines and earlier synthesis/model
+checks described below are retained only in the repository’s nonpublished
+`verification/kernel-laws/src/oracle/templates/withdrawal-queue` package for independent oracle
+and historical evidence tests. They do not execute the normal V2 decision.
+The declared policy still requires independent review of the intended rules.
+Host input framing, caller authentication and typed display remain shell
+assumptions; the demonstration destination's ledger persists only in-process.
 
 ## The rules
 
@@ -230,7 +247,7 @@ this application never commits a failure, because the law checker refuses
 every one (law 508). So laws 501 to 503 bound every committing decision, and
 each claim assumes them on every commit. Each law declares that scope in
 `project.zeno` (`on commit`), so elaboration also checks the claims' groups
-against the declared scopes, and `authority()` checks the manifest against
+against the declared scopes, and the privately retained native authority checks the manifest against
 them before it builds the authority. An induction step asks whether any
 transition the assumed laws admit can take a vault that satisfies the
 invariant to one that does not. It is checked for every integer, not only
@@ -492,11 +509,11 @@ cargo +1.97.1 run --locked -- new-vault.sqlite
 ```
 
 The SQLite shell is the `sqlite` feature, on by default. Without it,
-`cargo +1.97.1 build --no-default-features` builds the core alone: the
-generated bindings, the program, the law checker, the profile, the delivery
-adapter, and `authority()`, with no database; the gate checks that it also
-compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
-binary need the feature.
+`cargo +1.97.1 build --no-default-features` builds the V2 declarations,
+checked Authority and generated proposal/admission helpers; original native
+oracles are confined to the nonpublished private suite
+without a database. The gate also checks `wasm32-unknown-unknown`.
+`create`, `invoke`, `journey` and the demonstration binary need the feature.
 
 The demonstration requires a new database path. It deposits four units,
 meets every rejection reason, and requests a withdrawal on each lane. The

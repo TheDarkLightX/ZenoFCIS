@@ -10,7 +10,14 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
+mod artifact;
+mod providers;
+#[cfg(feature = "libcrux")]
+pub use providers::LibcruxSha256;
+pub use providers::RustCryptoSha256;
+pub mod domains;
+pub use artifact::EvidenceArtifact;
+
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
@@ -19,7 +26,9 @@ use zeno_fcis_value::zcve::{
     TAG_BOOL_FALSE, TAG_BOOL_TRUE, TAG_BYTES, TAG_ENUM, TAG_I128, TAG_MAP, TAG_RECORD, TAG_SUM,
     TAG_TEXT, TAG_TUPLE, TAG_U128, TAG_UNIT, TAG_VECTOR,
 };
-use zeno_fcis_value::{AdmittedValue, Field, MapEntry, Value, ValueError, ValueLimits};
+use zeno_fcis_value::{
+    AdmittedValue, Field, MapEntry, Value, ValueError, ValueLimits, ValueMetrics,
+};
 const ENVELOPE_MAGIC: &[u8; 8] = b"ZFCISV1\0";
 const ENVELOPE_OVERHEAD_BYTES: u64 = 8 + 4 + 32 + 4;
 const HASH_MAGIC: &[u8; 14] = b"ZENOFCIS-HASH\0";
@@ -60,11 +69,29 @@ impl fmt::Display for Hash32 {
     }
 }
 
+mod hasher_seal {
+    pub trait Sealed {}
+}
+
 /// A cryptographic commitment provider.
 ///
 /// The semantic kernel owns domain separation and preimage construction. A
 /// provider supplies only the vetted 32-byte hash primitive.
-pub trait CommitmentHasher {
+///
+/// Only the library's closed providers implement this trait.
+/// ```compile_fail
+/// use zeno_fcis_codec::{CommitmentHasher, Hash32};
+/// struct Impostor;
+/// impl CommitmentHasher for Impostor {
+///     const ALGORITHM_ID: &'static str = "sha2-256/rustcrypto-0.11.0";
+///     fn hash(_: &[u8]) -> Hash32 { Hash32::ZERO }
+/// }
+/// ```
+/// ```compile_fail
+/// struct Impostor;
+/// impl zeno_fcis_codec::hasher_seal::Sealed for Impostor {}
+/// ```
+pub trait CommitmentHasher: hasher_seal::Sealed {
     /// Stable algorithm identifier, such as `sha2-256/rustcrypto-0.11`.
     const ALGORITHM_ID: &'static str;
 
@@ -90,9 +117,16 @@ pub struct Domain<'a> {
 }
 
 impl<'a> Domain<'a> {
-    /// Validates an ASCII, non-empty, bounded domain name.
+    /// Validates a project domain outside the reserved library namespace.
+    ///
+    /// Fixed library domains are available only through [`domains`]. A caller
+    /// cannot recreate even a registered reserved domain by supplying its name.
     pub fn new(name: &'a str, version: u16) -> Result<Self, EncodeError> {
-        if name.is_empty() || !name.is_ascii() || name.len() > usize::from(u16::MAX) {
+        if name.is_empty()
+            || !name.is_ascii()
+            || name.len() > usize::from(u16::MAX)
+            || is_reserved_domain_name(name)
+        {
             return Err(EncodeError::InvalidDomain);
         }
         Ok(Self { name, version })
@@ -109,6 +143,15 @@ impl<'a> Domain<'a> {
     pub const fn version(self) -> u16 {
         self.version
     }
+}
+
+/// Namespace reserved for fixed library commitment identities.
+pub const RESERVED_DOMAIN_NAMESPACE: &str = "zeno-fcis";
+
+/// Tests the exact reserved namespace boundary without normalization.
+#[must_use]
+pub fn is_reserved_domain_name(name: &str) -> bool {
+    name == RESERVED_DOMAIN_NAMESPACE || name.starts_with("zeno-fcis/")
 }
 
 /// Builds the exact domain-separated hash preimage.
@@ -163,8 +206,29 @@ pub fn commitment<H: CommitmentHasher>(
     Ok(H::hash_parts(&parts))
 }
 
-/// Canonical encoding interface.
-pub trait CanonicalEncode {
+mod canonical_seal {
+    pub trait Sealed {}
+    impl Sealed for zeno_fcis_value::Value {}
+    impl Sealed for zeno_fcis_value::AdmittedValue {}
+    impl Sealed for super::Envelope {}
+    impl Sealed for super::AdmittedEnvelope {}
+}
+
+/// Canonical encoding for the four closed library value/envelope types.
+///
+/// The private supertrait prevents downstream encoding substitution.
+/// ```compile_fail
+/// use zeno_fcis_codec::{CanonicalEncode, EncodeError};
+/// struct Forged;
+/// impl CanonicalEncode for Forged {
+///     fn encode_to(&self, _: &mut Vec<u8>) -> Result<(), EncodeError> { Ok(()) }
+/// }
+/// ```
+/// ```compile_fail
+/// impl zeno_fcis_codec::canonical_seal::Sealed for Forged {}
+/// struct Forged;
+/// ```
+pub trait CanonicalEncode: canonical_seal::Sealed {
     /// Appends one canonical encoding.
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError>;
 
@@ -188,6 +252,28 @@ impl CanonicalEncode for AdmittedValue {
     }
 }
 
+/// Appends a canonical value using exactly the supplied structural limits.
+/// Every refusal preserves the existing output prefix.
+pub fn encode_value_with_limits(
+    value: &Value,
+    output: &mut Vec<u8>,
+    limits: ValueLimits,
+) -> Result<(), EncodeError> {
+    value
+        .encode_zcve_to_with_limits(output, limits)
+        .map_err(map_value_encode_error)
+}
+
+/// Returns canonical value bytes using exactly the supplied structural limits.
+pub fn canonical_value_bytes_with_limits(
+    value: &Value,
+    limits: ValueLimits,
+) -> Result<Vec<u8>, EncodeError> {
+    value
+        .zcve_bytes_with_limits(limits)
+        .map_err(map_value_encode_error)
+}
+
 fn map_value_encode_error(error: ValueError) -> EncodeError {
     match error {
         ValueError::RecordFieldOrder { .. } => EncodeError::NonCanonicalRecord,
@@ -195,18 +281,6 @@ fn map_value_encode_error(error: ValueError) -> EncodeError {
         ValueError::NonAsciiText => EncodeError::NonAsciiText,
         other => EncodeError::InvalidValue(other),
     }
-}
-
-fn put_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError> {
-    let length = u32::try_from(length).map_err(|_| EncodeError::LengthOverflow)?;
-    output.extend_from_slice(&length.to_be_bytes());
-    Ok(())
-}
-
-fn put_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
-    put_length(output, bytes.len())?;
-    output.extend_from_slice(bytes);
-    Ok(())
 }
 
 /// A canonical typed value envelope.
@@ -226,6 +300,33 @@ impl Envelope {
             schema_hash,
             value,
         }
+    }
+
+    /// Appends a complete frame admitted by the exact supplied limits.
+    /// Every refusal leaves the output prefix unchanged.
+    pub fn encode_to_with_limits(
+        &self,
+        output: &mut Vec<u8>,
+        limits: DecodeLimits,
+    ) -> Result<(), EncodeError> {
+        let payload = canonical_value_bytes_with_limits(&self.value, limits.value)?;
+        append_envelope(
+            output,
+            self.type_id,
+            self.schema_hash,
+            &payload,
+            limits.max_input_bytes,
+        )
+    }
+
+    /// Returns a complete frame admitted by the exact supplied limits.
+    pub fn canonical_bytes_with_limits(
+        &self,
+        limits: DecodeLimits,
+    ) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to_with_limits(&mut output, limits)?;
+        Ok(output)
     }
 
     /// Returns the type identifier.
@@ -253,8 +354,7 @@ impl Envelope {
     }
 }
 
-/// A canonical envelope admitted under the reviewed default value and input
-/// limits.
+/// A canonical envelope admitted under its exact retained value and input limits.
 ///
 /// Construction owns an [`AdmittedValue`] and retains its exact canonical
 /// payload length. Private fields prevent callers from pairing a different
@@ -264,12 +364,13 @@ impl Envelope {
 /// use zeno_fcis_codec::{AdmittedEnvelope, Hash32};
 /// use zeno_fcis_value::{AdmittedValue, Value};
 ///
-/// let value = AdmittedValue::try_new(Value::Unit)?;
+/// let value = AdmittedValue::try_new(Value::unit())?;
 /// let _ = AdmittedEnvelope {
 ///     type_id: 1,
 ///     schema_hash: Hash32::ZERO,
 ///     value,
 ///     payload_length: 1,
+///     max_input_bytes: 1,
 /// };
 /// # Ok::<(), zeno_fcis_value::ValueError>(())
 /// ```
@@ -279,6 +380,7 @@ pub struct AdmittedEnvelope {
     schema_hash: Hash32,
     value: AdmittedValue,
     payload_length: u32,
+    max_input_bytes: u64,
 }
 
 impl AdmittedEnvelope {
@@ -303,9 +405,38 @@ impl AdmittedEnvelope {
         value: AdmittedValue,
         max_input_bytes: u64,
     ) -> Result<Self, EncodeError> {
-        let payload = value.canonical_bytes()?;
-        let payload_length =
-            u32::try_from(payload.len()).map_err(|_| EncodeError::LengthOverflow)?;
+        Self::try_new_with_limits(
+            type_id,
+            schema_hash,
+            value,
+            DecodeLimits {
+                max_input_bytes,
+                value: ValueLimits::default(),
+            },
+        )
+    }
+
+    /// Owns a value admitted under the exact supplied structural and input limits.
+    pub fn try_new_with_limits(
+        type_id: u32,
+        schema_hash: Hash32,
+        value: AdmittedValue,
+        limits: DecodeLimits,
+    ) -> Result<Self, EncodeError> {
+        let value = if value.limits() == limits.value {
+            value
+        } else {
+            AdmittedValue::try_new_with_limits(value.into_value(), limits.value)
+                .map_err(map_value_encode_error)?
+        };
+        let max_input_bytes = limits.max_input_bytes;
+        let payload_length = u32::try_from(
+            value
+                .value()
+                .encoded_length()
+                .map_err(map_value_encode_error)?,
+        )
+        .map_err(|_| EncodeError::LengthOverflow)?;
         let attempted = ENVELOPE_OVERHEAD_BYTES
             .checked_add(u64::from(payload_length))
             .ok_or(EncodeError::LengthOverflow)?;
@@ -320,13 +451,32 @@ impl AdmittedEnvelope {
             schema_hash,
             value,
             payload_length,
+            max_input_bytes,
         })
     }
 
     /// Admits an existing raw envelope under the reviewed default limits.
     pub fn try_from_envelope(envelope: Envelope) -> Result<Self, EncodeError> {
-        let value = AdmittedValue::try_new(envelope.value).map_err(map_value_encode_error)?;
-        Self::try_new(envelope.type_id, envelope.schema_hash, value)
+        Self::try_from_envelope_with_limits(envelope, DecodeLimits::default())
+    }
+
+    /// Admits an existing envelope under exactly the supplied limits.
+    pub fn try_from_envelope_with_limits(
+        envelope: Envelope,
+        limits: DecodeLimits,
+    ) -> Result<Self, EncodeError> {
+        let value = AdmittedValue::try_new_with_limits(envelope.value, limits.value)
+            .map_err(map_value_encode_error)?;
+        Self::try_new_with_limits(envelope.type_id, envelope.schema_hash, value, limits)
+    }
+
+    /// Returns the actual limits retained at admission.
+    #[must_use]
+    pub const fn limits(&self) -> DecodeLimits {
+        DecodeLimits {
+            max_input_bytes: self.max_input_bytes,
+            value: self.value.limits(),
+        }
     }
 
     /// Returns the type identifier.
@@ -372,23 +522,59 @@ impl AdmittedEnvelope {
     }
 }
 
+fn append_envelope(
+    output: &mut Vec<u8>,
+    type_id: u32,
+    schema_hash: Hash32,
+    payload: &[u8],
+    max_input_bytes: u64,
+) -> Result<(), EncodeError> {
+    let payload_length = u32::try_from(payload.len()).map_err(|_| EncodeError::LengthOverflow)?;
+    let attempted = ENVELOPE_OVERHEAD_BYTES
+        .checked_add(u64::from(payload_length))
+        .ok_or(EncodeError::LengthOverflow)?;
+    if attempted > max_input_bytes {
+        return Err(EncodeError::EnvelopeInputLimit {
+            limit: max_input_bytes,
+            attempted,
+        });
+    }
+    let total = usize::try_from(attempted).map_err(|_| EncodeError::LengthOverflow)?;
+    output
+        .len()
+        .checked_add(total)
+        .ok_or(EncodeError::LengthOverflow)?;
+    // All fallible validation and arithmetic precedes the first output write.
+    output.extend_from_slice(ENVELOPE_MAGIC);
+    output.extend_from_slice(&type_id.to_be_bytes());
+    output.extend_from_slice(schema_hash.as_bytes());
+    output.extend_from_slice(&payload_length.to_be_bytes());
+    output.extend_from_slice(payload);
+    Ok(())
+}
+
 impl CanonicalEncode for Envelope {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
-        output.extend_from_slice(ENVELOPE_MAGIC);
-        output.extend_from_slice(&self.type_id.to_be_bytes());
-        output.extend_from_slice(self.schema_hash.as_bytes());
-        let payload = self.value.canonical_bytes()?;
-        put_bytes(output, &payload)
+        self.encode_to_with_limits(
+            output,
+            DecodeLimits {
+                max_input_bytes: u64::MAX,
+                value: ValueLimits::default(),
+            },
+        )
     }
 }
 
 impl CanonicalEncode for AdmittedEnvelope {
     fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
-        output.extend_from_slice(ENVELOPE_MAGIC);
-        output.extend_from_slice(&self.type_id.to_be_bytes());
-        output.extend_from_slice(self.schema_hash.as_bytes());
-        output.extend_from_slice(&self.payload_length.to_be_bytes());
-        self.value.encode_to(output)
+        let payload = self.value.canonical_bytes()?;
+        append_envelope(
+            output,
+            self.type_id,
+            self.schema_hash,
+            &payload,
+            self.max_input_bytes,
+        )
     }
 }
 
@@ -417,9 +603,25 @@ impl DecodeLimits {
 
 /// Decodes one value and rejects trailing bytes and noncanonical aliases.
 pub fn decode_value(bytes: &[u8], limits: DecodeLimits) -> Result<Value, DecodeError> {
+    decode_value_with_metrics(bytes, limits).map(|(value, _)| value)
+}
+
+/// Decodes a value and returns the exact counters observed by the actual decoder.
+pub fn decode_value_with_metrics(
+    bytes: &[u8],
+    limits: DecodeLimits,
+) -> Result<(Value, ValueMetrics), DecodeError> {
     enforce_input_limit(bytes, limits)?;
     let mut state = DecodeState::new(limits.value);
-    decode_complete_value(bytes, &mut state, 0)
+    let value = decode_complete_value(bytes, &mut state, 0)?;
+    Ok((
+        value,
+        ValueMetrics {
+            nodes: state.nodes,
+            payload_bytes: state.payload_bytes,
+            depth: state.depth,
+        },
+    ))
 }
 
 /// Decodes one canonical envelope.
@@ -458,7 +660,7 @@ pub fn decode_envelope(bytes: &[u8], limits: DecodeLimits) -> Result<Envelope, D
 /// must be consumed and the decoded value must re-encode to it. The caller owns
 /// the structural budget. [`decode_value`] enforces the input size and starts a
 /// fresh [`DecodeState`] at depth zero; a nested map key or value shares its
-/// parent's state and enters at `depth + 1`, so nesting inside a blob is
+/// parent's state and enters at `depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?`, so nesting inside a blob is
 /// charged against the same depth, node, and payload budgets as nesting on the
 /// wire. Reported trailing-byte offsets are relative to `bytes`.
 fn decode_complete_value(
@@ -473,7 +675,9 @@ fn decode_complete_value(
             offset: cursor.offset,
         });
     }
-    if value.canonical_bytes().map_err(DecodeError::Encode)? != bytes {
+    if canonical_value_bytes_with_limits(&value, state.limits).map_err(DecodeError::Encode)?
+        != bytes
+    {
         return Err(DecodeError::NonCanonical);
     }
     Ok(value)
@@ -494,6 +698,7 @@ struct DecodeState {
     limits: ValueLimits,
     nodes: u64,
     payload_bytes: u64,
+    depth: u32,
 }
 
 impl DecodeState {
@@ -502,6 +707,7 @@ impl DecodeState {
             limits,
             nodes: 0,
             payload_bytes: 0,
+            depth: 0,
         }
     }
 
@@ -512,6 +718,7 @@ impl DecodeState {
                 attempted: depth,
             });
         }
+        self.depth = self.depth.max(depth);
         self.nodes = self
             .nodes
             .checked_add(1)
@@ -559,23 +766,24 @@ fn decode_value_inner(
     state.enter(depth)?;
     let tag = cursor.take_u8()?;
     match tag {
-        TAG_UNIT => Ok(Value::Unit),
-        TAG_BOOL_FALSE => Ok(Value::Bool(false)),
-        TAG_BOOL_TRUE => Ok(Value::Bool(true)),
+        TAG_UNIT => Ok(Value::unit()),
+        TAG_BOOL_FALSE => Ok(Value::boolean(false)),
+        TAG_BOOL_TRUE => Ok(Value::boolean(true)),
         TAG_U128 => {
             let mut bytes = [0_u8; 16];
             bytes.copy_from_slice(cursor.take(16)?);
-            Ok(Value::U128(u128::from_be_bytes(bytes)))
+            Ok(Value::unsigned(u128::from_be_bytes(bytes)))
         }
         TAG_I128 => {
             let mut bytes = [0_u8; 16];
             bytes.copy_from_slice(cursor.take(16)?);
-            Ok(Value::I128(i128::from_be_bytes(bytes)))
+            Ok(Value::signed(i128::from_be_bytes(bytes)))
         }
         TAG_BYTES => {
             let bytes = cursor.take_blob(state.limits.max_payload_bytes)?;
             state.payload(bytes.len())?;
-            Ok(Value::Bytes(bytes.to_vec().into_boxed_slice()))
+            Value::bytes_with_limits(bytes.to_vec(), state.limits)
+                .map_err(DecodeError::InvalidValue)
         }
         TAG_TEXT => {
             let bytes = cursor.take_blob(state.limits.max_payload_bytes)?;
@@ -584,24 +792,26 @@ fn decode_value_inner(
                 return Err(DecodeError::NonAsciiText);
             }
             let text = core::str::from_utf8(bytes).map_err(|_| DecodeError::Utf8)?;
-            Ok(Value::Text(String::from(text).into_boxed_str()))
+            Value::text_ascii_with_limits(String::from(text), state.limits)
+                .map_err(DecodeError::InvalidValue)
         }
-        TAG_ENUM => Ok(Value::Enum {
-            type_id: cursor.take_u32()?,
-            variant: cursor.take_u16()?,
-        }),
+        TAG_ENUM => Ok(Value::enumeration(cursor.take_u32()?, cursor.take_u16()?)),
         TAG_TUPLE | TAG_VECTOR => {
             let count = cursor.take_u32()?;
             state.collection(count)?;
             let mut items =
                 Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 1)?);
             for _ in 0..count {
-                items.push(decode_value_inner(cursor, state, depth + 1)?);
+                items.push(decode_value_inner(
+                    cursor,
+                    state,
+                    depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                )?);
             }
             if tag == TAG_TUPLE {
-                Ok(Value::Tuple(items.into_boxed_slice()))
+                Value::tuple(items).map_err(DecodeError::InvalidValue)
             } else {
-                Ok(Value::Vector(items.into_boxed_slice()))
+                Value::vector(items).map_err(DecodeError::InvalidValue)
             }
         }
         TAG_RECORD => {
@@ -619,7 +829,11 @@ fn decode_value_inner(
                 previous = Some(id);
                 fields.push(Field::new(
                     id,
-                    decode_value_inner(cursor, state, depth + 1)?,
+                    decode_value_inner(
+                        cursor,
+                        state,
+                        depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                    )?,
                 ));
             }
             Value::record_canonical(fields).map_err(DecodeError::InvalidValue)
@@ -629,14 +843,14 @@ fn decode_value_inner(
             let variant = cursor.take_u16()?;
             let payload = match cursor.take_u8()? {
                 0 => None,
-                1 => Some(Box::new(decode_value_inner(cursor, state, depth + 1)?)),
+                1 => Some(decode_value_inner(
+                    cursor,
+                    state,
+                    depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                )?),
                 _ => return Err(DecodeError::InvalidSumFlag),
             };
-            Ok(Value::Sum {
-                type_id,
-                variant,
-                payload,
-            })
+            Ok(Value::sum(type_id, variant, payload))
         }
         TAG_MAP => {
             let count = cursor.take_u32()?;
@@ -657,10 +871,19 @@ fn decode_value_inner(
                 let encoded_value = cursor.take_blob(state.limits.max_payload_bytes)?;
                 state.payload(encoded_value.len())?;
 
-                let key = decode_complete_value(encoded_key, state, depth + 1)?;
-                let value = decode_complete_value(encoded_value, state, depth + 1)?;
+                let key = decode_complete_value(
+                    encoded_key,
+                    state,
+                    depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                )?;
+                let value = decode_complete_value(
+                    encoded_value,
+                    state,
+                    depth.checked_add(1).ok_or(DecodeError::LengthOverflow)?,
+                )?;
 
-                let entry = MapEntry::try_new(key, value).map_err(DecodeError::InvalidValue)?;
+                let entry = MapEntry::try_new_with_limits(key, value, state.limits)
+                    .map_err(DecodeError::InvalidValue)?;
                 if entry.encoded_key() != encoded_key {
                     return Err(DecodeError::NonCanonical);
                 }
@@ -749,6 +972,7 @@ impl<'a> Cursor<'a> {
 
 /// Canonical encoding failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum EncodeError {
     /// A collection cannot be represented by the canonical length field.
     LengthOverflow,
@@ -762,7 +986,7 @@ pub enum EncodeError {
     MapKeyMismatch,
     /// Domain names must be non-empty bounded ASCII.
     InvalidDomain,
-    /// A complete admitted envelope exceeds the default decoder input limit.
+    /// A complete admitted envelope exceeds its supplied decoder input limit.
     EnvelopeInputLimit {
         /// Reviewed input limit.
         limit: u64,
@@ -771,6 +995,8 @@ pub enum EncodeError {
     },
     /// The value itself violates closed-value invariants.
     InvalidValue(ValueError),
+    /// A protocol variant is unknown to this encoding version.
+    UnsupportedProtocolVariant(&'static str),
 }
 
 impl core::error::Error for EncodeError {}
@@ -791,12 +1017,16 @@ impl fmt::Display for EncodeError {
                 "canonical envelope bytes {attempted} exceeds input limit {limit}"
             ),
             Self::InvalidValue(error) => error.fmt(formatter),
+            Self::UnsupportedProtocolVariant(name) => {
+                write!(formatter, "unsupported {name} protocol variant")
+            }
         }
     }
 }
 
 /// Canonical decoding failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum DecodeError {
     /// Input exceeds the global byte limit.
     InputLimit {
@@ -925,23 +1155,12 @@ impl fmt::Display for DecodeError {
 }
 
 #[cfg(test)]
+use RustCryptoSha256 as TestHasher;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use alloc::vec;
-
-    struct XorTestHasher;
-
-    impl CommitmentHasher for XorTestHasher {
-        const ALGORITHM_ID: &'static str = "test/xor/v1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                output[index % 32] ^= byte;
-            }
-            Hash32::new(output)
-        }
-    }
 
     /// One value per wire tag, including both sum payload flags and a map with
     /// more than one entry.
@@ -950,38 +1169,33 @@ mod tests {
             MapEntry::try_new(key, value).unwrap_or_else(|error| panic!("map entry: {error}"))
         };
         vec![
-            Value::Unit,
-            Value::Bool(false),
-            Value::Bool(true),
-            Value::U128(0),
-            Value::U128(u128::MAX),
-            Value::I128(i128::MIN),
+            Value::unit(),
+            Value::boolean(false),
+            Value::boolean(true),
+            Value::unsigned(0),
+            Value::unsigned(u128::MAX),
+            Value::signed(i128::MIN),
             Value::bytes(vec![1, 2]).unwrap_or_else(|error| panic!("bytes: {error}")),
-            Value::Text(String::from("abc").into_boxed_str()),
-            Value::Enum {
-                type_id: 4,
-                variant: 5,
-            },
-            Value::tuple(vec![Value::Unit, Value::Bool(true)]),
-            Value::vector(vec![Value::U128(1), Value::U128(2)]),
+            Value::text_ascii(String::from("abc")).unwrap_or_else(|error| panic!("text: {error}")),
+            Value::enumeration(4, 5),
+            Value::tuple(vec![Value::unit(), Value::boolean(true)])
+                .unwrap_or_else(|error| panic!("collection: {error}")),
+            Value::vector(vec![Value::unsigned(1), Value::unsigned(2)])
+                .unwrap_or_else(|error| panic!("collection: {error}")),
             Value::record_canonical(vec![
-                Field::new(1, Value::Unit),
-                Field::new(2, Value::I128(-1)),
+                Field::new(1, Value::unit()),
+                Field::new(2, Value::signed(-1)),
             ])
             .unwrap_or_else(|error| panic!("record: {error}")),
-            Value::Sum {
-                type_id: 6,
-                variant: 7,
-                payload: None,
-            },
-            Value::Sum {
-                type_id: 6,
-                variant: 7,
-                payload: Some(Box::new(Value::Bool(false))),
-            },
+            Value::sum(6, 7, None),
+            Value::sum(6, 7, Some(Value::boolean(false))),
             Value::map_canonical(vec![
-                entry(Value::U128(1), Value::Bool(true)),
-                entry(Value::U128(2), Value::tuple(vec![Value::Unit])),
+                entry(Value::unsigned(1), Value::boolean(true)),
+                entry(
+                    Value::unsigned(2),
+                    Value::tuple(vec![Value::unit()])
+                        .unwrap_or_else(|error| panic!("collection: {error}")),
+                ),
             ])
             .unwrap_or_else(|error| panic!("map: {error}")),
         ]
@@ -1103,7 +1317,7 @@ mod tests {
     #[test]
     fn envelope_byte_mutations_report_exact_errors() {
         let limits = DecodeLimits::default();
-        let base = envelope_bytes(Value::U128(9));
+        let base = envelope_bytes(Value::unsigned(9));
         let length_offset = ENVELOPE_MAGIC.len() + 4 + 32;
         let payload_length = base.len() - length_offset - 4;
 
@@ -1195,8 +1409,11 @@ mod tests {
 
     #[test]
     fn nested_map_blobs_share_the_parent_depth_node_and_payload_budgets() {
-        let entry = MapEntry::try_new(Value::U128(1), Value::tuple(vec![Value::Unit]))
-            .unwrap_or_else(|error| panic!("map entry: {error}"));
+        let entry = MapEntry::try_new(
+            Value::unsigned(1),
+            Value::tuple(vec![Value::unit()]).unwrap_or_else(|error| panic!("collection: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("map entry: {error}"));
         let nested =
             Value::map_canonical(vec![entry]).unwrap_or_else(|error| panic!("nested map: {error}"));
         let bytes = nested
@@ -1344,9 +1561,13 @@ mod tests {
     fn value_round_trip_is_exact() {
         let bytes = Value::bytes(vec![1, 2]).unwrap_or_else(|error| panic!("bytes: {error}"));
         let value = Value::record_canonical(vec![
-            Field::new(1, Value::U128(42)),
-            Field::new(2, Value::Bool(true)),
-            Field::new(3, Value::tuple(vec![Value::I128(-7), bytes])),
+            Field::new(1, Value::unsigned(42)),
+            Field::new(2, Value::boolean(true)),
+            Field::new(
+                3,
+                Value::tuple(vec![Value::signed(-7), bytes])
+                    .unwrap_or_else(|error| panic!("collection: {error}")),
+            ),
         ]);
         assert!(value.is_ok());
         let value = match value {
@@ -1364,7 +1585,8 @@ mod tests {
 
     #[test]
     fn admitted_value_encoding_matches_raw_and_is_repeatable() {
-        let value = Value::tuple(vec![Value::U128(42), Value::Bool(true)]);
+        let value = Value::tuple(vec![Value::unsigned(42), Value::boolean(true)])
+            .unwrap_or_else(|error| panic!("collection: {error}"));
         let raw = value
             .canonical_bytes()
             .unwrap_or_else(|error| panic!("raw encoding: {error}"));
@@ -1383,16 +1605,18 @@ mod tests {
 
     #[test]
     fn raw_value_encoding_remains_fail_closed() {
-        let value = Value::Text(String::from("é").into_boxed_str());
-        assert_eq!(value.canonical_bytes(), Err(EncodeError::NonAsciiText));
+        assert_eq!(
+            Value::text_ascii(String::from("é")),
+            Err(zeno_fcis_value::TextError::NonAscii)
+        );
     }
 
     #[test]
     fn map_order_is_encoded_key_order() {
-        let key_one = Value::U128(1);
-        let key_two = Value::U128(2);
-        let entry_one = MapEntry::try_new(key_one, Value::Bool(true));
-        let entry_two = MapEntry::try_new(key_two, Value::Bool(false));
+        let key_one = Value::unsigned(1);
+        let key_two = Value::unsigned(2);
+        let entry_one = MapEntry::try_new(key_one, Value::boolean(true));
+        let entry_two = MapEntry::try_new(key_two, Value::boolean(false));
         assert!(entry_one.is_ok() && entry_two.is_ok());
         let entries = vec![
             entry_one.unwrap_or_else(|error| panic!("map entry: {error}")),
@@ -1412,7 +1636,7 @@ mod tests {
 
     #[test]
     fn map_encoding_preserves_the_zcve_v1_golden_bytes() {
-        let entry = MapEntry::try_new(Value::U128(1), Value::Bool(true));
+        let entry = MapEntry::try_new(Value::unsigned(1), Value::boolean(true));
         assert!(entry.is_ok());
         let map = Value::map_canonical(vec![
             entry.unwrap_or_else(|error| panic!("map entry: {error}")),
@@ -1433,7 +1657,7 @@ mod tests {
 
     #[test]
     fn trailing_bytes_are_rejected() {
-        let mut bytes = Value::Bool(true).canonical_bytes().unwrap_or_default();
+        let mut bytes = Value::boolean(true).canonical_bytes().unwrap_or_default();
         bytes.push(0);
         assert!(matches!(
             decode_value(&bytes, DecodeLimits::default()),
@@ -1474,15 +1698,15 @@ mod tests {
             Ok(domain) => domain,
             Err(error) => panic!("unexpected domain error: {error}"),
         };
-        let left = commitment::<XorTestHasher>(domain, b"payload");
+        let left = commitment::<TestHasher>(domain, b"payload");
         let right =
-            commitment::<XorTestHasher>(Domain::new("zeno/test", 2).unwrap_or(domain), b"payload");
+            commitment::<TestHasher>(Domain::new("zeno/test", 2).unwrap_or(domain), b"payload");
         assert!(left.is_ok() && right.is_ok());
         assert_ne!(left, right);
     }
 
     #[test]
-    fn legacy_hasher_parts_preserve_concatenation_and_empty_parts() {
+    fn sealed_provider_parts_preserve_concatenation_and_empty_parts() {
         for parts in [
             vec![],
             vec![&b""[..]],
@@ -1490,49 +1714,31 @@ mod tests {
             vec![&b"abc"[..]],
         ] {
             assert_eq!(
-                XorTestHasher::hash_parts(&parts),
-                XorTestHasher::hash(&parts.concat())
+                TestHasher::hash_parts(&parts),
+                TestHasher::hash(&parts.concat())
             );
         }
     }
 
     #[test]
-    fn commitment_preserves_exact_framing_for_legacy_and_segmented_hashers() {
+    fn commitment_preserves_exact_framing_with_sealed_provider() {
         // Independent literal: magic, big-endian version, domain length/name,
         // big-endian payload length, payload. Empty parts add no framing.
         const EXPECTED: &[u8] =
             b"ZENOFCIS-HASH\0\x12\x34\x00\x01x\x00\x00\x00\x00\x00\x00\x00\x03abc";
-        struct CheckFraming;
-        impl CommitmentHasher for CheckFraming {
-            const ALGORITHM_ID: &'static str = "test/framing-only";
-
-            fn hash(bytes: &[u8]) -> Hash32 {
-                assert_eq!(bytes, EXPECTED);
-                Hash32::ZERO
-            }
-        }
-        struct CheckParts;
-        impl CommitmentHasher for CheckParts {
-            const ALGORITHM_ID: &'static str = "test/segmented-framing-only";
-
-            fn hash(bytes: &[u8]) -> Hash32 {
-                CheckFraming::hash(bytes)
-            }
-
-            fn hash_parts(parts: &[&[u8]]) -> Hash32 {
-                let mut observed = parts.iter().flat_map(|part| part.iter());
-                for expected in EXPECTED {
-                    assert_eq!(observed.next(), Some(expected));
-                }
-                assert_eq!(observed.next(), None);
-                Hash32::ZERO
-            }
-        }
         let domain =
             Domain::new("x", 0x1234).unwrap_or_else(|error| panic!("test domain: {error}"));
         assert_eq!(domain_preimage(domain, b"abc"), Ok(EXPECTED.to_vec()));
-        assert_eq!(commitment::<CheckFraming>(domain, b"abc"), Ok(Hash32::ZERO));
-        assert_eq!(commitment::<CheckParts>(domain, b"abc"), Ok(Hash32::ZERO));
+        // Independently generated SHA-256 known answer for the literal frame.
+        let expected_digest = Hash32::new([
+            254, 87, 153, 91, 207, 133, 214, 43, 165, 243, 234, 226, 106, 81, 234, 221, 24, 42,
+            154, 78, 166, 64, 54, 158, 9, 202, 84, 83, 23, 112, 229, 122,
+        ]);
+        assert_eq!(TestHasher::hash(EXPECTED), expected_digest);
+        assert_eq!(
+            commitment::<TestHasher>(domain, b"abc"),
+            Ok(expected_digest)
+        );
     }
 
     #[test]
@@ -1546,7 +1752,7 @@ mod tests {
 
     #[test]
     fn envelope_round_trip_binds_type_and_schema() {
-        let envelope = Envelope::new(7, Hash32::new([3; 32]), Value::U128(9));
+        let envelope = Envelope::new(7, Hash32::new([3; 32]), Value::unsigned(9));
         let bytes = envelope.canonical_bytes().unwrap_or_default();
         assert_eq!(
             decode_envelope(&bytes, DecodeLimits::default()),
@@ -1559,7 +1765,8 @@ mod tests {
         let raw = Envelope::new(
             7,
             Hash32::new([3; 32]),
-            Value::tuple(vec![Value::U128(9), Value::Bool(true)]),
+            Value::tuple(vec![Value::unsigned(9), Value::boolean(true)])
+                .unwrap_or_else(|error| panic!("collection: {error}")),
         );
         let raw_bytes = raw
             .canonical_bytes()
@@ -1600,7 +1807,7 @@ mod tests {
 
     #[test]
     fn admitted_envelope_limit_is_exact() {
-        let admitted_value = AdmittedValue::try_new(Value::Bool(true))
+        let admitted_value = AdmittedValue::try_new(Value::boolean(true))
             .unwrap_or_else(|error| panic!("value admission: {error}"));
         let exact = ENVELOPE_OVERHEAD_BYTES + 1;
         let admitted = AdmittedEnvelope::try_new_with_limit(
@@ -1626,19 +1833,22 @@ mod tests {
 
     #[test]
     fn raw_envelope_admission_is_fail_closed() {
-        let valid = Envelope::new(1, Hash32::new([2; 32]), Value::U128(3));
+        let valid = Envelope::new(1, Hash32::new([2; 32]), Value::unsigned(3));
         let admitted = AdmittedEnvelope::try_from_envelope(valid.clone())
             .unwrap_or_else(|error| panic!("envelope admission: {error}"));
         assert_eq!(admitted.into_envelope(), valid);
 
-        let invalid = Envelope::new(
-            1,
-            Hash32::new([2; 32]),
-            Value::Text(String::from("é").into_boxed_str()),
-        );
+        let mut too_deep = Value::unit();
+        for _ in 0..65 {
+            too_deep = Value::sum(0, 0, Some(too_deep));
+        }
+        let invalid = Envelope::new(1, Hash32::new([2; 32]), too_deep);
         assert_eq!(
             AdmittedEnvelope::try_from_envelope(invalid),
-            Err(EncodeError::NonAsciiText)
+            Err(EncodeError::InvalidValue(ValueError::DepthLimit {
+                limit: 64,
+                attempted: 65
+            }))
         );
     }
 }

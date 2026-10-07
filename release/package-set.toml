@@ -49,8 +49,3 @@ private_packages = ["zeno-fcis-generated-code-tests"]
 package = "zeno-fcis-cli"
 target = "zeno-fcis"
 purpose = "bounded deterministic project authoring and formal-tool interface"
-
-[[binaries]]
-package = "zeno-fcis-adapter-zenodex"
-target = "mount-zenodex-zusd"
-purpose = "bounded diagnostic parity runner for the pinned ZenoDEX zUSD mount"

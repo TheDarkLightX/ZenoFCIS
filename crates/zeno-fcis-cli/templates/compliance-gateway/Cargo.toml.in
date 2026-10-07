@@ -30,6 +30,7 @@ zeno-fcis-schema = "=1.1.0"
 zeno-fcis-shell = "=1.1.0"
 zeno-fcis-shell-sqlite = { version = "=1.1.0", optional = true }
 zeno-fcis-spec = "=1.1.0"
+zeno-fcis-synthesis = "=1.1.0"
 zeno-fcis-transition = "=1.1.0"
 zeno-fcis-value = "=1.1.0"
 

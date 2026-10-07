@@ -27,6 +27,7 @@ zeno-fcis-transition = { version = "=1.1.0", path = "../zeno-fcis-transition" }
 zeno-fcis-value = { version = "=1.1.0", path = "../zeno-fcis-value" }
 zeno-fcis-codegen = { version = "=1.1.0", path = "../zeno-fcis-codegen" }
 zeno-fcis-schema = { version = "=1.1.0", path = "../zeno-fcis-schema" }
+zeno-fcis-synthesis = { version = "=1.1.0", path = "../zeno-fcis-synthesis" }
 
 [build-dependencies]
 zeno-fcis-bootstrap = { version = "=1.1.0", path = "../zeno-fcis-bootstrap" }
@@ -38,6 +39,7 @@ zeno-fcis-project = { version = "=1.1.0", path = "../zeno-fcis-project" }
 zeno-fcis-schema = { version = "=1.1.0", path = "../zeno-fcis-schema" }
 
 [dev-dependencies]
+zeno-fcis-codec = { version = "=1.1.0", path = "../zeno-fcis-codec", features = ["libcrux"] }
 zeno-fcis-crypto = { version = "=1.1.0", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
 
 [lints]

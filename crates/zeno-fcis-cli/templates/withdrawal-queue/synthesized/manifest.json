@@ -21,9 +21,9 @@
   },
   "assignments_evaluated": 67,
   "authority": "none",
-  "certificate": "ef31358bfa7cc166defb2073d86011c13cdd89d4e7147ecf24f62bce321111ce",
+  "certificate": "3ca4ea5a841dfafca4d0f205cd2c8d0db6a108cbb7526fd03d934ca4576f6da7",
   "contract": "1404c6533f4a5bf7792954948c1a05554499b238cb3373ab6570801154023a3a",
-  "emitter_sha256": "1ab46df268ed5ba6fdde2a49252b646830943eda4e458d2cffe50e420619196d",
+  "emitter_sha256": "20e23f551bb121d035c84f61c7f232b952db99898ccb855fde4927b36fcec904",
   "files": [
     {
       "bytes": 5823,
@@ -36,9 +36,9 @@
       "sha256": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc"
     },
     {
-      "bytes": 4921,
+      "bytes": 4986,
       "path": "transition.rs",
-      "sha256": "50257907c1f3d666b2b917a4cf886f60dba801a48df8c25a73f4e0b017608cf7"
+      "sha256": "9fb879a94ae798d76043258dc87d13cc4c04d424a1c335ef09a5273d855cab98"
     },
     {
       "bytes": 83393,

@@ -1,16 +1,16 @@
 //! Resolution of law and claim projection paths against declared types and
 //! fields.
 //!
-//! Elaboration does not check that a formula path names declared schema
-//! elements, so a mistyped segment elaborates silently and becomes a missing
-//! observation at evaluation time. This module reports such paths. It changes
-//! no canonical bytes and no elaboration result.
+//! Elaboration rejects every law or claim path naming an undeclared schema
+//! type or field. This same resolver also supports diagnostic inspection of
+//! individual paths. Resolution does not change valid canonical project bytes.
 //!
 //! A path resolves when its first segment is a declared type of the kind its
 //! root reads (`pre` and `post` read state types, `command` a command type, and
 //! `context` a context type) and each later segment is a field of the type
-//! before it. The `effects`, `outbox`, and `events` roots have no declared
-//! segment rules, so their paths are reported as unchecked, not as resolved.
+//! before it. Delivery roots require a destination or payload type linked by
+//! a declared effect or channel in that lane. There are no declared event
+//! roots, so event paths refuse. Footprints have a separate segment grammar.
 
 use alloc::vec::Vec;
 
@@ -26,8 +26,6 @@ pub enum PathResolution {
     /// The first segment is a declared type of the kind the root reads, and
     /// each later segment is a field of the type before it.
     Resolved,
-    /// The root has no declared segment rules, so the path is not checked.
-    Unchecked,
     /// The first segment is not a declared type of the kind the root reads.
     UnknownRootType {
         /// The unmatched first segment.
@@ -48,7 +46,6 @@ impl PathResolution {
     pub const fn code(self) -> &'static str {
         match self {
             Self::Resolved => "resolved",
-            Self::Unchecked => "unchecked",
             Self::UnknownRootType { .. } => "unknown-root-type",
             Self::UnknownField { .. } => "unknown-field",
         }
@@ -139,23 +136,11 @@ fn leaf_type(spec: &ProjectSpec, path: &ProjectionPath) -> Option<StableId> {
 /// fields.
 #[must_use]
 pub fn resolve_path(spec: &ProjectSpec, path: &ProjectionPath) -> PathResolution {
-    let kind = match path.root() {
-        ProjectionRoot::Pre | ProjectionRoot::Post => TypeKind::State,
-        ProjectionRoot::Command => TypeKind::Command,
-        ProjectionRoot::Context => TypeKind::Context,
-        ProjectionRoot::Effects | ProjectionRoot::Outbox | ProjectionRoot::Events => {
-            return PathResolution::Unchecked;
-        }
-    };
     // Paths are nonempty by construction.
     let Some((first, rest)) = path.segments().split_first() else {
         return PathResolution::Resolved;
     };
-    if !spec
-        .types()
-        .iter()
-        .any(|declared| declared.id() == *first && declared.kind() == kind)
-    {
+    if !root_type_is_declared(spec, path.root(), *first) {
         return PathResolution::UnknownRootType { segment: *first };
     }
     let mut owner = *first;
@@ -175,6 +160,28 @@ pub fn resolve_path(spec: &ProjectSpec, path: &ProjectionPath) -> PathResolution
         }
     }
     PathResolution::Resolved
+}
+
+fn root_type_is_declared(spec: &ProjectSpec, root: ProjectionRoot, id: StableId) -> bool {
+    let Some(declared) = spec.types().iter().find(|declared| declared.id() == id) else {
+        return false;
+    };
+    match root {
+        ProjectionRoot::Pre | ProjectionRoot::Post => declared.kind() == TypeKind::State,
+        ProjectionRoot::Command => declared.kind() == TypeKind::Command,
+        ProjectionRoot::Context => declared.kind() == TypeKind::Context,
+        ProjectionRoot::Effects => spec
+            .effects()
+            .iter()
+            .any(|effect| effect.destination_type() == id || effect.payload_type() == id),
+        ProjectionRoot::Outbox => spec
+            .channels()
+            .iter()
+            .any(|channel| channel.destination_type() == id || channel.payload_type() == id),
+        // The DSL has no event declaration or numeric query/operator grammar.
+        // Arbitrary numeric IDs cannot silently become unchecked observations.
+        ProjectionRoot::Events => false,
+    }
 }
 
 /// Returns every projection path a law reads, in syntax order.
@@ -280,6 +287,11 @@ mod tests {
         StableId::new(value).unwrap_or_else(|| unreachable!())
     }
 
+    fn path(root: ProjectionRoot, segments: &[u32]) -> ProjectionPath {
+        ProjectionPath::try_new(root, segments.iter().map(|value| id(*value)).collect())
+            .unwrap_or_else(|| unreachable!())
+    }
+
     fn codes(spec: &ProjectSpec) -> Vec<(u32, PathResolution)> {
         spec.laws()
             .iter()
@@ -356,7 +368,7 @@ mod tests {
             assert!(!domain.contains(-3) && !domain.contains(4));
         }
         // An int without a declared range has its bounds outside project.zeno,
-        // and unresolved or unchecked paths have no declared domain.
+        // and unresolved paths have no declared domain.
         assert_eq!(
             declared_domain(&spec, &path(ProjectionRoot::Pre, &[100, 110])),
             None
@@ -467,14 +479,20 @@ mod tests {
 
     #[test]
     fn undeclared_segments_are_reported_with_their_owner() {
-        let spec = spec(
-            "law 400 typo = post.100.999 == 0;\n\
-             law 401 wrong_kind = pre.101 == 0 && command.100 == 0;\n\
-             law 402 past_scalar = pre.100.110.5 == 0;\n\
-             law 403 missing = context.777 == 0;\n",
-        );
+        let spec = spec("");
+        let paths = [
+            (400, path(ProjectionRoot::Post, &[100, 999])),
+            (401, path(ProjectionRoot::Pre, &[101])),
+            (401, path(ProjectionRoot::Command, &[100])),
+            (402, path(ProjectionRoot::Pre, &[100, 110, 5])),
+            (403, path(ProjectionRoot::Context, &[777])),
+        ];
+        let actual: Vec<_> = paths
+            .iter()
+            .map(|(id, p)| (*id, resolve_path(&spec, p)))
+            .collect();
         assert_eq!(
-            codes(&spec),
+            actual,
             vec![
                 (
                     400,
@@ -498,22 +516,75 @@ mod tests {
     }
 
     #[test]
-    fn roots_without_segment_rules_are_unchecked_not_resolved() {
-        let spec = spec("law 400 effects = effects.300 == 0 && outbox.301.1 == 0;\n");
-        assert_eq!(
-            codes(&spec),
-            vec![
-                (400, PathResolution::Unchecked),
-                (400, PathResolution::Unchecked)
-            ]
+    fn delivery_paths_resolve_only_through_declared_lane_types_and_fields() {
+        let spec = spec(&format!(
+            "{DELIVERY_DECLARATIONS}\
+             law 400 delivery = effects.107.131.112 >= 0 && outbox.107.130 == 1 && outbox.106 == 3;\n\
+             claim 500 bounded cvc5 relational = outbox.107.132 <= 3;\n"
+        ));
+        assert!(
+            codes(&spec)
+                .iter()
+                .all(|(_, r)| *r == PathResolution::Resolved)
         );
-        assert!(!PathResolution::Unchecked.is_unresolved());
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Outbox, &[107, 130])),
+            Some(DeclaredDomain::Values(vec![0, 1]))
+        );
+        assert_eq!(
+            declared_domain(&spec, &path(ProjectionRoot::Outbox, &[107, 132])),
+            Some(DeclaredDomain::Range(
+                IntRange::try_new(-2, 3).unwrap_or_else(|| unreachable!())
+            ))
+        );
+    }
+
+    const DELIVERY_DECLARATIONS: &str = "type 106 destination Destination;\n\
+        type 107 payload Payload;\ntype 108 bool Flag;\ntype 109 int Level in -2..=3;\n\
+        type 115 payload Unlinked;\n\
+        field 130 107 flag 108;\nfield 131 107 delivery_inner 103;\nfield 132 107 level 109;\n\
+        effect 350 deliver destination 106 payload 107;\n\
+        channel 351 notify destination 106 payload 107;\n";
+
+    #[test]
+    fn delivery_and_event_roots_cannot_hide_undeclared_numeric_ids() {
+        for projection in [
+            "effects.777",
+            "outbox.777",
+            "effects.107.999",
+            "outbox.107.999",
+            "outbox.107.131.999",
+            "outbox.107.130.999",
+            "outbox.115",
+            "effects.100",
+            "events.777",
+            "events.100",
+        ] {
+            for declaration in [
+                format!("law 400 bad = {projection} == 0;"),
+                format!("claim 500 bad all finite 2 = always atom({projection} == 0);"),
+            ] {
+                let source = format!("{DECLARATIONS}{DELIVERY_DECLARATIONS}{declaration}\n");
+                let parsed = parse_project(&source, SourceLimits::default())
+                    .unwrap_or_else(|set| panic!("parse: {set}"));
+                let errors = elaborate_project(parsed, ProjectLimits::default())
+                    .err()
+                    .unwrap_or_else(|| {
+                        panic!("unresolved delivery/event path admitted: {projection}")
+                    });
+                assert_eq!(errors.diagnostics().len(), 1, "{projection}: {errors}");
+                assert_eq!(
+                    errors.diagnostics()[0].code(),
+                    DiagnosticCode::UnknownReference
+                );
+            }
+        }
     }
 
     #[test]
     fn claim_paths_include_temporal_and_quantified_bodies() {
         let spec = spec(
-            "claim 500 eventually cvc5 relational = forall i in 0..2 { post.100.999 >= i };\n\
+            "claim 500 eventually cvc5 relational = forall i in 0..2 { post.100.110 >= i };\n\
              claim 501 temporal all finite 2 = always atom(pre.100.110 <= post.100.110);\n",
         );
         let found: Vec<(u32, &'static str)> = spec
@@ -527,14 +598,71 @@ mod tests {
             .collect();
         assert_eq!(
             found,
-            vec![(500, "unknown-field"), (501, "resolved"), (501, "resolved")]
+            vec![(500, "resolved"), (501, "resolved"), (501, "resolved")]
+        );
+    }
+
+    #[test]
+    fn elaboration_mandatorily_rejects_unresolved_law_and_claim_paths() {
+        for formula in [
+            "law 400 bad = pre.777 == 0;",
+            "law 400 bad = pre.101 == 0;",
+            "law 400 bad = post.100.999 == 0;",
+            "law 400 bad = pre.100.110.5 == 0;",
+            "claim 500 bad cvc5 relational = forall i in 0..2 { post.100.999 >= i };",
+            "claim 500 bad all finite 2 = always atom(context.777 == 0);",
+        ] {
+            let source = format!("{DECLARATIONS}{formula}\n");
+            let parsed = parse_project(&source, SourceLimits::default())
+                .unwrap_or_else(|set| panic!("parse: {set}"));
+            let errors = elaborate_project(parsed, ProjectLimits::default())
+                .err()
+                .unwrap_or_else(|| panic!("unresolved formula must fail normal API"));
+            assert_eq!(errors.diagnostics().len(), 1, "{formula}: {errors}");
+            assert_eq!(
+                errors.diagnostics()[0].code(),
+                DiagnosticCode::UnknownReference
+            );
+        }
+    }
+
+    #[test]
+    fn builder_cannot_bypass_formula_path_resolution() {
+        use crate::ast::Declaration;
+        let source = format!("{DECLARATIONS}law 400 bad = post.100.999 == 0;\n");
+        let parsed = parse_project(&source, SourceLimits::default())
+            .unwrap_or_else(|set| panic!("parse: {set}"));
+        let mut builder = crate::ProjectSpecBuilder::new(parsed.project_id, parsed.name)
+            .merge_order(parsed.merge_order);
+        for spanned in parsed.declarations {
+            builder = match spanned.declaration {
+                Declaration::Namespace(v) => builder.namespace(v),
+                Declaration::Type(v) => builder.type_decl(v),
+                Declaration::Field(v) => builder.field(v),
+                Declaration::Variant(v) => builder.variant(v),
+                Declaration::Reason(v) => builder.reason(v),
+                Declaration::Effect(v) => builder.effect(v),
+                Declaration::Channel(v) => builder.channel(v),
+                Declaration::Component(v) => builder.component(v),
+                Declaration::Wiring(v) => builder.wiring(v),
+                Declaration::Law(v) => builder.law(v),
+                Declaration::Claim(v) => builder.claim(v),
+            };
+        }
+        let errors = builder
+            .finish(ProjectLimits::default())
+            .err()
+            .unwrap_or_else(|| panic!("builder must reject unresolved law"));
+        assert_eq!(errors.diagnostics().len(), 1);
+        assert_eq!(
+            errors.diagnostics()[0].code(),
+            DiagnosticCode::UnknownReference
         );
     }
 
     #[test]
     fn resolution_codes_are_stable() {
         assert_eq!(PathResolution::Resolved.code(), "resolved");
-        assert_eq!(PathResolution::Unchecked.code(), "unchecked");
         assert_eq!(
             PathResolution::UnknownRootType { segment: id(1) }.code(),
             "unknown-root-type"

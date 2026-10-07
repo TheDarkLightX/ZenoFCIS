@@ -1,0 +1,3268 @@
+{
+  "schema_version": "zenofcis-benchmark-seeds-v1",
+  "status": "public-development-seeds",
+  "enumeration": "ordered-product-last-input-fastest-v1",
+  "cases": [
+    {
+      "id": "B01",
+      "family": "boolean-involution",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-projection-involution",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Not",
+            0
+          ],
+          [
+            "Not",
+            1
+          ]
+        ],
+        "roots": [
+          2
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Double negation; functional equality changes Step usage.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B02",
+      "family": "boolean-absorption",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-two-input-projection",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "Not",
+            0
+          ],
+          [
+            "Not",
+            2
+          ],
+          [
+            "And",
+            3,
+            4
+          ],
+          [
+            "Not",
+            5
+          ]
+        ],
+        "roots": [
+          6
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Absorption with an unused ABI input retained.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B03",
+      "family": "boolean-distributed-factor",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-distributed-factor",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "And",
+            0,
+            2
+          ],
+          [
+            "Not",
+            3
+          ],
+          [
+            "Not",
+            4
+          ],
+          [
+            "And",
+            5,
+            6
+          ],
+          [
+            "Not",
+            7
+          ]
+        ],
+        "roots": [
+          8
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "Not",
+            2
+          ],
+          [
+            "And",
+            3,
+            4
+          ],
+          [
+            "Not",
+            5
+          ],
+          [
+            "And",
+            0,
+            6
+          ]
+        ],
+        "roots": [
+          7
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Shared factor must survive OR lowering; compare actual DAG counts.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B04",
+      "family": "boolean-guard-implication",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-two-input-projection",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "Select",
+            0,
+            2,
+            1
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            1
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Under a true guard its conjunction simplifies; both arms still eager.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B05",
+      "family": "boolean-shared-output",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-shared-output",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0",
+          "y1",
+          "y2"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "And",
+            4,
+            2
+          ]
+        ],
+        "roots": [
+          3,
+          5,
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "And",
+            3,
+            2
+          ]
+        ],
+        "roots": [
+          3,
+          4,
+          3
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Duplicate stored conjunctions merge across three ordered outputs, including repeated root.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B06",
+      "family": "boolean-parity-circuit",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-parity-circuit",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Not",
+            0
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "And",
+            0,
+            3
+          ],
+          [
+            "And",
+            2,
+            1
+          ],
+          [
+            "Not",
+            4
+          ],
+          [
+            "Not",
+            5
+          ],
+          [
+            "And",
+            6,
+            7
+          ],
+          [
+            "Not",
+            8
+          ]
+        ],
+        "roots": [
+          9
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "Select",
+            0,
+            2,
+            1
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Two-input parity in sum-of-products versus mux form; no XOR opcode.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B07",
+      "family": "boolean-majority-circuit",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-majority-circuit",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "And",
+            0,
+            2
+          ],
+          [
+            "Not",
+            3
+          ],
+          [
+            "Not",
+            4
+          ],
+          [
+            "And",
+            5,
+            6
+          ],
+          [
+            "Not",
+            7
+          ],
+          [
+            "And",
+            1,
+            2
+          ],
+          [
+            "Not",
+            8
+          ],
+          [
+            "Not",
+            9
+          ],
+          [
+            "And",
+            10,
+            11
+          ],
+          [
+            "Not",
+            12
+          ]
+        ],
+        "roots": [
+          13
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "Not",
+            2
+          ],
+          [
+            "And",
+            3,
+            4
+          ],
+          [
+            "Not",
+            5
+          ],
+          [
+            "And",
+            1,
+            2
+          ],
+          [
+            "Select",
+            0,
+            6,
+            7
+          ]
+        ],
+        "roots": [
+          8
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Three-vote majority compares alternate circuit structures.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B08",
+      "family": "boolean-policy-deny-guard",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-policy-deny-guard",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "And",
+            0,
+            3
+          ],
+          [
+            "Bool",
+            false
+          ],
+          [
+            "Select",
+            4,
+            2,
+            5
+          ]
+        ],
+        "roots": [
+          6
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "And",
+            0,
+            3
+          ],
+          [
+            "And",
+            4,
+            2
+          ]
+        ],
+        "roots": [
+          5
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Synthetic permit-and-not-deny-and-ready policy motif; not an application extraction.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B09",
+      "family": "boolean-six-input-coverage",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-six-input-coverage",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2",
+          "x3",
+          "x4",
+          "x5"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Input",
+            3
+          ],
+          [
+            "Input",
+            4
+          ],
+          [
+            "Input",
+            5
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "And",
+            2,
+            3
+          ],
+          [
+            "And",
+            4,
+            5
+          ],
+          [
+            "And",
+            6,
+            7
+          ],
+          [
+            "And",
+            9,
+            8
+          ],
+          [
+            "Not",
+            10
+          ],
+          [
+            "Not",
+            11
+          ]
+        ],
+        "roots": [
+          12
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Input",
+            3
+          ],
+          [
+            "Input",
+            4
+          ],
+          [
+            "Input",
+            5
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "And",
+            2,
+            3
+          ],
+          [
+            "And",
+            4,
+            5
+          ],
+          [
+            "And",
+            6,
+            7
+          ],
+          [
+            "And",
+            9,
+            8
+          ]
+        ],
+        "roots": [
+          10
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "All 64 tuples include one isolated all-true result; catches missed terminal row.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B10",
+      "family": "boolean-zero-arity",
+      "profile": "FunctionalBoolV1",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-zero-arity",
+        "application_extraction": false
+      },
+      "input_domains": [],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Bool",
+            true
+          ],
+          [
+            "Bool",
+            false
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "And",
+            0,
+            2
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Bool",
+            true
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Zero inputs have exactly one empty tuple, not zero evaluations.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B11",
+      "family": "boolean-demorgan-defect",
+      "profile": "FunctionalBoolV1",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-demorgan-defect",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "Not",
+            2
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Not",
+            0
+          ],
+          [
+            "Not",
+            1
+          ],
+          [
+            "And",
+            2,
+            3
+          ]
+        ],
+        "roots": [
+          4
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Wrong De Morgan rewrite confuses disjunction and conjunction.",
+      "witness": {
+        "ordinal": 1,
+        "tuple": [
+          false,
+          true
+        ],
+        "original": {
+          "ok": [
+            true
+          ]
+        },
+        "candidate": {
+          "ok": [
+            false
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "B12",
+      "family": "boolean-mux-polarity",
+      "profile": "FunctionalBoolV1",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-mux-priority",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Select",
+            0,
+            1,
+            2
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Select",
+            0,
+            2,
+            1
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Swapping branches without negating condition.",
+      "witness": {
+        "ordinal": 1,
+        "tuple": [
+          false,
+          false,
+          true
+        ],
+        "original": {
+          "ok": [
+            true
+          ]
+        },
+        "candidate": {
+          "ok": [
+            false
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "B13",
+      "family": "boolean-policy-priority",
+      "profile": "FunctionalBoolV1",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-mux-priority",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Select",
+            0,
+            1,
+            2
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "And",
+            0,
+            1
+          ],
+          [
+            "Not",
+            3
+          ],
+          [
+            "Not",
+            2
+          ],
+          [
+            "And",
+            4,
+            5
+          ],
+          [
+            "Not",
+            6
+          ]
+        ],
+        "roots": [
+          7
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Synthetic priority choice cannot flatten to OR: fallback may override a selected false branch.",
+      "witness": {
+        "ordinal": 5,
+        "tuple": [
+          true,
+          false,
+          true
+        ],
+        "original": {
+          "ok": [
+            false
+          ]
+        },
+        "candidate": {
+          "ok": [
+            true
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "B14",
+      "family": "boolean-output-order",
+      "profile": "FunctionalBoolV1",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-output-order",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0",
+          "y1",
+          "y2"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ]
+        ],
+        "roots": [
+          0,
+          1,
+          0
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ]
+        ],
+        "roots": [
+          1,
+          0,
+          0
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Ordered outputs differ even with identical root multiset; multiplicity retained.",
+      "witness": {
+        "ordinal": 1,
+        "tuple": [
+          false,
+          true
+        ],
+        "original": {
+          "ok": [
+            false,
+            true,
+            false
+          ]
+        },
+        "candidate": {
+          "ok": [
+            true,
+            false,
+            false
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "B15",
+      "family": "boolean-projection-control",
+      "profile": "FunctionalBoolV1",
+      "role": "no-improvement-control",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-projection-involution",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Already one stored node; minimum node count follows from profile lower bound 1, bytes unclaimed.",
+      "witness": null,
+      "target_status": "control-not-an-optimality-claim",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "B16",
+      "family": "boolean-shared-compact-control",
+      "profile": "FunctionalBoolV1",
+      "role": "no-improvement-control",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "boolean-shared-compact-control",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0",
+          "y1",
+          "y2"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "And",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2,
+          0,
+          2
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "And",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2,
+          0,
+          2
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Compact shared circuit with duplicate output; no need to change every task.",
+      "witness": null,
+      "target_status": "control-not-an-optimality-claim",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "designed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I01",
+      "family": "integer-additive-identity",
+      "profile": "CheckedI64V1-proposed",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-cancellation-eager-removal",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "0"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "x+0 equals x functionally; fewer Step attempts alter budget refusal behavior.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I02",
+      "family": "integer-self-subtraction",
+      "profile": "CheckedI64V1-proposed",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-self-subtraction",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "-9223372036854775806"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Sub",
+            0,
+            0
+          ]
+        ],
+        "roots": [
+          1
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Int",
+            "0"
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "x-x is safe even at MIN; unused input remains declared.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I03",
+      "family": "integer-cancellation",
+      "profile": "CheckedI64V1-proposed",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-cancellation-eager-removal",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ],
+          [
+            "Sub",
+            2,
+            1
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Cancellation valid on this original ordinary domain; contrast I08 without editing either domain.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I04",
+      "family": "integer-reassociation",
+      "profile": "CheckedI64V1-proposed",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-reassociation",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        },
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        },
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Add",
+            0,
+            1
+          ],
+          [
+            "Add",
+            3,
+            2
+          ],
+          [
+            "Int",
+            "0"
+          ],
+          [
+            "Add",
+            4,
+            5
+          ]
+        ],
+        "roots": [
+          6
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Add",
+            1,
+            2
+          ],
+          [
+            "Add",
+            0,
+            3
+          ]
+        ],
+        "roots": [
+          4
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Safe bounded reassociation plus neutral-node removal; contrast endpoint I09.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I05",
+      "family": "integer-mixed-guard",
+      "profile": "CheckedI64V1-proposed",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-mixed-guard",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Int",
+          "min": "0",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "0",
+          "max": "2"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Int",
+            "0"
+          ],
+          [
+            "Lt",
+            1,
+            2
+          ],
+          [
+            "And",
+            0,
+            3
+          ],
+          [
+            "Select",
+            4,
+            2,
+            1
+          ]
+        ],
+        "roots": [
+          5
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            1
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Known nonnegative input makes guarded lower clamp redundant; no claim outside declared range.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I06",
+      "family": "integer-shared-offset",
+      "profile": "CheckedI64V1-proposed",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-shared-offset",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        },
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        },
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0",
+          "y1",
+          "y2"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ],
+          [
+            "Add",
+            0,
+            1
+          ],
+          [
+            "Sub",
+            2,
+            1
+          ]
+        ],
+        "roots": [
+          2,
+          3,
+          4
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2,
+          2,
+          0
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Share offset across roots while preserving output multiplicity and order.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I07",
+      "family": "integer-eager-error-preserved",
+      "profile": "CheckedI64V1-proposed",
+      "role": "positive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-eager-error-preserved",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "9223372036854775806",
+          "max": "9223372036854775807"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ],
+          [
+            "Int",
+            "0"
+          ],
+          [
+            "Add",
+            2,
+            3
+          ]
+        ],
+        "roots": [
+          4
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Remove trailing zero-add but retain overflow at MAX; equivalence includes Arithmetic rows.",
+      "witness": null,
+      "target_status": "feasible-handwritten-baseline-not-optimal",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I08",
+      "family": "integer-cancellation",
+      "profile": "CheckedI64V1-proposed",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-cancellation-eager-removal",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "9223372036854775806",
+          "max": "9223372036854775807"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ],
+          [
+            "Sub",
+            2,
+            1
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "At MAX original Arithmetic; candidate returns MAX. No modular arithmetic.",
+      "witness": {
+        "ordinal": 1,
+        "tuple": [
+          "9223372036854775807"
+        ],
+        "original": {
+          "error": "Arithmetic"
+        },
+        "candidate": {
+          "ok": [
+            "9223372036854775807"
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "I09",
+      "family": "integer-reassociation",
+      "profile": "CheckedI64V1-proposed",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-reassociation",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "9223372036854775807",
+          "max": "9223372036854775807"
+        },
+        {
+          "kind": "Int",
+          "min": "1",
+          "max": "1"
+        },
+        {
+          "kind": "Int",
+          "min": "-1",
+          "max": "-1"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1",
+          "x2"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Add",
+            0,
+            1
+          ],
+          [
+            "Add",
+            3,
+            2
+          ]
+        ],
+        "roots": [
+          4
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Input",
+            2
+          ],
+          [
+            "Add",
+            1,
+            2
+          ],
+          [
+            "Add",
+            0,
+            3
+          ]
+        ],
+        "roots": [
+          4
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Intermediate overflow distinguishes (MAX+1)+(-1) from MAX+(1+(-1)).",
+      "witness": {
+        "ordinal": 0,
+        "tuple": [
+          "9223372036854775807",
+          "1",
+          "-1"
+        ],
+        "original": {
+          "error": "Arithmetic"
+        },
+        "candidate": {
+          "ok": [
+            "9223372036854775807"
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "I10",
+      "family": "integer-unused-overflow",
+      "profile": "CheckedI64V1-proposed",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-cancellation-eager-removal",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "9223372036854775806",
+          "max": "9223372036854775807"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Unused Add still executes; root-only evaluation is wrong.",
+      "witness": {
+        "ordinal": 1,
+        "tuple": [
+          "9223372036854775807"
+        ],
+        "original": {
+          "error": "Arithmetic"
+        },
+        "candidate": {
+          "ok": [
+            "9223372036854775807"
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "I11",
+      "family": "integer-unselected-overflow",
+      "profile": "CheckedI64V1-proposed",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-unselected-overflow",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Int",
+          "min": "9223372036854775807",
+          "max": "9223372036854775807"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            1,
+            2
+          ],
+          [
+            "Select",
+            0,
+            3,
+            1
+          ]
+        ],
+        "roots": [
+          4
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            1
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Even false guard selecting x executes overflowing other arm first.",
+      "witness": {
+        "ordinal": 0,
+        "tuple": [
+          false,
+          "9223372036854775807"
+        ],
+        "original": {
+          "error": "Arithmetic"
+        },
+        "candidate": {
+          "ok": [
+            "9223372036854775807"
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "I12",
+      "family": "integer-min-negation",
+      "profile": "CheckedI64V1-proposed",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-min-negation",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "-9223372036854775807"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "0"
+          ],
+          [
+            "Sub",
+            1,
+            0
+          ],
+          [
+            "Sub",
+            1,
+            2
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Double arithmetic negation traps at MIN; Boolean involution intuition is inapplicable.",
+      "witness": {
+        "ordinal": 0,
+        "tuple": [
+          "-9223372036854775808"
+        ],
+        "original": {
+          "error": "Arithmetic"
+        },
+        "candidate": {
+          "ok": [
+            "-9223372036854775808"
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "I13",
+      "family": "integer-output-domain",
+      "profile": "CheckedI64V1-proposed",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-output-domain",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "0",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "0",
+          "max": "1"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Lt",
+            1,
+            0
+          ],
+          [
+            "Select",
+            2,
+            1,
+            0
+          ]
+        ],
+        "roots": [
+          3
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "Clamping changes OutputDomain at x=2 to successful 1; range tightening is not a repair permission.",
+      "witness": {
+        "ordinal": 2,
+        "tuple": [
+          "2"
+        ],
+        "original": {
+          "error": "OutputDomain"
+        },
+        "candidate": {
+          "ok": [
+            "1"
+          ]
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "I14",
+      "family": "integer-first-error-precedence",
+      "profile": "CheckedI64V1-proposed",
+      "role": "incorrect-attractive",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-first-error-precedence",
+        "application_extraction": false
+      },
+      "input_domains": [],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "0",
+          "max": "0"
+        }
+      ],
+      "abi": {
+        "inputs": [],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Int",
+            "9223372036854775807"
+          ],
+          [
+            "Int",
+            "1"
+          ],
+          [
+            "Add",
+            1,
+            2
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Int",
+            "1"
+          ]
+        ],
+        "roots": [
+          0
+        ]
+      },
+      "expected_relation": "Different",
+      "rationale": "All nodes execute before output-domain validation: Arithmetic versus OutputDomain, not two interchangeable failures.",
+      "witness": {
+        "ordinal": 0,
+        "tuple": [],
+        "original": {
+          "error": "Arithmetic"
+        },
+        "candidate": {
+          "error": "OutputDomain"
+        }
+      },
+      "target_status": "invalid-target",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": false
+      }
+    },
+    {
+      "id": "I15",
+      "family": "integer-compact-control",
+      "profile": "CheckedI64V1-proposed",
+      "role": "no-improvement-control",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-compact-control",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        },
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Int",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Add",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Add",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Small direct sum; no global minimum asserted.",
+      "witness": null,
+      "target_status": "control-not-an-optimality-claim",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    },
+    {
+      "id": "I16",
+      "family": "integer-comparison-alternate",
+      "profile": "CheckedI64V1-proposed",
+      "role": "no-improvement-control",
+      "provenance": {
+        "kind": "handwritten-development-seed",
+        "source": "Astra design 2026-10-04",
+        "independence_group": "integer-comparison-alternate",
+        "application_extraction": false
+      },
+      "input_domains": [
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        },
+        {
+          "kind": "Int",
+          "min": "-2",
+          "max": "2"
+        }
+      ],
+      "output_domains": [
+        {
+          "kind": "Bool"
+        },
+        {
+          "kind": "Bool"
+        }
+      ],
+      "abi": {
+        "inputs": [
+          "x0",
+          "x1"
+        ],
+        "outputs": [
+          "y0",
+          "y1"
+        ]
+      },
+      "original": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Eq",
+            0,
+            1
+          ],
+          [
+            "Lt",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2,
+          3
+        ]
+      },
+      "candidate": {
+        "nodes": [
+          [
+            "Input",
+            0
+          ],
+          [
+            "Input",
+            1
+          ],
+          [
+            "Eq",
+            1,
+            0
+          ],
+          [
+            "Lt",
+            0,
+            1
+          ]
+        ],
+        "roots": [
+          2,
+          3
+        ]
+      },
+      "expected_relation": "Equivalent",
+      "rationale": "Commuted equality is an equivalent equal-node alternate form, not a strict improvement claim.",
+      "witness": null,
+      "target_status": "control-not-an-optimality-claim",
+      "eligibility": {
+        "structural": "expected-admitted",
+        "transform_profile": "proposed-not-qualified",
+        "optimization_denominator": true
+      }
+    }
+  ]
+}

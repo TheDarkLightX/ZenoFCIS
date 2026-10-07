@@ -1,38 +1,28 @@
 //! Regression laws for directional composition-frame authorization.
 
-use zeno_fcis_codec::{CommitmentHasher, Hash32};
+use zeno_fcis_codec::{EncodeError, EvidenceArtifact, Hash32};
 use zeno_fcis_compose::{
     AccessPath, ClaimEvidence, ComponentContract, ComponentId, CompositionBlocker,
     CompositionClaim, CompositionEvidence, CompositionSpec, EvidenceVerifier, Footprint, FrameRule,
     PathAtom, PathSet, Wiring, verify_assume_guarantee,
 };
 
-#[derive(Clone, Copy, Debug)]
-struct TestHasher;
-
-impl CommitmentHasher for TestHasher {
-    const ALGORITHM_ID: &'static str = "test-only/1";
-
-    fn hash(bytes: &[u8]) -> Hash32 {
-        let mut output = [0_u8; 32];
-        for (index, byte) in bytes.iter().enumerate() {
-            let slot = index % output.len();
-            output[slot] = output[slot]
-                .wrapping_add(*byte)
-                .rotate_left((index % 8) as u32);
-        }
-        Hash32::new(output)
-    }
-}
+use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
 struct ExactVerifier;
 
 impl EvidenceVerifier for ExactVerifier {
-    fn verify(&self, claim: &CompositionClaim, artifact: Hash32) -> bool {
-        claim.commitment::<TestHasher>().ok() == Some(artifact)
+    fn verify(&self, claim: &CompositionClaim, artifact: &[u8]) -> bool {
+        claim.canonical_bytes().ok().as_deref() == Some(artifact)
     }
 }
 
+// Toy native verifier fixture: exact canonical claim bytes, not a proof.
+fn evidence_artifact(bytes: Result<Vec<u8>, EncodeError>) -> EvidenceArtifact {
+    EvidenceArtifact::new::<TestHasher>(
+        bytes.unwrap_or_else(|error| panic!("artifact bytes: {error}")),
+    )
+}
 fn hash(byte: u8) -> Hash32 {
     Hash32::new([byte; 32])
 }
@@ -101,11 +91,9 @@ fn report_for(
         protected: protected_for_claim,
         claim: frame_claim,
     };
-    let artifact = statement
-        .commitment::<TestHasher>()
-        .unwrap_or_else(|error| panic!("frame evidence: {error}"));
+    let artifact = evidence_artifact(statement.canonical_bytes());
     let evidence = CompositionEvidence::try_new(
-        vec![ClaimEvidence::new(frame_claim, artifact)],
+        vec![ClaimEvidence::new(frame_claim, artifact.clone())],
         vec![],
         None,
     )

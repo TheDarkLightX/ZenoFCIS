@@ -16,14 +16,11 @@ fn hash(byte: u8) -> Hash32 {
     Hash32::new([byte; 32])
 }
 
-fn hash_bytes(domain: &str, bytes: &[u8]) -> Hash32 {
-    checked(commitment::<RustCryptoSha256>(
-        checked(Domain::new(domain, 1)),
-        bytes,
-    ))
+fn hash_bytes(domain: Domain<'_>, bytes: &[u8]) -> Hash32 {
+    checked(commitment::<RustCryptoSha256>(domain, bytes))
 }
 
-fn hash_value(domain: &str, value: &Value) -> Hash32 {
+fn hash_value(domain: Domain<'_>, value: &Value) -> Hash32 {
     hash_bytes(domain, &checked(value.canonical_bytes()))
 }
 
@@ -38,38 +35,32 @@ fn bindings() -> SynthesisBindings {
 
 fn values() -> Vec<Value> {
     vec![
-        Value::Unit,
-        Value::Bool(false),
-        Value::Bool(true),
-        Value::U128(u128::MAX),
-        Value::I128(-1),
-        Value::I128(0),
-        Value::Bytes(vec![1; 1024].into_boxed_slice()),
-        Value::Text("text".into()),
-        Value::Enum {
-            type_id: 17,
-            variant: 3,
-        },
-        Value::Tuple(vec![Value::Unit, Value::U128(0)].into_boxed_slice()),
-        Value::Record(vec![Field::new(2, Value::I128(i128::MIN))].into_boxed_slice()),
-        Value::Sum {
-            type_id: 5,
-            variant: 1,
-            payload: None,
-        },
-        Value::Sum {
-            type_id: 5,
-            variant: 2,
-            payload: Some(Box::new(Value::Bool(true))),
-        },
-        Value::Vector(vec![Value::Text("v".into())].into_boxed_slice()),
-        Value::Map(
-            vec![checked(MapEntry::try_new(
-                Value::Bool(true),
-                Value::Bytes(vec![3; 9].into_boxed_slice()),
-            ))]
-            .into_boxed_slice(),
-        ),
+        Value::unit(),
+        Value::boolean(false),
+        Value::boolean(true),
+        Value::unsigned(u128::MAX),
+        Value::signed(-1),
+        Value::signed(0),
+        Value::bytes(vec![1; 1024]).unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::text_ascii(String::from("text"))
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::enumeration(17, 3),
+        Value::tuple(vec![Value::unit(), Value::unsigned(0)])
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::record_canonical(vec![Field::new(2, Value::signed(i128::MIN))])
+            .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::sum(5, 1, None),
+        Value::sum(5, 2, Some(Value::boolean(true))),
+        Value::vector(vec![
+            Value::text_ascii(String::from("v"))
+                .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        ])
+        .unwrap_or_else(|error| panic!("value fixture: {error}")),
+        Value::map_canonical(vec![checked(MapEntry::try_new(
+            Value::boolean(true),
+            Value::bytes(vec![3; 9]).unwrap_or_else(|error| panic!("value fixture: {error}")),
+        ))])
+        .unwrap_or_else(|error| panic!("value fixture: {error}")),
     ]
 }
 
@@ -80,9 +71,10 @@ fn problem() -> SynthesisProblem {
             checked(Hole::try_new(
                 checked(HoleId::try_new(23)),
                 vec![
-                    Value::Text("longer".into()),
-                    Value::Unit,
-                    Value::Bool(false),
+                    Value::text_ascii(String::from("longer"))
+                        .unwrap_or_else(|error| panic!("value fixture: {error}")),
+                    Value::unit(),
+                    Value::boolean(false),
                 ],
             )),
             checked(Hole::try_new(checked(HoleId::try_new(2)), values())),
@@ -112,7 +104,7 @@ impl CandidateChecker for RecordingChecker {
             self.result.clone()
         } else {
             CheckResult::Rejected {
-                counterexample: Value::U128(ordinal as u128),
+                counterexample: Value::unsigned(ordinal as u128),
             }
         }
     }
@@ -123,9 +115,13 @@ fn every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_byte
     let problem = problem();
     let cardinality = usize::try_from(problem.cardinality()).unwrap_or_else(|_| unreachable!());
     for stop in 0..=cardinality {
-        let compiled =
-            Value::Tuple(vec![Value::Text("compiled".into()), Value::I128(-3)].into_boxed_slice());
-        let compiled_hash = hash_value("zeno-fcis/synthesis-compiled", &compiled);
+        let compiled = Value::tuple(vec![
+            Value::text_ascii(String::from("compiled"))
+                .unwrap_or_else(|error| panic!("value fixture: {error}")),
+            Value::signed(-3),
+        ])
+        .unwrap_or_else(|error| panic!("value fixture: {error}"));
+        let compiled_hash = hash_value(zeno_fcis_codec::domains::SYNTHESIS_COMPILED, &compiled);
         let mut checker = RecordingChecker {
             identity: hash(10),
             stop,
@@ -162,7 +158,8 @@ fn every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_byte
             checked(assignment.encode_to(&mut appended));
             assert_eq!(&appended[..2], &[0xaa, 0xbb]);
             assert_eq!(&appended[2..], bytes);
-            let assignment_hash = hash_bytes("zeno-fcis/synthesis-assignment", &bytes);
+            let assignment_hash =
+                hash_bytes(zeno_fcis_codec::domains::SYNTHESIS_ASSIGNMENT, &bytes);
             assert_eq!(checked(assignment.commitment()), assignment_hash);
             let mut step = trace.as_bytes().to_vec();
             step.extend_from_slice(assignment_hash.as_bytes());
@@ -173,14 +170,14 @@ fn every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_byte
                 }
             } else {
                 let counterexample = hash_value(
-                    "zeno-fcis/synthesis-counterexample",
-                    &Value::U128(ordinal as u128),
+                    zeno_fcis_codec::domains::SYNTHESIS_COUNTEREXAMPLE,
+                    &Value::unsigned(ordinal as u128),
                 );
                 rejected.push((assignment_hash, counterexample));
                 step.push(1);
                 step.extend_from_slice(counterexample.as_bytes());
             }
-            trace = hash_bytes("zeno-fcis/synthesis-trace", &step);
+            trace = hash_bytes(zeno_fcis_codec::domains::SYNTHESIS_TRACE, &step);
         }
         let (certificate, selected) = match result {
             SearchResult::Selected {
@@ -196,6 +193,7 @@ fn every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_byte
                 assert_eq!(stop, cardinality);
                 (certificate, None)
             }
+            _ => panic!("unsupported synthesis result"),
         };
         assert_eq!(certificate.trace_hash(), trace);
         assert_eq!(certificate.selected_assignment(), selected);
@@ -232,7 +230,7 @@ fn every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_byte
         assert_eq!(checked(certificate.canonical_bytes()), expected);
         assert_eq!(
             checked(certificate.commitment()),
-            hash_bytes("zeno-fcis/synthesis-certificate", &expected)
+            hash_bytes(zeno_fcis_codec::domains::SYNTHESIS_CERTIFICATE, &expected)
         );
     }
 }
@@ -240,7 +238,12 @@ fn every_selection_and_exhaustion_preserve_exact_assignment_and_certificate_byte
 #[test]
 fn checker_errors_stop_at_the_same_assignment_and_keep_first_error_order() {
     let problem = problem();
-    let invalid = Value::Text("\u{e9}".into());
+    assert!(Value::text_ascii("\u{e9}".into()).is_err());
+    // Structurally legal values may exceed the default encoding policy.
+    let mut invalid = Value::unit();
+    for _ in 0..65 {
+        invalid = checked(Value::tuple(vec![invalid]));
+    }
     let cases = [
         (
             CheckResult::Indeterminate,
@@ -250,7 +253,12 @@ fn checker_errors_stop_at_the_same_assignment_and_keep_first_error_order() {
             CheckResult::Rejected {
                 counterexample: invalid.clone(),
             },
-            SynthesisError::Encode(EncodeError::NonAsciiText),
+            SynthesisError::Encode(EncodeError::InvalidValue(
+                zeno_fcis_value::ValueError::DepthLimit {
+                    limit: 64,
+                    attempted: 65,
+                },
+            )),
         ),
         (
             CheckResult::Accepted {
@@ -274,7 +282,12 @@ fn checker_errors_stop_at_the_same_assignment_and_keep_first_error_order() {
                 reference_claim: hash(11),
                 composition_claim: hash(12),
             },
-            SynthesisError::Encode(EncodeError::NonAsciiText),
+            SynthesisError::Encode(EncodeError::InvalidValue(
+                zeno_fcis_value::ValueError::DepthLimit {
+                    limit: 64,
+                    attempted: 65,
+                },
+            )),
         ),
     ];
     for stop in [0, 1, 17, 44] {
@@ -304,28 +317,39 @@ fn checker_errors_stop_at_the_same_assignment_and_keep_first_error_order() {
 
 #[test]
 fn invalid_values_are_rejected_before_a_problem_can_be_searched() {
-    for (value, expected) in [
-        (Value::Text("\u{e9}".into()), EncodeError::NonAsciiText),
-        (
-            Value::Record(
-                vec![Field::new(2, Value::Unit), Field::new(1, Value::Unit)].into_boxed_slice(),
-            ),
-            EncodeError::NonCanonicalRecord,
-        ),
-        (
-            Value::Map(
-                vec![
-                    checked(MapEntry::try_new(Value::Bool(true), Value::Unit)),
-                    checked(MapEntry::try_new(Value::Bool(false), Value::Unit)),
-                ]
-                .into_boxed_slice(),
-            ),
-            EncodeError::NonCanonicalMap,
-        ),
-    ] {
-        assert_eq!(
-            Hole::try_new(checked(HoleId::try_new(1)), vec![value]),
-            Err(SynthesisError::Encode(expected))
-        );
+    use zeno_fcis_value::{ValueError, ValueLimits};
+    assert_eq!(
+        Value::text_ascii_with_limits("\u{e9}".into(), ValueLimits::default()),
+        Err(ValueError::NonAsciiText)
+    );
+    assert_eq!(
+        Value::record_canonical(vec![
+            Field::new(2, Value::unit()),
+            Field::new(1, Value::unit())
+        ]),
+        Err(ValueError::RecordFieldOrder {
+            previous: 2,
+            current: 1
+        })
+    );
+    assert_eq!(
+        Value::map_canonical(vec![
+            checked(MapEntry::try_new(Value::boolean(true), Value::unit())),
+            checked(MapEntry::try_new(Value::boolean(false), Value::unit())),
+        ]),
+        Err(ValueError::MapKeyOrder)
+    );
+    let mut value = Value::unit();
+    for _ in 0..65 {
+        value = checked(Value::tuple(vec![value]));
     }
+    assert_eq!(
+        Hole::try_new(checked(HoleId::try_new(1)), vec![value]),
+        Err(SynthesisError::Encode(EncodeError::InvalidValue(
+            ValueError::DepthLimit {
+                limit: 64,
+                attempted: 65,
+            }
+        )))
+    );
 }

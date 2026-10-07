@@ -35,9 +35,27 @@ types, relational law formulas, and the claims that `zeno-fcis prove` checks.
 `build.rs` supplies explicit scalar bounds and catalog meanings, then checks
 and generates the schema and project bindings. `profile.rs` binds the exact
 source, including the synthesis files, and the runtime-only law manifest.
-The adapter in `src/program.rs` and the law checker in `src/laws.rs` are
+The original adapter and law checker, formerly in `src/program.rs` and
+`src/laws.rs`, are retained privately and are
 written by hand; the law checker evaluates the formulas against every
 decision the adapter makes, and refuses any decision that breaks them.
+
+## V2 execution and retained legacy evidence
+
+The normal `src/lib.rs` and demonstration use `v2_contract::Contract`, its
+complete original-schema descriptor, and the checked library V2 Authority.
+The library reads the original envelopes, evaluates the declared typed graph,
+constructs the complete decision, and checks the original law programs with
+one meter. The SQLite shell consumes genuine `Publication` and
+`Publication` capabilities; exact replay recomputes the same original inputs.
+
+The hand-written adapters, legacy law engines and earlier synthesis/model
+checks described below are retained only in the repository’s nonpublished
+`verification/kernel-laws/src/oracle/templates/agent-treasury-guard` package for independent oracle
+and historical evidence tests. They do not execute the normal V2 decision.
+The declared policy still requires independent review of the intended rules.
+Host input framing, caller authentication and typed display remain shell
+assumptions; the demonstration destination's ledger persists only in-process.
 
 ## The rules
 
@@ -242,7 +260,7 @@ the clock and day-accounting laws on every commit, the proposal and
 settlement laws on accepts, and the refund law on committed failures, which
 is where the law manifest enforces them. Each law declares that scope in
 `project.zeno`, so elaboration also checks the claims' groups against the
-declared scopes, and `authority()` checks the manifest against them before
+declared scopes, and the privately retained native authority checks the manifest against them before
 it builds the authority. Claim 601 states the budget's part
 on its own, from five of those laws. For each, CVC5 answers `unsat`: no
 transition that satisfies the assumed laws, with the variant fields over
@@ -537,11 +555,11 @@ cargo +1.97.1 run --locked -- new-treasury.sqlite
 ```
 
 The SQLite shell is the `sqlite` feature, on by default. Without it,
-`cargo +1.97.1 build --no-default-features` builds the core alone: the
-generated bindings, the program, the law checker, the profile, the delivery
-adapter, and `authority()`, with no database; the gate checks that it also
-compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
-binary need the feature.
+`cargo +1.97.1 build --no-default-features` builds the V2 declarations,
+checked Authority and generated proposal/admission helpers; original native
+oracles are confined to the nonpublished private suite
+without a database. The gate also checks `wasm32-unknown-unknown`.
+`create`, `invoke`, `journey` and the demonstration binary need the feature.
 
 The demonstration requires a new database path. Its scripted agent proposes
 a good buy, then, while and after it settles, a proposal with a swap

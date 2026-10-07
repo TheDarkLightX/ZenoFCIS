@@ -2,6 +2,34 @@
 
 pub(crate) const FILES: &[(&str, &[u8])] = &[
     (
+        "src/v2_contract.rs",
+        include_bytes!("../templates/durable-counter/src/v2_contract.rs"),
+    ),
+    (
+        "src/legacy.rs",
+        include_bytes!("../templates/durable-counter/src/legacy.rs"),
+    ),
+    (
+        "v2/policy.json",
+        include_bytes!("../templates/durable-counter/v2/policy.json"),
+    ),
+    (
+        "v2/policy.zcve",
+        include_bytes!("../templates/durable-counter/v2/policy.zcve"),
+    ),
+    (
+        "v2/schema.zcve",
+        include_bytes!("../templates/durable-counter/v2/schema.zcve"),
+    ),
+    (
+        "v2/schema-origin.json",
+        include_bytes!("../templates/durable-counter/v2/schema-origin.json"),
+    ),
+    (
+        "tests/legacy_lifecycle.rs",
+        include_bytes!("../templates/durable-counter/tests/legacy_lifecycle.rs"),
+    ),
+    (
         "project.zeno",
         include_bytes!("../templates/durable-counter/project.zeno"),
     ),

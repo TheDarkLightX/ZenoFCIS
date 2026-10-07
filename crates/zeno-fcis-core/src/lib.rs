@@ -2,6 +2,11 @@
 //!
 //! This crate contains no I/O, clocks, randomness, storage, networking, or
 //! executable effect closures. It is suitable for `no_std + alloc` builds.
+//!
+//! Native meter construction, caller-authored transition traits, and usage-bound
+//! decision factories are retired. Their complete historical algorithms and tests
+//! live only in the nonpublished private kernel-law oracle. These remaining
+//! decision data types and resource identities confer no V2 publication authority.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
@@ -10,10 +15,10 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use core::cmp::Ordering;
-use core::fmt;
 
 /// The three semantic outcomes of a total FCIS transition.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
 pub enum DecisionKind {
     /// The requested command was accepted and produced an authoritative candidate.
     Accept,
@@ -110,6 +115,7 @@ impl<A, F> Failed<A, F> {
 
 /// The total three-way FCIS decision algebra.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Decision<A, R, F> {
     /// Accepted command with one sealed candidate.
     Accept(Accepted<A>),
@@ -174,267 +180,9 @@ fn compare_reasons<R: StableReason>(left: &R, right: &R) -> Ordering {
         .then_with(|| left.code().as_bytes().cmp(right.code().as_bytes()))
 }
 
-/// Resource classes measured by the deterministic budget.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[repr(u8)]
-pub enum Resource {
-    /// Logical state reads.
-    Read = 0,
-    /// Logical state writes.
-    Write = 1,
-    /// Candidate evaluations in a bounded search.
-    Candidate = 2,
-    /// Effect-plan operations.
-    Effect = 3,
-    /// Canonical bytes emitted or consumed.
-    Byte = 4,
-    /// Proof or witness bytes emitted.
-    WitnessByte = 5,
-    /// Recursion or nesting depth.
-    Depth = 6,
-}
-
-impl Resource {
-    const COUNT: usize = 7;
-
-    const fn index(self) -> usize {
-        self as usize
-    }
-}
-
-/// Immutable deterministic resource limits.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct BudgetLimits {
-    limits: [u64; Resource::COUNT],
-}
-
-impl BudgetLimits {
-    /// Creates an all-zero budget.
-    #[must_use]
-    pub const fn zero() -> Self {
-        Self {
-            limits: [0; Resource::COUNT],
-        }
-    }
-
-    /// Returns a copy with one resource limit replaced.
-    #[must_use]
-    pub const fn with_limit(mut self, resource: Resource, limit: u64) -> Self {
-        self.limits[resource.index()] = limit;
-        self
-    }
-
-    /// Returns the configured limit.
-    #[must_use]
-    pub const fn limit(self, resource: Resource) -> u64 {
-        self.limits[resource.index()]
-    }
-}
-
-impl Default for BudgetLimits {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-/// Exact deterministic resource consumption.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct BudgetUsed {
-    used: [u64; Resource::COUNT],
-}
-
-impl BudgetUsed {
-    /// Returns zero consumption.
-    #[must_use]
-    pub const fn zero() -> Self {
-        Self {
-            used: [0; Resource::COUNT],
-        }
-    }
-
-    /// Returns the consumed amount for one resource.
-    #[must_use]
-    pub const fn used(self, resource: Resource) -> u64 {
-        self.used[resource.index()]
-    }
-}
-
-impl Default for BudgetUsed {
-    fn default() -> Self {
-        Self::zero()
-    }
-}
-
-/// A deterministic budget consumed by logical work, never by wall-clock time.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Budget {
-    limits: BudgetLimits,
-    used: BudgetUsed,
-}
-
-impl Budget {
-    /// Creates a fresh budget with zero consumption.
-    #[must_use]
-    pub const fn new(limits: BudgetLimits) -> Self {
-        Self {
-            limits,
-            used: BudgetUsed::zero(),
-        }
-    }
-
-    /// Charges one resource atomically.
-    ///
-    /// On failure, consumption remains unchanged.
-    pub fn charge(&mut self, resource: Resource, amount: u64) -> Result<(), BudgetExceeded> {
-        let current = self.used.used[resource.index()];
-        let Some(next) = current.checked_add(amount) else {
-            return Err(BudgetExceeded {
-                resource,
-                limit: self.limits.limit(resource),
-                attempted: u64::MAX,
-            });
-        };
-        let limit = self.limits.limit(resource);
-        if next > limit {
-            return Err(BudgetExceeded {
-                resource,
-                limit,
-                attempted: next,
-            });
-        }
-        self.used.used[resource.index()] = next;
-        Ok(())
-    }
-
-    /// Returns immutable limits.
-    #[must_use]
-    pub const fn limits(&self) -> BudgetLimits {
-        self.limits
-    }
-
-    /// Returns exact consumption.
-    #[must_use]
-    pub const fn used(&self) -> BudgetUsed {
-        self.used
-    }
-
-    /// Consumes this execution-local meter and binds its exact report to a decision.
-    pub fn finish<A, R, F>(self, decision: Decision<A, R, F>) -> BudgetedDecision<A, R, F> {
-        BudgetedDecision {
-            decision,
-            limits: self.limits,
-            used: self.used,
-        }
-    }
-}
-
-/// One semantic decision paired with its immutable limits and exact logical usage.
-///
-/// Values can only be created by consuming a fresh [`Budget`] through
-/// [`Budget::finish`]. The execution-local mutation used to count logical work
-/// therefore cannot escape the transition result.
-#[must_use]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct BudgetedDecision<A, R, F> {
-    decision: Decision<A, R, F>,
-    limits: BudgetLimits,
-    used: BudgetUsed,
-}
-
-impl<A, R, F> BudgetedDecision<A, R, F> {
-    /// Returns the complete three-way semantic decision.
-    #[must_use]
-    pub const fn decision(&self) -> &Decision<A, R, F> {
-        &self.decision
-    }
-
-    /// Returns the immutable limits supplied to the transition.
-    #[must_use]
-    pub const fn limits(&self) -> BudgetLimits {
-        self.limits
-    }
-
-    /// Returns the exact logical resources charged by the transition.
-    #[must_use]
-    pub const fn used(&self) -> BudgetUsed {
-        self.used
-    }
-
-    /// Consumes the report and returns its complete parts.
-    #[must_use]
-    pub fn into_parts(self) -> (Decision<A, R, F>, BudgetLimits, BudgetUsed) {
-        (self.decision, self.limits, self.used)
-    }
-}
-
-/// A deterministic resource-bound failure.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct BudgetExceeded {
-    resource: Resource,
-    limit: u64,
-    attempted: u64,
-}
-
-impl BudgetExceeded {
-    /// Returns the exhausted resource.
-    #[must_use]
-    pub const fn resource(self) -> Resource {
-        self.resource
-    }
-
-    /// Returns the configured limit.
-    #[must_use]
-    pub const fn limit(self) -> u64 {
-        self.limit
-    }
-
-    /// Returns the attempted post-charge consumption.
-    #[must_use]
-    pub const fn attempted(self) -> u64 {
-        self.attempted
-    }
-}
-
-impl core::error::Error for BudgetExceeded {}
-
-impl fmt::Display for BudgetExceeded {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "resource {:?} would consume {} above limit {}",
-            self.resource, self.attempted, self.limit
-        )
-    }
-}
-
-/// A pure, deterministic FCIS transition.
-///
-/// Implementations must treat every input as immutable and must not observe
-/// ambient I/O, time, randomness, scheduling, global state, or process state.
-/// They create a fresh execution-local [`Budget`], charge modeled work, and
-/// consume it with [`Budget::finish`] so exact usage is returned explicitly.
-pub trait Transition {
-    /// Immutable pre-state type.
-    type State;
-    /// Validated command type.
-    type Command;
-    /// Explicit policy, evidence, and execution-context type.
-    type Context;
-    /// Sealed candidate returned by accepted and committed-failure outcomes.
-    type Candidate;
-    /// Stable unchanged-state rejection reason.
-    type Reject: StableReason;
-    /// Stable committed-failure reason.
-    type Failure: StableReason;
-
-    /// Computes exactly one modeled decision for admitted inputs.
-    fn step(
-        state: &Self::State,
-        command: &Self::Command,
-        context: &Self::Context,
-        limits: BudgetLimits,
-    ) -> BudgetedDecision<Self::Candidate, Self::Reject, Self::Failure>;
-}
+/// Shared identities for the checked V2 logical-work profile.
+pub mod resource;
+pub use resource::Resource;
 
 /// Collects applicable reasons without allowing iterator order to become policy.
 #[must_use]
@@ -446,129 +194,4 @@ where
     let collected: Vec<R> = reasons.into_iter().collect();
     let selected = first_reason(collected.iter().cloned());
     (collected, selected)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    enum Reason {
-        Later,
-        Earlier,
-        SameOrdinalButLexicallyFirst,
-    }
-
-    impl StableReason for Reason {
-        fn code(&self) -> &'static str {
-            match self {
-                Self::Later => "later",
-                Self::Earlier => "z_earlier",
-                Self::SameOrdinalButLexicallyFirst => "a_earlier",
-            }
-        }
-
-        fn precedence(&self) -> u16 {
-            match self {
-                Self::Later => 20,
-                Self::Earlier | Self::SameOrdinalButLexicallyFirst => 10,
-            }
-        }
-    }
-
-    #[test]
-    fn reason_selection_is_independent_of_input_order() {
-        let left = first_reason([
-            Reason::Later,
-            Reason::Earlier,
-            Reason::SameOrdinalButLexicallyFirst,
-        ]);
-        let right = first_reason([
-            Reason::SameOrdinalButLexicallyFirst,
-            Reason::Later,
-            Reason::Earlier,
-        ]);
-        assert_eq!(left, Some(Reason::SameOrdinalButLexicallyFirst));
-        assert_eq!(left, right);
-    }
-
-    #[test]
-    fn failed_budget_charge_is_atomic() {
-        let limits = BudgetLimits::zero().with_limit(Resource::Read, 2);
-        let mut budget = Budget::new(limits);
-        assert_eq!(budget.charge(Resource::Read, 2), Ok(()));
-        let error = budget.charge(Resource::Read, 1);
-        assert!(error.is_err());
-        assert_eq!(budget.used().used(Resource::Read), 2);
-    }
-
-    #[test]
-    fn decision_candidate_mapping_preserves_kind() {
-        let accepted: Decision<u64, Reason, Reason> = Decision::Accept(Accepted::new(3));
-        assert_eq!(
-            accepted.map_candidate(|value| value + 1).kind(),
-            DecisionKind::Accept
-        );
-
-        let failed: Decision<u64, Reason, Reason> =
-            Decision::CommittedFailure(Failed::new(3, Reason::Later));
-        assert_eq!(
-            failed.map_candidate(|value| value + 1).kind(),
-            DecisionKind::CommittedFailure
-        );
-    }
-
-    struct ReadTransition;
-
-    impl Transition for ReadTransition {
-        type State = u64;
-        type Command = u64;
-        type Context = ();
-        type Candidate = u64;
-        type Reject = Reason;
-        type Failure = Reason;
-
-        fn step(
-            state: &Self::State,
-            command: &Self::Command,
-            _context: &Self::Context,
-            limits: BudgetLimits,
-        ) -> BudgetedDecision<Self::Candidate, Self::Reject, Self::Failure> {
-            let mut budget = Budget::new(limits);
-            let decision = match budget.charge(Resource::Read, 1) {
-                Ok(()) => Decision::Accept(Accepted::new(state + command)),
-                Err(_) => Decision::Reject(Rejected::new(Reason::Earlier)),
-            };
-            budget.finish(decision)
-        }
-    }
-
-    #[test]
-    fn transition_returns_explicit_usage_from_immutable_limits() {
-        let limits = BudgetLimits::zero().with_limit(Resource::Read, 1);
-
-        let first = ReadTransition::step(&2, &3, &(), limits);
-        let second = ReadTransition::step(&2, &3, &(), limits);
-
-        assert_eq!(first, second);
-        assert_eq!(first.decision().kind(), DecisionKind::Accept);
-        assert_eq!(first.limits(), limits);
-        assert_eq!(first.used().used(Resource::Read), 1);
-
-        let (decision, returned_limits, used) = first.into_parts();
-        assert_eq!(decision.kind(), DecisionKind::Accept);
-        assert_eq!(returned_limits, limits);
-        assert_eq!(used.used(Resource::Read), 1);
-    }
-
-    #[test]
-    fn rejected_charge_reports_no_partial_usage() {
-        let limits = BudgetLimits::zero();
-
-        let result = ReadTransition::step(&2, &3, &(), limits);
-
-        assert_eq!(result.decision().kind(), DecisionKind::Reject);
-        assert_eq!(result.limits(), limits);
-        assert_eq!(result.used(), BudgetUsed::default());
-    }
 }

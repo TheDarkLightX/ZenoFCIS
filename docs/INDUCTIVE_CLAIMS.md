@@ -1,5 +1,13 @@
 # Inductive claims
 
+The mathematical induction argument and original regression ledger below are
+retained. Public `evaluate_invariant`, callback observers, and caller-reported
+law verdicts have been retired. Their original executable implementations and
+template tests live only in the nonpublished verification oracle. Normal V2
+authority must bind complete declarations and have the library check genesis,
+schemas, and every applicable law; a model diagnostic cannot authorize a
+transition. `invariant_at` remains a pure authoring transformation.
+
 ## Purpose
 
 Every other claim is proved over observations that nothing constrains. Such a
@@ -51,7 +59,10 @@ claim 600 counters_never_negative all inductive accept [501] failure [502] = pre
 
 ## What is checked, and where
 
-The argument has three parts. `prove` checks only the first.
+The argument has three parts. `prove` checks only the first, through normal
+SMT export and private data-only replay. Parts two and three describe the
+original reference contract preserved privately; their callback APIs are no
+longer normal application interfaces.
 
 1. **The step**, exported to SMT by `export_inductive_smt`. It asks for an
    assignment to every observed `pre.`, `post.`, `command.`, and `context.`
@@ -165,7 +176,7 @@ a larger implication.
 | `Refuted` | A replayed transition satisfies the assumed laws and leaves the invariant. |
 | `Undefined(reason)` | A replayed transition satisfies the assumed laws, and the invariant over `post.` has no value there. |
 
-A counterexample is replayed through the library evaluator before it is
+A counterexample is replayed through private closed model diagnostics before it is
 reported. The model is confirmed only when all of these hold:
 - every observed value is present, and within its declared domain;
 - every law assumed for the model's decision kind evaluates to true;

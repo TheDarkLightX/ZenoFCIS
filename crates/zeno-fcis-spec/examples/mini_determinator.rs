@@ -55,5 +55,9 @@ fn main() {
         MiniDecision::Blocked(reason) => {
             println!("blocked: {reason:?}");
         }
+        _ => {
+            eprintln!("blocked: unsupported Mini Determinator decision");
+            std::process::exit(2);
+        }
     }
 }

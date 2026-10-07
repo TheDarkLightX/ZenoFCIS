@@ -94,12 +94,20 @@ impl AuthenticatedProfile {
     }
 }
 
-impl CanonicalEncode for AuthenticatedProfile {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl AuthenticatedProfile {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.tree_id.as_bytes());
         output.extend_from_slice(self.profile_hash.as_bytes());
         output.extend_from_slice(self.projector_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -199,8 +207,9 @@ impl NodeBatch {
     }
 }
 
-impl CanonicalEncode for NodeBatch {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl NodeBatch {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_length(output, self.writes.len())?;
         for write in &self.writes {
             match write {
@@ -216,6 +225,13 @@ impl CanonicalEncode for NodeBatch {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -308,8 +324,9 @@ impl PlannedAuthenticatedCommit {
     }
 }
 
-impl CanonicalEncode for PlannedAuthenticatedCommit {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl PlannedAuthenticatedCommit {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&AUTHENTICATED_PLAN_ENCODING_VERSION.to_be_bytes());
         output.extend_from_slice(self.profile.tree_id.as_bytes());
         output.extend_from_slice(self.profile.profile_hash.as_bytes());
@@ -333,6 +350,13 @@ impl CanonicalEncode for PlannedAuthenticatedCommit {
             output.extend_from_slice(stale.old_leaf_hash.as_bytes());
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -418,8 +442,9 @@ impl DecodedAuthenticatedPlan {
     }
 }
 
-impl CanonicalEncode for DecodedAuthenticatedPlan {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DecodedAuthenticatedPlan {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&AUTHENTICATED_PLAN_ENCODING_VERSION.to_be_bytes());
         output.extend_from_slice(self.profile.tree_id.as_bytes());
         output.extend_from_slice(self.profile.profile_hash.as_bytes());
@@ -443,6 +468,13 @@ impl CanonicalEncode for DecodedAuthenticatedPlan {
             output.extend_from_slice(stale.old_leaf_hash.as_bytes());
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -518,7 +550,7 @@ pub fn decode_authenticated_plan(
         node_batch,
         stale_nodes: stale_nodes.into_boxed_slice(),
     };
-    require_canonical(bytes, &decoded)?;
+    require_canonical(bytes, decoded.canonical_bytes())?;
     Ok(decoded)
 }
 
@@ -622,7 +654,10 @@ fn plan_authenticated_update<P: StateProjector>(
             });
         }
     }
-    let patch_hash = hash_canonical("zeno-fcis/auth-patch", patch)?;
+    let patch_hash = hash_canonical(
+        zeno_fcis_codec::domains::AUTH_PATCH,
+        (patch).canonical_bytes(),
+    )?;
     let plan = PlannedAuthenticatedCommit {
         profile: tree.profile,
         expected_version: tree.version,
@@ -662,8 +697,9 @@ pub struct SparseProof {
     siblings: Box<[Hash32]>,
 }
 
-impl CanonicalEncode for SparseProof {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SparseProof {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&SPARSE_PROOF_ENCODING_VERSION.to_be_bytes());
         output.extend_from_slice(self.profile.tree_id.as_bytes());
         output.extend_from_slice(self.profile.profile_hash.as_bytes());
@@ -683,6 +719,13 @@ impl CanonicalEncode for SparseProof {
             output.extend_from_slice(sibling.as_bytes());
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -729,7 +772,7 @@ pub fn decode_sparse_proof(
         leaf,
         siblings: siblings.into_boxed_slice(),
     };
-    require_canonical(bytes, &proof)?;
+    require_canonical(bytes, proof.canonical_bytes())?;
     Ok(proof)
 }
 
@@ -1058,19 +1101,19 @@ fn leaf_hash(key: Hash32, value: &Value) -> Result<Hash32, AuthError> {
         &value.canonical_bytes().map_err(AuthError::Encode)?,
     )
     .map_err(AuthError::Encode)?;
-    hash_bytes("zeno-fcis/auth-leaf", &bytes)
+    hash_bytes(zeno_fcis_codec::domains::AUTH_LEAF, &bytes)
 }
 
 fn node_hash(left: Hash32, right: Hash32) -> Result<Hash32, AuthError> {
     let mut bytes = Vec::with_capacity(64);
     bytes.extend_from_slice(left.as_bytes());
     bytes.extend_from_slice(right.as_bytes());
-    hash_bytes("zeno-fcis/auth-node", &bytes)
+    hash_bytes(zeno_fcis_codec::domains::AUTH_NODE, &bytes)
 }
 
 fn empty_hashes() -> Result<[Hash32; TREE_DEPTH + 1], AuthError> {
     let mut hashes = [Hash32::ZERO; TREE_DEPTH + 1];
-    hashes[TREE_DEPTH] = hash_bytes("zeno-fcis/auth-empty", b"leaf")?;
+    hashes[TREE_DEPTH] = hash_bytes(zeno_fcis_codec::domains::AUTH_EMPTY, b"leaf")?;
     for depth in (0..TREE_DEPTH).rev() {
         hashes[depth] = node_hash(hashes[depth + 1], hashes[depth + 1])?;
     }
@@ -1124,13 +1167,15 @@ const fn key_bit(key: Hash32, depth: usize) -> u8 {
     (byte >> (7 - (depth % 8))) & 1
 }
 
-fn hash_canonical(domain: &'static str, value: &impl CanonicalEncode) -> Result<Hash32, AuthError> {
-    let bytes = value.canonical_bytes().map_err(AuthError::Encode)?;
+fn hash_canonical(
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
+) -> Result<Hash32, AuthError> {
+    let bytes = value.map_err(AuthError::Encode)?;
     hash_bytes(domain, &bytes)
 }
 
-fn hash_bytes(domain: &'static str, bytes: &[u8]) -> Result<Hash32, AuthError> {
-    let domain = Domain::new(domain, 1).map_err(AuthError::Encode)?;
+fn hash_bytes(domain: Domain<'static>, bytes: &[u8]) -> Result<Hash32, AuthError> {
     commitment::<RustCryptoSha256>(domain, bytes).map_err(AuthError::Encode)
 }
 
@@ -1177,7 +1222,7 @@ fn decode_node_batch(
     let batch = NodeBatch {
         writes: writes.into_boxed_slice(),
     };
-    require_canonical(bytes, &batch)?;
+    require_canonical(bytes, batch.canonical_bytes())?;
     Ok(batch)
 }
 
@@ -1224,8 +1269,11 @@ fn require_complete(cursor: &AuthCursor<'_>) -> Result<(), AuthDecodeError> {
     }
 }
 
-fn require_canonical(bytes: &[u8], value: &impl CanonicalEncode) -> Result<(), AuthDecodeError> {
-    let canonical = value.canonical_bytes().map_err(AuthDecodeError::Encode)?;
+fn require_canonical(
+    bytes: &[u8],
+    value: Result<Vec<u8>, EncodeError>,
+) -> Result<(), AuthDecodeError> {
+    let canonical = value.map_err(AuthDecodeError::Encode)?;
     if canonical.as_slice() == bytes {
         Ok(())
     } else {
@@ -1311,6 +1359,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 
 /// Authenticated planning or proof failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum AuthError {
     /// Profile or tree identity is the forbidden zero sentinel.
     ZeroIdentity,
@@ -1354,6 +1403,7 @@ pub enum AuthError {
 
 /// Strict authenticated plan or proof decoding failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum AuthDecodeError {
     /// Complete input exceeds the configured byte limit.
     InputLimit {
@@ -1599,13 +1649,13 @@ mod tests {
         let left = ReferenceSparseTree::try_new(
             profile(),
             0,
-            vec![(hash(3), Value::U128(3)), (hash(4), Value::U128(4))],
+            vec![(hash(3), Value::unsigned(3)), (hash(4), Value::unsigned(4))],
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
         let right = ReferenceSparseTree::try_new(
             profile(),
             0,
-            vec![(hash(4), Value::U128(4)), (hash(3), Value::U128(3))],
+            vec![(hash(4), Value::unsigned(4)), (hash(3), Value::unsigned(3))],
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
         assert_eq!(left.root(), right.root());
@@ -1616,7 +1666,7 @@ mod tests {
         let tree = ReferenceSparseTree::try_new(
             profile(),
             7,
-            vec![(hash(3), Value::U128(3)), (hash(4), Value::U128(4))],
+            vec![(hash(3), Value::unsigned(3)), (hash(4), Value::unsigned(4))],
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
         let member = tree
@@ -1638,7 +1688,7 @@ mod tests {
         assert_eq!(verified_member.context(), member_context);
         assert!(matches!(
             verified_member.leaf(),
-            ProofLeaf::Membership(Value::U128(3))
+            ProofLeaf::Membership(value) if matches!(value.view(), zeno_fcis_value::ValueRef::U128(3))
         ));
         assert!(matches!(verified_absent.leaf(), ProofLeaf::Absence));
     }
@@ -1648,7 +1698,7 @@ mod tests {
         let tree = ReferenceSparseTree::try_new(
             profile(),
             7,
-            vec![(hash(3), Value::U128(3)), (hash(4), Value::U128(4))],
+            vec![(hash(3), Value::unsigned(3)), (hash(4), Value::unsigned(4))],
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
         let proof = tree
@@ -1707,7 +1757,7 @@ mod tests {
         let tree = ReferenceSparseTree::try_new(
             profile(),
             7,
-            vec![(hash(3), Value::U128(3)), (hash(4), Value::U128(4))],
+            vec![(hash(3), Value::unsigned(3)), (hash(4), Value::unsigned(4))],
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
         let proof = tree
@@ -1716,7 +1766,7 @@ mod tests {
         let context = SparseProofContext::new(tree.profile(), tree.version(), tree.root(), hash(3));
 
         let mut wrong_leaf = proof.clone();
-        wrong_leaf.leaf = ProofLeaf::Membership(Value::U128(9));
+        wrong_leaf.leaf = ProofLeaf::Membership(Value::unsigned(9));
         assert_eq!(
             wrong_leaf.verify_against(context),
             Err(AuthError::InvalidProof)
@@ -1735,7 +1785,7 @@ mod tests {
         let tree = ReferenceSparseTree::try_new(
             profile(),
             7,
-            vec![(hash(3), Value::U128(3)), (hash(4), Value::U128(4))],
+            vec![(hash(3), Value::unsigned(3)), (hash(4), Value::unsigned(4))],
         )
         .unwrap_or_else(|error| panic!("tree: {error}"));
         let proof = tree
@@ -1786,21 +1836,18 @@ mod tests {
 
     #[test]
     fn planned_update_matches_full_rebuild() {
-        let pre = Value::U128(7);
+        let pre = Value::unsigned(7);
         let pre_root = hash_value::<RustCryptoSha256>(domain(), &pre)
             .unwrap_or_else(|error| panic!("pre root: {error}"));
-        let old_hash = hash_value::<RustCryptoSha256>(
-            Domain::new("zeno-fcis/value", 1).unwrap_or_else(|error| panic!("domain: {error}")),
-            &pre,
-        )
-        .unwrap_or_else(|error| panic!("old hash: {error}"));
+        let old_hash = hash_value::<RustCryptoSha256>(zeno_fcis_codec::domains::VALUE, &pre)
+            .unwrap_or_else(|error| panic!("old hash: {error}"));
         let patch = CanonicalPatch::try_new(
             1,
             pre_root,
             vec![PatchOp::Update {
                 path: ValuePath::new(Vec::new()),
                 expected_old_hash: old_hash,
-                value: Value::U128(8),
+                value: Value::unsigned(8),
             }],
         )
         .unwrap_or_else(|error| panic!("patch: {error}"));
@@ -1832,21 +1879,18 @@ mod tests {
 
     #[test]
     fn authenticated_plans_strictly_round_trip_as_non_authoritative_transport() {
-        let pre = Value::U128(7);
+        let pre = Value::unsigned(7);
         let pre_root = hash_value::<RustCryptoSha256>(domain(), &pre)
             .unwrap_or_else(|error| panic!("pre root: {error}"));
-        let old_hash = hash_value::<RustCryptoSha256>(
-            Domain::new("zeno-fcis/value", 1).unwrap_or_else(|error| panic!("domain: {error}")),
-            &pre,
-        )
-        .unwrap_or_else(|error| panic!("old hash: {error}"));
+        let old_hash = hash_value::<RustCryptoSha256>(zeno_fcis_codec::domains::VALUE, &pre)
+            .unwrap_or_else(|error| panic!("old hash: {error}"));
         let patch = CanonicalPatch::try_new(
             1,
             pre_root,
             vec![PatchOp::Update {
                 path: ValuePath::new(Vec::new()),
                 expected_old_hash: old_hash,
-                value: Value::U128(8),
+                value: Value::unsigned(8),
             }],
         )
         .unwrap_or_else(|error| panic!("patch: {error}"));
@@ -1983,7 +2027,7 @@ mod tests {
             writes: vec![
                 LeafWrite::Put {
                     key: hash(8),
-                    value: Value::U128(9),
+                    value: Value::unsigned(9),
                 },
                 LeafWrite::Delete { key: hash(9) },
             ]
@@ -2034,21 +2078,18 @@ mod tests {
 
     #[test]
     fn planning_at_maximum_version_returns_overflow() {
-        let pre = Value::U128(7);
+        let pre = Value::unsigned(7);
         let pre_root = hash_value::<RustCryptoSha256>(domain(), &pre)
             .unwrap_or_else(|error| panic!("pre root: {error}"));
-        let old_hash = hash_value::<RustCryptoSha256>(
-            Domain::new("zeno-fcis/value", 1).unwrap_or_else(|error| panic!("domain: {error}")),
-            &pre,
-        )
-        .unwrap_or_else(|error| panic!("old hash: {error}"));
+        let old_hash = hash_value::<RustCryptoSha256>(zeno_fcis_codec::domains::VALUE, &pre)
+            .unwrap_or_else(|error| panic!("old hash: {error}"));
         let patch = CanonicalPatch::try_new(
             1,
             pre_root,
             vec![PatchOp::Update {
                 path: ValuePath::new(Vec::new()),
                 expected_old_hash: old_hash,
-                value: Value::U128(8),
+                value: Value::unsigned(8),
             }],
         )
         .unwrap_or_else(|error| panic!("patch: {error}"));

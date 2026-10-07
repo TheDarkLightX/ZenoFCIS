@@ -1,15 +1,9 @@
-use durable_counter::{
-    authority, bindings::GeneratedProject, create, delivery::Destination, generated::*, invoke,
-    journey, profile,
-};
+use durable_counter::{authority, create, generated::*, invoke, journey};
 use std::{
     fs,
     path::PathBuf,
     sync::atomic::{AtomicU64, Ordering},
 };
-use zeno_fcis_core::Decision;
-use zeno_fcis_crypto::RustCryptoSha256;
-use zeno_fcis_schema::ValidationLimits;
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 struct Temp(PathBuf);
@@ -48,13 +42,10 @@ fn complete_durable_journey() {
 #[test]
 fn both_capacity_boundaries_reject_without_publication() {
     let temp = Temp::new();
-    let authority = authority().unwrap();
-    let mut shell = create(
-        &temp.0.join("counter.sqlite"),
-        &authority,
-        Destination::default(),
-    )
-    .unwrap();
+    let contract = durable_counter::v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor).unwrap();
+    let mut shell = create(&temp.0.join("counter.sqlite"), &authority).unwrap();
     for n in 0..3 {
         assert_eq!(
             invoke(
@@ -87,75 +78,6 @@ fn both_capacity_boundaries_reject_without_publication() {
         );
         assert_eq!(shell.snapshot().unwrap(), before);
     }
-    assert_eq!(before.bundle_count(), 6);
-    assert_eq!(before.pending_outbox(), 6);
-}
-
-#[test]
-fn every_bounded_input_obeys_the_independent_decision_table() {
-    let authority = authority().unwrap();
-    let project = GeneratedProject::try_new::<RustCryptoSha256>().unwrap();
-    for count in 0..=3 {
-        for failures in 0..=3 {
-            for command in [CounterCommand::Increment, CounterCommand::RecordFailure] {
-                for allowed in [false, true] {
-                    let pre = project
-                        .admit_root::<RustCryptoSha256>(
-                            &CounterState {
-                                count: CounterValue(count),
-                                failures: CounterValue(failures),
-                            },
-                            ValidationLimits::default(),
-                        )
-                        .unwrap();
-                    let cmd = project
-                        .admit_command::<RustCryptoSha256>(&command, ValidationLimits::default())
-                        .unwrap();
-                    let ctx = project
-                        .admit_context::<RustCryptoSha256>(
-                            &CounterContext(allowed),
-                            ValidationLimits::default(),
-                        )
-                        .unwrap();
-                    let binding = profile::digest(
-                        "example/test/input",
-                        format!("{count},{failures},{command:?},{allowed}").as_bytes(),
-                    );
-                    let invocation = authority
-                        .admit_invocation(
-                            pre,
-                            cmd.admitted().clone(),
-                            ctx.admitted().clone(),
-                            binding,
-                            binding,
-                            binding,
-                        )
-                        .unwrap();
-                    let selected = match command {
-                        CounterCommand::Increment => count,
-                        CounterCommand::RecordFailure => failures,
-                    };
-                    let decision = authority.execute(invocation).unwrap();
-                    match decision {
-                        Decision::Reject(reject) => {
-                            assert!(!allowed || selected == 3);
-                            assert_eq!(
-                                reject.reason().rejection().reason_id().get(),
-                                if allowed { 201 } else { 200 }
-                            );
-                        }
-                        Decision::Accept(_) => {
-                            assert!(allowed && count < 3);
-                            assert!(matches!(command, CounterCommand::Increment));
-                        }
-                        Decision::CommittedFailure(failure) => {
-                            assert!(allowed && failures < 3);
-                            assert!(matches!(command, CounterCommand::RecordFailure));
-                            assert_eq!(failure.reason().get(), 202);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    assert_eq!(before.version(), 6);
+    assert_eq!(before.pending(), 6);
 }

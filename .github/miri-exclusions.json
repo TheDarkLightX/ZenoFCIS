@@ -1,0 +1,65 @@
+{
+  "format": "zeno-fcis/miri-exclusions/1",
+  "exclusions": [
+    {
+      "group": "values",
+      "package": "zeno-fcis-value",
+      "test_binary": "construction",
+      "test": "legal_leaf_above_default_payload_remains_constructible_and_encodable",
+      "reason": "Builds three DEFAULT_MAX_PAYLOAD_BYTES + 1 (64 MiB + 1) values and scans two of them byte by byte. Under Miri on 2026-10-05 it never finished: both hosted values runs (jobs 111904274981 and 111905381871) were cut off by a runner shutdown after about 2 h 10 min in this test, and a local run under a 12 GB cap had no result after 90 min, with interpreter memory at 7.7 GB and still rising.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "all_original_small_domains_and_unlawful_order_states",
+      "reason": "Native corpus: 2,656 complete Authority evaluations (counter 64, inventory 864, order 1,728). Observed: in the hosted Miri run of 916b28e the synthesis-v2-template-contracts job started its 8 tests at 02:37:05 and was cancelled at 05:36:50 by its 180-minute budget with no test completed; natively the whole target took 389.41 s. Estimate, not a measurement: per-case Miri cost was not measured for this test, so any hour figure is an uncertain scaling estimate. miri_bounded_template_domain_profiles interprets pinned cases from this corpus with the same checked comparison; Miri's UB, provenance and aliasing checks are lost for the omitted cases.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "account_complete_clock_boundaries_without_domain_narrowing",
+      "reason": "Native corpus: 13,122 complete Authority evaluations over nine selected clock and deadline values, not the production timestamp range. Observed: in the hosted Miri run of 916b28e the synthesis-v2-template-contracts job started its 8 tests at 02:37:05 and was cancelled at 05:36:50 by its 180-minute budget with no test completed; natively the whole target took 389.41 s. Estimate, not a measurement: per-case Miri cost was not measured for this test, so any hour figure is an uncertain scaling estimate. miri_bounded_template_domain_profiles interprets pinned cases from this corpus with the same checked comparison; Miri's UB, provenance and aliasing checks are lost for the omitted cases.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "withdrawal_complete_raw_domain_and_certified_controller",
+      "reason": "Native corpus: 1,296,000 cases, each with a fresh core bind and frame. Observed: in the hosted Miri run of 916b28e the synthesis-v2-template-contracts job started its 8 tests at 02:37:05 and was cancelled at 05:36:50 by its 180-minute budget with no test completed; natively the whole target took 389.41 s. Estimate, not a measurement: per-case Miri cost was not measured for this test, so any hour figure is an uncertain scaling estimate. miri_bounded_template_domain_profiles interprets pinned cases from this corpus with the same checked comparison; Miri's UB, provenance and aliasing checks are lost for the omitted cases.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    },
+    {
+      "group": "synthesis-v2-template-contracts",
+      "package": "zeno-fcis-synthesis",
+      "test_binary": "v2_template_contracts",
+      "test": "treasury_guard_arithmetic_callbacks_and_unlawful_prestates",
+      "reason": "Native corpus: three partitions of 103,680, 677,376 and 82,944 cases (864,000), each with a fresh core bind and frame; not the full production Cartesian domain. Observed: in the hosted Miri run of 916b28e the synthesis-v2-template-contracts job started its 8 tests at 02:37:05 and was cancelled at 05:36:50 by its 180-minute budget with no test completed; natively the whole target took 389.41 s. Estimate, not a measurement: per-case Miri cost was not measured for this test, so any hour figure is an uncertain scaling estimate. miri_bounded_template_domain_profiles interprets pinned cases from this corpus with the same checked comparison; Miri's UB, provenance and aliasing checks are lost for the omitted cases.",
+      "native": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "rust",
+        "command": "cargo +1.97.1 test --workspace --all-features --locked"
+      }
+    }
+  ]
+}

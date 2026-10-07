@@ -1,0 +1,13 @@
+{
+  "schema": "zeno-fcis/template-schema-origin/1",
+  "retained_original": "crates/zeno-fcis-cli/templates/inventory-reservation/v2/schema.zcve",
+  "sha256": "d740f8e2da4110f9e302da68fb6e00b717591f81d57daf492002539fb419d2c7",
+  "bytes": 448,
+  "schema_commitment": "01850b4e695601ef00b6962907dfcdd04ee6f040a2527223b4178e9497d1846c",
+  "source_inputs": {
+    "project.zeno": "86eae29e32a72f193e9b50c527ccd99fb297cdff4dfe638a4c637f10f20a1106",
+    "build.rs": "f19c0cc685de8a407632595d469aac0dec373c13fc260e51d8152e6a19bba919",
+    "profile.rs": "d551c241a774d7a924a4cadb67ba5e7ccfc95934716c0932c1a058515e46a4db"
+  },
+  "qualification": "Retained actual original lower_schema output; full Description matched at catalog binding; fresh build assertion must also pass."
+}

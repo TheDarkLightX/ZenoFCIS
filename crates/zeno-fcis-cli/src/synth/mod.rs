@@ -224,19 +224,29 @@ fn prepare(selection: &Selection) -> Result<Prepared> {
                 json!({"assignments_evaluated":certificate.evaluated(),"certificate":hex(certificate.commitment().map_err(|e|semantic(Error::Search(e)))?),"first_counterexample":witness_json(first_counterexample)}),
             ));
         }
+        _ => {
+            return Err(fail(
+                crate::BLOCKED,
+                "unsupported-synthesis-outcome",
+                json!({"message":"the installed CLI does not support this synthesis outcome"}),
+            ));
+        }
     };
     let source = target.emitter.emit(&program).map_err(semantic)?;
     let mut files = BTreeMap::new();
     files.insert("problem.json".into(), problem.bytes);
     files.insert(
         "program.zcve".into(),
-        program.value().canonical_bytes().map_err(|e| {
-            fail(
-                crate::FAILURE,
-                "encoding-error",
-                json!({"message":e.to_string()}),
-            )
-        })?,
+        program
+            .value()
+            .and_then(|value| value.canonical_bytes())
+            .map_err(|e| {
+                fail(
+                    crate::FAILURE,
+                    "encoding-error",
+                    json!({"message":e.to_string()}),
+                )
+            })?,
     );
     files.insert(
         format!("transition.{}", target.emitter.target().extension),

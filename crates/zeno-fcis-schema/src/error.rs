@@ -6,6 +6,7 @@ use crate::{FieldId, TypeId, VariantId};
 
 /// Closed-schema construction or encoding failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SchemaError {
     /// A name was empty, too long, non-ASCII, or not an identifier.
     InvalidName,
@@ -63,6 +64,7 @@ impl std::error::Error for SchemaError {}
 
 /// Failure while checking a closed value against a schema.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ValueValidationError {
     /// The requested schema type does not exist.
     UnknownType(TypeId),

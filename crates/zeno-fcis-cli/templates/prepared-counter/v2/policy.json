@@ -1,0 +1,86 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "prepared-counter",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "leaf_bindings": {
+    "102": [
+      "Bool"
+    ],
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "105": [
+      "I128",
+      0,
+      3
+    ],
+    "106": [
+      "I128",
+      -1,
+      1
+    ]
+  },
+  "variables": {
+    "count": "pre.100.110",
+    "first": "command.101.120",
+    "second": "command.101.121",
+    "third": "command.101.122",
+    "allowed": "context.102",
+    "prefix_one": "count + first",
+    "prefix_two": "count + first + second",
+    "final_count": "count + first + second + third",
+    "capacity": "prefix_one < 0 || prefix_one > 3 || prefix_two < 0 || prefix_two > 3 || final_count < 0 || final_count > 3"
+  },
+  "cases": [
+    {
+      "when": "!allowed",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "capacity",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "final_count"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "local-observer",
+          "payload": {
+            "112": "final_count"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "CommittedFailureEffects",
+    "503": "RejectNoAuthority"
+  },
+  "original_domain": "count 0..3; three ordered record deltas -1..1; Bool context; every prefix must stay within count bounds."
+}

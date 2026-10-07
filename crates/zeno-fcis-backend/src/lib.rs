@@ -57,10 +57,18 @@ pub enum BackendOperation {
     GenerateDesign = 7,
 }
 
-impl CanonicalEncode for BackendOperation {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendOperation {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -95,13 +103,21 @@ impl BackendCapabilities {
     }
 }
 
-impl CanonicalEncode for BackendCapabilities {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendCapabilities {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_u16_length(output, self.0.len())?;
         for operation in &self.0 {
             operation.encode_to(output)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -171,12 +187,16 @@ impl BackendIdentity {
 
     /// Computes the complete backend identity commitment.
     pub fn commitment(&self) -> Result<Hash32, BackendError> {
-        hash_canonical("zeno-fcis/backend-identity", self)
+        hash_canonical(
+            zeno_fcis_codec::domains::BACKEND_IDENTITY,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for BackendIdentity {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendIdentity {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.name.encode_to(output)?;
         self.version.encode_to(output)?;
         output.extend_from_slice(&self.protocol_version.to_be_bytes());
@@ -184,6 +204,13 @@ impl CanonicalEncode for BackendIdentity {
         output.extend_from_slice(self.source_hash.as_bytes());
         output.extend_from_slice(self.configuration_hash.as_bytes());
         self.capabilities.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -251,13 +278,21 @@ impl BackendLimits {
     }
 }
 
-impl CanonicalEncode for BackendLimits {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendLimits {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.logical_fuel.to_be_bytes());
         output.extend_from_slice(&self.max_candidates.to_be_bytes());
         output.extend_from_slice(&self.max_output_bytes.to_be_bytes());
         output.extend_from_slice(&self.max_trace_entries.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -319,13 +354,21 @@ impl BackendUsage {
     }
 }
 
-impl CanonicalEncode for BackendUsage {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendUsage {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.logical_fuel.to_be_bytes());
         output.extend_from_slice(&self.candidates.to_be_bytes());
         output.extend_from_slice(&self.output_bytes.to_be_bytes());
         output.extend_from_slice(&self.trace_entries.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -414,12 +457,16 @@ impl BackendRequest {
 
     /// Computes the request commitment.
     pub fn commitment(&self) -> Result<Hash32, BackendError> {
-        hash_canonical("zeno-fcis/backend-request", self)
+        hash_canonical(
+            zeno_fcis_codec::domains::BACKEND_REQUEST,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for BackendRequest {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendRequest {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.request_id.as_bytes());
         output.extend_from_slice(self.profile_hash.as_bytes());
         self.operation.encode_to(output)?;
@@ -427,6 +474,13 @@ impl CanonicalEncode for BackendRequest {
         output.extend_from_slice(self.context_hash.as_bytes());
         put_blob(output, &self.input.canonical_bytes()?)?;
         self.limits.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -499,8 +553,9 @@ impl AcceptedOutcome {
     }
 }
 
-impl CanonicalEncode for AcceptedOutcome {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl AcceptedOutcome {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_blob(output, &self.artifact.canonical_bytes()?)?;
         output.extend_from_slice(self.reference_claim.as_bytes());
         output.extend_from_slice(self.composition_claim.as_bytes());
@@ -510,6 +565,13 @@ impl CanonicalEncode for AcceptedOutcome {
         }
         output.extend_from_slice(self.trace_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -542,11 +604,19 @@ impl RejectedOutcome {
     }
 }
 
-impl CanonicalEncode for RejectedOutcome {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl RejectedOutcome {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_blob(output, &self.counterexample.canonical_bytes()?)?;
         output.extend_from_slice(self.trace_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -579,11 +649,19 @@ impl IncompleteOutcome {
     }
 }
 
-impl CanonicalEncode for IncompleteOutcome {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl IncompleteOutcome {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_blob(output, &self.frontier.canonical_bytes()?)?;
         output.extend_from_slice(self.trace_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -610,16 +688,25 @@ impl IndeterminateOutcome {
     }
 }
 
-impl CanonicalEncode for IndeterminateOutcome {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl IndeterminateOutcome {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.reason.encode_to(output)?;
         output.extend_from_slice(self.trace_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
 /// Closed backend outcome algebra.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum BackendOutcome {
     /// Verified candidate artifact proposed by the backend.
     Accepted(AcceptedOutcome),
@@ -631,8 +718,9 @@ pub enum BackendOutcome {
     Indeterminate(IndeterminateOutcome),
 }
 
-impl CanonicalEncode for BackendOutcome {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendOutcome {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Accepted(value) => {
                 output.push(0);
@@ -651,6 +739,13 @@ impl CanonicalEncode for BackendOutcome {
                 value.encode_to(output)
             }
         }
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -771,21 +866,33 @@ impl BackendResponse {
 
     /// Computes the complete response commitment.
     pub fn commitment(&self) -> Result<Hash32, BackendError> {
-        hash_canonical("zeno-fcis/backend-response", self)
+        hash_canonical(
+            zeno_fcis_codec::domains::BACKEND_RESPONSE,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for BackendResponse {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendResponse {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.request_hash.as_bytes());
         output.extend_from_slice(self.identity_hash.as_bytes());
         self.usage.encode_to(output)?;
         self.outcome.encode_to(output)
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Closed execution failures reported by a mounted backend shell.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum BackendExecutionError {
     /// Backend process or service is unavailable.
     Unavailable,
@@ -813,6 +920,7 @@ pub trait BackendEngine {
 
 /// Independent verifier result for a complete backend response.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum VerificationDecision {
     /// Response and its claims were independently attested.
     Attested {
@@ -884,12 +992,16 @@ impl BackendCertificate {
 
     /// Computes the complete certificate identity.
     pub fn commitment(&self) -> Result<Hash32, BackendError> {
-        hash_canonical("zeno-fcis/backend-certificate", self)
+        hash_canonical(
+            zeno_fcis_codec::domains::BACKEND_CERTIFICATE,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for BackendCertificate {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendCertificate {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         for hash in [
             self.request_hash,
             self.response_hash,
@@ -900,6 +1012,13 @@ impl CanonicalEncode for BackendCertificate {
             output.extend_from_slice(hash.as_bytes());
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1011,10 +1130,12 @@ impl BackendRequestTemplate {
                 .entries()
                 .iter()
                 .map(|(id, value)| {
-                    Value::tuple(vec![Value::U128(u128::from(id.get())), value.clone()])
+                    Value::tuple(vec![Value::unsigned(u128::from(id.get())), value.clone()])
                 })
-                .collect(),
-        );
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|error| BackendError::Encode(EncodeError::InvalidValue(error)))?,
+        )
+        .map_err(|error| BackendError::Encode(EncodeError::InvalidValue(error)))?;
         BackendRequest::try_new(
             assignment.commitment().map_err(BackendError::Synthesis)?,
             self.profile_hash,
@@ -1027,12 +1148,20 @@ impl BackendRequestTemplate {
     }
 }
 
-impl CanonicalEncode for BackendRequestTemplate {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl BackendRequestTemplate {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.profile_hash.as_bytes());
         output.extend_from_slice(self.specification_hash.as_bytes());
         output.extend_from_slice(self.context_hash.as_bytes());
         self.limits.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1068,7 +1197,7 @@ impl<E: BackendEngine, V: BackendVerifier> SynthesisBackendChecker<E, V> {
         put_blob(&mut bytes, &engine.identity().canonical_bytes()?)?;
         put_blob(&mut bytes, &template.canonical_bytes()?)?;
         bytes.extend_from_slice(verifier_hash.as_bytes());
-        let checker_hash = hash_bytes("zeno-fcis/backend-synthesis-checker", &bytes)?;
+        let checker_hash = hash_bytes(zeno_fcis_codec::domains::BACKEND_SYNTHESIS_CHECKER, &bytes)?;
         Ok(Self {
             engine,
             verifier,
@@ -1102,14 +1231,14 @@ impl<E: BackendEngine, V: BackendVerifier> CandidateChecker for SynthesisBackend
         match run.response().outcome() {
             BackendOutcome::Accepted(accepted) => {
                 let Ok(reference_claim) = bind_verified_claim(
-                    "zeno-fcis/backend-synthesis-reference",
+                    zeno_fcis_codec::domains::BACKEND_SYNTHESIS_REFERENCE,
                     accepted.reference_claim(),
                     certificate_hash,
                 ) else {
                     return CheckResult::Indeterminate;
                 };
                 let Ok(composition_claim) = bind_verified_claim(
-                    "zeno-fcis/backend-synthesis-composition",
+                    zeno_fcis_codec::domains::BACKEND_SYNTHESIS_COMPOSITION,
                     accepted.composition_claim(),
                     certificate_hash,
                 ) else {
@@ -1138,11 +1267,11 @@ impl<E: BackendEngine, V: BackendVerifier> CandidateChecker for SynthesisBackend
 
 fn bind_verified_counterexample(counterexample: &Value, certificate_hash: Hash32) -> Option<Value> {
     let certificate = Value::bytes(certificate_hash.as_bytes().to_vec()).ok()?;
-    Some(Value::tuple(vec![counterexample.clone(), certificate]))
+    Value::tuple(vec![counterexample.clone(), certificate]).ok()
 }
 
 fn bind_verified_claim(
-    domain: &'static str,
+    domain: Domain<'static>,
     claim: Hash32,
     certificate_hash: Hash32,
 ) -> Result<Hash32, BackendError> {
@@ -1165,21 +1294,21 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
     Ok(())
 }
 
-fn hash_canonical<T: CanonicalEncode>(
-    domain: &'static str,
-    value: &T,
+fn hash_canonical(
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, BackendError> {
-    let bytes = value.canonical_bytes().map_err(BackendError::Encode)?;
+    let bytes = value.map_err(BackendError::Encode)?;
     hash_bytes(domain, &bytes)
 }
 
-fn hash_bytes(domain: &'static str, bytes: &[u8]) -> Result<Hash32, BackendError> {
-    let domain = Domain::new(domain, 1).map_err(BackendError::Encode)?;
+fn hash_bytes(domain: Domain<'static>, bytes: &[u8]) -> Result<Hash32, BackendError> {
     commitment::<RustCryptoSha256>(domain, bytes).map_err(BackendError::Encode)
 }
 
 /// Generic backend construction, validation, or verification failure.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum BackendError {
     /// A backend identity advertised no operations.
     EmptyCapabilities,
@@ -1337,7 +1466,7 @@ mod tests {
             operation,
             hash(12),
             hash(13),
-            Value::U128(7),
+            Value::unsigned(7),
             limits(),
         )
         .unwrap_or_else(|error| panic!("request: {error}"))
@@ -1378,7 +1507,7 @@ mod tests {
         let request = request(BackendOperation::Verify);
         let identity = identity(vec![BackendOperation::Verify]);
         let outcome = BackendOutcome::Rejected(
-            RejectedOutcome::try_new(Value::Unit, hash(30))
+            RejectedOutcome::try_new(Value::unit(), hash(30))
                 .unwrap_or_else(|error| panic!("outcome: {error}")),
         );
         let output_bytes = u64::try_from(
@@ -1403,7 +1532,7 @@ mod tests {
         let request = request(BackendOperation::Verify);
         let identity = identity(vec![BackendOperation::Verify]);
         let outcome = BackendOutcome::Rejected(
-            RejectedOutcome::try_new(Value::Unit, hash(31))
+            RejectedOutcome::try_new(Value::unit(), hash(31))
                 .unwrap_or_else(|error| panic!("outcome: {error}")),
         );
         let actual = u64::try_from(
@@ -1432,7 +1561,7 @@ mod tests {
         let usage = BackendUsage::try_new(request.limits(), 1, 1, 1024, 1)
             .unwrap_or_else(|error| panic!("usage: {error}"));
         let outcome = BackendOutcome::Rejected(
-            RejectedOutcome::try_new(Value::Unit, hash(30))
+            RejectedOutcome::try_new(Value::unit(), hash(30))
                 .unwrap_or_else(|error| panic!("outcome: {error}")),
         );
         assert!(matches!(
@@ -1474,17 +1603,21 @@ mod tests {
             &mut self,
             request: &BackendRequest,
         ) -> Result<BackendResponse, BackendExecutionError> {
-            let selected = match request.input() {
-                Value::Vector(entries) => match entries.first() {
-                    Some(Value::Tuple(pair)) => pair.get(1).cloned().unwrap_or(Value::Unit),
-                    _ => Value::Unit,
-                },
-                _ => Value::Unit,
+            let selected = match request.input().view() {
+                zeno_fcis_value::ValueRef::Vector(entries) => {
+                    match entries.first().map(Value::view) {
+                        Some(zeno_fcis_value::ValueRef::Tuple(pair)) => {
+                            pair.get(1).cloned().unwrap_or(Value::unit())
+                        }
+                        _ => Value::unit(),
+                    }
+                }
+                _ => Value::unit(),
             };
-            let outcome = if selected == Value::U128(2) {
+            let outcome = if selected == Value::unsigned(2) {
                 BackendOutcome::Accepted(
                     AcceptedOutcome::try_new(
-                        Value::U128(99),
+                        Value::unsigned(99),
                         hash(50),
                         hash(51),
                         Vec::new(),
@@ -1525,7 +1658,7 @@ mod tests {
         };
         let hole = Hole::try_new(
             HoleId::try_new(1).unwrap_or_else(|error| panic!("hole id: {error}")),
-            vec![Value::U128(1), Value::U128(3)],
+            vec![Value::unsigned(1), Value::unsigned(3)],
         )
         .unwrap_or_else(|error| panic!("hole: {error}"));
         let problem = SynthesisProblem::try_new(
@@ -1563,7 +1696,7 @@ mod tests {
         };
         let hole = Hole::try_new(
             HoleId::try_new(1).unwrap_or_else(|error| panic!("hole id: {error}")),
-            vec![Value::U128(2), Value::U128(1)],
+            vec![Value::unsigned(2), Value::unsigned(1)],
         )
         .unwrap_or_else(|error| panic!("hole: {error}"));
         let problem = SynthesisProblem::try_new(
@@ -1603,7 +1736,7 @@ mod tests {
         .unwrap_or_else(|error| panic!("checker: {error}"));
         let hole = Hole::try_new(
             HoleId::try_new(1).unwrap_or_else(|error| panic!("hole id: {error}")),
-            vec![Value::U128(2), Value::U128(1)],
+            vec![Value::unsigned(2), Value::unsigned(1)],
         )
         .unwrap_or_else(|error| panic!("hole: {error}"));
         let problem = SynthesisProblem::try_new(
@@ -1628,11 +1761,12 @@ mod tests {
                 assert_eq!(
                     assignment
                         .get(HoleId::try_new(1).unwrap_or_else(|error| panic!("id: {error}"))),
-                    Some(&Value::U128(2))
+                    Some(&Value::unsigned(2))
                 );
-                assert_eq!(compiled, Value::U128(99));
+                assert_eq!(compiled, Value::unsigned(99));
             }
             SearchResult::NoSolution { .. } => panic!("expected selected candidate"),
+            _ => panic!("unsupported synthesis result"),
         }
     }
 }
