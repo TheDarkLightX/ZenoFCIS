@@ -1,7 +1,10 @@
 //! Imperative demonstration destination, retained across database reopen in this process.
 //! A real remote destination must persist its idempotency ledger independently.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{RefCell, RefMut},
+    rc::Rc,
+};
 use zeno_fcis_codec::Hash32;
 use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_shell::{DeliveryCollision, IdempotentDestination, MemoryDestination};
@@ -10,6 +13,11 @@ use zeno_fcis_shell::{DeliveryCollision, IdempotentDestination, MemoryDestinatio
 pub struct Destination(Rc<RefCell<MemoryDestination>>);
 
 impl Destination {
+    /// Borrow the library-owned memory destination for checked delivery.
+    pub fn memory(&self) -> RefMut<'_, MemoryDestination> {
+        self.0.borrow_mut()
+    }
+
     #[must_use]
     pub fn delivered_count(&self) -> usize {
         self.0.borrow().delivered_count()

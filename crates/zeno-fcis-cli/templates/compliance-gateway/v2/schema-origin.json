@@ -1,0 +1,13 @@
+{
+  "schema": "zeno-fcis/template-schema-origin/1",
+  "retained_original": "crates/zeno-fcis-cli/templates/compliance-gateway/v2/schema.zcve",
+  "sha256": "9bbc41e9d5a6607a1da1cf6603b77f1dfafe8fa89dc244df3049ee8274255536",
+  "bytes": 1016,
+  "schema_commitment": "51e0c1611c9b08f69300cfb3512c214134406d73888855f860cca606d6196329",
+  "source_inputs": {
+    "project.zeno": "b40b0ddbae11470d11e4024a57f63b064a0cd61e08ecf314ea7bdc6bd7107ecb",
+    "build.rs": "82fc70a6c7edc72389191161e52761422e5f109d4cd865d832ebcfcc88a36ef5",
+    "profile.rs": "5b2c778f8c1ac21f515852779ba975f54d22a8c33dac50833c0dfdebef7e7972"
+  },
+  "qualification": "Actual original lower_schema output from original build body and reviewed scalar bindings; retained renderer is private. Complete Description correspondence and fresh normal build are required separately."
+}

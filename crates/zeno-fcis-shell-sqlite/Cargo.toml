@@ -22,6 +22,7 @@ zeno-fcis-receipt = { version = "=1.1.0", path = "../zeno-fcis-receipt" }
 zeno-fcis-schema = { version = "=1.1.0", path = "../zeno-fcis-schema" }
 # `std` keeps `DeliveryCollision: std::error::Error` for this crate's users.
 zeno-fcis-shell = { version = "=1.1.0", path = "../zeno-fcis-shell", features = ["std"] }
+zeno-fcis-synthesis = { version = "=1.1.0", path = "../zeno-fcis-synthesis" }
 zeno-fcis-value = { version = "=1.1.0", path = "../zeno-fcis-value" }
 
 [dev-dependencies]

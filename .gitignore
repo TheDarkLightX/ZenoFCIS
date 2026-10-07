@@ -12,9 +12,15 @@ Cargo.lock
 !demos/mini-determinator-qemu/Cargo.lock
 !verification/Cargo.lock
 !site/Cargo.lock
+!tools/resolved-purity/Cargo.lock
+# rustc writes over-long type names to <crate>.long-type-<hash>.txt in the CWD.
+*.long-type-*.txt
 *.profraw
 *.profdata
 .DS_Store
 .idea/
 .vscode/
 crates/zeno-fcis-generated-code-tests/python/
+
+# Local run records written by zeno-fcis inside a project; never source.
+.zeno-fcis/

@@ -65,6 +65,7 @@ fn reference_evaluate(program: &Program, input: &[i64]) -> Result<Vec<i64>, Erro
                     at(b)
                 }
             }
+            _ => panic!("unsupported future operation in the independent evaluator oracle"),
         };
         values.push(value);
     }

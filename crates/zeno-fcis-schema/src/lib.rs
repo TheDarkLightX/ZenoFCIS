@@ -30,26 +30,9 @@ pub use validate::{ValidationLimits, ValidationReport};
 mod tests {
     use alloc::vec;
 
-    use zeno_fcis_codec::{CanonicalEncode, Hash32};
-
     use super::*;
 
-    struct TestHash;
-
-    impl zeno_fcis_codec::CommitmentHasher for TestHash {
-        const ALGORITHM_ID: &'static str = "test/noncryptographic";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(byte)
-                    .rotate_left((slot % 7) as u32);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHash;
 
     fn type_def(id: u32, name: &str) -> TypeDef {
         match TypeDef::try_new(

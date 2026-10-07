@@ -80,7 +80,8 @@ The CI workflows add:
   prompt-minimized review-card rendering, and public-link validation;
 - `wasm32-unknown-unknown` checks for every `no_std + alloc` crate;
 - independent SHA-256 provider and provider-parity checks;
-- Miri interpretation of the semantic boundary tests;
+- Miri interpretation of the semantic boundary tests, except the five pinned
+  exclusions described under deliberate narrowings;
 - compilation of the codec and candidate-bundle fuzz targets;
 - focused crash-atomic SQLite, authenticated-state, synthesis, mounted-adapter, and collection-backend tests;
 - strict validated-decision, canonical-domain-manifest, and exhaustive-coverage promotion tests;
@@ -120,6 +121,9 @@ Optional developer guardrails use a private npm package with exact Probity
 digest for the complete canonical lock graph. CI installs that graph with
 lifecycle scripts disabled and runs `npm audit`. It is excluded from Rust
 runtime and protocol authority.
+The development graph also pins MCP SDK `1.31.0`, the patched 1.x version for
+[GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h).
+The package override and complete canonical lock digest are checked together.
 
 Packaged-application qualification also requires the existing Rust compiler,
 Python 3, and Node.js 22 to execute the same finite synthesis contract through
@@ -182,6 +186,107 @@ nothing else modifies.
 Any failed gate blocks release. Repair occurs in a new commit, followed by a complete rerun from a clean checkout. Do not reuse a source manifest, generated artifact, refinement fixture, or checker certificate across changed source unless its content address and all bound identifiers are unchanged and independently verified.
 
 SQLite schema v5 creates a store only from nominal `CatalogAuthorizedGenesis`, persists the exact initial state/root/policy/law-evaluation/authorization identity, and revalidates that record on reopen without caller-supplied state. It consumes nominal `CatalogAuthorizedTransition` values and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. Reopen strictly decodes and reauthorizes the gap-free transition sequence, reconstructs exact row-set equality, and requires the resulting state/root/version to equal the current semantic row. Replay and pending delivery repeat exact persisted-candidate validation. Delivery identities are derived from the implementation-neutral candidate and canonical outbox entry in both reference and SQLite shells. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Schema v4 and earlier or populated unversioned stores fail closed pending explicit migration. Operators must never edit genesis, policy, authorization, replay, receipt, or outbox rows to force progress.
+
+## Deliberate narrowings
+
+### Packaged tests compile only in the repository layout
+
+The release packager builds every library, binary, example and build script of
+the published crates from their archives alone, each crate unpacked at
+`sources/<crate>-<version>/`. Packaged tests are not standalone. They compile
+only from the published archives laid out as in the repository
+(`crates/<crate>/`), plus nine verification files copied from the commit.
+`release/packaged-test-inputs.json` lists every file a packaged test target
+reads outside its own package, with its SHA-256. The packager derives that set
+from rustc dep-info and requires exact equality, and refuses any such read by a
+non-test target. A test target reading a sibling package's file is accepted
+only when the manifest lists it. The whole-repository source archive is what
+runs every test.
+
+Two frozen, pinned references force this allowance: the `#[cfg(test)]`
+`#[path]` include in `crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs`
+and the two `verification/verus/` includes in
+`crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs`. Open item: restore
+standalone packaged tests when the verified sources next change, which is the
+identity regeneration planned for the 2.1.0 release.
+
+### Five tests are not interpreted by Miri
+
+`.github/miri-exclusions.json` pins the five tests Miri skips. The first is
+`legal_leaf_above_default_payload_remains_constructible_and_encodable` in
+`crates/zeno-fcis-value/tests/construction.rs`. It builds 64 MiB + 1 byte
+values and scans them byte by byte, which under Miri runs for hours and grows
+to many gigabytes; the measured reason is recorded in that file. The test still
+runs natively in the `ci` workflow's `rust` job. The code it calls still runs
+under Miri at small sizes: the codec's decoder corpus and other value tests
+reach `bytes_with_limits`, `text_ascii_with_limits`, `zcve_bytes_with_limits`,
+`AdmittedValue::try_new_with_limits` and `AdmittedValue::encode_zcve_to`. The
+codec's 64 MiB + 1 byte map-key test still runs under Miri. Only this test's
+own property is not interpreted: a text or admitted value above the default
+payload limit, accepted under supplied limits. `tools/miri_exclusions.py`
+fails unless the list equals the workflow's skips, each name matches exactly
+one test that is neither ignored nor conditionally compiled, and the named
+native job runs it.
+
+The other four are the finite native corpora in
+`crates/zeno-fcis-synthesis/tests/v2_template_contracts.rs`. Together they hold
+2,175,778 native cases:
+
+- `all_original_small_domains_and_unlawful_order_states`: 2,656 (counter 64,
+  inventory 864, order 1,728);
+- `account_complete_clock_boundaries_without_domain_narrowing`: 13,122;
+- `withdrawal_complete_raw_domain_and_certified_controller`: 1,296,000;
+- `treasury_guard_arithmetic_callbacks_and_unlawful_prestates`: 103,680,
+  677,376 and 82,944.
+
+These are the finite corpora the tests enumerate, not every value a production
+descriptor admits. Account covers nine selected clock and deadline values, not
+the timestamp range. Treasury covers three partitions, not the full Cartesian
+domain. In the hosted Miri run of 916b28e none of the target's tests finished
+within its 180-minute budget. The tests still run natively, unchanged in bounds
+and independent comparisons, in the `ci` workflow's `rust` job.
+
+Under Miri, eight `miri_bounded_profile_*` tests, one per corpus, run 92
+pinned cases from the eight corpora through the same checked path and
+independent comparison. The same cases run natively. For each corpus, the cases come in a fixed ascending order
+with a pinned count, and each is an actual native case. The test fails unless
+the bounded cases reach every outcome signature the complete native corpus
+produces (class and reason, or the actual refusal variant). They must also
+reach every value of each loop dimension and every named boundary relation,
+such as a clock just before, at and after a deadline. The native tests enforce
+the same signature, value and boundary pins over their complete corpora. This
+is finite sampling. It does not cover every internal path, every combination
+of values, or undefined behaviour in the omitted cases. **Miri's UB, provenance
+and aliasing checks are lost for every omitted execution.** No claim is made
+that only values are lost while paths are preserved. The 131 retained examples
+(12, 20, 23, 20, 26 and 30 per application) still run under Miri, with genesis
+and replay. Four applications retain their complete-example/genesis tests.
+Order-fulfillment and treasury use eleven `retained_examples_and_replay_*`
+batches of at most five examples plus two separate genesis/replay tests.
+Their exact intervals cover every original example once, and each batch
+checks its full corpus size and executed count. They are not
+drawn from these corpora and are not counted in them. The template
+remainder job checks that the exclusion step's Miri arguments skip exactly
+these four tests, and that its composed arguments keep those skips unchanged
+before skipping the exact-test groups. Every profile test, the retained
+examples and the two other semantic tests must run, and the artifact generator
+must remain the only ignored test.
+
+Splitting a test binary across Miri groups is not an exclusion. To keep each
+job under the workflow's configured 180-minute budget, the synthesis `completion` tests run their
+eight graph-seed groups separately. The synthesis library runs nine tests
+each in its own group: six byte-by-byte replay and comparison tests, and the
+three tests that the hosted run of 8eda309 measured at about 101 and 26
+minutes, or still running after more than 10 minutes. The template contracts run each
+bounded-profile corpus in a separate group. At 50e6b86, the order and treasury
+retained-example jobs also reached the 180-minute limit, so those two apps now
+use exact example batches and separate genesis jobs. Their per-case progress
+messages identify the active example without changing its assertions. The earlier combined genesis-and-replay test also exceeded the
+180-minute limit at 8eda309; these partitions retain every case and assertion. Each split
+target keeps one remainder group that skips exactly those tests and, for the
+template contracts, the four native-only tests. That job lists every group's
+selection under Miri and fails unless each listed test runs exactly once or is
+one of the remainder's pinned exclusions.
 
 ## Explicit non-claims
 

@@ -1,0 +1,1407 @@
+{
+  "additional_host_checks": {
+    "controller_vectors": {
+      "complete_bijective_coverage": true,
+      "direct_domain_rule_oracle_matches": true,
+      "rows": 384,
+      "source_sha256": "79ca5b0c341bc256850506b57eddc9131cb8b573de1ca4dd1a0822a1a3be0be5"
+    },
+    "existing_seeds": {
+      "case_count": 32,
+      "cases": [
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "B01",
+          "original_fixture_nodes": 3,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 2
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "B02",
+          "original_fixture_nodes": 7,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 4
+        },
+        {
+          "candidate_fixture_nodes": 8,
+          "first_difference": null,
+          "id": "B03",
+          "original_fixture_nodes": 9,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 8
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "B04",
+          "original_fixture_nodes": 4,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 4
+        },
+        {
+          "candidate_fixture_nodes": 5,
+          "first_difference": null,
+          "id": "B05",
+          "original_fixture_nodes": 6,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 8
+        },
+        {
+          "candidate_fixture_nodes": 4,
+          "first_difference": null,
+          "id": "B06",
+          "original_fixture_nodes": 10,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 4
+        },
+        {
+          "candidate_fixture_nodes": 9,
+          "first_difference": null,
+          "id": "B07",
+          "original_fixture_nodes": 14,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 8
+        },
+        {
+          "candidate_fixture_nodes": 6,
+          "first_difference": null,
+          "id": "B08",
+          "original_fixture_nodes": 7,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 8
+        },
+        {
+          "candidate_fixture_nodes": 11,
+          "first_difference": null,
+          "id": "B09",
+          "original_fixture_nodes": 13,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 64
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "B10",
+          "original_fixture_nodes": 4,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 1
+        },
+        {
+          "candidate_fixture_nodes": 5,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                false
+              ]
+            },
+            "input": [
+              false,
+              true
+            ],
+            "original": {
+              "ok": [
+                true
+              ]
+            }
+          },
+          "id": "B11",
+          "original_fixture_nodes": 4,
+          "profile": "FunctionalBoolV1",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 4
+        },
+        {
+          "candidate_fixture_nodes": 4,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                false
+              ]
+            },
+            "input": [
+              false,
+              false,
+              true
+            ],
+            "original": {
+              "ok": [
+                true
+              ]
+            }
+          },
+          "id": "B12",
+          "original_fixture_nodes": 4,
+          "profile": "FunctionalBoolV1",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 8
+        },
+        {
+          "candidate_fixture_nodes": 8,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                true
+              ]
+            },
+            "input": [
+              true,
+              false,
+              true
+            ],
+            "original": {
+              "ok": [
+                false
+              ]
+            }
+          },
+          "id": "B13",
+          "original_fixture_nodes": 4,
+          "profile": "FunctionalBoolV1",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 8
+        },
+        {
+          "candidate_fixture_nodes": 2,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                true,
+                false,
+                false
+              ]
+            },
+            "input": [
+              false,
+              true
+            ],
+            "original": {
+              "ok": [
+                false,
+                true,
+                false
+              ]
+            }
+          },
+          "id": "B14",
+          "original_fixture_nodes": 2,
+          "profile": "FunctionalBoolV1",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 4
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "B15",
+          "original_fixture_nodes": 1,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 2
+        },
+        {
+          "candidate_fixture_nodes": 3,
+          "first_difference": null,
+          "id": "B16",
+          "original_fixture_nodes": 3,
+          "profile": "FunctionalBoolV1",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 4
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "I01",
+          "original_fixture_nodes": 3,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 5
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "I02",
+          "original_fixture_nodes": 2,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 3
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "I03",
+          "original_fixture_nodes": 4,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 5
+        },
+        {
+          "candidate_fixture_nodes": 5,
+          "first_difference": null,
+          "id": "I04",
+          "original_fixture_nodes": 7,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 125
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": null,
+          "id": "I05",
+          "original_fixture_nodes": 6,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 6
+        },
+        {
+          "candidate_fixture_nodes": 3,
+          "first_difference": null,
+          "id": "I06",
+          "original_fixture_nodes": 5,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 5
+        },
+        {
+          "candidate_fixture_nodes": 3,
+          "first_difference": null,
+          "id": "I07",
+          "original_fixture_nodes": 5,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 2
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                "9223372036854775807"
+              ]
+            },
+            "input": [
+              "9223372036854775807"
+            ],
+            "original": {
+              "error": "Arithmetic"
+            }
+          },
+          "id": "I08",
+          "original_fixture_nodes": 4,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 2
+        },
+        {
+          "candidate_fixture_nodes": 5,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                "9223372036854775807"
+              ]
+            },
+            "input": [
+              "9223372036854775807",
+              "1",
+              "-1"
+            ],
+            "original": {
+              "error": "Arithmetic"
+            }
+          },
+          "id": "I09",
+          "original_fixture_nodes": 5,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 1
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                "9223372036854775807"
+              ]
+            },
+            "input": [
+              "9223372036854775807"
+            ],
+            "original": {
+              "error": "Arithmetic"
+            }
+          },
+          "id": "I10",
+          "original_fixture_nodes": 3,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 2
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                "9223372036854775807"
+              ]
+            },
+            "input": [
+              false,
+              "9223372036854775807"
+            ],
+            "original": {
+              "error": "Arithmetic"
+            }
+          },
+          "id": "I11",
+          "original_fixture_nodes": 5,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 2
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                "-9223372036854775808"
+              ]
+            },
+            "input": [
+              "-9223372036854775808"
+            ],
+            "original": {
+              "error": "Arithmetic"
+            }
+          },
+          "id": "I12",
+          "original_fixture_nodes": 4,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 2
+        },
+        {
+          "candidate_fixture_nodes": 4,
+          "first_difference": {
+            "candidate": {
+              "ok": [
+                "1"
+              ]
+            },
+            "input": [
+              "2"
+            ],
+            "original": {
+              "error": "OutputDomain"
+            }
+          },
+          "id": "I13",
+          "original_fixture_nodes": 1,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 3
+        },
+        {
+          "candidate_fixture_nodes": 1,
+          "first_difference": {
+            "candidate": {
+              "error": "OutputDomain"
+            },
+            "input": [],
+            "original": {
+              "error": "Arithmetic"
+            }
+          },
+          "id": "I14",
+          "original_fixture_nodes": 4,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "different",
+          "stored_witness_checked": true,
+          "tuples_checked": 1
+        },
+        {
+          "candidate_fixture_nodes": 3,
+          "first_difference": null,
+          "id": "I15",
+          "original_fixture_nodes": 3,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 25
+        },
+        {
+          "candidate_fixture_nodes": 4,
+          "first_difference": null,
+          "id": "I16",
+          "original_fixture_nodes": 4,
+          "profile": "CheckedI64V1-proposed",
+          "relation": "equivalent",
+          "stored_witness_checked": true,
+          "tuples_checked": 25
+        }
+      ],
+      "cases_sha256": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55",
+      "kind": "development_fixture_reference_check_only",
+      "limits": [
+        "Host reference fixture checks, not a qualified production checker.",
+        "No canonical-byte costs, optimizer benchmark, Rust correspondence, or formal proof.",
+        "Public development seeds; no held-out result or Herbie-effectiveness claim."
+      ],
+      "oracle_sha256": "3cba8eab910d732d7b8cf9a8d9c3aba363f9d0f6c707e94d5c3b241eafc91f8d",
+      "profile_counts": {
+        "Boolean": 16,
+        "checked_i64": 16
+      },
+      "same_ordered_original_behavior_groups": [
+        [
+          "B01",
+          "B15"
+        ],
+        [
+          "B12",
+          "B13"
+        ],
+        [
+          "I01",
+          "I03"
+        ],
+        [
+          "I08",
+          "I10"
+        ]
+      ],
+      "success": true,
+      "tuples_checked": 355
+    }
+  },
+  "artifact_manifest_sha256": "ad7ca6f9bc55b9a07b2146d2c82e6c71336b7e711422cb59726f9e0d7f37a3d1",
+  "artifacts": {
+    "debug/boolean-kernel-candidate.zcve": "b76551883b1aebb553faf5e10089d92cb46df6ff94698f7e09a77a42ba50f37b",
+    "debug/boolean-kernel-original.zcve": "84c7a4ecff4c9bd49dd2e3f5f5e0b63b38a0f92db3a9bfadb99df8325f8f81c5",
+    "debug/boolean-kernel-padded.zcve": "f800c6048253c258289b2b5d94e8aaee76b182d07ffef4fe50cb1c698d37d257",
+    "debug/current-decision-scalars-candidate.zcve": "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89",
+    "debug/current-decision-scalars-original.zcve": "21435b72cad2748bc20dbee6cc8ebf9b6e78f5a05a77c850851ccaa51e585f0c",
+    "debug/current-decision-scalars-padded.zcve": "0c214b5f2b4bdcd680587bd15f1106ff98d40f49afad3aff2a1b57572e455b35",
+    "debug/results.json": "5c400300dafa63b0b2da39c5837fc30463573ac2968ded4b733abee8b4250372",
+    "debug/retained-controller-candidate.zcve": "f9f04c4c9cf2e62c2146903c25018ba00c25a03c60f5c50e082718afd344eb18",
+    "debug/retained-controller-original.zcve": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc",
+    "debug/retained-controller-padded.zcve": "521872eafe8ff8ac26166d13b0ef920ac0be8b4e2a304ebf5788db8445fb1ee8",
+    "release/boolean-kernel-candidate.zcve": "b76551883b1aebb553faf5e10089d92cb46df6ff94698f7e09a77a42ba50f37b",
+    "release/boolean-kernel-original.zcve": "84c7a4ecff4c9bd49dd2e3f5f5e0b63b38a0f92db3a9bfadb99df8325f8f81c5",
+    "release/boolean-kernel-padded.zcve": "f800c6048253c258289b2b5d94e8aaee76b182d07ffef4fe50cb1c698d37d257",
+    "release/current-decision-scalars-candidate.zcve": "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89",
+    "release/current-decision-scalars-original.zcve": "21435b72cad2748bc20dbee6cc8ebf9b6e78f5a05a77c850851ccaa51e585f0c",
+    "release/current-decision-scalars-padded.zcve": "0c214b5f2b4bdcd680587bd15f1106ff98d40f49afad3aff2a1b57572e455b35",
+    "release/results.json": "456e7b34448e3401a33077a009dd09c898e10c2bd2ed5ef2b502d7bc507f4794",
+    "release/retained-controller-candidate.zcve": "f9f04c4c9cf2e62c2146903c25018ba00c25a03c60f5c50e082718afd344eb18",
+    "release/retained-controller-original.zcve": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc",
+    "release/retained-controller-padded.zcve": "521872eafe8ff8ac26166d13b0ef920ac0be8b4e2a304ebf5788db8445fb1ee8"
+  },
+  "commands": [
+    {
+      "command": [
+        "~/.cargo/bin/cargo",
+        "+1.97.1",
+        "fmt",
+        "--manifest-path",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/source/docs/benchmarks/withdrawal-queue/Cargo.toml",
+        "--",
+        "--check",
+        "--config",
+        "skip_children=true"
+      ],
+      "cwd": "/tmp/zenofcis-withdrawal-native-20261004-02/source",
+      "exit": 0,
+      "seconds": 0.11615166999399662
+    },
+    {
+      "command": [
+        "~/.cargo/bin/cargo",
+        "+1.97.1",
+        "build",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/source/docs/benchmarks/withdrawal-queue/Cargo.toml",
+        "--target-dir",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/target",
+        "-j",
+        "1"
+      ],
+      "cwd": "/tmp/zenofcis-withdrawal-native-20261004-02/source",
+      "exit": 0,
+      "seconds": 9.996918458491564
+    },
+    {
+      "command": [
+        "/tmp/zenofcis-withdrawal-native-20261004-02/target/debug/zeno-withdrawal-research",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/debug"
+      ],
+      "cwd": "/tmp/zenofcis-withdrawal-native-20261004-02/source",
+      "exit": 0,
+      "seconds": 0.26512068789452314
+    },
+    {
+      "command": [
+        "~/.cargo/bin/cargo",
+        "+1.97.1",
+        "build",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/source/docs/benchmarks/withdrawal-queue/Cargo.toml",
+        "--target-dir",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/target",
+        "-j",
+        "1",
+        "--release"
+      ],
+      "cwd": "/tmp/zenofcis-withdrawal-native-20261004-02/source",
+      "exit": 0,
+      "seconds": 15.309250466525555
+    },
+    {
+      "command": [
+        "/tmp/zenofcis-withdrawal-native-20261004-02/target/release/zeno-withdrawal-research",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/release",
+        "--all-application-inputs"
+      ],
+      "cwd": "/tmp/zenofcis-withdrawal-native-20261004-02/source",
+      "exit": 0,
+      "seconds": 10.443798302672803
+    },
+    {
+      "command": [
+        "~/.cargo/bin/cargo",
+        "+1.97.1",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--no-deps",
+        "--manifest-path",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/source/docs/benchmarks/withdrawal-queue/Cargo.toml",
+        "--target-dir",
+        "/tmp/zenofcis-withdrawal-native-20261004-02/target",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "cwd": "/tmp/zenofcis-withdrawal-native-20261004-02/source",
+      "exit": 0,
+      "seconds": 5.079606277868152
+    }
+  ],
+  "frozen_workspace_manifest_sha256": "72015e54f733b288f51f2907ebc2198df8f105e2beb55b4b77281b98061e54ff",
+  "head": "1ed6f88f7b1098bed6c409bc9aa3c12c99d43c3c",
+  "registry_dependencies": [
+    {
+      "checksum": "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa",
+      "dependencies": [
+        "hybrid-array"
+      ],
+      "name": "block-buffer",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.12.1"
+    },
+    {
+      "checksum": "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801",
+      "name": "cfg-if",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.0.4"
+    },
+    {
+      "checksum": "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201",
+      "dependencies": [
+        "libc"
+      ],
+      "name": "cpufeatures",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.3.0"
+    },
+    {
+      "checksum": "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453",
+      "dependencies": [
+        "hybrid-array"
+      ],
+      "name": "crypto-common",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.2"
+    },
+    {
+      "checksum": "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2",
+      "dependencies": [
+        "block-buffer",
+        "crypto-common"
+      ],
+      "name": "digest",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.11.3"
+    },
+    {
+      "checksum": "818356c5132c1fede50f837ca96afbe78ff42413047f4abb886217845e1b6c8c",
+      "dependencies": [
+        "typenum"
+      ],
+      "name": "hybrid-array",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.4.13"
+    },
+    {
+      "checksum": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
+      "name": "libc",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.2.189"
+    },
+    {
+      "checksum": "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4",
+      "dependencies": [
+        "cfg-if",
+        "cpufeatures",
+        "digest"
+      ],
+      "name": "sha2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "0.11.0"
+    },
+    {
+      "checksum": "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20",
+      "name": "typenum",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "version": "1.20.1"
+    }
+  ],
+  "results": {
+    "debug": {
+      "cases": [
+        {
+          "application_promotion": false,
+          "canonical_bytes": [
+            1063,
+            763,
+            1114
+          ],
+          "checked_rows": 16,
+          "declared_rows": 16,
+          "domain_complete": true,
+          "id": "boolean-kernel",
+          "malformed_inputs": 11,
+          "nodes": [
+            16,
+            7,
+            16
+          ],
+          "or_replacements": 3,
+          "padded_budgets": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "padded_comparisons": 288,
+          "resource_refinement": "NOT_QUALIFIED",
+          "wrong_or_witness": [
+            0,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "application_promotion": false,
+          "canonical_bytes": [
+            4090,
+            3790,
+            4141
+          ],
+          "checked_rows": 384,
+          "declared_rows": 384,
+          "domain_complete": true,
+          "id": "retained-controller",
+          "malformed_inputs": 19,
+          "nodes": [
+            69,
+            60,
+            69
+          ],
+          "or_replacements": 3,
+          "padded_budgets": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65,
+            66,
+            67,
+            68,
+            69,
+            70
+          ],
+          "padded_comparisons": 27264,
+          "resource_refinement": "NOT_QUALIFIED",
+          "wrong_or_witness": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "application_promotion": false,
+          "canonical_bytes": [
+            6686,
+            6486,
+            6720
+          ],
+          "checked_rows": 1,
+          "declared_rows": 1296000,
+          "domain_complete": false,
+          "id": "current-decision-scalars",
+          "malformed_inputs": 29,
+          "nodes": [
+            106,
+            100,
+            106
+          ],
+          "or_replacements": 2,
+          "padded_budgets": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            73,
+            74,
+            75,
+            76,
+            77,
+            78,
+            79,
+            80,
+            81,
+            82,
+            83,
+            84,
+            85,
+            86,
+            87,
+            88,
+            89,
+            90,
+            91,
+            92,
+            93,
+            94,
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107
+          ],
+          "padded_comparisons": 108,
+          "resource_refinement": "NOT_QUALIFIED",
+          "wrong_or_witness": [
+            0,
+            180,
+            0,
+            181,
+            0,
+            0,
+            0,
+            170,
+            160,
+            170,
+            1,
+            190,
+            1
+          ]
+        }
+      ],
+      "negative_controls": "passed",
+      "performance_claim": false,
+      "proof_replayed": false,
+      "runtime_source_changed": false,
+      "schema": "zeno-fcis/withdrawal-research/1"
+    },
+    "release": {
+      "cases": [
+        {
+          "application_promotion": false,
+          "canonical_bytes": [
+            1063,
+            763,
+            1114
+          ],
+          "checked_rows": 16,
+          "declared_rows": 16,
+          "domain_complete": true,
+          "id": "boolean-kernel",
+          "malformed_inputs": 11,
+          "nodes": [
+            16,
+            7,
+            16
+          ],
+          "or_replacements": 3,
+          "padded_budgets": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "padded_comparisons": 288,
+          "resource_refinement": "NOT_QUALIFIED",
+          "wrong_or_witness": [
+            0,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "application_promotion": false,
+          "canonical_bytes": [
+            4090,
+            3790,
+            4141
+          ],
+          "checked_rows": 384,
+          "declared_rows": 384,
+          "domain_complete": true,
+          "id": "retained-controller",
+          "malformed_inputs": 19,
+          "nodes": [
+            69,
+            60,
+            69
+          ],
+          "or_replacements": 3,
+          "padded_budgets": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65,
+            66,
+            67,
+            68,
+            69,
+            70
+          ],
+          "padded_comparisons": 27264,
+          "resource_refinement": "NOT_QUALIFIED",
+          "wrong_or_witness": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ]
+        },
+        {
+          "application_promotion": false,
+          "canonical_bytes": [
+            6686,
+            6486,
+            6720
+          ],
+          "checked_rows": 1296000,
+          "declared_rows": 1296000,
+          "domain_complete": true,
+          "id": "current-decision-scalars",
+          "malformed_inputs": 29,
+          "nodes": [
+            106,
+            100,
+            106
+          ],
+          "or_replacements": 2,
+          "padded_budgets": [
+            100
+          ],
+          "padded_comparisons": 1296000,
+          "resource_refinement": "NOT_QUALIFIED",
+          "wrong_or_witness": [
+            0,
+            180,
+            0,
+            181,
+            0,
+            0,
+            0,
+            170,
+            160,
+            170,
+            1,
+            190,
+            1
+          ]
+        }
+      ],
+      "negative_controls": "passed",
+      "performance_claim": false,
+      "proof_replayed": false,
+      "runtime_source_changed": false,
+      "schema": "zeno-fcis/withdrawal-research/1"
+    }
+  },
+  "schema": "zeno-fcis/withdrawal-native-evidence/1",
+  "scope": "offline native scalar benchmark; no application authority, proof or release qualification",
+  "source_checkout": "/tmp/zenofcis-v2-simplify",
+  "source_is_dirty": true,
+  "source_manifest": {
+    "Cargo.lock": "2e4281508aee49a24b555d7b5a853bb8a51827d20011a1a345255864a1277412",
+    "Cargo.toml": "9fb0a5a5e0430e15b543c4aac87aa93d2faa62a1e511765e7cd39a61aca86b50",
+    "README.md": "b0e36fc9353f1f65524ed6e51008b0f8f0c8a6d397f73ce1eef1bc57b8af7bde",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/Cargo.toml.in": "a6ff78a427168f93b794cdb1f08e07b58e918dbac316f1c2ffc11fa1c9990a35",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/README.md": "0323fa54ee60623ebf7ea878a9050bb769e2983242806429c4bd22833a047f80",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/build.rs": "e463cade4f1758f2e2266fb1064e72f7da3fac0a9ee5e081339c0489a0dbe34b",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/controller/contract.json": "751f31be67d38076c15d42a1807e80dc92f51799e85a613af5152eb351a2575f",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/controller/contract.sha256": "43e315460871f3001dd3270935245f5a21ab44a836cb436a96a6d986ebedcb6a",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/controller/model.py": "2b727027168d0c4a5dbfe22fe8003974dcb78c9eb8710239adfae85c678ae025",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/controller/rejected/alarm-deferential.strategy.json": "c155454fe050eef281959a777b1ff568cac0218d117e142f4217398aba8d8fdd",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/controller/rejected/fixed-priority.strategy.json": "5366cf74c387498ebb20280ea4706a308979f597d995cc90b8e4d29ede9f01b6",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/controller/strategy.json": "c741d5d410d4784fd7e553c3c7f822a3301513eb22a1e4a2176517d484cb1d3c",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/profile.rs": "26539187728fdc485cc51d3876af5282f4b8f030b5ccd81c9de01b05e34f1021",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/project.zeno": "ac326379295929abe19ebaffef0002acacdbb2184e1de3af44de1e52dbfddf79",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/controller.rs": "be4359da6427c8c4efc18a5bdfbab2f15b65dbf6229027d457accb19561bac79",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/delivery.rs": "d7c0f91a47ded772c7a6ff694e9cac1bb3f918b24885f113f1111c9f2cda2b8e",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/laws.rs": "14f929da48372a474cf03328b76a7ffc7bb1e26ab1cb046dfe4825858cb2903e",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/legacy.rs": "f2e2c51d1d4e43d2d8ec723a851242a75f983e2c9e5fb38645ba2bd9bafeb315",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/lib.rs": "601657649086b5727f5f4dc9fb4c160893dd7ca4be1f94ee60b6b9c10948a575",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/main.rs": "e0770059e4f05b4326fc73c6af3908d4c2534c36bb81e758286cedd02a1920e3",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/program.rs": "68d2116edb07285cbcce8a9fc700e1072406d4bd7935ed75c1f2a6b325da30a3",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/src/v2_contract.rs": "ab55edf809971aedf296c0c438738c87a1875ca214f785b8914dbaf5eb7c2d99",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesis.json": "aceae074a989d6b18b4b52b449dfe8a069da92e38711080c6d76b6cafe890489",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/manifest.json": "117a3ba7a4c95893d4b4dde2c20c3ad9127302e31293eb933d9356429abdf871",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/problem.json": "aceae074a989d6b18b4b52b449dfe8a069da92e38711080c6d76b6cafe890489",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/program.zcve": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/transition.rs": "9fb879a94ae798d76043258dc87d13cc4c04d424a1c335ef09a5273d855cab98",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/vectors.json": "79ca5b0c341bc256850506b57eddc9131cb8b573de1ca4dd1a0822a1a3be0be5",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/tests/claims.rs": "b4d31f651d7fcde052428a2f9ab021b9ddacf694ad13f1fdadd4ccd3ac5cfb22",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/tests/conformance.rs": "d7a648dee7094803f244eddd10b4b10bbe80bf6c50aa91a28afff145cce25bc1",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/tests/controller.rs": "d44e0e4e92d47e01d34934d6965554e5db24a9e33ebd0fb5a1e2eb29442307e1",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/tests/decision-examples.txt": "1ce2c6d0273d51dcb049d41076c86252b60b0e483c8abac0693b7a7da7bec31c",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/tests/determinism.rs": "d50c1d3972c7366d99d8c61e92c052c23aa006f55529897fc355a2fcdcad5cc2",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/tests/laws.rs": "673f41c9a43448aad94f395ad7d3b39edb1c3552b2942d63901cb5e9bf0fcbd7",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/tests/lifecycle.rs": "9f634be29f6f9a3ebd2082fe1263aaa505b450ec165ccd9952c3e4463a094639",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/v2/policy.json": "7dcbaf7840426805998bf77a9bfa639079f0408e408a928b32ed8559efe5dc6f",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/v2/policy.zcve": "be3f9e42ea9e2e41f069f81a99db1e98050a3ea3761b7a08f23949909682fb61",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/v2/schema-origin.json": "b1ae1cdee1afdf951c0bbf1077f2a2e1133ef22d535361f3f00e99ba770f097d",
+    "crates/zeno-fcis-cli/templates/withdrawal-queue/v2/schema.zcve": "8af4d95849025825fef4e8e31ed552bef1c0f438a963b82b9130abe983b3cbf2",
+    "crates/zeno-fcis-codec/Cargo.toml": "fcb68e7bc158d9f328b21f7f6499e4b596580061a647fefdd29c204ac1367cfc",
+    "crates/zeno-fcis-codec/src/artifact.rs": "3bd613e822e8fa6ef54a15c6d53fa528824b20bfc2ddd681327955e8511cdf41",
+    "crates/zeno-fcis-codec/src/domains.rs": "f4e006cc6ec0294e9af982f909a7a001f73448b70891d3ea423524b2476f71f5",
+    "crates/zeno-fcis-codec/src/lib.rs": "ec35b1b4eb20bc0932ca64de9311563afe476e3b90ce17d3835cf8577e6448af",
+    "crates/zeno-fcis-codec/src/providers.rs": "412e23fc2847f9b186e02547a1d466ab474db219e78810eeaf49e3eb12f0f926",
+    "crates/zeno-fcis-codec/tests/limits.rs": "504496dafe6d4f52db9429fe120e1a5001b1fc0edad03035bc1e78f1bc578d38",
+    "crates/zeno-fcis-core/Cargo.toml": "f1e7ffc4547de7a070e57e3c91d8d3d42a5e1770fcb9daa585a09e34509b5ef9",
+    "crates/zeno-fcis-core/src/lib.rs": "66e3ccb5de30045da7ca7e40212e8d533b2cda2dc6bcc82f09bbdc3d16b16b58",
+    "crates/zeno-fcis-core/src/resource.rs": "60d8a21aa556a26ecf499933b1932e9e892e91e6067d1d0ff848176c97784134",
+    "crates/zeno-fcis-crypto/Cargo.toml": "b33f84a7704222501de22fd3bd7e12feedea649597c076f50455214954193558",
+    "crates/zeno-fcis-crypto/benches/commitment.rs": "cc889ca06b1d043e176c90030f347fddcac83e27ae41e6d1703a6130be5aff22",
+    "crates/zeno-fcis-crypto/src/lib.rs": "453c024c0a348dfb9b74c1841efa6b980c6574079f032cf5dfd76d0ef7a015b6",
+    "crates/zeno-fcis-synthesis/Cargo.toml": "2c6b0d30cb6aefd8f6e0352f6ee6fc40232e14eb48050c3a875774d7d55874d4",
+    "crates/zeno-fcis-synthesis/examples/checked_continuation.rs": "7f3af190716703b6ab95da970f6fd11cbe9b32e9aee6c226423fdca91aa2e1e4",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope.rs": "c0141f70f67c0aab98709fbfcf5bf432a333fe14264d63a357756262c54e24b8",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope/spec.rs": "7e4b35d9addb658dca2ae3bbc206366d34bee4e3a5381e018779813e21760eeb",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope/tests.rs": "7a5df85e6e94068ba4d102f40ca38d82e8ce8301eb7003b9e650a363d8067f53",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/mod.rs": "aa3b67867035e364ae199988411ab4d9ba5000bd16e23645fbabb7d110f1353b",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/output.rs": "afbac0b02758f727fac17f3ca7132eabe1b9e70d7b846fe03b572c02c110d633",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/output/spec.rs": "4da7522ebe5eb81536ef117d6523ea698c86bae4fa1c5a23051357462026e611",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/output/tests.rs": "05522c6d2fc6b16e9d1571e52a7390ae738d57d3dd9d59cdd23a728383501e03",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema.rs": "3ab455d716ed6dec8345dafdd1548b093534d8cb4d02696dc41d718f794a9346",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema/admission.rs": "4c561b7564dbd3e923c82b2866198da29c60c161b357256bba5c6b4e2dbffd9b",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema/admission/spec.rs": "8d3b0e6b194ddc5b9c133fe6172977162e7667825deed5fb6c103bb05c72b60f",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema/spec.rs": "a36950c185ed215049c100289e6e17b1ed20fae8ba1a1f4d5d589e9e0044c81d",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema/tests.rs": "237d181519fed7d0eb80d99ba004a116752b271e4a99216fa9d85a82f7068b09",
+    "crates/zeno-fcis-synthesis/src/finite/canonical_v2/spec.rs": "3265d976ee25de7e064bccffecf989d094cfb56dec7d2fcf1fef8fc8bec7c7c1",
+    "crates/zeno-fcis-synthesis/src/finite/choice_tests.rs": "378c8e1d8e4cd300fa6ae3452c04683836afe2ec82357c1a230f8682e41629af",
+    "crates/zeno-fcis-synthesis/src/finite/completion.rs": "f16d2f92d495ab1d55c6238b0dca9dcd41bffd140a0c0e0cbc79bb1e4821ee2c",
+    "crates/zeno-fcis-synthesis/src/finite/emit.rs": "3d8702280593ca0ec53ceb9fc13f93a98cfa4d61129dac3eb3920f06c7530fca",
+    "crates/zeno-fcis-synthesis/src/finite/evaluation/admission/mod.rs": "e86b3120671812f5139eff797be335511fa00155fd7281003ea7c656f7397c00",
+    "crates/zeno-fcis-synthesis/src/finite/evaluation/admission/spec.rs": "3e5720038fbe23f76d611bba3745951653da01a10d0a912f08b39a6e0782218d",
+    "crates/zeno-fcis-synthesis/src/finite/evaluation/mod.rs": "b95735bc6b758c7a89371cc083f4eafb4a38ffe1ef8feedcea4f8d98a241ef99",
+    "crates/zeno-fcis-synthesis/src/finite/evaluation/spec.rs": "7ff9c854ebadf225a5f771e6af5e25228d67616b931b6e3da13fe2beb1ea0fcb",
+    "crates/zeno-fcis-synthesis/src/finite/evaluation_tests.rs": "fadca79b027dc67dc31edb5377f1409e523a72a309703f3a6886b9d6892f6d3b",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority.rs": "0b3903aa9903fc80f8edba74d5e13f7e0517779c988bd56e07af84cbf4330873",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound.rs": "36075940a52ae18015f6463a2c060a65a598f36cbaf38775d31d0230b7c587a3",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/bound_spec.rs": "dfb22145703de318af30023ae3a7d953b46ef298c661688e532fbf4ab613785d",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/candidate.rs": "085f2082130c81ed653e4ffc83f7c8af4bf71beee7eaf2474363f4abfd027336",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/canonical.rs": "8018fb41b48d1613147e75845c2dd666977168e0304ab5d305c164ee5e13a121",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/descriptor.rs": "3023bacfc8b8b3ca504d5ad24e6cad41bedc45abdab3376699455d3705689f9e",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/descriptor_spec.rs": "8740ef95c73188ad41117bd72115a9b0161cd84e847ef3b35fe1b70316ad1b21",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs": "ea22c86091374daf4b71049bc004e15e445a3166133ca6bce69ae3c6bd753c57",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/framing.rs": "74861158278278355ec8d8a68808fadc9290c235e2b0a95136295cf0a1ff3dcf",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/invocation_tests.rs": "1b854e4960bbe28e0e2cb5823c234e999da31feed6b298c6c1f9505c15ae7b9e",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/metadata.rs": "36e54d046a5ab84ec598905f70c8c5b73a47b8543779889c830dc5a0f2c0cb4a",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/metadata_spec.rs": "188b37f502fab212271a1b78905c8945a79338122ca3bc8cadd6daad1f2a4914",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/observations.rs": "0255004a331e9d40811efe11dec35194f079845b80fd8358abb745f36bc6b8d4",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/outcome.rs": "b26938254aaa036913d5266514c0fd8d9acaff6ffeaf51cd365a59bba768070e",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/outcome_spec.rs": "6afcb901ebbe65520313b2ff8f421b9f5d25dcd9dd75f8dcd64788447a05d894",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/policy.rs": "5ed2c8d1cdf184c2255e36121c475f61ba0dc1afc2fb4aff580d41b1c5804ab8",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/policy_spec.rs": "d89c80a91a44214ad397b8deb36d9bb3be39c58ad36c52d3ec2b940d1e148e6e",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication.rs": "0838d228f38ac224ba0a8e0cab1023386e85b90379ec78b12b1a1a74b357f40f",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication/spec.rs": "1239315dcf7d586d7d8ab2da9989b508802ab86b3b71a934f1e6e8bcbbc4d4e4",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/publication_tests.rs": "530dc62f16036024ef6deb337169e996469f63449a0271c3dbb0405b030d8ed9",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/refusal.rs": "cd58bacb5f81bbc7b5b65675c7ca0a32c82ed4dccdb6717e1af72723fe8ba07b",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/sealing_tests.rs": "72bc46fdc6e11cbfb2bf87aca3c1c1512cfe84b54f3a1b8b9386969b0cc4f471",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/spec.rs": "c39f1f87221718f89cbd356f287e624859a4e7b739d2c010afbc9fec274e3c24",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/tests.rs": "15e58ad7a8a704d6ec57e5c89ae5ef5bc64c02626ae9a68278d361f6d85385d8",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs": "0ba1058c5b502b959e859ab6ed23972acced18c575baa2d7d3a5ffff467506f7",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs": "857b9f57da6eee41395c98af51d601ffb74129defeab40d27b9cf76a89ba49fc",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/spec.rs": "bda8c4b7e18535576db6b01c5f1feafd9692b0df4465120f7d597d47785a54af",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/tests.rs": "af82970fd6559cd2c2448ac5c816ada88cd5198ee20f23e29176b2ed0d7c52d0",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition.rs": "628eaddfd44d0afcfaa3860c57720a6448b4b18461a2df604cd08202935d64eb",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/account_tests.rs": "6774c90097e2c49b602ba1e1fe70b3e6f2ec2beafa7cb5ed0c588d700d686c2c",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission.rs": "c1583f65c6c25fd71754377d3006b8007f150efa5f886ccdc01ef3ffe37541ca",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/admission/spec.rs": "eef077093c89518af60b0276ce511287e94a943963c3b08874dc1195740ec5c8",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/framed.rs": "733e8b2a1015aeccf13a01bb2f850092aea86568bbfe5bc6a4279e044e10dbc0",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/framed/spec.rs": "214850554a638672205a9ce847406197bcfdaac9755a7e10ebadaa4d67ef2b3d",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress.rs": "586ec17000170b7514aadeb17d031a8f0d70cc16b95a10e8d94b44cda5b21810",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/spec.rs": "e3504373aa3d905bc64559b6daead2824c6e9e23ce461bd5429900e6d7c87ebf",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/outcome.rs": "6345e4ddbb1fe5f73bff134c297cae84ead973073a27334d21c1ccd0a8483af5",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/producer.rs": "97315fd63fe06310c159ee5120f215ce3070c6a7561671e04268de1815a04e40",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/producer/spec.rs": "e3ece95cb57d3c521df1746138a950dbcf912569102ca933310b9ee28f5fe777",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/record_tests.rs": "02eaa5bb209cb4fd9f33019cf09a1a4efe13cd7932b4696bb9344d657bb9a421",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/schema_validation.rs": "b34a3533351954ce24580422e8568ee769063ef50d4867ef9d6c15385216fb0c",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/schema_validation/spec.rs": "92f9ca753c45ff203aaecb0de675cfcc41aedf0aae4f8583926f2abef1962ea8",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/spec.rs": "2c4bb4a185dab15c450133ba1f32d464f2e97df8cd4477f82e75a26d59ea1993",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/tests.rs": "7f6c17dedf5029cfbf46cc9a0163088301af990c39c161724bbd9088984e32e2",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/continuation.rs": "411960b34b97818ecc5925cf29da82b8cabad0d64274226d6d4907db9005fb70",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/continuation/spec.rs": "3b1593565c68854067a5c172c50966a830fd389ab8200c736bc9fcabf4afd09f",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/continuation/tests.rs": "d579d9425a6d070523d99412569b6b3da20b2e58016c6467e4f58161daa2e696",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/decision.rs": "637bce610fb46ede81b77b209a60d74b4bbb7df843e0e41734d6ad1bf9fe39bc",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/decision/spec.rs": "8135c372ed5e1f30e7e3eabe4152ad7e54912ccab73eb6b3e9e0748072d5baf6",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/decision/tests.rs": "9985db40668979dfde42f0f4fc2ce49cfe4a845ad7ad91a5b3ef2a3b866657d1",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view.rs": "00c05260eebd7b4bf861b6320b2516f5a8144d4038ec00ebd9c024eb34054749",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/spec.rs": "fbff4e5fde0f5171dd203d106d9d8588c9a8b8adc0c71b89e20c33069cf9dfc7",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/tests.rs": "3d22ee56b35b28e6a88c7c65ea418f1cbd9eecca3e5ecea37b96c319d483b331",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws.rs": "002d21f09f9c1994d7a1594629d2bb0033d8182b405f5abbffd6f7dd8479bcc0",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/atoms.rs": "93ab50cf8da586c649b7934f275fcf4ed2739fefd832ce4a3b40e38bae597b80",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/frame.rs": "c14586a1a535ceecc92fba0d386efd5177b74b71163d2816d1f3877c00971801",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/predicate.rs": "88e1f55244ed6c4f4aa27ba48388723dbcb389a2e7d59e30fd1bdb14cd85a988",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/spec.rs": "fb08514c01469a715349a82d59da54839605ce30e2bd6ffdcfd363c2ac5de2cd",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/tests.rs": "fd5ee35b62db0a0bfa6e86af16765cc7bac58f39c21c40a952ea2af962ef090b",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/types.rs": "8a393f7a3f6aaf78ce75038dbbaa1be9a6781d5653617455df8e2f0b74d34c94",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/meter.rs": "653f377742a34d11538eb263aa742feef68e3c41fb0e0bd705806db46eaba84b",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs": "f68a9daf54f645b3b4d94b0705e96c02d52a74d93b385bd85d434a0990389dc4",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/spec.rs": "64a5ce6637bd974d4462405b0d6bf58a5297ed103c4b227b4a9e69cb12a169a3",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tests.rs": "f20f017810ad0bd87dc1d6cc0c7bd32baf4843b16b0e0503dc3e879532b92e63",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/util.rs": "2e59d4aad40c8cd390aa70972d5a67cec741a93ac39668e7ad0c2917371ec975",
+    "crates/zeno-fcis-synthesis/src/finite/ir.rs": "a18e9795e6abda418f8cca3d1a19a39c2ee522913120d33e13c4692bcd1ff2b0",
+    "crates/zeno-fcis-synthesis/src/finite/mod.rs": "41b54262e4f9de8ac5becd7327faca73c0ab592dbaf2f7f7e414a9a45fdd9e45",
+    "crates/zeno-fcis-synthesis/src/finite/preparation.rs": "dbc1979ea7d135ac207dbd5de1ed0961e7961e02108ab0e09618c29e7f3f35de",
+    "crates/zeno-fcis-synthesis/src/finite_runtime.rs": "247e1df3d58af51a7bb5917e9d74eef5cabc48d0980fe044ed485dae7767c671",
+    "crates/zeno-fcis-synthesis/src/lib.rs": "d2414403d49d3c7ab91cd572604939af5a55a124a374523339dcde242e44a1e1",
+    "crates/zeno-fcis-synthesis/src/system.rs": "94b4eb44aa0e526c3a5fb847a421806674291eff72cf056a770b2855f629fcbc",
+    "crates/zeno-fcis-synthesis/tests/completion.rs": "dbddeb09b8350351768709e1f373d80cc5f7342b2e387b8b3f70e73d9a86169a",
+    "crates/zeno-fcis-synthesis/tests/finite.rs": "38746f674922aad4aafecb8c12fa441bd0cb704be57f72aacbdc69c09b295844",
+    "crates/zeno-fcis-synthesis/tests/search.rs": "57b21874942b970980f46c73cbb4ec734fc4f3eb8f9867051429a9aba0def62c",
+    "crates/zeno-fcis-synthesis/tests/v2_abstraction.rs": "2f0309a3b6d7889654b715276e32fc5fa66b4de16e262ff028d47f3113ec544c",
+    "crates/zeno-fcis-synthesis/tests/v2_authority.rs": "a142e4dabf4b328236a633f316906a751a7204892d3bbff46165a7db41dd0c71",
+    "crates/zeno-fcis-synthesis/tests/v2_catalog.rs": "81020ffeb31e1ea5aeb5222055e44ea4aa3df7ebc73e362bf3d78f1a4af5c0fb",
+    "crates/zeno-fcis-synthesis/tests/v2_composition.rs": "3383a8f6c2450b6fe4442a1d78e2eb0470b0ff5874d2c4eebb6d6c34c5c4c540",
+    "crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs": "b19a51a64ce09b2504f232cd1914ea38829f2cc3901cefee9cd33330579f0006",
+    "crates/zeno-fcis-synthesis/tests/v2_execution.rs": "81d6a75c3e94520a164d58b5c718c58e42a29d07e92ccc1c7af7f17c843dc14d",
+    "crates/zeno-fcis-synthesis/tests/v2_guarded_laws.rs": "90f0a601d91343655874a3c29ee3e3b81f8d309cf6323bc208cc3f54d72387b1",
+    "crates/zeno-fcis-synthesis/tests/v2_laws.rs": "7267e5ff6caa65755a4126ad0ccdf03c923a34649c99accf25b8a922e5f38ede",
+    "crates/zeno-fcis-synthesis/tests/v2_original_output.rs": "bed43603819f764805ff63a2e4256dcdaebe5a2c3dc7a96b7f4cd5e919b097a6",
+    "crates/zeno-fcis-synthesis/tests/v2_protected_input.rs": "71c834d6568b7fdded827aeccd956072cccef4298f5e96d5a02461353c7bab98",
+    "crates/zeno-fcis-synthesis/tests/v2_publication.rs": "3f10eaad8b4b07cdd2ee8b9ef50e58f3d1fd3ba9264b761a89750fc390bef9cc",
+    "crates/zeno-fcis-synthesis/tests/v2_record_execution.rs": "9de0d5b781226f657544a0f8d2d26c1bfc5b63b6dd7aab2f13299e838a5a4ee9",
+    "crates/zeno-fcis-synthesis/tests/v2_template_contracts.rs": "684c3a0ea8935a1ae3ca364cf3ab1c42acc08abbcf3f6fc71d3322eba6e79b82",
+    "crates/zeno-fcis-value/Cargo.toml": "216653044e5c69a81f39692282ab40de52dd3baf4d6a6c66a44ec31e6e4d1701",
+    "crates/zeno-fcis-value/src/lib.rs": "5b2801acecb3abdf971a75855fa2742049ba590f15fad6e0b13bd02f883c7232",
+    "crates/zeno-fcis-value/tests/construction.rs": "70a629f79ff9edb0ba7b8c45a2f2eb9d5984b0279515aa524487b65aed3015ba",
+    "docs/benchmarks/withdrawal-queue/Cargo.lock": "3a7a22aa7fb03d534bd122968bd8ca23beb4ce87f236b98c1cd4aff308b8b135",
+    "docs/benchmarks/withdrawal-queue/Cargo.toml": "980fa95385deba588394c609d568f87c3264c5fbbe3160156099157f2e7a5724",
+    "docs/benchmarks/withdrawal-queue/README.md": "de01297211852cf7438bcf87bf8415ad8c0e7cb3c907f96972e73392435cd14f",
+    "docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-candidate.zcve": "b76551883b1aebb553faf5e10089d92cb46df6ff94698f7e09a77a42ba50f37b",
+    "docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve": "84c7a4ecff4c9bd49dd2e3f5f5e0b63b38a0f92db3a9bfadb99df8325f8f81c5",
+    "docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-padded.zcve": "f800c6048253c258289b2b5d94e8aaee76b182d07ffef4fe50cb1c698d37d257",
+    "docs/benchmarks/withdrawal-queue/artifacts/current-decision-scalars-candidate.zcve": "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89",
+    "docs/benchmarks/withdrawal-queue/artifacts/current-decision-scalars-original.zcve": "21435b72cad2748bc20dbee6cc8ebf9b6e78f5a05a77c850851ccaa51e585f0c",
+    "docs/benchmarks/withdrawal-queue/artifacts/current-decision-scalars-padded.zcve": "0c214b5f2b4bdcd680587bd15f1106ff98d40f49afad3aff2a1b57572e455b35",
+    "docs/benchmarks/withdrawal-queue/artifacts/manifest.json": "ad7ca6f9bc55b9a07b2146d2c82e6c71336b7e711422cb59726f9e0d7f37a3d1",
+    "docs/benchmarks/withdrawal-queue/artifacts/retained-controller-candidate.zcve": "f9f04c4c9cf2e62c2146903c25018ba00c25a03c60f5c50e082718afd344eb18",
+    "docs/benchmarks/withdrawal-queue/artifacts/retained-controller-original.zcve": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc",
+    "docs/benchmarks/withdrawal-queue/artifacts/retained-controller-padded.zcve": "521872eafe8ff8ac26166d13b0ef920ac0be8b4e2a304ebf5788db8445fb1ee8",
+    "docs/benchmarks/withdrawal-queue/run.py": "a8606abf346c0b53ee024bc38b28826b7d7410d9b8e261424d7df7a24f4a4c79",
+    "docs/benchmarks/withdrawal-queue/src/main.rs": "2bf04938510a5928b63c744145d16fac47a4f426427b95c200914ae3c697d4bc",
+    "rust-toolchain.toml": "8e390d6a0838315f972690f46ef8bae8b7ecc9ee6c1ed70140ef852869c2482e"
+  },
+  "source_manifest_sha256": "7c1a716151b22e8636acf28b75f3b56ba50c10d4d57e29fa7b745614fb77a9a4",
+  "success": true
+}

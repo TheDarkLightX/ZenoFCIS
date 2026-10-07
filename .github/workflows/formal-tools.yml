@@ -3,6 +3,14 @@ name: formal-tools
 on:
   pull_request:
     paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/**"
+      - "verification/Cargo.toml"
+      - "verification/Cargo.lock"
+      - "verification/kernel-laws/**"
+      - "tools/record_gate_evidence.py"
       - "crates/zeno-fcis-formal-tools/**"
       - "crates/zeno-fcis-cli/**"
       - "crates/zeno-fcis-spec/**"
@@ -10,6 +18,7 @@ on:
       - "release/formal-tools-linux-x86_64.sha256"
       - "release/lean-4.30.0-tree.sha256"
       - ".github/workflows/formal-tools.yml"
+      - ".github/actions/fetch-locked-crates/**"
   push:
     branches: [main]
   workflow_dispatch:
@@ -33,6 +42,8 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust toolchain
         run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
       - name: Record runner storage before tool download
         run: df -h
       - name: Download official artifacts
@@ -77,7 +88,7 @@ jobs:
           ACTUAL_TREE="$(cargo +1.97.1 run --quiet --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
             -p zeno-fcis-cli --locked -- backend inventory-lean "$LEAN_ROOT" | awk '/^lean tree_sha256 / { print $3 }')"
           test "$ACTUAL_TREE" = "$EXPECTED_TREE"
-      - name: Kernel-check the exact generated Lean obligation
+      - name: Kernel-check the private original shallow Lean reference
         working-directory: ${{ runner.temp }}
         run: |
           LEAN_BIN="$(find lean -type f -path '*/bin/lean' -perm -111 -print -quit)"
@@ -91,7 +102,7 @@ jobs:
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
               -p zeno-fcis-formal-tools --locked \
               translation_tests::operator_corpus_checks_with_existing_lean -- --ignored --exact --nocapture
-      - name: Kernel-check Lean through the published CLI process
+      - name: Kernel-check the private original CLI reference process
         working-directory: ${{ runner.temp }}
         run: |
           LEAN_BIN="$(find lean -type f -path '*/bin/lean' -perm -111 -print -quit)"
@@ -99,8 +110,8 @@ jobs:
           ZENO_FCIS_LEAN="$PWD/$LEAN_BIN" \
             ZENO_FCIS_LEAN_ROOT="$PWD/lean/lean-4.30.0-linux" \
             cargo +1.97.1 test --manifest-path "$GITHUB_WORKSPACE/Cargo.toml" \
-              -p zeno-fcis-cli --locked --test cli_adopter_flow \
-              pinned_lean_cli_prove_is_process_level -- --ignored --exact
+              -p zeno-fcis-formal-tools --locked \
+              legacy_cli::pinned_lean_cli_prove_is_process_level -- --ignored --exact
       - name: Differential-check exact CVC5 and Z3 translations
         working-directory: ${{ runner.temp }}
         run: |

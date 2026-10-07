@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
-use zeno_fcis_codec::{CanonicalEncode as _, Domain, Hash32, commitment};
+use zeno_fcis_codec::{Domain, Hash32, commitment};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::{Schema, TypeKind};
 
@@ -29,9 +29,11 @@ pub fn generate(schema: &Schema, spec: &GenerationSpec) -> Result<GeneratedBundl
     let constants = collect_constants(schema)?;
     let cases = vectors::build(schema)?;
 
-    let vector_set_hash = vectors::set_hash("zeno-fcis/vector-set", &cases, |bytes| {
-        hash_bytes("zeno-fcis/vector-set", bytes)
-    })?;
+    let vector_set_hash = vectors::set_hash(
+        zeno_fcis_codec::domains::VECTOR_SET.name(),
+        &cases,
+        |bytes| hash_bytes(zeno_fcis_codec::domains::VECTOR_SET, bytes),
+    )?;
 
     let rust = render_rust(schema, spec, schema_hash, &schema_bytes, &constants, &cases)?;
     let python_module = python::render_adapter_module(schema, spec, &cases)?;
@@ -49,7 +51,10 @@ pub fn generate(schema: &Schema, spec: &GenerationSpec) -> Result<GeneratedBundl
     files.sort_by(|left, right| left.path().cmp(right.path()));
 
     let manifest = render_manifest(schema_hash, vector_set_hash, &files, &cases)?;
-    let manifest_hash = hash_bytes("zeno-fcis/generation-manifest", manifest.as_bytes())?;
+    let manifest_hash = hash_bytes(
+        zeno_fcis_codec::domains::GENERATION_MANIFEST,
+        manifest.as_bytes(),
+    )?;
     files.push(GeneratedFile::new(
         "MANIFEST.zfcis".to_owned(),
         manifest.into_bytes(),
@@ -175,7 +180,7 @@ fn render_rust(
     output.push_str("extern crate alloc;\n\n");
     output.push_str("use alloc::vec;\n");
     output.push_str("use alloc::vec::Vec;\n");
-    output.push_str("use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, EncodeError, Hash32, decode_value};\n");
+    output.push_str("use zeno_fcis_codec::{CommitmentHasher, EncodeError, Hash32};\n");
     output.push_str("use zeno_fcis_patch::{PathSegment, ValuePath};\n");
     output.push_str(&root_envelope::render_imports(schema));
     output.push_str("use zeno_fcis_value::{Field, MapEntry, Value, ValueError};\n\n");
@@ -265,7 +270,7 @@ fn render_manifest(
     let _ = writeln!(output, "schema_hash={schema_hash}");
     let _ = writeln!(output, "vector_set_hash={vector_set_hash}");
     for file in files {
-        let file_hash = hash_bytes("zeno-fcis/generated-file", file.bytes())?;
+        let file_hash = hash_bytes(zeno_fcis_codec::domains::GENERATED_FILE, file.bytes())?;
         let length = u64::try_from(file.bytes().len()).map_err(|_| CodegenError::LengthOverflow)?;
         let _ = writeln!(
             output,
@@ -276,7 +281,7 @@ fn render_manifest(
         );
     }
     for case in cases {
-        let vector_hash = hash_bytes("zeno-fcis/vector", &case.bytes)?;
+        let vector_hash = hash_bytes(zeno_fcis_codec::domains::VECTOR, &case.bytes)?;
         let length = u64::try_from(case.bytes.len()).map_err(|_| CodegenError::LengthOverflow)?;
         let _ = writeln!(
             output,
@@ -290,8 +295,7 @@ fn render_manifest(
     Ok(output)
 }
 
-fn hash_bytes(domain_name: &'static str, bytes: &[u8]) -> Result<Hash32, CodegenError> {
-    let domain = Domain::new(domain_name, 1).map_err(|_| CodegenError::SchemaEncoding)?;
+fn hash_bytes(domain: Domain<'static>, bytes: &[u8]) -> Result<Hash32, CodegenError> {
     commitment::<RustCryptoSha256>(domain, bytes).map_err(|_| CodegenError::SchemaEncoding)
 }
 

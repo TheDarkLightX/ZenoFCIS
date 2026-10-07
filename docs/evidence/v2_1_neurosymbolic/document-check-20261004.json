@@ -1,0 +1,106 @@
+{
+  "bad_local_links": [],
+  "baseline_head": "1ed6f88f7b1098bed6c409bc9aa3c12c99d43c3c",
+  "changed_existing_files": [
+    "README.md",
+    "docs/V2_1_FACTORY_PLAN.md"
+  ],
+  "files": {
+    "docs/neurosymbolic-loop/CHECKLIST.md": {
+      "bytes": 6655,
+      "lines": 109,
+      "sha256": "954623d395b80ed488109a8dba5512b926de2b8eeb702901af93fee7f1b05e6a"
+    },
+    "docs/neurosymbolic-loop/CLAUDE_HANDOFF.md": {
+      "bytes": 6994,
+      "lines": 117,
+      "sha256": "36d8120317e2f9e60550e2abb44804ca8c6cb3177705fac30c3e54c31416500d"
+    },
+    "docs/neurosymbolic-loop/DESIGN.md": {
+      "bytes": 16475,
+      "lines": 265,
+      "sha256": "4ad38a57f14e6fabf3eac98a6739254ab4e8531bee16a3a27af8ded395832afb"
+    },
+    "docs/neurosymbolic-loop/NOTE.md": {
+      "bytes": 2916,
+      "lines": 46,
+      "sha256": "3ca33d915385e21f0786455ca75b626ff9d8933ae8564abf0e99d4ded8b582c4"
+    },
+    "docs/neurosymbolic-loop/README.md": {
+      "bytes": 1616,
+      "lines": 26,
+      "sha256": "aba434d764036007b18fc633229d7dfb327f79b5dee15e34e8f40d1587a06d8c"
+    },
+    "docs/neurosymbolic-loop/check_packet.py": {
+      "bytes": 5392,
+      "sha256": "0ad4563b96c3aac46f5239661f2e570571dd9953deb061fe74066b7ddb7cce5e"
+    },
+    "docs/neurosymbolic-loop/documentation-checks.json": {
+      "bytes": 12170,
+      "sha256": "9c2e454dd4b2811ca63197dacd45fdf3de5f12f279f959ccb90aa5133b5f7dc8"
+    },
+    "docs/neurosymbolic-loop/paper.md": {
+      "bytes": 35981,
+      "lines": 596,
+      "sha256": "a1b7cae1c52437afc68b90d98bc5ff7a826674fb3e1a1ea22d8ff7905a144b1d"
+    },
+    "docs/neurosymbolic-loop/paper.pdf": {
+      "bytes": 285693,
+      "sha256": "00f844f744cd74ee894858f581d7a1b2f1558a394563ed81b7e310e6ebfcd8ed"
+    },
+    "docs/neurosymbolic-loop/paper.tex": {
+      "bytes": 37873,
+      "lines": 244,
+      "sha256": "710d79dbbe4f9215ac8508d766045eaf29aca467dd57136b5c474dd47298f992"
+    },
+    "docs/neurosymbolic-loop/render_paper.py": {
+      "bytes": 5981,
+      "sha256": "9d936297bbc3db91bc72f06f5e23f2a82ec51720e45e92ccdaa30aa54d2e55cd"
+    },
+    "docs/neurosymbolic-loop/specs/00-contract.md": {
+      "bytes": 4631,
+      "lines": 74,
+      "sha256": "987f574980edd5b93dea642b23f7732f79a256f7e0cb542c00ecec3e6024b9ad"
+    },
+    "docs/neurosymbolic-loop/specs/01-loop.md": {
+      "bytes": 4329,
+      "lines": 70,
+      "sha256": "0c4464ca773b3d5ae49bf4992c3116ceaed134b2b32acf6583a15e0acf54ee2f"
+    },
+    "docs/neurosymbolic-loop/specs/02-checker-feedback.md": {
+      "bytes": 4959,
+      "lines": 78,
+      "sha256": "907ebad33626749a16bf6b1bc71f76cc3feefce0081f108bb4be8ac6b1cda765"
+    },
+    "docs/neurosymbolic-loop/specs/03-resources-resume.md": {
+      "bytes": 5393,
+      "lines": 82,
+      "sha256": "39602d506cbd4f29c941b389ef34200f4f05707770aaab6b5c7c4adceb0f6592"
+    },
+    "docs/neurosymbolic-loop/specs/04-integration.md": {
+      "bytes": 4238,
+      "lines": 68,
+      "sha256": "7ab89904e03c7988080c8aff72e5d801c56aa56ad27d9dfcd18c4d4b2aa8bd63"
+    },
+    "docs/neurosymbolic-loop/specs/05-qualification-evaluation.md": {
+      "bytes": 4949,
+      "lines": 74,
+      "sha256": "6bb94baf5ffd634d133c1e2ed1ace61ca2be9643a18ea2ce2f2447e9d4d7b3df"
+    },
+    "docs/neurosymbolic-loop/specs/INDEX.md": {
+      "bytes": 1897,
+      "lines": 27,
+      "sha256": "5b55f4bcb35b531cc3f4f2a8cf6510b3cde933025383e371f9dba302bf9eefce"
+    }
+  },
+  "kind": "documentation_validation_only",
+  "local_links_checked": 60,
+  "markdown_to_latex_regeneration_matches": true,
+  "missing_required_items": [],
+  "original_published_paper_unchanged": true,
+  "runtime_or_neural_experiments_run": false,
+  "specification_requirements": 53,
+  "success": true,
+  "unexpected_existing_changes": [],
+  "unexpected_new_files": []
+}

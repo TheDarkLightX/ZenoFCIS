@@ -1,0 +1,130 @@
+name: verus
+
+on:
+  pull_request:
+    paths:
+      - "crates/zeno-fcis-authority/**"
+      - "crates/zeno-fcis-synthesis/**"
+      - "crates/zeno-fcis-core/**"
+      - "crates/zeno-fcis-codec/**"
+      - "crates/zeno-fcis-crypto/**"
+      - "crates/zeno-fcis-value/**"
+      - "crates/zeno-fcis-cli/templates/**"
+      - "verification/verus/**"
+      - "tools/check_*.py"
+      - "tools/test_check_*.py"
+      - "tools/verus_coverage.py"
+      - "docs/V2_*_STAGE.md"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".cargo/**"
+      - ".github/workflows/verus.yml"
+      - ".github/actions/fetch-locked-crates/**"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualification:
+    name: qualification (${{ matrix.gate }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - {gate: shared-runtime, script: check_verus.py, output: receipt.json}
+          - {gate: finite-execution, script: check_finite_execution.py, output: receipt.json}
+          - {gate: metered-execution, script: check_metered_execution.py, output: receipt.json}
+          - {gate: canonical-bytes, script: check_canonical_bytes.py, output: receipt.json}
+          - {gate: protected-input, script: check_protected_input.py, output: receipt.json}
+          - {gate: envelope-frame, script: check_envelope_frame_v2.py, output: receipt.json}
+          - {gate: schema-binding, script: check_schema_binding_v2.py, output: receipt.json}
+          - {gate: decision, script: check_decision_v2.py, output: receipt.json}
+          - {gate: account-data, script: check_account_graph_v2.py, output: run}
+          - {gate: laws, script: check_laws_v2.py, output: receipt.json}
+          - {gate: composition, script: check_composition_v2.py, output: run/receipt.json}
+          - {gate: catalog, script: check_catalog_v2.py, output: receipt.json}
+          - {gate: authority, script: check_authority_v2.py, output: run}
+          - {gate: original-output, script: check_original_output_v2.py, output: run}
+          - {gate: publication, script: check_publication_v2.py, output: run}
+          - {gate: guarded-laws, script: check_guarded_laws_v2.py, output: run}
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CARGO_BUILD_JOBS: "1"
+      CARGO_INCREMENTAL: "0"
+      RUST_TEST_THREADS: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: tools
+      GATE_SCRIPT: ${{ matrix.script }}
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install application and verifier toolchains
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
+          rustup toolchain install 1.98.1 --profile minimal
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
+      - name: Prepare the pinned verifier and the evidence directory
+        # `runner` is a step context; GitHub rejects it in job-level env.
+        env:
+          EVIDENCE_DIRECTORY: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import check_verus
+          pin = json.loads((check_verus.ROOT / check_verus.PIN).read_text())
+          check_verus.prepare_tools(Path.home() / '.cache/zeno-fcis/verus', pin, True)
+          PY
+          mkdir -p "$EVIDENCE_DIRECTORY" "$CARGO_TARGET_DIR"
+      - name: Check gate admission and failure controls
+        run: python3 "tools/test_${GATE_SCRIPT}"
+      - name: Require the complete exact-source proof and control suite
+        env:
+          GATE_OUTPUT: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}/${{ matrix.output }}
+        run: python3 "tools/${GATE_SCRIPT}" --out "$GATE_OUTPUT"
+      - name: Retain source, commands, diagnostics and receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: verus-${{ matrix.gate }}-evidence
+          path: ${{ runner.temp }}/v2-evidence/${{ matrix.gate }}
+          if-no-files-found: warn
+          include-hidden-files: true
+
+  native-compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install the pinned application toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal
+      - name: Check no-std authority compatibility
+        run: cargo +1.97.1 check -p zeno-fcis-authority -p zeno-fcis-synthesis --no-default-features --locked
+
+  shared-runtime-source:
+    needs: [qualification, native-compatibility]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require every proof and native compatibility check
+        env:
+          QUALIFICATION_RESULT: ${{ needs.qualification.result }}
+          NATIVE_RESULT: ${{ needs.native-compatibility.result }}
+        run: |
+          test "$QUALIFICATION_RESULT" = success
+          test "$NATIVE_RESULT" = success

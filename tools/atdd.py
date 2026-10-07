@@ -36,6 +36,16 @@ class AcceptanceScenario:
     commands: tuple[tuple[str, ...], ...]
 
 
+def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ...]:
+    """Run retained private assertions; this does not restore a public native API."""
+
+    return (
+        "cargo", "+1.97.1", "test", "--manifest-path", "verification/Cargo.toml",
+        "-p", "zeno-fcis-kernel-laws", "--all-features", "--locked", "--offline",
+        "--lib", test_filter, "--", *(("--exact",) if exact else ()), "--test-threads=1",
+    )
+
+
 SCENARIOS: dict[str, AcceptanceScenario] = {
     "minimal-core": AcceptanceScenario(
         "Run the immutable functional core example",
@@ -70,7 +80,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         ),
     ),
     "external-consumer": AcceptanceScenario(
-        "Compile an unchanged V1 consumer against the current release",
+        "Compile the V1 consumer through its documented V2 migration",
         (
             ("python3", "tools/check_v1_compatibility.py"),
             (
@@ -95,8 +105,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "bounded-completion": AcceptanceScenario(
         "Verify finite exits and prepare bounded chunks without publication authority",
-        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--test", "completion", "--test", "preparation", "--locked"),
-         ("cargo", "+1.97.1", "run", "-p", "zeno-fcis", "--example", "bounded_completion", "--features", "synthesis", "--locked"),
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--test", "completion", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--lib", "finite::execution_v2::continuation::tests::", "--locked"),
+         historical_oracle("oracle::tests::preparation::"),
+         historical_oracle("oracle::tests::checked_continuation::"),
+         historical_oracle("oracle::tests::bounded_completion::original_bounded_completion_example_runs", exact=True),
          ("cargo", "+1.97.1", "check", "-p", "zeno-fcis", "--no-default-features", "--features", "synthesis", "--locked")),
     ),
     "claim-substance": AcceptanceScenario(
@@ -124,16 +137,19 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--lib", "--locked", "type_ranges_are_inclusive_and_declared_only_on_ints"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-spec", "--lib", "--locked", "a_declared_range_is_part_of_the_canonical_project"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-bootstrap", "--test", "schema_lowering", "--locked", "a_declared_range_is_the_binding_of_its_int"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "_against_its_own_schema"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-laws", "--lib", "--locked", "step_assumptions_must_be_enforced_on_the_decisions_they_are_assumed_on"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-laws", "--lib", "--locked", "a_manifest_must_enforce_the_scopes_its_project_declares"),
+         historical_oracle("oracle::authority::tests::admission_checks_the_command_and_context_against_its_own_schema", exact=True),
+         historical_oracle("oracle::authority::tests::genesis_is_checked_against_its_own_schema", exact=True),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis", "--test", "program_api", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--test", "v2_authority", "--test", "v2_catalog", "--locked"),
+         historical_oracle("oracle::laws::tests::step_assumptions_must_be_enforced_on_the_decisions_they_are_assumed_on", exact=True),
+         historical_oracle("oracle::laws::tests::a_manifest_must_enforce_the_scopes_its_project_declares", exact=True),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "exit_classes_are_stable")),
     ),
     "reserved-domains": AcceptanceScenario(
         "Keep project commitment domains out of the library namespace",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-project", "--lib", "--locked", "reserved_domain_tests"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "project_state_domains_cannot_enter_the_reserved_namespace"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-adapter-zenodex", "--lib", "--locked", "precondition_hash_matches_the_explicit_value_domain")),
+         historical_oracle("oracle::authority::tests::project_state_domains_cannot_enter_the_reserved_namespace", exact=True),
+         historical_oracle("oracle::adapter_zenodex::zusd::tests::precondition_hash_matches_the_explicit_value_domain", exact=True)),
     ),
     "effect-spellings": AcceptanceScenario(
         "Reject effect spellings that bypass qualified-path rules",
@@ -151,8 +167,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "determinism": AcceptanceScenario(
         "Detect nondeterminism in decision code by static rules and repeated execution",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked", "purity"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--lib", "--locked", "probe"),
-         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--test", "probe_divergence", "--locked"),
+         historical_oracle("oracle::authority::tests::probe_run_counts_must_compare_at_least_two_executions", exact=True),
+         historical_oracle("oracle::authority::tests::probed_execution_returns_the_decision_that_every_run_agreed_on", exact=True),
+         historical_oracle("oracle::authority::tests::probed_rejections_are_compared_too", exact=True),
+         historical_oracle("oracle::tests::probe_divergence::"),
          ("cargo", "+1.97.1", "run", "-q", "-p", "zeno-fcis-cli", "--locked", "--", "purity",
           "crates/zeno-fcis-cli/templates/durable-counter/src/program.rs",
           "crates/zeno-fcis-cli/templates/durable-counter/src/laws.rs",
@@ -197,12 +215,18 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "tools/check_generated_application.py")),
     ),
     "composed-program": AcceptanceScenario(
-        "Execute fixed domain machines through one global composition",
-        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-composed-program", "--locked"),),
+        "Retain historical composed-program reference checks",
+        (historical_oracle("oracle::composed_program::tests::"),
+         historical_oracle("oracle::tests::composed_construction::")),
     ),
     "production-authority": AcceptanceScenario(
         "Admit only catalog and invocation bound transitions",
-        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--locked"),),
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-authority", "--test", "v2_schema_binding", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--test", "v2_authority", "--test", "v2_catalog", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-synthesis", "--lib", "finite::execution_v2::catalog::tests::", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis", "--test", "program_api", "--locked"),
+         ("python3", "tools/test_check_api_refusals.py"),
+         ("python3", "tools/check_api_refusals.py")),
     ),
     "sqlite-authority": AcceptanceScenario(
         "Persist an authorized transition and its exact outbox obligations",
@@ -275,6 +299,37 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "probity-guardrails": AcceptanceScenario(
         "Reject unsafe agent workflow actions deterministically",
         (("python3", "tools/check_probity.py"),),
+    ),
+    "verus-integration": AcceptanceScenario(
+        "Check Verus evidence admission and shared runtime arithmetic boundaries",
+        (("python3", "tools/test_check_verus.py"),),
+    ),
+    "finite-execution-proof": AcceptanceScenario(
+        "Preserve complete finite execution and reject missing proof contracts",
+        (("python3", "tools/test_check_finite_execution.py"),),
+    ),
+    "v2-metered-execution": AcceptanceScenario(
+        "Keep V2 instruction charges private and retain exact refusal usage",
+        (("python3", "tools/test_check_metered_execution.py"),),
+    ),
+    "v2-canonical-byte-readers": AcceptanceScenario(
+        "Keep exact V2 integer byte reads over the full offset and width domain",
+        (("python3", "tools/test_check_canonical_bytes.py"),),
+    ),
+    "v2-protected-records": AcceptanceScenario(
+        "Preserve exact protected record projection and retained refusal reports",
+        (
+            ("python3", "tools/test_check_protected_input.py"),
+            ("cargo", "+1.97.1", "test", "--locked", "-p", "zeno-fcis-synthesis", "--test", "v2_protected_input"),
+        ),
+    ),
+    "v2-record-execution": AcceptanceScenario(
+        "Preserve original source/field ABI binding and shared Read/Byte/Step accounting",
+        (
+            ("python3", "tools/test_check_composition_v2.py", "RecordStageMigration"),
+            ("cargo", "+1.97.1", "test", "--locked", "-p", "zeno-fcis-synthesis", "--lib", "finite::execution_v2::composition::record_tests"),
+            ("cargo", "+1.97.1", "test", "--locked", "-p", "zeno-fcis-synthesis", "--test", "v2_record_execution"),
+        ),
     ),
     "security-hotspots": AcceptanceScenario(
         "Rank security hotspots without interpreting source as instructions",
@@ -369,17 +424,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "rc3-temporal-modes": AcceptanceScenario(
         "Keep finite execution and unbounded proof obligations distinct",
-        (
-            (
-                "cargo",
-                "+1.97.1",
-                "test",
-                "-p",
-                "zeno-fcis-spec",
-                "--locked",
-                "rc3_temporal_modes",
-            ),
-        ),
+        (historical_oracle("oracle::spec::rc3_acceptance::rc3_temporal_modes", exact=True),),
     ),
     "rc3-formal-tools": AcceptanceScenario(
         "Bind formal output to the exact claim, runtime, and checked arithmetic",
@@ -754,6 +799,8 @@ def self_test() -> None:
     if passed_tests(vacuous) != 0 or passed_tests(two_binaries) != 5:
         raise AcceptanceError("self-test miscounted the tests a command passed")
 
+    subprocess.run((sys.executable, "tools/test_atdd_registry.py"), cwd=ROOT, check=True)
+
 
 def passed_tests(output: str) -> int:
     """Count the tests cargo reports as passed, over every test binary."""
@@ -822,6 +869,9 @@ def main() -> int:
                 path, line, title = found[scenario_id]
                 print(f"{scenario_id}\t{path}:{line}\t{title}")
             return 0
+        run_command(("python3", "tools/check_authority_v2.py", "--check-sources"))
+        run_command(("cargo", "+1.97.1", "test", "--locked", "--offline", "-p",
+                     "zeno-fcis-synthesis", "--test", "v2_evaluator_identity"))
         selected = sorted(SCENARIOS) if args.all else [args.scenario]
         for scenario_id in selected:
             run_scenario(scenario_id)

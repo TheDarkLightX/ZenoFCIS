@@ -8,7 +8,7 @@ This document describes the ZenoFCIS `1.1.0` artifact set.
 
 - 36 public crates in dependency-first publication order;
 - one private crate for compiled generated-code tests;
-- the `zeno-fcis` authoring CLI and `mount-zenodex-zusd` diagnostic target;
+- the `zeno-fcis` authoring CLI;
 - the exact Cargo version and Rust toolchain.
 
 `tools/rc_package.py check` compares that manifest with Cargo metadata and
@@ -25,7 +25,6 @@ crate.
 ```text
 packages/*.crate
 binaries/zeno-fcis-<version>-<target>.tar.gz
-binaries/mount-zenodex-zusd-<version>-<target>.tar.gz
 docs/zeno-fcis-rustdoc-<version>.tar.gz
 source/zeno-fcis-<version>-source.tar.gz
 SOURCE-MANIFEST.json
@@ -42,14 +41,41 @@ the locked external graph, packages every public crate with `--locked`, then
 unpacks the complete crate set into a temporary resolver-3 workspace. It
 reconciles a copy of the reviewed lock against only the unpacked internal
 packages, rejects external identity/checksum drift and internal source fallback, then
-compiles all features across every public library, test, example, benchmark,
-and binary target with `--locked --offline`. This catches source, build, binary,
-or test files that exist in the repository and are absent from a packaged
-archive. The same run builds both declared binaries in release mode,
+runs two compilations with all features, `--locked --offline`:
+
+1. **Consumer build, archives only.** With each crate unpacked at
+   `sources/<crate>-<version>/`, it builds every library, binary, example and
+   build script. Published crates therefore build from their archives alone. A
+   non-test target that reads a file outside its own package fails here.
+2. **Packaged tests, repository layout.** The same unpacked archives are placed at
+   `crates/<crate>/`, and the nine verification files named in
+   `release/packaged-test-inputs.json` are copied from the exact commit. Every
+   target, tests included, is compiled with `--no-run`. Rustc's dep-info then
+   gives every file each target read outside its own package. Those reads must
+   equal the committed manifest exactly: test target, path and SHA-256, for
+   sibling-archive files and verification files alike. Any non-test target with
+   such a read fails.
+
+Packaged tests are not standalone. They compile only from the published
+archives laid out as in the repository, plus those nine verification files. A
+crate's tests cannot be compiled from its own archive, or from crates.io. The
+whole-repository source archive is what runs every test. Two frozen, pinned
+references force this allowance:
+
+- the `#[cfg(test)]` `#[path]` include in
+  `crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs`, which reads the
+  CLI's order-fulfillment `synthesized/transition.rs`;
+- `crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs`, which includes
+  two files from `verification/verus/`.
+
+Open item: restore standalone packaged tests when the verified sources next
+change. That change is the identity regeneration planned for the 2.1.0 release.
+The same run builds both declared binaries in release mode,
 generates warning-denied rustdoc, records the Cargo dependency graph as
 CycloneDX 1.6, and content-addresses every retained artifact.
 
-Before deleting the unpacked workspace, the packager also builds its CLI and
+Before deleting the unpacked workspaces, the packager also builds its CLI in the
+archives-only layout and
 uses that executable to emit fresh durable-counter, prepared-counter,
 account-lockout, order-fulfillment, inventory-reservation,
 compliance-gateway, withdrawal-queue, and agent-treasury-guard applications.

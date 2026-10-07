@@ -16,46 +16,6 @@ use alloc::vec::Vec;
 
 use crate::finite::{Contract, Domain, Error, Program};
 
-/// A closed Boolean relation over a transition's inputs followed by its
-/// outputs, kept together with the equivalent synthesis [`Contract`].
-///
-/// [`Contract`] does not expose its relation program, so this type retains the
-/// program for encoders such as SMT exporters while [`check_system_property`]
-/// evaluates the same relation through [`Property::contract`].
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Property {
-    contract: Contract,
-    relation: Program,
-}
-
-impl Property {
-    /// Validates `relation` as a Boolean relation over `inputs` then `outputs`.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Contract::try_new`].
-    pub fn try_new(
-        inputs: Vec<Domain>,
-        outputs: Vec<Domain>,
-        relation: Program,
-    ) -> Result<Self, Error> {
-        let contract = Contract::try_new(inputs, outputs, relation.clone())?;
-        Ok(Self { contract, relation })
-    }
-
-    /// Returns the equivalent contract.
-    #[must_use]
-    pub const fn contract(&self) -> &Contract {
-        &self.contract
-    }
-
-    /// Returns the relation program: inputs, then outputs, to one Boolean.
-    #[must_use]
-    pub const fn relation(&self) -> &Program {
-        &self.relation
-    }
-}
-
 /// Deterministic enumeration limits for one check.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SystemLimits {

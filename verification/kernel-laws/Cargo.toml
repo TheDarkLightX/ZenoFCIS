@@ -5,13 +5,43 @@ edition = "2024"
 rust-version = "1.97.1"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "Property harnesses for ZenoFCIS kernel laws"
+description = "Private retained reference algorithms and kernel law oracles"
+autotests = false
+
+[features]
+default = ["std", "rustcrypto"]
+std = []
+rustcrypto = []
+libcrux = ["zeno-fcis-crypto/libcrux"]
 
 [dependencies]
 
 [dev-dependencies]
+zeno-fcis-codegen = { version = "=1.1.0", path = "../../crates/zeno-fcis-codegen" }
+rusqlite = { version = "=0.40.1", features = ["bundled", "hooks"] }
+zeno-fcis-shell = { version = "=1.1.0", path = "../../crates/zeno-fcis-shell", features = ["std"] }
+zeno-fcis-shell-sqlite = { version = "=1.1.0", path = "../../crates/zeno-fcis-shell-sqlite" }
 bolero = "=0.13.4"
-zeno-fcis-codec = { version = "=1.1.0", path = "../../crates/zeno-fcis-codec" }
+zeno-fcis-codec = { version = "=1.1.0", path = "../../crates/zeno-fcis-codec", features = ["libcrux"] }
 zeno-fcis-core = { version = "=1.1.0", path = "../../crates/zeno-fcis-core" }
 zeno-fcis-patch = { version = "=1.1.0", path = "../../crates/zeno-fcis-patch" }
 zeno-fcis-value = { version = "=1.1.0", path = "../../crates/zeno-fcis-value" }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.151"
+zeno-fcis-catalog = { version = "=1.1.0", path = "../../crates/zeno-fcis-catalog" }
+zeno-fcis-compose = { version = "=1.1.0", path = "../../crates/zeno-fcis-compose" }
+zeno-fcis-crypto = { version = "=1.1.0", path = "../../crates/zeno-fcis-crypto", default-features = false, features = ["std", "rustcrypto"] }
+zeno-fcis-evidence = { version = "=1.1.0", path = "../../crates/zeno-fcis-evidence" }
+zeno-fcis-laws = { version = "=1.1.0", path = "../../crates/zeno-fcis-laws" }
+zeno-fcis-plan = { version = "=1.1.0", path = "../../crates/zeno-fcis-plan" }
+zeno-fcis-project = { version = "=1.1.0", path = "../../crates/zeno-fcis-project" }
+zeno-fcis-refine = { version = "=1.1.0", path = "../../crates/zeno-fcis-refine" }
+zeno-fcis-schema = { version = "=1.1.0", path = "../../crates/zeno-fcis-schema" }
+zeno-fcis-spec = { version = "=1.1.0", path = "../../crates/zeno-fcis-spec" }
+zeno-fcis-synthesis = { version = "=1.1.0", path = "../../crates/zeno-fcis-synthesis" }
+zeno-fcis-authenticated = { version = "=1.1.0", path = "../../crates/zeno-fcis-authenticated" }
+zeno-fcis-security = { version = "=1.1.0", path = "../../crates/zeno-fcis-security" }
+zeno-fcis-secret = { version = "=1.1.0", path = "../../crates/zeno-fcis-secret" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)"] }

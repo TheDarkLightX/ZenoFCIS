@@ -1,6 +1,6 @@
 //! Runtime validation of owned values against closed schemas.
 
-use zeno_fcis_value::Value;
+use zeno_fcis_value::{Value, ValueRef};
 
 use crate::{
     EnumVariantDef, Schema, SumVariantDef, TypeId, TypeKind, ValueValidationError, VariantId,
@@ -97,38 +97,38 @@ fn validate_node(
     let definition = schema
         .type_by_id(type_id)
         .ok_or(ValueValidationError::UnknownType(type_id))?;
-    match (definition.kind(), value) {
-        (TypeKind::Unit, Value::Unit) | (TypeKind::Bool, Value::Bool(_)) => Ok(()),
-        (TypeKind::U128 { min, max }, Value::U128(integer)) => {
-            if min <= integer && integer <= max {
+    match (definition.kind(), value.view()) {
+        (TypeKind::Unit, ValueRef::Unit) | (TypeKind::Bool, ValueRef::Bool(_)) => Ok(()),
+        (TypeKind::U128 { min, max }, ValueRef::U128(integer)) => {
+            if *min <= integer && integer <= *max {
                 Ok(())
             } else {
                 Err(ValueValidationError::IntegerRange)
             }
         }
-        (TypeKind::I128 { min, max }, Value::I128(integer)) => {
-            if min <= integer && integer <= max {
+        (TypeKind::I128 { min, max }, ValueRef::I128(integer)) => {
+            if *min <= integer && integer <= *max {
                 Ok(())
             } else {
                 Err(ValueValidationError::IntegerRange)
             }
         }
-        (TypeKind::Bytes { min_len, max_len }, Value::Bytes(bytes)) => {
+        (TypeKind::Bytes { min_len, max_len }, ValueRef::Bytes(bytes)) => {
             validate_length(bytes.len(), *min_len, *max_len)
         }
-        (TypeKind::Text { min_len, max_len }, Value::Text(text)) => {
+        (TypeKind::Text { min_len, max_len }, ValueRef::Text(text)) => {
             validate_length(text.len(), *min_len, *max_len)
         }
-        (TypeKind::Enum { variants }, Value::Enum { type_id, variant }) => {
-            if *type_id != definition.id().get() {
+        (TypeKind::Enum { variants }, ValueRef::Enum { type_id, variant }) => {
+            if type_id != definition.id().get() {
                 return Err(ValueValidationError::TypeIdentity);
             }
-            let variant_id = VariantId::new(*variant);
+            let variant_id = VariantId::new(variant);
             find_enum_variant(variants, variant_id)
                 .ok_or(ValueValidationError::UnknownVariant(variant_id))?;
             Ok(())
         }
-        (TypeKind::Tuple { items: types }, Value::Tuple(items)) => {
+        (TypeKind::Tuple { items: types }, ValueRef::Tuple(items)) => {
             if types.len() != items.len() {
                 return Err(ValueValidationError::Length);
             }
@@ -142,7 +142,7 @@ fn validate_node(
             TypeKind::Record {
                 fields: definitions,
             },
-            Value::Record(fields),
+            ValueRef::Record(fields),
         ) => {
             if definitions.len() != fields.len() {
                 return Err(ValueValidationError::RecordShape);
@@ -158,16 +158,16 @@ fn validate_node(
         }
         (
             TypeKind::Sum { variants },
-            Value::Sum {
+            ValueRef::Sum {
                 type_id,
                 variant,
                 payload,
             },
         ) => {
-            if *type_id != definition.id().get() {
+            if type_id != definition.id().get() {
                 return Err(ValueValidationError::TypeIdentity);
             }
-            let variant_id = VariantId::new(*variant);
+            let variant_id = VariantId::new(variant);
             let variant = find_sum_variant(variants, variant_id)
                 .ok_or(ValueValidationError::UnknownVariant(variant_id))?;
             match (variant.payload(), payload) {
@@ -185,7 +185,7 @@ fn validate_node(
                 min_len,
                 max_len,
             },
-            Value::Vector(items),
+            ValueRef::Vector(items),
         ) => {
             validate_length(items.len(), *min_len, *max_len)?;
             let next = next_depth(depth)?;
@@ -201,7 +201,7 @@ fn validate_node(
                 min_len,
                 max_len,
             },
-            Value::Map(entries),
+            ValueRef::Map(entries),
         ) => {
             validate_length(entries.len(), *min_len, *max_len)?;
             let next = next_depth(depth)?;
@@ -246,7 +246,6 @@ fn next_depth(depth: u16) -> Result<u16, ValueValidationError> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::boxed::Box;
     use alloc::vec;
 
     use super::*;
@@ -276,11 +275,11 @@ mod tests {
         let schema = scalar_schema();
         assert!(
             schema
-                .validate_root(&Value::U128(42), ValidationLimits::default())
+                .validate_root(&Value::unsigned(42), ValidationLimits::default())
                 .is_ok()
         );
         assert_eq!(
-            schema.validate_root(&Value::U128(0), ValidationLimits::default()),
+            schema.validate_root(&Value::unsigned(0), ValidationLimits::default()),
             Err(ValueValidationError::IntegerRange)
         );
     }
@@ -334,7 +333,8 @@ mod tests {
                 Ok(value) => value,
                 Err(error) => panic!("schema rejected: {error}"),
             };
-        let value = Value::Tuple(Box::new([Value::Bool(true), Value::Bool(false)]));
+        let value = Value::tuple(vec![Value::boolean(true), Value::boolean(false)])
+            .unwrap_or_else(|error| panic!("tuple: {error}"));
         let report = schema.validate_root(
             &value,
             ValidationLimits {

@@ -6,7 +6,7 @@
 //! reports a broken binding rather than aborting; `build.rs` turns such an
 //! error into a build failure.
 
-use zeno_fcis_codec::{CanonicalEncode, Domain, Hash32, commitment};
+use zeno_fcis_codec::{Domain, Hash32, commitment};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_laws::{
     DecisionScope, GenesisApplicability, LawDefinition, LawEvidenceRequirement, LawFamilyPolicy,
@@ -94,13 +94,13 @@ pub fn source_hash() -> Result<Hash32, BindingError> {
             "\0",
             include_str!("src/lib.rs"),
             "\0",
-            include_str!("src/program.rs"),
-            "\0",
-            include_str!("src/laws.rs"),
-            "\0",
             include_str!("src/delivery.rs"),
             "\0",
-            include_str!("src/controller.rs"),
+            include_str!("src/v2_contract.rs"),
+            "\0",
+            include_str!("v2/policy.json"),
+            "\0",
+            include_str!("v2/schema-origin.json"),
             "\0",
             include_str!("synthesis.json"),
             "\0",
@@ -122,13 +122,22 @@ pub fn source_hash() -> Result<Hash32, BindingError> {
         )
         .as_bytes(),
     )?;
-    let program = digest(
-        "example/withdrawal-queue/closed-ir",
-        include_bytes!("synthesized/program.zcve"),
+    let schema = digest(
+        "example/withdrawal-queue/v2-schema",
+        include_bytes!("v2/schema.zcve"),
+    )?;
+    let policy = digest(
+        "example/withdrawal-queue/v2-policy",
+        include_bytes!("v2/policy.zcve"),
     )?;
     digest(
         "example/withdrawal-queue/source-complete",
-        &[source.as_bytes().as_slice(), program.as_bytes().as_slice()].concat(),
+        &[
+            source.as_bytes().as_slice(),
+            schema.as_bytes().as_slice(),
+            policy.as_bytes().as_slice(),
+        ]
+        .concat(),
     )
 }
 

@@ -5,6 +5,20 @@
 Open. Entries are added as 1.x work finds them. An entry is closed when V2 is
 released with it or it is withdrawn with a reason.
 
+## Smaller V2 scope — 2026-10-03
+
+The owner chose simplification followed by one mandatory checked application
+route for the eight existing templates. The [32-entry disposition](../V2_LEDGER_SCOPE.md)
+records every original entry and its reason: 19 route-required entries remain
+open for final qualification; 13 broader completion requirements are withdrawn.
+Working protections remain intact. Withdrawal does not authorize a bypass.
+
+The original decision list below is retained as the historical record.
+The [current V2 plan](../V2_VERIFIED_CORE_PLAN.md) defines the supported route,
+semantic replacement APIs, proof obligations and release boundary. Compound
+execution and full-width U128 zUSD move to a new V2.1 profile; neither was a
+separate entry in this ledger. No required entry is closed by this scope edit.
+
 ## Context
 
 The 1.x line promises Cargo API stability. `tools/check_v1_compatibility.py`

@@ -29,24 +29,27 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt
           rustup target add wasm32-unknown-unknown --toolchain 1.97.1
 
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
+
       - name: Check formatting
         run: cargo +1.97.1 fmt --all -- --check
 
-      - name: Lint composed authority boundary
+      - name: Lint retired compatibility and current authority surfaces
         run: cargo +1.97.1 clippy -p zeno-fcis-composed-program -p zeno-fcis-authority --all-targets --all-features --locked -- -D warnings
 
-      - name: Test composed authority boundary
-        run: cargo +1.97.1 test -p zeno-fcis-composed-program -p zeno-fcis-authority --all-features --locked
+      - name: Execute retained historical composition assertions
+        run: python3 tools/atdd.py run --scenario composed-program
 
-      - name: Test composed-program documentation
-        run: cargo +1.97.1 test -p zeno-fcis-composed-program --doc --all-features --locked
+      - name: Test current checked authority admission and invocation
+        run: python3 tools/atdd.py run --scenario production-authority
 
-      - name: Check no_std composed-program surfaces
+      - name: Check no_std compatibility surfaces
         run: |
           cargo +1.97.1 check -p zeno-fcis-composed-program --no-default-features --locked --target wasm32-unknown-unknown
           cargo +1.97.1 check -p zeno-fcis --no-default-features --features composed-program --locked --target wasm32-unknown-unknown
 
-      - name: Check warning-free documentation
+      - name: Build warning-free compatibility documentation
         env:
           RUSTDOCFLAGS: -D warnings
         run: cargo +1.97.1 doc -p zeno-fcis-composed-program --all-features --locked --no-deps

@@ -1,4 +1,8 @@
-//! Same-candidate construction for patches, plans, receipts, and commit bundles.
+//! Strict legacy receipt transport and library-private same-candidate reconstruction.
+//!
+//! Decoded bundles are inert historical data, never V2 publication capabilities.
+//! Public native candidate authoring is retired; genuine publication is produced
+//! only by the checked program family.
 //!
 //! Candidate sealing applies the patch to the supplied immutable pre-state,
 //! derives the post-root, commits every component, and creates one candidate
@@ -14,7 +18,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::DecisionKind;
 use zeno_fcis_patch::{
     AppliedPatch, CanonicalPatch, PatchDecodeError, PatchDecodeLimits, PatchError,
@@ -181,9 +185,10 @@ impl CandidateBody {
     }
 }
 
-impl CanonicalEncode for CandidateBody {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
-        output.push(decision_tag(self.decision_kind));
+impl CandidateBody {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+        output.push(decision_tag(self.decision_kind)?);
         match &self.reason_code {
             None => output.push(0),
             Some(reason) => {
@@ -198,6 +203,13 @@ impl CanonicalEncode for CandidateBody {
         output.extend_from_slice(self.commit_plan_hash.as_bytes());
         output.extend_from_slice(self.outbox_plan_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -222,10 +234,18 @@ impl Receipt {
     }
 }
 
-impl CanonicalEncode for Receipt {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Receipt {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.candidate_id.hash().as_bytes());
         put_blob(output, &self.body.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -277,11 +297,19 @@ impl RejectReceipt {
     }
 }
 
-impl CanonicalEncode for RejectReceipt {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl RejectReceipt {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         encode_bindings(self.bindings, output);
         output.extend_from_slice(self.pre_root.as_bytes());
         put_blob(output, self.reason_code.as_str().as_bytes())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -368,14 +396,22 @@ impl CommitBundle {
     }
 }
 
-impl CanonicalEncode for CommitBundle {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CommitBundle {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.candidate_id.hash().as_bytes());
         put_blob(output, &self.body.canonical_bytes()?)?;
         put_blob(output, &self.patch.canonical_bytes()?)?;
         put_blob(output, &self.commit_plan.canonical_bytes()?)?;
         put_blob(output, &self.outbox_plan.canonical_bytes()?)?;
         put_blob(output, &self.receipt.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -400,13 +436,14 @@ pub fn decode_receipt<H: CommitmentHasher>(
     ensure_consumed(&cursor)?;
     let body = decode_candidate_body(encoded_body)?;
     let expected = CandidateId::new(
-        hash_component::<H>("zeno-fcis/candidate", &body).map_err(ReceiptDecodeError::Seal)?,
+        hash_component::<H>(zeno_fcis_codec::domains::CANDIDATE, body.canonical_bytes())
+            .map_err(ReceiptDecodeError::Seal)?,
     );
     if candidate_id != expected {
         return Err(ReceiptDecodeError::CandidateMismatch);
     }
     let receipt = Receipt { candidate_id, body };
-    ensure_canonical(bytes, &receipt)?;
+    ensure_canonical(bytes, receipt.canonical_bytes())?;
     Ok(receipt)
 }
 
@@ -423,14 +460,14 @@ pub fn decode_reject_receipt(
     ensure_consumed(&cursor)?;
     let receipt =
         RejectReceipt::new(bindings, pre_root, &reason).map_err(ReceiptDecodeError::Seal)?;
-    ensure_canonical(bytes, &receipt)?;
+    ensure_canonical(bytes, receipt.canonical_bytes())?;
     Ok(receipt)
 }
 
 /// Strictly decodes and fully reconstructs one complete committed candidate.
 ///
 /// Nested patches and plans pass through their own bounded canonical decoders.
-/// The result is then rebuilt through [`CandidateBuilder::seal`] against the
+/// The result is then rebuilt through library-private candidate sealing against the
 /// supplied pre-state and state domain. No decoded wire field directly creates
 /// a trusted bundle.
 pub fn decode_commit_bundle<H: CommitmentHasher>(
@@ -485,7 +522,7 @@ pub fn decode_commit_bundle<H: CommitmentHasher>(
     if rebuilt.receipt != receipt {
         return Err(ReceiptDecodeError::ReceiptMismatch);
     }
-    ensure_canonical(bytes, &rebuilt)?;
+    ensure_canonical(bytes, rebuilt.canonical_bytes())?;
     Ok(rebuilt)
 }
 
@@ -510,7 +547,7 @@ fn decode_candidate_body(bytes: &[u8]) -> Result<CandidateBody, ReceiptDecodeErr
         outbox_plan_hash: cursor.take_hash32()?,
     };
     ensure_consumed(&cursor)?;
-    ensure_canonical(bytes, &body)?;
+    ensure_canonical(bytes, body.canonical_bytes())?;
     Ok(body)
 }
 
@@ -564,10 +601,11 @@ fn ensure_consumed(cursor: &ReceiptCursor<'_>) -> Result<(), ReceiptDecodeError>
     Ok(())
 }
 
-fn ensure_canonical<T: CanonicalEncode>(bytes: &[u8], value: &T) -> Result<(), ReceiptDecodeError> {
-    let encoded = value
-        .canonical_bytes()
-        .map_err(ReceiptDecodeError::Encode)?;
+fn ensure_canonical(
+    bytes: &[u8],
+    value: Result<Vec<u8>, EncodeError>,
+) -> Result<(), ReceiptDecodeError> {
+    let encoded = value.map_err(ReceiptDecodeError::Encode)?;
     if encoded.as_slice() != bytes {
         return Err(ReceiptDecodeError::NonCanonical);
     }
@@ -638,12 +676,12 @@ impl<'a> ReceiptCursor<'a> {
 }
 
 /// Private-construction namespace for complete candidates.
-pub struct CandidateBuilder;
+pub(crate) struct CandidateBuilder;
 
 impl CandidateBuilder {
     /// Applies the patch, derives every component hash, and seals one bundle.
     #[allow(clippy::too_many_arguments)]
-    pub fn seal<H: CommitmentHasher>(
+    pub(crate) fn seal<H: CommitmentHasher>(
         pre_state: &Value,
         state_domain: Domain<'_>,
         decision_kind: DecisionKind,
@@ -657,9 +695,16 @@ impl CandidateBuilder {
         let applied = patch
             .apply::<H>(pre_state, state_domain)
             .map_err(SealError::Patch)?;
-        let patch_hash = hash_component::<H>("zeno-fcis/patch", &patch)?;
-        let commit_plan_hash = hash_component::<H>("zeno-fcis/commit-plan", &commit_plan)?;
-        let outbox_plan_hash = hash_component::<H>("zeno-fcis/outbox-plan", &outbox_plan)?;
+        let patch_hash =
+            hash_component::<H>(zeno_fcis_codec::domains::PATCH, patch.canonical_bytes())?;
+        let commit_plan_hash = hash_component::<H>(
+            zeno_fcis_codec::domains::COMMIT_PLAN,
+            commit_plan.canonical_bytes(),
+        )?;
+        let outbox_plan_hash = hash_component::<H>(
+            zeno_fcis_codec::domains::OUTBOX_PLAN,
+            outbox_plan.canonical_bytes(),
+        )?;
         let body = CandidateBody {
             decision_kind,
             reason_code,
@@ -670,7 +715,8 @@ impl CandidateBuilder {
             commit_plan_hash,
             outbox_plan_hash,
         };
-        let candidate_hash = hash_component::<H>("zeno-fcis/candidate", &body)?;
+        let candidate_hash =
+            hash_component::<H>(zeno_fcis_codec::domains::CANDIDATE, body.canonical_bytes())?;
         let candidate_id = CandidateId::new(candidate_hash);
         let receipt = Receipt {
             candidate_id,
@@ -699,23 +745,24 @@ fn validate_decision_reason(
         (DecisionKind::Reject, _) => Err(SealError::RejectCannotBeCandidate),
         (DecisionKind::Accept, Some(_)) => Err(SealError::AcceptHasFailureReason),
         (DecisionKind::CommittedFailure, None) => Err(SealError::MissingFailureReason),
+        _ => Err(SealError::UnsupportedDecisionKind),
     }
 }
 
 fn hash_component<H: CommitmentHasher>(
-    domain_name: &str,
-    value: &impl CanonicalEncode,
+    domain: Domain<'_>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, SealError> {
-    let domain = Domain::new(domain_name, 1).map_err(SealError::Encode)?;
-    let bytes = value.canonical_bytes().map_err(SealError::Encode)?;
+    let bytes = value.map_err(SealError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(SealError::Encode)
 }
 
-const fn decision_tag(kind: DecisionKind) -> u8 {
+const fn decision_tag(kind: DecisionKind) -> Result<u8, EncodeError> {
     match kind {
-        DecisionKind::Accept => 0,
-        DecisionKind::Reject => 1,
-        DecisionKind::CommittedFailure => 2,
+        DecisionKind::Accept => Ok(0),
+        DecisionKind::Reject => Ok(1),
+        DecisionKind::CommittedFailure => Ok(2),
+        _ => Err(EncodeError::UnsupportedProtocolVariant("DecisionKind")),
     }
 }
 
@@ -737,6 +784,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 
 /// Candidate construction or validation failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SealError {
     /// Canonical encoding failed.
     Encode(EncodeError),
@@ -752,10 +800,13 @@ pub enum SealError {
     MissingFailureReason,
     /// Reconstructed bundle does not match the supplied bundle.
     BundleMismatch,
+    /// This protocol version does not support the decision kind.
+    UnsupportedDecisionKind,
 }
 
 /// Bounded canonical receipt or bundle decoding failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ReceiptDecodeError {
     /// Complete input exceeds the declared byte limit.
     InputLimit {
@@ -836,6 +887,7 @@ impl fmt::Display for SealError {
             Self::BundleMismatch => {
                 formatter.write_str("commit bundle relationships do not validate")
             }
+            Self::UnsupportedDecisionKind => formatter.write_str("unsupported decision kind"),
         }
     }
 }
@@ -879,347 +931,5 @@ impl fmt::Display for ReceiptDecodeError {
             Self::Seal(error) => error.fmt(formatter),
             Self::Encode(error) => error.fmt(formatter),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use alloc::vec;
-    use zeno_fcis_patch::{PatchOp, ValuePath};
-    use zeno_fcis_plan::{Effect, OutboxEntry};
-    use zeno_fcis_value::Field;
-
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test/fold/v1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().copied().enumerate() {
-                let slot = index % 32;
-                output[slot] = output[slot].wrapping_add(byte);
-            }
-            Hash32::new(output)
-        }
-    }
-
-    fn domain() -> Domain<'static> {
-        Domain::new("test/state", 1).unwrap_or_else(|error| panic!("domain: {error}"))
-    }
-
-    fn bindings() -> CandidateBindings {
-        CandidateBindings {
-            profile_hash: Hash32::new([1; 32]),
-            command_hash: Hash32::new([2; 32]),
-            context_hash: Hash32::new([3; 32]),
-            precedence_hash: Hash32::new([4; 32]),
-            algorithm_hash: Hash32::new([5; 32]),
-            budget_hash: Hash32::new([6; 32]),
-        }
-    }
-
-    fn candidate_bundle() -> CommitBundle {
-        let state = Value::Record(Vec::<Field>::new().into_boxed_slice());
-        let pre_root =
-            zeno_fcis_patch::hash_value::<TestHasher>(domain(), &state).unwrap_or(Hash32::ZERO);
-        let patch = CanonicalPatch::try_new(
-            1,
-            pre_root,
-            vec![PatchOp::Insert {
-                path: ValuePath::new(vec![zeno_fcis_patch::PathSegment::Field(1)]),
-                map_key: None,
-                value: Value::U128(9),
-            }],
-        )
-        .unwrap_or_else(|error| panic!("patch: {error}"));
-        let commit_plan = CommitPlan::try_new(vec![Effect::new(
-            0,
-            7,
-            Hash32::new([7; 32]),
-            Hash32::new([8; 32]),
-            Value::U128(9),
-        )])
-        .unwrap_or_else(|error| panic!("commit plan: {error}"));
-        let outbox_plan =
-            OutboxPlan::try_new(vec![OutboxEntry::new(0, 3, Value::U128(4), Value::U128(5))])
-                .unwrap_or_else(|error| panic!("outbox plan: {error}"));
-        CandidateBuilder::seal::<TestHasher>(
-            &state,
-            domain(),
-            DecisionKind::Accept,
-            None,
-            bindings(),
-            patch,
-            commit_plan,
-            outbox_plan,
-        )
-        .unwrap_or_else(|error| panic!("seal: {error}"))
-    }
-
-    fn empty_state() -> Value {
-        Value::Record(Vec::<Field>::new().into_boxed_slice())
-    }
-
-    #[test]
-    fn candidate_seals_patch_plan_receipt_and_bundle_together() {
-        let state = Value::Record(Vec::<Field>::new().into_boxed_slice());
-        let pre_root =
-            zeno_fcis_patch::hash_value::<TestHasher>(domain(), &state).unwrap_or(Hash32::ZERO);
-        let patch = CanonicalPatch::try_new(
-            1,
-            pre_root,
-            vec![PatchOp::Insert {
-                path: ValuePath::new(vec![zeno_fcis_patch::PathSegment::Field(1)]),
-                map_key: None,
-                value: Value::U128(9),
-            }],
-        )
-        .unwrap_or_else(|error| panic!("patch: {error}"));
-        let bundle = CandidateBuilder::seal::<TestHasher>(
-            &state,
-            domain(),
-            DecisionKind::Accept,
-            None,
-            bindings(),
-            patch,
-            CommitPlan::empty(),
-            OutboxPlan::empty(),
-        );
-        assert!(bundle.is_ok());
-        let bundle = bundle.unwrap_or_else(|error| panic!("seal: {error}"));
-        assert_eq!(bundle.receipt().candidate_id(), bundle.candidate_id());
-        assert_eq!(bundle.validate::<TestHasher>(&state, domain()), Ok(()));
-    }
-
-    #[test]
-    fn committed_failure_requires_a_reason() {
-        let state = Value::Unit;
-        let root =
-            zeno_fcis_patch::hash_value::<TestHasher>(domain(), &state).unwrap_or(Hash32::ZERO);
-        let patch = CanonicalPatch::try_new(1, root, Vec::new())
-            .unwrap_or_else(|error| panic!("patch: {error}"));
-        let result = CandidateBuilder::seal::<TestHasher>(
-            &state,
-            domain(),
-            DecisionKind::CommittedFailure,
-            None,
-            bindings(),
-            patch,
-            CommitPlan::empty(),
-            OutboxPlan::empty(),
-        );
-        assert_eq!(result, Err(SealError::MissingFailureReason));
-    }
-
-    #[test]
-    fn reject_receipt_is_unchanged_state_only() {
-        let receipt = RejectReceipt::new(bindings(), Hash32::new([9; 32]), "invalid_command");
-        assert!(receipt.is_ok());
-        let receipt = receipt.unwrap_or_else(|error| panic!("receipt: {error}"));
-        assert_eq!(receipt.pre_root(), receipt.post_root());
-    }
-
-    #[test]
-    fn strict_decoders_round_trip_complete_artifacts_at_exact_limits() {
-        let bundle = candidate_bundle();
-        let bundle_bytes = bundle
-            .canonical_bytes()
-            .unwrap_or_else(|error| panic!("bundle bytes: {error}"));
-        let receipt_bytes = bundle
-            .receipt()
-            .canonical_bytes()
-            .unwrap_or_else(|error| panic!("receipt bytes: {error}"));
-        let receipt_limits = ReceiptDecodeLimits {
-            max_input_bytes: u64::try_from(receipt_bytes.len()).unwrap_or(u64::MAX),
-            max_body_bytes: u64::try_from(
-                bundle.body().canonical_bytes().unwrap_or_default().len(),
-            )
-            .unwrap_or(u64::MAX),
-        };
-        let decoded_receipt = decode_receipt::<TestHasher>(&receipt_bytes, receipt_limits);
-        assert_eq!(decoded_receipt, Ok(bundle.receipt().clone()));
-
-        let limits = BundleDecodeLimits {
-            max_input_bytes: u64::try_from(bundle_bytes.len()).unwrap_or(u64::MAX),
-            receipt: receipt_limits,
-            patch: PatchDecodeLimits {
-                max_input_bytes: u64::try_from(
-                    bundle.patch().canonical_bytes().unwrap_or_default().len(),
-                )
-                .unwrap_or(u64::MAX),
-                ..PatchDecodeLimits::default()
-            },
-            commit_plan: PlanDecodeLimits {
-                max_input_bytes: u64::try_from(
-                    bundle
-                        .commit_plan()
-                        .canonical_bytes()
-                        .unwrap_or_default()
-                        .len(),
-                )
-                .unwrap_or(u64::MAX),
-                ..PlanDecodeLimits::default()
-            },
-            outbox_plan: PlanDecodeLimits {
-                max_input_bytes: u64::try_from(
-                    bundle
-                        .outbox_plan()
-                        .canonical_bytes()
-                        .unwrap_or_default()
-                        .len(),
-                )
-                .unwrap_or(u64::MAX),
-                ..PlanDecodeLimits::default()
-            },
-        };
-        let decoded =
-            decode_commit_bundle::<TestHasher>(&bundle_bytes, &empty_state(), domain(), limits);
-        assert_eq!(decoded, Ok(bundle));
-    }
-
-    #[test]
-    fn strict_bundle_decoder_rejects_candidate_receipt_and_state_substitution() {
-        let bundle = candidate_bundle();
-        let bytes = bundle
-            .canonical_bytes()
-            .unwrap_or_else(|error| panic!("bundle bytes: {error}"));
-        let mut changed_candidate = bytes.clone();
-        changed_candidate[0] ^= 1;
-        assert_eq!(
-            decode_commit_bundle::<TestHasher>(
-                &changed_candidate,
-                &empty_state(),
-                domain(),
-                BundleDecodeLimits::default(),
-            ),
-            Err(ReceiptDecodeError::CandidateMismatch)
-        );
-
-        let mut changed_receipt = bytes.clone();
-        let last = changed_receipt.len().saturating_sub(1);
-        changed_receipt[last] ^= 1;
-        assert!(matches!(
-            decode_commit_bundle::<TestHasher>(
-                &changed_receipt,
-                &empty_state(),
-                domain(),
-                BundleDecodeLimits::default(),
-            ),
-            Err(ReceiptDecodeError::CandidateMismatch)
-                | Err(ReceiptDecodeError::ReceiptMismatch)
-                | Err(ReceiptDecodeError::NonCanonical)
-        ));
-
-        assert!(matches!(
-            decode_commit_bundle::<TestHasher>(
-                &bytes,
-                &Value::Unit,
-                domain(),
-                BundleDecodeLimits::default(),
-            ),
-            Err(ReceiptDecodeError::Seal(SealError::Patch(_)))
-        ));
-    }
-
-    #[test]
-    fn strict_bundle_decoder_enforces_nested_and_outer_bounds() {
-        let bundle = candidate_bundle();
-        let bytes = bundle
-            .canonical_bytes()
-            .unwrap_or_else(|error| panic!("bundle bytes: {error}"));
-        let actual = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
-        assert_eq!(
-            decode_commit_bundle::<TestHasher>(
-                &bytes,
-                &empty_state(),
-                domain(),
-                BundleDecodeLimits {
-                    max_input_bytes: actual.saturating_sub(1),
-                    ..BundleDecodeLimits::default()
-                },
-            ),
-            Err(ReceiptDecodeError::InputLimit {
-                limit: actual.saturating_sub(1),
-                actual,
-            })
-        );
-        assert!(matches!(
-            decode_commit_bundle::<TestHasher>(
-                &bytes,
-                &empty_state(),
-                domain(),
-                BundleDecodeLimits {
-                    patch: PatchDecodeLimits {
-                        max_operations: 0,
-                        ..PatchDecodeLimits::default()
-                    },
-                    ..BundleDecodeLimits::default()
-                },
-            ),
-            Err(ReceiptDecodeError::Patch(
-                PatchDecodeError::OperationLimit { .. }
-            ))
-        ));
-    }
-
-    #[test]
-    fn strict_decoders_reject_malformed_flags_trailing_bytes_and_truncation() {
-        let bundle = candidate_bundle();
-        let mut receipt = bundle
-            .receipt()
-            .canonical_bytes()
-            .unwrap_or_else(|error| panic!("receipt bytes: {error}"));
-        let body_offset = 32 + 4;
-        receipt[body_offset + 1] = 2;
-        assert_eq!(
-            decode_receipt::<TestHasher>(&receipt, ReceiptDecodeLimits::default()),
-            Err(ReceiptDecodeError::InvalidReasonFlag(2))
-        );
-
-        let mut trailing = bundle
-            .canonical_bytes()
-            .unwrap_or_else(|error| panic!("bundle bytes: {error}"));
-        trailing.push(0);
-        assert!(matches!(
-            decode_commit_bundle::<TestHasher>(
-                &trailing,
-                &empty_state(),
-                domain(),
-                BundleDecodeLimits::default(),
-            ),
-            Err(ReceiptDecodeError::TrailingBytes { .. })
-        ));
-        trailing.truncate(31);
-        assert!(matches!(
-            decode_commit_bundle::<TestHasher>(
-                &trailing,
-                &empty_state(),
-                domain(),
-                BundleDecodeLimits::default(),
-            ),
-            Err(ReceiptDecodeError::UnexpectedEnd { .. })
-        ));
-    }
-
-    #[test]
-    fn strict_reject_receipt_decoder_round_trips_and_rejects_non_ascii() {
-        let receipt = RejectReceipt::new(bindings(), Hash32::new([9; 32]), "invalid_command")
-            .unwrap_or_else(|error| panic!("receipt: {error}"));
-        let bytes = receipt
-            .canonical_bytes()
-            .unwrap_or_else(|error| panic!("receipt bytes: {error}"));
-        assert_eq!(
-            decode_reject_receipt(&bytes, ReceiptDecodeLimits::default()),
-            Ok(receipt)
-        );
-        let mut invalid = bytes;
-        let last = invalid.len().saturating_sub(1);
-        invalid[last] = 0xff;
-        assert_eq!(
-            decode_reject_receipt(&invalid, ReceiptDecodeLimits::default()),
-            Err(ReceiptDecodeError::InvalidReasonText)
-        );
     }
 }

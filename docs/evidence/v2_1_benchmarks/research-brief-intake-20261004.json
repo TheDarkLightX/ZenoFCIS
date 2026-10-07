@@ -1,0 +1,22 @@
+{
+  "kind": "host_recheck_of_the_briefs_Boolean_grammar_only",
+  "inputs": 4,
+  "valuations": 16,
+  "free_slots": "four inputs and both Boolean constants",
+  "gate_grammar": [
+    "Not",
+    "And",
+    "Eq",
+    "Select"
+  ],
+  "one_gate_programs": 294,
+  "ordered_two_gate_programs": 131712,
+  "two_gate_Any_witnesses": 0,
+  "three_Select_witness_matches": true,
+  "full_IR_minimum_argument": "four essential Input nodes plus three distinct nonconstant output computations; not a formal refinement proof",
+  "reported_research_performance_replayed": false,
+  "Lean_or_Rust_replayed": false,
+  "production_changes": false,
+  "source_pdf_sha256": "64864411111372088bc5c5b690ff003fb17086182516d390b8ced64f0514f309",
+  "assessment_sha256": "11f6ea5de99c8107d4f019ce8f27101161d3c62aa86fe1a3e5b3cfdea25725d5"
+}

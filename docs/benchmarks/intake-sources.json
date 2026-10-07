@@ -1,0 +1,86 @@
+{
+  "worktree": "/tmp/zenofcis-v2-simplify",
+  "old_head_from_brief": "1ed6f88f7b1098bed6c409bc9aa3c12c99d43c3c",
+  "qualified_source_manifest": false,
+  "note": "Hashes captured after read-only intake, not a qualified source closure. Active worktree was dirty.",
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "lines": 54,
+      "sha256_at_recording": "29895ad792342d76065cb2c757152b77cc6af26eaffb81470b8f31b6a058092c",
+      "read_scope": "complete"
+    },
+    {
+      "path": "skills/handoff-completion-gate/SKILL.md",
+      "lines": 22,
+      "sha256_at_recording": "3af608f109f26194ad7a06a076043980bc05356391e232de2f92277a760aab5a",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/neurosymbolic-loop/specs/00-contract.md",
+      "lines": 74,
+      "sha256_at_recording": "987f574980edd5b93dea642b23f7732f79a256f7e0cb542c00ecec3e6024b9ad",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/neurosymbolic-loop/specs/01-loop.md",
+      "lines": 70,
+      "sha256_at_recording": "0c4464ca773b3d5ae49bf4992c3116ceaed134b2b32acf6583a15e0acf54ee2f",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/neurosymbolic-loop/specs/02-checker-feedback.md",
+      "lines": 78,
+      "sha256_at_recording": "907ebad33626749a16bf6b1bc71f76cc3feefce0081f108bb4be8ac6b1cda765",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/neurosymbolic-loop/specs/03-resources-resume.md",
+      "lines": 82,
+      "sha256_at_recording": "39602d506cbd4f29c941b389ef34200f4f05707770aaab6b5c7c4adceb0f6592",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/neurosymbolic-loop/specs/05-qualification-evaluation.md",
+      "lines": 74,
+      "sha256_at_recording": "6bb94baf5ffd634d133c1e2ed1ace61ca2be9643a18ea2ce2f2447e9d4d7b3df",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/neurosymbolic-loop/DESIGN.md",
+      "lines": 265,
+      "sha256_at_recording": "4ad38a57f14e6fabf3eac98a6739254ab4e8531bee16a3a27af8ded395832afb",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/V2_1_TRANSFORM_DESIGN.md",
+      "lines": 334,
+      "sha256_at_recording": "06aedb3d9e00586b30ef3070b43fc2c954a4ffcde1c1ea2d9d7de1514460e488",
+      "read_scope": "complete"
+    },
+    {
+      "path": "crates/zeno-fcis-synthesis/src/finite/evaluation/mod.rs",
+      "lines": 331,
+      "sha256_at_recording": "b95735bc6b758c7a89371cc083f4eafb4a38ffe1ef8feedcea4f8d98a241ef99",
+      "read_scope": "complete"
+    },
+    {
+      "path": "crates/zeno-fcis-synthesis/src/finite/evaluation/admission/mod.rs",
+      "lines": 224,
+      "sha256_at_recording": "e86b3120671812f5139eff797be335511fa00155fd7281003ea7c656f7397c00",
+      "read_scope": "complete"
+    },
+    {
+      "path": "crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs",
+      "lines": 291,
+      "sha256_at_recording": "f68a9daf54f645b3b4d94b0705e96c02d52a74d93b385bd85d434a0990389dc4",
+      "read_scope": "complete"
+    },
+    {
+      "path": "docs/V2_1_FACTORY_PLAN.md",
+      "lines": 504,
+      "sha256_at_recording": "1a8f17da4e037bd6f6383d9cec3d8ac66ca7b66ed61d25a4aa91e37dfb3e81c0",
+      "read_scope": "1-105,133-150,293-401"
+    }
+  ]
+}

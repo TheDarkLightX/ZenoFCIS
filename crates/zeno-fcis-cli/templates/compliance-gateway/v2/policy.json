@@ -1,0 +1,327 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "compliance-gateway",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "105": [
+      "Text",
+      1,
+      32
+    ],
+    "107": [
+      "I128",
+      0,
+      3
+    ],
+    "108": [
+      "I128",
+      0,
+      3
+    ],
+    "109": [
+      "I128",
+      0,
+      4
+    ],
+    "110": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "strikes": "pre.100.120",
+    "action": "command.101.130",
+    "region": "command.101.131",
+    "amount_band": "command.101.132",
+    "risk": "command.101.133",
+    "identity_tier": "context.102.140",
+    "reviewer": "context.102.141",
+    "struck": "choose(strikes < 3, strikes + 1, 3)"
+  },
+  "cases": [
+    {
+      "when": "action == 151 && !reviewer",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 151 && strikes == 0",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": 0
+      },
+      "outbox": []
+    },
+    {
+      "rule": "sanctioned_region",
+      "when": "region == 162",
+      "class": "CommittedFailure",
+      "reason": 210,
+      "post": {
+        "120": "struck"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "compliance-team",
+          "payload": {
+            "147": 170,
+            "148": "struck"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "frozen_account",
+      "when": "strikes == 3",
+      "class": "CommittedFailure",
+      "reason": 211,
+      "post": {
+        "120": "struck"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "compliance-team",
+          "payload": {
+            "147": 171,
+            "148": "struck"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "unverified_high_risk",
+      "when": "identity_tier == 0 && risk == 167",
+      "class": "CommittedFailure",
+      "reason": 212,
+      "post": {
+        "120": "struck"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "compliance-team",
+          "payload": {
+            "147": 172,
+            "148": "struck"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "restricted_large",
+      "when": "region == 161 && amount_band >= 3",
+      "class": "CommittedFailure",
+      "reason": 213,
+      "post": {
+        "120": "struck"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "compliance-team",
+          "payload": {
+            "147": 173,
+            "148": "struck"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "unverified_large",
+      "when": "region == 160 && identity_tier == 0 && amount_band >= 3",
+      "class": "CommittedFailure",
+      "reason": 214,
+      "post": {
+        "120": "struck"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "compliance-team",
+          "payload": {
+            "147": 174,
+            "148": "struck"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "high_risk_counterparty",
+      "when": "risk == 167",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "strikes"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "review-queue",
+          "payload": {
+            "145": 175,
+            "146": "amount_band"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "restricted_region",
+      "when": "region == 161",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "strikes"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "review-queue",
+          "payload": {
+            "145": 176,
+            "146": "amount_band"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "unverified_transfer",
+      "when": "identity_tier == 0 && amount_band >= 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "strikes"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "review-queue",
+          "payload": {
+            "145": 177,
+            "146": "amount_band"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "partially_verified_large",
+      "when": "identity_tier == 1 && amount_band >= 3",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "strikes"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "review-queue",
+          "payload": {
+            "145": 178,
+            "146": "amount_band"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "repeat_offender",
+      "when": "strikes >= 2 && amount_band >= 2",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "strikes"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "review-queue",
+          "payload": {
+            "145": 179,
+            "146": "amount_band"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "medium_risk_large",
+      "when": "risk == 166 && amount_band == 4",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "strikes"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "review-queue",
+          "payload": {
+            "145": 180,
+            "146": "amount_band"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "default_allow",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "120": "strikes"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "120": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AuthoritySubjectRecipient",
+    "503": "CommittedFailureEffects"
+  },
+  "framework_reject_law": 509,
+  "original_domain": "Standing strikes 0..3; identity tier 0..3; amount band 0..4; both original actions and reviewer flags; all three original region and counterparty-risk variants; reinstatement precedes all screening rules."
+}

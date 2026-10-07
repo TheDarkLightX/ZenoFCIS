@@ -299,6 +299,7 @@ impl MergeConflict {
 /// Why execution remains blocked without an authoritative transition.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum MiniBlocker {
     DuplicateWorker,
     DuplicatePrivateWrite,
@@ -318,6 +319,7 @@ pub enum MiniBlocker {
 /// Complete pure Mini Determinator decision.
 #[allow(missing_docs)]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum MiniDecision {
     /// Canonical disjoint merge and worker returns.
     Accepted {

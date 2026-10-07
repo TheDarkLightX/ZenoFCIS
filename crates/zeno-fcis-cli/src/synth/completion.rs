@@ -401,6 +401,11 @@ fn semantic(error: CompletionError) -> Failure {
         ),
         CompletionError::Invalid(reason) => invalid(reason.into()),
         CompletionError::Resource(error) => invalid(error.to_string()),
+        _ => fail(
+            crate::BLOCKED,
+            "unsupported-completion-error",
+            json!({"message": error.to_string()}),
+        ),
     }
 }
 

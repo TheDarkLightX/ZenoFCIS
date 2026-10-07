@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
 use zeno_fcis_synthesis::finite::{Domain, Op, Program};
-use zeno_fcis_synthesis::system::{Property, SystemCheck, SystemLimits, check_system_property};
+use zeno_fcis_synthesis::system::{SystemCheck, SystemLimits, check_system_property};
 
 const COUNTER: &[u8] = include_bytes!("../../templates/durable-counter/synthesis.json");
 fn selected() -> (problem::Problem, Vec<Case>) {
@@ -222,7 +222,7 @@ const COUNTER_PROGRAM: &[u8] =
     include_bytes!("../../templates/durable-counter/synthesized/program.zcve");
 
 /// A property over the counter's four inputs followed by its six outputs.
-fn counter_property(problem: &problem::Problem, nodes: Vec<Op>) -> Property {
+fn counter_property(problem: &problem::Problem, nodes: Vec<Op>) -> Contract {
     let inputs = problem.contract.inputs().to_vec();
     let outputs = problem.contract.outputs().to_vec();
     let root = u16::try_from(nodes.len() - 1).unwrap();
@@ -233,7 +233,7 @@ fn counter_property(problem: &problem::Problem, nodes: Vec<Op>) -> Property {
         vec![root],
     )
     .unwrap();
-    Property::try_new(inputs, outputs, relation).unwrap()
+    Contract::try_new(inputs, outputs, relation).unwrap()
 }
 
 #[test]
@@ -248,10 +248,17 @@ fn counter_system_properties_are_checked_against_the_exact_program() {
         panic!("counter must be expressible")
     };
     // The obligations bind to the exact shipped program bytes.
-    assert_eq!(program.value().canonical_bytes().unwrap(), COUNTER_PROGRAM);
+    assert_eq!(
+        program
+            .value()
+            .unwrap_or_else(|error| panic!("program value: {error}"))
+            .canonical_bytes()
+            .unwrap(),
+        COUNTER_PROGRAM
+    );
     let limits = SystemLimits::default();
     let check = |property: &Contract| check_system_property(&program, property, limits).unwrap();
-    let checked = |property: &Property| check(property.contract());
+    let checked = |property: &Contract| check(property);
 
     // Refinement: the program satisfies the reviewed relation, and the relation
     // is not implied by the output domains alone.
@@ -347,7 +354,7 @@ fn counter_system_properties_are_checked_against_the_exact_program() {
     .unwrap();
     let first = vec![0, 3, 1, 1];
     assert_eq!(
-        check_system_property(&buggy, failures_monotone.contract(), limits).unwrap(),
+        check_system_property(&buggy, &failures_monotone, limits).unwrap(),
         SystemCheck::NotTotal {
             input: first.clone()
         }
@@ -370,7 +377,14 @@ fn pinned_counter_system_smt_agrees_with_exhaustive_check() {
     else {
         panic!("counter must be expressible")
     };
-    assert_eq!(program.value().canonical_bytes().unwrap(), COUNTER_PROGRAM);
+    assert_eq!(
+        program
+            .value()
+            .unwrap_or_else(|error| panic!("program value: {error}"))
+            .canonical_bytes()
+            .unwrap(),
+        COUNTER_PROGRAM
+    );
     let solve = |kind, script: &[u8]| {
         let mut child = std::process::Command::new(&cvc5)
             .args(["--lang", "smt2"])
@@ -403,7 +417,7 @@ fn pinned_counter_system_smt_agrees_with_exhaustive_check() {
     for nodes in properties {
         let property = counter_property(&problem, nodes);
         let exhaustive =
-            check_system_property(&program, property.contract(), SystemLimits::default()).unwrap();
+            check_system_property(&program, &property, SystemLimits::default()).unwrap();
         let verdict = system_verdict(&program, &property, solve).unwrap();
         assert_eq!(verdict.code(), exhaustive.code());
     }

@@ -6,6 +6,170 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Repair the V2 CI failures found on pull request 119. Every job that runs a
+  repository tool with `cargo --offline` first fetches the root, verification
+  and resolved-purity lockfiles through one shared action. The verus workflow
+  no longer reads the step-only `runner` context in job-level `env`, which made
+  GitHub reject the file, and the static workflow check now rejects any
+  context GitHub does not allow at its key. Miri interprets the synthesis
+  example through `miri run`, and its coverage check requires a row for every
+  example. The inventory-reservation bindings are regenerated through their
+  derivative test after the simplification changed the evaluator sources. The
+  candidate fuzz target admits its bundle through `decode_commit_bundle`. The
+  QEMU demo lock records the codec's `sha2` dependency at the root-lock
+  versions, the kernel handles the non-exhaustive `MiniDecision`, and the
+  soft-float guest selects sha2's portable backend.
+- Narrow the packaged release check, deliberately. Published crates still
+  build from their archives alone: every library, binary, example and build
+  script at `sources/<crate>-<version>/`. Packaged tests are no longer
+  standalone. They compile from the published archives laid out as in the
+  repository, plus nine verification files copied from the commit. Every file a
+  test target reads outside its own package must equal
+  `release/packaged-test-inputs.json` (target, path, SHA-256). Any such read by
+  a non-test target fails. The whole-repository source archive runs every test.
+  Two frozen, pinned references force this: the `#[cfg(test)]` `#[path]`
+  include in `crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs` and
+  the `verification/verus/` includes in
+  `crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs`. Open item:
+  restore standalone packaged tests when the verified sources next change, at
+  the identity regeneration planned for 2.1.0.
+- Skip one test under Miri, deliberately:
+  `legal_leaf_above_default_payload_remains_constructible_and_encodable`
+  scans 64 MiB values byte by byte and does not finish under Miri. It is skipped
+  only in the values group through `.github/miri-exclusions.json`, which must
+  equal the workflow's skips, name exactly one test, and name the native job
+  that still runs it (`ci`, `rust`). The calls it makes still run under Miri at
+  small sizes.
+- Fix the SQLite v2 shell's exact-schema check, which skipped objects whose
+  names matched `LIKE 'sqlite_%'`. In `LIKE`, `_` matches any character and
+  ASCII case is ignored, so a user trigger named, for example, `sqlitex`
+  passed the check. Such a trigger could mark every new delivery
+  acknowledged while audits still passed. `open`, `audit`, live operations
+  and initialization now compare every `sqlite_master` object with no name
+  filter. A regression test plants triggers named `sqlitex`, `SQLiteX` and
+  `sqlite1`. An independent review of V2.1 found the defect.
+- Share the V2 genesis and transition outcome/publication types while retaining
+  the invoked kind through evaluation, publication and replay contracts.
+  The SQLite adapter refuses genuine publications used for the wrong invocation
+  with `Error::InvocationKind`, before a refresh or checkpoint write; foreign
+  identity precedence and correct-kind bundle ordering are retained. Separate
+  `Genesis*` wrappers are retired. Final combined qualification remains pending.
+- Bound V2 core completion to one mandatory library-owned Authority → Publication
+  → SQLite v2 route for the existing eight templates, preserving their legal
+  inputs, successful behavior, laws and refusal-accounting protections. Application
+  decision/law callbacks and caller-built publication capabilities cannot
+  substitute for that route. Final combined qualification remains pending.
+- Approve the staged core simplification: a generated evaluator digest checked
+  against the approved sources by required gates;
+  removal of History and pair export/import with identity/replay protection
+  retained on the surviving shell; one scalar/record decoder and driver;
+  generic account declarations; one value model; one tagged artifact shape.
+  These are staged changes to implement and qualify, not a completed release.
+- Record intentional API/identity changes, malformed-account refusal classes,
+  regenerated Step limits and the account-lockout assurance delta separately.
+  Generic graph execution and boundary replay do not establish
+  the former all-timestamps rule-correspondence theorem. Preserve certificate-bound
+  delivery identity, including repeated state and equal-payload transactions.
+- Move the 12-type compound executor and full-width U128 zUSD to V2.1 as a new
+  supported profile. Keep wide successful cases and their full domains; baseline
+  local recovery is refs/simplify/baseline at tree
+  94bac799b44859b158e50377313b7e0ef6c1bc51 (not yet published remotely).
+  Historical parser/schema/private-oracle
+  evidence is not end-to-end authoritative execution qualification.
+- Use explicit ADR0004 triage: close only entries required by the route and
+  withdraw the remainder with reasons. Implemented protections remain intact.
+  Move QEMU, portable sources/mirrors, archive/privacy scans, private-oracle
+  qualification and package/version polish to release engineering. Applicable
+  release gates still apply before shipping. Verus/Z3 results retain their
+  stated trusted base and do not become Lean KernelChecked evidence.
+- Implement the staged simplification S1-S5 on one source tree: a generated
+  evaluator digest; History and the pair export/import API removed, with
+  prepared-counter on `V2SqliteShell`; one scalar/record decoder and driver;
+  account rules declared on the generic path; one value model; one tagged
+  outcome shape that retains the invoked kind; admission performed once and
+  carried by the `BoundCore` type invariant; shared helpers in `util.rs`.
+  - The whole-core Verus harness (`verification/verus/authority_v2.rs`, pinned
+    flags) reports 835 verified, 0 errors. Its 468 Exec functions each have
+    zero `requires` and at least one `ensures`; there is no `admit`, `assume`
+    or `external_body`. The baseline reported 1338 verified and 625 Exec
+    functions; the figures are not additive across units, and the decrease
+    comes from removed code, not from dropped checks. Native tests: 134
+    passed. Strict Clippy, no-std and no-default-features builds pass.
+  - These are implementation checkpoints. Full mutation-control runs of the
+    16 proof gates on the final source, the pre-commit ATDD run, independent
+    review and exact-head CI remain open; see the plan's
+    "Intake and current qualification".
+- Record the mutation controls retired or replaced by the simplification in
+  `verification/verus/simplification-retired-controls.json`: seven retired
+  (each names the removed fault class, for example the four `law_delivery_*`
+  copies that no longer exist without `law_bridge`) and three replaced or
+  added (`reject_replay_comparison`, `wrong_unsigned_value`, and the Root
+  selector/effect-lane controls moved from the composition gate to the laws
+  gate). Anchor matching in `tools/check_finite_execution.py` and
+  `tools/check_catalog_v2.py` compares tokens, so whitespace may differ, and
+  still requires exactly one match; anchors were re-pointed to the simplified
+  sources. Retired controls remain restorable from `refs/simplify/baseline`.
+- Format the workspace with `cargo fmt --all`. Formatting pushed `seal`
+  (`execution_v2/authority/outcome.rs`) and `prepare`
+  (`execution_v2/authority/publication.rs`) over the solver's resource limit;
+  they gained two and four proof assertions respectively. No `rlimit` was
+  raised: the core's only two resource-limit attributes
+  (`decision.rs` 30, `authority/spec.rs` 20) are unchanged from the baseline.
+- The purity checker's compiler-tool context (which decides whether a
+  `#[rustfmt::...]` attribute resolves to the compiler tool) no longer refuses
+  because an enclosing manifest has a `[[bin]]` table: a binary target adds no
+  dependency or rename. Every other unread manifest form, including
+  `[dependencies]`, `[lib]`, `[patch]` and `[replace]`, still refuses.
+  Test: `compiler_tool_context_accepts_a_binary_target_but_not_a_rustfmt_dependency`.
+- Run the umbrella crate's API custody fixtures. The files in
+  `crates/zeno-fcis/tests/ui` were never compiled by any test, tool or
+  workflow. `tools/check_api_refusals.py` now builds `zeno-fcis` with all
+  features and compiles each fixture: the two positive routes must compile, and
+  each of the 30 refusals must fail with its expected first error code (retired
+  names, private fields, missing `Clone`, non-exhaustive `Resource`, rejected
+  callback, raw value, raw pre-state and supplied identity). Two fixtures were
+  added for paths through `zeno_fcis::legacy`: the re-exported receipt crate
+  still hides the candidate sealer (E0603), and the legacy core has no budget.
+  The check runs in the `production-authority` acceptance scenario.
+- Delete `crates/zeno-fcis-shell-sqlite/src/tests/{destination,transaction}_tests.rs`.
+  The crate no longer included them, and they are byte-identical to the copies
+  the private kernel-law oracle compiles and runs, so no assertion is lost.
+- Retire the native zUSD mount from packaging. The `mount-zenodex-zusd`
+  binary target is removed from `release/package-set.toml` and its source
+  from `zeno-fcis-adapter-zenodex`; `.github/workflows/mounted-zenodex.yml`
+  is deleted. The adapter crate states that native zUSD authoring is retired
+  and that a checked full-width zUSD profile is planned for V2.1. The
+  original pinned assertions remain executable in the private kernel-law
+  oracle.
+- `test-data/v1-compatibility/baseline.json` is now a V2 migration pin. It pins
+  the V1 consumer after its documented V2 migration and the V2 foundational
+  protocol sources with their embedded wire tests. The migration changes:
+  - the prelude import, which moves to `legacy`;
+  - `Value::Bool` becomes `Value::boolean`;
+  - caller-side budgets become `zero_limits()` (the library owns the meter);
+  - `TransitionDecision` becomes `PublicationOutcome`.
+
+  The table in `docs/V2_PROGRAM_API_MIGRATION.md` lists them. V2 intentionally
+  changes the V1.0 foundational sources (ADR 0004); the V1.0 pins remain in git
+  history at `02694c2`. The acceptance scenario compiles and runs the migrated
+  consumer against the locked graph. This is not universal downstream source
+  compatibility.
+- Re-synchronize the kernel-laws oracle's template copies (`normal.rs`,
+  `v2_contract.rs` for six templates) with the simplified templates by
+  three-way merge, keeping the oracle's intentional 9xx law ids (for example
+  909 where the template binds 509). The oracle policy files are regenerated
+  by the ignored test `policy_artifacts::emit_oracle_policy_artifacts` in
+  `verification/kernel-laws/src/oracle/templates/mod.rs`.
+- Regenerate the six finite template synthesis manifests against the
+  simplified synthesizer. Relative to the tree before regeneration only the
+  `certificate` field changed; programs, vectors and emitted source are
+  byte-identical, and the Rust, Python and JavaScript replays passed.
+- ATDD: test filters that named retired native tests now run the retained
+  assertions in the kernel-laws oracle through a `historical_oracle` helper in
+  `tools/atdd.py`; two broken documentation links are fixed; the
+  `execution_v2/continuation/tests.rs` imports no longer depend on one
+  harness's module path.
+
 - Invocation admission now validates the pre-state against the authority's
   own schema and validation limits before issuing a witness that permits
   program execution. Command/context and later artifact checks remain.

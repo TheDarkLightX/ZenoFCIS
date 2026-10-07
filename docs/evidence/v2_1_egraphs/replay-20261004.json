@@ -1,0 +1,261 @@
+{
+  "analyzer_sha256": "7b75784a0c122d266707908aabdb69b55150da2c51972d7df3f7d2ac24d7ac2f",
+  "corpus_sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18",
+  "failed_runs": [
+    {
+      "file": "main-rust.json",
+      "reason": "Rust verification/tool gate failed",
+      "rejected": true
+    },
+    {
+      "file": "main-30s-rust.json",
+      "reason": "Rust verification/tool gate failed",
+      "rejected": true
+    }
+  ],
+  "fresh_lean_replay": false,
+  "fresh_optimizer_run": false,
+  "fresh_rust_tests": false,
+  "inputs_sha256": {
+    "bounded-repeat-rust.json": "187b549de89813acbe9d887c086b68c13e159957ea6b1e7c200b64ec6ca12bab",
+    "bounded-rust.json": "7d83d18380c1768b582689d7ddb34664482d1e7223ea1bbbac99187a3a49aff2",
+    "main-30s-rust.json": "6bffe4cc5fff7cb53b6eaf6205e8c5752421664994ca3713af61b080a9c60737",
+    "main-rust.json": "00c25cfbb6c398a1709ef7a1aed1f00909dff20b236a398e6fbe21da7e703dd1"
+  },
+  "kind": "StoredOutputAnalyzerReplay",
+  "manifest_hashes_matched": true,
+  "manifest_listed_files": 54,
+  "production_source_comparison": {
+    "baseline": "cb1366cddc5c813f9977b377f541e64bcf94035c",
+    "changed_files": 55,
+    "experiment_only_commits": 2,
+    "outside_experiment": []
+  },
+  "python_version": "3.12.3",
+  "repeat_artifact_expression_and_observation_fields_identical": [
+    "outputs",
+    "program",
+    "evaluation",
+    "fcis_nodes",
+    "status",
+    "error"
+  ],
+  "reports": {
+    "first": {
+      "aggregate_nodes": {
+        "local_baseline": 895,
+        "raw": 1506,
+        "rewrite_egg": 854,
+        "semantic_egg": 816
+      },
+      "candidate_input_comparisons": 12544,
+      "cases": 100,
+      "comparisons": {
+        "local_vs_raw": {
+          "candidate_nodes": 895,
+          "reference_nodes": 1506,
+          "regressions": 0,
+          "strict_wins": 93,
+          "ties": 7
+        },
+        "rewrite_vs_local": {
+          "candidate_nodes": 854,
+          "reference_nodes": 895,
+          "regressions": 7,
+          "strict_wins": 13,
+          "ties": 80
+        },
+        "semantic_vs_local": {
+          "candidate_nodes": 816,
+          "reference_nodes": 895,
+          "regressions": 4,
+          "strict_wins": 18,
+          "ties": 78
+        },
+        "semantic_vs_rewrite": {
+          "candidate_nodes": 816,
+          "reference_nodes": 854,
+          "regressions": 0,
+          "strict_wins": 12,
+          "ties": 88
+        }
+      },
+      "fixed_cost_criterion_met": true,
+      "invalid_input_probes": 8176,
+      "non_timing_analysis_matches_exactly": true,
+      "preregistered_success": false,
+      "protected_selection": {
+        "aggregate_nodes": 812,
+        "chosen_variants": {
+          "local_baseline": 82,
+          "semantic_egg": 18
+        },
+        "complete": true,
+        "receipt_cases_checked": 100
+      },
+      "published_analysis_equal": false,
+      "timing_sum_rounding_differences": [
+        {
+          "fresh": 59.834045,
+          "path": "/separate_python_baseline_timings/sum_case_medians_ms",
+          "published": 59.83404499999999
+        },
+        {
+          "fresh": 13.115082,
+          "path": "/timings/local_baseline/total/sum_ms",
+          "published": 13.115081999999997
+        },
+        {
+          "fresh": 14.053666,
+          "path": "/timings/raw/total/sum_ms",
+          "published": 14.053665999999998
+        },
+        {
+          "fresh": 15.238043,
+          "path": "/timings/rewrite_egg/evaluation/sum_ms",
+          "published": 15.238043000000006
+        },
+        {
+          "fresh": 214.377707,
+          "path": "/timings/rewrite_egg/saturation/sum_ms",
+          "published": 214.37770699999984
+        },
+        {
+          "fresh": 10546.208455,
+          "path": "/timings/rewrite_egg/total/sum_ms",
+          "published": 10546.208454999996
+        },
+        {
+          "fresh": 14.938581,
+          "path": "/timings/semantic_egg/evaluation/sum_ms",
+          "published": 14.938581000000001
+        },
+        {
+          "fresh": 744.1527570000001,
+          "path": "/timings/semantic_egg/extraction/sum_ms",
+          "published": 744.152757
+        },
+        {
+          "fresh": 16.984543,
+          "path": "/timings/semantic_egg/saturation/sum_ms",
+          "published": 16.984543000000002
+        },
+        {
+          "fresh": 776.3719580000001,
+          "path": "/timings/semantic_egg/total/sum_ms",
+          "published": 776.371958
+        }
+      ],
+      "variants": 400
+    },
+    "repeat": {
+      "aggregate_nodes": {
+        "local_baseline": 895,
+        "raw": 1506,
+        "rewrite_egg": 854,
+        "semantic_egg": 816
+      },
+      "candidate_input_comparisons": 12544,
+      "cases": 100,
+      "comparisons": {
+        "local_vs_raw": {
+          "candidate_nodes": 895,
+          "reference_nodes": 1506,
+          "regressions": 0,
+          "strict_wins": 93,
+          "ties": 7
+        },
+        "rewrite_vs_local": {
+          "candidate_nodes": 854,
+          "reference_nodes": 895,
+          "regressions": 7,
+          "strict_wins": 13,
+          "ties": 80
+        },
+        "semantic_vs_local": {
+          "candidate_nodes": 816,
+          "reference_nodes": 895,
+          "regressions": 4,
+          "strict_wins": 18,
+          "ties": 78
+        },
+        "semantic_vs_rewrite": {
+          "candidate_nodes": 816,
+          "reference_nodes": 854,
+          "regressions": 0,
+          "strict_wins": 12,
+          "ties": 88
+        }
+      },
+      "fixed_cost_criterion_met": true,
+      "invalid_input_probes": 8176,
+      "non_timing_analysis_matches_exactly": true,
+      "preregistered_success": false,
+      "protected_selection": {
+        "aggregate_nodes": 812,
+        "chosen_variants": {
+          "local_baseline": 82,
+          "semantic_egg": 18
+        },
+        "complete": true,
+        "receipt_cases_checked": 100
+      },
+      "published_analysis_equal": false,
+      "timing_sum_rounding_differences": [
+        {
+          "fresh": 59.834045,
+          "path": "/separate_python_baseline_timings/sum_case_medians_ms",
+          "published": 59.83404499999999
+        },
+        {
+          "fresh": 13.080455,
+          "path": "/timings/local_baseline/evaluation/sum_ms",
+          "published": 13.080454999999999
+        },
+        {
+          "fresh": 13.088203,
+          "path": "/timings/local_baseline/total/sum_ms",
+          "published": 13.088202999999998
+        },
+        {
+          "fresh": 13.963588,
+          "path": "/timings/raw/evaluation/sum_ms",
+          "published": 13.963587999999998
+        },
+        {
+          "fresh": 14.263918,
+          "path": "/timings/rewrite_egg/evaluation/sum_ms",
+          "published": 14.263918000000002
+        },
+        {
+          "fresh": 213.912918,
+          "path": "/timings/rewrite_egg/saturation/sum_ms",
+          "published": 213.91291800000005
+        },
+        {
+          "fresh": 14.162996,
+          "path": "/timings/semantic_egg/evaluation/sum_ms",
+          "published": 14.162995999999996
+        },
+        {
+          "fresh": 746.8769609999999,
+          "path": "/timings/semantic_egg/extraction/sum_ms",
+          "published": 746.876961
+        },
+        {
+          "fresh": 16.366004,
+          "path": "/timings/semantic_egg/saturation/sum_ms",
+          "published": 16.366004000000004
+        },
+        {
+          "fresh": 777.681875,
+          "path": "/timings/semantic_egg/total/sum_ms",
+          "published": 777.6818749999999
+        }
+      ],
+      "variants": 400
+    }
+  },
+  "revision": "a69ed8db594d95279a46bff0f65185ef67d51f98",
+  "self_test_negative_mutations_rejected": 13
+}

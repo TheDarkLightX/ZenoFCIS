@@ -7,14 +7,14 @@
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use zeno_fcis_codec::CanonicalEncode;
 use zeno_fcis_collections::{BTreeMapBackend, LogicalEntry, PersistentMap};
-use zeno_fcis_value::Value;
+use zeno_fcis_value::{Value, ValueRef};
 
 fn make_entry(key_byte: u16, value_byte: u32) -> LogicalEntry {
-    let key = Value::U128(u128::from(key_byte));
+    let key = Value::unsigned(u128::from(key_byte));
     let encoded_key = key
         .canonical_bytes()
         .unwrap_or_else(|e| panic!("encode key: {e}"));
-    LogicalEntry::try_new(encoded_key, key, Value::U128(u128::from(value_byte)))
+    LogicalEntry::try_new(encoded_key, key, Value::unsigned(u128::from(value_byte)))
         .unwrap_or_else(|error| panic!("logical entry: {error}"))
 }
 
@@ -53,7 +53,7 @@ fn bench_lookup<M: PersistentMap>(c: &mut Criterion, name: &str) {
     for size in [10u16, 50, 100, 200, 1024] {
         let entries = build_dense(size);
         let map: M = entries.iter().fold(M::empty(), |m, e| m.insert(e.clone()));
-        let lookup_key = Value::U128(u128::from(size / 2))
+        let lookup_key = Value::unsigned(u128::from(size / 2))
             .canonical_bytes()
             .unwrap_or_else(|e| panic!("encode key: {e}"));
         group.bench_with_input(BenchmarkId::new(name, size), &lookup_key, |b, key| {
@@ -136,10 +136,10 @@ fn check_fixtures<M: PersistentMap>() {
         ] {
             assert_eq!(entries.len(), cardinality);
             for entry in &entries {
-                let Value::U128(key) = entry.key() else {
+                let ValueRef::U128(key) = entry.key().view() else {
                     panic!("fixture key must be unsigned");
                 };
-                assert_eq!(entry.value(), &Value::U128(key * multiplier));
+                assert_eq!(entry.value(), &Value::unsigned(key * multiplier));
             }
             let reference = entries
                 .iter()
@@ -157,7 +157,7 @@ fn check_fixtures<M: PersistentMap>() {
                 updated.try_canonical_bytes(),
                 updated_reference.try_canonical_bytes()
             );
-            let key = Value::U128(1)
+            let key = Value::unsigned(1)
                 .canonical_bytes()
                 .unwrap_or_else(|error| panic!("removal key: {error}"));
             assert_eq!(

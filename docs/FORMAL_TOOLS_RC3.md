@@ -1,5 +1,11 @@
 # Formal tools in V1
 
+Normal V2 retains SMT authoring, fail-closed process diagnostics, and Lean
+runtime inspection. The shallow Lean obligation factories and their renderer
+are private test references. Normal `prove --backend lean` reports
+`UnsupportedMode` before tool execution. An old formula-only kernel result
+never establishes the checked V2 implementation or publication authority.
+
 ZenoFCIS `1.1.0` pins and exercises process adapters for CVC5 `1.3.3`,
 Z3 `4.16.0`, and Lean `4.30.0`. Each adapter gives its result a deliberately
 limited classification. `zeno-fcis-formal-tools` is a standard-library shell
@@ -97,7 +103,7 @@ length through the declared horizon.
 
 A preflight walk stops export before recursive rendering when a claim exceeds
 256 temporal steps, 4,096 formula nodes, depth 256, one million conservative
-render operations, or 16 MiB of generated source. The Lean renderer also
+render operations, or 16 MiB of generated source. The private original Lean renderer also
 checks its operation and byte budgets while constructing each term, so a wide
 bounded formula stops before building an oversized intermediate string. Named
 predicate identifiers use a length-prefixed hexadecimal encoding, so distinct
@@ -106,14 +112,16 @@ source names stay distinct in solver input.
 CVC5 runs with `--safe-mode=safe` and proof production. Z3 runs
 with `-in -smt2`.
 
-`export_lean` accepts only unbounded temporal claims selecting Lean. It emits
+The private original `export_lean` accepts only unbounded temporal claims
+selecting Lean. It emits
 the exact claim ID and has translations for projections, relational atoms,
 checked arithmetic, bounded sums and quantifiers, and every temporal operator.
 The generated source ends with an axiom-report command. A generic relational
 placeholder is never substituted for the typed claim.
 
-The pinned Lean workflow kernel-checks the representative Mini Determinator
-claim 501 through both the library and the CLI. It also checks the relational
+The pinned Lean workflow retains the original representative Mini Determinator
+claim 501 through the private library factory and private original CLI process.
+These reference regressions do not qualify the normal CLI. It also checks the relational
 operator corpus and temporal equivalences, including nested time binders,
 using the same existing executable. The ordinary tests compare relational
 results with independently specified outcomes and check the previously faulty

@@ -1,35 +1,62 @@
 ---
 name: zenofcis-synthesis-first
-description: Build or revise ZenoFCIS application decision cores; prefer checked finite synthesis when the complete pure transition fits, and report exact assurance boundaries when it does not.
+description: Propose complete ZenoFCIS checked program declarations, use supported library execution and finite synthesis, and keep evidence separate from runtime publication and trusted shell effects.
 ---
 
 # ZenoFCIS synthesis first
 
-For a ZenoFCIS application, specify the complete pure transition before writing
-decision code: admitted pre-state, command, explicit context, decision and
-reason, post-state, and planned effects/outbox. Treat the specification as a
-reviewed requirement, not as evidence merely because an LLM wrote it. Keep
-independent decision examples or a separately written reference model.
+Specify the complete pure transition before implementation: every legal original
+pre-state, command and explicit context, decision class/reason, successor state,
+ordered effects/deliveries, required transition laws and genuine genesis laws.
+Review intent independently and retain separately authored acceptance examples or
+a reference model. An LLM proposal does not establish requirements adequacy.
 
-Assess the Cartesian input and output spaces and grammar/work limits with
-`assess_finite_problem` or the CLI. The current `finite-i64/1` profile has
-16 fields per side, 256 nodes per graph, 65,536 inputs, 4,096 outputs, and
-100 million graph-node work units. If the complete core fits, synthesize it,
-run `synth run --check` on the checked-in artifact, and run `synth verify` on
-the exact emitted target. Verify the adapter's full decision, state update,
-reasons, and effect plan against an independent model over **every admitted
-finite input**. Preserve catalog admission, laws, and commit authority.
+Use `discover_program_authoring` or `zeno-fcis describe` to inspect the actual CLI.
+Use `create_program_project` or `zeno-fcis new --template durable-counter` for a
+complete checked declaration example. The other supported normal examples are
+account-lockout, order-fulfillment, inventory-reservation, withdrawal-queue and
+agent-treasury-guard. `check_project_spec` or `zeno-fcis check --format json`
+checks `.zeno` authoring diagnostics; it does not admit a runtime program.
 
-For large numeric domains, a smaller fact domain is acceptable only when its
-projection is independently proved to preserve the raw decision and output.
-If this or another obligation is missing, label the result a checked finite
-subcore and keep the rest as trusted code; never market the whole core as
-formally guaranteed. A timeout, incomplete search, solver `unsat` without a
-checked proof, or a passing sample test is not synthesis success.
+The normal Rust API is `zeno_fcis::prelude` and `zeno_fcis::program`. Propose the
+complete original schema description/bytes, `ProgramDefinition`, original policy
+bytes and original state/command/context frame and channel links. Preserve every
+legal input and intended successful outcome. `policy_bytes` only serializes a
+proposal. Call the actual library `bind_catalog` and `bind_program`; never supply
+an evaluator, observer, law verdict, claimed usage or candidate sealer.
+Generated adapters are declaration data and retain complete original envelopes.
 
-Use the local MCP server in
-[`integrations/mcp/zeno_fcis_synthesis.py`](../../integrations/mcp/zeno_fcis_synthesis.py)
-when installed, or the same `zeno-fcis synth` CLI directly. The MCP tools
-report CLI evidence; they do not grant application authority. The full tool
-and installation guide is
-[`docs/LLM_SYNTHESIS.md`](../../docs/LLM_SYNTHESIS.md).
+Use the library's supported closed finite/control IR or full-width account
+producer. Unsupported schemas/profiles return named refusals; explain the missing
+support without granting an alternative commit capability. The Account producer
+owns its raw-input abstraction; a newly proposed small fact projection needs its
+own independent correspondence proof. Never replace the full domain with a
+smaller set or an all-Reject policy to make a checker pass.
+
+`Program::publish` and `publish_genesis` execute actual original envelope
+admission, declared footprints/private resource meter, complete decision and
+required laws before a private Publication can exist. Rejections and technical
+refusals grant no committing publication. Context authentication, trusted version
+selection, durable replay/state comparison and physical effects belong to the
+host. A tool report or passing source test is not that runtime capability.
+
+Standalone finite synthesis remains useful. Assess the Cartesian spaces with
+`assess_finite_problem` or the CLI. `finite-i64/1` has 16 fields per side, 256 nodes
+per graph, 65,536 inputs, 4,096 outputs and 100 million graph-node work units.
+When the complete reviewed relation fits, use `synthesize_finite_core`/`synth run`,
+`synth run --check` and `verify_finite_core`/`synth verify` on the exact target.
+Retain independent full-decision/state/reason/delivery comparisons over every
+admitted input. Finite target evidence does not authorize arbitrary generated Rust
+or replace checked Program binding, laws or complete raw-input correspondence.
+
+Report authoring proposals, finite exhaustive results, source-bound proof
+qualification, genuine runtime Publications and trusted shell effects separately.
+Timeouts, incomplete searches, unchecked solver answers and passing samples are
+not proof acceptance. Preserve artifact drift refusals and exact source/tool
+identities. A Wasm compilation does not establish native/Wasm execution parity or
+a universal Rust code-generation theorem.
+
+Use the local [MCP server](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/integrations/mcp/zeno_fcis_synthesis.py) or the same
+CLI directly. Installation and tool usage are documented in
+[docs/LLM_SYNTHESIS.md](https://github.com/TheDarkLightX/ZenoFCIS/blob/main/docs/LLM_SYNTHESIS.md). Neither the skill nor MCP
+substitutes for independent intent/specification review.

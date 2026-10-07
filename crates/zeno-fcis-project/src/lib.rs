@@ -17,7 +17,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, EncodeError, Hash32, commitment};
 
 /// Canonical project-profile format version.
 pub const PROJECT_PROFILE_FORMAT_VERSION: u16 = 1;
@@ -32,13 +32,12 @@ pub const MAX_DOMAIN_PREFIX_BYTES: usize = 160;
 /// Library commitments such as candidate IDs, receipts, and patch
 /// preconditions use names that start with `zeno-fcis/`. A project domain in
 /// the same namespace could share a commitment domain with those identities.
-pub const RESERVED_DOMAIN_NAMESPACE: &str = "zeno-fcis";
+pub const RESERVED_DOMAIN_NAMESPACE: &str = zeno_fcis_codec::RESERVED_DOMAIN_NAMESPACE;
 
 /// Returns true when `name` is the reserved namespace itself or lies inside it.
 #[must_use]
 pub fn is_reserved_domain_name(name: &str) -> bool {
-    name.strip_prefix(RESERVED_DOMAIN_NAMESPACE)
-        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+    zeno_fcis_codec::is_reserved_domain_name(name)
 }
 /// Maximum number of stable registry entries in one profile.
 pub const MAX_REGISTRY_ENTRIES: usize = 65_536;
@@ -73,9 +72,17 @@ impl StableName {
     }
 }
 
-impl CanonicalEncode for StableName {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl StableName {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_u16_blob(output, self.0.as_bytes())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -84,10 +91,13 @@ impl CanonicalEncode for StableName {
 pub struct DomainPrefix(Box<str>);
 
 impl DomainPrefix {
-    /// Creates a lowercase ASCII domain prefix.
+    /// Creates a lowercase ASCII project prefix outside the reserved namespace.
     pub fn try_new(value: impl Into<String>) -> Result<Self, ProfileError> {
         let value = value.into();
-        if value.is_empty() || value.len() > MAX_DOMAIN_PREFIX_BYTES {
+        if value.is_empty()
+            || value.len() > MAX_DOMAIN_PREFIX_BYTES
+            || is_reserved_domain_name(&value)
+        {
             return Err(ProfileError::InvalidDomainPrefix);
         }
         let bytes = value.as_bytes();
@@ -118,17 +128,21 @@ impl DomainPrefix {
     /// [`DomainPrefix::try_new`] rejects, and for the reserved namespace
     /// described by [`RESERVED_DOMAIN_NAMESPACE`].
     pub fn try_new_project(value: impl Into<String>) -> Result<Self, ProfileError> {
-        let prefix = Self::try_new(value)?;
-        if is_reserved_domain_name(prefix.as_str()) {
-            return Err(ProfileError::InvalidDomainPrefix);
-        }
-        Ok(prefix)
+        Self::try_new(value)
     }
 }
 
-impl CanonicalEncode for DomainPrefix {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DomainPrefix {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_u16_blob(output, self.0.as_bytes())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -153,10 +167,18 @@ impl SemanticId {
     }
 }
 
-impl CanonicalEncode for SemanticId {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl SemanticId {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.0.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -188,10 +210,18 @@ pub enum RegistryKind {
     Migration = 10,
 }
 
-impl CanonicalEncode for RegistryKind {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl RegistryKind {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -252,13 +282,21 @@ impl RegistryEntry {
     }
 }
 
-impl CanonicalEncode for RegistryEntry {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl RegistryEntry {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.kind.encode_to(output)?;
         self.id.encode_to(output)?;
         self.name.encode_to(output)?;
         output.extend_from_slice(self.definition_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -300,8 +338,9 @@ impl ProfileBindings {
     }
 }
 
-impl CanonicalEncode for ProfileBindings {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ProfileBindings {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         for hash in [
             self.schema_hash,
             self.precedence_hash,
@@ -314,6 +353,13 @@ impl CanonicalEncode for ProfileBindings {
             output.extend_from_slice(hash.as_bytes());
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -461,14 +507,14 @@ impl ProjectProfile {
     /// Computes the complete content-derived profile commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ProfileError> {
         let bytes = self.canonical_bytes().map_err(ProfileError::Encode)?;
-        let domain = Domain::new("zeno-fcis/project-profile", PROJECT_PROFILE_FORMAT_VERSION)
-            .map_err(ProfileError::Encode)?;
+        let domain = zeno_fcis_codec::domains::PROJECT_PROFILE;
         commitment::<H>(domain, &bytes).map_err(ProfileError::Encode)
     }
 }
 
-impl CanonicalEncode for ProjectProfile {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ProjectProfile {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-PROJECT\0");
         output.extend_from_slice(&PROJECT_PROFILE_FORMAT_VERSION.to_be_bytes());
         self.project.encode_to(output)?;
@@ -485,6 +531,13 @@ impl CanonicalEncode for ProjectProfile {
             entry.encode_to(output)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -553,12 +606,20 @@ impl AdditiveExtensionEvidence {
     }
 }
 
-impl CanonicalEncode for AdditiveExtensionEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl AdditiveExtensionEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         encode_optional_hash(output, self.schema);
         encode_optional_hash(output, self.effect_registry);
         encode_optional_hash(output, self.channel_registry);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -587,8 +648,9 @@ impl EvolutionMode {
     }
 }
 
-impl CanonicalEncode for EvolutionMode {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl EvolutionMode {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Additive { evidence } => {
                 output.push(0);
@@ -601,10 +663,18 @@ impl CanonicalEncode for EvolutionMode {
             }
         }
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// One incompatibility discovered between profile revisions.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CompatibilityBlocker {
     /// The successor names a different project.
     DifferentProject,
@@ -825,22 +895,26 @@ impl ProfileEvolution {
     /// Computes the complete content-derived evolution commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, EvolutionError> {
         let bytes = self.canonical_bytes().map_err(EvolutionError::Encode)?;
-        let domain = Domain::new(
-            "zeno-fcis/profile-evolution",
-            PROFILE_EVOLUTION_FORMAT_VERSION,
-        )
-        .map_err(EvolutionError::Encode)?;
+        let domain = zeno_fcis_codec::domains::PROFILE_EVOLUTION;
         commitment::<H>(domain, &bytes).map_err(EvolutionError::Encode)
     }
 }
 
-impl CanonicalEncode for ProfileEvolution {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ProfileEvolution {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-EVOLUTION\0");
         output.extend_from_slice(&PROFILE_EVOLUTION_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.previous_profile_hash.as_bytes());
         output.extend_from_slice(self.next_profile_hash.as_bytes());
         self.mode.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -935,6 +1009,7 @@ fn put_u32_length(output: &mut Vec<u8>, length: usize) -> Result<(), EncodeError
 
 /// Project-profile construction failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ProfileError {
     /// Stable name is empty, oversized, non-lowercase, or contains an invalid character.
     InvalidStableName,
@@ -1009,6 +1084,7 @@ impl std::error::Error for ProfileError {}
 
 /// Profile-evolution validation or commitment failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum EvolutionError {
     /// Compatibility validation found one or more deterministic blockers.
     Incompatible(CompatibilityReport),
@@ -1067,8 +1143,8 @@ mod reserved_domain_tests {
                 DomainPrefix::try_new_project(reserved),
                 Err(ProfileError::InvalidDomainPrefix)
             );
-            // The V1 constructor keeps accepting it; V2 makes the check mandatory.
-            assert!(DomainPrefix::try_new(reserved).is_ok());
+            // The normal constructor enforces the same V2 namespace boundary.
+            assert!(DomainPrefix::try_new(reserved).is_err());
         }
     }
 }
@@ -1077,23 +1153,7 @@ mod reserved_domain_tests {
 mod tests {
     use super::*;
 
-    #[derive(Clone, Copy, Debug)]
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test-only/1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(*byte)
-                    .rotate_left((index % 8) as u32);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
     fn hash(byte: u8) -> Hash32 {
         Hash32::new([byte; 32])

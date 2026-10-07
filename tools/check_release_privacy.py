@@ -85,10 +85,13 @@ class Scan:
             raise ValueError("byte-limit")
         zipped = zipfile.is_zipfile(io.BytesIO(data))
         suffix = basename.lower()
+        intended_zip = suffix.endswith(".zip") or data.startswith(
+            (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
+        )
         unsupported = (b"\xfd7zXZ\x00", b"BZh", b"\x28\xb5\x2f\xfd", b"7z\xbc\xaf\x27\x1c", b"Rar!\x1a\x07")
         if suffix.endswith((".xz", ".bz2", ".zst", ".7z", ".rar")) or data.startswith(unsupported):
             raise ValueError("unsupported-archive-format")
-        if suffix.endswith(".zip") and not zipped:
+        if intended_zip and not zipped:
             raise ValueError("invalid-zip")
         if suffix.endswith((".gz", ".tgz", ".crate")) and not data.startswith(b"\x1f\x8b"):
             raise ValueError("invalid-gzip")
@@ -159,8 +162,15 @@ class Scan:
                 return
             with path.open("rb") as stream:
                 self.inspect(location, self.read(stream))
-        except (OSError, ValueError, RuntimeError, EOFError, tarfile.TarError, zipfile.BadZipFile):
+        except (OSError, ValueError, RuntimeError, EOFError, tarfile.TarError, zipfile.BadZipFile) as error:
             self.error(location, "inspection-failed-or-limit-exceeded")
+            # Do not echo exception messages: archive names and payloads can
+            # contain private data. A bounded category distinguishes parsing
+            # failures from resource limits during release qualification.
+            reasons = {"byte-limit", "file-or-depth-limit", "unsupported-archive-format",
+                       "invalid-zip", "invalid-gzip"}
+            reason = str(error) if isinstance(error, ValueError) and str(error) in reasons else type(error).__name__
+            self.errors[-1]["reason"] = reason
 
     def report(self) -> dict[str, object]:
         return {

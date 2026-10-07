@@ -1,0 +1,100 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "durable-counter",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "102": [
+      "Bool"
+    ],
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "105": [
+      "I128",
+      0,
+      3
+    ]
+  },
+  "variables": {
+    "count": "pre.100.110",
+    "failures": "pre.100.111",
+    "action": "command.101",
+    "allowed": "context.102",
+    "full": "choose(action == 120, count == 3, failures == 3)"
+  },
+  "cases": [
+    {
+      "when": "!allowed",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "full",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 120",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "count + 1",
+        "111": "failures"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "local-observer",
+          "payload": {
+            "112": "count + 1",
+            "113": "failures"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "true",
+      "class": "CommittedFailure",
+      "reason": 202,
+      "post": {
+        "110": "count",
+        "111": "failures + 1"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "local-observer",
+          "payload": {
+            "112": "count",
+            "113": "failures + 1"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "CommittedFailureEffects",
+    "503": "RejectNoAuthority"
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes."
+}

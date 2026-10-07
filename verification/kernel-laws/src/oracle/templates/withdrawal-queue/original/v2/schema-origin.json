@@ -1,0 +1,13 @@
+{
+  "schema": "zeno-fcis/template-schema-origin/1",
+  "retained_original": "verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/v2/schema.zcve",
+  "sha256": "8af4d95849025825fef4e8e31ed552bef1c0f438a963b82b9130abe983b3cbf2",
+  "bytes": 742,
+  "schema_commitment": "1dfa1b7627e5461be73bb2805f980fb71b27f0990366112b6907a9072666a0aa",
+  "source_inputs": {
+    "project.zeno": "ac326379295929abe19ebaffef0002acacdbb2184e1de3af44de1e52dbfddf79",
+    "build.rs": "858f1deab7f71eb050d34f4697a0f7ddae611f743d3958e0957bba5ed3864011",
+    "profile.rs": "f3b239a5e95325a0bbdb41a6d1f6afeefff1e3c6057456868846a5a9918e7630"
+  },
+  "qualification": "Retained actual original lower_schema output; full Description matched at catalog binding; fresh build assertion must also pass."
+}

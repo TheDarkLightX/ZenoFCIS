@@ -37,7 +37,7 @@ use zeno_fcis_value::{MapEntry, Value, ValueError};
 /// use zeno_fcis_collections::LogicalEntry;
 /// use zeno_fcis_value::Value;
 ///
-/// let _ = LogicalEntry::new(vec![0], Value::Unit, Value::Unit);
+/// let _ = LogicalEntry::new(vec![0], Value::unit(), Value::unit());
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LogicalEntry {
@@ -108,6 +108,7 @@ impl LogicalEntry {
 
 /// Map materialization or encoding failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum MapError {
     /// Value map construction failed (duplicate or unsorted keys).
     ValueMap(ValueError),
@@ -168,7 +169,7 @@ mod private {
 
 /// A persistent map with structural sharing.
 ///
-/// All implementations must produce identical `Value::Map` values for the same
+/// All implementations must produce identical canonical map values for the same
 /// logical entries, regardless of insertion history. The canonical encoding
 /// is defined over the materialized entries, not the backend's internal shape.
 ///
@@ -215,7 +216,7 @@ pub trait PersistentMap: Clone + private::Sealed {
     /// Materializes entries in canonical (encoded-key-sorted) order.
     fn to_entries(&self) -> Vec<LogicalEntry>;
 
-    /// Materializes a `Value::Map` in canonical order.
+    /// Materializes a canonical map in canonical order.
     ///
     /// Returns an error if entries are not in strict sorted order or have
     /// duplicate keys. Backends sort entries in `to_entries()`, so this only

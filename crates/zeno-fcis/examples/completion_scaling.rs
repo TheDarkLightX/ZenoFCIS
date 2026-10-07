@@ -3,8 +3,8 @@
 #[cfg(feature = "synthesis")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
-    use zeno_fcis::prelude::*;
-    use zeno_fcis::synthesis::finite::{Domain as FiniteDomain, Op, Program};
+    use zeno_fcis::legacy::prelude::*;
+    use zeno_fcis::legacy::synthesis::finite::{Domain as FiniteDomain, Op, Program};
 
     for states in [8_i64, 64, 512, 4096] {
         let state = FiniteDomain::Int {

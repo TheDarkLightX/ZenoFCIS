@@ -11,6 +11,7 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+mod checked_catalog;
 mod test_catalog;
 
 use zeno_fcis_bootstrap::{BootstrapLimits, BootstrapSpec, generate_project};
@@ -83,6 +84,8 @@ fn main() {
         }
     }
 
+    write_additional_checked_fixture(&out_dir);
+    println!("cargo::rerun-if-changed=checked_catalog.rs");
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=test_catalog.rs");
 }
@@ -100,4 +103,35 @@ fn write_bootstrap_file(
         .unwrap_or_else(|| panic!("bootstrap bundle missing {generated_path}"));
     fs::write(out_dir.join(output_name), file.bytes())
         .unwrap_or_else(|_| panic!("write bootstrap fixture {output_name}"));
+}
+
+// This independently named supported workflow adds actual Authority coverage.
+// It leaves the original compound fixture and its obligations intact.
+fn write_additional_checked_fixture(out_dir: &std::path::Path) {
+    let schema = checked_catalog::checked_schema();
+    let spec = zeno_fcis_codegen::GenerationSpec::try_new(
+        "additional_checked_fixture",
+        "additional_checked_fixture",
+    )
+    .unwrap_or_else(|error| panic!("additional codegen spec: {error}"));
+    let bundle =
+        generate(&schema, &spec).unwrap_or_else(|error| panic!("additional codegen: {error}"));
+    let rust = bundle
+        .files()
+        .iter()
+        .find(|file| file.path() == "rust/additional_checked_fixture.rs")
+        .unwrap_or_else(|| panic!("additional codegen source"));
+    fs::write(out_dir.join("checked_schema.rs"), rust.bytes())
+        .unwrap_or_else(|error| panic!("additional schema write: {error}"));
+    let catalog = checked_catalog::checked_catalog(schema);
+    let spec = BootstrapSpec::try_new(
+        "additional-checked-fixture",
+        "additional_checked_fixture",
+        "additional_checked_fixture",
+        BootstrapLimits::default(),
+    )
+    .unwrap_or_else(|error| panic!("additional bootstrap spec: {error}"));
+    let project = generate_project::<RustCryptoSha256>(&catalog, &spec)
+        .unwrap_or_else(|error| panic!("additional bootstrap: {error}"));
+    write_bootstrap_file(out_dir, &project, "rust/project.rs", "checked_project.rs");
 }

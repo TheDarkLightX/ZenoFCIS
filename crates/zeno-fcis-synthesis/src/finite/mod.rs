@@ -4,17 +4,40 @@
 //! checking and encoded as 0/1 at the language boundary. This profile proves
 //! neither unbounded temporal properties nor adequacy of the reviewed contract.
 
+/// Verified integer byte primitives; schema admission remains a separate stage.
+pub mod canonical_v2;
 /// Finite exit-path search and independent decreasing-rank verification.
 pub mod completion;
 pub mod emit;
+mod evaluation;
+mod execution_v2;
+
+pub use execution_v2::composition as v2_composition;
+pub use execution_v2::continuation as v2_continuation;
+pub use execution_v2::laws as v2_laws;
+#[cfg(test)]
+/// Unchanged emitted order fixture for complete-decision test comparisons.
+pub use execution_v2::order_fixture_transition as v2_order_fixture_transition;
 mod ir;
-/// Bounded, ordered preparation without publication authority.
-pub mod preparation;
 
 #[cfg(test)]
 mod choice_tests;
 
+pub use execution_v2::{
+    AccessAttempt as V2ReadAttempt, Failure as V2ExecutionFailure, InputField as V2InputField,
+    InputLeaf as V2InputLeaf, InputVariant as V2InputVariant, Limits as V2Limits,
+    MeterFailure as V2MeterFailure, Outcome as V2ExecutionOutcome,
+    RecordFailure as V2RecordFailure, RecordProjection as V2RecordProjection,
+    Resource as V2Resource, ScalarProgram as V2ScalarProgram, Usage as V2Usage,
+    execute as execute_v2, project_record as project_record_v2, zero_limits as v2_zero_limits,
+};
 pub use ir::{Domain, MAX_FIELDS, MAX_NODES, Op, PROFILE, Program};
+
+/// V2 instruction-attempt accounting, separate from the scalar wire profile.
+pub const V2_EXECUTION_PROFILE: &str = "zeno-fcis/finite-instruction-meter/2";
+
+/// V2 ingress bytes and protected flat-record field attempts.
+pub const V2_RECORD_PROFILE: &str = "zeno-fcis/finite-protected-record/2";
 
 use crate::{
     Assignment, CandidateChecker, CheckResult, Hole, HoleId, SearchBudget, SearchResult,
@@ -27,13 +50,19 @@ use ir::{schema_value, tuple, validate_roots, validate_shape};
 use zeno_fcis_codec::{CanonicalEncode, Hash32};
 use zeno_fcis_value::Value;
 
+// All source commitments are fixed-width 32-byte leaves. Checked construction
+// retains the original wire bytes without exposing a raw Value variant.
+fn digest_value(hash: Hash32) -> Result<Value, Error> {
+    Value::bytes(hash.as_bytes().to_vec()).map_err(|_| Error::Invalid("finite-source-digest"))
+}
+
 /// Canonical scalar tuple shared by the optional finite operation profiles.
 /// Boolean positions retain the finite ABI's exact integer values 0 and 1.
-fn finite_tuple(values: &[i64]) -> Value {
+fn finite_tuple(values: &[i64]) -> Result<Value, zeno_fcis_codec::EncodeError> {
     tuple(
         values
             .iter()
-            .map(|value| Value::I128(i128::from(*value)))
+            .map(|value| Value::signed(i128::from(*value)))
             .collect(),
     )
 }
@@ -47,6 +76,7 @@ pub const MAX_STEPS: u64 = 100_000_000;
 
 /// Failure never usable as positive synthesis evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Error {
     /// Invalid shape, scope, type, or domain with a stable diagnostic code.
     Invalid(&'static str),
@@ -81,6 +111,11 @@ impl fmt::Display for Error {
 impl From<SynthesisError> for Error {
     fn from(error: SynthesisError) -> Self {
         Self::Search(error)
+    }
+}
+impl From<zeno_fcis_codec::EncodeError> for Error {
+    fn from(error: zeno_fcis_codec::EncodeError) -> Self {
+        Self::Search(SynthesisError::Encode(error))
     }
 }
 #[cfg(feature = "std")]
@@ -166,7 +201,7 @@ impl Sketch {
                         .iter()
                         .map(|op| {
                             Ok((
-                                op.value()
+                                op.value()?
                                     .canonical_bytes()
                                     .map_err(SynthesisError::Encode)?,
                                 op.clone(),
@@ -175,8 +210,13 @@ impl Sketch {
                         .collect::<Result<Vec<_>, Error>>()?;
                     keyed.sort_by(|left, right| left.0.cmp(&right.0));
                     *alternatives = keyed.into_iter().map(|(_, op)| op).collect();
-                    let hole =
-                        Hole::try_new(hole_id, alternatives.iter().map(Op::value).collect())?;
+                    let hole = Hole::try_new(
+                        hole_id,
+                        alternatives
+                            .iter()
+                            .map(Op::value)
+                            .collect::<Result<Vec<_>, _>>()?,
+                    )?;
                     if holes.iter().any(|h: &Hole| h.id() == hole.id()) {
                         return Err(Error::Invalid("duplicate-hole"));
                     }
@@ -235,28 +275,33 @@ impl Sketch {
             self.roots.clone(),
         )
     }
-    fn value(&self) -> Value {
+    fn value(&self) -> Result<Value, zeno_fcis_codec::EncodeError> {
         tuple(vec![
-            schema_value(&self.inputs, &self.outputs),
+            schema_value(&self.inputs, &self.outputs)?,
             tuple(
                 self.nodes
                     .iter()
                     .map(|slot| match slot {
-                        Slot::Fixed(op) => tuple(vec![Value::U128(0), op.value()]),
+                        Slot::Fixed(op) => tuple(vec![Value::unsigned(0), op.value()?]),
                         Slot::Choice { id, alternatives } => tuple(vec![
-                            Value::U128(1),
-                            Value::U128((*id).into()),
-                            tuple(alternatives.iter().map(Op::value).collect()),
+                            Value::unsigned(1),
+                            Value::unsigned((*id).into()),
+                            tuple(
+                                alternatives
+                                    .iter()
+                                    .map(Op::value)
+                                    .collect::<Result<Vec<_>, _>>()?,
+                            )?,
                         ]),
                     })
-                    .collect(),
-            ),
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?,
             tuple(
                 self.roots
                     .iter()
-                    .map(|id| Value::U128((*id).into()))
+                    .map(|id| Value::unsigned((*id).into()))
                     .collect(),
-            ),
+            )?,
         ])
     }
 }
@@ -299,6 +344,11 @@ impl Contract {
     pub fn outputs(&self) -> &[Domain] {
         &self.outputs
     }
+    /// The exact admitted relation over inputs followed by outputs.
+    #[must_use]
+    pub const fn relation(&self) -> &Program {
+        &self.relation
+    }
     /// Rechecks a target's actual complete output tuple against the relation.
     pub fn holds(&self, input: &[i64], output: &[i64]) -> Result<bool, Error> {
         let mut environment = Vec::new();
@@ -336,11 +386,12 @@ impl Contract {
     /// Canonical contract identity, including its full schema and semantics.
     pub fn commitment(&self) -> Result<Hash32, Error> {
         Ok(hash_canonical(
-            "zeno-fcis/finite-contract",
-            &tuple(vec![
-                schema_value(&self.inputs, &self.outputs),
-                self.relation.value(),
-            ]),
+            zeno_fcis_codec::domains::FINITE_CONTRACT,
+            tuple(vec![
+                schema_value(&self.inputs, &self.outputs)?,
+                self.relation.value()?,
+            ])?
+            .canonical_bytes(),
         )?)
     }
 }
@@ -452,6 +503,7 @@ pub struct Witness {
 /// Results with distinct contract, grammar, and selected-program meanings.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)]
+#[non_exhaustive]
 pub enum Outcome {
     /// Complete finite semantic acceptance. Target execution is still separate.
     Selected {
@@ -551,13 +603,16 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
     }
     let bindings = SynthesisBindings {
         schema_hash: hash_canonical(
-            "zeno-fcis/finite-schema",
-            &schema_value(contract.inputs(), contract.outputs()),
+            zeno_fcis_codec::domains::FINITE_SCHEMA,
+            schema_value(contract.inputs(), contract.outputs())?.canonical_bytes(),
         )?,
         contract_hash: contract.commitment()?,
-        grammar_hash: hash_canonical("zeno-fcis/finite-grammar", &sketch.value())?,
+        grammar_hash: hash_canonical(
+            zeno_fcis_codec::domains::FINITE_GRAMMAR,
+            sketch.value()?.canonical_bytes(),
+        )?,
         algorithm_hash: hash_bytes(
-            "zeno-fcis/finite-algorithm",
+            zeno_fcis_codec::domains::FINITE_ALGORITHM,
             b"canonical-search/1; eager-finite-i64/1; exhaustive-total-relation/1",
         )?,
     };
@@ -569,25 +624,39 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
         },
     )?;
     let checker_hash = hash_canonical(
-        "zeno-fcis/finite-checker",
-        &tuple(vec![
-            Value::Text(PROFILE.into()),
-            schema_value(contract.inputs(), contract.outputs()),
-            contract.relation.value(),
-            Value::U128(budget.max_steps.into()),
-            Value::Bytes(
-                hash_bytes("zeno-fcis/finite-checker-source", include_bytes!("mod.rs"))?
-                    .as_bytes()
-                    .to_vec()
-                    .into_boxed_slice(),
-            ),
-            Value::Bytes(
-                hash_bytes("zeno-fcis/finite-ir-source", include_bytes!("ir.rs"))?
-                    .as_bytes()
-                    .to_vec()
-                    .into_boxed_slice(),
-            ),
-        ]),
+        zeno_fcis_codec::domains::FINITE_CHECKER,
+        tuple(vec![
+            Value::text_ascii(PROFILE.into()).map_err(|_| Error::Invalid("finite-profile-text"))?,
+            schema_value(contract.inputs(), contract.outputs())?,
+            contract.relation.value()?,
+            Value::unsigned(budget.max_steps.into()),
+            digest_value(hash_bytes(
+                zeno_fcis_codec::domains::FINITE_CHECKER_SOURCE,
+                include_bytes!("mod.rs"),
+            )?)?,
+            digest_value(hash_bytes(
+                zeno_fcis_codec::domains::FINITE_IR_SOURCE,
+                include_bytes!("ir.rs"),
+            )?)?,
+            digest_value(hash_bytes(
+                zeno_fcis_codec::domains::FINITE_EXECUTION_SOURCE,
+                include_bytes!("evaluation/mod.rs"),
+            )?)?,
+            digest_value(hash_bytes(
+                zeno_fcis_codec::domains::FINITE_EXECUTION_SPECIFICATION,
+                include_bytes!("evaluation/spec.rs"),
+            )?)?,
+            digest_value(hash_bytes(
+                zeno_fcis_codec::domains::FINITE_ADMISSION_SOURCE,
+                include_bytes!("evaluation/admission/mod.rs"),
+            )?)?,
+            digest_value(hash_bytes(
+                zeno_fcis_codec::domains::FINITE_ADMISSION_SPECIFICATION,
+                include_bytes!("evaluation/admission/spec.rs"),
+            )?)?,
+            digest_value(Hash32::new(execution_v2::authority::EVALUATOR))?,
+        ])?
+        .canonical_bytes(),
     )?;
     let mut checker = Checker {
         contract,
@@ -703,17 +772,22 @@ impl CandidateChecker for Checker<'_> {
             };
             if !holds {
                 let output = evaluated.then(|| self.program_output.clone());
-                let counterexample = tuple(vec![
-                    tuple(
-                        self.input
-                            .iter()
-                            .map(|v| Value::I128((*v).into()))
-                            .collect(),
-                    ),
-                    output.as_ref().map_or(Value::Unit, |out| {
-                        tuple(out.iter().map(|v| Value::I128((*v).into())).collect())
-                    }),
-                ]);
+                let counterexample = (|| {
+                    tuple(vec![
+                        tuple(
+                            self.input
+                                .iter()
+                                .map(|v| Value::signed((*v).into()))
+                                .collect(),
+                        )?,
+                        output.as_ref().map_or(Ok(Value::unit()), |out| {
+                            tuple(out.iter().map(|v| Value::signed((*v).into())).collect())
+                        })?,
+                    ])
+                })();
+                let Ok(counterexample) = counterexample else {
+                    return CheckResult::Indeterminate;
+                };
                 if self.first.is_none() {
                     self.first = Some(Witness {
                         input: self.input.clone(),
@@ -723,15 +797,28 @@ impl CandidateChecker for Checker<'_> {
                 return CheckResult::Rejected { counterexample };
             }
         }
-        let compiled = program.value();
-        let evidence = tuple(vec![
-            self.contract.relation.value(),
-            compiled.clone(),
-            Value::U128(count.into()),
-        ]);
+        let Ok(compiled) = program.value() else {
+            return CheckResult::Indeterminate;
+        };
+        let evidence = (|| {
+            tuple(vec![
+                self.contract.relation.value()?,
+                compiled.clone(),
+                Value::unsigned(count.into()),
+            ])
+        })();
+        let Ok(evidence) = evidence else {
+            return CheckResult::Indeterminate;
+        };
         let (Ok(reference_claim), Ok(composition_claim)) = (
-            hash_canonical("zeno-fcis/finite-contract-coverage", &evidence),
-            hash_canonical("zeno-fcis/finite-closed-totality", &evidence),
+            hash_canonical(
+                zeno_fcis_codec::domains::FINITE_CONTRACT_COVERAGE,
+                evidence.canonical_bytes(),
+            ),
+            hash_canonical(
+                zeno_fcis_codec::domains::FINITE_CLOSED_TOTALITY,
+                evidence.canonical_bytes(),
+            ),
         ) else {
             return CheckResult::Indeterminate;
         };
@@ -743,3 +830,7 @@ impl CandidateChecker for Checker<'_> {
         }
     }
 }
+
+pub use execution_v2::authority as v2_authority;
+
+pub use execution_v2::catalog as v2_catalog;

@@ -1,15 +1,30 @@
 # API reference
 
+The V2 development branch uses the checked program family by default. `zeno_fcis::Program` is the existing private Authority; `bind_catalog` and `bind_program` perform actual admission. Original envelopes enter `Program::publish`/`publish_genesis`; only successful library evaluation returns a private publication capability. See [migration](V2_PROGRAM_API_MIGRATION.md) for declaration modules, refusal/replay behavior and remaining lower-level obligations.
+
+| Normal goal | Entry point |
+|---|---|
+| Complete original schema and declarative behavior | `program::{schema, scalar, declaration, law}`, `ProgramDefinition` |
+| Checked original policy/catalog and library identity | `bind_catalog`, `bind_program`, `Program` |
+| Original invocation and private publication | `Invocation`, `PublicationOutcome` |
+| Actual usage and immutable audit | `Evaluation`, `Resource`, `Usage` |
+| Capability-consuming SQLite boundary | `zeno_fcis::sqlite` with feature `sqlite-shell` |
+
+The `spec` frontend remains authoring input and still requires checked program
+admission. `zeno_fcis::legacy` retains inert data and standalone evidence
+utilities; retired native transition and authorization constructors are not
+available through that namespace.
+
 ## Hosted reference
 
-After publication, rustdoc for the umbrella crate is available at:
+The historical 1.1.0 API reference is available at:
 
 ```text
 https://docs.rs/zeno-fcis/1.1.0/zeno_fcis/
 ```
 
-Every public subcrate is published at the same exact version and receives its
-own docs.rs reference.
+That reference does not document this breaking V2 development API. Generate
+rustdoc from the exact checkout below for its current signatures.
 
 ## Local reference
 
@@ -27,30 +42,17 @@ For machine discovery of the CLI, use `zeno-fcis describe` or
 `zeno-fcis describe generate`. The [agent guide](LLM_USAGE.md) describes the
 versioned JSON workflow and recovery by exit class.
 
-| Goal | Entry point |
-|---|---|
-| Basic decision and budget algebra | `zeno_fcis::core` |
-| Canonical admitted values | `zeno_fcis::value`, `zeno_fcis::codec` |
-| `.zeno` parsing and typed authoring | `zeno_fcis::spec::{parse_project, elaborate_project, ProjectSpecBuilder}` with feature `authoring` |
-| Bounded relational and temporal evaluation | `zeno_fcis::spec::{evaluate_relational, evaluate_temporal}` |
-| Mini Determinator semantic reference | `zeno_fcis::spec::{MiniDeterminator, WorkerProgram, WorkerInstruction}` |
-| Project schema and policy | `zeno_fcis::project`, `schema`, `catalog` |
-| Pure transition construction | `zeno_fcis::transition` |
-| Project invariants and conservation | `zeno_fcis::laws` |
-| Nominal genesis and commit authorization | `zeno_fcis::authority` |
-| Strict authenticated proof/plan decoding | `zeno_fcis::authenticated::{AuthenticatedDecodeLimits, decode_sparse_proof, decode_authenticated_plan}` |
-| Qualified candidate-bound authenticated publication | `zeno_fcis::authenticated_authority::{AuthenticatedCommitAuthority, CatalogAuthorizedAuthenticatedCommit, ProductionAuthenticatedCommitPort}` |
-| Strict receipt and bundle decoding | `zeno_fcis::receipt::{ReceiptDecodeLimits, BundleDecodeLimits, decode_receipt, decode_reject_receipt, decode_commit_bundle}` |
-| Persisted authorization re-entry | `zeno_fcis::authority::{AuthorizationDecodeLimits, CatalogCommitAuthority::reauthorize_canonical_transition}` |
-| Fixed domain machines | `zeno_fcis::domain` |
-| Global composed program | `zeno_fcis::composed_program` |
-| Composition proof obligations | `zeno_fcis::compose` |
-| Formal tool protocol | `zeno_fcis::backend`, `evidence`, `refine` |
-| CVC5, Z3, and Lean process adapters | package `zeno-fcis-formal-tools` |
-| Deterministic authoring CLI | package `zeno-fcis-cli`, binary `zeno-fcis` |
-| Strict runtime decision reconstruction | `zeno_fcis::refine::{ValidatedNormalizedDecision, DecisionValidationLimits}` |
-| Verified finite-domain promotion | `zeno_fcis::refine::{ExhaustiveDomainManifest, ValidatedRefinementCase, ValidatedPromotionEvidence, evaluate_validated_promotion}` |
-| Reference and concrete shells | `zeno_fcis::shell`, `zeno-fcis-shell-sqlite` |
+For V2 application execution, use the normal entry points in the first table.
+The `.zeno` parser and elaborator are exposed through `zeno_fcis::spec` with
+feature `authoring`; the CLI is the `zeno-fcis-cli` package. Canonical values,
+codecs, catalogs and standalone evidence utilities remain available under the
+applicable `legacy` feature namespaces. Their data cannot substitute for a
+private library publication.
+
+Historical guides below describe earlier protocols and assurance work. They
+are not instructions to restore removed callback authority or authenticated
+commit constructors. The [scope ledger](V2_LEDGER_SCOPE.md) and
+[migration guide](V2_PROGRAM_API_MIGRATION.md) govern the smaller V2 route.
 
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
 the [crate map](CRATE_MAP.md) and generated rustdoc for exact signatures.
@@ -79,7 +81,8 @@ strict plan reauthorization, and nominal authenticated publication.
 
 ## Stability
 
-`1.1.0` extends the stable V1 Cargo API with optional finite completion and
-preparation. Protocol identifiers remain independent of Cargo versions and may
-not be silently reinterpreted. The release gate retains an unchanged V1.0 consumer
-and foundational protocol source baseline; see [V1.1 notes](V1_1_RELEASE_NOTES.md).
+This development branch intentionally changes the 1.1.0 execution API. It has
+not been released as V2. Protocol identifiers remain versioned; SQLite schema
+9 refuses older stores rather than silently migrating them. Final application,
+proof, CI and release checks remain open as recorded in the
+[V2 plan](V2_VERIFIED_CORE_PLAN.md).

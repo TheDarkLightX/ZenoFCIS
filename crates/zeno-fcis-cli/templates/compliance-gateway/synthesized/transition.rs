@@ -1,4 +1,5 @@
 // Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.
+/// Evaluates the generated finite program; no commit authority.
 #[rustfmt::skip]
 pub fn transition(input: &[i64]) -> Option<[i64; 3]> {
     if input.len() != 7 { return None; }

@@ -6,19 +6,23 @@
 //! checked by an [`EvidenceVerifier`]. Effects and outbox obligations conflict
 //! conservatively unless the specification declares an exact commutativity law
 //! with accepted evidence. Production parallel authorization additionally
-//! requires authority-owned bindings and independently verified evidence that
-//! every component's declared footprint covers all admitted executions.
+//! requires authority-owned bindings and external attestations that every
+//! component's declared footprint covers all admitted executions. The library
+//! checks exact subjects and artifact digests, not the external verifier's
+//! truthfulness; its accepted reports do not constitute kernel proofs.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
+pub use zeno_fcis_codec::EvidenceArtifact;
+
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 
 /// Canonical format version for composition specifications and proof claims.
 pub const COMPOSITION_FORMAT_VERSION: u16 = 2;
@@ -51,10 +55,18 @@ impl ComponentId {
     }
 }
 
-impl CanonicalEncode for ComponentId {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ComponentId {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.0.to_be_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -75,8 +87,9 @@ pub enum PathAtom {
     AnyDescendant,
 }
 
-impl CanonicalEncode for PathAtom {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl PathAtom {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         match self {
             Self::Field(id) => {
                 output.push(0);
@@ -98,6 +111,13 @@ impl CanonicalEncode for PathAtom {
             Self::AnyDescendant => output.push(5),
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -178,14 +198,22 @@ impl AccessPath {
     }
 }
 
-impl CanonicalEncode for AccessPath {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl AccessPath {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.namespace.to_be_bytes());
         put_u16_length(output, self.atoms.len())?;
         for atom in &self.atoms {
             atom.encode_to(output)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -251,13 +279,21 @@ impl PathSet {
     }
 }
 
-impl CanonicalEncode for PathSet {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl PathSet {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_u32_length(output, self.paths.len())?;
         for path in &self.paths {
             put_blob(output, &path.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -319,12 +355,20 @@ impl Footprint {
     }
 }
 
-impl CanonicalEncode for Footprint {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Footprint {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         for set in [&self.reads, &self.writes, &self.contexts, &self.effects] {
             put_blob(output, &set.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -348,10 +392,18 @@ pub enum ConflictKind {
     RightEffectLeftOutbox = 6,
 }
 
-impl CanonicalEncode for ConflictKind {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ConflictKind {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -369,9 +421,17 @@ impl Conflict {
     }
 }
 
-impl CanonicalEncode for Conflict {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Conflict {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.kind.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -433,10 +493,18 @@ impl Assumption {
     }
 }
 
-impl CanonicalEncode for Assumption {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Assumption {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.claim.as_bytes());
         put_blob(output, &self.depends_on.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -467,10 +535,18 @@ impl Guarantee {
     }
 }
 
-impl CanonicalEncode for Guarantee {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Guarantee {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.claim.as_bytes());
         put_blob(output, &self.depends_on.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -524,8 +600,9 @@ impl FrameRule {
     }
 }
 
-impl CanonicalEncode for FrameRule {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl FrameRule {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_blob(output, &self.protected.canonical_bytes()?)?;
         put_u16_length(output, self.allowed_writers.len())?;
         for writer in &self.allowed_writers {
@@ -533,6 +610,13 @@ impl CanonicalEncode for FrameRule {
         }
         output.extend_from_slice(self.proof_claim.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -662,8 +746,9 @@ impl ComponentContract {
     }
 }
 
-impl CanonicalEncode for ComponentContract {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ComponentContract {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.id.encode_to(output)?;
         output.extend_from_slice(self.profile_hash.as_bytes());
         put_blob(output, &self.footprint.canonical_bytes()?)?;
@@ -681,6 +766,13 @@ impl CanonicalEncode for ComponentContract {
             put_blob(output, &frame.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -744,14 +836,22 @@ impl Wiring {
     }
 }
 
-impl CanonicalEncode for Wiring {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Wiring {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.source_component.encode_to(output)?;
         put_blob(output, &self.source_effect.canonical_bytes()?)?;
         self.destination_component.encode_to(output)?;
         put_blob(output, &self.destination_path.canonical_bytes()?)?;
         output.extend_from_slice(self.schema_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -790,11 +890,19 @@ impl ProviderGuarantee {
     }
 }
 
-impl CanonicalEncode for ProviderGuarantee {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ProviderGuarantee {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.component.encode_to(output)?;
         output.extend_from_slice(self.guarantee.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -859,13 +967,21 @@ impl ParallelConflictLaw {
     }
 }
 
-impl CanonicalEncode for ParallelConflictLaw {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ParallelConflictLaw {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.left.encode_to(output)?;
         self.right.encode_to(output)?;
         self.kind.encode_to(output)?;
         output.extend_from_slice(self.claim.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1030,7 +1146,12 @@ impl CompositionSpec {
 
     /// Computes the canonical specification commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
-        hash_canonical::<H>("zeno-fcis/composition-spec", self)
+        #[cfg(test)]
+        commitment_observation::record();
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::COMPOSITION_SPEC,
+            (self).canonical_bytes(),
+        )
     }
 
     fn component(&self, id: ComponentId) -> Option<&ComponentContract> {
@@ -1058,8 +1179,9 @@ impl CompositionSpec {
     }
 }
 
-impl CanonicalEncode for CompositionSpec {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CompositionSpec {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-COMPOSITION-SPEC\0");
         output.extend_from_slice(&COMPOSITION_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(&self.version.to_be_bytes());
@@ -1085,22 +1207,38 @@ impl CanonicalEncode for CompositionSpec {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Coverage status for one transition decision class.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum DecisionCoverageStatus {
     /// At least one admitted input exercises the decision class.
     Covered = 0,
-    /// The proof establishes that the decision class is unreachable.
-    ProvedUnreachable = 1,
+    /// External evidence attests that the decision class is unreachable.
+    AttestedUnreachable = 1,
 }
 
-impl CanonicalEncode for DecisionCoverageStatus {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DecisionCoverageStatus {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1146,11 +1284,19 @@ impl DecisionClassCoverage {
     }
 }
 
-impl CanonicalEncode for DecisionClassCoverage {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DecisionClassCoverage {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.accept.encode_to(output)?;
         self.reject.encode_to(output)?;
         self.committed_failure.encode_to(output)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1209,12 +1355,16 @@ impl ExhaustiveFootprintDomain {
 
     /// Computes the canonical exhaustive-domain commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
-        hash_footprint_canonical::<H>("zeno-fcis/exhaustive-footprint-domain", self)
+        hash_footprint_canonical::<H>(
+            zeno_fcis_codec::domains::EXHAUSTIVE_FOOTPRINT_DOMAIN,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for ExhaustiveFootprintDomain {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ExhaustiveFootprintDomain {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-EXHAUSTIVE-FOOTPRINT-DOMAIN\0");
         output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.domain_definition_hash.as_bytes());
@@ -1224,6 +1374,13 @@ impl CanonicalEncode for ExhaustiveFootprintDomain {
             output.extend_from_slice(input.as_bytes());
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1241,10 +1398,18 @@ pub enum FootprintProofKind {
     Theorem = 3,
 }
 
-impl CanonicalEncode for FootprintProofKind {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl FootprintProofKind {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.push(*self as u8);
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1354,8 +1519,9 @@ impl FootprintProofMethod {
     }
 }
 
-impl CanonicalEncode for FootprintProofMethod {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl FootprintProofMethod {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.kind.encode_to(output)?;
         output.extend_from_slice(self.method_hash.as_bytes());
         output.extend_from_slice(self.policy_hash.as_bytes());
@@ -1367,6 +1533,13 @@ impl CanonicalEncode for FootprintProofMethod {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1502,12 +1675,16 @@ impl FootprintAuthorityBinding {
 
     /// Commits to the complete evidence envelope.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
-        hash_footprint_canonical::<H>("zeno-fcis/complete-footprint-evidence", self)
+        hash_footprint_canonical::<H>(
+            zeno_fcis_codec::domains::COMPLETE_FOOTPRINT_EVIDENCE,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for FootprintAuthorityBinding {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl FootprintAuthorityBinding {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.component.encode_to(output)?;
         output.extend_from_slice(self.profile_hash.as_bytes());
         output.extend_from_slice(self.transition_program_hash.as_bytes());
@@ -1520,6 +1697,13 @@ impl CanonicalEncode for FootprintAuthorityBinding {
         output.extend_from_slice(self.proof_toolchain_hash.as_bytes());
         output.extend_from_slice(self.verifier_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1583,12 +1767,16 @@ impl FootprintCompletenessClaim {
 
     /// Computes the canonical complete-footprint claim commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
-        hash_footprint_canonical::<H>("zeno-fcis/complete-footprint-claim", self)
+        hash_footprint_canonical::<H>(
+            zeno_fcis_codec::domains::COMPLETE_FOOTPRINT_CLAIM,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for FootprintCompletenessClaim {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl FootprintCompletenessClaim {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-COMPLETE-FOOTPRINT-CLAIM\0");
         output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
         put_blob(output, &self.binding.canonical_bytes()?)?;
@@ -1597,13 +1785,20 @@ impl CanonicalEncode for FootprintCompletenessClaim {
         output.extend_from_slice(self.coverage_hash.as_bytes());
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Untrusted evidence offered for one complete-footprint claim.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FootprintCompletenessEvidence {
     claim: FootprintCompletenessClaim,
-    artifact: Hash32,
+    artifact: EvidenceArtifact,
     verifier_hash: Hash32,
 }
 
@@ -1611,10 +1806,10 @@ impl FootprintCompletenessEvidence {
     /// Creates an evidence envelope with exact artifact and verifier identities.
     pub fn try_new(
         claim: FootprintCompletenessClaim,
-        artifact: Hash32,
+        artifact: EvidenceArtifact,
         verifier_hash: Hash32,
     ) -> Result<Self, ContractError> {
-        if artifact == Hash32::ZERO || verifier_hash == Hash32::ZERO {
+        if artifact.digest() == Hash32::ZERO || verifier_hash == Hash32::ZERO {
             return Err(ContractError::ZeroHash);
         }
         Ok(Self {
@@ -1633,7 +1828,7 @@ impl FootprintCompletenessEvidence {
     /// Returns the retained proof, analysis, derivation, or replay artifact.
     #[must_use]
     pub const fn artifact(&self) -> Hash32 {
-        self.artifact
+        self.artifact.digest()
     }
 
     /// Returns the claimed independent verifier identity.
@@ -1643,14 +1838,22 @@ impl FootprintCompletenessEvidence {
     }
 }
 
-impl CanonicalEncode for FootprintCompletenessEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl FootprintCompletenessEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-COMPLETE-FOOTPRINT-EVIDENCE\0");
         output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
         put_blob(output, &self.claim.canonical_bytes()?)?;
-        output.extend_from_slice(self.artifact.as_bytes());
+        output.extend_from_slice(self.artifact.digest().as_bytes());
         output.extend_from_slice(self.verifier_hash.as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1659,11 +1862,15 @@ pub trait FootprintEvidenceVerifier {
     /// Returns the pinned verifier implementation and configuration identity.
     fn verifier_hash(&self) -> Hash32;
 
-    /// Returns true only when the retained artifact proves the complete claim.
-    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: Hash32) -> bool;
+    /// Reports whether these exact bytes establish the complete claim.
+    /// The answer remains an external attestation.
+    fn verify(&self, claim: &FootprintCompletenessClaim, artifact: &[u8]) -> bool;
 }
 
-/// Nominal proof that one exact static footprint covers every admitted input.
+/// External attestation that one exact footprint covers every admitted input.
+///
+/// The library checks binding and digest integrity; it does not prove the
+/// external verifier answer or promote it to kernel-checked evidence.
 ///
 /// Fields are private. Production code obtains this value only through
 /// [`verify_complete_footprint`].
@@ -1687,7 +1894,7 @@ pub struct CompleteFootprintWitness {
 }
 
 impl CompleteFootprintWitness {
-    /// Returns the verified theorem statement.
+    /// Returns the exact externally attested statement.
     #[must_use]
     pub const fn claim(&self) -> &FootprintCompletenessClaim {
         &self.claim
@@ -1711,14 +1918,18 @@ impl CompleteFootprintWitness {
         self.verifier_hash
     }
 
-    /// Computes the canonical verified-witness commitment.
+    /// Computes the canonical attestation-witness commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
-        hash_footprint_canonical::<H>("zeno-fcis/complete-footprint-witness", self)
+        hash_footprint_canonical::<H>(
+            zeno_fcis_codec::domains::COMPLETE_FOOTPRINT_WITNESS,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for CompleteFootprintWitness {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CompleteFootprintWitness {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-COMPLETE-FOOTPRINT-WITNESS\0");
         output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
         put_blob(output, &self.claim.canonical_bytes()?)?;
@@ -1726,10 +1937,17 @@ impl CanonicalEncode for CompleteFootprintWitness {
         output.extend_from_slice(self.verifier_hash.as_bytes());
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Verifies exact evidence and mints the nominal complete-footprint witness.
-pub fn verify_complete_footprint<V: FootprintEvidenceVerifier>(
+pub fn verify_complete_footprint<H: CommitmentHasher, V: FootprintEvidenceVerifier>(
     expected: &FootprintAuthorityBinding,
     evidence: FootprintCompletenessEvidence,
     verifier: &V,
@@ -1744,48 +1962,59 @@ pub fn verify_complete_footprint<V: FootprintEvidenceVerifier>(
     {
         return Err(FootprintWitnessError::VerifierIdentityMismatch);
     }
-    if !verifier.verify(&evidence.claim, evidence.artifact) {
+    if !evidence.artifact.matches::<H>() {
+        return Err(FootprintWitnessError::ArtifactDigestMismatch);
+    }
+    if !verifier.verify(&evidence.claim, evidence.artifact.bytes()) {
         return Err(FootprintWitnessError::UnverifiedEvidence);
     }
     Ok(CompleteFootprintWitness {
         claim: evidence.claim,
-        artifact: evidence.artifact,
+        artifact: evidence.artifact.digest(),
         verifier_hash,
     })
 }
 
 /// Evidence binding one local claim to one external proof artifact.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ClaimEvidence {
     claim: Hash32,
-    artifact: Hash32,
+    artifact: EvidenceArtifact,
 }
 
 impl ClaimEvidence {
     /// Creates an evidence binding.
     #[must_use]
-    pub const fn new(claim: Hash32, artifact: Hash32) -> Self {
+    pub const fn new(claim: Hash32, artifact: EvidenceArtifact) -> Self {
         Self { claim, artifact }
     }
 
     /// Returns the claim commitment.
     #[must_use]
-    pub const fn claim(self) -> Hash32 {
+    pub const fn claim(&self) -> Hash32 {
         self.claim
     }
 
     /// Returns the artifact commitment.
     #[must_use]
-    pub const fn artifact(self) -> Hash32 {
-        self.artifact
+    pub const fn artifact(&self) -> Hash32 {
+        self.artifact.digest()
     }
 }
 
-impl CanonicalEncode for ClaimEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ClaimEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(self.claim.as_bytes());
-        output.extend_from_slice(self.artifact.as_bytes());
+        output.extend_from_slice(self.artifact.digest().as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1795,7 +2024,7 @@ pub struct AssumptionDischarge {
     component: ComponentId,
     assumption: Hash32,
     providers: Box<[ProviderGuarantee]>,
-    artifact: Hash32,
+    artifact: EvidenceArtifact,
 }
 
 impl AssumptionDischarge {
@@ -1804,12 +2033,12 @@ impl AssumptionDischarge {
         component: ComponentId,
         assumption: Hash32,
         mut providers: Vec<ProviderGuarantee>,
-        artifact: Hash32,
+        artifact: EvidenceArtifact,
     ) -> Result<Self, ContractError> {
         if component.get() == 0 {
             return Err(ContractError::ZeroIdentifier);
         }
-        if assumption == Hash32::ZERO || artifact == Hash32::ZERO {
+        if assumption == Hash32::ZERO || artifact.digest() == Hash32::ZERO {
             return Err(ContractError::ZeroHash);
         }
         providers.sort();
@@ -1845,20 +2074,28 @@ impl AssumptionDischarge {
     /// Returns the assumption-closure artifact.
     #[must_use]
     pub const fn artifact(&self) -> Hash32 {
-        self.artifact
+        self.artifact.digest()
     }
 }
 
-impl CanonicalEncode for AssumptionDischarge {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl AssumptionDischarge {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         self.component.encode_to(output)?;
         output.extend_from_slice(self.assumption.as_bytes());
         put_u32_length(output, self.providers.len())?;
         for provider in &self.providers {
             provider.encode_to(output)?;
         }
-        output.extend_from_slice(self.artifact.as_bytes());
+        output.extend_from_slice(self.artifact.digest().as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -1932,8 +2169,9 @@ impl ParallelVerificationContext {
     }
 }
 
-impl CanonicalEncode for ParallelVerificationContext {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ParallelVerificationContext {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         for hash in [
             self.composition_spec_hash,
             self.source_revision_hash,
@@ -1951,6 +2189,13 @@ impl CanonicalEncode for ParallelVerificationContext {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// Evidence for one complete sequential-versus-parallel equivalence claim.
@@ -1959,7 +2204,7 @@ pub struct ParallelParityEvidence {
     context: ParallelVerificationContext,
     sequential_result: Hash32,
     composed_result: Hash32,
-    artifact: Hash32,
+    artifact: EvidenceArtifact,
 }
 
 impl ParallelParityEvidence {
@@ -1968,11 +2213,11 @@ impl ParallelParityEvidence {
         context: ParallelVerificationContext,
         sequential_result: Hash32,
         composed_result: Hash32,
-        artifact: Hash32,
+        artifact: EvidenceArtifact,
     ) -> Result<Self, ContractError> {
         if sequential_result == Hash32::ZERO
             || composed_result == Hash32::ZERO
-            || artifact == Hash32::ZERO
+            || artifact.digest() == Hash32::ZERO
         {
             return Err(ContractError::ZeroHash);
         }
@@ -2005,17 +2250,25 @@ impl ParallelParityEvidence {
     /// Returns the retained proof or replay artifact commitment.
     #[must_use]
     pub const fn artifact(&self) -> Hash32 {
-        self.artifact
+        self.artifact.digest()
     }
 }
 
-impl CanonicalEncode for ParallelParityEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl ParallelParityEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_blob(output, &self.context.canonical_bytes()?)?;
         output.extend_from_slice(self.sequential_result.as_bytes());
         output.extend_from_slice(self.composed_result.as_bytes());
-        output.extend_from_slice(self.artifact.as_bytes());
+        output.extend_from_slice(self.artifact.digest().as_bytes());
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -2039,7 +2292,7 @@ impl CompositionEvidence {
         }
         if claim_evidence
             .iter()
-            .any(|item| item.claim == Hash32::ZERO || item.artifact == Hash32::ZERO)
+            .any(|item| item.claim == Hash32::ZERO || item.artifact.digest() == Hash32::ZERO)
         {
             return Err(ContractError::ZeroHash);
         }
@@ -2081,11 +2334,11 @@ impl CompositionEvidence {
         self.parity.as_ref()
     }
 
-    fn claim(&self, claim: Hash32) -> Option<ClaimEvidence> {
+    fn claim(&self, claim: Hash32) -> Option<&ClaimEvidence> {
         self.claim_evidence
             .binary_search_by_key(&claim, |item| item.claim)
             .ok()
-            .map(|index| self.claim_evidence[index])
+            .map(|index| &self.claim_evidence[index])
     }
 
     fn discharge(
@@ -2102,8 +2355,9 @@ impl CompositionEvidence {
     }
 }
 
-impl CanonicalEncode for CompositionEvidence {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CompositionEvidence {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-COMPOSITION-EVIDENCE\0");
         output.extend_from_slice(&COMPOSITION_FORMAT_VERSION.to_be_bytes());
         put_u32_length(output, self.claim_evidence.len())?;
@@ -2122,6 +2376,13 @@ impl CanonicalEncode for CompositionEvidence {
             }
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -2187,12 +2448,16 @@ pub enum CompositionClaim {
 impl CompositionClaim {
     /// Computes the canonical claim commitment for evidence indexing or tests.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
-        hash_canonical::<H>("zeno-fcis/composition-claim", self)
+        hash_canonical::<H>(
+            zeno_fcis_codec::domains::COMPOSITION_CLAIM,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for CompositionClaim {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CompositionClaim {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-COMPOSITION-CLAIM\0");
         output.extend_from_slice(&COMPOSITION_FORMAT_VERSION.to_be_bytes());
         match self {
@@ -2256,17 +2521,25 @@ impl CanonicalEncode for CompositionClaim {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 /// External verifier for exact, content-addressed composition statements.
 pub trait EvidenceVerifier {
-    /// Returns true only when the artifact proves the complete supplied claim
-    /// under the verifier's pinned semantics and toolchain.
-    fn verify(&self, claim: &CompositionClaim, artifact: Hash32) -> bool;
+    /// Reports whether these exact bytes establish the supplied claim under
+    /// the selected semantics and toolchain. The answer remains Attested.
+    fn verify(&self, claim: &CompositionClaim, artifact: &[u8]) -> bool;
 }
 
 /// One fail-closed composition blocker.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum CompositionBlocker {
     /// The specification could not be canonically committed.
     CompositionIdentityFailure,
@@ -2401,12 +2674,16 @@ impl DeterministicParallelAuthorization {
 
     /// Computes the complete authorization commitment.
     pub fn commitment<H: CommitmentHasher>(&self) -> Result<Hash32, ContractError> {
-        hash_footprint_canonical::<H>("zeno-fcis/deterministic-parallel-authorization", self)
+        hash_footprint_canonical::<H>(
+            zeno_fcis_codec::domains::DETERMINISTIC_PARALLEL_AUTHORIZATION,
+            (self).canonical_bytes(),
+        )
     }
 }
 
-impl CanonicalEncode for DeterministicParallelAuthorization {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl DeterministicParallelAuthorization {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(b"ZFCIS-DETERMINISTIC-PARALLEL-AUTHORIZATION\0");
         output.extend_from_slice(&FOOTPRINT_WITNESS_FORMAT_VERSION.to_be_bytes());
         output.extend_from_slice(self.spec_hash.as_bytes());
@@ -2416,6 +2693,13 @@ impl CanonicalEncode for DeterministicParallelAuthorization {
             put_blob(output, &witness.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -2430,7 +2714,8 @@ pub fn verify_assume_guarantee<H: CommitmentHasher, V: EvidenceVerifier>(
         return composition_identity_failure();
     };
     CompositionReport {
-        blockers: assume_guarantee_blockers(spec, evidence, verifier, spec_hash).into_boxed_slice(),
+        blockers: assume_guarantee_blockers::<H, V>(spec, evidence, verifier, spec_hash)
+            .into_boxed_slice(),
     }
 }
 
@@ -2448,7 +2733,7 @@ fn composition_identity_failure() -> CompositionReport {
 /// hasher. Recomputing it here could only reproduce the same 32 bytes, so each
 /// public entry commits the specification exactly once and passes the result
 /// down. The order in which blockers are appended is part of the report.
-fn assume_guarantee_blockers<V: EvidenceVerifier>(
+fn assume_guarantee_blockers<H: CommitmentHasher, V: EvidenceVerifier>(
     spec: &CompositionSpec,
     evidence: &CompositionEvidence,
     verifier: &V,
@@ -2462,7 +2747,7 @@ fn assume_guarantee_blockers<V: EvidenceVerifier>(
                 component: component.id(),
                 claim: guarantee.claim(),
             };
-            if !accepted_claim(evidence, verifier, guarantee.claim(), &claim) {
+            if !accepted_claim::<H, V>(evidence, verifier, guarantee.claim(), &claim) {
                 blockers.push(CompositionBlocker::MissingGuaranteeEvidence {
                     component: component.id(),
                     claim: guarantee.claim(),
@@ -2476,7 +2761,7 @@ fn assume_guarantee_blockers<V: EvidenceVerifier>(
                 protected: frame.protected().clone(),
                 claim: frame.proof_claim(),
             };
-            if !accepted_claim(evidence, verifier, frame.proof_claim(), &claim) {
+            if !accepted_claim::<H, V>(evidence, verifier, frame.proof_claim(), &claim) {
                 blockers.push(CompositionBlocker::MissingFrameEvidence {
                     component: component.id(),
                     claim: frame.proof_claim(),
@@ -2518,7 +2803,8 @@ fn assume_guarantee_blockers<V: EvidenceVerifier>(
                 assumption: assumption.claim(),
                 providers: discharge.providers().to_vec().into_boxed_slice(),
             };
-            if !providers_valid || !verifier.verify(&claim, discharge.artifact()) {
+            if !providers_valid || !accepted_artifact::<H, V>(&discharge.artifact, verifier, &claim)
+            {
                 blockers.push(CompositionBlocker::MissingAssumptionDischarge {
                     component: component.id(),
                     claim: assumption.claim(),
@@ -2561,7 +2847,7 @@ fn assume_guarantee_blockers<V: EvidenceVerifier>(
             spec_hash,
             claim: *claim_hash,
         };
-        if !accepted_claim(evidence, verifier, *claim_hash, &claim) {
+        if !accepted_claim::<H, V>(evidence, verifier, *claim_hash, &claim) {
             blockers.push(CompositionBlocker::MissingCouplingEvidence { claim: *claim_hash });
         }
     }
@@ -2581,7 +2867,7 @@ pub fn verify_deterministic_parallel<H: CommitmentHasher, V: EvidenceVerifier>(
         return composition_identity_failure();
     };
     CompositionReport {
-        blockers: deterministic_parallel_blockers(
+        blockers: deterministic_parallel_blockers::<H, V>(
             spec,
             evidence,
             expected_context,
@@ -2594,14 +2880,14 @@ pub fn verify_deterministic_parallel<H: CommitmentHasher, V: EvidenceVerifier>(
 
 /// Collects deterministic-parallel blockers under an already computed
 /// specification identity, starting from the assume-guarantee blockers.
-fn deterministic_parallel_blockers<V: EvidenceVerifier>(
+fn deterministic_parallel_blockers<H: CommitmentHasher, V: EvidenceVerifier>(
     spec: &CompositionSpec,
     evidence: &CompositionEvidence,
     expected_context: &ParallelVerificationContext,
     verifier: &V,
     spec_hash: Hash32,
 ) -> Vec<CompositionBlocker> {
-    let mut blockers = assume_guarantee_blockers(spec, evidence, verifier, spec_hash);
+    let mut blockers = assume_guarantee_blockers::<H, V>(spec, evidence, verifier, spec_hash);
     if expected_context.composition_spec_hash() != spec_hash
         || expected_context.merge_order() != spec.merge_order()
     {
@@ -2623,7 +2909,7 @@ fn deterministic_parallel_blockers<V: EvidenceVerifier>(
                     continue;
                 };
                 let claim = CompositionClaim::ConflictLaw { spec_hash, law };
-                if !accepted_claim(evidence, verifier, law.claim(), &claim) {
+                if !accepted_claim::<H, V>(evidence, verifier, law.claim(), &claim) {
                     blockers.push(CompositionBlocker::MissingConflictLawEvidence {
                         left: left.id(),
                         right: right.id(),
@@ -2649,7 +2935,7 @@ fn deterministic_parallel_blockers<V: EvidenceVerifier>(
                 sequential_result: parity.sequential_result(),
                 composed_result: parity.composed_result(),
             };
-            if !verifier.verify(&claim, parity.artifact()) {
+            if !accepted_artifact::<H, V>(&parity.artifact, verifier, &claim) {
                 blockers.push(CompositionBlocker::UnverifiedSequentialParityEvidence);
             }
         }
@@ -2724,13 +3010,11 @@ pub fn authorize_deterministic_parallel<
                 },
             );
         }
-        let witness =
-            verify_complete_footprint(expected, supplied, footprint_verifier).map_err(|error| {
-                ParallelAuthorizationError::FootprintEvidence {
-                    component: component.id(),
-                    index,
-                    error,
-                }
+        let witness = verify_complete_footprint::<H, F>(expected, supplied, footprint_verifier)
+            .map_err(|error| ParallelAuthorizationError::FootprintEvidence {
+                component: component.id(),
+                index,
+                error,
             })?;
         footprint_witnesses.push(witness);
     }
@@ -2743,8 +3027,13 @@ pub fn authorize_deterministic_parallel<
             composition_identity_failure(),
         ));
     };
-    let blockers =
-        deterministic_parallel_blockers(spec, evidence, expected_context, verifier, spec_hash);
+    let blockers = deterministic_parallel_blockers::<H, V>(
+        spec,
+        evidence,
+        expected_context,
+        verifier,
+        spec_hash,
+    );
     if !blockers.is_empty() {
         return Err(ParallelAuthorizationError::Composition(CompositionReport {
             blockers: blockers.into_boxed_slice(),
@@ -2781,7 +3070,7 @@ fn component_conflicts(left: &ComponentContract, right: &ComponentContract) -> V
     output
 }
 
-fn accepted_claim<V: EvidenceVerifier>(
+fn accepted_claim<H: CommitmentHasher, V: EvidenceVerifier>(
     evidence: &CompositionEvidence,
     verifier: &V,
     claim_hash: Hash32,
@@ -2789,7 +3078,15 @@ fn accepted_claim<V: EvidenceVerifier>(
 ) -> bool {
     evidence
         .claim(claim_hash)
-        .is_some_and(|item| verifier.verify(claim, item.artifact()))
+        .is_some_and(|item| accepted_artifact::<H, V>(&item.artifact, verifier, claim))
+}
+
+fn accepted_artifact<H: CommitmentHasher, V: EvidenceVerifier>(
+    artifact: &EvidenceArtifact,
+    verifier: &V,
+    claim: &CompositionClaim,
+) -> bool {
+    artifact.matches::<H>() && verifier.verify(claim, artifact.bytes())
 }
 
 fn has_duplicate_components(components: &[ComponentId]) -> bool {
@@ -2799,22 +3096,18 @@ fn has_duplicate_components(components: &[ComponentId]) -> bool {
 }
 
 fn hash_canonical<H: CommitmentHasher>(
-    domain_name: &'static str,
-    value: &impl CanonicalEncode,
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, ContractError> {
-    let bytes = value.canonical_bytes().map_err(ContractError::Encode)?;
-    let domain =
-        Domain::new(domain_name, COMPOSITION_FORMAT_VERSION).map_err(ContractError::Encode)?;
+    let bytes = value.map_err(ContractError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(ContractError::Encode)
 }
 
 fn hash_footprint_canonical<H: CommitmentHasher>(
-    domain_name: &'static str,
-    value: &impl CanonicalEncode,
+    domain: Domain<'static>,
+    value: Result<Vec<u8>, EncodeError>,
 ) -> Result<Hash32, ContractError> {
-    let bytes = value.canonical_bytes().map_err(ContractError::Encode)?;
-    let domain = Domain::new(domain_name, FOOTPRINT_WITNESS_FORMAT_VERSION)
-        .map_err(ContractError::Encode)?;
+    let bytes = value.map_err(ContractError::Encode)?;
     commitment::<H>(domain, &bytes).map_err(ContractError::Encode)
 }
 
@@ -2838,11 +3131,14 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 
 /// Failure to mint a nominal complete-footprint witness.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum FootprintWitnessError {
     /// The evidence describes a different authority-owned component binding.
     AuthorityBindingMismatch,
     /// The claimed verifier differs from the verifier that made the decision.
     VerifierIdentityMismatch,
+    /// Retained bytes do not match their digest under the selected provider.
+    ArtifactDigestMismatch,
     /// The independent verifier rejected the retained evidence.
     UnverifiedEvidence,
 }
@@ -2856,6 +3152,9 @@ impl fmt::Display for FootprintWitnessError {
             Self::VerifierIdentityMismatch => {
                 formatter.write_str("footprint verifier identity does not match")
             }
+            Self::ArtifactDigestMismatch => {
+                formatter.write_str("footprint artifact digest mismatch")
+            }
             Self::UnverifiedEvidence => {
                 formatter.write_str("footprint completeness evidence was not verified")
             }
@@ -2868,6 +3167,7 @@ impl std::error::Error for FootprintWitnessError {}
 
 /// Failure to authorize deterministic-parallel execution.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ParallelAuthorizationError {
     /// The authority binding count differs from the component count.
     AuthorityBindingSetCardinality,
@@ -2953,6 +3253,7 @@ impl std::error::Error for ParallelAuthorizationError {}
 
 /// Contract construction failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ContractError {
     /// A stable identifier or composition version was zero.
     ZeroIdentifier,
@@ -3061,32 +3362,22 @@ mod tests {
     use super::*;
     use alloc::vec;
 
-    #[derive(Clone, Copy, Debug)]
-    struct TestHasher;
-
-    impl CommitmentHasher for TestHasher {
-        const ALGORITHM_ID: &'static str = "test-only/1";
-
-        fn hash(bytes: &[u8]) -> Hash32 {
-            let mut output = [0_u8; 32];
-            for (index, byte) in bytes.iter().enumerate() {
-                let slot = index % output.len();
-                output[slot] = output[slot]
-                    .wrapping_add(*byte)
-                    .rotate_left((index % 8) as u32);
-            }
-            Hash32::new(output)
-        }
-    }
+    use zeno_fcis_codec::RustCryptoSha256 as TestHasher;
 
     struct ExactVerifier;
 
     impl EvidenceVerifier for ExactVerifier {
-        fn verify(&self, claim: &CompositionClaim, artifact: Hash32) -> bool {
-            claim.commitment::<TestHasher>().ok() == Some(artifact)
+        fn verify(&self, claim: &CompositionClaim, artifact: &[u8]) -> bool {
+            claim.canonical_bytes().ok().as_deref() == Some(artifact)
         }
     }
 
+    // Toy native verifier fixture: exact canonical claim bytes, not a proof.
+    fn evidence_artifact(bytes: Result<Vec<u8>, EncodeError>) -> EvidenceArtifact {
+        EvidenceArtifact::new::<TestHasher>(
+            bytes.unwrap_or_else(|error| panic!("artifact bytes: {error}")),
+        )
+    }
     fn hash(byte: u8) -> Hash32 {
         Hash32::new([byte; 32])
     }
@@ -3136,12 +3427,67 @@ mod tests {
     }
 
     fn claim_evidence(claim_hash: Hash32, claim: CompositionClaim) -> ClaimEvidence {
-        ClaimEvidence::new(
-            claim_hash,
-            claim
-                .commitment::<TestHasher>()
-                .unwrap_or_else(|error| panic!("claim hash: {error}")),
+        ClaimEvidence::new(claim_hash, evidence_artifact(claim.canonical_bytes()))
+    }
+
+    #[test]
+    fn composition_checks_claim_binding_before_external_attestation() {
+        use core::cell::Cell;
+
+        struct CountingVerifier(Cell<usize>);
+        impl EvidenceVerifier for CountingVerifier {
+            fn verify(&self, _: &CompositionClaim, _: &[u8]) -> bool {
+                self.0.set(self.0.get() + 1);
+                true
+            }
+        }
+        let guarantee = hash(20);
+        let component = contract(
+            1,
+            Footprint::default(),
+            PathSet::empty(),
+            vec![],
+            vec![Guarantee::new(guarantee, PathSet::empty())],
+            vec![],
+        );
+        let spec = CompositionSpec::try_new(
+            2,
+            vec![component],
+            vec![],
+            vec![],
+            vec![ComponentId::new(1)],
         )
+        .unwrap_or_else(|error| panic!("spec: {error}"));
+        let claim = CompositionClaim::Guarantee {
+            spec_hash: spec
+                .commitment::<TestHasher>()
+                .unwrap_or_else(|error| panic!("spec hash: {error}")),
+            component: ComponentId::new(1),
+            claim: guarantee,
+        };
+        let artifact = EvidenceArtifact::new::<TestHasher>(
+            claim
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("claim bytes: {error}")),
+        );
+        assert!(artifact.matches::<TestHasher>());
+        let evidence = CompositionEvidence::try_new(
+            vec![ClaimEvidence::new(hash(21), artifact)],
+            vec![],
+            None,
+        )
+        .unwrap_or_else(|error| panic!("evidence: {error}"));
+        let verifier = CountingVerifier(Cell::new(0));
+        let report = verify_assume_guarantee::<TestHasher, _>(&spec, &evidence, &verifier);
+        assert!(!report.is_verified());
+        assert_eq!(verifier.0.get(), 0);
+        assert_eq!(
+            report.blockers(),
+            &[CompositionBlocker::MissingGuaranteeEvidence {
+                component: ComponentId::new(1),
+                claim: guarantee,
+            }]
+        );
     }
 
     #[test]
@@ -3222,9 +3568,7 @@ mod tests {
             ComponentId::new(2),
             assumption_claim,
             providers,
-            discharge_claim
-                .commitment::<TestHasher>()
-                .unwrap_or_else(|error| panic!("discharge hash: {error}")),
+            evidence_artifact(discharge_claim.canonical_bytes()),
         )
         .unwrap_or_else(|error| panic!("discharge: {error}"));
         let guarantee = CompositionClaim::Guarantee {
@@ -3249,7 +3593,12 @@ mod tests {
             ComponentId::new(2),
             assumption_claim,
             vec![wrong_provider],
-            evidence.assumption_discharges()[0].artifact(),
+            EvidenceArtifact::new::<TestHasher>(
+                evidence.assumption_discharges()[0]
+                    .artifact()
+                    .as_bytes()
+                    .to_vec(),
+            ),
         )
         .unwrap_or_else(|error| panic!("substituted: {error}"));
         let substituted_evidence = CompositionEvidence::try_new(
@@ -3317,9 +3666,7 @@ mod tests {
             expected.clone(),
             result_hash,
             result_hash,
-            parity_claim
-                .commitment::<TestHasher>()
-                .unwrap_or_else(|error| panic!("parity claim: {error}")),
+            evidence_artifact(parity_claim.canonical_bytes()),
         )
         .unwrap_or_else(|error| panic!("parity: {error}"));
         let law_statement = CompositionClaim::ConflictLaw {
@@ -3440,9 +3787,7 @@ mod tests {
             mutated,
             result_hash,
             result_hash,
-            claim
-                .commitment::<TestHasher>()
-                .unwrap_or_else(|error| panic!("claim: {error}")),
+            evidence_artifact(claim.canonical_bytes()),
         )
         .unwrap_or_else(|error| panic!("parity: {error}"));
         let evidence = CompositionEvidence::try_new(vec![], vec![], Some(parity))
@@ -3460,3 +3805,23 @@ mod tests {
         );
     }
 }
+
+// Private observation of the actual specification commitment boundary. The
+// module and its call site do not exist in ordinary compiled production code.
+#[cfg(test)]
+mod commitment_observation {
+    extern crate std;
+    use core::cell::Cell;
+    std::thread_local! { static COUNT: Cell<usize> = const { Cell::new(0) }; }
+    pub(super) fn record() {
+        COUNT.with(|count| count.set(count.get() + 1));
+    }
+    pub(super) fn reset() {
+        COUNT.with(|count| count.set(0));
+    }
+    pub(super) fn count() -> usize {
+        COUNT.with(Cell::get)
+    }
+}
+#[cfg(test)]
+mod composition_identity_tests;

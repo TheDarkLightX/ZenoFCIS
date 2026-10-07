@@ -1,22 +1,22 @@
 @rc2 @architecture @authority
-Feature: Build deterministic composed applications without bypassing authority
-  Software architects should be able to compose narrow domain machines while
-  keeping canonical sequential execution and nominal commit authorization as
-  explicit global decisions.
+Feature: Preserve historical composition evidence and current checked authority
+  Historical composition assertions remain private executable references.
+  Current checked publication binds complete declarations and original inputs.
 
   @atdd-composed-program
-  Scenario: Execute fixed domain machines through one global composition
-    Given fixed machine interfaces and an explicit canonical composition
-    When the composed program executes its bounded test portfolio
-    Then local results merge through the declared global order
-    And proof-carrying parallel claims do not replace the sequential oracle
+  Scenario: Retain historical composed-program reference checks
+    Given retained private fixed machine interfaces and canonical composition
+    When the historical oracle runs construction and executed-suffix output-presence assertions
+    Then exact identities paths effects reason domains and required output presence retain their original checks
+    And this evidence grants no current composed-program publication capability
 
   @atdd-production-authority
   Scenario: Admit only catalog and invocation bound transitions
-    Given an authority-owned catalog program laws provider deployment and genesis
-    When the authority crate runs its complete test portfolio
-    Then raw bundles and caller-selected authority inputs cannot enter the production port
-    And rejection cannot produce a committable transition
+    Given a checked catalog program and complete original schema policy and inputs
+    When current catalog authority and public program API tests run
+    Then all decision classes preserve original wires actual work and exact replay
+    And changed inputs policy source and subjects are refused
+    And rejection exposes no publication and failed initial laws expose no genesis
 
   @atdd-sqlite-authority
   Scenario: Persist an authorized transition and its exact outbox obligations

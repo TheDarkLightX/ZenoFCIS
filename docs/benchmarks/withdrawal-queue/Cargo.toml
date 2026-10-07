@@ -1,0 +1,16 @@
+[package]
+name = "zeno-withdrawal-research"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.97.1"
+publish = false
+
+[workspace]
+
+[dependencies]
+zeno-fcis-synthesis = { path = "../../../crates/zeno-fcis-synthesis" }
+zeno-fcis-codec = { path = "../../../crates/zeno-fcis-codec" }
+
+[profile.release]
+overflow-checks = true
+

@@ -15,8 +15,8 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use zeno_fcis_codec::{
-    CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain, EncodeError, Hash32,
-    commitment, decode_value,
+    CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, EncodeError, Hash32, commitment,
+    decode_value,
 };
 use zeno_fcis_value::Value;
 
@@ -114,13 +114,21 @@ impl Effect {
     }
 }
 
-impl CanonicalEncode for Effect {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Effect {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.ordinal.to_be_bytes());
         output.extend_from_slice(&self.operation.to_be_bytes());
         output.extend_from_slice(self.authority.as_bytes());
         output.extend_from_slice(self.subject.as_bytes());
         put_blob(output, &self.payload.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -155,13 +163,21 @@ impl CommitPlan {
     }
 }
 
-impl CanonicalEncode for CommitPlan {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl CommitPlan {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_length(output, self.effects.len())?;
         for effect in &self.effects {
             put_blob(output, &effect.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -218,17 +234,27 @@ impl OutboxEntry {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(candidate_id.as_bytes());
         self.encode_to(&mut bytes)?;
-        let domain = Domain::new("zeno-fcis/delivery", 1)?;
+        let domain = zeno_fcis_codec::domains::DELIVERY;
+        #[cfg(test)]
+        delivery_observation::record();
         commitment::<H>(domain, &bytes)
     }
 }
 
-impl CanonicalEncode for OutboxEntry {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl OutboxEntry {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(&self.ordinal.to_be_bytes());
         output.extend_from_slice(&self.channel.to_be_bytes());
         put_blob(output, &self.destination.canonical_bytes()?)?;
         put_blob(output, &self.payload.canonical_bytes()?)
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -267,13 +293,21 @@ impl OutboxPlan {
     }
 }
 
-impl CanonicalEncode for OutboxPlan {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl OutboxPlan {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         put_length(output, self.entries.len())?;
         for entry in &self.entries {
             put_blob(output, &entry.canonical_bytes()?)?;
         }
         Ok(())
+    }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
     }
 }
 
@@ -310,7 +344,7 @@ pub fn decode_commit_plan(
     ensure_plan_consumed(&cursor)?;
 
     let plan = CommitPlan::try_new(effects).map_err(PlanDecodeError::Plan)?;
-    ensure_canonical_plan(bytes, &plan)?;
+    ensure_canonical_plan(bytes, plan.canonical_bytes())?;
     Ok(plan)
 }
 
@@ -351,7 +385,7 @@ pub fn decode_outbox_plan(
     ensure_plan_consumed(&cursor)?;
 
     let plan = OutboxPlan::try_new(entries).map_err(PlanDecodeError::Plan)?;
-    ensure_canonical_plan(bytes, &plan)?;
+    ensure_canonical_plan(bytes, plan.canonical_bytes())?;
     Ok(plan)
 }
 
@@ -375,11 +409,11 @@ fn ensure_plan_consumed(cursor: &PlanCursor<'_>) -> Result<(), PlanDecodeError> 
     Ok(())
 }
 
-fn ensure_canonical_plan<T: CanonicalEncode>(
+fn ensure_canonical_plan(
     input: &[u8],
-    plan: &T,
+    plan: Result<Vec<u8>, EncodeError>,
 ) -> Result<(), PlanDecodeError> {
-    let encoded = plan.canonical_bytes().map_err(PlanDecodeError::Encode)?;
+    let encoded = plan.map_err(PlanDecodeError::Encode)?;
     if encoded.as_slice() != input {
         return Err(PlanDecodeError::NonCanonical);
     }
@@ -536,6 +570,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 
 /// Closed-plan construction failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum PlanError {
     /// Two commit-evidence records share one ordinal.
     DuplicateEffectOrdinal(u32),
@@ -545,6 +580,7 @@ pub enum PlanError {
 
 /// Strict canonical plan decoding failure.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum PlanDecodeError {
     /// Complete input exceeds the declared byte limit.
     InputLimit {
@@ -673,10 +709,9 @@ mod tests {
         OutboxEntry::new(ordinal, 20, destination, payload)
     }
 
-    fn encode_items<T: CanonicalEncode>(items: &[T]) -> Vec<u8> {
+    fn encode_items(items: impl ExactSizeIterator<Item = Result<Vec<u8>, EncodeError>>) -> Vec<u8> {
         let encoded = items
-            .iter()
-            .map(|item| match item.canonical_bytes() {
+            .map(|item| match item {
                 Ok(encoded) => encoded,
                 Err(error) => panic!("test item encoding: {error}"),
             })
@@ -704,32 +739,29 @@ mod tests {
 
     #[test]
     fn delivery_id_preserves_recorded_hash_input() {
-        struct RecordedHasher;
-        impl CommitmentHasher for RecordedHasher {
-            const ALGORITHM_ID: &'static str = "test/recorded-delivery-input";
-
-            fn hash(bytes: &[u8]) -> Hash32 {
-                // Captured before direct encoding; this provider checks the
-                // complete framing before returning its recorded SHA-256.
-                assert_eq!(
-                    bytes,
-                    &[
-                        90, 69, 78, 79, 70, 67, 73, 83, 45, 72, 65, 83, 72, 0, 0, 1, 0, 18, 122,
-                        101, 110, 111, 45, 102, 99, 105, 115, 47, 100, 101, 108, 105, 118, 101,
-                        114, 121, 0, 0, 0, 0, 0, 0, 0, 50, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
-                        42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
-                        42, 42, 42, 0, 0, 0, 7, 0, 0, 0, 20, 0, 0, 0, 1, 0, 0, 0, 0, 1, 2
-                    ]
-                );
-                Hash32::new([
-                    27, 179, 49, 243, 149, 88, 107, 201, 76, 187, 167, 125, 203, 69, 244, 66, 120,
-                    103, 204, 225, 190, 180, 75, 246, 61, 166, 77, 125, 88, 30, 4, 172,
-                ])
-            }
-        }
-        let entry = OutboxEntry::new(7, 20, Value::Unit, Value::Bool(true));
+        let entry = OutboxEntry::new(7, 20, Value::unit(), Value::boolean(true));
+        let mut payload = vec![42; 32];
+        payload.extend_from_slice(
+            &entry
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("entry: {error}")),
+        );
+        let preimage =
+            zeno_fcis_codec::domain_preimage(zeno_fcis_codec::domains::DELIVERY, &payload)
+                .unwrap_or_else(|error| panic!("preimage: {error}"));
         assert_eq!(
-            entry.delivery_id::<RecordedHasher>(Hash32::new([42; 32])),
+            preimage.as_slice(),
+            &[
+                90, 69, 78, 79, 70, 67, 73, 83, 45, 72, 65, 83, 72, 0, 0, 1, 0, 18, 122, 101, 110,
+                111, 45, 102, 99, 105, 115, 47, 100, 101, 108, 105, 118, 101, 114, 121, 0, 0, 0, 0,
+                0, 0, 0, 50, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+                42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 0, 0, 0, 7, 0, 0, 0,
+                20, 0, 0, 0, 1, 0, 0, 0, 0, 1, 2
+            ]
+        );
+
+        assert_eq!(
+            entry.delivery_id::<zeno_fcis_codec::RustCryptoSha256>(Hash32::new([42; 32])),
             Ok(Hash32::new([
                 27, 179, 49, 243, 149, 88, 107, 201, 76, 187, 167, 125, 203, 69, 244, 66, 120, 103,
                 204, 225, 190, 180, 75, 246, 61, 166, 77, 125, 88, 30, 4, 172
@@ -739,31 +771,49 @@ mod tests {
 
     #[test]
     fn invalid_delivery_values_preserve_error_order_without_hashing() {
-        struct RejectHashing;
-        impl CommitmentHasher for RejectHashing {
-            const ALGORITHM_ID: &'static str = "test/no-hash-on-invalid-delivery";
-
-            fn hash(_: &[u8]) -> Hash32 {
-                panic!("invalid delivery must not reach the hash provider")
-            }
-        }
-        let text = Value::Text(alloc::string::String::from("é").into_boxed_str());
-        let record = Value::Record(
-            vec![
-                zeno_fcis_value::Field::new(1, Value::Unit),
-                zeno_fcis_value::Field::new(1, Value::Unit),
-            ]
-            .into_boxed_slice(),
+        use zeno_fcis_value::{ValueError, ValueLimits};
+        assert_eq!(
+            Value::text_ascii_with_limits("é".into(), ValueLimits::default()),
+            Err(ValueError::NonAsciiText)
         );
+        assert_eq!(
+            Value::record_canonical(vec![
+                zeno_fcis_value::Field::new(1, Value::unit()),
+                zeno_fcis_value::Field::new(1, Value::unit()),
+            ]),
+            Err(ValueError::RecordFieldOrder {
+                previous: 1,
+                current: 1
+            })
+        );
+        let mut depth = Value::unit();
+        for _ in 0..65 {
+            depth = Value::tuple(vec![depth]).unwrap_or_else(|error| panic!("tuple: {error}"));
+        }
+        let collection = Value::vector(vec![Value::unit(); 1_000_001])
+            .unwrap_or_else(|error| panic!("vector: {error}"));
+        let depth_error = EncodeError::InvalidValue(ValueError::DepthLimit {
+            limit: 64,
+            attempted: 65,
+        });
+        let collection_error = EncodeError::InvalidValue(ValueError::CollectionLimit {
+            limit: 1_000_000,
+            attempted: 1_000_001,
+        });
         let cases = [
-            (text.clone(), record.clone(), EncodeError::NonAsciiText),
-            (record, text.clone(), EncodeError::NonCanonicalRecord),
-            (Value::Unit, text, EncodeError::NonAsciiText),
+            (depth.clone(), collection.clone(), depth_error.clone()),
+            (collection, depth.clone(), collection_error),
+            (Value::unit(), depth, depth_error),
         ];
         for (destination, payload, error) in cases {
             let entry = OutboxEntry::new(u32::MAX, u32::MAX, destination, payload);
             let before = entry.clone();
-            assert_eq!(entry.delivery_id::<RejectHashing>(Hash32::ZERO), Err(error));
+            delivery_observation::reset();
+            assert_eq!(
+                entry.delivery_id::<zeno_fcis_codec::RustCryptoSha256>(Hash32::ZERO),
+                Err(error)
+            );
+            assert_eq!(delivery_observation::count(), 0);
             assert_eq!(entry, before);
         }
     }
@@ -771,8 +821,8 @@ mod tests {
     #[test]
     fn effect_order_is_canonical() {
         let effects = vec![
-            Effect::new(2, 10, Hash32::ZERO, Hash32::ZERO, Value::U128(2)),
-            Effect::new(1, 10, Hash32::ZERO, Hash32::ZERO, Value::U128(1)),
+            Effect::new(2, 10, Hash32::ZERO, Hash32::ZERO, Value::unsigned(2)),
+            Effect::new(1, 10, Hash32::ZERO, Hash32::ZERO, Value::unsigned(1)),
         ];
         let plan = CommitPlan::try_new(effects);
         assert!(plan.is_ok());
@@ -786,8 +836,8 @@ mod tests {
     #[test]
     fn duplicate_outbox_ordinals_fail_closed() {
         let entries = vec![
-            OutboxEntry::new(1, 1, Value::Unit, Value::Bool(true)),
-            OutboxEntry::new(1, 2, Value::Unit, Value::Bool(false)),
+            OutboxEntry::new(1, 1, Value::unit(), Value::boolean(true)),
+            OutboxEntry::new(1, 2, Value::unit(), Value::boolean(false)),
         ];
         assert_eq!(
             OutboxPlan::try_new(entries),
@@ -798,15 +848,15 @@ mod tests {
     #[test]
     fn strict_decoders_round_trip_complete_canonical_plans() {
         let commit = match CommitPlan::try_new(vec![
-            effect(2, Value::Bool(true)),
-            effect(1, Value::U128(7)),
+            effect(2, Value::boolean(true)),
+            effect(1, Value::unsigned(7)),
         ]) {
             Ok(plan) => plan,
             Err(error) => panic!("commit plan: {error}"),
         };
         let outbox = match OutboxPlan::try_new(vec![
-            outbox_entry(2, Value::U128(9), Value::Bool(false)),
-            outbox_entry(1, Value::Unit, Value::Bool(true)),
+            outbox_entry(2, Value::unsigned(9), Value::boolean(false)),
+            outbox_entry(1, Value::unit(), Value::boolean(true)),
         ]) {
             Ok(plan) => plan,
             Err(error) => panic!("outbox plan: {error}"),
@@ -871,8 +921,16 @@ mod tests {
 
     #[test]
     fn input_and_cardinality_limits_are_exact() {
-        let commit_bytes = encode_items(&[effect(1, Value::Unit)]);
-        let outbox_bytes = encode_items(&[outbox_entry(1, Value::Unit, Value::Bool(true))]);
+        let commit_bytes = encode_items(
+            [effect(1, Value::unit())]
+                .iter()
+                .map(|item| item.canonical_bytes()),
+        );
+        let outbox_bytes = encode_items(
+            [outbox_entry(1, Value::unit(), Value::boolean(true))]
+                .iter()
+                .map(|item| item.canonical_bytes()),
+        );
         let commit_length = match u64::try_from(commit_bytes.len()) {
             Ok(length) => length,
             Err(error) => panic!("commit length: {error}"),
@@ -933,11 +991,16 @@ mod tests {
 
     #[test]
     fn aggregate_value_limits_cover_complete_outbox_plans() {
-        let bytes = encode_items(&[outbox_entry(
-            1,
-            Value::Bytes(vec![1_u8, 2].into_boxed_slice()),
-            Value::Bytes(vec![3_u8, 4, 5].into_boxed_slice()),
-        )]);
+        let bytes = encode_items(
+            [outbox_entry(
+                1,
+                Value::bytes(vec![1_u8, 2]).unwrap_or_else(|error| panic!("test bytes: {error}")),
+                Value::bytes(vec![3_u8, 4, 5])
+                    .unwrap_or_else(|error| panic!("test bytes: {error}")),
+            )]
+            .iter()
+            .map(|item| item.canonical_bytes()),
+        );
         let exact = PlanDecodeLimits {
             max_value_nodes: 2,
             max_value_payload_bytes: 5,
@@ -974,10 +1037,15 @@ mod tests {
 
     #[test]
     fn nested_value_limits_propagate_without_partial_plans() {
-        let bytes = encode_items(&[effect(
-            1,
-            Value::Vector(vec![Value::Unit, Value::Unit].into_boxed_slice()),
-        )]);
+        let bytes = encode_items(
+            [effect(
+                1,
+                Value::vector(vec![Value::unit(), Value::unit()])
+                    .unwrap_or_else(|error| panic!("test vector: {error}")),
+            )]
+            .iter()
+            .map(|item| item.canonical_bytes()),
+        );
         let mut limits = PlanDecodeLimits::default();
         limits.value.value.max_collection_len = 1;
         assert_eq!(
@@ -988,7 +1056,11 @@ mod tests {
             }))
         );
 
-        let unit_bytes = encode_items(&[effect(1, Value::Unit)]);
+        let unit_bytes = encode_items(
+            [effect(1, Value::unit())]
+                .iter()
+                .map(|item| item.canonical_bytes()),
+        );
         limits = PlanDecodeLimits::default();
         limits.value.max_input_bytes = 1;
         assert!(decode_commit_plan(&unit_bytes, limits).is_ok());
@@ -1004,11 +1076,22 @@ mod tests {
 
     #[test]
     fn alternate_item_order_is_rejected_for_both_plan_kinds() {
-        let commit = encode_items(&[effect(2, Value::Bool(false)), effect(1, Value::Bool(true))]);
-        let outbox = encode_items(&[
-            outbox_entry(2, Value::Unit, Value::Bool(false)),
-            outbox_entry(1, Value::Unit, Value::Bool(true)),
-        ]);
+        let commit = encode_items(
+            [
+                effect(2, Value::boolean(false)),
+                effect(1, Value::boolean(true)),
+            ]
+            .iter()
+            .map(|item| item.canonical_bytes()),
+        );
+        let outbox = encode_items(
+            [
+                outbox_entry(2, Value::unit(), Value::boolean(false)),
+                outbox_entry(1, Value::unit(), Value::boolean(true)),
+            ]
+            .iter()
+            .map(|item| item.canonical_bytes()),
+        );
         assert_eq!(
             decode_commit_plan(&commit, PlanDecodeLimits::default()),
             Err(PlanDecodeError::NonCanonical)
@@ -1021,11 +1104,19 @@ mod tests {
 
     #[test]
     fn duplicate_ordinals_are_rejected_during_reconstruction() {
-        let commit = encode_items(&[effect(1, Value::Unit), effect(1, Value::Bool(true))]);
-        let outbox = encode_items(&[
-            outbox_entry(1, Value::Unit, Value::Bool(false)),
-            outbox_entry(1, Value::Unit, Value::Bool(true)),
-        ]);
+        let commit = encode_items(
+            [effect(1, Value::unit()), effect(1, Value::boolean(true))]
+                .iter()
+                .map(|item| item.canonical_bytes()),
+        );
+        let outbox = encode_items(
+            [
+                outbox_entry(1, Value::unit(), Value::boolean(false)),
+                outbox_entry(1, Value::unit(), Value::boolean(true)),
+            ]
+            .iter()
+            .map(|item| item.canonical_bytes()),
+        );
         assert_eq!(
             decode_commit_plan(&commit, PlanDecodeLimits::default()),
             Err(PlanDecodeError::Plan(PlanError::DuplicateEffectOrdinal(1)))
@@ -1038,7 +1129,7 @@ mod tests {
 
     #[test]
     fn malformed_nested_and_item_bytes_fail_closed() {
-        let mut encoded_effect = match effect(1, Value::Unit).canonical_bytes() {
+        let mut encoded_effect = match effect(1, Value::unit()).canonical_bytes() {
             Ok(bytes) => bytes,
             Err(error) => panic!("effect bytes: {error}"),
         };
@@ -1049,7 +1140,7 @@ mod tests {
             Err(PlanDecodeError::TrailingBytes { .. })
         ));
 
-        let mut invalid_value_effect = match effect(1, Value::Unit).canonical_bytes() {
+        let mut invalid_value_effect = match effect(1, Value::unit()).canonical_bytes() {
             Ok(bytes) => bytes,
             Err(error) => panic!("effect bytes: {error}"),
         };
@@ -1064,7 +1155,11 @@ mod tests {
 
     #[test]
     fn top_level_trailing_and_truncated_inputs_fail_closed() {
-        let bytes = encode_items(&[effect(1, Value::Unit)]);
+        let bytes = encode_items(
+            [effect(1, Value::unit())]
+                .iter()
+                .map(|item| item.canonical_bytes()),
+        );
         let mut trailing = bytes.clone();
         trailing.push(0);
         assert!(matches!(
@@ -1078,5 +1173,21 @@ mod tests {
             decode_commit_plan(&truncated, PlanDecodeLimits::default()),
             Err(PlanDecodeError::UnexpectedEnd { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+mod delivery_observation {
+    extern crate std;
+    use core::cell::Cell;
+    std::thread_local! { static COUNT: Cell<usize> = const { Cell::new(0) }; }
+    pub(super) fn record() {
+        COUNT.with(|count| count.set(count.get() + 1));
+    }
+    pub(super) fn reset() {
+        COUNT.with(|count| count.set(0));
+    }
+    pub(super) fn count() -> usize {
+        COUNT.with(Cell::get)
     }
 }

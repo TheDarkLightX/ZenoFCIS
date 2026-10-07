@@ -4,7 +4,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 
-use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
+use zeno_fcis_codec::{CommitmentHasher, EncodeError, Hash32, commitment};
 
 use crate::{EnumVariantDef, FieldDef, Schema, SchemaError, SumVariantDef, TypeDef, TypeKind};
 
@@ -22,8 +22,9 @@ const KIND_SUM: u8 = 9;
 const KIND_VECTOR: u8 = 10;
 const KIND_MAP: u8 = 11;
 
-impl CanonicalEncode for Schema {
-    fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
+impl Schema {
+    /// Appends this protocol type's exact canonical encoding.
+    pub fn encode_to(&self, output: &mut Vec<u8>) -> Result<(), EncodeError> {
         output.extend_from_slice(SCHEMA_MAGIC);
         put_text(output, self.profile().as_str())?;
         output.extend_from_slice(&self.version().to_be_bytes());
@@ -34,13 +35,20 @@ impl CanonicalEncode for Schema {
         }
         Ok(())
     }
+
+    /// Returns this protocol type's exact canonical bytes.
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, EncodeError> {
+        let mut output = Vec::new();
+        self.encode_to(&mut output)?;
+        Ok(output)
+    }
 }
 
 impl Schema {
     /// Computes the schema commitment under the fixed ZenoFCIS schema domain.
     pub fn schema_hash<H: CommitmentHasher>(&self) -> Result<Hash32, SchemaError> {
         let bytes = self.canonical_bytes().map_err(|_| SchemaError::Encoding)?;
-        let domain = Domain::new("zeno-fcis/schema", 1).map_err(|_| SchemaError::Encoding)?;
+        let domain = zeno_fcis_codec::domains::SCHEMA;
         commitment::<H>(domain, &bytes).map_err(|_| SchemaError::Encoding)
     }
 }

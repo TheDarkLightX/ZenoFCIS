@@ -23,6 +23,9 @@ jobs:
       - name: Install pinned Rust
         run: rustup toolchain install 1.97.1 --profile minimal
 
+      - name: Fetch locked crates for offline repository tools
+        uses: ./.github/actions/fetch-locked-crates
+
       - name: Prove static assurance rules
         run: |
           python3 tools/check_assurance.py --self-test > /tmp/zeno-fcis-static-assurance.txt

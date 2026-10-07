@@ -53,4 +53,28 @@ pub(crate) const FILES: &[(&str, &[u8])] = &[
         "completion.json",
         include_bytes!("../templates/prepared-counter/completion.json"),
     ),
+    (
+        "src/v2_contract.rs",
+        include_bytes!("../templates/prepared-counter/src/v2_contract.rs"),
+    ),
+    (
+        "v2/policy.json",
+        include_bytes!("../templates/prepared-counter/v2/policy.json"),
+    ),
+    (
+        "v2/schema.zcve",
+        include_bytes!("../templates/prepared-counter/v2/schema.zcve"),
+    ),
+    (
+        "v2/schema-origin.json",
+        include_bytes!("../templates/prepared-counter/v2/schema-origin.json"),
+    ),
+    (
+        "v2/policy.zcve",
+        include_bytes!("../templates/prepared-counter/v2/policy.zcve"),
+    ),
+    (
+        "tests/conformance.rs",
+        include_bytes!("../templates/prepared-counter/tests/conformance.rs"),
+    ),
 ];

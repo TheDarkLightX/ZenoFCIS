@@ -1,0 +1,7 @@
+# Normal program API stage
+
+The umbrella root and prelude directly expose the existing checked Program family. Program is the private Authority type; bind_program and bind_catalog are its actual checked constructors. This stage adds no executable facade, arbitrary callback, alternate interpreter or source identity input. Complete original-schema policy, framing and channel links remain mandatory.
+
+See [migration and remaining boundaries](V2_PROGRAM_API_MIGRATION.md). Original legacy examples remain under explicit compatibility imports. The normal minimal_core example and external program_api tests call actual constructors and original-wire publication/replay. External compile controls check private Program/Publication/GenesisPublication/Usage, non-Clone capabilities, immutable descriptors, absent legacy normal routes and refused callback/claimed usage/identity entry points. Test evidence and exact source-bound manifests live in the root-owned parallel-stage handoff, not a release receipt.
+
+The bounded stage does not complete the lower-level Budget/CandidateBuilder/GeneratedTransition/pre_state ledger. It does not prove policy adequacy, Rust/LLVM/Wasm semantics, cryptographic hashing, SQLite or physical delivery. Root owns combined actual-body Verus, coverage, Miri, template, workspace, ATDD and release qualification. Native/Wasm compile checks and external consumer tests retain these claim limits.

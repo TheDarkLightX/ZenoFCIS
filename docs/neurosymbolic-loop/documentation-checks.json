@@ -1,0 +1,467 @@
+{
+  "kind": "documentation-only-checks-v1",
+  "date": "2026-10-04",
+  "status": "PASS",
+  "failures": [],
+  "model_role": "gpt-6-astra/max; confirmed by parent spawn metadata",
+  "required_files": 16,
+  "requirement_ids": [
+    "NSC-001",
+    "NSC-002",
+    "NSC-003",
+    "NSC-004",
+    "NSC-005",
+    "NSC-006",
+    "NSC-007",
+    "NSC-008",
+    "NSL-001",
+    "NSL-002",
+    "NSL-003",
+    "NSL-004",
+    "NSL-005",
+    "NSL-006",
+    "NSL-007",
+    "NSL-008",
+    "NSF-001",
+    "NSF-002",
+    "NSF-003",
+    "NSF-004",
+    "NSF-005",
+    "NSF-006",
+    "NSF-007",
+    "NSF-008",
+    "NSF-009",
+    "NSR-001",
+    "NSR-002",
+    "NSR-003",
+    "NSR-004",
+    "NSR-005",
+    "NSR-006",
+    "NSR-007",
+    "NSR-008",
+    "NSR-009",
+    "NSR-010",
+    "NSM-001",
+    "NSM-002",
+    "NSM-003",
+    "NSM-004",
+    "NSM-005",
+    "NSM-006",
+    "NSM-007",
+    "NSM-008",
+    "NSE-001",
+    "NSE-002",
+    "NSE-003",
+    "NSE-004",
+    "NSE-005",
+    "NSE-006",
+    "NSE-007",
+    "NSE-008",
+    "NSE-009",
+    "NSE-010"
+  ],
+  "markdown_tex_regeneration_equal": true,
+  "manuscript_markers": {
+    "named_author": true,
+    "pdf_author_metadata": true,
+    "draft_date": true,
+    "markdown_digest_embedded": true,
+    "factory_title": true,
+    "formal_core_foundation": true,
+    "incomplete_v2": true,
+    "historical_pin": true,
+    "conditional_proofs": true,
+    "separate_evidence_table": true,
+    "no_online_neural_study": true
+  },
+  "local_links": [
+    {
+      "source": "CHECKLIST.md",
+      "target": "documentation-checks.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CHECKLIST.md",
+      "target": "../evidence/v2_1_neurosymbolic/paper-build-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CHECKLIST.md",
+      "target": "CLAUDE_HANDOFF.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "NOTE.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "../V2_1_FACTORY_PLAN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "../V2_1_TRANSFORM_DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "../V2_1_EGRAPH_REVIEW.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "../evidence/v2_1_egraphs/replay-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "../evidence/v2_1_egraphs/source-check-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "specs/INDEX.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "../adr/0003-epistemic-status.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "../adr/0005-decision-gate.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "paper.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "CLAUDE_HANDOFF.md",
+      "target": "CHECKLIST.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "DESIGN.md",
+      "target": "../V2_1_FACTORY_PLAN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "DESIGN.md",
+      "target": "../V2_1_TRANSFORM_DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "DESIGN.md",
+      "target": "../V2_1_EGRAPH_REVIEW.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "DESIGN.md",
+      "target": "../evidence/v2_1_egraphs/replay-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "DESIGN.md",
+      "target": "specs/INDEX.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "DESIGN.md",
+      "target": "../adr/0003-epistemic-status.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "DESIGN.md",
+      "target": "../adr/0005-decision-gate.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "../V2_1_EGRAPH_REVIEW.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "../V2_1_TRANSFORM_DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "../V2_1_FACTORY_PLAN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "../evidence/v2_1_egraphs/replay-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "README.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "specs/INDEX.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "CLAUDE_HANDOFF.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "paper.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "paper.tex",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "NOTE.md",
+      "target": "CHECKLIST.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "../V2_1_FACTORY_PLAN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "NOTE.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "specs/INDEX.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "CLAUDE_HANDOFF.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "paper.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "paper.pdf",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "paper.tex",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "CHECKLIST.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "render_paper.py",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "README.md",
+      "target": "../evidence/v2_1_neurosymbolic/paper-build-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "paper.md",
+      "target": "../evidence/v2_1_egraphs/replay-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "paper.md",
+      "target": "../evidence/v2_1_egraphs/source-check-20261004.json",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/00-contract.md",
+      "target": "../DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/01-loop.md",
+      "target": "../DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/02-checker-feedback.md",
+      "target": "../DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/03-resources-resume.md",
+      "target": "../DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/04-integration.md",
+      "target": "../DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/05-qualification-evaluation.md",
+      "target": "../DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "../DESIGN.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "../CLAUDE_HANDOFF.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "00-contract.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "01-loop.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "02-checker-feedback.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "03-resources-resume.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "04-integration.md",
+      "exists_or_receipt_to_write": true
+    },
+    {
+      "source": "specs/INDEX.md",
+      "target": "05-qualification-evaluation.md",
+      "exists_or_receipt_to_write": true
+    }
+  ],
+  "files": {
+    "README.md": {
+      "bytes": 1616,
+      "newline_count": 26,
+      "sha256": "aba434d764036007b18fc633229d7dfb327f79b5dee15e34e8f40d1587a06d8c"
+    },
+    "DESIGN.md": {
+      "bytes": 16475,
+      "newline_count": 265,
+      "sha256": "4ad38a57f14e6fabf3eac98a6739254ab4e8531bee16a3a27af8ded395832afb"
+    },
+    "NOTE.md": {
+      "bytes": 2916,
+      "newline_count": 46,
+      "sha256": "3ca33d915385e21f0786455ca75b626ff9d8933ae8564abf0e99d4ded8b582c4"
+    },
+    "CLAUDE_HANDOFF.md": {
+      "bytes": 6994,
+      "newline_count": 117,
+      "sha256": "36d8120317e2f9e60550e2abb44804ca8c6cb3177705fac30c3e54c31416500d"
+    },
+    "CHECKLIST.md": {
+      "bytes": 6655,
+      "newline_count": 109,
+      "sha256": "954623d395b80ed488109a8dba5512b926de2b8eeb702901af93fee7f1b05e6a"
+    },
+    "paper.md": {
+      "bytes": 35981,
+      "newline_count": 596,
+      "sha256": "a1b7cae1c52437afc68b90d98bc5ff7a826674fb3e1a1ea22d8ff7905a144b1d"
+    },
+    "paper.tex": {
+      "bytes": 37873,
+      "newline_count": 244,
+      "sha256": "710d79dbbe4f9215ac8508d766045eaf29aca467dd57136b5c474dd47298f992"
+    },
+    "render_paper.py": {
+      "bytes": 5981,
+      "newline_count": 146,
+      "sha256": "9d936297bbc3db91bc72f06f5e23f2a82ec51720e45e92ccdaa30aa54d2e55cd"
+    },
+    "check_packet.py": {
+      "bytes": 5392,
+      "newline_count": 101,
+      "sha256": "0ad4563b96c3aac46f5239661f2e570571dd9953deb061fe74066b7ddb7cce5e"
+    },
+    "specs/INDEX.md": {
+      "bytes": 1897,
+      "newline_count": 27,
+      "sha256": "5b55f4bcb35b531cc3f4f2a8cf6510b3cde933025383e371f9dba302bf9eefce"
+    },
+    "specs/00-contract.md": {
+      "bytes": 4631,
+      "newline_count": 74,
+      "sha256": "987f574980edd5b93dea642b23f7732f79a256f7e0cb542c00ecec3e6024b9ad"
+    },
+    "specs/01-loop.md": {
+      "bytes": 4329,
+      "newline_count": 70,
+      "sha256": "0c4464ca773b3d5ae49bf4992c3116ceaed134b2b32acf6583a15e0acf54ee2f"
+    },
+    "specs/02-checker-feedback.md": {
+      "bytes": 4959,
+      "newline_count": 78,
+      "sha256": "907ebad33626749a16bf6b1bc71f76cc3feefce0081f108bb4be8ac6b1cda765"
+    },
+    "specs/03-resources-resume.md": {
+      "bytes": 5393,
+      "newline_count": 82,
+      "sha256": "39602d506cbd4f29c941b389ef34200f4f05707770aaab6b5c7c4adceb0f6592"
+    },
+    "specs/04-integration.md": {
+      "bytes": 4238,
+      "newline_count": 68,
+      "sha256": "7ab89904e03c7988080c8aff72e5d801c56aa56ad27d9dfcd18c4d4b2aa8bd63"
+    },
+    "specs/05-qualification-evaluation.md": {
+      "bytes": 4949,
+      "newline_count": 74,
+      "sha256": "6bb94baf5ffd634d133c1e2ed1ace61ca2be9643a18ea2ce2f2447e9d4d7b3df"
+    }
+  },
+  "limits": [
+    "Text/link/digest checks do not qualify runtime implementation or prove semantic correctness.",
+    "No Rust optimizer, native test, Lean/Verus proof, model experiment or product build was run by this task.",
+    "Parent owns final PDF compilation/visual review and integrated evidence.",
+    "Receipt itself is excluded from file hashes to avoid self-reference."
+  ]
+}

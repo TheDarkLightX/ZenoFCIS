@@ -43,7 +43,7 @@ Feature: Report evidence that cannot distinguish system behavior
     When an int type declares an inclusive range
     Then the step asserts that range for every observed value of that type, and lowering makes it the schema's bounds and refuses a binding that contradicts it
     And a half-open, reversed, or non-int range is refused, and a project that declares no range encodes as before
-    And the authority checks every command, context, and initial state against its own schema, whatever hasher built the envelope
+    And retained historical schema assertions and current checked admission require the complete original command context and initial-state schema
     When a law declares the decisions it is enforced on
     Then elaboration refuses a claim that assumes it outside that scope, and a law without a declared scope encodes as before
     And a law manifest that enforces another scope or genesis applicability than the project declares, or lacks a declared law, is reported
@@ -53,8 +53,9 @@ Feature: Report evidence that cannot distinguish system behavior
     Given library identities such as candidate IDs in the zeno-fcis namespace
     When a project binds a state domain or profile prefix through the project constructors
     Then names inside the reserved namespace are rejected
-    And names outside it and the V1 constructors are unchanged
-    And the zUSD patch precondition hash stays byte-identical
+    And current project prefixes outside it remain accepted
+    And the private historical authority retains its original namespace assertion
+    And the historical zUSD patch precondition hash stays byte-identical
 
   @atdd-determinism
   Scenario: Detect nondeterminism in decision code by static rules and repeated execution
@@ -66,10 +67,11 @@ Feature: Report evidence that cannot distinguish system behavior
     And a binary target, a renamed dependency, an unrecognized manifest form, include!, or a path attribute keeps a crate from being confined
     And a directory, link, or file the check cannot read makes the result unreadable, never clean
     And the decision code of every application template is clean
-    When one invocation is executed repeatedly on fresh copies
+    When the retained private native probe executes one invocation repeatedly on fresh copies
     Then its decision is returned only if every execution produced identical canonical bytes
     And a program that changes its decision between runs is withheld with the differing run
     And a probe of a single execution is refused
+    And this historical probe evidence is not a proof of current V2 determinism
 
   @atdd-zusd-lane-gaps
   Scenario: Pin what the zeno language cannot state about the zUSD lane

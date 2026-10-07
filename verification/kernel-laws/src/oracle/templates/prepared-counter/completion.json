@@ -1,0 +1,192 @@
+{
+  "schema": "zeno-fcis/completion-problem/1",
+  "profile": "zeno-fcis/finite-i64/1",
+  "state": [
+    {
+      "name": "count",
+      "type": {
+        "kind": "int",
+        "min": 0,
+        "max": 3
+      }
+    }
+  ],
+  "commands": [
+    {
+      "name": "first",
+      "type": {
+        "kind": "int",
+        "min": -1,
+        "max": 1
+      }
+    },
+    {
+      "name": "second",
+      "type": {
+        "kind": "int",
+        "min": -1,
+        "max": 1
+      }
+    },
+    {
+      "name": "third",
+      "type": {
+        "kind": "int",
+        "min": -1,
+        "max": 1
+      }
+    }
+  ],
+  "step": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "input",
+        1
+      ],
+      [
+        "input",
+        2
+      ],
+      [
+        "input",
+        3
+      ],
+      [
+        "add",
+        0,
+        1
+      ],
+      [
+        "add",
+        4,
+        2
+      ],
+      [
+        "add",
+        5,
+        3
+      ],
+      [
+        "int",
+        0
+      ],
+      [
+        "int",
+        3
+      ],
+      [
+        "lt",
+        4,
+        7
+      ],
+      [
+        "lt",
+        8,
+        4
+      ],
+      [
+        "not",
+        9
+      ],
+      [
+        "not",
+        10
+      ],
+      [
+        "and",
+        11,
+        12
+      ],
+      [
+        "lt",
+        5,
+        7
+      ],
+      [
+        "lt",
+        8,
+        5
+      ],
+      [
+        "not",
+        14
+      ],
+      [
+        "not",
+        15
+      ],
+      [
+        "and",
+        16,
+        17
+      ],
+      [
+        "lt",
+        6,
+        7
+      ],
+      [
+        "lt",
+        8,
+        6
+      ],
+      [
+        "not",
+        19
+      ],
+      [
+        "not",
+        20
+      ],
+      [
+        "and",
+        21,
+        22
+      ],
+      [
+        "and",
+        13,
+        18
+      ],
+      [
+        "and",
+        24,
+        23
+      ],
+      [
+        "select",
+        25,
+        6,
+        0
+      ]
+    ],
+    "roots": [
+      25,
+      26
+    ]
+  },
+  "terminal": {
+    "nodes": [
+      [
+        "input",
+        0
+      ],
+      [
+        "int",
+        0
+      ],
+      [
+        "eq",
+        0,
+        1
+      ]
+    ],
+    "roots": [
+      2
+    ]
+  }
+}

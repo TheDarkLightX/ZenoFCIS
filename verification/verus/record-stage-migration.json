@@ -1,0 +1,150 @@
+{
+  "schema": "zeno-fcis/record-stage-migration/1",
+  "baseline": "94bac799b44859b158e50377313b7e0ef6c1bc51",
+  "controls": [
+    {
+      "retired_control": "substitute_same_typed_source",
+      "composition_control": "record_state_source",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "substitute_source_descriptor",
+      "composition_control": "record_source_schema",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "ignore_upper_domain_bound",
+      "composition_control": "record_domain_upper",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "alias_boolean_and_integer_domain",
+      "composition_control": "record_domain_kind",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "wrong_binding_scalar_position",
+      "composition_control": "record_scalar_position",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "allow_unknown_binding",
+      "composition_control": "record_unknown_binding",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "allow_duplicate_binding",
+      "composition_control": "record_duplicate_binding",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "omit_context_binding_coverage",
+      "composition_control": "record_context_coverage",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "omit_context_schema_admission",
+      "composition_control": "record_context_schema",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "drop_metadata_refusal_cleanup",
+      "composition_control": null,
+      "status": "retired interface/proof step",
+      "reason": "Retired caller-owned output buffer; surviving BoundCore exposes no candidate on metadata refusal. The retained boundary fixture still asserts output clearing on every refusal, and Authority candidate_after_refusal control remains."
+    },
+    {
+      "retired_control": "mislabel_record_refusal",
+      "composition_control": "record_command_refusal",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "decode_wrong_original_record",
+      "composition_control": "record_context_bytes",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "reset_shared_meter_before_execution",
+      "composition_control": "record_meter_prefix",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "drop_prior_source_attempt_prefix",
+      "composition_control": "record_read_prefix",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "rollback_record_charges_on_execution_refusal",
+      "composition_control": "record_refusal_usage",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "misroute_abi_projection",
+      "composition_control": "record_binding_order",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "skip_complete_context_record",
+      "composition_control": "record_skip_context",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "weaken_public_execution_contract",
+      "composition_control": "record_execution_contract",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "narrow_public_execution_domain",
+      "composition_control": "record_execution_domain",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "inject_caller_usage",
+      "composition_control": null,
+      "status": "retired interface/proof step",
+      "reason": "Retired function signature has no replacement caller-usage argument; surviving BoundCore starts its private meter. Existing public authority custody controls retain private constructor and usage ownership checks."
+    },
+    {
+      "retired_control": "remove_typing_bridge_application",
+      "composition_control": null,
+      "status": "retired interface/proof step",
+      "reason": "Retired tuple_is_typed proof and its sole application removed with the duplicate driver; producer tuple/atoms/evaluator total contracts and generic descriptor admission remain verified. There is no surviving application to mutate."
+    },
+    {
+      "retired_control": "cached_record_before_metadata",
+      "composition_control": null,
+      "status": "removed boundary (S5)",
+      "reason": "S5 makes BoundCore carry the admitted-descriptor invariant; producer::produce takes &BoundCore, so record work before admission cannot be expressed. The fault class is excluded by the type, not by a body-order check."
+    },
+    {
+      "retired_control": "change_record_execution_specification",
+      "composition_control": "specification_body",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    },
+    {
+      "retired_control": "add_uncontracted_record_work",
+      "composition_control": "uncontracted_helper",
+      "status": "migrated; final replay pending",
+      "reason": "Same semantic fault now targets the production composition boundary. Former record controls required semantic proof refusal, with no per-mutant native requirement."
+    }
+  ]
+}

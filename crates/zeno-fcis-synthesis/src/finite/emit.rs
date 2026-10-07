@@ -82,7 +82,7 @@ impl TargetEmitter for RustEmitter {
     }
     fn emit(&self, program: &Program) -> Result<String, Error> {
         let mut source = String::from(
-            "// Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.\n#[rustfmt::skip]\n",
+            "// Generated from zeno-fcis/finite-i64/1. Pure code; no commit authority.\n/// Evaluates the generated finite program; no commit authority.\n#[rustfmt::skip]\n",
         );
         writeln!(
             source,

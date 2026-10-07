@@ -3,8 +3,8 @@
 This local application follows one order from checkout to delivery. Payment
 and shipping happen in other systems: the order sends them requests through
 the outbox, and their answers come back as commands. It shows three patterns:
-- a synthesized finite decision core, which selects a complete decision
-  branch from the order, command, and caller;
+- a synthesized finite decision core, which selects the decision branch and
+  complete successor state from the order, command, and caller;
 - idempotent external requests: each request is queued once, by the decision
   that moves the order, and carries a number the receiver can use to recognize
   a retry;
@@ -13,9 +13,11 @@ the outbox, and their answers come back as commands. It shows three patterns:
 
 `synthesis.json` defines the closed finite decision relation. `zeno-fcis
 synth` selected `synthesized/transition.rs` after checking all 1,728 input
-tuples. `src/program.rs` is a reviewed adapter from the selected branch to
-typed state updates, rejection reasons, and outbox requests. Its executed
-decisions are checked against an independent model for all 1,440 inputs over
+tuples. Its output includes the branch, post-decision status, and post-decision
+payment-attempt count, including the unchanged state on rejection.
+`src/program.rs` is a reviewed adapter from that output to typed state writes,
+rejection reasons, and outbox requests. Its executed decisions are checked
+against an independent model for all 1,440 inputs over
 lawful pre-states. The law checker in `src/laws.rs` also evaluates the formulas
 in `project.zeno` against each decision before publication.
 
@@ -23,6 +25,23 @@ in `project.zeno` against each decision before publication.
 types, and relational formulas. `build.rs` supplies explicit scalar bounds and
 catalog meanings, then checks and generates the schema and project bindings.
 `profile.rs` binds the exact source and the runtime-only law manifest.
+
+## V2 execution and retained legacy evidence
+
+The normal `src/lib.rs` and demonstration use `v2_contract::Contract`, its
+complete original-schema descriptor, and the checked library V2 Authority.
+The library reads the original envelopes, evaluates the declared typed graph,
+constructs the complete decision, and checks the original law programs with
+one meter. The SQLite shell consumes genuine `Publication` and
+`Publication` capabilities; exact replay recomputes the same original inputs.
+
+The hand-written adapters, legacy law engines and earlier synthesis/model
+checks described below are retained only in the repository’s nonpublished
+`verification/kernel-laws/src/oracle/templates/order-fulfillment` package for independent oracle
+and historical evidence tests. They do not execute the normal V2 decision.
+The declared policy still requires independent review of the intended rules.
+Host input framing, caller authentication and typed display remain shell
+assumptions; the demonstration destination's ledger persists only in-process.
 
 ## The rules
 
@@ -102,10 +121,12 @@ zeno-fcis synth run synthesis.json --out synthesized --check
 zeno-fcis synth verify synthesis.json --out synthesized
 ```
 
-The synthesis claim covers the pure branch-selection function and its declared
-finite inputs. The app-level conformance test additionally checks the adapter's
-post-state, reasons, and request plan on every lawful finite input. The
-external payment and carrier systems are outside that claim.
+The synthesis claim covers branch selection and the complete pure successor
+state on the declared finite inputs. The branch also selects the request kind;
+the synthesized attempt count supplies its request number. The typed mapping
+to reasons and outbox requests remains reviewed adapter code, checked against
+the independent app-level model on every lawful finite input. External payment
+and carrier systems are outside that claim.
 
 Every decision is checked at run time, before it can be published:
 - law 500: an order awaiting payment, paid, shipped, or delivered has made at
@@ -129,7 +150,7 @@ zeno-fcis check project.zeno --require-substantive --require-resolved-paths
 
 Each law with a formula also declares the decisions it is enforced on: `on
 commit, genesis` for 500, `on accept` for 501 to 505, and `on failure` for
-506. `authority()` checks the law manifest against those declarations before
+506. the privately retained native authority checks the law manifest against those declarations before
 it builds the authority, and `tests/laws.rs` shows a manifest that binds law
 501 to every commit, or to the genesis, reported as a mismatch.
 
@@ -188,11 +209,11 @@ cargo +1.97.1 run --locked -- new-order.sqlite
 ```
 
 The SQLite shell is the `sqlite` feature, on by default. Without it,
-`cargo +1.97.1 build --no-default-features` builds the core alone: the
-generated bindings, the program, the law checker, the profile, the delivery
-adapter, and `authority()`, with no database; the gate checks that it also
-compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
-binary need the feature.
+`cargo +1.97.1 build --no-default-features` builds the V2 declarations,
+checked Authority and generated proposal/admission helpers; original native
+oracles are confined to the nonpublished private suite
+without a database. The gate also checks `wasm32-unknown-unknown`.
+`create`, `invoke`, `journey` and the demonstration binary need the feature.
 
 The demonstration requires a new database path. It declines one payment and
 refuses a late capture of it. After a second checkout, it refuses a late

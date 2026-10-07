@@ -11,6 +11,7 @@ use zeno_fcis_spec::{ProjectSpec, StableId, TypeKind as AuthoredKind};
 
 /// A source declaration cannot be represented by the requested exact schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum SchemaLoweringError {
     /// The selected root is absent or is not declared as state.
     WrongRoot(StableId),

@@ -2,6 +2,30 @@
 
 pub(crate) const FILES: &[(&str, &[u8])] = &[
     (
+        "src/v2_contract.rs",
+        include_bytes!("../templates/inventory-reservation/src/v2_contract.rs"),
+    ),
+    (
+        "src/legacy.rs",
+        include_bytes!("../templates/inventory-reservation/src/legacy.rs"),
+    ),
+    (
+        "v2/policy.json",
+        include_bytes!("../templates/inventory-reservation/v2/policy.json"),
+    ),
+    (
+        "v2/policy.zcve",
+        include_bytes!("../templates/inventory-reservation/v2/policy.zcve"),
+    ),
+    (
+        "v2/schema.zcve",
+        include_bytes!("../templates/inventory-reservation/v2/schema.zcve"),
+    ),
+    (
+        "v2/schema-origin.json",
+        include_bytes!("../templates/inventory-reservation/v2/schema-origin.json"),
+    ),
+    (
         "project.zeno",
         include_bytes!("../templates/inventory-reservation/project.zeno"),
     ),
