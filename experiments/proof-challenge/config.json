@@ -1,0 +1,8 @@
+{
+  "challenge_module": "Challenge",
+  "solution_module": "Solution",
+  "theorem_names": ["ApprovalContract.approval_requires_authority"],
+  "definition_names": [],
+  "permitted_axioms": [],
+  "enable_nanoda": false
+}

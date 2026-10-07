@@ -1,0 +1,18 @@
+{
+  "lean_version": "4.30.0",
+  "lean_commit": "d024af099ca4bf2c86f649261ebf59565dc8c622",
+  "repositories": {
+    ".": {
+      "url": "https://github.com/leanprover/comparator",
+      "revision": "1cfc5d8ad183bf65efe7accd0efc175b6b8f25b6"
+    },
+    ".lake/packages/lean4export": {
+      "url": "https://github.com/leanprover/lean4export",
+      "revision": "a3e35a584f59b390667db7269cd37fca8575e4bf"
+    },
+    ".lake/packages/Lean4Checker": {
+      "url": "https://github.com/leanprover/lean4checker",
+      "revision": "b7398199245524275543dec6113229c9bb4902e5"
+    }
+  }
+}
