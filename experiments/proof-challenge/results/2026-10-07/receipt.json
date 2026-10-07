@@ -1,0 +1,121 @@
+{
+  "additional_kernel": false,
+  "cases": [
+    {
+      "comparator_exit": 0,
+      "expected": "accept",
+      "judge_log_sha256": "bfa7aef305f2b6191833c543400a3dc2102e6ce287042f1e56583e8001453e15",
+      "name": "valid",
+      "native_exit": 0,
+      "native_log_sha256": "a08d301643b2126dd7e234fe480668697568a8701f025eba8f0b9e6d40894df3",
+      "reason": null
+    },
+    {
+      "comparator_exit": 0,
+      "expected": "accept",
+      "judge_log_sha256": "cb4f4200d239ce065e751c57107007741b148cef66f007edcc6fc384202896b2",
+      "name": "alternate-proof",
+      "native_exit": 0,
+      "native_log_sha256": "db2d0195f1c6ab3db6fe01da856cd6d7681d89df96d2c4cca1f045a64dfea0d8",
+      "reason": null
+    },
+    {
+      "comparator_exit": 1,
+      "expected": "refuse",
+      "judge_log_sha256": "9547d6a73156e9ccec12eacec1772056b04e8bf94241557b5a923f99631eec56",
+      "name": "weakened-statement",
+      "native_exit": 0,
+      "native_log_sha256": "e3767f84f95fae2a4125af2b5605b54c0c2354518af568e5e58c6435a43c112d",
+      "reason": "Challenge and solution theorem statement do not match"
+    },
+    {
+      "comparator_exit": 1,
+      "expected": "refuse",
+      "judge_log_sha256": "759981df2781ac015a260e7ca427c83f3cd5b3d8192cb8f9c2fec643b8fff939",
+      "name": "changed-definition",
+      "native_exit": 0,
+      "native_log_sha256": "9c9e6dab0c3d1e32a417c3439b99150bb34f1b05af280a4f6ba2451312dde5cc",
+      "reason": "Const does not match between challenge and target 'ApprovalContract.approve'"
+    },
+    {
+      "comparator_exit": 1,
+      "expected": "refuse",
+      "judge_log_sha256": "c8975276c21904005a174bb4a2ad7088248295538a4a408cc49161f3f7e113d2",
+      "name": "changed-helper",
+      "native_exit": 0,
+      "native_log_sha256": "73758df0a49be43c5dc285a28db73c14fb203e0db84809fd152cc4ac6706261e",
+      "reason": "Const does not match between challenge and target 'ApprovalContract.permission'"
+    },
+    {
+      "comparator_exit": 1,
+      "expected": "refuse",
+      "judge_log_sha256": "6fcaeec86c4882f395541e6fe388585594b2748763726a632785b57fe2b7bc72",
+      "name": "forbidden-axiom",
+      "native_exit": 0,
+      "native_log_sha256": "4f1b5c8bf05781dbfa2b6026a55d0610603213063b67bcbed30eb3e35aa3b66c",
+      "reason": "Illegal axiom detected: 'ApprovalContract.assumed_authority'"
+    },
+    {
+      "comparator_exit": 1,
+      "expected": "refuse",
+      "judge_log_sha256": "7d4315db7c9303eb7bd5812af5762465d3c1fb9d63dad23f9eb260faeb8f6714",
+      "name": "unfinished-proof",
+      "native_exit": 0,
+      "native_log_sha256": "dd64aabe1f93e66d806ca57f75ccb30173f391583a346332247121d7d19749b8",
+      "reason": "Illegal axiom detected: 'sorryAx'"
+    },
+    {
+      "comparator_exit": 1,
+      "expected": "refuse",
+      "judge_log_sha256": "7c112bb040ce886e2d2c95ced83aab6ac9e85d48a320adcba7ef2078c1f98202",
+      "name": "invalid-proof",
+      "native_exit": 1,
+      "native_log_sha256": "b2c1f7c6ee03776e8510531e11b5bd5a14a588c8c3704b4e9e1674eef801fd8e",
+      "reason": "Tactic `rfl` failed"
+    }
+  ],
+  "fixtures": {
+    "Challenge.lean": "303d7501c611abb7884b46f06e8673f255fb481a2dbc245d229874bd1a9a5ca8",
+    "cases/alternate-proof.lean": "74199c03e23830c2cbab524c25b66b688464f751b08b9a3c1b853f2a55a2741a",
+    "cases/changed-definition.lean": "53bbcb8adfb0bafa6b83fb74664ac9f501ce04781fc6a36abf7c5a113dda3f64",
+    "cases/changed-helper.lean": "85c1e4c0d6c7af0363a39590e633bda3c766195c6a0cb659e086ae8504745a60",
+    "cases/forbidden-axiom.lean": "5e75e7dca2f6ffaf2789acd4074c62ab80165d5e749961bac127c9563c24b4d5",
+    "cases/invalid-proof.lean": "e7e6037533eff0347a2aa814172d0a961de804c930859e051b0d1ab1bf36047b",
+    "cases/unfinished-proof.lean": "5e920928caf037e65120526d79ab8128b049c18f5cb6af6deaa146ec1f7d2ae6",
+    "cases/valid.lean": "303d7501c611abb7884b46f06e8673f255fb481a2dbc245d229874bd1a9a5ca8",
+    "cases/weakened-statement.lean": "c6b4b4e794266aa501163bd96f7679b3a1946afdcced3525a5c3e4673343b29f",
+    "config.json": "26aea2e2b92ea0274f1edb68929ce453b4f899711a71d9347e4eb6a8342237af",
+    "lakefile.toml": "7f0606a08ae673e3e6a5176dc22c1008792370d22c7a583fac2224efef372004",
+    "lean-toolchain": "54727eec5cba149c18842e6deb5c41b369d66455c93ce135d7d5347c782b2325",
+    "pins.json": "09b747c0591abbc8cf1506eda966284b4e3895696757fbc52c8e256e588b3748"
+  },
+  "format": "zeno-fcis/proof-challenge-experiment/1",
+  "manifest_sha256": "17b000231fa92bd0a99b2b8f47a0cf1c821da665b69315c6fb1cd9438b99dcc5",
+  "runner_sha256": "663d199630df6b3750975b04abc8a420206b1ca42ae8dda77904c215b913cd25",
+  "scope": "frozen reviewed fixtures only; not untrusted-submission containment",
+  "status": "experiment_pass",
+  "tools": {
+    "binaries": {
+      "comparator": "c9e9997b146b847a93bd2b0e7b5a6d89439104292ad0b279ae961b54c71723e4",
+      "development_shim": "167507c89d8b3c7667ad78b50df7b19f89883751a01efd1457404fa34a994e8b",
+      "lake": "d3e1f322c08d87f0d5850132a0b0309c1edbe53d641276b344717da448c8bc8b",
+      "lean": "3e0d0d3d801675359f2d4cf9815bfdb417b20b92fdd9d48b3b14c95bbae28bbf",
+      "lean4export": "8e763913b03762488571a93ced6ec1a4e04f7d8eebbe40bd1215ba41a6bd4449"
+    },
+    "lean_version": "Lean (version 4.30.0, x86_64-unknown-linux-gnu, commit d024af099ca4bf2c86f649261ebf59565dc8c622, Release)",
+    "repositories": {
+      ".": {
+        "revision": "1cfc5d8ad183bf65efe7accd0efc175b6b8f25b6",
+        "url": "https://github.com/leanprover/comparator"
+      },
+      ".lake/packages/Lean4Checker": {
+        "revision": "b7398199245524275543dec6113229c9bb4902e5",
+        "url": "https://github.com/leanprover/lean4checker"
+      },
+      ".lake/packages/lean4export": {
+        "revision": "a3e35a584f59b390667db7269cd37fca8575e4bf",
+        "url": "https://github.com/leanprover/lean4export"
+      }
+    }
+  }
+}

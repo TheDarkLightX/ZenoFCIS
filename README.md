@@ -85,6 +85,12 @@ and revision-bound exports connect authoring to the existing factory route.
 ZAL's Python checks and cooperative review remain distinct from verified Rust
 execution and authenticated approval.
 
+Two reusable [proof and specification review skills](docs/LLM_SYNTHESIS.md#proof-and-specification-review)
+help agents keep formal obligations fixed and challenge guarantees that could
+hold without useful behavior. The [frozen proof pilot](experiments/proof-challenge/README.md)
+demonstrates these checks on a small Lean model; it is separate from Rust
+execution qualification.
+
 The [neurosymbolic loop design](docs/neurosymbolic-loop/DESIGN.md) and
 [implementation specifications](docs/neurosymbolic-loop/specs/INDEX.md) describe
 how proposals, checker feedback and revisions form a bounded process under a
