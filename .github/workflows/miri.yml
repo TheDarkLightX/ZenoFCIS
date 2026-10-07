@@ -51,10 +51,21 @@ jobs:
           {"group": "synthesis-v2-template-contracts", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "miri_skip": ["all_original_small_domains_and_unlawful_order_states", "account_complete_clock_boundaries_without_domain_narrowing", "withdrawal_complete_raw_domain_and_certified_controller", "treasury_guard_arithmetic_callbacks_and_unlawful_prestates"]},
           {"group": "synthesis-v2-template-retained-durable-counter", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_durable_counter"},
           {"group": "synthesis-v2-template-retained-inventory-reservation", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_inventory_reservation"},
-          {"group": "synthesis-v2-template-retained-order-fulfillment", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_order_fulfillment"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-order-fulfillment-00-04", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_order_fulfillment_00_04"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-order-fulfillment-05-09", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_order_fulfillment_05_09"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-order-fulfillment-10-14", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_order_fulfillment_10_14"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-order-fulfillment-15-19", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_order_fulfillment_15_19"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-order-fulfillment-20-22", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_order_fulfillment_20_22"},
+          {"group": "synthesis-v2-template-retained-genesis-and-replay-order-fulfillment", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_genesis_and_replay_order_fulfillment"},
           {"group": "synthesis-v2-template-retained-account-lockout", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_account_lockout"},
           {"group": "synthesis-v2-template-retained-withdrawal-queue", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_withdrawal_queue"},
-          {"group": "synthesis-v2-template-retained-agent-treasury-guard", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_complete_examples_genesis_and_replay_agent_treasury_guard"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-00-04", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_00_04"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-05-09", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_05_09"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-10-14", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_10_14"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-15-19", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_15_19"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-20-24", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_20_24"},
+          {"group": "synthesis-v2-template-retained-examples-and-replay-agent-treasury-guard-25-29", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_examples_and_replay_agent_treasury_guard_25_29"},
+          {"group": "synthesis-v2-template-retained-genesis-and-replay-agent-treasury-guard", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "retained_genesis_and_replay_agent_treasury_guard"},
           {"group": "synthesis-v2-template-profile-durable-counter", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_durable_counter"},
           {"group": "synthesis-v2-template-profile-inventory-reservation", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_inventory_reservation"},
           {"group": "synthesis-v2-template-profile-order-fulfillment", "packages": "-p zeno-fcis-synthesis", "target": "--test v2_template_contracts", "test": "miri_bounded_profile_order_fulfillment"},
@@ -198,10 +209,16 @@ jobs:
               retained_examples = {
                   'retained_complete_examples_genesis_and_replay_durable_counter',
                   'retained_complete_examples_genesis_and_replay_inventory_reservation',
-                  'retained_complete_examples_genesis_and_replay_order_fulfillment',
                   'retained_complete_examples_genesis_and_replay_account_lockout',
                   'retained_complete_examples_genesis_and_replay_withdrawal_queue',
-                  'retained_complete_examples_genesis_and_replay_agent_treasury_guard',
+              }
+              retained_examples |= {
+                  f'retained_examples_and_replay_{suffix}_{start:02}_{min(start + 5, count) - 1:02}'
+                  for suffix, count in [('order_fulfillment', 23), ('agent_treasury_guard', 30)]
+                  for start in range(0, count, 5)
+              } | {
+                  'retained_genesis_and_replay_order_fulfillment',
+                  'retained_genesis_and_replay_agent_treasury_guard',
               }
               retained = retained_examples | {
                   'policy_schema_law_and_meter_mutations_refuse',
