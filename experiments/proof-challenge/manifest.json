@@ -1,0 +1,15 @@
+{
+  "Challenge.lean": "303d7501c611abb7884b46f06e8673f255fb481a2dbc245d229874bd1a9a5ca8",
+  "cases/alternate-proof.lean": "74199c03e23830c2cbab524c25b66b688464f751b08b9a3c1b853f2a55a2741a",
+  "cases/changed-definition.lean": "53bbcb8adfb0bafa6b83fb74664ac9f501ce04781fc6a36abf7c5a113dda3f64",
+  "cases/changed-helper.lean": "85c1e4c0d6c7af0363a39590e633bda3c766195c6a0cb659e086ae8504745a60",
+  "cases/forbidden-axiom.lean": "5e75e7dca2f6ffaf2789acd4074c62ab80165d5e749961bac127c9563c24b4d5",
+  "cases/invalid-proof.lean": "e7e6037533eff0347a2aa814172d0a961de804c930859e051b0d1ab1bf36047b",
+  "cases/unfinished-proof.lean": "5e920928caf037e65120526d79ab8128b049c18f5cb6af6deaa146ec1f7d2ae6",
+  "cases/valid.lean": "303d7501c611abb7884b46f06e8673f255fb481a2dbc245d229874bd1a9a5ca8",
+  "cases/weakened-statement.lean": "c6b4b4e794266aa501163bd96f7679b3a1946afdcced3525a5c3e4673343b29f",
+  "config.json": "26aea2e2b92ea0274f1edb68929ce453b4f899711a71d9347e4eb6a8342237af",
+  "lakefile.toml": "7f0606a08ae673e3e6a5176dc22c1008792370d22c7a583fac2224efef372004",
+  "lean-toolchain": "54727eec5cba149c18842e6deb5c41b369d66455c93ce135d7d5347c782b2325",
+  "pins.json": "09b747c0591abbc8cf1506eda966284b4e3895696757fbc52c8e256e588b3748"
+}

@@ -1,0 +1,15 @@
+info: proof_challenge_experiment: no previous manifest, creating one from scratch
+info: toolchain not updated; already up-to-date
+Building Challenge
+WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Challenge
+✔ [2/3] Built Challenge (341ms)
+Build completed successfully (3 jobs).
+WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /tmp/zenofcis-proof-tools-20261007/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Challenge -- ApprovalContract.approval_requires_authority Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList
+Exporting #[ApprovalContract.approval_requires_authority, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Challenge
+Building Solution
+WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec lake build Solution
+✔ [2/3] Built Solution (393ms)
+Build completed successfully (3 jobs).
+WARNING: THIS IS NOT REAL LANDRUN! UNSAFELY RUNNING exec /tmp/zenofcis-proof-tools-20261007/comparator/.lake/packages/lean4export/.lake/build/bin/lean4export Solution -- ApprovalContract.approval_requires_authority Nat.add Nat.sub Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor Nat.shiftLeft Nat.shiftRight String.ofList
+Exporting #[ApprovalContract.approval_requires_authority, Nat.add, Nat.sub, Nat.mul, Nat.pow, Nat.gcd, Nat.div, Nat.mod, Nat.beq, Nat.ble, Nat.land, Nat.lor, Nat.xor, Nat.shiftLeft, Nat.shiftRight, String.ofList] from Solution
+uncaught exception: Const does not match between challenge and target 'ApprovalContract.approve'

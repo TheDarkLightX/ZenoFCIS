@@ -104,3 +104,28 @@ authoring/refusal tools with:
 ZENO_FCIS_CLI=/absolute/path/to/zeno-fcis uv run --no-project --with 'mcp==2.2.0' \
   python integrations/mcp/test_server.py
 ```
+
+## Proof and specification review
+
+Two additional skills are available from the same checkout:
+
+- [fixed-spec-proof-review](../skills/fixed-spec-proof-review/SKILL.md) checks
+  the exact theorem, transitive definitions, permitted assumptions, and
+  proof replay. A compiled proof of a weakened or changed obligation is
+  insufficient.
+- [specification-non-vacuity](../skills/specification-non-vacuity/SKILL.md)
+  checks that required success remains possible, premises and relevant
+  states are meaningful, and deny-all variants fail independent examples.
+
+They complement the synthesis-first skill and work across projects. They
+provide review instructions, not a new application authority or automatic
+proof service. For project-local Codex installation, copy each directory
+into `.agents/skills/`; for Claude Code use `.claude/skills/`. Preserve any
+existing skill with that name and keep the source revision with the copied
+instructions. Start a fresh harness session to load newly installed skills.
+
+The [frozen proof challenge](../experiments/proof-challenge/README.md) records
+the pinned Lean Comparator pilot and its planted controls. Its small Boolean
+model is separate from the Rust core. The runner accepts only its reviewed
+fixtures, and the development shim provides no sandbox for arbitrary agent
+submissions. Follow that README for reproduction and the named trust boundary.
