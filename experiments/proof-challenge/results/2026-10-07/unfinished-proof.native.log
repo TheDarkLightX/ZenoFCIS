@@ -1,0 +1,5 @@
+info: proof_challenge_experiment: no previous manifest, creating one from scratch
+info: toolchain not updated; already up-to-date
+⚠ [2/3] Built Solution (338ms)
+warning: Solution.lean:8:8: declaration uses `sorry`
+Build completed successfully (3 jobs).

@@ -1,0 +1,16 @@
+info: proof_challenge_experiment: no previous manifest, creating one from scratch
+info: toolchain not updated; already up-to-date
+✖ [2/3] Building Solution (335ms)
+trace: .> LEAN_PATH=/tmp/zenofcis-proof-tools-20261007/pilot03/projects-6no6qctw/invalid-proof-native/.lake/build/lib/lean <PINNED_LEAN_ROOT>/bin/lean /tmp/zenofcis-proof-tools-20261007/pilot03/projects-6no6qctw/invalid-proof-native/Solution.lean -o /tmp/zenofcis-proof-tools-20261007/pilot03/projects-6no6qctw/invalid-proof-native/.lake/build/lib/lean/Solution.olean -i /tmp/zenofcis-proof-tools-20261007/pilot03/projects-6no6qctw/invalid-proof-native/.lake/build/lib/lean/Solution.ilean -c /tmp/zenofcis-proof-tools-20261007/pilot03/projects-6no6qctw/invalid-proof-native/.lake/build/ir/Solution.c --setup /tmp/zenofcis-proof-tools-20261007/pilot03/projects-6no6qctw/invalid-proof-native/.lake/build/ir/Solution.setup.json --json
+error: Solution.lean:11:2: Tactic `rfl` failed: The left-hand side
+  authorized
+is not definitionally equal to the right-hand side
+  true
+
+pending authorized : Bool
+a✝ : approve pending authorized = true
+⊢ authorized = true
+error: Lean exited with code 1
+Some required targets logged failures:
+- Solution
+error: build failed
