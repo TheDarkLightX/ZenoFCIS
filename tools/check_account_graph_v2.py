@@ -14,13 +14,15 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 import time
-from unittest.mock import patch
-import check_template_contracts_v2 as emitter
 
 ROOT = Path(__file__).resolve().parents[1]
-SUBJECT = Path('crates/zeno-fcis-cli/templates/account-lockout/src/v2_contract.rs')
+TEMPLATE = Path('crates/zeno-fcis-cli/templates/account-lockout')
+SUBJECT = TEMPLATE / 'src/v2_contract.rs'
 LEDGER = Path('verification/verus/account-stage-migration.json')
+# What `zeno-fcis generate contract` reads; it writes src/v2_contract.rs.
+CONTRACT_INPUTS = ('project.zeno', 'v2/policy.json', 'v2/schema.zcve', 'v2/schema-origin.json')
 
 
 def once(text, before, after):
@@ -29,39 +31,53 @@ def once(text, before, after):
     return text.replace(before, after, 1)
 
 
+def generated_source(root, policy):
+    """The account contract the CLI generates for a changed rules file."""
+    with tempfile.TemporaryDirectory(prefix='zeno-fcis-account-') as directory:
+        app = Path(directory)
+        for name in CONTRACT_INPUTS:
+            (app / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(root / TEMPLATE / name, app / name)
+        (app / 'v2/policy.json').write_text(json.dumps(policy, indent=2) + '\n')
+        command = ['cargo', '+1.97.1', 'run', '--locked', '--offline', '-q', '-p', 'zeno-fcis-cli', '--',
+                   'generate', 'contract', str(app)]
+        subprocess.run(command, cwd=root, check=True, capture_output=True, text=True)
+        return (app / 'src/v2_contract.rs').read_text()
+
+
 def mutations(root=ROOT):
-    with patch.object(emitter, 'ROOT', root):
-        original = (root / SUBJECT).read_text()
-        rows = {}
-        for name, case, before, after in [
-            ('lose_original_seen', 0, 'now < seen', 'now < now'),
-            ('account_backwards_fact', 0, 'now < seen', 'now < until'),
-            ('lock_equality_is_locked', 1, 'now < until', 'now <= until'),
-            ('early_third_failure', 4, 'failed == 2', 'failed == 1'),
-        ]:
-            p = emitter.Project('account-lockout')
-            p.policy['cases'][case]['when'] = once(p.policy['cases'][case]['when'], before, after)
-            rows[name] = emitter.source(p)[0]
-        for name, expression in [('short_lock', 'now + 899'), ('wrong_arithmetic', 'now - 900')]:
-            p = emitter.Project('account-lockout')
-            p.variables['computed.deadline'] = emitter.parse(expression)
-            rows[name] = emitter.source(p)[0]
-        rows['cap_legal_timestamp'] = once(original,
-            'id: 130,\n                    leaf: InputLeaf::I128 {\n                        min: 0,\n                        max: 4102444800,',
-            'id: 130,\n                    leaf: InputLeaf::I128 {\n                        min: 0,\n                        max: 1000,')
-        rows['wrong_original_field'] = once(original,
-            'id: 112,\n                    leaf: InputLeaf::I128 {',
-            'id: 111,\n                    leaf: InputLeaf::I128 {')
-        rows['widen_command_domain'] = once(original,
-            'InputVariant { id: 122, code: 122 },',
-            'InputVariant { id: 122, code: 122 }, InputVariant { id: 123, code: 123 },')
-        rows['widen_command_domain'] = once(rows['widen_command_domain'],
-            'type_id: 101,\n                min: 120,\n                max: 122,',
-            'type_id: 101,\n                min: 120,\n                max: 123,')
-        rows['account_full_deadline'] = once(original, 'roots: &[32, 34, 35],', 'roots: &[32, 35, 35],')
-        if any(value == original for value in rows.values()):
-            raise ValueError('account mutation left its subject unchanged')
-        return rows
+    original = (root / SUBJECT).read_text()
+    policy = json.loads((root / TEMPLATE / 'v2/policy.json').read_text())
+    rows = {}
+    for name, case, before, after in [
+        ('lose_original_seen', 0, 'now < seen', 'now < now'),
+        ('account_backwards_fact', 0, 'now < seen', 'now < until'),
+        ('lock_equality_is_locked', 1, 'now < until', 'now <= until'),
+        ('early_third_failure', 4, 'failed == 2', 'failed == 1'),
+    ]:
+        changed = json.loads(json.dumps(policy))
+        changed['cases'][case]['when'] = once(changed['cases'][case]['when'], before, after)
+        rows[name] = generated_source(root, changed)
+    for name, expression in [('short_lock', 'now + 899'), ('wrong_arithmetic', 'now - 900')]:
+        changed = json.loads(json.dumps(policy))
+        changed['variables']['computed.deadline'] = expression
+        rows[name] = generated_source(root, changed)
+    rows['cap_legal_timestamp'] = once(original,
+        'id: 130,\n                    leaf: InputLeaf::I128 {\n                        min: 0,\n                        max: 4102444800,',
+        'id: 130,\n                    leaf: InputLeaf::I128 {\n                        min: 0,\n                        max: 1000,')
+    rows['wrong_original_field'] = once(original,
+        'id: 112,\n                    leaf: InputLeaf::I128 {',
+        'id: 111,\n                    leaf: InputLeaf::I128 {')
+    rows['widen_command_domain'] = once(original,
+        'InputVariant { id: 122, code: 122 },',
+        'InputVariant { id: 122, code: 122 }, InputVariant { id: 123, code: 123 },')
+    rows['widen_command_domain'] = once(rows['widen_command_domain'],
+        'type_id: 101,\n                min: 120,\n                max: 122,',
+        'type_id: 101,\n                min: 120,\n                max: 123,')
+    rows['account_full_deadline'] = once(original, 'roots: &[32, 34, 35],', 'roots: &[32, 35, 35],')
+    if any(value == original for value in rows.values()):
+        raise ValueError('account mutation left its subject unchanged')
+    return rows
 
 
 def source_files(root):

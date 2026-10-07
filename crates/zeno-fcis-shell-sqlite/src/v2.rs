@@ -1,12 +1,29 @@
-//! SQLite schema v9 stores compact genuine publications under one admitted identity.
-//! Full reconstructed publications bind replay, certificates and delivery IDs.
-//! The functional core owns decisions; SQLite, SHA-256 and destination acknowledgements
-//! remain trusted shell assumptions. Identity copying is outside the logical byte cap.
-//! Private checkpoints require trusted provenance and do not authenticate hostile stores.
+//! SQLite schema v10 stores compact genuine publications under the admitted
+//! identities of a contract lineage. Full reconstructed publications bind replay,
+//! certificates and delivery IDs. The functional core owns decisions; SQLite,
+//! SHA-256 and destination acknowledgements remain trusted shell assumptions.
+//! Identity copying is outside the logical byte cap. Private checkpoints
+//! require trusted provenance and do not authenticate hostile stores.
+//!
+//! A store starts under one Authority. A checked upgrade appends a chained
+//! record that moves the head to a later contract of the application's
+//! lineage with the same state schema: a program successor at any state, and
+//! any other contract only when its genesis laws admit the current state (see
+//! [`upgrade`](crate::v2::upgrade)). Each history segment replays under the
+//! Authority it was published with, so a store with upgrades is opened through
+//! its [`Lineage`](crate::v2::Lineage), oldest version first, which yields a
+//! typed handle.
+//!
+//! The chain shows that every segment is valid under the lineage version it
+//! names. It is not keyed: anyone who can write the file can append a
+//! well-formed record or roll the store back to an earlier valid head, and
+//! detecting that needs a tip held outside the file, such as an
+//! [`UpgradeReceipt`](crate::v2::UpgradeReceipt) or a private
+//! [`Checkpoint`](crate::v2::Checkpoint).
 
 use crate::CrashPoint;
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
-use std::{fmt, path::Path};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
+use std::{cell::Cell, fmt, path::Path};
 use zeno_fcis_codec::{
     CanonicalEncode, DecodeLimits, Domain, EncodeError, Hash32, commitment, decode_value,
 };
@@ -19,9 +36,15 @@ use zeno_fcis_synthesis::finite::{
 };
 
 mod compact;
+pub mod equivalence;
+mod lineage;
+/// The pure upgrade decision and the lineage assignment.
+pub mod upgrade;
 pub use compact::{compact_publication, expand_publication};
+pub use lineage::{Lineage, Opened, Store, Superseded, V9Store};
 
-const SCHEMA: &str = "
+/// The tables of schema v9, which v10 keeps unchanged.
+const HISTORY: &str = "
 CREATE TABLE v2_genesis (
  singleton INTEGER PRIMARY KEY CHECK(singleton=1),
  identity BLOB NOT NULL, initial BLOB NOT NULL, publication BLOB NOT NULL,
@@ -61,8 +84,38 @@ CREATE TABLE v2_checkpoints (
  sequence INTEGER PRIMARY KEY CHECK(sequence>=0),
  root BLOB NOT NULL CHECK(length(root)=32), chain BLOB NOT NULL CHECK(length(chain)=32)
 );
-PRAGMA user_version = 9;
 ";
+/// Schema v10 adds the chained upgrade records. `ordinal` orders them;
+/// `sequence` is the head each one was recorded at; `identity` is the full
+/// identity of the contract upgraded to; `publication` is the admission the
+/// record binds: that contract's compact genesis publication over the state
+/// at the head for a genesis admission, or the adoption receipt digests for a
+/// program successor. The record's magic names its kind.
+const UPGRADES: &str = "
+CREATE TABLE v2_upgrades (
+ ordinal INTEGER PRIMARY KEY CHECK(ordinal>0),
+ sequence INTEGER NOT NULL CHECK(sequence>=0),
+ identity BLOB NOT NULL, publication BLOB NOT NULL,
+ root BLOB NOT NULL CHECK(length(root)=32),
+ previous_chain BLOB NOT NULL CHECK(length(previous_chain)=32),
+ record BLOB NOT NULL, chain BLOB NOT NULL UNIQUE CHECK(length(chain)=32)
+);
+";
+const SCHEMA_VERSION: i64 = 10;
+
+/// The complete current schema a new store receives.
+fn schema_v10() -> String {
+    format!("{HISTORY}{UPGRADES}PRAGMA user_version = {SCHEMA_VERSION};\n")
+}
+/// Schema v9 exactly as the previous shell created it: the history tables alone.
+fn schema_v9() -> String {
+    format!("{HISTORY}PRAGMA user_version = 9;\n")
+}
+/// The one explicit migration: the upgrade table and the new version, so a
+/// migrated store's catalog equals a new store's.
+fn migration_v9_to_v10() -> String {
+    format!("{UPGRADES}PRAGMA user_version = {SCHEMA_VERSION};\n")
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Anchor {
@@ -89,6 +142,7 @@ pub struct Snapshot {
     bundles: u64,
     replays: u64,
     pending: u64,
+    upgrades: u64,
 }
 impl Snapshot {
     /// Number of committed transitions after genesis.
@@ -99,7 +153,8 @@ impl Snapshot {
     pub fn state(&self) -> &[u8] {
         &self.anchor.state
     }
-    /// Actual full stored identity, admitted in the same transaction as this head.
+    /// Actual full stored identity of the current contract, admitted in the
+    /// same transaction as this head.
     pub fn binding(&self) -> &[u8] {
         &self.binding
     }
@@ -123,6 +178,10 @@ impl Snapshot {
     pub fn pending(&self) -> u64 {
         self.pending
     }
+    /// Number of recorded contract upgrades; the history has one more segment.
+    pub fn upgrades(&self) -> u64 {
+        self.upgrades
+    }
 }
 
 /// Durable certificate bound to the actual pre-state root and core publication.
@@ -144,6 +203,65 @@ impl CommitReceipt {
     /// Whether this call committed or matched a previously committed invocation.
     pub fn status(&self) -> CommitStatus {
         self.status
+    }
+}
+
+/// A recorded contract upgrade: the chained record and what it binds.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UpgradeReceipt {
+    kind: upgrade::Kind,
+    premises: Option<upgrade::Premises>,
+    ordinal: u64,
+    sequence: u64,
+    chain: Hash32,
+    from_identity: Vec<u8>,
+    identity: Vec<u8>,
+    receipts: Vec<Hash32>,
+    record: Vec<u8>,
+}
+impl UpgradeReceipt {
+    /// How the new contract admitted the store's state.
+    pub fn kind(&self) -> upgrade::Kind {
+        self.kind
+    }
+    /// For a program successor, the evidence that the shell established all
+    /// five premises, including the number of input tuples on which it
+    /// compared the two decision programs; `None` for a genesis admission.
+    pub fn premises(&self) -> Option<upgrade::Premises> {
+        self.premises
+    }
+    /// Position among the store's upgrades, from 1.
+    pub fn ordinal(&self) -> u64 {
+        self.ordinal
+    }
+    /// For a program successor, the SHA-256 of each adoption receipt between
+    /// the two versions, oldest first, as the upgrading lineage declares
+    /// them; empty for a genesis admission. They are provenance: the shell
+    /// replays no receipt, it compares the two programs itself, and an audit
+    /// requires these digests to be the auditing lineage's.
+    pub fn receipts(&self) -> &[Hash32] {
+        &self.receipts
+    }
+    /// The commit position the upgrade was recorded at; later commits run
+    /// under the new contract.
+    pub fn version(&self) -> u64 {
+        self.sequence
+    }
+    /// The hash chain tip after the upgrade.
+    pub fn chain(&self) -> Hash32 {
+        self.chain
+    }
+    /// Full identity of the contract the store ran before.
+    pub fn from_identity(&self) -> &[u8] {
+        &self.from_identity
+    }
+    /// Full identity of the contract the store runs now.
+    pub fn identity(&self) -> &[u8] {
+        &self.identity
+    }
+    /// The canonical record whose `V2_CHAIN` hash is the new chain tip.
+    pub fn record(&self) -> &[u8] {
+        &self.record
     }
 }
 
@@ -209,9 +327,130 @@ impl Pending {
     }
 }
 
-/// SQLite adapter bound to one immutable library Authority. There is no application evaluator.
+/// The contract versions a handle replays with, oldest first; the last one is
+/// the contract the store runs now.
+#[derive(Clone, Copy)]
+enum Members<'a, 'p> {
+    /// Created or opened with one Authority: a store without upgrades.
+    One(&'a Authority<'p>),
+    /// Opened through a lineage, bound to its first `len` versions.
+    Lineage {
+        lineage: &'a Lineage<'a, 'p>,
+        len: usize,
+    },
+}
+impl<'a, 'p> Members<'a, 'p> {
+    fn authorities(self) -> &'a [Authority<'p>] {
+        match self {
+            Self::One(authority) => std::slice::from_ref(authority),
+            Self::Lineage { lineage, len } => &lineage.authorities()[..len],
+        }
+    }
+    /// What a program-successor record is checked against; nothing for a
+    /// handle opened with one Authority, whose store has no upgrade.
+    /// `missing` receives a pair of versions whose comparison the check
+    /// needed and the lineage had not yet established.
+    fn declared<'m>(self, missing: &'m Cell<Option<(usize, usize)>>) -> Declared<'m, 'a, 'p> {
+        Declared {
+            lineage: self.lineage(),
+            len: self.authorities().len(),
+            missing,
+        }
+    }
+    /// The lineage a handle was opened through, if any.
+    fn lineage(self) -> Option<&'a Lineage<'a, 'p>> {
+        match self {
+            Self::One(_) => None,
+            Self::Lineage { lineage, .. } => Some(lineage),
+        }
+    }
+    fn last(self) -> &'a Authority<'p> {
+        self.authorities()
+            .last()
+            .unwrap_or_else(|| unreachable!("a handle is bound to at least one Authority"))
+    }
+}
+
+/// What the lineage a handle is bound to declares for its first `len`
+/// versions: each version's checked catalog, the adoption receipt digests
+/// between each version and the next, and the premises it established for
+/// pairs of versions. An audit takes a program succession from these alone
+/// and never takes evidence from the store as evidence about itself. Inside a
+/// transaction it only looks an established pair up; a pair not yet
+/// established goes to `missing`, and the check ends with `Error::Unsettled`.
+#[derive(Clone, Copy)]
+struct Declared<'m, 'a, 'p> {
+    lineage: Option<&'a Lineage<'a, 'p>>,
+    len: usize,
+    missing: &'m Cell<Option<(usize, usize)>>,
+}
+
+/// Establishes, from plain reads and before any write transaction, the
+/// comparisons an operation on the store will need: one for each
+/// program-successor record, and with `to_last` the one from the version
+/// the store runs to the last. It is only a head start: a store that fails
+/// to read here fails the same way inside the transaction, and one changed
+/// in between is caught there.
+fn prepare(connection: &Connection, members: Members<'_, '_>, to_last: bool) {
+    let Some(lineage) = members.lineage() else {
+        return;
+    };
+    let authorities = members.authorities();
+    let Ok(segments) = load_upgrades(connection)
+        .and_then(|upgrades| Segments::load(connection, authorities, upgrades))
+    else {
+        return;
+    };
+    for (index, stored) in segments.upgrades.iter().enumerate() {
+        if upgrade::Kind::of_record(&stored.record) == Some(upgrade::Kind::ProgramSuccessor) {
+            let (from, to) = (segments.position(index), segments.position(index + 1));
+            // The outcome, failures included, is kept for the transaction.
+            let _ = lineage.establish(connection, from, to);
+        }
+    }
+    let (current, last) = (
+        segments.position(segments.current()),
+        authorities.len().saturating_sub(1),
+    );
+    if to_last && authorities[current].identity() != authorities[last].identity() {
+        let _ = lineage.establish(connection, current, last);
+    }
+}
+
+/// Runs `attempt`, which holds its write transaction only while it runs,
+/// until no comparison it needs is missing. After an attempt that ended
+/// with `Error::Unsettled`, and so wrote nothing, the missing pair is
+/// established with no transaction open and the attempt runs again. A store
+/// whose pairs remain unavailable, because other connections change it or
+/// comparisons keep the shared memo busy, ends when the bounded retries
+/// are exhausted with `Error::Unsettled`.
+fn settle<T>(
+    connection: &mut Connection,
+    members: Members<'_, '_>,
+    mut attempt: impl FnMut(&mut Connection, &Cell<Option<(usize, usize)>>) -> Result<T, Error>,
+) -> Result<T, Error> {
+    let missing = Cell::new(None);
+    for _ in 0..=members.authorities().len() {
+        match attempt(connection, &missing) {
+            Err(Error::Unsettled) => match (members.lineage(), missing.take()) {
+                (Some(lineage), Some((from, to))) => {
+                    // The outcome, a missing premise included, is kept for
+                    // the next attempt; only an error ends here.
+                    let _established = lineage.establish(connection, from, to)?;
+                }
+                _ => return Err(Error::Unsettled),
+            },
+            other => return other,
+        }
+    }
+    Err(Error::Unsettled)
+}
+
+/// SQLite adapter bound to immutable library Authorities: one, or a prefix of
+/// a contract lineage, oldest first. The last one is the contract the store
+/// runs now. There is no application evaluator.
 pub struct V2SqliteShell<'a, 'p> {
-    authority: &'a Authority<'p>,
+    members: Members<'a, 'p>,
     connection: Connection,
     anchor: Anchor,
     genesis: Hash32,
@@ -268,7 +507,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
                 delivery_interpreter.as_bytes(),
             ],
         )?;
-        tx.execute_batch(SCHEMA)?;
+        tx.execute_batch(&schema_v10())?;
         check_schema(&tx)?;
         tx.execute(
             "INSERT INTO v2_genesis VALUES(1,?1,?2,?3,?4,?5)",
@@ -301,7 +540,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             chain,
         };
         Ok(Self {
-            authority,
+            members: Members::One(authority),
             connection,
             anchor,
             genesis: chain,
@@ -309,9 +548,11 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             data_version,
         })
     }
-    /// Re-admit genesis and recompute every complete decision and delivery on reopening.
+    /// Re-admit genesis and recompute every complete decision and delivery on
+    /// reopening a store that never upgraded. A store with upgrades opens
+    /// through its [`Lineage`]. A missing file is refused, never created.
     pub fn open(path: impl AsRef<Path>, authority: &'a Authority<'p>) -> Result<Self, Error> {
-        Self::reopen(Connection::open(path)?, authority, None)
+        Self::reopen(open_existing(path)?, Members::One(authority), None).map(|(shell, _)| shell)
     }
     /// Check the tail after a privately validated prefix. The checkpoint is a trusted input.
     pub fn open_at_checkpoint(
@@ -319,55 +560,117 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         authority: &'a Authority<'p>,
         checkpoint: &Checkpoint,
     ) -> Result<Self, Error> {
-        Self::reopen(Connection::open(path)?, authority, Some(checkpoint))
+        Self::reopen(
+            open_existing(path)?,
+            Members::One(authority),
+            Some(checkpoint),
+        )
+        .map(|(shell, _)| shell)
     }
+    /// Audit a schema v10 store under `members`: every history segment
+    /// replays under the member that published it. Returns the handle and the
+    /// position of the store's current segment among the members.
     fn reopen(
         mut connection: Connection,
-        authority: &'a Authority<'p>,
+        members: Members<'a, 'p>,
         checkpoint: Option<&Checkpoint>,
-    ) -> Result<Self, Error> {
+    ) -> Result<(Self, usize), Error> {
         provider()?;
         configure(&connection)?;
-        let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_schema(&tx)?;
-        let (genesis, initial) = genesis_anchor(&tx, authority)?;
-        let delivery_interpreter = MemoryDestination::interpreter_identity()?;
-        let start = match checkpoint {
-            None => initial,
-            Some(c) => {
-                if c.identity != authority.identity() || c.genesis != genesis {
-                    return Err(Error::Identity);
-                }
-                check_checkpoint(&tx, c)?;
-                c.anchor.clone()
-            }
-        };
-        let anchor = audit_tail(&tx, authority, start)?;
-        let data_version = data_version(&tx)?;
-        tx.commit()?;
-        Ok(Self {
-            authority,
+        // A full open establishes its comparisons before the lock; a
+        // checkpoint open needs only the tail's, which the retry finds.
+        if checkpoint.is_none() {
+            prepare(&connection, members, false);
+        }
+        let (anchor, genesis, delivery_interpreter, position, data_version) =
+            settle(&mut connection, members, |connection, missing| {
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                check_schema(&tx)?;
+                let authorities = members.authorities();
+                let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
+                let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+                let delivery_interpreter = MemoryDestination::interpreter_identity()?;
+                let (start, consumed) = match checkpoint {
+                    None => (initial, 0),
+                    Some(c) => {
+                        if c.genesis != genesis {
+                            return Err(Error::Identity);
+                        }
+                        let consumed = check_checkpoint(&tx, &segments, c)?;
+                        if c.identity != segments.authority(authorities, consumed).identity() {
+                            return Err(Error::Identity);
+                        }
+                        (c.anchor.clone(), consumed)
+                    }
+                };
+                let anchor = audit_tail(
+                    &tx,
+                    authorities,
+                    members.declared(missing),
+                    &segments,
+                    start,
+                    consumed,
+                )?;
+                let position = segments.position(segments.current());
+                let data_version = data_version(&tx)?;
+                tx.commit()?;
+                Ok((
+                    anchor,
+                    genesis,
+                    delivery_interpreter,
+                    position,
+                    data_version,
+                ))
+            })?;
+        let shell = Self {
+            members,
             connection,
             anchor,
             genesis,
             delivery_interpreter,
             data_version,
-        })
+        };
+        Ok((shell, position))
+    }
+    /// The contract the store runs now: the last member this handle is bound to.
+    pub fn authority(&self) -> &'a Authority<'p> {
+        self.current()
+    }
+    /// Every contract version this handle replays with, oldest first.
+    pub fn lineage(&self) -> &'a [Authority<'p>] {
+        self.members.authorities()
+    }
+    fn current(&self) -> &'a Authority<'p> {
+        self.members.last()
     }
     /// Revalidate all history explicitly, including acknowledged delivery data.
     pub fn audit(&mut self) -> Result<Checkpoint, Error> {
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_schema(&tx)?;
-        let (genesis, initial) = genesis_anchor(&tx, self.authority)?;
-        let anchor = audit_tail(&tx, self.authority, initial)?;
-        if genesis != self.genesis {
-            return Err(Error::History);
-        }
-        save_checkpoint(&tx, &anchor)?;
-        let data_version = data_version(&tx)?;
-        tx.commit()?;
+        let (members, expected_genesis) = (self.members, self.genesis);
+        prepare(&self.connection, members, false);
+        let (anchor, data_version) =
+            settle(&mut self.connection, members, |connection, missing| {
+                let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                check_schema(&tx)?;
+                let authorities = members.authorities();
+                let segments = Segments::load(&tx, authorities, load_upgrades(&tx)?)?;
+                segments.require_current(authorities)?;
+                let (genesis, initial) = genesis_anchor(&tx, segments.authority(authorities, 0))?;
+                let anchor = audit_tail(
+                    &tx,
+                    authorities,
+                    members.declared(missing),
+                    &segments,
+                    initial,
+                    0,
+                )?;
+                if genesis != expected_genesis {
+                    return Err(Error::History);
+                }
+                save_checkpoint(&tx, &anchor)?;
+                let data_version = data_version(&tx)?;
+                tx.commit()?;
+                Ok((anchor, data_version))
+            })?;
         self.anchor = anchor;
         self.data_version = data_version;
         Ok(self.checkpoint_value())
@@ -382,7 +685,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
     }
     fn checkpoint_value(&self) -> Checkpoint {
         Checkpoint {
-            identity: self.authority.identity().to_vec(),
+            identity: self.current().identity().to_vec(),
             genesis: self.genesis,
             anchor: self.anchor.clone(),
         }
@@ -393,7 +696,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_cached_tip(&tx, &self.anchor, self.data_version, self.authority)?;
+        check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         save_checkpoint(&tx, &self.anchor)?;
         tx.commit()?;
         Ok(self.checkpoint_value())
@@ -405,8 +713,13 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_cached_tip(&tx, &self.anchor, self.data_version, self.authority)?;
-        let binding = stored_binding(&tx, self.authority)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
+        let binding = segments.identity(segments.current()).to_vec();
         let (bundles, replays): (i64, i64) = tx.query_row(
             "SELECT count(*),count(DISTINCT replay_id) FROM v2_commits",
             [],
@@ -424,6 +737,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             bundles: u64::try_from(bundles).map_err(|_| Error::History)?,
             replays: u64::try_from(replays).map_err(|_| Error::History)?,
             pending: u64::try_from(pending).map_err(|_| Error::History)?,
+            upgrades: u64::try_from(segments.upgrades.len()).map_err(|_| Error::History)?,
         })
     }
     /// Atomically publish a private capability. Reusing a key requires exact original bytes.
@@ -490,7 +804,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         expected_version: Option<u64>,
         byte_limit: Option<usize>,
     ) -> Result<CommitReceipt, Error> {
-        if publication.identity() != self.authority.identity() {
+        if publication.identity() != self.current().identity() {
             return Err(Error::Identity);
         }
         if publication.evaluation().kind() != Kind::Transition {
@@ -502,7 +816,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_cached_tip(&tx, &self.anchor, self.data_version, self.authority)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         if expected_version.is_some_and(|expected| expected != self.anchor.sequence as u64) {
             return Err(Error::Concurrent);
         }
@@ -517,7 +836,8 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             let row = load_commit(&tx, sequence)?;
             check_commit(
                 &tx,
-                self.authority,
+                self.members.authorities(),
+                &segments,
                 &row,
                 publication.evaluation().raw().state,
             )?;
@@ -598,15 +918,21 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             status: CommitStatus::Committed,
         })
     }
-    /// Read the actual persisted immutable identity and re-admit it while holding a transaction.
+    /// Read the actual persisted immutable identity of the current contract and
+    /// re-admit it while holding a transaction.
     /// This copies and compares O(H) metadata outside the invocation logical meter.
     pub fn binding(&mut self) -> Result<Vec<u8>, Error> {
         self.synchronize()?;
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_cached_tip(&tx, &self.anchor, self.data_version, self.authority)?;
-        let binding = stored_binding(&tx, self.authority)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
+        let binding = segments.identity(segments.current()).to_vec();
         tx.commit()?;
         Ok(binding)
     }
@@ -623,7 +949,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         // Refuse a wrong kind before snapshot() can refresh and save a checkpoint;
         // a foreign identity still reports Identity first.
         if publication.evaluation().kind() != Kind::Transition {
-            if publication.identity() != self.authority.identity() {
+            if publication.identity() != self.current().identity() {
                 return Err(Error::Identity);
             }
             return Err(Error::InvocationKind);
@@ -632,7 +958,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         if snapshot.version() != expected_version {
             return Err(Error::Concurrent);
         }
-        if publication.identity() != self.authority.identity() {
+        if publication.identity() != self.current().identity() {
             return Err(Error::Identity);
         }
         if publication.evaluation().raw().state != snapshot.state() {
@@ -646,14 +972,19 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_cached_tip(&tx, &self.anchor, self.data_version, self.authority)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         let position: Option<(i64,i64,i64)> = tx.query_row("SELECT sequence,lane,ordinal FROM v2_deliveries WHERE acknowledged=0 ORDER BY sequence,lane,ordinal LIMIT 1", [], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
         let result = match position {
             None => None,
             Some((sequence, lane, ordinal)) => {
                 let row = load_commit(&tx, sequence)?;
                 let state = previous_state(&tx, sequence)?;
-                check_commit(&tx, self.authority, &row, &state)?;
+                check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
                 Some(load_pending(&tx, sequence, lane, ordinal)?)
             }
         };
@@ -666,7 +997,12 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        check_cached_tip(&tx, &self.anchor, self.data_version, self.authority)?;
+        let segments = check_cached_tip(
+            &tx,
+            &self.anchor,
+            self.data_version,
+            self.members.authorities(),
+        )?;
         let sequence: i64 = tx
             .query_row(
                 "SELECT sequence FROM v2_deliveries WHERE delivery_id=?1",
@@ -677,7 +1013,7 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
             .ok_or(Error::Delivery)?;
         let row = load_commit(&tx, sequence)?;
         let state = previous_state(&tx, sequence)?;
-        check_commit(&tx, self.authority, &row, &state)?;
+        check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
         let expected: Vec<u8> = tx.query_row(
             "SELECT entry_hash FROM v2_deliveries WHERE delivery_id=?1",
             [delivery_id.as_bytes().as_slice()],
@@ -745,6 +1081,180 @@ impl<'a> BoundMemoryInterpreter<'a> {
     }
 }
 
+/// One stored upgrade row, read in ordinal order.
+#[derive(Debug)]
+struct StoredUpgrade {
+    ordinal: i64,
+    sequence: i64,
+    identity: Vec<u8>,
+    publication: Vec<u8>,
+    root: Hash32,
+    previous_chain: Hash32,
+    record: Vec<u8>,
+    chain: Hash32,
+}
+fn load_upgrades(connection: &Connection) -> Result<Vec<StoredUpgrade>, Error> {
+    let mut statement = connection.prepare("SELECT ordinal,sequence,identity,publication,root,previous_chain,record,chain FROM v2_upgrades ORDER BY ordinal")?;
+    let rows = statement
+        .query_map([], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, Vec<u8>>(2)?,
+                r.get::<_, Vec<u8>>(3)?,
+                r.get::<_, Vec<u8>>(4)?,
+                r.get::<_, Vec<u8>>(5)?,
+                r.get::<_, Vec<u8>>(6)?,
+                r.get::<_, Vec<u8>>(7)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut upgrades = Vec::with_capacity(rows.len());
+    for (index, row) in rows.into_iter().enumerate() {
+        let upgrade = StoredUpgrade {
+            ordinal: row.0,
+            sequence: row.1,
+            identity: row.2,
+            publication: row.3,
+            root: parse_hash(&row.4)?,
+            previous_chain: parse_hash(&row.5)?,
+            record: row.6,
+            chain: parse_hash(&row.7)?,
+        };
+        // Ordinals are consecutive from one and heads never move backwards.
+        let expected = i64::try_from(index)
+            .ok()
+            .and_then(|index| index.checked_add(1))
+            .ok_or(Error::Range)?;
+        if upgrade.ordinal != expected
+            || upgrade.sequence < 0
+            || upgrades
+                .last()
+                .is_some_and(|previous: &StoredUpgrade| previous.sequence > upgrade.sequence)
+        {
+            return Err(Error::History);
+        }
+        upgrades.push(upgrade);
+    }
+    Ok(upgrades)
+}
+
+/// The store's history segments: the genesis contract, then one more per
+/// upgrade, each mapped to the lineage member that published it.
+struct Segments {
+    genesis_identity: Vec<u8>,
+    upgrades: Vec<StoredUpgrade>,
+    positions: Vec<usize>,
+}
+impl Segments {
+    fn load(
+        connection: &Connection,
+        lineage: &[Authority<'_>],
+        upgrades: Vec<StoredUpgrade>,
+    ) -> Result<Self, Error> {
+        let genesis_identity: Vec<u8> = connection.query_row(
+            "SELECT identity FROM v2_genesis WHERE singleton=1",
+            [],
+            |row| row.get(0),
+        )?;
+        let identities: Vec<&[u8]> = std::iter::once(genesis_identity.as_slice())
+            .chain(upgrades.iter().map(|upgrade| upgrade.identity.as_slice()))
+            .collect();
+        let members: Vec<&[u8]> = lineage.iter().map(|member| member.identity()).collect();
+        let positions = upgrade::assign(&members, &identities)?;
+        Ok(Self {
+            genesis_identity,
+            upgrades,
+            positions,
+        })
+    }
+    /// Index of the segment the head is in.
+    fn current(&self) -> usize {
+        self.upgrades.len()
+    }
+    fn identity(&self, segment: usize) -> &[u8] {
+        match segment.checked_sub(1) {
+            None => &self.genesis_identity,
+            Some(index) => &self.upgrades[index].identity,
+        }
+    }
+    /// The lineage position of a segment's contract.
+    fn position(&self, segment: usize) -> usize {
+        self.positions[segment]
+    }
+    fn authority<'x, 'p>(&self, lineage: &'x [Authority<'p>], segment: usize) -> &'x Authority<'p> {
+        &lineage[self.position(segment)]
+    }
+    /// The segment a commit belongs to: after every upgrade recorded at an
+    /// earlier head.
+    fn segment_of(&self, sequence: i64) -> usize {
+        self.upgrades
+            .iter()
+            .take_while(|upgrade| upgrade.sequence < sequence)
+            .count()
+    }
+    /// The store runs the lineage's last member. Identities, not positions,
+    /// decide: an identity binds the complete policy and the evaluator, so a
+    /// lineage that repeats one still opens a store that runs it.
+    fn require_current(&self, lineage: &[Authority<'_>]) -> Result<(), Error> {
+        match lineage.last() {
+            Some(last) if last.identity() == self.identity(self.current()) => Ok(()),
+            _ => Err(Error::Identity),
+        }
+    }
+    /// How many upgrades a validated anchor already includes: all those at
+    /// earlier heads, and those at its own head up to the one whose chain
+    /// link it carries.
+    fn consumed_at(&self, connection: &Connection, anchor: &Anchor) -> Result<usize, Error> {
+        let before = self.segment_of(anchor.sequence);
+        if anchor.chain == base_chain(connection, anchor.sequence)? {
+            return Ok(before);
+        }
+        for (offset, upgrade) in self.upgrades[before..].iter().enumerate() {
+            if upgrade.sequence != anchor.sequence {
+                break;
+            }
+            if upgrade.chain == anchor.chain {
+                return Ok(before + offset + 1);
+            }
+        }
+        Err(Error::History)
+    }
+    /// The chain tip a commit at `sequence` extends: the last upgrade recorded
+    /// at the previous head, else that head's own link.
+    fn chain_before(&self, connection: &Connection, sequence: i64) -> Result<Hash32, Error> {
+        let previous = sequence.checked_sub(1).ok_or(Error::History)?;
+        self.tip_chain(connection, previous)
+    }
+    /// The chain tip after every event at `sequence`.
+    fn tip_chain(&self, connection: &Connection, sequence: i64) -> Result<Hash32, Error> {
+        match self
+            .upgrades
+            .iter()
+            .rev()
+            .find(|upgrade| upgrade.sequence == sequence)
+        {
+            Some(upgrade) => Ok(upgrade.chain),
+            None => base_chain(connection, sequence),
+        }
+    }
+}
+/// The link of the commit at `sequence`, or the genesis link at zero.
+fn base_chain(connection: &Connection, sequence: i64) -> Result<Hash32, Error> {
+    let chain: Vec<u8> = if sequence == 0 {
+        connection.query_row("SELECT chain FROM v2_genesis WHERE singleton=1", [], |r| {
+            r.get(0)
+        })?
+    } else {
+        connection.query_row(
+            "SELECT chain FROM v2_commits WHERE sequence=?1",
+            [sequence],
+            |r| r.get(0),
+        )?
+    };
+    parse_hash(&chain)
+}
+
 #[derive(Debug)]
 struct StoredCommit {
     sequence: i64,
@@ -775,9 +1285,11 @@ fn load_commit(connection: &Connection, sequence: i64) -> Result<StoredCommit, E
         certificate: row.9,
     })
 }
+/// Replay one commit under the Authority of its own segment.
 fn check_commit(
     connection: &Connection,
-    authority: &Authority<'_>,
+    lineage: &[Authority<'_>],
+    segments: &Segments,
     row: &StoredCommit,
     pre: &[u8],
 ) -> Result<(), Error> {
@@ -792,8 +1304,13 @@ fn check_commit(
         command: &row.command,
         context: &row.context,
     };
-    let binding = stored_binding(connection, authority)?;
-    let full = expand_publication(&binding, &row.publication)?;
+    let segment = segments.segment_of(row.sequence);
+    let authority = segments.authority(lineage, segment);
+    let binding = segments.identity(segment);
+    if authority.identity() != binding {
+        return Err(Error::Identity);
+    }
+    let full = expand_publication(binding, &row.publication)?;
     let PublicationOutcome::Commit(p) = authority.replay_publication(raw, &full) else {
         return Err(Error::History);
     };
@@ -810,29 +1327,156 @@ fn check_commit(
     )?;
     if row.certificate != certificate
         || hash(zeno_fcis_codec::domains::V2_CHAIN, &certificate)? != row.chain
+        || row.previous_chain != segments.chain_before(connection, row.sequence)?
     {
-        return Err(Error::History);
-    }
-    let previous = if row.sequence == 1 {
-        connection.query_row("SELECT chain FROM v2_genesis WHERE singleton=1", [], |r| {
-            r.get::<_, Vec<u8>>(0)
-        })?
-    } else {
-        connection.query_row(
-            "SELECT chain FROM v2_commits WHERE sequence=?1",
-            [row.sequence - 1],
-            |r| r.get::<_, Vec<u8>>(0),
-        )?
-    };
-    if row.previous_chain != parse_hash(&previous)? {
         return Err(Error::History);
     }
     check_deliveries(connection, row.sequence, &p, &certificate)
 }
+/// Recompute one upgrade record at the head it was recorded at, re-checking
+/// the admission its kind claims: a genesis admission replays the stored
+/// genesis publication over the state, and a program successor establishes
+/// all five premises again from the two versions' catalogs, exactly as the
+/// upgrade did, and requires the stored receipt digests to be the ones the
+/// lineage declares for the versions the record spans.
+fn check_upgrade(
+    connection: &Connection,
+    lineage: &[Authority<'_>],
+    declared: Declared<'_, '_, '_>,
+    segments: &Segments,
+    index: usize,
+    anchor: &Anchor,
+) -> Result<(), Error> {
+    let upgrade = &segments.upgrades[index];
+    let ordinal = u64::try_from(index)
+        .ok()
+        .and_then(|index| index.checked_add(1))
+        .ok_or(Error::Range)?;
+    if u64::try_from(upgrade.ordinal) != Ok(ordinal)
+        || upgrade.sequence != anchor.sequence
+        || upgrade.root != anchor.root
+        || upgrade.previous_chain != anchor.chain
+    {
+        return Err(Error::History);
+    }
+    let from = segments.identity(index);
+    let (old, new) = (segments.position(index), segments.position(index + 1));
+    let authority = &lineage[new];
+    if authority.identity() != upgrade.identity || from == upgrade.identity {
+        return Err(Error::Identity);
+    }
+    let sequence = u64::try_from(anchor.sequence).map_err(|_| Error::Range)?;
+    let kind = upgrade::Kind::of_record(&upgrade.record).ok_or(Error::History)?;
+    let admission = match kind {
+        upgrade::Kind::GenesisAdmission => {
+            let full = expand_publication(&upgrade.identity, &upgrade.publication)?;
+            let PublicationOutcome::Commit(p) =
+                authority.replay_genesis_publication(&anchor.state, &full)
+            else {
+                return Err(Error::History);
+            };
+            if p.poststate() != anchor.state {
+                return Err(Error::History);
+            }
+            full
+        }
+        upgrade::Kind::ProgramSuccessor => {
+            // A handle opened with one Authority holds no catalog, and its
+            // store cannot hold an upgrade.
+            let (Some(declarer), true) = (declared.lineage, new < declared.len) else {
+                return Err(Error::Identity);
+            };
+            let Some(receipts) = declarer.receipts().get(old..new) else {
+                return Err(Error::Identity);
+            };
+            // Every premise, established from the lineage's own catalogs
+            // before this transaction; the record must bind the same tuple
+            // count.
+            let Some(settled) = declarer.settled(old, new) else {
+                declared.missing.set(Some((old, new)));
+                return Err(Error::Unsettled);
+            };
+            let premises = match settled? {
+                Ok(premises) => premises,
+                Err(premise) => {
+                    return Err(Error::Succession(upgrade::Unsupported::Premise(premise)));
+                }
+            };
+            // The stored digests must be the lineage's, value for value.
+            let evidence = upgrade::evidence_bytes(receipts);
+            if upgrade.publication != evidence {
+                // A record that is exact under the digests it stores was made
+                // for another declaration of this lineage, and the store may
+                // be intact. Any other record is damaged.
+                let stored = upgrade::successor_admission(premises, &upgrade.publication);
+                let record = upgrade::record_bytes(
+                    kind,
+                    ordinal,
+                    sequence,
+                    from,
+                    &upgrade.identity,
+                    &stored,
+                    anchor.root,
+                    anchor.chain,
+                )?;
+                let exact = upgrade.publication.len() == evidence.len()
+                    && upgrade.record == record
+                    && hash(zeno_fcis_codec::domains::V2_CHAIN, &record)? == upgrade.chain;
+                return Err(if exact {
+                    Error::Succession(upgrade::Unsupported::Receipts)
+                } else {
+                    Error::History
+                });
+            }
+            upgrade::successor_admission(premises, &evidence)
+        }
+    };
+    let record = upgrade::record_bytes(
+        kind,
+        ordinal,
+        sequence,
+        from,
+        &upgrade.identity,
+        &admission,
+        anchor.root,
+        anchor.chain,
+    )?;
+    if upgrade.record != record
+        || hash(zeno_fcis_codec::domains::V2_CHAIN, &record)? != upgrade.chain
+        || base_chain(connection, anchor.sequence)? == upgrade.chain
+    {
+        return Err(Error::History);
+    }
+    Ok(())
+}
+/// Check every upgrade recorded at the anchor's head and advance its chain.
+fn apply_upgrades(
+    connection: &Connection,
+    lineage: &[Authority<'_>],
+    declared: Declared<'_, '_, '_>,
+    segments: &Segments,
+    anchor: &mut Anchor,
+    mut consumed: usize,
+) -> Result<usize, Error> {
+    while let Some(upgrade) = segments.upgrades.get(consumed) {
+        if upgrade.sequence > anchor.sequence {
+            break;
+        }
+        check_upgrade(connection, lineage, declared, segments, consumed, anchor)?;
+        anchor.chain = upgrade.chain;
+        consumed += 1;
+    }
+    Ok(consumed)
+}
+/// Replay every commit after the anchor under its segment's Authority, and
+/// every upgrade at the heads passed, up to the stored head.
 fn audit_tail(
     connection: &Connection,
-    authority: &Authority<'_>,
+    lineage: &[Authority<'_>],
+    declared: Declared<'_, '_, '_>,
+    segments: &Segments,
     mut anchor: Anchor,
+    mut consumed: usize,
 ) -> Result<Anchor, Error> {
     let mut statement = connection
         .prepare("SELECT sequence FROM v2_commits WHERE sequence>?1 ORDER BY sequence")?;
@@ -840,14 +1484,25 @@ fn audit_tail(
         .query_map([anchor.sequence], |r| r.get::<_, i64>(0))?
         .collect::<Result<Vec<_>, _>>()?;
     for sequence in positions {
+        consumed = apply_upgrades(
+            connection,
+            lineage,
+            declared,
+            segments,
+            &mut anchor,
+            consumed,
+        )?;
         if sequence != anchor.sequence.checked_add(1).ok_or(Error::Range)? {
             return Err(Error::History);
         }
         let row = load_commit(connection, sequence)?;
-        if row.previous_chain != anchor.chain || row.pre_root != anchor.root {
+        if row.previous_chain != anchor.chain
+            || row.pre_root != anchor.root
+            || segments.segment_of(sequence) != consumed
+        {
             return Err(Error::History);
         }
-        check_commit(connection, authority, &row, &anchor.state)?;
+        check_commit(connection, lineage, segments, &row, &anchor.state)?;
         anchor = Anchor {
             sequence,
             state: row.post,
@@ -855,7 +1510,16 @@ fn audit_tail(
             chain: row.chain,
         };
     }
-    if read_anchor(connection)? != anchor {
+    consumed = apply_upgrades(
+        connection,
+        lineage,
+        declared,
+        segments,
+        &mut anchor,
+        consumed,
+    )?;
+    // An upgrade recorded beyond the head, or one skipped, is not history.
+    if consumed != segments.upgrades.len() || read_anchor(connection)? != anchor {
         return Err(Error::History);
     }
     let orphan: i64 = connection.query_row("SELECT count(*) FROM v2_deliveries d LEFT JOIN v2_commits c ON d.sequence=c.sequence WHERE c.sequence IS NULL", [], |r| r.get(0))?;
@@ -953,7 +1617,7 @@ fn previous_state(connection: &Connection, sequence: i64) -> Result<Vec<u8>, Err
         )?)
     }
 }
-fn check_tip(connection: &Connection, anchor: &Anchor) -> Result<(), Error> {
+fn check_tip(connection: &Connection, segments: &Segments, anchor: &Anchor) -> Result<(), Error> {
     let (count, max): (i64, i64) = connection.query_row(
         "SELECT count(*),coalesce(max(sequence),0) FROM v2_commits",
         [],
@@ -964,36 +1628,63 @@ fn check_tip(connection: &Connection, anchor: &Anchor) -> Result<(), Error> {
     }
     if anchor.sequence > 0 {
         let row = load_commit(connection, anchor.sequence)?;
-        if row.post != anchor.state || row.post_root != anchor.root || row.chain != anchor.chain {
+        if row.post != anchor.state || row.post_root != anchor.root {
             return Err(Error::History);
         }
     }
+    if segments.tip_chain(connection, anchor.sequence)? != anchor.chain
+        || segments
+            .upgrades
+            .last()
+            .is_some_and(|upgrade| upgrade.sequence > anchor.sequence)
+    {
+        return Err(Error::History);
+    }
     Ok(())
 }
-fn check_checkpoint(connection: &Connection, c: &Checkpoint) -> Result<(), Error> {
+/// Check a trusted checkpoint against the store and return how many upgrades
+/// its anchor already includes. Its chain link must be one the head holds;
+/// the stored marker is keyed by head alone, so a later save at the same head
+/// after an upgrade replaces it, which is `Error::Checkpoint`, not tampering.
+fn check_checkpoint(
+    connection: &Connection,
+    segments: &Segments,
+    c: &Checkpoint,
+) -> Result<usize, Error> {
     if c.anchor.sequence < 0
         || hash(zeno_fcis_codec::domains::V2_STATE, &c.anchor.state)? != c.anchor.root
     {
         return Err(Error::History);
     }
+    if c.anchor.sequence > 0 {
+        let row = load_commit(connection, c.anchor.sequence)?;
+        if row.post_root != c.anchor.root || row.post != c.anchor.state {
+            return Err(Error::History);
+        }
+    }
+    let consumed = segments.consumed_at(connection, &c.anchor)?;
     let (root, chain): (Vec<u8>, Vec<u8>) = connection.query_row(
         "SELECT root,chain FROM v2_checkpoints WHERE sequence=?1",
         [c.anchor.sequence],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
-    if parse_hash(&root)? != c.anchor.root || parse_hash(&chain)? != c.anchor.chain {
+    if parse_hash(&root)? != c.anchor.root {
         return Err(Error::History);
     }
-    if c.anchor.sequence > 0 {
-        let row = load_commit(connection, c.anchor.sequence)?;
-        if row.chain != c.anchor.chain
-            || row.post_root != c.anchor.root
-            || row.post != c.anchor.state
-        {
-            return Err(Error::History);
-        }
+    if parse_hash(&chain)? != c.anchor.chain {
+        return Err(Error::Checkpoint);
     }
-    Ok(())
+    Ok(consumed)
+}
+/// Opens an existing database file. A missing one is refused and not
+/// created, so a refused operation on a mistyped path leaves nothing behind.
+fn open_existing(path: impl AsRef<Path>) -> Result<Connection, Error> {
+    Ok(Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_URI
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?)
 }
 fn configure(connection: &Connection) -> Result<(), Error> {
     // These connection settings must be established outside a transaction.
@@ -1001,31 +1692,41 @@ fn configure(connection: &Connection) -> Result<(), Error> {
     Ok(())
 }
 fn check_schema(connection: &Connection) -> Result<(), Error> {
+    check_exact_schema(connection, SCHEMA_VERSION, &schema_v10())
+}
+/// A v9 store, exactly as the previous shell created it.
+fn check_schema_v9(connection: &Connection) -> Result<(), Error> {
+    check_exact_schema(connection, 9, &schema_v9())
+}
+fn check_exact_schema(connection: &Connection, expected: i64, schema: &str) -> Result<(), Error> {
     let version: i64 = connection.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-    if version != 9 {
+    if version != expected {
         return Err(Error::Schema(version));
     }
     let reference = Connection::open_in_memory()?;
-    reference.execute_batch(SCHEMA)?;
+    reference.execute_batch(schema)?;
     if schema_rows(connection)? != schema_rows(&reference)? {
         return Err(Error::Schema(version));
     }
     Ok(())
 }
+/// Called only after BEGIN IMMEDIATE. Returns the store's segments, for the
+/// operation that follows. If another connection wrote between synchronize()
+/// and this transaction, refuse rather than bless stale data.
 fn check_cached_tip(
     connection: &Connection,
     anchor: &Anchor,
     version: i64,
-    authority: &Authority<'_>,
-) -> Result<(), Error> {
+    lineage: &[Authority<'_>],
+) -> Result<Segments, Error> {
     check_schema(connection)?;
-    stored_binding(connection, authority)?;
-    // Called only after BEGIN IMMEDIATE. If another connection wrote between
-    // synchronize() and this transaction, refuse rather than bless stale data.
+    let segments = Segments::load(connection, lineage, load_upgrades(connection)?)?;
+    segments.require_current(lineage)?;
     if data_version(connection)? != version || read_anchor(connection)? != *anchor {
         return Err(Error::Concurrent);
     }
-    check_tip(connection, anchor)
+    check_tip(connection, &segments, anchor)?;
+    Ok(segments)
 }
 fn save_checkpoint(connection: &Connection, anchor: &Anchor) -> Result<(), Error> {
     connection.execute(
@@ -1342,7 +2043,8 @@ fn complete_bundle(
     )?;
     let effects = lane_bytes(sequence, publication, 0, publication.effects(), &receipt)?;
     let outbox = lane_bytes(sequence, publication, 1, publication.outbox(), &receipt)?;
-    let mut bytes = b"ZFCIS-SQL-PUBLICATION-BUNDLE\0\x09".to_vec();
+    // The byte after the NUL is the schema version the rows belong to.
+    let mut bytes = b"ZFCIS-SQL-PUBLICATION-BUNDLE\0\x0a".to_vec();
     append_parts(&mut bytes, &[&commit, &state, &effects, &outbox])?;
     let command = zeno_fcis_codec::decode_envelope(raw.command, DecodeLimits::default())
         .map_err(|_| Error::History)?
@@ -1371,17 +2073,6 @@ fn complete_bundle(
     })
 }
 
-fn stored_binding(connection: &Connection, authority: &Authority<'_>) -> Result<Vec<u8>, Error> {
-    let binding = connection.query_row(
-        "SELECT identity FROM v2_genesis WHERE singleton=1",
-        [],
-        |row| row.get::<_, Vec<u8>>(0),
-    )?;
-    if binding != authority.identity() {
-        return Err(Error::Identity);
-    }
-    Ok(binding)
-}
 fn data_version(connection: &Connection) -> Result<i64, Error> {
     Ok(connection.query_row("PRAGMA data_version", [], |r| r.get(0))?)
 }
@@ -1427,12 +2118,23 @@ pub enum Error {
     Provider,
     /// A different schema requires an explicit reviewed migration, never implicit replay.
     Schema(i64),
-    /// The private capability or checkpoint belongs to another bound Authority.
+    /// The private capability or checkpoint belongs to another bound Authority, or a
+    /// history segment was published under no lineage member in order, or the
+    /// store does not run the contract the operation needs.
     Identity,
+    /// The library refused to bind a lineage catalog into an Authority.
+    Authority,
+    /// A lineage needs at least one version and exactly one adoption receipt
+    /// between each version and the next.
+    Lineage,
+    /// The store no longer holds this checkpoint: its head was saved again
+    /// with a later chain link, after an upgrade recorded at the same head.
+    /// Open from a newer checkpoint or with a full audit.
+    Checkpoint,
     /// The genuine publication has the other verified invocation kind: genesis only
     /// initializes a store, and only a transition commits or forms a publication bundle.
     InvocationKind,
-    /// Stored history fails exact replay, root, certificate or chain validation.
+    /// Stored history fails exact replay, root, certificate, upgrade record or chain validation.
     History,
     /// Integer or canonical entry length cannot be represented.
     Range,
@@ -1453,6 +2155,16 @@ pub enum Error {
         /// Requested limit, prior to any publication.
         declared: usize,
     },
+    /// The pure upgrade decision refused; see [`upgrade::Refusal`].
+    Upgrade(upgrade::Refusal),
+    /// The store holds a program-successor upgrade that the lineage it was
+    /// opened with does not support; see [`upgrade::Unsupported`]. The store
+    /// may be intact. Nothing was written.
+    Succession(upgrade::Unsupported),
+    /// Needed program comparisons stayed unavailable across the bounded
+    /// transaction retries: another connection changed the store, or the
+    /// shared comparison cache stayed busy. Nothing was written.
+    Unsettled,
     /// An explicitly requested interruption was injected.
     InjectedCrash(CrashPoint),
 }
@@ -1466,9 +2178,102 @@ impl From<EncodeError> for Error {
         Self::Encoding(e)
     }
 }
+/// One line: what happened, then what to do. The variant name stays in the
+/// `Debug` form, for logs and machine output.
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "V2 SQLite refinement refused: {self:?}")
+        match self {
+            Self::Sqlite(error) => write!(
+                f,
+                "SQLite refused the operation ({error}), so nothing was committed: check that the database file exists and is readable and writable, and that no other program locks it"
+            ),
+            Self::Encoding(error) => write!(
+                f,
+                "a value could not be canonically encoded ({error}), so nothing was written: keep values within the canonical encoding's limits"
+            ),
+            Self::Provider => f.write_str(
+                "the pinned SHA-256 provider failed its known-answer check, so nothing can be hashed safely: rebuild with the pinned dependencies",
+            ),
+            Self::Schema(9) => f.write_str(
+                "the database holds schema version 9, from before upgrades were recorded, or tables that differ from it: migrate an unaltered version 9 store to version 10 before any other operation, and create a new store only in a new, empty file",
+            ),
+            Self::Schema(10) => f.write_str(
+                "the database already holds schema version 10, the current one, or tables that differ from it: create a new store only in a new, empty file; a version 10 store needs no migration, and an altered one cannot be opened",
+            ),
+            Self::Schema(version) => write!(
+                f,
+                "the database has schema version {version}, which is not a store this shell opens: open a store this shell created, or create a new store in a new, empty file"
+            ),
+            Self::Identity => f.write_str(
+                "this database, or a checkpoint or publication used with it, belongs to a different contract: audit the database with the build that created it, or upgrade it with a build that adopted its contract",
+            ),
+            Self::Authority => f.write_str(
+                "the library refused to bind a contract version of the lineage: regenerate the contract and rebuild the application with the same ZenoFCIS version",
+            ),
+            Self::Lineage => f.write_str(
+                "the contract lineage is malformed: it needs at least one version and exactly one adoption receipt between each version and the next; regenerate the contract",
+            ),
+            Self::Checkpoint => f.write_str(
+                "the store no longer holds this checkpoint, because its head was saved again after an upgrade at the same head: open it from a newer checkpoint or with a full audit",
+            ),
+            Self::InvocationKind => f.write_str(
+                "the publication has the wrong invocation kind: create a store only from a genesis publication, and commit or bundle only a transition",
+            ),
+            Self::History => f.write_str(
+                "the stored history fails exact replay, root, certificate, upgrade record or chain validation: the database was changed outside this shell or damaged; restore it from a trusted copy before using it",
+            ),
+            Self::Range => f.write_str(
+                "an integer or entry length cannot be represented, so nothing was written: the store or a value is beyond this shell's limits",
+            ),
+            Self::PreState => f.write_str(
+                "the publication was made for a different state than the store's current one: decide again from the current state",
+            ),
+            Self::Replay => f.write_str(
+                "this replay key was already used with different input or publication bytes: use a new replay key for a new command, or resend exactly the original bytes",
+            ),
+            Self::Concurrent => f.write_str(
+                "another connection changed the store during this operation, so nothing was written: reopen the store and try again",
+            ),
+            Self::Delivery => f.write_str(
+                "a delivery or its acknowledgement differs from what the store holds: acknowledge exactly the entry the store delivered; a malformed stored entry means the database was damaged",
+            ),
+            Self::Interpreter => f.write_str(
+                "the delivery interpreter differs from the one the store was created with: deliver with the ZenoFCIS version that created the store",
+            ),
+            Self::Capacity { required, declared } => write!(
+                f,
+                "the complete publication needs {required} bytes, more than the declared limit of {declared}, so nothing was written: raise the limit or publish a smaller decision"
+            ),
+            Self::Upgrade(upgrade::Refusal::StateSchema) => f.write_str(
+                "upgrade refused: the new contract's state schema differs from the store's, and an upgrade never migrates data; keep the state schema, or start a new application",
+            ),
+            Self::Upgrade(upgrade::Refusal::SameContract) => f.write_str(
+                "upgrade refused: the store already runs this contract version, so there is nothing to upgrade",
+            ),
+            Self::Upgrade(upgrade::Refusal::Genesis { missing, refusal }) => {
+                write!(
+                    f,
+                    "upgrade refused: the new contract is not a program successor of the store's ({missing}), and its genesis laws do not admit the store's current state",
+                )?;
+                if let Some(refusal) = refusal {
+                    write!(f, " (the library refused: {refusal:?})")?;
+                }
+                f.write_str(
+                    "; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+                )
+            }
+            Self::Succession(unsupported) => write!(
+                f,
+                "the store holds a program-successor upgrade that this application does not support: {unsupported}; nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too"
+            ),
+            Self::Unsettled => f.write_str(
+                "the store or its shared comparison cache stayed busy while the shell checked the decision programs it needs, so nothing was written: try again when other connections and comparisons are idle",
+            ),
+            Self::InjectedCrash(point) => write!(
+                f,
+                "an interruption was injected at {point:?} for a crash test: reopen the store, which holds its last committed state"
+            ),
+        }
     }
 }
 impl std::error::Error for Error {}
@@ -1490,5 +2295,213 @@ mod interpreter_tests {
         ));
         assert_eq!(destination.delivered_count(), 0);
         assert!(BoundMemoryInterpreter::bind(&mut destination, actual).is_ok());
+    }
+
+    #[test]
+    fn the_v10_schema_is_v9_with_the_upgrade_table_and_migration_adds_exactly_that() {
+        let v9 = schema_v9();
+        let history = v9
+            .strip_suffix("PRAGMA user_version = 9;\n")
+            .unwrap_or_else(|| panic!("v9 ends with its version"));
+        assert_eq!(schema_v10(), format!("{history}{}", migration_v9_to_v10()));
+        assert!(schema_v10().ends_with("PRAGMA user_version = 10;\n"));
+        let fresh = Connection::open_in_memory().unwrap_or_else(|error| panic!("{error}"));
+        fresh
+            .execute_batch(&schema_v10())
+            .unwrap_or_else(|error| panic!("{error}"));
+        let migrated = Connection::open_in_memory().unwrap_or_else(|error| panic!("{error}"));
+        migrated
+            .execute_batch(&schema_v9())
+            .unwrap_or_else(|error| panic!("{error}"));
+        migrated
+            .execute_batch(&migration_v9_to_v10())
+            .unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(
+            schema_rows(&fresh).unwrap_or_else(|error| panic!("{error}")),
+            schema_rows(&migrated).unwrap_or_else(|error| panic!("{error}"))
+        );
+        assert!(check_schema(&migrated).is_ok());
+        assert!(matches!(check_schema_v9(&migrated), Err(Error::Schema(10))));
+    }
+}
+
+#[cfg(test)]
+mod message_tests {
+    use super::*;
+    use zeno_fcis_synthesis::finite::{
+        v2_authority::Refusal as LibraryRefusal, v2_composition::Failure as CoreFailure,
+        v2_laws::Failure as LawFailure,
+    };
+
+    /// The variant's name. No wildcard: a new variant does not compile until
+    /// it has a message below.
+    fn variant(error: &Error) -> &'static str {
+        match error {
+            Error::Sqlite(_) => "Sqlite",
+            Error::Encoding(_) => "Encoding",
+            Error::Provider => "Provider",
+            Error::Schema(_) => "Schema",
+            Error::Identity => "Identity",
+            Error::Authority => "Authority",
+            Error::Lineage => "Lineage",
+            Error::Checkpoint => "Checkpoint",
+            Error::InvocationKind => "InvocationKind",
+            Error::History => "History",
+            Error::Range => "Range",
+            Error::PreState => "PreState",
+            Error::Replay => "Replay",
+            Error::Concurrent => "Concurrent",
+            Error::Delivery => "Delivery",
+            Error::Interpreter => "Interpreter",
+            Error::Capacity { .. } => "Capacity",
+            Error::Upgrade(upgrade::Refusal::StateSchema) => "Upgrade(StateSchema)",
+            Error::Upgrade(upgrade::Refusal::SameContract) => "Upgrade(SameContract)",
+            Error::Upgrade(upgrade::Refusal::Genesis { .. }) => "Upgrade(Genesis)",
+            Error::Succession(upgrade::Unsupported::Receipts) => "Succession(Receipts)",
+            Error::Succession(upgrade::Unsupported::Premise(_)) => "Succession(Premise)",
+            Error::Unsettled => "Unsettled",
+            Error::InjectedCrash(_) => "InjectedCrash",
+        }
+    }
+
+    #[test]
+    fn every_store_error_reads_as_one_line_saying_what_happened_and_what_to_do() {
+        let cases = [
+            (
+                Error::Sqlite(rusqlite::Error::QueryReturnedNoRows),
+                "SQLite refused the operation (Query returned no rows), so nothing was committed: check that the database file exists and is readable and writable, and that no other program locks it",
+            ),
+            (
+                Error::Encoding(EncodeError::LengthOverflow),
+                "a value could not be canonically encoded (canonical length overflow), so nothing was written: keep values within the canonical encoding's limits",
+            ),
+            (
+                Error::Provider,
+                "the pinned SHA-256 provider failed its known-answer check, so nothing can be hashed safely: rebuild with the pinned dependencies",
+            ),
+            (
+                Error::Schema(9),
+                "the database holds schema version 9, from before upgrades were recorded, or tables that differ from it: migrate an unaltered version 9 store to version 10 before any other operation, and create a new store only in a new, empty file",
+            ),
+            (
+                Error::Schema(10),
+                "the database already holds schema version 10, the current one, or tables that differ from it: create a new store only in a new, empty file; a version 10 store needs no migration, and an altered one cannot be opened",
+            ),
+            (
+                Error::Schema(0),
+                "the database has schema version 0, which is not a store this shell opens: open a store this shell created, or create a new store in a new, empty file",
+            ),
+            (
+                Error::Identity,
+                "this database, or a checkpoint or publication used with it, belongs to a different contract: audit the database with the build that created it, or upgrade it with a build that adopted its contract",
+            ),
+            (
+                Error::Authority,
+                "the library refused to bind a contract version of the lineage: regenerate the contract and rebuild the application with the same ZenoFCIS version",
+            ),
+            (
+                Error::Lineage,
+                "the contract lineage is malformed: it needs at least one version and exactly one adoption receipt between each version and the next; regenerate the contract",
+            ),
+            (
+                Error::Checkpoint,
+                "the store no longer holds this checkpoint, because its head was saved again after an upgrade at the same head: open it from a newer checkpoint or with a full audit",
+            ),
+            (
+                Error::InvocationKind,
+                "the publication has the wrong invocation kind: create a store only from a genesis publication, and commit or bundle only a transition",
+            ),
+            (
+                Error::History,
+                "the stored history fails exact replay, root, certificate, upgrade record or chain validation: the database was changed outside this shell or damaged; restore it from a trusted copy before using it",
+            ),
+            (
+                Error::Range,
+                "an integer or entry length cannot be represented, so nothing was written: the store or a value is beyond this shell's limits",
+            ),
+            (
+                Error::PreState,
+                "the publication was made for a different state than the store's current one: decide again from the current state",
+            ),
+            (
+                Error::Replay,
+                "this replay key was already used with different input or publication bytes: use a new replay key for a new command, or resend exactly the original bytes",
+            ),
+            (
+                Error::Concurrent,
+                "another connection changed the store during this operation, so nothing was written: reopen the store and try again",
+            ),
+            (
+                Error::Delivery,
+                "a delivery or its acknowledgement differs from what the store holds: acknowledge exactly the entry the store delivered; a malformed stored entry means the database was damaged",
+            ),
+            (
+                Error::Interpreter,
+                "the delivery interpreter differs from the one the store was created with: deliver with the ZenoFCIS version that created the store",
+            ),
+            (
+                Error::Capacity {
+                    required: 70_000,
+                    declared: 65_536,
+                },
+                "the complete publication needs 70000 bytes, more than the declared limit of 65536, so nothing was written: raise the limit or publish a smaller decision",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::StateSchema),
+                "upgrade refused: the new contract's state schema differs from the store's, and an upgrade never migrates data; keep the state schema, or start a new application",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::SameContract),
+                "upgrade refused: the store already runs this contract version, so there is nothing to upgrade",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Policy,
+                    refusal: None,
+                }),
+                "upgrade refused: the new contract is not a program successor of the store's (premise 1: its policy differs from the store's contract in more than the decision program and its Step limit), and its genesis laws do not admit the store's current state; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Genesis {
+                    missing: upgrade::Premise::Equivalence(
+                        equivalence::Unestablished::Counterexample { ordinal: 41 },
+                    ),
+                    refusal: Some(LibraryRefusal::Core(CoreFailure::Law(LawFailure::Violated))),
+                }),
+                "upgrade refused: the new contract is not a program successor of the store's (premise 3: the two decision programs differ on input tuple 41 of their declared domain, counting from 0 in enumeration order), and its genesis laws do not admit the store's current state (the library refused: Core(Law(Violated))); a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
+            ),
+            (
+                Error::Succession(upgrade::Unsupported::Receipts),
+                "the store holds a program-successor upgrade that this application does not support: it names other adoption receipts than this application declares for those versions; nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
+            (
+                Error::Succession(upgrade::Unsupported::Premise(
+                    upgrade::Premise::Equivalence(equivalence::Unestablished::DomainTooLarge {
+                        size: Some(1_296_000),
+                        cap: 1_000,
+                    }),
+                )),
+                "the store holds a program-successor upgrade that this application does not support: this application's contracts do not establish it (premise 3: the decision programs' input domain has 1296000 tuples, more than the lineage's comparison cap of 1000); nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
+            (
+                Error::Unsettled,
+                "the store or its shared comparison cache stayed busy while the shell checked the decision programs it needs, so nothing was written: try again when other connections and comparisons are idle",
+            ),
+            (
+                Error::InjectedCrash(CrashPoint::AfterCommit),
+                "an interruption was injected at AfterCommit for a crash test: reopen the store, which holds its last committed state",
+            ),
+        ];
+        let mut covered = std::collections::BTreeSet::new();
+        for (error, message) in &cases {
+            assert_eq!(error.to_string(), *message, "{error:?}");
+            assert!(!message.contains('\n'), "{error:?}");
+            // The variant name stays in the Debug form.
+            let name = variant(error);
+            let stem = name.split('(').next().unwrap_or(name);
+            assert!(format!("{error:?}").starts_with(stem), "{error:?}");
+            covered.insert(name);
+        }
+        assert_eq!(covered.len(), 24, "{covered:?}");
     }
 }

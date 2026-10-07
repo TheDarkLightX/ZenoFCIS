@@ -42,6 +42,7 @@
 - [Schema and code-generation boundary](SCHEMA_CODEGEN_BOUNDARY.md)
 - [Schema-bound catalog](SCHEMA_BOUND_CATALOG.md)
 - [Project bootstrap generator](PROJECT_BOOTSTRAP_GENERATOR.md)
+- [Contract rules reference: `v2/policy.json`](CONTRACT_RULES.md)
 - [Generated durable application milestone](GENERATED_APPLICATION_MILESTONE.md)
 - [Packaged application qualification](PACKAGED_APPLICATION_QUALIFICATION.md)
 - [Catalogued transition builder](CATALOGUED_TRANSITION_BUILDER.md)
@@ -78,11 +79,14 @@
 - [Shared-source Verus verification](../verification/verus/README.md)
 - [Lessons from Verus](VERUS_LESSONS_AND_V2_PLAN.md)
 - [V2 implementation and core verification plan](V2_VERIFIED_CORE_PLAN.md)
+- [2.1 and 2.2 plan](V2_1_V2_2_PLAN.md), the plan of record; the
+  [earlier 2.1 roadmap](V2_1_FACTORY_PLAN.md) keeps its design notes
 - [System properties of finite transitions](SYSTEM_PROPERTIES.md)
 - [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md)
 - [Deterministic synthesis](DETERMINISTIC_SYNTHESIS.md)
 - [Language-neutral synthesis and target conformance](LANGUAGE_NEUTRAL_SYNTHESIS.md)
 - [Synthesis-first skill and MCP tools](LLM_SYNTHESIS.md)
+- [Rust typestate and checked newtypes skill](../skills/rust-typestate-newtype/SKILL.md)
 - [Evidence importers](EVIDENCE_IMPORTERS.md)
 - [Mounted ZenoDEX adapter](MOUNTED_ZENODEX_ADAPTER.md)
 - [Mounted ZenoDEX zUSD v1](MOUNTED_ZENODEX_ZUSD_V1.md)

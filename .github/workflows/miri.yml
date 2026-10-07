@@ -221,13 +221,14 @@ jobs:
                   'retained_genesis_and_replay_agent_treasury_guard',
               }
               retained = retained_examples | {
+                  'compiled_contracts_reproduce_their_committed_policy_bytes',
                   'policy_schema_law_and_meter_mutations_refuse',
                   'original_conservation_and_required_delivery_checks_remain_independent',
               }
-              expected = profile | native_only | retained | {'emit_library_policy_artifacts'}
+              expected = profile | native_only | retained
               assert collections.Counter(output.splitlines()) == collections.Counter(name + ': test' for name in expected), 'template semantic inventory differs'
               ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--', '--ignored', '--list', '--format', 'terse'])
-              assert ignored.splitlines() == ['emit_library_policy_artifacts: test'], 'semantic template tests must not be ignored'
+              assert ignored.splitlines() == [], 'semantic template tests must not be ignored'
               template_rows = [row for row in rows if row['target'] == selected['target']]
               remainder = [row for row in template_rows if 'test' not in row]
               assert len(remainder) == 1 and sorted(remainder[0].get('miri_skip', [])) == sorted(native_only), 'template native-only workloads differ'
@@ -243,10 +244,10 @@ jobs:
                   assert effective[:2] == ['--', '--exact'] and effective[2::2] == ['--skip'] * len(native_only) and set(effective[3::2]) == native_only and len(effective) == 2 + 2 * len(native_only), 'template Miri arguments must skip exactly the native-only corpora'
                   runs = listed(selected['target'], arguments(selected))
                   skipped_ignored = run(cargo + ['miri', 'test', '--locked', '-p', 'zeno-fcis-synthesis', '--test', 'v2_template_contracts', '--'] + arguments(selected) + ['--ignored', '--list', '--format', 'terse'])
-                  assert skipped_ignored.splitlines() == ['emit_library_policy_artifacts: test'], 'template generator must stay the only ignored test'
-                  interpreted = set(runs) - {'emit_library_policy_artifacts'}
-                  assert len(runs) == len(set(runs)) and interpreted == retained - set(isolated), 'template Miri remainder must run the two other retained semantic tests'
-                  print(f'Template Miri remainder runs {sorted(interpreted)}; exact-test groups {sorted(isolated)}; native-only {sorted(native_only)}; ignored generator emit_library_policy_artifacts.')
+                  assert skipped_ignored.splitlines() == [], 'template Miri selection must not run ignored tests'
+                  interpreted = set(runs)
+                  assert len(runs) == len(set(runs)) and interpreted == retained - set(isolated), 'template Miri remainder must run the policy-bytes check and two other retained semantic tests'
+                  print(f'Template Miri remainder runs {sorted(interpreted)}; exact-test groups {sorted(isolated)}; native-only {sorted(native_only)}; no ignored tests.')
 
           if selected['target'] in split_targets:
               target = selected['target']

@@ -1,0 +1,111 @@
+# {package}
+
+This application was built from its contract by `zeno-fcis new --contract`.
+`project.zeno` declares its types, reasons, channels and laws, and
+`v2/policy.json` holds its decision rules and genesis state.
+`docs/CONTRACT_RULES.md` in the ZenoFCIS source tree describes every key of
+`v2/policy.json`, the expressions, the law kinds and the laws generation
+adds.
+
+- `src/v2_contract.rs`, `v2/schema.zcve` and `v2/policy.zcve` are generated
+  from those two files. `zeno-fcis generate contract .` rewrites them;
+  with `--check` it changes nothing and names each file that differs.
+- `src/lib.rs` and `src/session.rs` are the same for every application built
+  from a contract. They frame inputs, keep publications in SQLite and
+  deliver the outbox. The library Authority makes every decision and checks
+  every law; this application contains no decision or law code.
+  `src/examples.rs` is the decision-examples grammar, shared with
+  `zeno-fcis contract review`.
+- `tests/decision-examples.txt` lists decisions, one per line:
+  `inputs | class reason post-state | deliveries`. Inputs are the state
+  fields, then the command, then the context, in the order the program
+  reads them; booleans are 0 or 1 and sums are variant IDs. The section
+  "Decision examples" of `docs/CLI_REFERENCE.md` in the ZenoFCIS source
+  tree gives the full grammar.
+
+## Build and run
+
+`zeno-fcis new` bound this application to a ZenoFCIS source tree: the one
+named by `--source`, or else the tree the CLI was built from.
+
+- `Cargo.toml` ends with a `[patch.crates-io]` section that resolves each
+  ZenoFCIS package the application needs to that tree. Without it, Cargo
+  would resolve the version pins to the crates published under the same
+  versions, which are a different release.
+- `Cargo.lock` is the tree's lock, so the external crates are the versions
+  the tree pins. The first build adds this application to it.
+- `rust-toolchain.toml`, copied when the tree has one, makes rustup select
+  the toolchain the tree pins.
+
+From this directory:
+
+```sh
+cargo test --offline
+cargo run --offline -- NEW_DATABASE_PATH
+```
+
+`--offline` builds only from crates already in Cargo's cache; `cargo fetch`
+in the source tree fills it. Without `--offline`, Cargo downloads the locked
+versions.
+
+`cargo test` checks every example against the Authority's decision and
+publishes the contract's genesis state. With the `sqlite` feature it then
+runs the examples as one session from genesis: each example whose pre-state
+is the current state is published, committed and replayed, and the outbox is
+delivered across a reopen of the database. `cargo run` runs the same session
+in a new database at NEW_DATABASE_PATH and prints its summary: each
+decision's class; `bundles`, the number of committed decisions, genesis not
+counted; the `pending` outbox entries; and the `deliveries` made.
+
+## Contract versions
+
+`zeno-fcis contract adopt . --candidate C.zcve --receipt R.json --usage
+new-version` adopts a checked replacement for the decision program as the
+next contract version. The rules record the candidate, its `transform`
+receipt and the policy of the version it supersedes under `adoptions`; the
+candidate and receipt are kept under `v2/adoptions/N/`; and the superseded
+version stays beside the current one as `src/v2_contract_vN.rs` and
+`v2/policy_vN.zcve`. Stores may run a superseded version, so generation
+refuses any later edit that would change one: once a version is superseded,
+only another adoption changes the contract. `src/v2_contract.rs` states
+`VERSION`, the adoptions' receipt digests and `with_lineage`, the checked
+catalogs of every version, which these commands use on an existing database:
+
+- `cargo run -- --audit DATABASE_PATH` replays each history segment under
+  the version that published it and prints the head with the version the
+  store runs, whichever version of this application that is.
+- `cargo run -- --upgrade DATABASE_PATH` records the checked upgrade to this
+  build's version. An adopted version differs from the one it replaced only
+  in its decision program and Step limit. The store's shell checks the five
+  premises of a program succession itself, including a comparison of the
+  two decision programs on every input tuple, so a store at any state
+  upgrades, and the chained record binds both identities, the number of
+  tuples compared and the adoption receipts' digests. Under those premises
+  the two versions reach the same states, so every law and proved inductive
+  claim still holds; only the sealed Step usage can change. When a premise
+  is missing, the refusal names it, and only a store whose state the new
+  version's genesis laws admit upgrades. Pending outbox entries keep their IDs and order. A refusal writes
+  nothing. A store that runs an earlier version commits and delivers nothing
+  until it is upgraded.
+- `cargo run -- --deliver DATABASE_PATH` delivers the pending outbox entries
+  of a store at this build's version and prints their IDs.
+- `cargo run -- --migrate DATABASE_PATH` converts a database created before
+  upgrades were recorded (SQLite schema v9) to the current schema after a
+  complete audit. Nothing else is migrated implicitly.
+
+`cargo run -- --decide DATABASE_PATH` runs the same session but leaves the
+outbox pending for `--deliver`. Without a file at DATABASE_PATH it starts at
+genesis in a new database. On an existing store, which must run this build's
+version (upgrade it first otherwise), it continues from the store's state:
+while one remains, the first example whose pre-state is that state is
+decided and committed. A store at another version is refused and left as it
+was. `--decide` is an aid for acceptance tests and maintenance, not an
+operational interface; an operational command line for applications is
+planned for 2.2. After the
+`transform` checker changes its semantics version, `zeno-fcis contract
+refresh-receipts .` checks every adoption again and rebinds each receipt to
+the new checker; it refuses if anything but the checker identity would change.
+
+These checks cover the listed examples and the laws in `project.zeno`, which
+the Authority enforces on every decision. They do not show that the rules
+match intent beyond those examples and laws.

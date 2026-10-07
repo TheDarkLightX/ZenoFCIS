@@ -1,0 +1,71 @@
+{
+  "semantics": "zeno-fcis/transform-check/1",
+  "vectors": [
+    {
+      "name": "equivalent-usage-preserved",
+      "original": "program-1.zcve",
+      "candidate": "program-2.zcve",
+      "step_limit": 256,
+      "max_input_tuples": 100000000,
+      "exit": 0,
+      "expected": "equivalent-usage-preserved.expected.json",
+      "receipt": "equivalent-usage-preserved.receipt.json"
+    },
+    {
+      "name": "equivalent-usage-differs",
+      "original": "program-3.zcve",
+      "candidate": "program-4.zcve",
+      "step_limit": 256,
+      "max_input_tuples": 100000000,
+      "exit": 0,
+      "expected": "equivalent-usage-differs.expected.json",
+      "receipt": "equivalent-usage-differs.receipt.json"
+    },
+    {
+      "name": "equivalent-identical-failures",
+      "original": "program-5.zcve",
+      "candidate": "program-6.zcve",
+      "step_limit": 256,
+      "max_input_tuples": 100000000,
+      "exit": 0,
+      "expected": "equivalent-identical-failures.expected.json",
+      "receipt": "equivalent-identical-failures.receipt.json"
+    },
+    {
+      "name": "counterexample",
+      "original": "program-4.zcve",
+      "candidate": "program-7.zcve",
+      "step_limit": 256,
+      "max_input_tuples": 100000000,
+      "exit": 1,
+      "expected": "counterexample.expected.json"
+    },
+    {
+      "name": "budget-boundary",
+      "original": "program-3.zcve",
+      "candidate": "program-4.zcve",
+      "step_limit": 2,
+      "max_input_tuples": 100000000,
+      "exit": 2,
+      "expected": "budget-boundary.expected.json"
+    },
+    {
+      "name": "domain-too-large",
+      "original": "program-1.zcve",
+      "candidate": "program-2.zcve",
+      "step_limit": 256,
+      "max_input_tuples": 8,
+      "exit": 2,
+      "expected": "domain-too-large.expected.json"
+    },
+    {
+      "name": "output-abi-refused",
+      "original": "program-4.zcve",
+      "candidate": "program-8.zcve",
+      "step_limit": 256,
+      "max_input_tuples": 100000000,
+      "exit": 1,
+      "expected": "output-abi-refused.expected.json"
+    }
+  ]
+}

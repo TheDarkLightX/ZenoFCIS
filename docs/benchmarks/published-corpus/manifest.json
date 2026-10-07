@@ -1,0 +1,826 @@
+{
+  "authority": "none",
+  "cases": {
+    "absorption_complement-00": {
+      "bytes": 541,
+      "family": "absorption_complement",
+      "inputs": 3,
+      "nodes": 7,
+      "outputs": 1,
+      "sha256": "5e407be81aa768666619142b9d6644f44e0c3720168db837ee4c2a2ec6df42e2"
+    },
+    "absorption_complement-01": {
+      "bytes": 581,
+      "family": "absorption_complement",
+      "inputs": 4,
+      "nodes": 7,
+      "outputs": 1,
+      "sha256": "616fde549c4a17c616f4f7a382dbfc9922f2d0e2eff3339ee1dbab92baa94312"
+    },
+    "absorption_complement-02": {
+      "bytes": 526,
+      "family": "absorption_complement",
+      "inputs": 5,
+      "nodes": 5,
+      "outputs": 1,
+      "sha256": "ce3e13f72d66608c894833abd8b4af8f4ae0ce0449032b7e4310d58dc8352e57"
+    },
+    "absorption_complement-03": {
+      "bytes": 488,
+      "family": "absorption_complement",
+      "inputs": 6,
+      "nodes": 3,
+      "outputs": 1,
+      "sha256": "545e1fa96036dfd756a405f1b2a1d8c273697376085e4f94f7dd91edb59ebd50"
+    },
+    "absorption_complement-04": {
+      "bytes": 636,
+      "family": "absorption_complement",
+      "inputs": 3,
+      "nodes": 9,
+      "outputs": 1,
+      "sha256": "fb328cd38492371235be64f7a19bc5744e33ed10f24c103d61911e6e240335bf"
+    },
+    "absorption_complement-05": {
+      "bytes": 715,
+      "family": "absorption_complement",
+      "inputs": 4,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "1a811712d049a5cd39f322c5912f099613a1dc2dde964b10eeebe72b185a3810"
+    },
+    "absorption_complement-06": {
+      "bytes": 660,
+      "family": "absorption_complement",
+      "inputs": 5,
+      "nodes": 8,
+      "outputs": 1,
+      "sha256": "96c3800986c3ba5a66900960a31acbd6afbc011bba0af8eb5cf8c00cc1495e8d"
+    },
+    "absorption_complement-07": {
+      "bytes": 700,
+      "family": "absorption_complement",
+      "inputs": 6,
+      "nodes": 8,
+      "outputs": 1,
+      "sha256": "86e08bc057453f0a559a3ed59adcbf575cfb5ff7321e50665533b56567de9ba1"
+    },
+    "absorption_complement-08": {
+      "bytes": 485,
+      "family": "absorption_complement",
+      "inputs": 3,
+      "nodes": 6,
+      "outputs": 1,
+      "sha256": "0d491792a83a6a4a047ef888254f51336b13af5b64dc0dd7e0d4976ff9d034a5"
+    },
+    "absorption_complement-09": {
+      "bytes": 447,
+      "family": "absorption_complement",
+      "inputs": 4,
+      "nodes": 4,
+      "outputs": 1,
+      "sha256": "9ed5495167056b150df1385146135b88091c8378460d915951f4b813c19b1bdb"
+    },
+    "absorption_complement-10": {
+      "bytes": 755,
+      "family": "absorption_complement",
+      "inputs": 5,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "364dca4e5a7605a8be9750a4d4336115596b1e45d4a1afc7b4f186b08b746149"
+    },
+    "absorption_complement-11": {
+      "bytes": 834,
+      "family": "absorption_complement",
+      "inputs": 6,
+      "nodes": 11,
+      "outputs": 1,
+      "sha256": "4a9f9e8af83994d63fe170350248e444c595d6725bd24485dcb3a64f12c3fbc7"
+    },
+    "absorption_complement-12": {
+      "bytes": 753,
+      "family": "absorption_complement",
+      "inputs": 3,
+      "nodes": 12,
+      "outputs": 1,
+      "sha256": "0d9b66f8af67f6eb8efb988862138e232150a0741dd444ebdb483daa71a9e900"
+    },
+    "absorption_complement-13": {
+      "bytes": 793,
+      "family": "absorption_complement",
+      "inputs": 4,
+      "nodes": 12,
+      "outputs": 1,
+      "sha256": "53bec6c294f3b2432421b23aa632465f1bbdcfc12c4dfc5b9f6d2e0bcd021b3c"
+    },
+    "absorption_complement-14": {
+      "bytes": 738,
+      "family": "absorption_complement",
+      "inputs": 5,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "81ec86b097de2407419c02e51a6e20f7ce3cf81bfc6c55c1b047e2fcf2758092"
+    },
+    "absorption_complement-15": {
+      "bytes": 700,
+      "family": "absorption_complement",
+      "inputs": 6,
+      "nodes": 8,
+      "outputs": 1,
+      "sha256": "30c971e60a68a733a6bed82ad4bad7b65cfe81e047918576ea6b97bd8128682f"
+    },
+    "absorption_complement-16": {
+      "bytes": 848,
+      "family": "absorption_complement",
+      "inputs": 3,
+      "nodes": 14,
+      "outputs": 1,
+      "sha256": "159cfacf213bb8cd5c921790e5e542efb8d32af05df54c055057e5c0c9e3d8aa"
+    },
+    "absorption_complement-17": {
+      "bytes": 927,
+      "family": "absorption_complement",
+      "inputs": 4,
+      "nodes": 15,
+      "outputs": 1,
+      "sha256": "ccff134a37989543566130c06a18a7c6473b86b5a03b34580c4b6a34f33b323c"
+    },
+    "balanced_general-00": {
+      "bytes": 1359,
+      "family": "balanced_general",
+      "inputs": 4,
+      "nodes": 22,
+      "outputs": 2,
+      "sha256": "d4c86528dd213eb60cfab823b2d4776bef6d0fbe5f4dd1e1a2a81be0790bb754"
+    },
+    "balanced_general-01": {
+      "bytes": 1883,
+      "family": "balanced_general",
+      "inputs": 5,
+      "nodes": 35,
+      "outputs": 1,
+      "sha256": "7d9949c4d55a5db65c780a170830d82a9e57f869c3e111cae7f97a0ab260e25e"
+    },
+    "balanced_general-02": {
+      "bytes": 1455,
+      "family": "balanced_general",
+      "inputs": 6,
+      "nodes": 23,
+      "outputs": 1,
+      "sha256": "f5945910ef8d789cd7457e3d3b6db07fe4da3aadbacdb3ac9953895b1f5f9355"
+    },
+    "balanced_general-03": {
+      "bytes": 2079,
+      "family": "balanced_general",
+      "inputs": 4,
+      "nodes": 38,
+      "outputs": 1,
+      "sha256": "e6a6aa3fa1b9a4cfea8cccaed2431834d16c6aa029839e912a9980b6c894113f"
+    },
+    "balanced_general-04": {
+      "bytes": 2661,
+      "family": "balanced_general",
+      "inputs": 5,
+      "nodes": 50,
+      "outputs": 2,
+      "sha256": "348b2c018fe58fd48ab2e2eacd5ce32a44f653487dbdf7c84a0ad9b018be479d"
+    },
+    "balanced_general-05": {
+      "bytes": 2125,
+      "family": "balanced_general",
+      "inputs": 6,
+      "nodes": 38,
+      "outputs": 1,
+      "sha256": "1ea99e60b44403fad5669c33a8bc5efbe10087f4ed6ec1b6c46fa581fb534d55"
+    },
+    "balanced_general-06": {
+      "bytes": 793,
+      "family": "balanced_general",
+      "inputs": 4,
+      "nodes": 12,
+      "outputs": 1,
+      "sha256": "f5beae4b241beba79162895e38cf8ef31c36ec9f1b11a423920a4b2046b95ba2"
+    },
+    "balanced_general-07": {
+      "bytes": 1454,
+      "family": "balanced_general",
+      "inputs": 5,
+      "nodes": 24,
+      "outputs": 1,
+      "sha256": "fd590adc25885ee6cc21f640a4fed60c42cda4392a5e83bc650aac6b8841f27e"
+    },
+    "balanced_general-08": {
+      "bytes": 1561,
+      "family": "balanced_general",
+      "inputs": 6,
+      "nodes": 26,
+      "outputs": 2,
+      "sha256": "e714b8f26fef75b0a1417fe6936a3cacc5faa34f5725fd561a239f4db426dff8"
+    },
+    "balanced_general-09": {
+      "bytes": 1760,
+      "family": "balanced_general",
+      "inputs": 4,
+      "nodes": 32,
+      "outputs": 1,
+      "sha256": "b37e22eafca70e2e95e05c54acaa17496af4fae9203106a040098e52ba4a42ef"
+    },
+    "balanced_general-10": {
+      "bytes": 1291,
+      "family": "balanced_general",
+      "inputs": 5,
+      "nodes": 22,
+      "outputs": 1,
+      "sha256": "062335a606a1c386cf337d616174a1d41bbbdfebf606ded68f83579c3d1950ed"
+    },
+    "balanced_general-11": {
+      "bytes": 2578,
+      "family": "balanced_general",
+      "inputs": 6,
+      "nodes": 47,
+      "outputs": 1,
+      "sha256": "0f7cf9aa2da0c3fdc445bfa584f80a84f3d173b41635716e54b8df993d287681"
+    },
+    "balanced_general-12": {
+      "bytes": 1381,
+      "family": "balanced_general",
+      "inputs": 4,
+      "nodes": 23,
+      "outputs": 2,
+      "sha256": "34ee05e584db9842c82feacbcdd9f3d020ea8b7dececb7dd52bd8f81bce8553b"
+    },
+    "balanced_general-13": {
+      "bytes": 1532,
+      "family": "balanced_general",
+      "inputs": 5,
+      "nodes": 26,
+      "outputs": 1,
+      "sha256": "bfdceea26d59bfe3a0fd5e70c20012c7d794194195d5978622df85a9dc46d026"
+    },
+    "balanced_general-14": {
+      "bytes": 1102,
+      "family": "balanced_general",
+      "inputs": 6,
+      "nodes": 17,
+      "outputs": 1,
+      "sha256": "f3c88c5b6beea76998b534972e8a1e93d51148e672ac3c14d5f2c4725a529ae7"
+    },
+    "balanced_general-15": {
+      "bytes": 2167,
+      "family": "balanced_general",
+      "inputs": 4,
+      "nodes": 42,
+      "outputs": 1,
+      "sha256": "f85d6a46e154845b86b01639a1b1ba8b459742916925abe361ba6c85b380051b"
+    },
+    "balanced_general-16": {
+      "bytes": 2120,
+      "family": "balanced_general",
+      "inputs": 5,
+      "nodes": 37,
+      "outputs": 2,
+      "sha256": "4ac5075de01de2c01fb0415178a92b3fb63af4a1cb9474eb5bf17deb5e205ec5"
+    },
+    "balanced_general-17": {
+      "bytes": 1616,
+      "family": "balanced_general",
+      "inputs": 6,
+      "nodes": 28,
+      "outputs": 1,
+      "sha256": "173dba936807232fcdd2dd6512418b2214942519a37b2e263bd8eb92199384a1"
+    },
+    "balanced_general-18": {
+      "bytes": 430,
+      "family": "balanced_general",
+      "inputs": 4,
+      "nodes": 4,
+      "outputs": 1,
+      "sha256": "a0d5cd2b875bfdcf114bde125cf787f2722970826bd678d681dc0ce40c4ea3e1"
+    },
+    "balanced_general-19": {
+      "bytes": 1973,
+      "family": "balanced_general",
+      "inputs": 5,
+      "nodes": 36,
+      "outputs": 1,
+      "sha256": "e265b463dcc687ecf178bd5c562b4da27a003cd4bd8879bddcfb1138224f03eb"
+    },
+    "distributed_factoring-00": {
+      "bytes": 676,
+      "family": "distributed_factoring",
+      "inputs": 4,
+      "nodes": 9,
+      "outputs": 1,
+      "sha256": "8ed6295587a377d74cac534cce461a5e7e7f9b1edc3640defdfb540881aed636"
+    },
+    "distributed_factoring-01": {
+      "bytes": 794,
+      "family": "distributed_factoring",
+      "inputs": 5,
+      "nodes": 11,
+      "outputs": 1,
+      "sha256": "7802a4d11080f01c9f457904792a77ac737d562f8fa9fa7c5589c2b3f96fc9e0"
+    },
+    "distributed_factoring-02": {
+      "bytes": 756,
+      "family": "distributed_factoring",
+      "inputs": 6,
+      "nodes": 9,
+      "outputs": 1,
+      "sha256": "429780093a77bc47cb5174f5fe44e1e57415efb004e05773a272781d70eb74be"
+    },
+    "distributed_factoring-03": {
+      "bytes": 754,
+      "family": "distributed_factoring",
+      "inputs": 4,
+      "nodes": 11,
+      "outputs": 1,
+      "sha256": "2f33d2812fa5b88617ef0bebf6a178fd3a0413aa78e60d76bb086e69030ffd27"
+    },
+    "distributed_factoring-04": {
+      "bytes": 928,
+      "family": "distributed_factoring",
+      "inputs": 5,
+      "nodes": 14,
+      "outputs": 1,
+      "sha256": "5a7af5a3cdd0ab41d2918a48cf3001bf53a4554a3a8e084f64a9dee355ae3981"
+    },
+    "distributed_factoring-05": {
+      "bytes": 929,
+      "family": "distributed_factoring",
+      "inputs": 6,
+      "nodes": 13,
+      "outputs": 1,
+      "sha256": "457b1b70bf63200cd899d74c5b3c12bd25de90a3585c360c9fe66f072afcc966"
+    },
+    "distributed_factoring-06": {
+      "bytes": 715,
+      "family": "distributed_factoring",
+      "inputs": 4,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "25376f7e0235ff17c37451c2f54c7633637092435b9fe8193f9197362a866fb9"
+    },
+    "distributed_factoring-07": {
+      "bytes": 833,
+      "family": "distributed_factoring",
+      "inputs": 5,
+      "nodes": 12,
+      "outputs": 1,
+      "sha256": "ace9e00ff5ac8cf92aacdd87e27f686420861ae98a9474df48d9c45c8c85876f"
+    },
+    "distributed_factoring-08": {
+      "bytes": 795,
+      "family": "distributed_factoring",
+      "inputs": 6,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "5a24afd50690a72c1cd47d73f216e2ff9f215112fdb3b27c39913354320b3765"
+    },
+    "distributed_factoring-09": {
+      "bytes": 793,
+      "family": "distributed_factoring",
+      "inputs": 4,
+      "nodes": 12,
+      "outputs": 1,
+      "sha256": "fb6775d130112240a811dde9cade079635c4770e4ddbe746f6fe8ee363e6f6bd"
+    },
+    "distributed_factoring-10": {
+      "bytes": 967,
+      "family": "distributed_factoring",
+      "inputs": 5,
+      "nodes": 15,
+      "outputs": 1,
+      "sha256": "fd6679db6501d0ddd65604bcc979aa296098ec03fa5a5d8d7ddef8a3a23f4f08"
+    },
+    "distributed_factoring-11": {
+      "bytes": 968,
+      "family": "distributed_factoring",
+      "inputs": 6,
+      "nodes": 14,
+      "outputs": 1,
+      "sha256": "c1f19139350c8628cd96329db3b215a5ec0e24c708171de0e78798ed178ecbf4"
+    },
+    "distributed_factoring-12": {
+      "bytes": 771,
+      "family": "distributed_factoring",
+      "inputs": 4,
+      "nodes": 11,
+      "outputs": 1,
+      "sha256": "d8e2b4594514e1f9eca9b213496c547d15ff8dd8d60e1bfb7288e2af51fc491d"
+    },
+    "distributed_factoring-13": {
+      "bytes": 889,
+      "family": "distributed_factoring",
+      "inputs": 5,
+      "nodes": 13,
+      "outputs": 1,
+      "sha256": "a8141cd7b1e96b4980921847a815dad4524395db571fa83ebe455d817841492b"
+    },
+    "distributed_factoring-14": {
+      "bytes": 851,
+      "family": "distributed_factoring",
+      "inputs": 6,
+      "nodes": 11,
+      "outputs": 1,
+      "sha256": "42c7c18c2366d0955e0fbb57943c7f06281f826c1f64d2e11e56e62f40e44764"
+    },
+    "distributed_factoring-15": {
+      "bytes": 849,
+      "family": "distributed_factoring",
+      "inputs": 4,
+      "nodes": 13,
+      "outputs": 1,
+      "sha256": "eedab1143f9e6f816aad8dc7137862d70981c58562c6132ed27e5f23f676634a"
+    },
+    "distributed_factoring-16": {
+      "bytes": 984,
+      "family": "distributed_factoring",
+      "inputs": 5,
+      "nodes": 15,
+      "outputs": 1,
+      "sha256": "a20f0e2e88a6f6d7fa20e74772704b72b9f85bbd30f526ecbb1294a159f62949"
+    },
+    "distributed_factoring-17": {
+      "bytes": 985,
+      "family": "distributed_factoring",
+      "inputs": 6,
+      "nodes": 14,
+      "outputs": 1,
+      "sha256": "565c99f5b1a5edcae876c858a1b68110b6dbac242ef8fbbb1022b01c31e33d76"
+    },
+    "mixed_ite_demorgan-00": {
+      "bytes": 424,
+      "family": "mixed_ite_demorgan",
+      "inputs": 3,
+      "nodes": 4,
+      "outputs": 1,
+      "sha256": "6b152136d9f0c3b805dc12b9d77af3792ae41534ef7fb1b9294b86f7b7c2da6d"
+    },
+    "mixed_ite_demorgan-01": {
+      "bytes": 425,
+      "family": "mixed_ite_demorgan",
+      "inputs": 4,
+      "nodes": 3,
+      "outputs": 1,
+      "sha256": "0d4dc58b6ce972b80116579a1b84109ff9277f33abd710757c92b3e11f38bbd1"
+    },
+    "mixed_ite_demorgan-02": {
+      "bytes": 543,
+      "family": "mixed_ite_demorgan",
+      "inputs": 5,
+      "nodes": 5,
+      "outputs": 1,
+      "sha256": "b4d8e1c034bea743be15505cec8c910f5f389054d299b8f4e9661fb8ced70894"
+    },
+    "mixed_ite_demorgan-03": {
+      "bytes": 527,
+      "family": "mixed_ite_demorgan",
+      "inputs": 6,
+      "nodes": 4,
+      "outputs": 1,
+      "sha256": "f5eae3c60de0a1bf1973e7f910c71378bfd544493b209546f36f47523c8fa49f"
+    },
+    "mixed_ite_demorgan-04": {
+      "bytes": 524,
+      "family": "mixed_ite_demorgan",
+      "inputs": 3,
+      "nodes": 7,
+      "outputs": 1,
+      "sha256": "cf5826906ae29d0b5d81671752cf3daa27163c5c6be8b6b84389e34bbcc702a3"
+    },
+    "mixed_ite_demorgan-05": {
+      "bytes": 693,
+      "family": "mixed_ite_demorgan",
+      "inputs": 4,
+      "nodes": 9,
+      "outputs": 1,
+      "sha256": "a6722d7206aa8d909a3d003eaf7484ac522dda1b0b3d855e17d4b89bfe3a1817"
+    },
+    "mixed_ite_demorgan-06": {
+      "bytes": 504,
+      "family": "mixed_ite_demorgan",
+      "inputs": 5,
+      "nodes": 4,
+      "outputs": 1,
+      "sha256": "cc2e5a1fb420f09acf17b9178331bbcc24617c523d7b550dbbf96e2a7d1faf85"
+    },
+    "mixed_ite_demorgan-07": {
+      "bytes": 756,
+      "family": "mixed_ite_demorgan",
+      "inputs": 6,
+      "nodes": 9,
+      "outputs": 1,
+      "sha256": "e40b692810cb6be6e4c661dbe1e5bf1f8b4fde8450dcbd518473c3a735653ec2"
+    },
+    "mixed_ite_demorgan-08": {
+      "bytes": 675,
+      "family": "mixed_ite_demorgan",
+      "inputs": 3,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "8937a30b51508eacf13099af18a690413f05dd94ce653abdaad915fd98627d3f"
+    },
+    "mixed_ite_demorgan-09": {
+      "bytes": 698,
+      "family": "mixed_ite_demorgan",
+      "inputs": 4,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "0da8ec1378ab6cc392bcf7dc8062018f8d4556564815f0caa9b9b088d442e252"
+    },
+    "mixed_ite_demorgan-10": {
+      "bytes": 855,
+      "family": "mixed_ite_demorgan",
+      "inputs": 5,
+      "nodes": 13,
+      "outputs": 1,
+      "sha256": "fbe6d0f6111c2f978f93be057b03de8a2b7d9e9e29af1ba7584c482adc284c1c"
+    },
+    "mixed_ite_demorgan-11": {
+      "bytes": 946,
+      "family": "mixed_ite_demorgan",
+      "inputs": 6,
+      "nodes": 13,
+      "outputs": 1,
+      "sha256": "045229f6cfc08fbb674d818b20246116c13a1783ac11c9b481d7a78f1781abdf"
+    },
+    "mixed_ite_demorgan-12": {
+      "bytes": 519,
+      "family": "mixed_ite_demorgan",
+      "inputs": 3,
+      "nodes": 6,
+      "outputs": 1,
+      "sha256": "b873c9b282cbb17a08b323f1cb7cc22819434fe176e2e57119b0cc7d7f85bec4"
+    },
+    "mixed_ite_demorgan-13": {
+      "bytes": 732,
+      "family": "mixed_ite_demorgan",
+      "inputs": 4,
+      "nodes": 10,
+      "outputs": 1,
+      "sha256": "d2aa54f2151afda61f2d531532c8929ac412a47dd2743dd4d51f23d150203cc5"
+    },
+    "mixed_ite_demorgan-14": {
+      "bytes": 811,
+      "family": "mixed_ite_demorgan",
+      "inputs": 5,
+      "nodes": 11,
+      "outputs": 1,
+      "sha256": "28d389c7bcb1a29eeb4999bf19060290b0af0c361463d6aa69b5de7a65f089f4"
+    },
+    "mixed_ite_demorgan-15": {
+      "bytes": 834,
+      "family": "mixed_ite_demorgan",
+      "inputs": 6,
+      "nodes": 11,
+      "outputs": 1,
+      "sha256": "6a4d4b6d9924cce105243c60dc03b61f87ba8bd5aacbe0f13ccd150c8be24be6"
+    },
+    "mixed_ite_demorgan-16": {
+      "bytes": 831,
+      "family": "mixed_ite_demorgan",
+      "inputs": 3,
+      "nodes": 14,
+      "outputs": 1,
+      "sha256": "9e8346c69e5ac1631e557156bcbca83e935380a0c8feb50b87c6e17000fdbc9b"
+    },
+    "mixed_ite_demorgan-17": {
+      "bytes": 922,
+      "family": "mixed_ite_demorgan",
+      "inputs": 4,
+      "nodes": 14,
+      "outputs": 1,
+      "sha256": "a1c9d1b27f52dba84212f84010dde033db199a09d2facbd12551f8d98e278dbf"
+    },
+    "shared_guards-00": {
+      "bytes": 1244,
+      "family": "shared_guards",
+      "inputs": 4,
+      "nodes": 17,
+      "outputs": 4,
+      "sha256": "cae65b52c07330fc768aabef254e4d5eb92abd0af38146571c60215889dea897"
+    },
+    "shared_guards-01": {
+      "bytes": 1574,
+      "family": "shared_guards",
+      "inputs": 5,
+      "nodes": 24,
+      "outputs": 4,
+      "sha256": "83c75a83cd071327468cc2b62cd5e12d382789f02a3d8b4096466e7f6804af9b"
+    },
+    "shared_guards-02": {
+      "bytes": 1381,
+      "family": "shared_guards",
+      "inputs": 6,
+      "nodes": 17,
+      "outputs": 5,
+      "sha256": "1967756033309c7a944589bfb252b3cac298541b37558756c995288cbbecdedf"
+    },
+    "shared_guards-03": {
+      "bytes": 1361,
+      "family": "shared_guards",
+      "inputs": 4,
+      "nodes": 20,
+      "outputs": 4,
+      "sha256": "cae3ed95508f580768566c02f806e81916444405c34e30ef36b2887cd15cdcc0"
+    },
+    "shared_guards-04": {
+      "bytes": 1457,
+      "family": "shared_guards",
+      "inputs": 5,
+      "nodes": 21,
+      "outputs": 4,
+      "sha256": "6cacbc53709409563e37254b6349dab2c50e4c5c37ba47bfcd61d8ffac02f3ab"
+    },
+    "shared_guards-05": {
+      "bytes": 1498,
+      "family": "shared_guards",
+      "inputs": 6,
+      "nodes": 20,
+      "outputs": 5,
+      "sha256": "f10aedc07263fbc5bade129e3dccf38bfbf5b00fc4dfa8c7842f45ab9158cb31"
+    },
+    "shared_guards-06": {
+      "bytes": 1244,
+      "family": "shared_guards",
+      "inputs": 4,
+      "nodes": 17,
+      "outputs": 4,
+      "sha256": "cf5ad4130f7e359c2f9ec29032e32e38b4601ade32f077016adf3605ca41cfe4"
+    },
+    "shared_guards-07": {
+      "bytes": 1574,
+      "family": "shared_guards",
+      "inputs": 5,
+      "nodes": 24,
+      "outputs": 4,
+      "sha256": "8c4fa9909cb4e74c1998bb6287f46243e430a78da1062b403c44f62690c6165a"
+    },
+    "shared_guards-08": {
+      "bytes": 1381,
+      "family": "shared_guards",
+      "inputs": 6,
+      "nodes": 17,
+      "outputs": 5,
+      "sha256": "be242514ea2d9c6f000d07eb473498dff93ea793308da6e13668bb2fa24a323b"
+    },
+    "shared_guards-09": {
+      "bytes": 1361,
+      "family": "shared_guards",
+      "inputs": 4,
+      "nodes": 20,
+      "outputs": 4,
+      "sha256": "4cab656ce59fb2ddbea277ae29db99c7a912213cb96a5e69684627725e224d71"
+    },
+    "shared_guards-10": {
+      "bytes": 1457,
+      "family": "shared_guards",
+      "inputs": 5,
+      "nodes": 21,
+      "outputs": 4,
+      "sha256": "a071892e9841d02a7a9458fa34bf1d2f3bd174930a42c0e1bbbe0efb4e0c5eb2"
+    },
+    "shared_guards-11": {
+      "bytes": 1498,
+      "family": "shared_guards",
+      "inputs": 6,
+      "nodes": 20,
+      "outputs": 5,
+      "sha256": "9e01a57124ecabc1d85bbc398265aa133219c97d40a900c7b235df009680cdcf"
+    },
+    "shared_guards-12": {
+      "bytes": 1244,
+      "family": "shared_guards",
+      "inputs": 4,
+      "nodes": 17,
+      "outputs": 4,
+      "sha256": "312ae60ec32cfddceee70ab4b52646f1dc6283af54b6d1de02fb681869323854"
+    },
+    "shared_guards-13": {
+      "bytes": 1574,
+      "family": "shared_guards",
+      "inputs": 5,
+      "nodes": 24,
+      "outputs": 4,
+      "sha256": "c852cd24b1d1b907f52fa617b652daca737265bb4505e9d2b22abb34ca1d5996"
+    },
+    "shared_guards-14": {
+      "bytes": 1381,
+      "family": "shared_guards",
+      "inputs": 6,
+      "nodes": 17,
+      "outputs": 5,
+      "sha256": "fbc28b7ddc6868f6671b3276db5c9a8abc3ef43d8fd56d5116e5a32294fc674d"
+    },
+    "shared_guards-15": {
+      "bytes": 1361,
+      "family": "shared_guards",
+      "inputs": 4,
+      "nodes": 20,
+      "outputs": 4,
+      "sha256": "de0e9c49e567cf4bc707634a2cfae55e8343954de19793641c81bd69c3e69f74"
+    },
+    "shared_guards-16": {
+      "bytes": 1457,
+      "family": "shared_guards",
+      "inputs": 5,
+      "nodes": 21,
+      "outputs": 4,
+      "sha256": "caf370d9ebd9cc87da906575cf5604a137da291c4cf47b789e7bb833c7d3af02"
+    },
+    "shared_guards-17": {
+      "bytes": 1498,
+      "family": "shared_guards",
+      "inputs": 6,
+      "nodes": 20,
+      "outputs": 5,
+      "sha256": "38427942c774422308996ef08db4a0ee069c8dd5eb03de512e92a443c6d4cd17"
+    },
+    "small_gate-00": {
+      "bytes": 273,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 1,
+      "outputs": 1,
+      "sha256": "eb7580e0105df2a8363e4e4fcc22abdf71a6b1e06a5163eb52a70a81a7a0c052"
+    },
+    "small_gate-01": {
+      "bytes": 368,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 3,
+      "outputs": 1,
+      "sha256": "e43e6aa55fbfd1eada38e3c2d8ba37995595e0c2b175eed10fc5b383226c0715"
+    },
+    "small_gate-02": {
+      "bytes": 485,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 6,
+      "outputs": 1,
+      "sha256": "9d103349cc6d08d4a29b500fae1763989f8c20f709575db12b40b1b6e5b884b8"
+    },
+    "small_gate-03": {
+      "bytes": 351,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 3,
+      "outputs": 1,
+      "sha256": "f9a8193db8d8a4c4ff3bed0d7c0bce57420d5fc5fc53742dbc9e883fc0917c7b"
+    },
+    "small_gate-04": {
+      "bytes": 636,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 9,
+      "outputs": 1,
+      "sha256": "ae0c3baf4d26a3a5fb57431e8966a4e7e5866f3e41c08f358bfa85835a7cc6c0"
+    },
+    "small_gate-05": {
+      "bytes": 385,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 3,
+      "outputs": 1,
+      "sha256": "330114abf3a440b542754f3e7fd828a30dbfa70d9f1474017bdae951299f29de"
+    },
+    "small_gate-06": {
+      "bytes": 446,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 5,
+      "outputs": 1,
+      "sha256": "fc942fafd36bb0766385a7de0458181f2b45ef356ac072b628634b5fee8b5c2d"
+    },
+    "small_gate-07": {
+      "bytes": 521,
+      "family": "small_gate",
+      "inputs": 3,
+      "nodes": 4,
+      "outputs": 3,
+      "sha256": "08a8c0268db13ab3a21593302a52ebbfefdd8d80c1259b437caf3709f60c54dd"
+    }
+  },
+  "schema": "zeno-fcis/published-corpus-manifest/1",
+  "source": {
+    "branch": "research/semantic-egraphs",
+    "commit": "a69ed8db594d95279a46bff0f65185ef67d51f98",
+    "kept_fields": [
+      "id",
+      "family",
+      "nvars",
+      "outputs",
+      "truth_signatures"
+    ],
+    "path": "experiments/semantic-egraphs/corpus.json",
+    "repository": "https://github.com/TheDarkLightX/ZenoFCIS",
+    "seed": 20261003,
+    "sha256": "f0ad16732a453ef6c176e48aa46e544ad07015f4793bf32c84459a271ee9bc18"
+  },
+  "totals": {
+    "cases": 100,
+    "nodes": 1506
+  },
+  "use": "calibration only"
+}

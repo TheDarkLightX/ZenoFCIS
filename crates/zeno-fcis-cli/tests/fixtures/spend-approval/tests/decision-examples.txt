@@ -1,0 +1,30 @@
+# Spend-approval decision examples, written from the plain-language matrix.
+# Provenance: written by an AI agent (the author of v2/policy.json); not an
+# independent oracle.
+#
+# status tier cfo_ok ceo_ok action tier_requested role board within_limit | outcome reason status tier cfo_ok ceo_ok | delivery
+# status 150 Empty 151 Pending 152 Executed 153 Cancelled 154 Blocked
+# role 160 Nobody 161 Clerk 162 Cfo 163 Ceo; action 170 Create 171 Approve 172 Execute 173 Cancel
+# deliveries: 300 payment_tier (payment to the bank), 301 alert_tier (alert to the risk desk)
+#
+# The journey: a tier 3 request collects both approvals and the board.
+150 0 0 0 170 3 160 0 1 | reject 200 150 0 0 0 | -
+150 0 0 0 170 3 162 0 1 | reject 202 150 0 0 0 | -
+150 0 0 0 170 3 161 0 1 | accept - 151 3 0 0 | -
+151 3 0 0 171 0 161 0 1 | reject 202 151 3 0 0 | -
+151 3 0 0 172 0 161 1 1 | reject 205 151 3 0 0 | -
+151 3 0 0 171 0 162 0 1 | accept - 151 3 1 0 | -
+151 3 1 0 171 0 162 0 1 | reject 203 151 3 1 0 | -
+151 3 1 0 172 0 161 1 1 | reject 206 151 3 1 0 | -
+151 3 1 0 171 0 163 0 1 | accept - 151 3 1 1 | -
+151 3 1 1 172 0 161 0 1 | reject 207 151 3 1 1 | -
+151 3 1 1 172 0 161 1 1 | accept - 152 3 1 1 | 300 3
+152 3 1 1 173 0 163 0 1 | reject 201 152 3 1 1 | -
+# Other branches.
+151 0 0 0 171 0 162 0 1 | reject 204 151 0 0 0 | -
+151 2 1 1 172 0 161 0 0 | failure 208 154 2 1 1 | 301 2
+151 1 0 0 173 0 162 0 1 | accept - 153 1 0 0 | -
+153 1 0 0 173 0 161 0 1 | reject 201 153 1 0 0 | -
+151 1 0 0 170 2 161 0 1 | reject 201 151 1 0 0 | -
+151 0 0 0 172 0 161 0 1 | accept - 152 0 0 0 | 300 0
+151 1 1 0 172 0 161 0 1 | accept - 152 1 1 0 | 300 1

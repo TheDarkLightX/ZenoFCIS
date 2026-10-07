@@ -45,6 +45,9 @@ Feature: Adopt the ZenoFCIS core library
     And the compliance-gateway oracle evaluates its rule base separately from the template's own evaluator
     And the withdrawal-queue controller is re-checked in Rust against its pinned contract, and by OrbitSynthesis's checker when ORBIT_SYNTHESIS_ROOT names a checkout
     And the agent-treasury-guard demonstration prints the scripted outcome of each of its 23 proposals and answers and ends with no swap outstanding
+    And an application built with `zeno-fcis new --contract` from the dual-approval example contract builds as an isolated package
+    And its tests check all 12 decision examples against the library Authority and run them as one SQLite session from genesis
+    And `zeno-fcis new` binds every application it writes to this source tree, and the gate checks that binding rather than writing it
 
   @atdd-example-templates
   Scenario: Emit example applications whose laws all constrain their transitions
@@ -53,6 +56,19 @@ Feature: Adopt the ZenoFCIS core library
     Then every law formula in each project can constrain some transition and every law path resolves
     And a second creation into the same directory is refused without changing any file
     And each application template emits exactly the files in its directory
+
+  @atdd-generated-contracts
+  Scenario: Regenerate each template's V2 contract from its declarations and rules
+    Given each template's project.zeno, reviewed rules file and original schema
+    When the CLI generates src/v2_contract.rs and v2/policy.zcve into a fresh directory
+    Then both files equal the committed files byte for byte for all eight templates
+    And the library's own catalog binding accepts the generated policy before it is written
+    And a check names each drifted file and changes nothing
+    And each planted rule, declaration or library-rule error is refused at the entry that holds it
+    And each channel's idempotency domain covers every ordinal the rules use, the Effect limit is the most deliveries of any case, and a committed failure without a failure law is refused at its case
+    And a refusal by the library's catalog names the delivery, law or channel without which the library admits the contract
+    And the rules reference documents exactly the keys, leaves, classes, operators, functions and law kinds the generator reads
+    And `contract export-program` writes the current decision program that optimize and transform read, and the optimizer's receipt for it replays
 
   @atdd-finite-synthesis
   Scenario: Synthesize and replay one contract across languages

@@ -626,7 +626,7 @@ fn every_durable_field_and_schema_tamper_refuses_without_relabeling_or_delivery(
         ok(external.execute_batch("CREATE TRIGGER altered AFTER INSERT ON v2_commits BEGIN DELETE FROM v2_deliveries; END;"));
         assert!(matches!(
             db.commit(Hash32::new([14; 32]), publication(h, raw(&pre, &cmd, &ctx))),
-            Err(Error::Schema(9))
+            Err(Error::Schema(10))
         ));
         let sequence: i64 =
             ok(external.query_row("SELECT sequence FROM v2_state", [], |r| r.get(0)));
@@ -638,7 +638,7 @@ fn every_durable_field_and_schema_tamper_refuses_without_relabeling_or_delivery(
 fn old_schema_versions_never_upgrade_implicitly() {
     with_authority(None, |a, h| {
         let pre = state(0);
-        for version in [5, 7, 8] {
+        for version in [5, 7, 8, 9] {
             let path = Temp::new();
             let connection = ok(Connection::open(&path.0));
             ok(connection.execute_batch(&format!(
@@ -824,7 +824,7 @@ fn aggregate_bundle_matches_every_actual_persisted_column_and_required_copy() {
             }
             lanes.push(lane_bytes);
         }
-        let mut expected = b"ZFCIS-SQL-PUBLICATION-BUNDLE\0\x09".to_vec();
+        let mut expected = b"ZFCIS-SQL-PUBLICATION-BUNDLE\0\x0a".to_vec();
         for row in [&commit, &state_row, &lanes[0], &lanes[1]] {
             expected.extend_from_slice(&ok(u64::try_from(row.len())).to_be_bytes());
             expected.extend_from_slice(row);

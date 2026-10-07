@@ -57,3 +57,9 @@ required-features = ["sqlite"]
 debug = 0
 incremental = false
 opt-level = 1
+
+# Every program comparison a store upgrade or open makes runs in the
+# library evaluator; optimising that one crate keeps debug builds usable.
+# Overflow checks and debug assertions stay on, as in every dev build.
+[profile.dev.package.zeno-fcis-synthesis]
+opt-level = 3

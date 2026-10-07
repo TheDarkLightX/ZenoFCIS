@@ -2,32 +2,31 @@
 //! Numeric reference rules and retained owner examples do not call the emitter,
 //! its expression trees, or the generated scalar/law programs.
 #![allow(clippy::too_many_lines, clippy::unwrap_used, clippy::expect_used)]
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/account-lockout/src/v2_contract.rs"]
 mod account;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs"]
 mod counter;
 #[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/compliance-gateway/src/v2_contract.rs"]
 mod gateway;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/order-fulfillment/src/v2_contract.rs"]
 mod order;
-#[allow(dead_code)]
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../../verification/kernel-laws/src/oracle/templates/withdrawal-queue/original/src/controller.rs"]
 mod original_controller;
 #[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/prepared-counter/src/v2_contract.rs"]
 mod prepared;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/inventory-reservation/src/v2_contract.rs"]
 mod stock;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/agent-treasury-guard/src/v2_contract.rs"]
 mod treasury;
-#[allow(unreachable_pub)]
+#[allow(dead_code, unreachable_pub)]
 #[path = "../../zeno-fcis-cli/templates/withdrawal-queue/src/v2_contract.rs"]
 mod vault;
 
@@ -1625,10 +1624,11 @@ macro_rules! with_app {
         $body(&authority, &$module::FRAMING)
     }};
 }
+/// `zeno-fcis generate contract` writes v2/policy.zcve from its own model;
+/// this recomputes the bytes from each compiled `v2_contract.rs`.
 #[test]
-#[ignore = "Explicit artifact generation: writes only eight owned policy files"]
-fn emit_library_policy_artifacts() {
-    macro_rules! emit {
+fn compiled_contracts_reproduce_their_committed_policy_bytes() {
+    macro_rules! check {
         ($module:ident,$name:literal) => {{
             let contract = $module::Contract::new();
             let d = contract.descriptor();
@@ -1640,23 +1640,20 @@ fn emit_library_policy_artifacts() {
                 $module::CHANNEL_ROOTS,
             )
             .expect("library policy encoding");
-            let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(concat!(
-                "../zeno-fcis-cli/templates/",
-                $name,
-                "/v2/policy.zcve"
-            ));
-            std::fs::write(file, &bytes).unwrap();
-            println!("{} policy bytes {}", $name, bytes.len());
+            assert!(
+                bytes == $module::ORIGINAL_POLICY,
+                concat!($name, " policy bytes")
+            );
         }};
     }
-    emit!(counter, "durable-counter");
-    emit!(stock, "inventory-reservation");
-    emit!(order, "order-fulfillment");
-    emit!(account, "account-lockout");
-    emit!(vault, "withdrawal-queue");
-    emit!(treasury, "agent-treasury-guard");
-    emit!(prepared, "prepared-counter");
-    emit!(gateway, "compliance-gateway");
+    check!(counter, "durable-counter");
+    check!(stock, "inventory-reservation");
+    check!(order, "order-fulfillment");
+    check!(account, "account-lockout");
+    check!(vault, "withdrawal-queue");
+    check!(treasury, "agent-treasury-guard");
+    check!(prepared, "prepared-counter");
+    check!(gateway, "compliance-gateway");
 }
 // Exact groups retain all 131 examples and exactly six genesis/replay checks.
 // The two slow applications use batches of at most five unchanged examples.
@@ -1665,6 +1662,17 @@ macro_rules! retained_genesis {
         println!("retained {} genesis: bind", APPS[$index].name);
         with_app!($module, |a: &a::Authority<'_>, f: &c::Framing| {
             let app = &APPS[$index];
+            // The generated contract states the retained genesis.
+            let retained: Vec<c::Field<'static>> = app
+                .state
+                .iter()
+                .zip(app.genesis)
+                .map(|((id, kind), n)| c::Field {
+                    id: *id,
+                    value: atom(*kind, *n),
+                })
+                .collect();
+            assert_eq!($module::GENESIS, retained.as_slice(), "{}", app.name);
             let raw = frame(&f.state, record(app.state, app.genesis));
             let result = a.genesis(&raw);
             assert!(result.result().is_ok(), "{:?}", result.result());
