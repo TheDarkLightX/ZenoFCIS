@@ -820,14 +820,35 @@ fn exercise(
         outcome(result)
     }
 }
-fn examples(index: usize, authority: &a::Authority<'_>, framing: &c::Framing) -> usize {
-    let app = &APPS[index];
-    let mut count = 0;
-    for line in app
+fn example_count(index: usize) -> usize {
+    APPS[index]
         .examples
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .count()
+}
+fn examples(index: usize, authority: &a::Authority<'_>, framing: &c::Framing) -> usize {
+    examples_range(index, authority, framing, 0, example_count(index))
+}
+fn examples_range(
+    index: usize,
+    authority: &a::Authority<'_>,
+    framing: &c::Framing,
+    start: usize,
+    end: usize,
+) -> usize {
+    let app = &APPS[index];
+    let mut count = 0;
+    assert!(start < end && end <= example_count(index));
+    for (case, line) in app
+        .examples
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .enumerate()
+        .skip(start)
+        .take(end - start)
     {
+        println!("retained {} example {}: start", app.name, case);
         let sections: Vec<_> = line.split('|').map(str::trim).collect();
         let split = sections.len() - 2;
         let all: Vec<i64> = sections[..split]
@@ -884,6 +905,10 @@ fn examples(index: usize, authority: &a::Authority<'_>, framing: &c::Framing) ->
         assert_eq!(out.subject(), replay.subject());
         exercise(index, authority, framing, &all);
         count += 1;
+        println!(
+            "retained {} example {}: checked and replayed",
+            app.name, case
+        );
     }
     count
 }
@@ -1630,56 +1655,133 @@ fn compiled_contracts_reproduce_their_committed_policy_bytes() {
     check!(prepared, "prepared-counter");
     check!(gateway, "compliance-gateway");
 }
+// Exact groups retain all 131 examples and exactly six genesis/replay checks.
+// The two slow applications use batches of at most five unchanged examples.
+macro_rules! retained_genesis {
+    ($module:ident,$index:expr) => {{
+        println!("retained {} genesis: bind", APPS[$index].name);
+        with_app!($module, |a: &a::Authority<'_>, f: &c::Framing| {
+            let app = &APPS[$index];
+            // The generated contract states the retained genesis.
+            let retained: Vec<c::Field<'static>> = app
+                .state
+                .iter()
+                .zip(app.genesis)
+                .map(|((id, kind), n)| c::Field {
+                    id: *id,
+                    value: atom(*kind, *n),
+                })
+                .collect();
+            assert_eq!($module::GENESIS, retained.as_slice(), "{}", app.name);
+            let raw = frame(&f.state, record(app.state, app.genesis));
+            let result = a.genesis(&raw);
+            assert!(result.result().is_ok(), "{:?}", result.result());
+            assert!(
+                a.replay_genesis(&raw, result.subject().unwrap())
+                    .result()
+                    .is_ok()
+            );
+            let mut bad = app.genesis.to_vec();
+            bad[0] += 1;
+            let raw = frame(&f.state, record(app.state, &bad));
+            assert!(a.genesis(&raw).result().is_err());
+        });
+        println!(
+            "retained {} genesis: checked and replayed",
+            APPS[$index].name
+        );
+    }};
+}
+macro_rules! retained_examples_and_genesis {
+    ($module:ident,$index:expr,$count:expr) => {{
+        println!("retained {} complete examples: bind", APPS[$index].name);
+        let count = with_app!($module, |a, f| examples($index, a, f));
+        assert_eq!(count, $count);
+        retained_genesis!($module, $index);
+        println!(
+            "retained examples={}; genesis/replay=1; eight examples retain owner-review-pending provenance",
+            count
+        );
+    }};
+}
+macro_rules! retained_examples_batch {
+    ($module:ident,$index:expr,$total:expr,$start:expr,$end:expr) => {{
+        assert_eq!(example_count($index), $total);
+        println!(
+            "retained {} examples {}..{}: bind",
+            APPS[$index].name, $start, $end
+        );
+        let count = with_app!($module, |a, f| examples_range($index, a, f, $start, $end));
+        assert_eq!(count, $end - $start);
+    }};
+}
 #[test]
-fn retained_complete_examples_genesis_and_replay() {
-    let counts = [
-        with_app!(counter, |a, f| examples(0, a, f)),
-        with_app!(stock, |a, f| examples(1, a, f)),
-        with_app!(order, |a, f| examples(2, a, f)),
-        with_app!(account, |a, f| examples(3, a, f)),
-        with_app!(vault, |a, f| examples(4, a, f)),
-        with_app!(treasury, |a, f| examples(5, a, f)),
-    ];
-    assert_eq!(counts, [12, 20, 23, 20, 26, 30]);
-    macro_rules! genesis {
-        ($module:ident,$index:expr) => {
-            with_app!($module, |a: &a::Authority<'_>, f: &c::Framing| {
-                let app = &APPS[$index];
-                // The generated contract states the retained genesis.
-                let retained: Vec<c::Field<'static>> = app
-                    .state
-                    .iter()
-                    .zip(app.genesis)
-                    .map(|((id, kind), n)| c::Field {
-                        id: *id,
-                        value: atom(*kind, *n),
-                    })
-                    .collect();
-                assert_eq!($module::GENESIS, retained.as_slice(), "{}", app.name);
-                let raw = frame(&f.state, record(app.state, app.genesis));
-                let result = a.genesis(&raw);
-                assert!(result.result().is_ok(), "{:?}", result.result());
-                assert!(
-                    a.replay_genesis(&raw, result.subject().unwrap())
-                        .result()
-                        .is_ok()
-                );
-                let mut bad = app.genesis.to_vec();
-                bad[0] += 1;
-                let raw = frame(&f.state, record(app.state, &bad));
-                assert!(a.genesis(&raw).result().is_err());
-            });
-        };
-    }
-    genesis!(counter, 0);
-    genesis!(stock, 1);
-    genesis!(order, 2);
-    genesis!(account, 3);
-    genesis!(vault, 4);
-    genesis!(treasury, 5);
-    println!(
-        "retained examples=131; genesis/replay=6; eight examples retain owner-review-pending provenance"
-    );
+fn retained_complete_examples_genesis_and_replay_durable_counter() {
+    retained_examples_and_genesis!(counter, 0, 12);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_inventory_reservation() {
+    retained_examples_and_genesis!(stock, 1, 20);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_00_04() {
+    retained_examples_batch!(order, 2, 23, 0, 5);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_05_09() {
+    retained_examples_batch!(order, 2, 23, 5, 10);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_10_14() {
+    retained_examples_batch!(order, 2, 23, 10, 15);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_15_19() {
+    retained_examples_batch!(order, 2, 23, 15, 20);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_20_22() {
+    retained_examples_batch!(order, 2, 23, 20, 23);
+}
+#[test]
+fn retained_genesis_and_replay_order_fulfillment() {
+    retained_genesis!(order, 2);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_account_lockout() {
+    retained_examples_and_genesis!(account, 3, 20);
+}
+#[test]
+fn retained_complete_examples_genesis_and_replay_withdrawal_queue() {
+    retained_examples_and_genesis!(vault, 4, 26);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_00_04() {
+    retained_examples_batch!(treasury, 5, 30, 0, 5);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_05_09() {
+    retained_examples_batch!(treasury, 5, 30, 5, 10);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_10_14() {
+    retained_examples_batch!(treasury, 5, 30, 10, 15);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_15_19() {
+    retained_examples_batch!(treasury, 5, 30, 15, 20);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_20_24() {
+    retained_examples_batch!(treasury, 5, 30, 20, 25);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_25_29() {
+    retained_examples_batch!(treasury, 5, 30, 25, 30);
+}
+#[test]
+fn retained_genesis_and_replay_agent_treasury_guard() {
+    retained_genesis!(treasury, 5);
 }
 #[test]
 fn all_original_small_domains_and_unlawful_order_states() {
@@ -1943,39 +2045,68 @@ fn treasury_guard_arithmetic_callbacks_and_unlawful_prestates() {
     );
 }
 
-/// Pinned deterministic cases from each native corpus above, run identically
-/// natively and under Miri, which skips those four corpora. Every case passes the
-/// same independent comparison; the bounded cases must reach every outcome
-/// signature, every dimension value and every named boundary relation of the
-/// complete native corpus. That is finite sampling, not path, interaction or
-/// undefined-behaviour coverage of the omitted cases.
-#[test]
-fn miri_bounded_template_domain_profiles() {
-    let mut observed = vec![
-        with_app!(counter, |a, f| bounded(&COUNTER_CORPUS, a, f)),
-        with_app!(stock, |a, f| bounded(&STOCK_CORPUS, a, f)),
-        with_app!(order, |a, f| bounded(&ORDER_CORPUS, a, f)),
-        with_app!(account, |a, f| bounded(&ACCOUNT_CORPUS, a, f)),
-        with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS, a, f)),
-    ];
-    observed.extend(with_app!(treasury, |a, f| {
-        [&TREASURY_PROPOSALS, &TREASURY_CALLBACKS, &TREASURY_GUARDS]
-            .map(|corpus| bounded(corpus, a, f))
-    }));
-    check_observations(&observed, true);
-    let counts: Vec<_> = observed.iter().map(|observed| observed.cases).collect();
-    assert_eq!(counts, [5, 7, 11, 9, 10, 12, 22, 16]);
-    for observed in &observed {
-        println!(
-            "bounded Miri profile: {} {} of {} native cases",
-            observed.corpus.name, observed.cases, observed.corpus.size
-        );
-    }
-    // The 131 retained examples run under Miri in their own test; they are not
-    // drawn from these corpora and are not counted against them.
+/// Checks one corpus's bounded profile against its pins and its pinned count.
+/// The eight profile tests below together run 92 cases: 5, 7, 11, 9, 10, 12, 22
+/// and 16. The 131 retained examples run under Miri in their exact groups; they are
+/// not drawn from these corpora and are not counted against them.
+fn check_bounded(observed: Observation<'_>, cases: usize) {
+    check_observations(std::slice::from_ref(&observed), true);
+    assert_eq!(observed.cases, cases);
     println!(
-        "bounded Miri profile cases={}; retained examples [12, 20, 23, 20, 26, 30] run in retained_complete_examples_genesis_and_replay",
-        counts.iter().sum::<usize>()
+        "bounded Miri profile: {} {} of {} native cases",
+        observed.corpus.name, observed.cases, observed.corpus.size
+    );
+}
+
+// Pinned deterministic cases from each native corpus above, run identically
+// natively and under Miri, which skips those four corpora. Every case passes the
+// same independent comparison; the bounded cases must reach every outcome
+// signature, every dimension value and every named boundary relation of the
+// complete native corpus. That is finite sampling, not path, interaction or
+// undefined-behaviour coverage of the omitted cases. Each corpus is its own test
+// so that Miri can interpret each in a separate job.
+#[test]
+fn miri_bounded_profile_durable_counter() {
+    check_bounded(with_app!(counter, |a, f| bounded(&COUNTER_CORPUS, a, f)), 5);
+}
+#[test]
+fn miri_bounded_profile_inventory_reservation() {
+    check_bounded(with_app!(stock, |a, f| bounded(&STOCK_CORPUS, a, f)), 7);
+}
+#[test]
+fn miri_bounded_profile_order_fulfillment() {
+    check_bounded(with_app!(order, |a, f| bounded(&ORDER_CORPUS, a, f)), 11);
+}
+#[test]
+fn miri_bounded_profile_account_lockout() {
+    check_bounded(with_app!(account, |a, f| bounded(&ACCOUNT_CORPUS, a, f)), 9);
+}
+#[test]
+fn miri_bounded_profile_withdrawal_queue() {
+    check_bounded(
+        with_app!(vault, |a, f| bounded(&WITHDRAWAL_CORPUS, a, f)),
+        10,
+    );
+}
+#[test]
+fn miri_bounded_profile_treasury_proposals() {
+    check_bounded(
+        with_app!(treasury, |a, f| bounded(&TREASURY_PROPOSALS, a, f)),
+        12,
+    );
+}
+#[test]
+fn miri_bounded_profile_treasury_callbacks() {
+    check_bounded(
+        with_app!(treasury, |a, f| bounded(&TREASURY_CALLBACKS, a, f)),
+        22,
+    );
+}
+#[test]
+fn miri_bounded_profile_treasury_guards() {
+    check_bounded(
+        with_app!(treasury, |a, f| bounded(&TREASURY_GUARDS, a, f)),
+        16,
     );
 }
 

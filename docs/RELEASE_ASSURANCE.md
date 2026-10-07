@@ -121,6 +121,9 @@ Optional developer guardrails use a private npm package with exact Probity
 digest for the complete canonical lock graph. CI installs that graph with
 lifecycle scripts disabled and runs `npm audit`. It is excluded from Rust
 runtime and protocol authority.
+The development graph also pins MCP SDK `1.31.0`, the patched 1.x version for
+[GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h).
+The package override and complete canonical lock digest are checked together.
 
 Packaged-application qualification also requires the existing Rust compiler,
 Python 3, and Node.js 22 to execute the same finite synthesis contract through
@@ -245,9 +248,9 @@ domain. In the hosted Miri run of 916b28e none of the target's tests finished
 within its 180-minute budget. The tests still run natively, unchanged in bounds
 and independent comparisons, in the `ci` workflow's `rust` job.
 
-Under Miri, `miri_bounded_template_domain_profiles` runs 92 pinned cases from
-the eight corpora through the same checked path and independent comparison. The same
-cases run natively. For each corpus, the cases come in a fixed ascending order
+Under Miri, eight `miri_bounded_profile_*` tests, one per corpus, run 92
+pinned cases from the eight corpora through the same checked path and
+independent comparison. The same cases run natively. For each corpus, the cases come in a fixed ascending order
 with a pinned count, and each is an actual native case. The test fails unless
 the bounded cases reach every outcome signature the complete native corpus
 produces (class and reason, or the actual refusal variant). They must also
@@ -259,22 +262,36 @@ of values, or undefined behaviour in the omitted cases. **Miri's UB, provenance
 and aliasing checks are lost for every omitted execution.** No claim is made
 that only values are lost while paths are preserved. The 131 retained examples
 (12, 20, 23, 20, 26 and 30 per application) still run under Miri, with genesis
-and replay, in `retained_complete_examples_genesis_and_replay`. They are not
-drawn from these corpora and are not counted in them. The template job checks
-that its effective Miri arguments skip exactly these four tests. The bounded
-profile, `compiled_contracts_reproduce_their_committed_policy_bytes` and the
-three other semantic tests must run, and the target must have no ignored test.
-V2's ignored artifact writer `emit_library_policy_artifacts` is gone in 2.1:
-that pure, nonignored test recomputes each template's policy bytes from its
-compiled contract under Miri and writes no files.
+and replay. Four applications retain their complete-example/genesis tests.
+Order-fulfillment and treasury use eleven `retained_examples_and_replay_*`
+batches of at most five examples plus two separate genesis/replay tests.
+Their exact intervals cover every original example once, and each batch
+checks its full corpus size and executed count. They are not
+drawn from these corpora and are not counted in them. The template
+remainder job checks that the exclusion step's Miri arguments skip exactly
+these four tests, and that its composed arguments keep those skips unchanged
+before skipping the exact-test groups. Every profile test, the retained
+examples, the policy-byte comparison and the two other semantic tests must
+run; the target has no ignored tests. V2’s ignored artifact writer is replaced
+by the pure `compiled_contracts_reproduce_their_committed_policy_bytes` test,
+which compares each compiled contract’s policy bytes without writing files.
 
 Splitting a test binary across Miri groups is not an exclusion. To keep each
 job under the workflow's configured 180-minute budget, the synthesis `completion` tests run their
-eight graph-seed groups separately, and the synthesis library runs six
-byte-by-byte replay and comparison tests each in its own group. Each split
-target keeps one remainder group that skips exactly those tests. That job lists
-every group's selection under Miri and fails unless each listed test runs
-exactly once.
+eight graph-seed groups separately. The synthesis library runs nine tests
+each in its own group: six byte-by-byte replay and comparison tests, and the
+three tests that the hosted run of 8eda309 measured at about 101 and 26
+minutes, or still running after more than 10 minutes. The template contracts run each
+bounded-profile corpus in a separate group. At 50e6b86, the order and treasury
+retained-example jobs also reached the 180-minute limit, so those two apps now
+use exact example batches and separate genesis jobs. Their per-case progress
+messages identify the active example without changing its assertions. At 8eda309, the job reached its 180-minute limit while the combined
+genesis-and-replay test was still running; these partitions retain every case
+and assertion. Each split
+target keeps one remainder group that skips exactly those tests and, for the
+template contracts, the four native-only tests. That job lists every group's
+selection under Miri and fails unless each listed test runs exactly once or is
+one of the remainder's pinned exclusions.
 
 ## Explicit non-claims
 

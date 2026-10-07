@@ -152,6 +152,17 @@ page creation by a local socket restriction, and the supported browser refused
 loopback access. DOM-double checks do not establish native rendering, keyboard,
 touch, HTTP or accessibility behavior for the new help controls.
 
+## Addon follow-up for 2.3
+
+The [harness integration](zal/HARNESS_INTEGRATION.md) is an additive follow-up to
+the archived prototype. `integrations/zal/setup.py` now prepares persistent
+project-local MCP registration and a shared skill; `workspace.py` adds a reviewed,
+revision/checker-bound declaration export and exact regeneration check. Terminal
+review now supports explicit acceptance of a displayed initial model. It does
+not add an acceptance tool or change the Rust core. Earlier cloud/harness evidence
+above remains historical; current native configuration and live model results
+must be reported separately. This track leaves the fixed 2.2 journey unchanged.
+
 ## Definition of done for the prototype
 
 The primary-literature review, bounded grammar, paired canonical surfaces and

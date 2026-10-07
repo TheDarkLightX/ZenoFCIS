@@ -78,6 +78,13 @@ loop is planned; the completed e-graph study evaluated symbolic optimization.
 The factory description states our intended destination; comparative leadership
 remains a claim to demonstrate.
 
+The [ZAL addon for coding harnesses](docs/zal/HARNESS_INTEGRATION.md) is an
+additive 2.3 track: Codex and Claude Code can inspect, compare and propose precise
+finite application behavior through MCP and a shared skill. Separate human review
+and revision-bound exports connect authoring to the existing factory route.
+ZAL's Python checks and cooperative review remain distinct from verified Rust
+execution and authenticated approval.
+
 The [neurosymbolic loop design](docs/neurosymbolic-loop/DESIGN.md) and
 [implementation specifications](docs/neurosymbolic-loop/specs/INDEX.md) describe
 how proposals, checker feedback and revisions form a bounded process under a

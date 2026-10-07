@@ -222,6 +222,22 @@ cursor previously displayed by that client and refuse intervening changes;
 the person does not need to type digests or JSON. Structured output and explicit
 full-hash commands remain optional low-level interfaces.
 
+The 2.3 addon adds `show` / `accept-current` for an initial or unchanged model.
+It requires successful rendering of that exact model/checker/event cursor and
+no pending proposal. The cursor is captured with the displayed snapshot under
+the same workspace lock; an intervening event requires another display.
+Agreement records bind the candidate revision, canonical English and checker.
+The checker identity version `zal/checker/2` hashes `behavior.py`, `workflow.py`,
+`factory.py`, `shared.py`, `terminal.py`, `mcp.py` and `workspace.py`.
+
+Reviewed workspace export reruns supported-profile checks and requires the last
+human agreement to match the current revision, meaning and checker, with no
+pending proposal. Its `zal/reviewed-declarations/1` receipt names the agreement
+sequence and every generated file digest. Verification independently regenerates
+the declarations, compares the complete file/directory inventory and exact bytes,
+and refuses unreadable content or symlinks. This is a cooperative review gate,
+not authenticated approval, a proved lowering checker or factory qualification.
+
 Acceptance is a trusted local client event. It is not a cryptographic human
 attestation: a malicious process with the same local access can operate the
 client. The transport has no acceptance tool; command approval is a separate

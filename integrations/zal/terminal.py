@@ -18,6 +18,7 @@ why STATE EVENT fact=yes (exact local guard/outcome explanation)
 propose FILE [symbolic|english]
 trace submit authorized=no then approve authorized=yes
 accept | reject (the exact candidate last displayed here)
+show | accept-current (review the current/initial model, with no pending candidate)
 cancel | quit
 Ask/propose in your usual Codex/Claude coding session through the MCP bridge.
 This human loop owns acceptance; tool/command approval does not accept meaning.
@@ -103,43 +104,67 @@ class ReviewClient:
         self.workspace = workspace
         self.displayed = None
         self.awaiting_display = None
+        self.current_displayed = None
+        self.awaiting_current = None
 
     def execute(self, line):
         words = shlex.split(line)
         self.awaiting_display = None
+        self.awaiting_current = None
+        if words == ["show"]:
+            self.current_displayed = None
         if words and words[0] in {"candidate", "propose"}:
             self.displayed = None
         def action(session):
+            if words == ["accept-current"]:
+                current = (session.model.revision, checker_identity(), len(session.events))
+                if self.current_displayed != current or session.proposal:
+                    raise Refusal("Current meaning changed or has not been displayed here; run show and review it first")
+                session.accept_current_human(current[0])
+                return {"agreement": session.agreement, "revision": session.model.revision,
+                        "evidence": session.evidence, "realization": session.realization}, None, None
             if words in [["accept"], ["reject"]]:
                 proposal = session.proposal
                 current = None if not proposal else (
                     proposal["base_revision"], proposal["revision"], len(session.events))
                 if self.displayed is None or self.displayed != current:
                     raise Refusal("Candidate changed or has not been displayed here; run candidate and review it first")
-                return command(session, " ".join([words[0], *self.displayed[:2]])), None
+                return command(session, " ".join([words[0], *self.displayed[:2]])), None, None
             result = command(session, line)
             displayed = None
             if words and words[0] in {"candidate", "propose"} and session.proposal:
                 displayed = (session.proposal["base_revision"], session.proposal["revision"], len(session.events))
-            return result, displayed
-        result, displayed = self.workspace.use(action)
+            current = (session.model.revision, checker_identity(), len(session.events)) if words == ["show"] else None
+            return result, displayed, current
+        result, displayed, current = self.workspace.use(action)
+        if current:
+            self.awaiting_current = (canonical(result), current)
         if words and words[0] in {"candidate", "propose", "accept", "reject", "cancel"}:
             self.displayed = None
             self.awaiting_display = (canonical(result), displayed) if displayed else None
+        if words and words[0] in {"accept", "reject", "accept-current", "cancel"}:
+            self.current_displayed = None
+            self.displayed = None
         return result
 
     def present(self, result, writer=print, json_output=False):
         """Bind review only after the exact candidate was successfully rendered."""
         pending = self.awaiting_display
+        current = self.awaiting_current
         try:
             if pending and canonical(result) != pending[0]:
                 raise Refusal("Displayed candidate changed before rendering; review it again")
+            if current and canonical(result) != current[0]:
+                raise Refusal("Displayed current meaning changed before rendering; review it again")
             text = json.dumps(result, indent=2) if json_output else human_text(result)
             writer(text)
             if pending:
                 self.displayed = pending[1]
+            if current:
+                self.current_displayed = current[1]
         finally:
             self.awaiting_display = None
+            self.awaiting_current = None
 
 
 def observations(context):
@@ -295,7 +320,7 @@ def main():
     client = ReviewClient(workspace)
     if not options.json:
         print("ZAL human review · finite-fsm/1 · no production authority\n" + HELP)
-        print(human_text(client.execute("show")))
+        client.present(client.execute("show"))
     while True:
         try:
             line = input("" if options.json else "zal> ")
