@@ -9,6 +9,8 @@ every row was re-checked read-only against the final simplified tree: 18 require
 rows hold with code evidence and a named check, row 5 holds in code and is now
 checked by `tools/check_api_refusals.py`, and no withdrawn row is contradicted.
 Line citations refer to that final tree; each target line was re-read.
+On the 2.1 branch these citations still name the V2 tree
+(c4e8a6c); later 2.1 changes move lines in some cited files.
 Frozen baseline: refs/simplify/baseline,
 94bac799b44859b158e50377313b7e0ef6c1bc51; HEAD is 1ed6f88.
 

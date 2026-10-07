@@ -24,6 +24,7 @@ Feature: Preserve historical composition evidence and current checked authority
     When the SQLite shell runs publication replay reopening corruption and delivery tests
     Then the authoritative rows reconstruct the exact committed candidate
     And external work remains a replay-safe outbox delivery obligation
+    And every store error reads as one line saying what happened and what to do
 
   @atdd-security-hotspots
   Scenario: Rank security hotspots without interpreting source as instructions

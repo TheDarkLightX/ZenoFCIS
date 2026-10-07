@@ -195,7 +195,9 @@ The release packager builds every library, binary, example and build script of
 the published crates from their archives alone, each crate unpacked at
 `sources/<crate>-<version>/`. Packaged tests are not standalone. They compile
 only from the published archives laid out as in the repository
-(`crates/<crate>/`), plus nine verification files copied from the commit.
+(`crates/<crate>/`), plus the repository files the manifest pins, copied from
+the commit: nine from `verification/` and the benchmark artifacts under
+`docs/benchmarks/` that the CLI's tests include.
 `release/packaged-test-inputs.json` lists every file a packaged test target
 reads outside its own package, with its SHA-256. The packager derives that set
 from rustc dep-info and requires exact equality, and refuses any such read by a
@@ -269,8 +271,10 @@ drawn from these corpora and are not counted in them. The template
 remainder job checks that the exclusion step's Miri arguments skip exactly
 these four tests, and that its composed arguments keep those skips unchanged
 before skipping the exact-test groups. Every profile test, the retained
-examples and the two other semantic tests must run, and the artifact generator
-must remain the only ignored test.
+examples, the policy-byte comparison and the two other semantic tests must
+run; the target has no ignored tests. V2’s ignored artifact writer is replaced
+by the pure `compiled_contracts_reproduce_their_committed_policy_bytes` test,
+which compares each compiled contract’s policy bytes without writing files.
 
 Splitting a test binary across Miri groups is not an exclusion. To keep each
 job under the workflow's configured 180-minute budget, the synthesis `completion` tests run their
@@ -281,8 +285,9 @@ minutes, or still running after more than 10 minutes. The template contracts run
 bounded-profile corpus in a separate group. At 50e6b86, the order and treasury
 retained-example jobs also reached the 180-minute limit, so those two apps now
 use exact example batches and separate genesis jobs. Their per-case progress
-messages identify the active example without changing its assertions. The earlier combined genesis-and-replay test also exceeded the
-180-minute limit at 8eda309; these partitions retain every case and assertion. Each split
+messages identify the active example without changing its assertions. At 8eda309, the job reached its 180-minute limit while the combined
+genesis-and-replay test was still running; these partitions retain every case
+and assertion. Each split
 target keeps one remainder group that skips exactly those tests and, for the
 template contracts, the four native-only tests. That job lists every group's
 selection under Miri and fails unless each listed test runs exactly once or is

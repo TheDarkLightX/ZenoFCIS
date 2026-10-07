@@ -82,7 +82,8 @@ named under "Checkpoints and final qualification"; none is the final gate.
   byte-identical) and the Rust, Python and JavaScript replays pass. The
   kernel-laws oracle template copies are re-synchronized and their policy
   files regenerated. `check_template_contracts_v2.py` reports matching
-  declarations and library-encoded policies for all eight templates.
+  declarations and library-encoded policies for all eight templates. (In
+  2.1, `zeno-fcis generate contract --check` replaces that script.)
 - Compatibility: `test-data/v1-compatibility/baseline.json` pins the V1
   consumer's documented V2 migration, the five API changes listed in the
   [migration guide](V2_PROGRAM_API_MIGRATION.md#v1-consumer-migration). The
@@ -220,7 +221,7 @@ Missing, stale, filtered or development-only evidence leaves its gate open.
    qualify its 19 route-required entries; preserve the recorded reasons for
    withdrawing 13 broader requirements from this V2 completion gate.
    Update API migration and user-facing descriptions to this exact scope.
-   Run `python3 tools/check_template_contracts_v2.py`,
+   Run `zeno-fcis generate contract --check` on each template,
    `python3 tools/check_generated_application.py`, required native/Clippy,
    no-default/no-std and Miri checks, full mutation gates (run in CI; see
    "Checkpoints and final qualification"), and

@@ -24,7 +24,9 @@ class SynthesisToolsTest(unittest.IsolatedAsyncioTestCase):
             tools = {tool.name for tool in (await client.list_tools()).tools}
             self.assertEqual(tools, {"assess_finite_problem", "synthesize_finite_core",
                                      "verify_finite_core", "discover_program_authoring",
-                                     "create_program_project", "check_project_spec"})
+                                     "create_program_project", "check_project_spec",
+                                     "transform_request", "transform_candidate",
+                                     "transform_replay"})
             problem = str(ORDER / "synthesis.json")
             output = str(ORDER / "synthesized")
             assessed = (await client.call_tool("assess_finite_problem",

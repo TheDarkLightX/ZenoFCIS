@@ -6,6 +6,194 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Fix `zeno-fcis loop`, whose resume could run checker work without
+  charging it. `resume`, `candidate` and `run` first resume the session,
+  which replays its checked incumbent and stored counterexamples. The
+  replay's work reservation reached the ledger only after the replay
+  finished, so an interruption during the replay left the session's
+  allowance unchanged, and repeated interruptions repeated checker work for
+  free. A `run` refused for its `--script` or `--hosted-config` after the
+  replay also left it uncharged. The reservation is now written to the
+  ledger before any replay work runs, and the replay can start only after
+  that write succeeded; an interrupted replay stays charged. Every resume
+  still reserves and pays for its own replay and never reuses an earlier
+  one; when the remaining session work cannot cover it, the command exits 2
+  with `resume-inconclusive` (`insufficient-replay-allowance`) and writes
+  nothing. The ledger format is unchanged, and an uninterrupted session
+  writes the same ledger and report as before. This concerns work
+  accounting only: the loop still installs no memory caps and does not
+  cancel process trees.
+- Fix store upgrade admission and audit. A `program-successor` upgrade was
+  admitted when the two contracts' policies differed only in the decision
+  program and Step limit, with nothing else required: a successor with a
+  Step limit of zero, or with a program that decides differently on some
+  input, was admitted at any state, and the audit took the receipt digests
+  from the store's own record. Now `v2::upgrade::Successor::establish`
+  constructs a successor only when the shell itself establishes all five
+  premises from the two bound catalogs: the policy comparison; law 991
+  declared as a decision-conformance law on every decision and required, in
+  both; both Step limits covering every program and law node; no law
+  observing Step usage; and the two decision programs equal on every input
+  tuple. The last is the new pure `v2::equivalence::compare`, the predicate
+  of `zeno-fcis transform check` at the full Step budget: every tuple of the
+  ordered product of the declared input domains runs through the library
+  evaluator, with checked domain sizing and an odometer instead of a list of
+  tuples, up to a cap the lineage carries, 100,000,000 tuples by default or
+  another value through `Lineage::bind_with_cap`. A CLI test compiles the
+  module and checks that it gives the same verdict as the transform checker
+  on its known answers, the benchmark cases, planted defects and the
+  withdrawal-queue adoption, which it compares on 1,296,000 input tuples.
+  When a premise is missing the upgrade takes the genesis route, and a
+  refusal, which writes nothing, now names the missing premise:
+  `upgrade::Refusal::Genesis` carries `missing` and `refusal`. The audit
+  establishes all five premises again from the auditing lineage and requires
+  the recorded receipt digests to be that lineage's, value for value. An
+  open that fails either check ends with the new `Error::Succession`, which
+  carries `upgrade::Unsupported::Receipts` or the missing premise and says
+  the store may be intact, instead of `Error::History`. The
+  digests are provenance: the shell replays no receipt. The record's
+  admission is now the premises byte `0x1f`, the number of tuples compared
+  and the digests, and `UpgradeReceipt::premises` returns that evidence;
+  2.1 was never released, so there is no compatibility path. The
+  application's upgrade report lists the five premises and
+  `programs_equal_on_input_tuples`. Every process that upgrades a store, or
+  fully opens one holding a program-successor record, compares the two
+  programs once: a bound `Lineage` keeps each pair's outcome in memory
+  (`Lineage::comparisons` counts its enumerations), and programs with
+  identical instructions and roots are equal without enumeration. No
+  comparison runs while a write transaction is open: the needed pairs are
+  established from plain reads first, the transaction only looks them up,
+  and a pair that another connection's change made necessary in between is
+  established before a retry, bounded by the number of versions, beyond
+  which `Error::Unsettled` is returned with nothing written. Generated
+  application manifests optimise `zeno-fcis-synthesis` in dev builds, with
+  overflow checks and debug assertions still on. For the withdrawal queue
+  one comparison takes about 3 seconds in a release build and about 4 in a
+  debug build.
+
+- `zeno-fcis new` now binds every Cargo application it writes, from
+  `--contract` and from the `durable-counter`, `prepared-counter` and example
+  templates, to a ZenoFCIS source tree. Before, a generated application
+  resolved its exact version pins to the crates published under the same
+  versions, which are a different release, and failed to build; only
+  `tools/check_generated_application.py` knew the binding. `new` appends a
+  `[patch.crates-io]` section with a path entry for every ZenoFCIS package
+  the application needs, directly or through other ZenoFCIS packages, copies
+  the tree's `Cargo.lock`, and copies its `rust-toolchain.toml`. The tree is
+  the one the new `--source TREE` option names, else the tree the CLI was
+  built from while it still exists; it must be a Cargo workspace whose
+  members provide every needed package at the CLI's version. Without a tree
+  `new` exits 2 and names `--source`; with a tree that cannot bind the
+  application it exits 1; either way it writes no file. A CLI built with
+  `ZENO_FCIS_BUILD_TREE` set records that path instead, or none when it is
+  empty. `tools/rc_package.py build` builds the release binaries with it
+  empty, so they hold no build directory; with an installed binary, pass
+  `--source <extracted source tree>`. The generated README lists
+  `cargo test --offline` and `cargo run --offline -- NEW_DATABASE_PATH`.
+  `tools/check_generated_application.py`, `tools/check_contract_upgrade.py`
+  and `site/build.py` now check the binding `new` wrote instead of writing
+  one; the site then leaves it out, since its own workspace resolves the
+  applications' pins. The template READMEs give the same steps.
+- Fix contracts the generator accepted but the library refused. Each
+  channel's idempotency domain now covers every `idempotency_ordinal` the
+  rules use on it, where it was fixed at 0, so a nonzero ordinal no longer
+  fails the catalog binding. The Effect limit is now the most deliveries any
+  case makes, at least 1, where it was fixed at 1, so a case with two
+  deliveries no longer has every decision refused at run time. Generation
+  refuses a case whose deliveries are not in increasing ordinal order, and a
+  contract with a committed-failure case but no `CommittedFailureEffects`
+  law, naming the case: framework law 908 would refuse every committed
+  failure. It also refuses framework law ID 0, which the library refuses.
+  When the library's catalog still refuses a contract, the error
+  names the case delivery, law or channel without which the library admits
+  it, beside the library's own error, found by binding the contract again
+  without each; the library's error types are unchanged. The eight
+  templates' generated contracts are byte-identical. The app study's
+  original escrow, whose split pays out in two deliveries with idempotency
+  ordinals 0 and 1, is a CLI test fixture and builds and runs its 23
+  examples.
+- Add `zeno-fcis contract export-program [DIR] --out FILE`: the contract's
+  current decision program, in the canonical encoding `optimize`,
+  `transform` and `loop` read, written to a new file. After an adoption it
+  is the adopted candidate. The output is a function of the contract's files.
+  `v2/policy.zcve` is a whole policy, which those commands refuse, so the
+  optimization journey needed a script that parsed generated Rust.
+- An application built from a contract can now keep deciding on an existing
+  store: `--decide DATABASE_PATH` on a store at this build's version
+  continues the session from the store's state, with a replay key of its own
+  for each commit; without a file it starts at genesis as before. A store at
+  another version is refused and left as it was. `--decide` is an aid for
+  acceptance tests and maintenance, not an operational interface, which is
+  planned for 2.2.
+- Add `tools/check_app_journey.py` and the ATDD scenario `app-journey`, with
+  the app study's escrow and spend-approval contracts as CLI test fixtures.
+  In new directories outside the repository, and with the command lines
+  alone:
+  - `zeno-fcis new` builds the escrow, whose split pays out in two
+    deliveries with idempotency ordinals 0 and 1, and the commands its
+    README lists, run exactly as written, build it, check its 23 examples
+    and run its session;
+  - `contract export-program`, `optimize`, `transform replay` and
+    `contract adopt` make the spend-approval contract's version 2;
+  - a version 1 store with four commits and a pending payment upgrades as a
+    program successor at commit 4 and delivers the payment under its
+    original identifier, after which the version 1 build refuses the store;
+  - a version 1 store at commit 2 upgrades and keeps committing under
+    version 2 with `--decide`, and its audit replays both segments;
+  - a CLI built as the release build builds it holds no path of the
+    checkout and refuses `new` without `--source`; the same build without
+    the variable, the control, holds it.
+- Add `docs/CONTRACT_RULES.md`, the reference for `v2/policy.json`: every
+  key, leaf bindings, expressions with `choose` and `div_floor`, the law
+  kinds and the scopes five of them require, framework laws 908, 909, 990
+  and 991, `idempotency_ordinal`, roots, full post-states and reasons. A test
+  checks its tables against the keys, leaves, classes, operators, functions
+  and law kinds the generator reads. The CLI reference recommends release
+  builds for review, transform and optimize, which the app study measured
+  4.7 to 7.5 times faster on reviews; documents that `contract adopt`
+  renders the whole rules file again; and `generate contract --help` now
+  lists `v2/schema.zcve` among the files it writes. The generated
+  application's `bundles` count is documented as the committed decisions,
+  without genesis.
+- `contract review` reports refusals, in packet schema
+  `zeno-fcis/contract-review/2`. Each refusal names its class (law, domain,
+  arithmetic, meter, input or other) and, when a law refused, the law the
+  library's own law diagnostics report. For each refused input, the
+  library's law evaluator runs the contract's law programs on the pre-state
+  as a genesis state and decides whether it satisfies every state law: each
+  law that applies at genesis and to every committing decision. A law
+  refusal on a pre-state that satisfies every state law is a finding: the
+  review exits 1 with status `law-refusal` and names the law, the number of
+  inputs, the first of them and the case the decision program selects for
+  it. Refusals on pre-states the state laws exclude are counted apart, and
+  refused rows name the state law they break. The summary counts refusals
+  by class and by pre-state. The review still does not decide reachability:
+  a pre-state that satisfies every state law may be unreachable. The
+  app-building study's planted bug in its spend-approval contract (the CFO
+  check moved from tier 1 to tier 2), which the review passed with no
+  finding, is now a finding: law 500 refuses 16 inputs. The unchanged
+  contract, now a test fixture, and the eight templates review with no
+  finding. Mutants still compare refusals as the library reports them, not
+  by law.
+- One decision-examples grammar. `contract-app/src/examples.rs`, which
+  `new --contract` copies into every application, parses the examples in
+  the application, and `contract review` compiles the same file. Both now
+  accept inputs split over several `|` sections, a delivery written as its
+  payload alone when the contract declares one channel, and indented
+  comment lines, and both refuse every other line with the same message.
+  Generated applications used to refuse all three, although the review
+  accepted them. Every number is checked against
+  its declared domain while parsing, the successor state's included. The
+  grammar is documented in `docs/CLI_REFERENCE.md`. Every template's
+  examples parse to the same examples as before.
+- The SQLite v2 shell's errors display as one line saying what happened and
+  what to do, instead of `V2 SQLite refinement refused: Identity` and the
+  like. `Debug` keeps the variant names. Applications built from a contract
+  print `store:`, that message and, in parentheses, the error's `Debug` form,
+  which starts with the variant name, for example `store: upgrade refused:
+  the store already runs this contract version, so there is nothing to
+  upgrade (Upgrade(SameContract))`.
+
 - Repair the V2 CI failures found on pull request 119. Every job that runs a
   repository tool with `cargo --offline` first fetches the root, verification
   and resolved-purity lockfiles through one shared action. The verus workflow
@@ -23,8 +211,10 @@ embedded in ZenoFCIS values.
   build from their archives alone: every library, binary, example and build
   script at `sources/<crate>-<version>/`. Packaged tests are no longer
   standalone. They compile from the published archives laid out as in the
-  repository, plus nine verification files copied from the commit. Every file a
-  test target reads outside its own package must equal
+  repository, plus the repository files the manifest pins, copied from the
+  commit: nine from `verification/` and, in 2.1, the benchmark artifacts under
+  `docs/benchmarks/` that the CLI's checker, optimizer and loop tests include.
+  Every file a test target reads outside its own package must equal
   `release/packaged-test-inputs.json` (target, path, SHA-256). Any such read by
   a non-test target fails. The whole-repository source archive runs every test.
   Two frozen, pinned references force this: the `#[cfg(test)]` `#[path]`
@@ -48,6 +238,203 @@ embedded in ZenoFCIS values.
   and initialization now compare every `sqlite_master` object with no name
   filter. A regression test plants triggers named `sqlitex`, `SQLiteX` and
   `sqlite1`. An independent review of V2.1 found the defect.
+- Improve `zeno-fcis optimize` (F4.1, from the 2026-10-05 e-graph literature
+  review). Every e-class now keeps an exact table over the inputs it depends
+  on, its minimal support, whenever that support's domains have at most 2^16
+  tuples, so classes of large domains merge by exact equality (poison
+  included) instead of only within domains of at most 64 tuples; classes
+  beyond the cap or the per-search table budget keep the conservative interval
+  guard. Completion buckets candidates by sample values (every tuple up to
+  1,024 tuples) and confirms each by its table before adding it. A new
+  `cut-rewrite` phase rewrites Boolean classes over cuts of up to three leaves
+  with a built-in table of minimum circuits, with and without `Eq`, that a
+  test regenerates and checks entry by entry. Strategies gain an optional
+  `profile` (`functional-bool-v1` or `checked-i64-v1`): no instruction outside
+  it is proposed or extracted, and every candidate passes its gate; `optimize`
+  gains `--profile`. Strategies also gain `limits.max_work`, a deterministic
+  work budget in millions of steps that stands in for time. Without
+  `--strategy`, `optimize` now runs a fixed portfolio
+  (`zeno-fcis/optimize-portfolio/1`) of three strategies, each ending with
+  merging and cut rewriting under its own size and work budgets, with one
+  incumbent across them; the report tags phases and candidates with their run
+  and adds per-run statistics. `--with-candidate FILE` (up to 8) supplies
+  programs to fuse into the search: each is checked against the original
+  first, and only an accepted one is added, unpinned, with its roots merged
+  with the original's when the original can never fail or when their exact
+  tables agree. The loop's strategy grammar admits `profile` and `max_work`,
+  its engine phase table lists `cut-rewrite`, and the engine seam now passes
+  the request's profile and the session's checked replacement, so the
+  engine's candidates stay within the profile (a strategy naming another
+  profile is `strategy-unavailable`) and must beat the replacement.
+  Measured, every result accepted by the checker with a replaying receipt:
+  withdrawal-queue controller 46 to 35 instructions, current decision graph
+  100 to 88, kernel unchanged at 7; Boolean seeds 59 to 58 (B07 6 to 5),
+  integer seeds 47 to 45 (I04 7 to 5); the published 100-case corpus, added
+  under `docs/benchmarks/published-corpus/` as calibration data with its
+  generator and provenance, 514 to 508. `docs/benchmarks/measure_optimizer.py`
+  reproduces the figures. Two e-graph changes cut search time without
+  changing any result: rebuild repairs each dirty class once per pass, and
+  unions keep class lists sorted without re-sorting. These are bounded,
+  checked results, not minimality claims; `Cargo.lock` and the verified core
+  are unchanged.
+- Add `zeno-fcis optimize --program P [--strategy FILE] [--candidate-out OUT]
+  [--receipt OUT] [--max-input-tuples N]`: an in-house e-graph optimizer
+  (union-find, hash-consing, congruence rebuild; no new dependency) that
+  proposes smaller equivalent finite scalar programs, and the transform checker
+  that judges every one of them in-process over the full declared domain. The
+  optimizer is an untrusted proposer: a candidate is reported as accepted only
+  with the checker's receipt, which `transform replay` reproduces. Classes
+  carry exact signatures with trap poison for domains of at most 64 tuples
+  and conservative interval bounds otherwise; classes merge only when their
+  signatures and trap behavior agree, every `Add` or `Sub` that may overflow
+  is kept, and arithmetic is rewritten only by constant folding that never
+  folds a possible trap. Strategies are small versioned JSON documents in a
+  closed grammar (phases `boolean`, `semantic-merge`, `select`, `fold`,
+  `share`; bounded rounds, node, class and rewrite limits; extractor `tree` or
+  `dag-greedy`); unknown keys are refused and no user-supplied code runs. The
+  fixed default strategy, version 1, reaches the recorded 7-node
+  withdrawal-queue Boolean kernel from 16 nodes, a 46-node retained
+  controller from 69 (the recorded hand candidate has 60) and a 100-node
+  current decision graph from 106 over all 1,296,000 tuples, and on the
+  sixteen Boolean benchmark seeds matches or beats every recorded candidate
+  while leaving minimal originals unchanged. The report states the termination
+  bounds: phases and rounds run, e-node and class counts, and any limit hit.
+  Exit codes follow `transform`: improved 0, no checked improvement or a
+  domain above the cap 2, refusals 1, I/O failure 3. Nothing is adopted into
+  an application; the result is a bounded search, not a minimality claim.
+  Pure code in the CLI crate; `Cargo.lock` and the verified core are unchanged.
+- Add `zeno-fcis loop open|candidate|run|resume|encode`: the bounded adaptive
+  optimization loop of `docs/neurosymbolic-loop`. A frozen canonical request
+  binds the original, its domain and ABI, the profile (`functional-bool-v1`
+  or `checked-i64-v1`), the cost objective, the limits, the disabled provider
+  policy and the checker identity. Proposers (a deterministic local rewriter,
+  a scripted fake provider, agent-supplied candidates through the MCP tools
+  `transform_request`, `transform_candidate` and `transform_replay`, and a
+  hosted adapter that is disabled with a zero allowance) only produce data;
+  every candidate is judged by `transform check` on the whole domain, and only
+  a complete equivalence that lowers (nodes, bytes) within the original's
+  bounds replaces the incumbent. Attempts, model calls and checks are reserved
+  in a hash-chained ledger before work and never refunded; resume re-admits
+  the request, verifies the ledger against its head and replays the incumbent,
+  returning no trusted incumbent on any failure. Strategy proposals in the
+  optimizer's grammar are admitted as data and run by the checked e-graph
+  optimizer. Its bytes re-enter the loop's admission and check, and its own
+  verdict is only provenance. The loop core is pure code in the CLI crate;
+  `Cargo.lock` and the verified core are unchanged. No convergence,
+  optimality or neural benefit is claimed.
+  `docs/benchmarks/run_neural_loop_protocol.py` runs the available arms of the
+  preregistered protocol, including the two e-graph arms, and reports every
+  result.
+- Add `zeno-fcis contract review <app-dir> [--out PACKET.json] [--max-tuples N]`,
+  an advisory review of an application's contract. It binds the generated
+  contract to the library Authority as the application does and writes a
+  canonical packet, schema `zeno-fcis/contract-review/1`, byte-identical on
+  repeat: every input of a domain of at most `--max-tuples` tuples (default
+  2^20), or a documented boundary set of a larger one, each with the
+  library's class, reason, successor digest and outbox digest or refusal;
+  the agreement of those decisions with `tests/decision-examples.txt`; and
+  a fixed, versioned catalog of rule mutants (comparison flips, constants
+  moved by one, dropped guard conjuncts, swapped adjacent cases, changed
+  reasons, dropped deliveries), each regenerated and bound through the
+  library, then distinguished by a witness written as a proposed decision
+  example, refused by the generator or the library, equivalent over a fully
+  enumerated domain, or not distinguished within the boundary set. The
+  review grants no authority and changes no application file; a decision
+  that contradicts an owner example exits 1. The review is pure code in the
+  CLI crate; `Cargo.lock` and the verified core are unchanged.
+- Add `zeno-fcis contract adopt DIR --candidate C --receipt R --usage
+  preserved|new-version`: a checked candidate decision program becomes the
+  application's next contract version. The rules file records the adoption
+  (candidate and receipt SHA-256, claimed usage, and the SHA-256 of the
+  superseded version's policy) in an `adoptions` list, the candidate and
+  receipt are kept under `v2/adoptions/N/`, and the generator replays every
+  receipt, in order, against the program it re-derives from the
+  declarations, rules and earlier adoptions before it emits the last
+  candidate as the descriptor's program. `preserved` is accepted only when
+  the receipt reports equal Step usage on every input. Superseded versions
+  are emitted beside the current one (`src/v2_contract_vN.rs`,
+  `v2/policy_vN.zcve`) and kept exactly: generation refuses any later edit
+  that would change one, an adoption that leaves the program unchanged, and
+  a lineage that would repeat a version. Every generated contract states
+  `VERSION` and offers `with_lineage`, the checked catalogs of all its
+  versions; a contract with adoptions also states `ADOPTION_RECEIPTS` and
+  passes them with the catalogs. The eight templates, which have no
+  adoptions, are byte-identical. The withdrawal-queue 106-to-100 node
+  candidate is adopted as version 2 in a committed fixture. A refusal writes
+  nothing, and running an interrupted adoption again finishes it.
+- Add `zeno-fcis contract refresh-receipts DIR`: after a change of the
+  transform checker's semantics version, every adoption is checked again
+  under its receipt's limits and each receipt rebound to the current
+  checker. It refuses, writing nothing, when anything but the checker
+  identity would change, and every new receipt must replay.
+- Add checked contract upgrades to the SQLite v2 shell. Schema v10 adds a
+  `v2_upgrades` table of chained records. `v2::Lineage::bind(catalogs,
+  receipts)` binds an application's lineage, and `Lineage::open` returns
+  typed handles: a v9 store, which only `migrate`s; a current v10 store; or a
+  superseded one, which can be audited, read, or upgraded with
+  `Superseded::upgrade`, which consumes it and returns the current handle.
+  After a full audit the pure `v2::upgrade::decide` requires equal canonical
+  state schema bytes and differing identities, and admits the state in one
+  of two record kinds. A `program-successor` is admitted at any state only
+  when the shell establishes all five premises of the plan's program
+  succession, under which the two versions reach the same states (see the
+  entry on upgrade admission above). A
+  `genesis-admission` covers other contracts and needs the new contract's
+  genesis evaluation to admit the current state, which law 990 confines to
+  the declared genesis state. Each segment replays under the Authority that
+  published it; `open` keeps working for stores that never upgraded. Pending
+  deliveries keep their certificate-bound IDs and order across an upgrade.
+  A v9 store is refused until the explicit migration, which adds the table
+  after a complete audit; every other mismatch refuses and writes nothing,
+  and no open creates a missing file. `Snapshot::upgrades` counts the
+  records. Applications built from a contract gain `--audit` at any version,
+  `--upgrade`, `--deliver`, `--migrate` and `--decide`. The `zeno-fcis`
+  binary does not open stores.
+- Add `zeno-fcis transform check --original P --candidate C [--receipt OUT]`
+  and `zeno-fcis transform replay --receipt R --original P --candidate C`.
+  Both programs must pass the library importer's full admission and have the
+  same input and output ABI. Each tuple of the declared input domain then
+  runs through the library's verified metered evaluator at a full Step
+  budget that no admitted program can exhaust. `check` reports one of three
+  outcomes:
+  - an equivalence, only when every tuple gives identical outputs or
+    identical failures and the declared Step limit never binds. It writes a
+    canonical receipt binding both programs, the domain, the limits, the
+    counts, the Step usage and the checker identity: the checker's semantics
+    version, `zeno-fcis/transform-check/1`, which committed known answers
+    pin, and the library's evaluator digest. A new crate version or a
+    refactor of the checker changes no receipt. Step usage is always
+    reported, never compared;
+  - the first differing tuple as a counterexample, with no receipt;
+  - inconclusive, when the domain exceeds the cap (default 10^8 tuples) or
+    the Step limit binds.
+
+  `replay` re-runs the check and accepts only a byte-identical receipt. A
+  receipt proves equivalence only over the declared domain, under eager
+  semantics. It grants no application or publication authority. The checker
+  is pure code in the CLI crate; `Cargo.lock` and the verified core are
+  unchanged.
+- Add `zeno-fcis generate contract <dir> [--check]`. An application's
+  `project.zeno` and reviewed `v2/policy.json` generate `v2/schema.zcve`,
+  `src/v2_contract.rs` and `v2/policy.zcve`. Generation is pure functions in
+  the CLI crate, which already depends on everything it needs, so
+  `Cargo.lock`, part of the approved evaluator source closure, is unchanged;
+  the command itself only reads and writes files. The policy bytes come from
+  `v2_authority::policy_bytes`, and the library's catalog binding, including
+  its exact canonical-schema check, must accept them before anything is
+  written. All eight templates regenerate byte for byte. This replaces
+  `tools/check_template_contracts_v2.py`, its test, and the ignored
+  `emit_library_policy_artifacts` test; a non-ignored test recomputes every
+  template's policy bytes from its compiled source. Every generated contract
+  states its genesis state as `GENESIS`. An invalid contract writes nothing;
+  for the rules the generator checks itself, the error names the file and
+  entry at fault.
+- Add `zeno-fcis new DIR --contract CONTRACT`: an application built from
+  `project.zeno`, `v2/policy.json` and optional decision examples alone, with
+  source shared by every such application and no decision or law code; its
+  tests check each example against the library Authority and run the
+  examples as one SQLite session from genesis. `examples/dual-approval` is
+  the first such contract.
 - Share the V2 genesis and transition outcome/publication types while retaining
   the invoked kind through evaluation, publication and replay contracts.
   The SQLite adapter refuses genuine publications used for the wrong invocation

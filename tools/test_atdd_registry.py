@@ -385,7 +385,7 @@ class RepairedRegistryTests(unittest.TestCase):
         inventory = sorted(re.findall(r"#\[test\]\s*(?:#\[ignore[^\n]*\n\s*)?fn (\w+)\(", rust))
         self.assertEqual(len(inventory), 32)
         inventories = {target: inventory}
-        ignored = {target: ["emit_library_policy_artifacts"]}
+        ignored = {target: []}
         arguments = miri_exclusions.miri_test_arguments(remainder)
 
         def coverage(row=remainder, workflow=source, args=None, names=inventories, skip=True, ignore=ignored):
@@ -439,13 +439,16 @@ class RepairedRegistryTests(unittest.TestCase):
         self.assertNotEqual(discarding, source)
         with self.assertRaisesRegex(AssertionError, "template Miri remainder must run"):
             coverage(workflow=discarding)
-        for names in ([n for n in inventory if n != TEMPLATE_PROFILE_TESTS[0]], inventory + ["invented_test"]):
+        for names in ([n for n in inventory if n != TEMPLATE_PROFILE_TESTS[0]],
+                      [n for n in inventory if n != "compiled_contracts_reproduce_their_committed_policy_bytes"],
+                      inventory + ["invented_test"]):
             for row in (remainder, exact[1]):
                 with self.assertRaisesRegex(AssertionError, "template semantic inventory differs"):
                     coverage(row, names={target: names})
         for row in (remainder, exact[1]):
-            with self.assertRaisesRegex(AssertionError, "must not be ignored"):
-                coverage(row, ignore={target: ["emit_library_policy_artifacts", TEMPLATE_PROFILE_TESTS[0]]})
+            for ignored_name in (TEMPLATE_PROFILE_TESTS[0], "compiled_contracts_reproduce_their_committed_policy_bytes"):
+                with self.assertRaisesRegex(AssertionError, "must not be ignored"):
+                    coverage(row, ignore={target: [ignored_name]})
 
         # Planted source controls for the pinned counts, signatures, values,
         # boundaries and bounded cases.
@@ -495,6 +498,14 @@ class RepairedRegistryTests(unittest.TestCase):
         self.assertTrue(any("finite::execution_v2::catalog::tests::" in c for c in commands))
         self.assertTrue(any("finite::execution_v2::continuation::tests::" in c
                             for c in atdd.SCENARIOS["bounded-completion"].commands))
+
+
+    def test_the_app_journey_runs_its_own_tests_before_the_journey(self):
+        commands = atdd.SCENARIOS["app-journey"].commands
+        self.assertEqual(commands, (("python3", "tools/test_check_app_journey.py"),
+                                    ("python3", "tools/check_app_journey.py")))
+        for command in commands:
+            self.assertTrue((atdd.ROOT / command[1]).is_file(), command)
 
 
 if __name__ == "__main__":

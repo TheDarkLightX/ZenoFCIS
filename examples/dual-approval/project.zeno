@@ -1,0 +1,42 @@
+zeno 1;
+project 1 dual_approval;
+namespace 2 core;
+// A payment request is released only after two different officers approve it.
+type 100 state Request;
+type 101 command RequestCommand;
+type 102 context Caller;
+type 103 destination ReleaseDesk;
+type 104 payload Release;
+type 105 data Status;
+type 106 data Officer;
+field 110 100 status 105;
+field 111 100 first_approval 106;
+field 112 100 second_approval 106;
+field 120 102 officer 106;
+field 130 104 approved_by 106;
+field 131 104 first_approved_by 106;
+variant 140 101 Approve none;
+variant 141 101 Cancel none;
+variant 150 105 Pending none;
+variant 151 105 Approved none;
+variant 152 105 Cancelled none;
+variant 160 106 Nobody none;
+variant 161 106 Alice none;
+variant 162 106 Bob none;
+variant 163 106 Carol none;
+reason 200 closed precedence 0;
+reason 201 unknown_officer precedence 1;
+reason 202 cancelled precedence 2;
+reason 203 same_officer precedence 3;
+channel 300 release destination 103 payload 104;
+component 400 approvals {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 two_officers_approve on commit, genesis = post.100.110 == 151 -> post.100.111 != 160 && post.100.112 != 160 && post.100.111 != post.100.112;
+law 501 an_approval_records_its_officer on accept = pre.100.110 == 150 && post.100.110 != 152 && (post.100.111 == context.102.120 || post.100.112 == context.102.120);
+law 502 a_cancel_closes_the_request on failure = command.101 == 141 && post.100.110 == 152 && post.100.111 == pre.100.111 && post.100.112 == pre.100.112;

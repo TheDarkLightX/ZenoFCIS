@@ -1,5 +1,11 @@
 # ZenoFCIS 2.1: high assurance software factory roadmap
 
+> **Superseded on 2026-10-05** by [the 2.1 and 2.2 plan](V2_1_V2_2_PLAN.md),
+> which is the plan of record. This earlier roadmap is kept for its design
+> notes and research. For example, section 6 on transform and optimization
+> with independent equivalence checks is cited by the `rust-typestate-newtype`
+> skill. Where the two documents differ, the new plan governs.
+
 Status: planned; updated 2026-10-04. Track 6 now has application-derived native
 optimization evidence, recorded below; the product feature remains planned.
 

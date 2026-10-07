@@ -1,0 +1,80 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "spend-approval",
+  "roots": {"state": 100, "command": 101, "context": 102},
+  "leaf_bindings": {
+    "103": ["Text", 1, 32],
+    "108": ["Bool"]
+  },
+  "variables": {
+    "status": "pre.100.120",
+    "tier": "pre.100.121",
+    "cfo_ok": "pre.100.122",
+    "ceo_ok": "pre.100.123",
+    "action": "command.101.130",
+    "requested": "command.101.131",
+    "role": "context.102.140",
+    "board": "context.102.141",
+    "within_limit": "context.102.142"
+  },
+  "cases": [
+    {"rule": "only staff can act", "when": "role == 160",
+     "class": "Reject", "reason": 200, "post": {}, "outbox": []},
+
+    {"rule": "create: only an empty request", "when": "action == 170 && status != 150",
+     "class": "Reject", "reason": 201, "post": {}, "outbox": []},
+    {"rule": "create: only the clerk", "when": "action == 170 && role != 161",
+     "class": "Reject", "reason": 202, "post": {}, "outbox": []},
+    {"rule": "create: the clerk opens the request at its tier", "when": "action == 170",
+     "class": "Accept", "reason": null,
+     "post": {"120": 151, "121": "requested", "122": false, "123": false}, "outbox": []},
+
+    {"rule": "approve: only a pending request", "when": "action == 171 && status != 151",
+     "class": "Reject", "reason": 201, "post": {}, "outbox": []},
+    {"rule": "approve: only an officer", "when": "action == 171 && role == 161",
+     "class": "Reject", "reason": 202, "post": {}, "outbox": []},
+    {"rule": "approve: once per officer", "when": "action == 171 && ((role == 162 && cfo_ok) || (role == 163 && ceo_ok))",
+     "class": "Reject", "reason": 203, "post": {}, "outbox": []},
+    {"rule": "approve: tier 0 needs no approval", "when": "action == 171 && tier == 0",
+     "class": "Reject", "reason": 204, "post": {}, "outbox": []},
+    {"rule": "approve: the CFO approves", "when": "action == 171 && role == 162",
+     "class": "Accept", "reason": null,
+     "post": {"120": 151, "121": "tier", "122": true, "123": "ceo_ok"}, "outbox": []},
+    {"rule": "approve: the CEO approves", "when": "action == 171",
+     "class": "Accept", "reason": null,
+     "post": {"120": 151, "121": "tier", "122": "cfo_ok", "123": true}, "outbox": []},
+
+    {"rule": "execute: only a pending request", "when": "action == 172 && status != 151",
+     "class": "Reject", "reason": 201, "post": {}, "outbox": []},
+    {"rule": "execute: only the clerk", "when": "action == 172 && role != 161",
+     "class": "Reject", "reason": 202, "post": {}, "outbox": []},
+    {"rule": "execute: tier 1 and above need the CFO", "when": "action == 172 && tier >= 1 && !cfo_ok",
+     "class": "Reject", "reason": 205, "post": {}, "outbox": []},
+    {"rule": "execute: tier 2 and above need the CEO", "when": "action == 172 && tier >= 2 && !ceo_ok",
+     "class": "Reject", "reason": 206, "post": {}, "outbox": []},
+    {"rule": "execute: tier 3 needs a board resolution", "when": "action == 172 && tier == 3 && !board",
+     "class": "Reject", "reason": 207, "post": {}, "outbox": []},
+    {"rule": "execute: over the daily limit, the request is blocked and risk is alerted", "when": "action == 172 && !within_limit",
+     "class": "CommittedFailure", "reason": 208,
+     "post": {"120": 154, "121": "tier", "122": "cfo_ok", "123": "ceo_ok"},
+     "outbox": [{"ordinal": 0, "channel": 301, "destination": "risk-desk", "payload": {"146": "tier"}, "idempotency_ordinal": 0}]},
+    {"rule": "execute: the payment is sent", "when": "action == 172",
+     "class": "Accept", "reason": null,
+     "post": {"120": 152, "121": "tier", "122": "cfo_ok", "123": "ceo_ok"},
+     "outbox": [{"ordinal": 0, "channel": 300, "destination": "bank", "payload": {"145": "tier"}, "idempotency_ordinal": 0}]},
+
+    {"rule": "cancel: only a pending request", "when": "status != 151",
+     "class": "Reject", "reason": 201, "post": {}, "outbox": []},
+    {"rule": "cancel: any staff member cancels a pending request", "when": "true",
+     "class": "Accept", "reason": null,
+     "post": {"120": 153, "121": "tier", "122": "cfo_ok", "123": "ceo_ok"}, "outbox": []}
+  ],
+  "genesis": {"120": 150, "121": 0, "122": false, "123": false},
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "CommittedFailureEffects",
+    "503": "AssetConservation"
+  },
+  "framework_reject_law": 509
+}

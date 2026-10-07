@@ -101,6 +101,57 @@ class ExampleApplicationTests(unittest.TestCase):
                                 template, Path("app"), Path("work"), {}, "1.1.0", {}, ["cli"])
 
 
+class ContractApplicationTests(unittest.TestCase):
+    def test_contract_sessions_and_example_counts_are_compared(self):
+        for name, expected in application.CONTRACT_EXAMPLES.items():
+            with self.subTest(contract=name):
+                log = f"decision examples checked: {expected['examples']}\n"
+                passed = {"status": "passed", "demonstration": json.dumps(expected["summary"])}
+                with mock.patch.object(application, "exercise_rust_application", return_value=(passed, log)):
+                    result = application.exercise_contract_application(
+                        name, Path("app"), Path("work"), {}, "1.1.0", {})
+                self.assertEqual(result["contract"], name)
+                for key in expected["summary"]:
+                    changed = {"status": "passed",
+                               "demonstration": json.dumps({**expected["summary"], key: "different"})}
+                    with mock.patch.object(application, "exercise_rust_application",
+                                           return_value=(changed, log)):
+                        with self.assertRaisesRegex(RuntimeError, "session differs"):
+                            application.exercise_contract_application(
+                                name, Path("app"), Path("work"), {}, "1.1.0", {})
+                with mock.patch.object(application, "exercise_rust_application",
+                                       return_value=(passed, "decision examples checked: 0\n")):
+                    with self.assertRaisesRegex(RuntimeError, "not all checked"):
+                        application.exercise_contract_application(
+                            name, Path("app"), Path("work"), {}, "1.1.0", {})
+
+    def test_single_threaded_libtest_prefix_is_normalized_but_counts_stay_exact(self):
+        prefix = "test every_example_is_the_authority_decision ... "
+        for name, expected in application.CONTRACT_EXAMPLES.items():
+            count = expected["examples"]
+            passed = {"status": "passed", "demonstration": json.dumps(expected["summary"])}
+            # Actual hosted/ATDD shape: the marker follows libtest's test-name prefix.
+            accepted = f"running 4 tests\n{prefix}decision examples checked: {count}\nok\n"
+            refused = {
+                "absent": "running 4 tests\ntest result: ok.\n",
+                "other marker only": f"{prefix}decision example forms read alike: {count}\n",
+                "wrong count": f"{prefix}decision examples checked: {count - 1}\n",
+                "malformed count": f"{prefix}decision examples checked: {count}x\n",
+                "embedded mid-line": f"note decision examples checked: {count}\n",
+                "duplicate": f"{prefix}decision examples checked: {count}\ndecision examples checked: {count}\n",
+                "malformed beside correct": f"{prefix}decision examples checked: \ndecision examples checked: {count}\n",
+            }
+            with self.subTest(contract=name, case="prefixed"), \
+                    mock.patch.object(application, "exercise_rust_application", return_value=(passed, accepted)):
+                self.assertEqual(application.exercise_contract_application(
+                    name, Path("app"), Path("work"), {}, "1.1.0", {})["contract"], name)
+            for label, log in refused.items():
+                with self.subTest(contract=name, case=label), \
+                        mock.patch.object(application, "exercise_rust_application", return_value=(passed, log)), \
+                        self.assertRaisesRegex(RuntimeError, "not all checked"):
+                    application.exercise_contract_application(name, Path("app"), Path("work"), {}, "1.1.0", {})
+
+
 class OrbitControllerCheckTests(unittest.TestCase):
     def completed(self, returncode, record):
         return subprocess.CompletedProcess(args=[], returncode=returncode,
@@ -320,6 +371,86 @@ class DependencyAdmissionTests(unittest.TestCase):
             application.bind_generated_dependencies(manifest, packages, "1.0.0-rc.3")
             patched = rc_package.load_toml(manifest)["patch"]["crates-io"]
             self.assertEqual(patched, {name: {"path": str(path)} for name, path in packages.items()})
+
+
+class GeneratedBindingTests(unittest.TestCase):
+    """The binding `zeno-fcis new` writes, as the gate admits it."""
+
+    def tree(self, root: Path) -> dict[str, Path]:
+        packages = {}
+        for name, dependencies in (("zeno-fcis-core", ""),
+                                   ("zeno-fcis-value", ""),
+                                   ("zeno-fcis-shell", 'zeno-fcis-core = "=1.1.0"\n'),
+                                   ("zeno-fcis-tests-only", "")):
+            packages[name] = root / "crates" / name
+            packages[name].mkdir(parents=True)
+            (packages[name] / "Cargo.toml").write_text(
+                f'[package]\nname = "{name}"\nversion = "1.1.0"\n[dependencies]\n{dependencies}'
+                '[dev-dependencies]\nzeno-fcis-tests-only = "=1.1.0"\n')
+        (root / "Cargo.lock").write_text("version = 4\n")
+        (root / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        return packages
+
+    def bound(self, root: Path, packages: dict[str, Path]) -> Path:
+        app = root / "app"
+        app.mkdir()
+        section = "".join(f'{name} = {{ path = {json.dumps(str(packages[name]))} }}\n'
+                          for name in ("zeno-fcis-core", "zeno-fcis-shell"))
+        (app / "Cargo.toml").write_text(
+            '[package]\nname = "app"\nversion = "0.0.0"\n[dependencies]\n'
+            'zeno-fcis-shell = "=1.1.0"\n\n[patch.crates-io]\n' + section)
+        (app / "Cargo.lock").write_text("version = 4\n")
+        (app / "rust-toolchain.toml").write_text('[toolchain]\nchannel = "1.97.1"\n')
+        return app
+
+    def test_the_needed_closure_with_the_tree_lock_and_toolchain_is_admitted(self):
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-binding-") as directory:
+            root = Path(directory)
+            packages = self.tree(root)
+            app = self.bound(root, packages)
+            result = application.check_generated_binding(app, packages, "1.1.0")
+            self.assertEqual(result["packages"], ["zeno-fcis-core", "zeno-fcis-shell"])
+            # Binding is for a manifest no generator bound, such as the V1 consumer's.
+            manifest = (app / "Cargo.toml").read_text()
+            with self.assertRaisesRegex(RuntimeError, "already contains a resolver override"):
+                application.bind_generated_dependencies(app / "Cargo.toml", packages, "1.1.0")
+            self.assertEqual((app / "Cargo.toml").read_text(), manifest)
+
+    def test_every_other_binding_is_refused(self):
+        def missing(app: Path) -> None:
+            text = (app / "Cargo.toml").read_text()
+            (app / "Cargo.toml").write_text(text.split("\n[patch.crates-io]\n")[0])
+
+        def extra(app: Path) -> None:
+            with (app / "Cargo.toml").open("a") as manifest:
+                manifest.write('zeno-fcis-value = { path = "/elsewhere" }\n')
+
+        def moved(app: Path) -> None:
+            text = (app / "Cargo.toml").read_text()
+            (app / "Cargo.toml").write_text(text.replace("crates/zeno-fcis-core", "crates/other"))
+
+        def stale_lock(app: Path) -> None:
+            (app / "Cargo.lock").write_text("version = 3\n")
+
+        def no_toolchain(app: Path) -> None:
+            (app / "rust-toolchain.toml").unlink()
+
+        def replaced(app: Path) -> None:
+            text = (app / "Cargo.toml").read_text()
+            (app / "Cargo.toml").write_text(
+                text.replace("[dependencies]", '[replace]\n"x:1.0.0" = { path = "/x" }\n[dependencies]'))
+
+        for change, message in ((missing, "no single"), (extra, "differs"), (moved, "differs"),
+                                (stale_lock, "Cargo.lock"), (no_toolchain, "rust-toolchain"),
+                                (replaced, "another resolver override")):
+            with self.subTest(change=change.__name__), \
+                    tempfile.TemporaryDirectory(prefix="zeno-fcis-binding-") as directory:
+                root = Path(directory)
+                packages = self.tree(root)
+                app = self.bound(root, packages)
+                change(app)
+                with self.assertRaisesRegex(RuntimeError, message):
+                    application.check_generated_binding(app, packages, "1.1.0")
 
 
 class PackagedStagingTests(unittest.TestCase):

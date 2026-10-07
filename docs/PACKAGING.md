@@ -48,16 +48,19 @@ runs two compilations with all features, `--locked --offline`:
    build script. Published crates therefore build from their archives alone. A
    non-test target that reads a file outside its own package fails here.
 2. **Packaged tests, repository layout.** The same unpacked archives are placed at
-   `crates/<crate>/`, and the nine verification files named in
-   `release/packaged-test-inputs.json` are copied from the exact commit. Every
+   `crates/<crate>/`, and the repository files named in
+   `release/packaged-test-inputs.json` are copied from the exact commit: nine
+   from `verification/`, and the benchmark artifacts under `docs/benchmarks/`
+   that the CLI's checker, optimizer and loop tests include. Every
    target, tests included, is compiled with `--no-run`. Rustc's dep-info then
    gives every file each target read outside its own package. Those reads must
    equal the committed manifest exactly: test target, path and SHA-256, for
-   sibling-archive files and verification files alike. Any non-test target with
-   such a read fails.
+   sibling-archive files and repository files alike. Any non-test target with
+   such a read fails. Only `verification/` and `docs/benchmarks/` may hold a
+   pinned repository file.
 
 Packaged tests are not standalone. They compile only from the published
-archives laid out as in the repository, plus those nine verification files. A
+archives laid out as in the repository, plus those pinned repository files. A
 crate's tests cannot be compiled from its own archive, or from crates.io. The
 whole-repository source archive is what runs every test. Two frozen, pinned
 references force this allowance:
@@ -72,7 +75,11 @@ Open item: restore standalone packaged tests when the verified sources next
 change. That change is the identity regeneration planned for the 2.1.0 release.
 The same run builds both declared binaries in release mode,
 generates warning-denied rustdoc, records the Cargo dependency graph as
-CycloneDX 1.6, and content-addresses every retained artifact.
+CycloneDX 1.6, and content-addresses every retained artifact. The binaries
+are built with `ZENO_FCIS_BUILD_TREE` empty, so `zeno-fcis` holds no build
+directory: `zeno-fcis new` from an installed binary needs `--source
+<extracted source tree>`, for example the extracted
+`source/zeno-fcis-<version>-source.tar.gz`.
 
 Before deleting the unpacked workspaces, the packager also builds its CLI in the
 archives-only layout and

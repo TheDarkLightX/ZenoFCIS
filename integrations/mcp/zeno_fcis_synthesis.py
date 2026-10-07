@@ -7,8 +7,12 @@ import shutil
 import subprocess
 from typing import Any
 
+import functools
+
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+
+from zeno_fcis_transform import TOOLS as TRANSFORM_TOOLS, TransformToolError
 
 
 mcp = MCPServer("ZenoFCIS synthesis")
@@ -157,6 +161,23 @@ def synthesize_finite_core(problem_path: str, output_path: str, target: str = "r
 def verify_finite_core(problem_path: str, output_path: str, target: str = "rust") -> dict[str, Any]:
     """Rebuild and execute the exact generated target on every admitted input."""
     return _invoke("verify", problem_path, output_path, target, False)
+
+
+def _transform_tool(handler):
+    """Register a transform-loop handler; its refusals become MCP tool errors."""
+    @functools.wraps(handler)
+    def tool(*arguments, **keywords):
+        try:
+            return handler(*arguments, **keywords)
+        except TransformToolError as error:
+            raise ToolError(str(error)) from error
+    return mcp.tool()(tool)
+
+
+# transform_request, transform_candidate and transform_replay drive the bounded
+# optimization loop (`zeno-fcis loop`); see docs/LLM_SYNTHESIS.md.
+for _handler in TRANSFORM_TOOLS:
+    _transform_tool(_handler)
 
 
 if __name__ == "__main__":

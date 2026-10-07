@@ -2,6 +2,84 @@
   "format": "zeno-fcis/packaged-test-inputs/1",
   "inputs": [
     {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "crates/zeno-fcis-shell-sqlite/src/v2/equivalence.rs",
+      "sha256": "14014af0b8772ad4dbbe9ed2ef960fcfada7c11ae3bb4dd80873d449e50b80c8"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/cases.json",
+      "sha256": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-candidate.zcve",
+      "sha256": "b76551883b1aebb553faf5e10089d92cb46df6ff94698f7e09a77a42ba50f37b"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-original.zcve",
+      "sha256": "84c7a4ecff4c9bd49dd2e3f5f5e0b63b38a0f92db3a9bfadb99df8325f8f81c5"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-padded.zcve",
+      "sha256": "f800c6048253c258289b2b5d94e8aaee76b182d07ffef4fe50cb1c698d37d257"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/current-decision-scalars-candidate.zcve",
+      "sha256": "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/current-decision-scalars-original.zcve",
+      "sha256": "21435b72cad2748bc20dbee6cc8ebf9b6e78f5a05a77c850851ccaa51e585f0c"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/current-decision-scalars-padded.zcve",
+      "sha256": "0c214b5f2b4bdcd680587bd15f1106ff98d40f49afad3aff2a1b57572e455b35"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/manifest.json",
+      "sha256": "ad7ca6f9bc55b9a07b2146d2c82e6c71336b7e711422cb59726f9e0d7f37a3d1"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/retained-controller-candidate.zcve",
+      "sha256": "f9f04c4c9cf2e62c2146903c25018ba00c25a03c60f5c50e082718afd344eb18"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/retained-controller-original.zcve",
+      "sha256": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "bin:zeno-fcis",
+      "path": "docs/benchmarks/withdrawal-queue/artifacts/retained-controller-padded.zcve",
+      "sha256": "521872eafe8ff8ac26166d13b0ef920ac0be8b4e2a304ebf5788db8445fb1ee8"
+    },
+    {
+      "package": "zeno-fcis-cli",
+      "target": "test:loop_cli",
+      "path": "docs/benchmarks/cases.json",
+      "sha256": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55"
+    },
+    {
       "package": "zeno-fcis-formal-tools",
       "target": "lib:zeno_fcis_formal_tools",
       "path": "verification/kernel-laws/src/oracle/formal_tools/lean_items.rs",
@@ -39,9 +117,27 @@
     },
     {
       "package": "zeno-fcis-shell-sqlite",
+      "target": "lib:zeno_fcis_shell_sqlite",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
+      "sha256": "f2aa16e9b29e2b81d20ad28a01ec5222c3f4340d43ca804291f9b13d39454e1d"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "lib:zeno_fcis_shell_sqlite",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/policy.zcve",
+      "sha256": "3169d8ffe59338cce7b4c0ce1701042ed671bcaf104cd6fba764007285cf6ade"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "lib:zeno_fcis_shell_sqlite",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve",
+      "sha256": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
       "target": "test:compact",
       "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
-      "sha256": "785fc052d539c60c354ade0ac093edd1a8e9a4e56bfac877e1acd4cd6221430f"
+      "sha256": "f2aa16e9b29e2b81d20ad28a01ec5222c3f4340d43ca804291f9b13d39454e1d"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -59,7 +155,7 @@
       "package": "zeno-fcis-shell-sqlite",
       "target": "test:compact",
       "path": "crates/zeno-fcis-cli/templates/prepared-counter/src/v2_contract.rs",
-      "sha256": "9f1b7ebe224c7556e18a4d5254b4ef3b8751049df73e50de859598104d812d0e"
+      "sha256": "c23109e67e9c34cfbe940e4726dd348928a05b97e2f3dd5ae8613eb625867a75"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -75,9 +171,57 @@
     },
     {
       "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
+      "sha256": "f2aa16e9b29e2b81d20ad28a01ec5222c3f4340d43ca804291f9b13d39454e1d"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/policy.zcve",
+      "sha256": "3169d8ffe59338cce7b4c0ce1701042ed671bcaf104cd6fba764007285cf6ade"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve",
+      "sha256": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs",
+      "sha256": "a6f46d19c9a745c9fb0865a0ae5dbefd3ada43899bf5a61ae6a2625211012d06"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract_v1.rs",
+      "sha256": "248086d1e4280c0af4afa22ec0361319c63d651393ac8d8af3ae1b1390efed50"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/policy.zcve",
+      "sha256": "a080dab62b09d1bdc99d4626b70b36387a333a02ddbdc1d89e40b9a56278bd6f"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/policy_v1.zcve",
+      "sha256": "be3f9e42ea9e2e41f069f81a99db1e98050a3ea3761b7a08f23949909682fb61"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:upgrade",
+      "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/schema.zcve",
+      "sha256": "8af4d95849025825fef4e8e31ed552bef1c0f438a963b82b9130abe983b3cbf2"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
       "target": "test:v2",
       "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
-      "sha256": "785fc052d539c60c354ade0ac093edd1a8e9a4e56bfac877e1acd4cd6221430f"
+      "sha256": "f2aa16e9b29e2b81d20ad28a01ec5222c3f4340d43ca804291f9b13d39454e1d"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -107,7 +251,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_abstraction",
       "path": "crates/zeno-fcis-cli/templates/account-lockout/src/v2_contract.rs",
-      "sha256": "16636946d0c76ddac8db5c95ca3c0b938cc02962ce9d8df9d9eb85d9424a717b"
+      "sha256": "98bfde63f3c5cbbf9263ad608e56f1c0e8ff1033a2800d14fd66b4b7f26abe01"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -131,7 +275,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_composition",
       "path": "crates/zeno-fcis-cli/templates/account-lockout/src/v2_contract.rs",
-      "sha256": "16636946d0c76ddac8db5c95ca3c0b938cc02962ce9d8df9d9eb85d9424a717b"
+      "sha256": "98bfde63f3c5cbbf9263ad608e56f1c0e8ff1033a2800d14fd66b4b7f26abe01"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -197,7 +341,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/account-lockout/src/v2_contract.rs",
-      "sha256": "16636946d0c76ddac8db5c95ca3c0b938cc02962ce9d8df9d9eb85d9424a717b"
+      "sha256": "98bfde63f3c5cbbf9263ad608e56f1c0e8ff1033a2800d14fd66b4b7f26abe01"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -221,7 +365,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/agent-treasury-guard/src/v2_contract.rs",
-      "sha256": "72e0662db3df4df944c86e8b13c70df68a09f183b5d90ccc132b956b9af1c8e5"
+      "sha256": "bb342057ad70a887d5c9529baaf4382c7dda7b2b496e208e1f5c841c1e7b4448"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -245,7 +389,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/compliance-gateway/src/v2_contract.rs",
-      "sha256": "045d978c5164aa5c9e6a2e04447463ecf4ab2dfafb230d01c022a77ea223b315"
+      "sha256": "fe8f9ba43cb6a1d9b925e20667be248007cd8de7aa6b0647da32426c2bbca0b3"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -263,7 +407,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs",
-      "sha256": "785fc052d539c60c354ade0ac093edd1a8e9a4e56bfac877e1acd4cd6221430f"
+      "sha256": "f2aa16e9b29e2b81d20ad28a01ec5222c3f4340d43ca804291f9b13d39454e1d"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -287,7 +431,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/inventory-reservation/src/v2_contract.rs",
-      "sha256": "929eacff96d8c5f5b5ffd95ef28283948db3b32c7f272eca196c2da8174c4ab5"
+      "sha256": "94f6c30bef7b35c304678442645fb747aaad90f9b3ea2760dc6b18af4ac24f21"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -311,7 +455,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/order-fulfillment/src/v2_contract.rs",
-      "sha256": "9cebc40b247f55e481365f05ce1b17e2c2ec79d4544f1fb5f6428e5dfa0cc2e0"
+      "sha256": "786373b8572d770fae4c13e22e699a36ab2d906d53127aad4d27597f4f5de99d"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -335,7 +479,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/prepared-counter/src/v2_contract.rs",
-      "sha256": "9f1b7ebe224c7556e18a4d5254b4ef3b8751049df73e50de859598104d812d0e"
+      "sha256": "c23109e67e9c34cfbe940e4726dd348928a05b97e2f3dd5ae8613eb625867a75"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -353,7 +497,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_template_contracts",
       "path": "crates/zeno-fcis-cli/templates/withdrawal-queue/src/v2_contract.rs",
-      "sha256": "ab55edf809971aedf296c0c438738c87a1875ca214f785b8914dbaf5eb7c2d99"
+      "sha256": "fb0c233ceb32f79ed15bf249f8bfd859a3781086669c126eb17a3ccf809c7bcc"
     },
     {
       "package": "zeno-fcis-synthesis",

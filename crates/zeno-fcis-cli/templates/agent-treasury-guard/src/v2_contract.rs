@@ -1,5 +1,5 @@
 // Generated declarative data. Review v2/policy.json and project.zeno.
-// Regenerate/check with tools/check_template_contracts_v2.py; no runtime mapper.
+// Regenerate or check with `zeno-fcis generate contract`; no runtime mapper.
 extern crate alloc;
 use alloc::{vec, vec::Vec};
 use zeno_fcis_synthesis::finite::{Domain as ScalarDomain, Op, V2ScalarProgram};
@@ -344,6 +344,40 @@ pub const FRAMING: c::Framing = c::Framing {
 };
 /// Exact channel to original destination and payload type links.
 pub const CHANNEL_ROOTS: &[(u32, u32, u32)] = &[(300, 103, 104)];
+/// The genesis state law 990 requires, field by field.
+pub const GENESIS: &[c::Field<'static>] = &[
+    c::Field {
+        id: 130,
+        value: c::Atom::I128(6),
+    },
+    c::Field {
+        id: 131,
+        value: c::Atom::I128(1),
+    },
+    c::Field {
+        id: 132,
+        value: c::Atom::I128(0),
+    },
+    c::Field {
+        id: 133,
+        value: c::Atom::I128(0),
+    },
+    c::Field {
+        id: 134,
+        value: c::Atom::Sum {
+            type_id: 109,
+            variant: 170,
+        },
+    },
+    c::Field {
+        id: 135,
+        value: c::Atom::I128(0),
+    },
+    c::Field {
+        id: 136,
+        value: c::Atom::I128(0),
+    },
+];
 /// Complete ordered decisions selected only by actual graph output.
 pub const BRANCHES: &[c::Branch<'static>] = &[
     c::Branch {
@@ -2858,4 +2892,17 @@ pub fn checked_authority<'a>(
 ) -> Result<authority::Authority<'a>, BindFailure> {
     let catalog = checked_catalog(descriptor).map_err(BindFailure::Catalog)?;
     authority::bind(&catalog).map_err(BindFailure::Authority)
+}
+/// Position in this application's contract lineage: 1 before any adoption.
+pub const VERSION: u32 = 1;
+/// Every contract version's checked catalog, oldest first and this one last,
+/// for a store upgrade or a lineage open. Each binding checks that version's
+/// complete retained schema and policy bytes.
+pub fn with_lineage<R>(
+    f: impl FnOnce(&[&catalog::BoundCatalog<'_>]) -> R,
+) -> Result<R, catalog::Failure> {
+    let contract = Contract::new();
+    let descriptor = contract.descriptor();
+    let catalog = checked_catalog(&descriptor)?;
+    Ok(f(&[&catalog]))
 }

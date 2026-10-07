@@ -8,8 +8,10 @@ In order:
    reviewed lock (the site's lock names the same external packages); then
    `cargo +1.97.1 build -p zeno-fcis-cli`, then `zeno-fcis new
    site/apps/<template> --template <template>` for every template, so that
-   the page runs each template exactly as the CLI ships it. An application
-   whose files are unchanged is kept as it is.
+   the page runs each template exactly as the CLI ships it. The binding to
+   this checkout that `new` writes is checked, then left out, since the site's
+   own workspace resolves the applications' pins. An application whose files
+   are unchanged is kept as it is.
 2. lock: site/Cargo.lock. Every external package must carry the identity the
    workspace lock reviewed, and every local package must be this checkout's.
    `--relock` regenerates the lock from the workspace lock first.
@@ -97,12 +99,28 @@ def build_cli(environment: dict[str, str]) -> Path:
     return target_dir(environment) / "debug" / "zeno-fcis"
 
 
+def unbind(application: Path) -> None:
+    """Removes the dependency binding `zeno-fcis new` writes, after the gate has
+    checked it. The site's workspace resolves each application's pins with its
+    own `[patch.crates-io]` table and lock instead."""
+    manifest = application / "Cargo.toml"
+    manifest.write_text(manifest.read_text().split("\n[patch.crates-io]\n", 1)[0])
+    for name in ("Cargo.lock", "rust-toolchain.toml"):
+        (application / name).unlink(missing_ok=True)
+
+
 def generate_application(executable: Path, template: str, environment: dict[str, str]) -> None:
-    """Writes the template as the CLI ships it. Unchanged files keep their timestamps."""
+    """Writes the template as the CLI ships it, without the binding to this
+    checkout. Unchanged files keep their timestamps."""
     destination = app(template)
     with tempfile.TemporaryDirectory(prefix="zeno-fcis-site-") as directory:
         fresh = Path(directory) / template
         run([str(executable), "new", str(fresh), "--template", template], ROOT, environment)
+        packages = {tomllib.loads(manifest.read_text())["package"]["name"]: manifest.parent
+                    for manifest in sorted((ROOT / "crates").glob("*/Cargo.toml"))}
+        version = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"]["package"]["version"]
+        gate.check_generated_binding(fresh, packages, version)
+        unbind(fresh)
         source = ROOT / "crates" / "zeno-fcis-cli" / "templates" / template
         expected = gate.generated_file_manifest(source)
         for entry in expected:

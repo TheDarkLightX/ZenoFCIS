@@ -416,7 +416,7 @@ observed; long JSON is reduced to the fields named.
    checks the base case, the observer, and the law manifest, which the
    library's guide to inductive claims requires.
 
-8. **Test the application.** `cargo +1.97.1 test --locked` runs the tests
+8. **Test the application.** `cargo +1.97.1 test --offline` runs the tests
    listed under [What is checked](#what-is-checked). The library's gate,
    `python3 tools/check_generated_application.py`, repeats steps 4, 5, and 8
    on a fresh copy, with a separate Python evaluation of `rules.txt` as the
@@ -467,15 +467,21 @@ python3 tools/check_generated_application.py
 
 That gate creates a fresh application using the CLI, checks its synthesis in
 Rust, Python, and JavaScript against a separate evaluation of `rules.txt`,
-patches its dependencies to the exact checkout, checks dependency versions
-against the workspace lock, then compiles and runs its tests and demonstration
-as an isolated package. With these development dependencies available in a
-standalone checkout:
+checks the dependency binding `zeno-fcis new` wrote to the exact checkout,
+checks dependency versions against the workspace lock, then compiles and runs
+its tests and demonstration as an isolated package.
+`zeno-fcis new` binds the application to a ZenoFCIS source tree, the one it
+was built from or the one `--source` names: `Cargo.toml` ends with a
+`[patch.crates-io]` section, and the tree's `Cargo.lock` and
+`rust-toolchain.toml` are copied. From the application's directory:
 
 ```sh
-cargo +1.97.1 test --locked
-cargo +1.97.1 run --locked -- new-gateway.sqlite
+cargo +1.97.1 test --offline
+cargo +1.97.1 run --offline -- new-gateway.sqlite
 ```
+
+The first build adds the application to its lock, so `--locked` works only
+after it.
 
 The SQLite shell is the `sqlite` feature, on by default. Without it,
 `cargo +1.97.1 build --no-default-features` builds the core alone: the

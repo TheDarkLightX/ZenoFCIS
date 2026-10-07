@@ -875,7 +875,7 @@ def binary_artifact_inventory(
                 "archive": archive_name,
                 "prefix": stem,
                 "command": (
-                    "cargo +1.97.1 build --release --locked "
+                    "ZENO_FCIS_BUILD_TREE= cargo +1.97.1 build --release --locked "
                     f"-p {package_name} --bin {target_name}"
                 ),
             }
@@ -1130,8 +1130,10 @@ def compiler_flag_evidence(environment: dict[str, str], source: Path, label: str
 PACKAGED_TEST_INPUTS_PATH = ROOT / "release" / "packaged-test-inputs.json"
 PACKAGED_TEST_INPUTS_FORMAT = "zeno-fcis/packaged-test-inputs/1"
 # Test inputs that are not in any published archive. They are copied from the
-# exact commit and must also appear, with their SHA-256, in the manifest.
-REPOSITORY_INPUT_PREFIX = "verification/"
+# exact commit and must also appear, with their SHA-256, in the manifest. Only
+# these repository folders may hold them: the verification workspace, and the
+# benchmark artifacts that the CLI's checker, optimizer and loop tests read.
+REPOSITORY_INPUT_PREFIXES = ("verification/", "docs/benchmarks/")
 CONSUMER_TARGET_ARGUMENTS = ("--workspace", "--lib", "--bins", "--examples", "--all-features")
 PACKAGED_TEST_ARGUMENTS = ("--workspace", "--all-targets", "--all-features")
 
@@ -1158,7 +1160,8 @@ def load_packaged_test_inputs(path: Path = PACKAGED_TEST_INPUTS_PATH) -> list[di
             relative.is_absolute()
             or ".." in relative.parts
             or relative.as_posix() != entry["path"]
-            or relative.parts[0] not in ("crates", REPOSITORY_INPUT_PREFIX.rstrip("/"))
+            or not (relative.parts[0] == "crates"
+                    or entry["path"].startswith(REPOSITORY_INPUT_PREFIXES))
             or re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]) is None
         ):
             raise RcError(f"{path.name}: invalid input entry {entry['path']}")
@@ -1190,7 +1193,7 @@ def stage_repository_inputs(
 
     staged = []
     for path, digest in sorted({(entry["path"], entry["sha256"]) for entry in entries}):
-        if not path.startswith(REPOSITORY_INPUT_PREFIX):
+        if not path.startswith(REPOSITORY_INPUT_PREFIXES):
             continue
         data = read_blob(path)
         if hashlib.sha256(data).hexdigest() != digest:
@@ -1623,6 +1626,8 @@ def build(output: Path) -> None:
     host = host_lines[0]
     host_targets = {host}
     binary_inventory = binary_artifact_inventory(configured, version, host)
+    # A released `zeno-fcis` records no build directory; `new` then needs `--source`.
+    build_environment["ZENO_FCIS_BUILD_TREE"] = ""
     for item in binary_inventory:
         package_name = item["package"]
         target_name = item["target"]
