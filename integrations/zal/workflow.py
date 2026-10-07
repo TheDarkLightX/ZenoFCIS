@@ -27,11 +27,12 @@ PROPOSAL_SCHEMA = {
 def _disk_checker_identity():
     """Hash the source closure used by this cooperative local prototype."""
     here = Path(__file__).resolve().parent
-    digest = hashlib.sha256(b"zal/checker/1\0")
-    for name in ["behavior.py", "workflow.py", "factory.py"]:
+    digest = hashlib.sha256(b"zal/checker/2\0")
+    for name in ["behavior.py", "workflow.py", "factory.py", "shared.py",
+                 "terminal.py", "mcp.py", "workspace.py"]:
         path = here / name
         digest.update(name.encode() + b"\0")
-        digest.update(path.read_bytes() if path.exists() else b"absent")
+        digest.update(path.read_bytes())
     return digest.hexdigest()
 
 
@@ -131,7 +132,8 @@ class Session:
         if evidence != proposal["evidence"] or evidence["status"] == "counterexample":
             raise Refusal("Current checks are stale or failed; acceptance is blocked")
         self.record("agree", "human", {"base_revision": base_revision, "candidate_revision": candidate_revision,
-                                        "canonical_paraphrase": proposal["model"].render(True)})
+                                        "canonical_paraphrase": proposal["model"].render(True),
+                                        "checker": evidence["checker"]})
         self.model = proposal["model"]
         self.evidence = evidence
         self.proposal = None
@@ -139,6 +141,20 @@ class Session:
         self.realization = "not-run"
         if self.selected not in self.objects():
             self.selected = "default"
+
+    def accept_current_human(self, revision):
+        """Explicit review of a seed/current meaning; never a model tool."""
+        if self.proposal or revision != self.model.revision:
+            raise Refusal("Review the exact current model without a pending candidate")
+        evidence = check(self.model, checker_identity())
+        if evidence["status"] == "counterexample":
+            raise Refusal("Current checks failed; acceptance is blocked")
+        self.record("agree", "human", {"base_revision": revision, "candidate_revision": revision,
+                                        "canonical_paraphrase": self.model.render(True),
+                                        "checker": evidence["checker"]})
+        self.evidence = evidence
+        self.agreement = "human-accepted"
+        self.realization = "not-run"
 
     def reject_human(self, base_revision, candidate_revision):
         if not self.proposal or base_revision != self.model.revision or candidate_revision != self.proposal["revision"]:

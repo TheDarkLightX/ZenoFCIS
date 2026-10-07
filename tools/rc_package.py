@@ -39,7 +39,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "ad0e8b30c9e142bb4f6577b671d1931c125ea62544aea0871c8791ee86dab33b"
+    "2ffb98016ee7c29d001ea981067e047a23020043f29a16005731e5215667bcba"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -146,6 +146,8 @@ def validate_developer_tooling_documents(
     dependencies = package.get("devDependencies")
     if dependencies != {"@nizos/probity": EXPECTED_PROBITY_VERSION}:
         raise RcError("package.json must pin only Probity 1.10.0 as developer tooling")
+    if package.get("overrides") != {"@modelcontextprotocol/sdk": "1.31.0"}:
+        raise RcError("package.json must pin the patched MCP SDK 1.31.0 override")
     if node_version.strip() != EXPECTED_NODE_VERSION:
         raise RcError(".node-version does not pin exact Node 22.23.1")
 
@@ -460,6 +462,23 @@ def run_self_test(configured: dict[str, object], metadata: dict[str, object]) ->
         pass
     else:
         raise RcError("self-test mutation survived: Probity version")
+
+    for changed_override in ({}, {"@modelcontextprotocol/sdk": "1.30.0"}):
+        wrong_override = copy.deepcopy(package)
+        wrong_override["overrides"] = changed_override
+        try:
+            validate_developer_tooling_documents(
+                wrong_override,
+                lock,
+                PROBITY_CONFIG_PATH.read_text(encoding="utf-8"),
+                NODE_VERSION_PATH.read_text(encoding="utf-8"),
+                require_string(configured, "version"),
+            )
+        except RcError as error:
+            if "patched MCP SDK" not in str(error):
+                raise RcError("self-test override mutation failed for an unrelated reason") from error
+        else:
+            raise RcError("self-test mutation survived: patched MCP SDK override")
 
     changed_transitive_lock = copy.deepcopy(lock)
     changed_transitive_packages = changed_transitive_lock.get("packages")

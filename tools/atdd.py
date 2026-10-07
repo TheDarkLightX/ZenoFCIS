@@ -107,6 +107,7 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Review finite behavior through deterministic language help and exact revisions",
         (("python3", "-m", "unittest", "discover", "-s", "integrations/zal", "-p", "test_*.py", "-v"),
          ("node", "integrations/zal/test_workspace.cjs"),
+         ("node", "integrations/zal/test_mcp_sdk.mjs"),
          ("python3", "integrations/zal/oracles/independent_oracle.py"),
          ("python3", "integrations/zal/oracles/formula_oracle.py"),
          ("python3", "integrations/zal/oracles/explanation_oracle.py"),

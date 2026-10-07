@@ -213,10 +213,19 @@ If I ask for a change, stage it for my separate terminal review.” The loop is:
    terminal. A command/tool permission prompt is not semantic acceptance.
 4. The harness calls `zal_read` again before continuing on the new meaning.
 
-This is a pull workflow. There are no hooks, skill installation, Channels,
+This is a pull workflow. There are no hooks, Channels,
 unsolicited model turns, change subscriptions or auto-refresh into a conversation.
 Neither the shared store nor the bridge calls a provider. The harness controls
 what it sends to its model, using its existing account and permissions.
+
+### Project addon for Codex and Claude Code
+
+The [2.3 addon guide](HARNESS_INTEGRATION.md) provides persistent project-local
+MCP entries and a shared authoring skill. Run `integrations/zal/setup.py` from a
+stable source checkout, first without `--apply` to inspect the plan. It preserves
+unrelated configuration and pending work, and refuses a differing existing ZAL
+entry or skill. The older per-invocation instructions below remain available.
+Installation does not change tool approval policies or call a model.
 
 ### Codex: per-invocation configuration
 
@@ -317,6 +326,15 @@ an instruction to avoid tools is not a physical isolation guarantee.
 Live use is separate from default offline checks. See [evidence distinctions](RESEARCH.md#integration-evidence-and-open-work).
 
 ## File-level export and actual factory qualification
+
+For the shared harness workspace, use the [reviewed export commands](HARNESS_INTEGRATION.md)
+after separate terminal acceptance. They require the current exact revision and
+checker binding, and verify every exported file. `show` followed by
+`accept-current` reviews a seed without inventing a meaning change; it refuses a
+pending proposal or an intervening event. Existing unbound approval records need
+an explicit new review. Shared-file acceptance is cooperative, not authenticated.
+
+The file-level commands below deliberately remain proposal operations.
 
 ```sh
 python3 integrations/zal/run.py diff integrations/zal/examples/order.zal /path/to/candidate.zal
