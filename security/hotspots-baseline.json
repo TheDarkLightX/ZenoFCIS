@@ -1879,42 +1879,42 @@
         "host-tool",
         "release-control"
       ],
-      "production_lines": 1518,
+      "production_lines": 1536,
       "rank": 15,
       "score": 89,
       "signals": [
         {
           "id": "ambient-context",
           "lines": [
-            603,
-            1509,
-            1535
+            622,
+            1528,
+            1554
           ]
         },
         {
           "id": "cryptographic-verification",
           "lines": [
             126,
-            620,
-            625,
-            707,
-            708,
-            1037,
-            1180,
-            1268
+            639,
+            644,
+            726,
+            727,
+            1056,
+            1199,
+            1287
           ]
         },
         {
           "id": "filesystem-mutation",
           "lines": [
-            565,
-            569,
-            570,
-            573,
-            638,
-            662,
-            663,
-            665
+            584,
+            588,
+            589,
+            592,
+            657,
+            681,
+            682,
+            684
           ]
         },
         {
@@ -1922,12 +1922,12 @@
           "lines": [
             106,
             113,
-            195,
-            196,
-            455,
-            456,
-            479,
-            480
+            197,
+            198,
+            457,
+            458,
+            473,
+            474
           ]
         },
         {
@@ -1940,18 +1940,18 @@
           "id": "json-or-line-protocol",
           "lines": [
             113,
-            222,
-            1220
+            224,
+            1239
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            710,
-            732,
-            1031,
-            1046,
-            1708
+            729,
+            751,
+            1050,
+            1065,
+            1727
           ]
         }
       ],
@@ -3610,31 +3610,31 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 245,
+      "production_lines": 262,
       "rank": 34,
       "score": 81,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            80
+            91
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
-            84
+            95
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
             15,
-            86,
-            96,
-            104,
-            267,
-            277
+            97,
+            107,
+            115,
+            284,
+            294
           ]
         }
       ],
@@ -5125,9 +5125,9 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 6226464,
+    "admitted_bytes": 6232206,
     "admitted_files": 430,
-    "inventory_sha256": "2cd30d9695e998d39f95b08736236f2d9b501016042a388e93560a9b71e3ccba",
+    "inventory_sha256": "0a15335b287497676ded7844cabbf10962cd8dd28186ed0cec5b04a42a9fd0e0",
     "ranked_above_minimum": 359,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
