@@ -121,6 +121,9 @@ Optional developer guardrails use a private npm package with exact Probity
 digest for the complete canonical lock graph. CI installs that graph with
 lifecycle scripts disabled and runs `npm audit`. It is excluded from Rust
 runtime and protocol authority.
+The development graph also pins MCP SDK `1.31.0`, the patched 1.x version for
+[GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h).
+The package override and complete canonical lock digest are checked together.
 
 Packaged-application qualification also requires the existing Rust compiler,
 Python 3, and Node.js 22 to execute the same finite synthesis contract through
@@ -257,8 +260,11 @@ of values, or undefined behaviour in the omitted cases. **Miri's UB, provenance
 and aliasing checks are lost for every omitted execution.** No claim is made
 that only values are lost while paths are preserved. The 131 retained examples
 (12, 20, 23, 20, 26 and 30 per application) still run under Miri, with genesis
-and replay, in six `retained_complete_examples_genesis_and_replay_*` tests,
-one per application. They are not
+and replay. Four applications retain their complete-example/genesis tests.
+Order-fulfillment and treasury use eleven `retained_examples_and_replay_*`
+batches of at most five examples plus two separate genesis/replay tests.
+Their exact intervals cover every original example once, and each batch
+checks its full corpus size and executed count. They are not
 drawn from these corpora and are not counted in them. The template
 remainder job checks that the exclusion step's Miri arguments skip exactly
 these four tests, and that its composed arguments keep those skips unchanged
@@ -272,8 +278,10 @@ eight graph-seed groups separately. The synthesis library runs nine tests
 each in its own group: six byte-by-byte replay and comparison tests, and the
 three tests that the hosted run of 8eda309 measured at about 101 and 26
 minutes, or still running after more than 10 minutes. The template contracts run each
-bounded-profile corpus and each application’s retained examples in separate
-groups. The earlier combined genesis-and-replay test also exceeded the
+bounded-profile corpus in a separate group. At 50e6b86, the order and treasury
+retained-example jobs also reached the 180-minute limit, so those two apps now
+use exact example batches and separate genesis jobs. Their per-case progress
+messages identify the active example without changing its assertions. The earlier combined genesis-and-replay test also exceeded the
 180-minute limit at 8eda309; these partitions retain every case and assertion. Each split
 target keeps one remainder group that skips exactly those tests and, for the
 template contracts, the four native-only tests. That job lists every group's

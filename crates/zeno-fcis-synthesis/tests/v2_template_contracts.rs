@@ -821,14 +821,35 @@ fn exercise(
         outcome(result)
     }
 }
-fn examples(index: usize, authority: &a::Authority<'_>, framing: &c::Framing) -> usize {
-    let app = &APPS[index];
-    let mut count = 0;
-    for line in app
+fn example_count(index: usize) -> usize {
+    APPS[index]
         .examples
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .count()
+}
+fn examples(index: usize, authority: &a::Authority<'_>, framing: &c::Framing) -> usize {
+    examples_range(index, authority, framing, 0, example_count(index))
+}
+fn examples_range(
+    index: usize,
+    authority: &a::Authority<'_>,
+    framing: &c::Framing,
+    start: usize,
+    end: usize,
+) -> usize {
+    let app = &APPS[index];
+    let mut count = 0;
+    assert!(start < end && end <= example_count(index));
+    for (case, line) in app
+        .examples
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .enumerate()
+        .skip(start)
+        .take(end - start)
     {
+        println!("retained {} example {}: start", app.name, case);
         let sections: Vec<_> = line.split('|').map(str::trim).collect();
         let split = sections.len() - 2;
         let all: Vec<i64> = sections[..split]
@@ -885,6 +906,10 @@ fn examples(index: usize, authority: &a::Authority<'_>, framing: &c::Framing) ->
         assert_eq!(out.subject(), replay.subject());
         exercise(index, authority, framing, &all);
         count += 1;
+        println!(
+            "retained {} example {}: checked and replayed",
+            app.name, case
+        );
     }
     count
 }
@@ -1633,31 +1658,53 @@ fn emit_library_policy_artifacts() {
     emit!(prepared, "prepared-counter");
     emit!(gateway, "compliance-gateway");
 }
-// Separate jobs retain all 131 examples and all six genesis/replay checks.
-// The previous combined test exceeded the hosted Miri job's time limit.
+// Exact groups retain all 131 examples and exactly six genesis/replay checks.
+// The two slow applications use batches of at most five unchanged examples.
+macro_rules! retained_genesis {
+    ($module:ident,$index:expr) => {{
+        println!("retained {} genesis: bind", APPS[$index].name);
+        with_app!($module, |a: &a::Authority<'_>, f: &c::Framing| {
+            let app = &APPS[$index];
+            let raw = frame(&f.state, record(app.state, app.genesis));
+            let result = a.genesis(&raw);
+            assert!(result.result().is_ok(), "{:?}", result.result());
+            assert!(
+                a.replay_genesis(&raw, result.subject().unwrap())
+                    .result()
+                    .is_ok()
+            );
+            let mut bad = app.genesis.to_vec();
+            bad[0] += 1;
+            let raw = frame(&f.state, record(app.state, &bad));
+            assert!(a.genesis(&raw).result().is_err());
+        });
+        println!(
+            "retained {} genesis: checked and replayed",
+            APPS[$index].name
+        );
+    }};
+}
 macro_rules! retained_examples_and_genesis {
     ($module:ident,$index:expr,$count:expr) => {{
+        println!("retained {} complete examples: bind", APPS[$index].name);
         let count = with_app!($module, |a, f| examples($index, a, f));
         assert_eq!(count, $count);
-            with_app!($module, |a: &a::Authority<'_>, f: &c::Framing| {
-                let app = &APPS[$index];
-                let raw = frame(&f.state, record(app.state, app.genesis));
-                let result = a.genesis(&raw);
-                assert!(result.result().is_ok(), "{:?}", result.result());
-                assert!(
-                    a.replay_genesis(&raw, result.subject().unwrap())
-                        .result()
-                        .is_ok()
-                );
-                let mut bad = app.genesis.to_vec();
-                bad[0] += 1;
-                let raw = frame(&f.state, record(app.state, &bad));
-                assert!(a.genesis(&raw).result().is_err());
-            });
+        retained_genesis!($module, $index);
         println!(
             "retained examples={}; genesis/replay=1; eight examples retain owner-review-pending provenance",
             count
         );
+    }};
+}
+macro_rules! retained_examples_batch {
+    ($module:ident,$index:expr,$total:expr,$start:expr,$end:expr) => {{
+        assert_eq!(example_count($index), $total);
+        println!(
+            "retained {} examples {}..{}: bind",
+            APPS[$index].name, $start, $end
+        );
+        let count = with_app!($module, |a, f| examples_range($index, a, f, $start, $end));
+        assert_eq!(count, $end - $start);
     }};
 }
 #[test]
@@ -1669,8 +1716,28 @@ fn retained_complete_examples_genesis_and_replay_inventory_reservation() {
     retained_examples_and_genesis!(stock, 1, 20);
 }
 #[test]
-fn retained_complete_examples_genesis_and_replay_order_fulfillment() {
-    retained_examples_and_genesis!(order, 2, 23);
+fn retained_examples_and_replay_order_fulfillment_00_04() {
+    retained_examples_batch!(order, 2, 23, 0, 5);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_05_09() {
+    retained_examples_batch!(order, 2, 23, 5, 10);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_10_14() {
+    retained_examples_batch!(order, 2, 23, 10, 15);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_15_19() {
+    retained_examples_batch!(order, 2, 23, 15, 20);
+}
+#[test]
+fn retained_examples_and_replay_order_fulfillment_20_22() {
+    retained_examples_batch!(order, 2, 23, 20, 23);
+}
+#[test]
+fn retained_genesis_and_replay_order_fulfillment() {
+    retained_genesis!(order, 2);
 }
 #[test]
 fn retained_complete_examples_genesis_and_replay_account_lockout() {
@@ -1681,8 +1748,32 @@ fn retained_complete_examples_genesis_and_replay_withdrawal_queue() {
     retained_examples_and_genesis!(vault, 4, 26);
 }
 #[test]
-fn retained_complete_examples_genesis_and_replay_agent_treasury_guard() {
-    retained_examples_and_genesis!(treasury, 5, 30);
+fn retained_examples_and_replay_agent_treasury_guard_00_04() {
+    retained_examples_batch!(treasury, 5, 30, 0, 5);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_05_09() {
+    retained_examples_batch!(treasury, 5, 30, 5, 10);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_10_14() {
+    retained_examples_batch!(treasury, 5, 30, 10, 15);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_15_19() {
+    retained_examples_batch!(treasury, 5, 30, 15, 20);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_20_24() {
+    retained_examples_batch!(treasury, 5, 30, 20, 25);
+}
+#[test]
+fn retained_examples_and_replay_agent_treasury_guard_25_29() {
+    retained_examples_batch!(treasury, 5, 30, 25, 30);
+}
+#[test]
+fn retained_genesis_and_replay_agent_treasury_guard() {
+    retained_genesis!(treasury, 5);
 }
 #[test]
 fn all_original_small_domains_and_unlawful_order_states() {
@@ -1948,7 +2039,7 @@ fn treasury_guard_arithmetic_callbacks_and_unlawful_prestates() {
 
 /// Checks one corpus's bounded profile against its pins and its pinned count.
 /// The eight profile tests below together run 92 cases: 5, 7, 11, 9, 10, 12, 22
-/// and 16. The 131 retained examples run under Miri in their six tests; they are
+/// and 16. The 131 retained examples run under Miri in their exact groups; they are
 /// not drawn from these corpora and are not counted against them.
 fn check_bounded(observed: Observation<'_>, cases: usize) {
     check_observations(std::slice::from_ref(&observed), true);

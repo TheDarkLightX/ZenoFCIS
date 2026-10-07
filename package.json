@@ -12,5 +12,8 @@
   },
   "devDependencies": {
     "@nizos/probity": "1.10.0"
+  },
+  "overrides": {
+    "@modelcontextprotocol/sdk": "1.31.0"
   }
 }

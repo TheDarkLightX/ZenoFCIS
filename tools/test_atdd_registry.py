@@ -116,8 +116,17 @@ TEMPLATE_CORPORA = [("COUNTER_CORPUS", 64, "durable_counter", "counter"),
                     ("TREASURY_GUARDS", 82_944, "treasury_guards", "treasury")]
 TEMPLATE_PROFILE_TESTS = ["miri_bounded_profile_" + suffix for _, _, suffix, _ in TEMPLATE_CORPORA]
 TEMPLATE_RETAINED = [('durable_counter', 'counter', 0, 12), ('inventory_reservation', 'stock', 1, 20), ('order_fulfillment', 'order', 2, 23), ('account_lockout', 'account', 3, 20), ('withdrawal_queue', 'vault', 4, 26), ('agent_treasury_guard', 'treasury', 5, 30)]
-TEMPLATE_RETAINED_TESTS = ["retained_complete_examples_genesis_and_replay_" + suffix
-                           for suffix, _, _, _ in TEMPLATE_RETAINED]
+TEMPLATE_RETAINED_CALLS = {}
+for suffix, module, index, count in TEMPLATE_RETAINED:
+    if suffix in {"order_fulfillment", "agent_treasury_guard"}:
+        for start in range(0, count, 5):
+            end = min(start + 5, count)
+            name = f"retained_examples_and_replay_{suffix}_{start:02}_{end - 1:02}"
+            TEMPLATE_RETAINED_CALLS[name] = f"retained_examples_batch!({module}, {index}, {count}, {start}, {end});"
+        TEMPLATE_RETAINED_CALLS["retained_genesis_and_replay_" + suffix] = f"retained_genesis!({module}, {index});"
+    else:
+        TEMPLATE_RETAINED_CALLS["retained_complete_examples_genesis_and_replay_" + suffix] = f"retained_examples_and_genesis!({module}, {index}, {count});"
+TEMPLATE_RETAINED_TESTS = list(TEMPLATE_RETAINED_CALLS)
 
 
 def template_profile_problems(source):
@@ -146,11 +155,15 @@ def template_profile_problems(source):
     if len(helper) != 1 or "check_observations(std::slice::from_ref(&observed), true);" not in helper[0] \
             or "assert_eq!(observed.cases, cases);" not in helper[0]:
         problems.append("the bounded profile must check its observations and pinned count")
-    for suffix, module, index, count in TEMPLATE_RETAINED:
-        name = "retained_complete_examples_genesis_and_replay_" + suffix
-        expected = f"retained_examples_and_genesis!({module}, {index}, {count});"
+    for name, expected in TEMPLATE_RETAINED_CALLS.items():
         if body(name).strip() != expected:
-            problems.append(f"{name} must retain its application and all {count} examples")
+            problems.append(f"{name} must retain its application and exact example interval or genesis")
+    helper = re.search(r"^fn examples_range\([\s\S]*?^\}", source, re.M)
+    required = ["assert!(start < end && end <= example_count(index));", ".enumerate()", ".skip(start)", ".take(end - start)"]
+    if helper is None or any(part not in helper.group(0) for part in required):
+        problems.append("example ranges must execute their exact nonempty, in-bounds intervals")
+    if "assert_eq!(example_count($index), $total);" not in source or "assert_eq!(count, $end - $start);" not in source:
+        problems.append("example batches must pin their full corpus and exact executed count")
     cases = []
     for const, size, suffix, module in TEMPLATE_CORPORA:
         block = re.search(r"^const " + const + r": Corpus = Corpus \{\n(.*?)^\};", source, re.M | re.S)
@@ -273,7 +286,7 @@ class RepairedRegistryTests(unittest.TestCase):
         ] + [("run", "--example", path.stem) for path in (synthesis / "examples").glob("*.rs")]
         self.assertEqual(collections.Counter(actual), collections.Counter(expected))
         template = [row for row in rows if row["target"] == "--test v2_template_contracts"]
-        self.assertEqual(len(template), 15)
+        self.assertEqual(len(template), 26)
         self.assertEqual(sum("test" not in row for row in template), 1)
         self.assertTrue(all("--skip" not in row["target"] for row in template))
 
@@ -370,7 +383,7 @@ class RepairedRegistryTests(unittest.TestCase):
         self.assertEqual(sum_native, 2_175_778)
 
         inventory = sorted(re.findall(r"#\[test\]\s*(?:#\[ignore[^\n]*\n\s*)?fn (\w+)\(", rust))
-        self.assertEqual(len(inventory), 21)
+        self.assertEqual(len(inventory), 32)
         inventories = {target: inventory}
         ignored = {target: ["emit_library_policy_artifacts"]}
         arguments = miri_exclusions.miri_test_arguments(remainder)
@@ -380,7 +393,7 @@ class RepairedRegistryTests(unittest.TestCase):
                 args = miri_exclusions.miri_test_arguments(row)
             return run_miri_coverage_check(workflow, row, names, honour_skip=skip, ignored=ignore, test_args=args)
         # The remainder keeps the four native-only skips first, then skips the
-        # fourteen exact-test groups; each exact-test group runs its one test.
+        # twenty-five exact-test groups; each exact-test group runs its one test.
         self.assertEqual(coverage(), arguments + " " + shlex.join([a for name in isolated for a in ("--skip", name)]))
         for row in exact:
             self.assertEqual(coverage(row), "-- " + shlex.join(["--exact", row["test"]]))
@@ -460,8 +473,16 @@ class RepairedRegistryTests(unittest.TestCase):
         self.assertTrue(problems("fn miri_bounded_profile_withdrawal_queue() {\n",
                                  "fn miri_bounded_profile_withdrawal_queue() {\n    if cfg!(miri) {}\n"))
         self.assertTrue(problems("fn miri_bounded_profile_treasury_guards()", "fn miri_bounded_profile_treasury_guard()"))
-        self.assertTrue(problems("retained_examples_and_genesis!(treasury, 5, 30);",
-                                 "retained_examples_and_genesis!(treasury, 5, 29);"))
+        self.assertTrue(problems("retained_examples_batch!(treasury, 5, 30, 25, 30);",
+                                 "retained_examples_batch!(treasury, 5, 29, 25, 30);"))
+        self.assertTrue(problems("retained_examples_batch!(order, 2, 23, 5, 10);",
+                                 "retained_examples_batch!(order, 2, 23, 4, 10);"))
+        self.assertTrue(problems("retained_genesis!(treasury, 5);", "retained_genesis!(order, 5);"))
+        self.assertTrue(problems("        .skip(start)\n", "        .skip(start + 1)\n"))
+        self.assertTrue(problems("        .take(end - start)\n", "        .take(end - start - 1)\n"))
+        self.assertTrue(problems("    assert!(start < end && end <= example_count(index));\n", ""))
+        self.assertTrue(problems("        assert_eq!(example_count($index), $total);\n", ""))
+        self.assertTrue(problems("        assert_eq!(count, $end - $start);\n", ""))
         self.assertTrue(problems("retained_examples_and_genesis!(account, 3, 20);",
                                  "retained_examples_and_genesis!(stock, 3, 20);"))
         self.assertTrue(problems("#[test]\nfn retained_complete_examples_genesis_and_replay_durable_counter",
