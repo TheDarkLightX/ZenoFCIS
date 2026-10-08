@@ -47,6 +47,11 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "bounded-collections-pipes": AcceptanceScenario(
+        "Bound immutable canonical collections and profile-bound FIFO messages",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-collections",
+          "--all-features", "--locked", "--test", "bounded_contract"),),
+    ),
     "minimal-core": AcceptanceScenario(
         "Run the immutable functional core example",
         (
