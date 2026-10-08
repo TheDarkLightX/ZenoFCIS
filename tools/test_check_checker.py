@@ -111,9 +111,13 @@ class SharedCheckerGate(unittest.TestCase):
         self.assertEqual(controls['narrow_final_domain'][0], gate.API)
         self.assertEqual(gate.COVERAGE_TARGETS['narrow_final_domain'],
                          ('checker::checker_api::compare_with_usage', 'requires_sha256'))
-        self.assertIn('requires original.inputs.len() > 0,', controls['narrow_final_domain'][1])
+        self.assertIn('requires false,', controls['narrow_final_domain'][1])
         self.assertIn('ensures comparison(original, candidate, cap, step_limit, result),',
                       controls['narrow_final_domain'][1])
+        self.assertIn('ensures spec::equality_result(original, candidate, cap, result) || true,',
+                      controls['weaken_final_theorem'][1])
+        self.assertIn('ensures comparison(original, candidate, cap, step_limit, result) || true,',
+                      controls['api_weaken_projection'][1])
 
     def test_simulated_proof_reports_fail_closed(self):
         pin = {'version': 'pinned', 'commit': 'exact'}
@@ -269,11 +273,77 @@ class SharedCheckerGate(unittest.TestCase):
                         vir(name, 'false') + vir(other, 'false'),
                         vir(name, 'false', '1') + vir(other)):
             self.assertFalse(gate.coverage_refusal(changed, profile, name, 'ensures_sha256')[0])
-        extra = 'checker::checker::unchecked_identity'
+        extra = 'checker::checker::unchecked_constant'
         unchecked = vir(extra).replace(':ensure ((Bool true))', ':ensure ()')
         self.assertTrue(gate.coverage_refusal(original + unchecked, profile, extra, 'inventory')[0])
         self.assertFalse(gate.coverage_refusal(original + vir(extra), profile, extra, 'inventory')[0])
         self.assertFalse(gate.coverage_refusal(original + unchecked + vir('checker::unexpected'), profile, extra, 'inventory')[0])
+
+    def test_local_binding_attribution_refuses_body_changes_and_capture(self):
+        name = 'checker::checker::compare_equal'
+        def variable(number, label='value'):
+            return f'(VarIdent "{label}" (VarIdentDisambiguate RustcId {number}))'
+        def vir(ids=(4, 4, 5, 5), ensure='true', parameter=1, body_value=0):
+            body = ' '.join(variable(i) for i in ids)
+            return (f'(Function (Fun :path {name}) :mode Exec :typ_bounds () '
+                    f':params ((Param :name {variable(parameter)})) :ret () :require () '
+                    f':ensure ((Bool {ensure})) :d () :body (Block {body} '
+                    f'{variable(1)} (Int {body_value})))')
+        original = vir()
+        profile = {'namespace': 'checker::', 'body_covered_functions': [name],
+                   'functions': gate.inventory(original, 'checker::', (name,))}
+        changed = vir((14, 14, 15, 15), ensure='false')
+        self.assertFalse(gate.coverage_refusal(changed, profile, name, 'ensures_sha256')[0])
+        killed, evidence = gate.coverage_refusal(changed, profile, name, 'ensures_sha256',
+                                                original_vir=original)
+        self.assertTrue(killed)
+        self.assertIn('binding IDs only', evidence['unchanged_structure'])
+        for changed in (
+            vir((14, 4, 15, 15), 'false'),   # Inconsistent references.
+            vir((14, 14, 14, 14), 'false'), # Two bindings merged.
+            vir((1, 1, 15, 15), 'false'),   # Local captures parameter.
+            vir((14, 14, 15, 15), 'false', parameter=2),
+            vir((14, 14, 15, 15), 'false', body_value=1),
+            vir((14, 14, 15, 15), 'false').replace('"value"', '"other"'),
+        ):
+            with self.subTest(changed=changed):
+                self.assertFalse(gate.coverage_refusal(changed, profile, name, 'ensures_sha256',
+                                                      original_vir=original)[0])
+        self.assertFalse(gate.same_noncontract_structure(vir(ensure='false'), changed,
+                                                        profile, name, 'ensures_sha256'))
+
+    def test_contract_control_allows_only_consistent_signature_and_body_binding_ids(self):
+        name = 'checker::checker_api::compare_with_usage'
+        def variable(number, label):
+            return f'(VarIdent "{label}" (VarIdentDisambiguate RustcId {number}))'
+        def vir(parameter=1, result=2, local=3, require='()', body_parameter=None):
+            ref = parameter if body_parameter is None else body_parameter
+            return (f'(Function (Fun :path {name}) :mode Exec :typ_bounds () '
+                    f':params ((Param :name {variable(parameter, "value")})) '
+                    f':ret (Param :name {variable(result, "result")}) :require {require} '
+                    f':ensure ((Eq {variable(parameter, "value")} {variable(result, "result")})) '
+                    f':d () :body (Block {variable(local, "value")} {variable(local, "value")} '
+                    f'{variable(ref, "value")} {variable(result, "result")} (Int 0)))')
+        original = vir()
+        profile = {'namespace': 'checker::', 'body_covered_functions': [name],
+                   'functions': gate.inventory(original, 'checker::', (name,))}
+        changed = vir(11, 12, 13, '((Bool false))')
+        self.assertTrue(gate.coverage_refusal(changed, profile, name, 'requires_sha256',
+                                             original_vir=original)[0])
+        # The raw production guard must continue to reject the same specimen.
+        with self.assertRaises(ValueError):
+            gate.require_coverage(changed, profile)
+        for invalid in (
+            vir(11, 12, 13, '((Bool false))', body_parameter=1),
+            vir(11, 12, 11, '((Bool false))'),
+            changed.replace('(Int 0)', '(Int 1)'),
+            changed.replace(':typ_bounds ()', ':typ_bounds ((Bool true))'),
+            changed.replace(':d ()', ':d ((Bool true))'),
+            changed.replace(':ensure ((Eq', ':ensure ((Ne'),
+        ):
+            with self.subTest(invalid=invalid):
+                self.assertFalse(gate.coverage_refusal(invalid, profile, name, 'requires_sha256',
+                                                      original_vir=original)[0])
 
     def test_missing_reviewed_profile_is_not_positive_evidence(self):
         with tempfile.TemporaryDirectory() as temporary:

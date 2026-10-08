@@ -19,7 +19,7 @@ import check_verus as verifier
 from check_finite_execution import once
 from v2_proof_sources import execution_sources
 from v2_native_dependencies import native_dependency_args
-from verus_coverage import inventory, require_coverage
+from verus_coverage import inventory, parse_vir, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path('verification/verus/checker.rs')
@@ -56,7 +56,7 @@ COVERAGE_TARGETS = {
     'weaken_final_theorem': ('checker::checker::compare_equal', 'ensures_sha256'),
     'narrow_final_domain': ('checker::checker_api::compare_with_usage', 'requires_sha256'),
     'alter_rank_spec': ('checker::checker::spec::rank', 'body_sha256'),
-    'unchecked_path': ('checker::checker::unchecked_identity', 'inventory'),
+    'unchecked_path': ('checker::checker::unchecked_constant', 'inventory'),
 }
 SEMANTIC_FAILURES = frozenset((
     'assertion failed', 'postcondition not satisfied', 'precondition not satisfied',
@@ -192,18 +192,24 @@ def mutations(source: str, spec: str, equality: str, api: str) -> dict[str, tupl
     # These outer entry points have no proved callers in this whole unit.
     # Weakening a private contract consumed by the public projection would
     # instead break the caller's proof, invalidating a coverage-only oracle.
+    # Retain each predicate's reads when making it vacuous: removing them
+    # renumbers read IDs throughout the raw VIR and obscures attribution.
+    # An impossible precondition tests loss of the whole admitted domain
+    # without allocating extra reads. Keep raw coverage comparison exact.
     needle = 'ensures spec::equality_result(original, candidate, cap, result),'
-    controls['weaken_final_theorem'] = (SUBJECT, once(source, needle, 'ensures true,'), 'coverage')
+    controls['weaken_final_theorem'] = (SUBJECT, once(source, needle,
+        'ensures spec::equality_result(original, candidate, cap, result) || true,'), 'coverage')
     needle = 'ensures comparison(original, candidate, cap, step_limit, result),'
     controls['narrow_final_domain'] = (API, once(api, needle,
-        'requires original.inputs.len() > 0,\n    ' + needle), 'coverage')
+        'requires false,\n    ' + needle), 'coverage')
     controls['alter_rank_spec'] = (SPEC, once(spec, 'rank(ds, xs, n - 1) * width(ds[n - 1]) + xs[n - 1] - lo(ds[n - 1])', 'rank(ds, xs, n - 1) * width(ds[n - 1]) + (xs[n - 1] - lo(ds[n - 1])) + 0'), 'coverage')
-    controls['unchecked_path'] = (SUBJECT, source + '\nfn unchecked_identity(x: u64) -> u64 { x }\n', 'coverage')
+    controls['unchecked_path'] = (SUBJECT, source + '\nfn unchecked_constant(_x: u64) -> u64 { 0 }\n', 'coverage')
     controls['api_wrong_count'] = (API, once(api, 'Ok((done.tuples(), done.usage()))', 'Ok((0, done.usage()))'), 'proof')
     controls['api_wrong_cap'] = (API, once(api, 'checker::validate_pair(original, candidate, cap)', 'checker::validate_pair(original, candidate, 0)'), 'proof')
     controls['api_wrong_limit'] = (API, once(api, 'checker::compare_with_usage(original, candidate, cap, step_limit)', 'checker::compare_with_usage(original, candidate, cap, 0)'), 'proof')
     controls['api_weaken_projection'] = (API, once(api,
-        'ensures comparison(original, candidate, cap, step_limit, result),', 'ensures true,'), 'coverage')
+        'ensures comparison(original, candidate, cap, step_limit, result),',
+        'ensures comparison(original, candidate, cap, step_limit, result) || true,'), 'coverage')
     return controls
 
 
@@ -298,7 +304,55 @@ def semantic_refusal(proc, report: dict, pin: dict, profile: dict,
     return bool(count and terminal == count and result['errors'] <= count), evidence
 
 
-def coverage_refusal(vir: str, profile: dict, target: str, field: str) -> tuple[bool, dict]:
+def same_noncontract_structure(original_vir: str, mutated_vir: str,
+                               profile: dict, target: str, field: str) -> bool:
+    """Compare all unchanged target fields modulo bijective Rustc binding IDs.
+
+    This is negative-test attribution, never production coverage normalization.
+    Bind the original to the exact reviewed profile. Compare signature bindings
+    first, then the body and unchanged contract with the same bijection, so a
+    local binding cannot capture a parameter or another binding. Only the one
+    deliberately mutated contract is excluded. Names, structure and every
+    other token must match; production coverage still checks exact raw hashes.
+    """
+    try:
+        changed_field = {'requires_sha256': ':require',
+                         'ensures_sha256': ':ensure'}[field]
+        require_coverage(original_vir, profile)
+        def function(source):
+            node = next(n for n in parse_vir(source)
+                        if n and n[0] == 'Function' and n[1][2] == target)
+            return dict(zip(node[2::2], node[3::2]))
+        original, mutated = function(original_vir), function(mutated_vir)
+        if set(original) != set(mutated):
+            return False
+        def binding(node):
+            return (isinstance(node, list) and len(node) == 3 and node[0] == 'VarIdent'
+                    and isinstance(node[1], str) and isinstance(node[2], list)
+                    and len(node[2]) == 3 and node[2][:2] == ['VarIdentDisambiguate', 'RustcId']
+                    and isinstance(node[2][2], str) and node[2][2].isdigit())
+        forward, backward = {}, {}
+        def equal(left, right):
+            if binding(left):
+                if not binding(right) or left[1] != right[1]:
+                    return False
+                old, new = (left[1], left[2][2]), (right[1], right[2][2])
+                if forward.get(old, new) != new or backward.get(new, old) != old:
+                    return False
+                forward[old], backward[new] = new, old
+                return True
+            if isinstance(left, list):
+                return (isinstance(right, list) and len(left) == len(right)
+                        and all(equal(a, b) for a, b in zip(left, right)))
+            return left == right
+        keys = [':params', ':ret'] + sorted(set(original) - {':params', ':ret', changed_field})
+        return all(equal(original[key], mutated[key]) for key in keys)
+    except (ValueError, KeyError, IndexError, StopIteration, TypeError):
+        return False
+
+
+def coverage_refusal(vir: str, profile: dict, target: str, field: str,
+                     *, original_vir: str | None = None) -> tuple[bool, dict]:
     evidence = {'function': target, 'field': field, 'refusal': None}
     try:
         actual = inventory(vir, profile['namespace'], tuple(profile['body_covered_functions']))
@@ -322,6 +376,13 @@ def coverage_refusal(vir: str, profile: dict, target: str, field: str) -> tuple[
         permitted = {field}
         if field in ('requires_sha256', 'ensures_sha256'):
             permitted.add(field.removesuffix('_sha256'))
+            if (set(actual) == set(expected) and changed == {target}
+                    and original_vir is not None
+                    and same_noncontract_structure(original_vir, vir, profile, target, field)):
+                other_contract = ('ensures_sha256' if field == 'requires_sha256'
+                                  else 'requires_sha256')
+                permitted.update(('body_sha256', 'signature_sha256', other_contract))
+                evidence['unchanged_structure'] = 'consistent compiler binding IDs only'
         intended = (set(actual) == set(expected) and changed == {target}
                     and actual[target].get(field) != expected[target].get(field)
                     and {key for key in set(actual[target]) | set(expected[target])
@@ -444,7 +505,8 @@ def check(cache: Path, out: Path, positive_only: bool, refresh: bool) -> dict:
                 raise ValueError(f'control {name} source changed during proof')
             if expected == 'coverage':
                 target, field = COVERAGE_TARGETS[name]
-                killed, attribution = coverage_refusal((specimen / 'vir/crate.vir').read_text(), profile, target, field)
+                killed, attribution = coverage_refusal((specimen / 'vir/crate.vir').read_text(), profile, target, field,
+                                                       original_vir=vir)
                 killed = (killed and run.returncode == 0 and proof_succeeded(record, pin)
                           and not ERROR_HEADER.search(run.stderr) and not NON_SEMANTIC.search(run.stderr))
             else:
