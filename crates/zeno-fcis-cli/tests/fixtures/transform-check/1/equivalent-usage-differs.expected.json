@@ -10,7 +10,7 @@
         "sha256": "9ce0c88c4f2b768cb490a1db73d30d19202d2e9bb9757f5a6ddac91e16c2e8c0"
       },
       "checker": {
-        "evaluator_identity": "62b8e3d96738e2ed5fa6f17771a530a7d0cf91278c0beefc8ba9e88842e1b135",
+        "evaluator_identity": "06625439ca5fd003036a7da9149219a108cd91393dfc51eed36a22337cdcaed4",
         "semantics": "zeno-fcis/transform-check/1"
       },
       "claim": "Functionally equal on the full declared input domain: every tuple gives identical outputs or identical failures. The Step limit never binds: no tuple needs more Steps than the limit in either program.",
@@ -58,7 +58,7 @@
       "verdict": "equivalent"
     },
     "receipt_path": null,
-    "receipt_sha256": "36be76ff58d1109b3d4f020e1a929b730403d9bdd806a904cefd6a3e54b4870a"
+    "receipt_sha256": "0df2ecad4d6581480f3e39e426810976995241efcdefb3bd85c19e411bc7d0a4"
   },
   "limits": {
     "input_tuples": 100000000,

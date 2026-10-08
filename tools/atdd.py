@@ -246,6 +246,15 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "contract::review::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_review", "--locked")),
     ),
+    "symbolic-per-case-checks": AcceptanceScenario(
+        "Check rule cases with pinned solvers beyond the enumeration cap",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "symbolic::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "symbolic_cli", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-formal-tools", "--locked",
+          "smt_sessions_"),
+         ("python3", "tools/symbolic_solver_tests.py")),
+    ),
     "checked-upgrade": AcceptanceScenario(
         "Adopt a checked candidate and upgrade a live store under its lineage",
         (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
@@ -260,10 +269,45 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "upgrade", "--locked"),
          ("python3", "tools/check_contract_upgrade.py")),
     ),
+    "rule-change-upgrade": AcceptanceScenario(
+        "Change the rules of a live store after the owner reviews the change",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_evolve", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "behaviour_change", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
+          "v2::upgrade::tests::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
+          "v2::message_tests::"),
+         ("python3", "tools/check_contract_evolve.py")),
+    ),
+    "data-migration-upgrade": AcceptanceScenario(
+        "Migrate the data of a live store across a layout change",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_migrate", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "data_migration", "--locked"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
+          "v2::migration::tests::"),
+         ("python3", "tools/check_contract_migrate.py"),
+         ("python3", "tools/check_migration_claims.py")),
+    ),
+    "contract-diff": AcceptanceScenario(
+        "Classify a contract change and name every changed item",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::diff::"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_diff", "--locked")),
+    ),
     "app-journey": AcceptanceScenario(
         "Build, optimize, adopt and upgrade applications through their command lines alone",
         (("python3", "tools/test_check_app_journey.py"),
+         ("python3", "tools/test_relay.py"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "relay", "--locked"),
          ("python3", "tools/check_app_journey.py")),
+    ),
+    "operational-journey": AcceptanceScenario(
+        "Operate, deliver, evolve, migrate and replay one live application",
+        (("python3", "tools/test_relay_destination.py"),
+         ("python3", "tools/test_check_operational_journey.py"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--lib", "--locked",
+          "a_shared_simulation_lookup_does_not_wait_for_a_busy_memo"),
+         ("python3", "tools/check_operational_journey.py")),
     ),
     "gate-evidence": AcceptanceScenario(
         "Publish gate evidence only for the unchanged committed revision",
@@ -294,7 +338,9 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     ),
     "sqlite-authority": AcceptanceScenario(
         "Persist an authorized transition and its exact outbox obligations",
-        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked"),),
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--locked"),
+         ("python3", "tools/test_check_compile_fail.py"),
+         ("python3", "tools/check_compile_fail.py")),
     ),
     "release-contract": AcceptanceScenario(
         "Run the local V1 release gate",
@@ -375,6 +421,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
     "v2-metered-execution": AcceptanceScenario(
         "Keep V2 instruction charges private and retain exact refusal usage",
         (("python3", "tools/test_check_metered_execution.py"),),
+    ),
+    "v2-shared-finite-checker": AcceptanceScenario(
+        "Bind both finite comparison callers to one checker and reject incomplete proof evidence",
+        (("python3", "tools/test_check_checker.py"),),
     ),
     "v2-canonical-byte-readers": AcceptanceScenario(
         "Keep exact V2 integer byte reads over the full offset and width domain",

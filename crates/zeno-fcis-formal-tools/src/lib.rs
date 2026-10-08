@@ -2256,6 +2256,141 @@ pub fn execute_tool(
     })
 }
 
+/// One CVC5 or Z3 executable, admitted once, that runs a sequence of SMT-LIB
+/// scripts its caller built.
+///
+/// [`SmtSession::open`] makes the checks [`execute_tool`] makes before each
+/// run: the configured path is a bounded regular file, its bytes hash to the
+/// manifest's SHA-256, and a private copy of exactly those bytes reports the
+/// pinned version. Every [`SmtSession::run`] executes that same private copy
+/// with the backend's fixed argv, cleared environment, timeout, output bound
+/// and process-group containment, in the two-run protocol of
+/// [`execute_tool`]: the script, then, after `unsat` from CVC5, the script
+/// with `(get-proof)` appended, or after `sat`, with `(get-model)` appended.
+/// Two runs that disagree give no answer.
+///
+/// Nothing here interprets or replays an answer. An `unsat` means only that
+/// the solver reported no model; CVC5's proof text is not checked. A model
+/// is evidence only once the caller replays it through its own evaluator.
+pub struct SmtSession {
+    config: ToolConfig,
+    checked: CheckedTool,
+}
+
+impl SmtSession {
+    /// Admits a CVC5 or Z3 configuration once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ToolFailure::UnsupportedEvidence`] for Lean, and every
+    /// admission failure of [`verify_tool`].
+    pub fn open(config: &ToolConfig) -> Result<Self, ToolFailure> {
+        if !matches!(config.backend, ToolBackend::Cvc5 | ToolBackend::Z3) {
+            return Err(ToolFailure::UnsupportedEvidence);
+        }
+        Ok(Self {
+            config: config.clone(),
+            checked: check_tool(config)?,
+        })
+    }
+
+    /// Returns the admitted executable's identity.
+    #[must_use]
+    pub const fn identity(&self) -> &ToolIdentity {
+        &self.checked.identity
+    }
+
+    /// Runs one script, which must end with `(check-sat)` and request models
+    /// with `(set-option :produce-models true)` if it wants them.
+    ///
+    /// # Errors
+    ///
+    /// Returns the process failures of [`execute_tool`]: a timeout, an
+    /// output overflow, a containment failure, or an I/O error.
+    pub fn run(&self, source: &[u8]) -> Result<ScriptRun, ToolFailure> {
+        let execution = run_smt(&self.config, self.checked.execution.executable(), source)?;
+        let output = execution.final_output();
+        Ok(ScriptRun {
+            answer: script_answer(self.config.backend, &execution),
+            stdout: output.stdout.clone(),
+            stderr: output.stderr.clone(),
+        })
+    }
+}
+
+/// A solver's answer to one caller-built script, before any replay.
+#[non_exhaustive]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ScriptAnswer {
+    /// `unsat`. `proof_output` is true when CVC5's `(get-proof)` run printed
+    /// proof-shaped text, which is not checked. Z3 is never asked for a proof.
+    Unsat {
+        /// Whether CVC5 printed proof steps.
+        proof_output: bool,
+    },
+    /// `sat`, with every integer value the `(get-model)` run printed.
+    Sat {
+        /// Model values by declared name.
+        values: BTreeMap<String, i128>,
+    },
+    /// `unknown`.
+    Unknown,
+    /// The process failed, printed no answer, or its two runs disagreed.
+    NoAnswer(ToolFailure),
+}
+
+/// One script's answer with the final run's output.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScriptRun {
+    answer: ScriptAnswer,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+impl ScriptRun {
+    /// Returns the classified answer.
+    #[must_use]
+    pub const fn answer(&self) -> &ScriptAnswer {
+        &self.answer
+    }
+    /// Returns the bounded standard output of the final run.
+    #[must_use]
+    pub fn stdout(&self) -> &[u8] {
+        &self.stdout
+    }
+    /// Returns the bounded standard error of the final run.
+    #[must_use]
+    pub fn stderr(&self) -> &[u8] {
+        &self.stderr
+    }
+}
+
+fn script_answer(backend: ToolBackend, execution: &ToolExecution) -> ScriptAnswer {
+    if execution.inconsistent {
+        return ScriptAnswer::NoAnswer(ToolFailure::InconsistentResult);
+    }
+    let output = execution.final_output();
+    if !output.status.success() {
+        return ScriptAnswer::NoAnswer(ToolFailure::Crash(output.status.code()));
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    match text
+        .lines()
+        .find(|line| !line.trim().is_empty())
+        .unwrap_or("")
+        .trim()
+    {
+        "unsat" => ScriptAnswer::Unsat {
+            proof_output: backend == ToolBackend::Cvc5 && text.contains("(step"),
+        },
+        "sat" => ScriptAnswer::Sat {
+            values: parse_model_values(&text),
+        },
+        "unknown" => ScriptAnswer::Unknown,
+        _ => ScriptAnswer::NoAnswer(ToolFailure::UnsupportedEvidence),
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SolverResult {
     Sat,
@@ -6456,6 +6591,114 @@ mod tests {
         fs::write(root.join("descendant"), std::process::id().to_string())
             .unwrap_or_else(|error| panic!("write descendant pid: {error}"));
         thread::sleep(Duration::from_secs(30));
+    }
+
+    /// A stand-in solver that answers each script by the `answer=` marker the
+    /// script carries, as a solver answers the two runs of one query.
+    #[cfg(unix)]
+    const SCRIPTED_SOLVER: &str = "#!/bin/sh
+if [ \"$1\" = \"--version\" ]; then printf '%s\\n' \"$VERSION_LINE\"; exit 0; fi
+input=''
+while IFS= read -r line || [ -n \"$line\" ]; do input=\"$input$line;\"; done
+case \"$input\" in
+  *answer=unsat*) case \"$input\" in *'(get-proof)'*) printf 'unsat\\n(step t0 :rule refl)\\n' ;; *) printf 'unsat\\n' ;; esac ;;
+  *answer=sat*) case \"$input\" in *'(get-model)'*) printf 'sat\\n(\\n(define-fun x0 () Int (- 7))\\n(define-fun x1 () Int 12)\\n)\\n' ;; *) printf 'sat\\n' ;; esac ;;
+  *answer=flip*) case \"$input\" in *'(get-proof)'*) printf 'sat\\n' ;; *) printf 'unsat\\n' ;; esac ;;
+  *answer=crash*) exit 3 ;;
+  *) printf 'unknown\\n' ;;
+esac
+";
+
+    #[test]
+    #[cfg(unix)]
+    fn smt_sessions_admit_once_and_classify_scripts_without_replay() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = std::env::temp_dir().join(format!(
+            "zeno-fcis-session-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+        fs::create_dir(&root).unwrap_or_else(|error| panic!("create session root: {error}"));
+        let solver = |backend: ToolBackend, version_line: &str| {
+            let script = SCRIPTED_SOLVER.replace("\"$VERSION_LINE\"", &format!("'{version_line}'"));
+            let path = root.join(backend.name());
+            fs::write(&path, script.as_bytes())
+                .unwrap_or_else(|error| panic!("write scripted solver: {error}"));
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o700))
+                .unwrap_or_else(|error| panic!("make scripted solver executable: {error}"));
+            ToolConfig {
+                backend,
+                path,
+                version: backend.required_version().to_owned(),
+                sha256: hash_hex(RustCryptoSha256::hash(script.as_bytes())),
+                runtime: None,
+                timeout_ms: 10_000,
+                max_output_bytes: 4096,
+                allowed_axioms: Vec::new(),
+            }
+        };
+        let cvc5 = solver(ToolBackend::Cvc5, "This is cvc5 version 1.3.3");
+        let z3 = solver(ToolBackend::Z3, "Z3 version 4.16.0 - 64 bit");
+        let script = |answer: &str| format!("; answer={answer}\n(check-sat)\n").into_bytes();
+
+        let session =
+            SmtSession::open(&cvc5).unwrap_or_else(|error| panic!("open CVC5: {error:?}"));
+        assert_eq!(session.identity().backend(), ToolBackend::Cvc5);
+        let answer = |session: &SmtSession, name: &str| {
+            session
+                .run(&script(name))
+                .unwrap_or_else(|error| panic!("{name}: {error:?}"))
+                .answer()
+                .clone()
+        };
+        assert_eq!(
+            answer(&session, "unsat"),
+            ScriptAnswer::Unsat { proof_output: true }
+        );
+        assert_eq!(
+            answer(&session, "sat"),
+            ScriptAnswer::Sat {
+                values: BTreeMap::from([("x0".to_owned(), -7), ("x1".to_owned(), 12)])
+            }
+        );
+        assert_eq!(answer(&session, "silent"), ScriptAnswer::Unknown);
+        assert_eq!(
+            answer(&session, "flip"),
+            ScriptAnswer::NoAnswer(ToolFailure::InconsistentResult)
+        );
+        assert_eq!(
+            answer(&session, "crash"),
+            ScriptAnswer::NoAnswer(ToolFailure::Crash(Some(3)))
+        );
+
+        // Z3 is never asked for a proof, so its `unsat` carries none.
+        let session = SmtSession::open(&z3).unwrap_or_else(|error| panic!("open Z3: {error:?}"));
+        assert_eq!(
+            answer(&session, "unsat"),
+            ScriptAnswer::Unsat {
+                proof_output: false
+            }
+        );
+
+        // Admission is the adapter's: a wrong hash or a Lean entry is refused.
+        let tampered = ToolConfig {
+            sha256: "0".repeat(64),
+            ..cvc5.clone()
+        };
+        assert!(matches!(
+            SmtSession::open(&tampered),
+            Err(ToolFailure::HashMismatch)
+        ));
+        let lean = ToolConfig {
+            backend: ToolBackend::Lean,
+            ..cvc5
+        };
+        assert!(matches!(
+            SmtSession::open(&lean),
+            Err(ToolFailure::UnsupportedEvidence)
+        ));
+        let _ = fs::remove_dir_all(&root);
     }
 
     #[cfg(unix)]

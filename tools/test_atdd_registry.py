@@ -502,10 +502,16 @@ class RepairedRegistryTests(unittest.TestCase):
 
     def test_the_app_journey_runs_its_own_tests_before_the_journey(self):
         commands = atdd.SCENARIOS["app-journey"].commands
-        self.assertEqual(commands, (("python3", "tools/test_check_app_journey.py"),
-                                    ("python3", "tools/check_app_journey.py")))
+        self.assertEqual(commands, (
+            ("python3", "tools/test_check_app_journey.py"),
+            ("python3", "tools/test_relay.py"),
+            ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-shell-sqlite", "--test", "relay",
+             "--locked"),
+            ("python3", "tools/check_app_journey.py")))
         for command in commands:
-            self.assertTrue((atdd.ROOT / command[1]).is_file(), command)
+            if command[0] == "python3":
+                self.assertTrue((atdd.ROOT / command[1]).is_file(), command)
+        self.assertTrue((atdd.ROOT / "crates/zeno-fcis-shell-sqlite/tests/relay.rs").is_file())
 
 
 if __name__ == "__main__":

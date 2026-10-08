@@ -47,6 +47,18 @@ fn ok<T, E: std::fmt::Debug>(result: Result<T, E>) -> T {
     }
 }
 
+/// Delivers and acknowledges the oldest pending entry; whether there was one.
+fn deliver_next(
+    db: &mut V2SqliteShell<'_, '_>,
+    destination: &mut MemoryDestination,
+) -> Result<bool, Error> {
+    let Some(pending) = db.next_pending()? else {
+        return Ok(false);
+    };
+    pending.deliver(destination)?.acknowledge()?;
+    Ok(true)
+}
+
 fn digest(text: &str) -> [u8; 32] {
     let mut bytes = [0; 32];
     for (index, byte) in bytes.iter_mut().enumerate() {
@@ -598,7 +610,10 @@ fn a_store_away_from_genesis_upgrades_to_a_program_successor_and_keeps_its_deliv
         assert_eq!(snapshot.state(), paid_state());
         assert_ne!(snapshot.state(), genesis_state());
         assert_eq!(snapshot.pending(), 1);
-        let pending = ok(db.next_pending()).unwrap_or_else(|| panic!("lane A's payout pending"));
+        let pending = ok(db.next_pending())
+            .unwrap_or_else(|| panic!("lane A's payout pending"))
+            .delivery()
+            .clone();
         assert_eq!(pending.version(), 3);
         let head = ok(db.checkpoint());
         drop(db);
@@ -662,10 +677,13 @@ fn a_store_away_from_genesis_upgrades_to_a_program_successor_and_keeps_its_deliv
         assert_eq!(snapshot.chain(), receipt.chain());
         // The pending payout keeps its certificate-bound ID and is delivered
         // exactly once.
-        assert_eq!(ok(db.next_pending()), Some(pending.clone()));
+        assert_eq!(
+            ok(db.next_pending()).map(|token| token.delivery().clone()),
+            Some(pending.clone())
+        );
         let mut destination = MemoryDestination::default();
-        assert!(ok(db.deliver_next_memory(&mut destination)));
-        assert!(!ok(db.deliver_next_memory(&mut destination)));
+        assert!(ok(deliver_next(&mut db, &mut destination)));
+        assert!(!ok(deliver_next(&mut db, &mut destination)));
         assert_eq!(destination.delivered_count(), 1);
         assert_eq!(ok(db.snapshot()).pending(), 0);
 
@@ -740,7 +758,7 @@ fn a_store_at_genesis_also_upgrades_as_a_program_successor() {
         let (mut db, receipt) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
         assert_eq!(receipt.kind(), upgrade::Kind::ProgramSuccessor);
         let mut destination = MemoryDestination::default();
-        while ok(db.deliver_next_memory(&mut destination)) {}
+        while ok(deliver_next(&mut db, &mut destination)) {}
         assert_eq!(destination.delivered_count(), 2);
         ok(db.audit());
     });
@@ -1334,7 +1352,7 @@ fn a_v9_store_needs_the_explicit_migration() {
         let (mut db, _) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
         assert_eq!(ok(db.snapshot()).upgrades(), 1);
         let mut destination = MemoryDestination::default();
-        while ok(db.deliver_next_memory(&mut destination)) {}
+        while ok(deliver_next(&mut db, &mut destination)) {}
         assert_eq!(destination.delivered_count(), 2);
         ok(db.audit());
         // A v9 store under the last version migrates straight to current.
@@ -1382,6 +1400,35 @@ fn a_live_handle_bound_to_the_old_version_stops_at_another_connections_upgrade()
         assert_eq!(snapshot.chain(), receipt.chain());
         assert_eq!(snapshot.pending(), 1);
         assert_eq!(snapshot.binding(), v2.identity());
+    });
+}
+
+#[test]
+fn a_delivered_token_of_the_old_version_is_refused_after_another_connections_upgrade() {
+    with_lineage(|_, lineage| {
+        let v1 = &lineage.authorities()[0];
+        let file = StoreFile::new();
+        let mut old = store_under(&file.0, v1, 3);
+        let mut destination = MemoryDestination::default();
+        let pending = ok(old.next_pending()).unwrap_or_else(|| panic!("lane A's payout pending"));
+        let record = pending.delivery().clone();
+        let delivered = ok(pending.deliver(&mut destination));
+        // Another connection upgrades the store while the token is live. The
+        // token acts only through its own handle, which runs version 1.
+        let (upgraded, _) = ok(superseded(ok(lineage.open(&file.0))).upgrade());
+        drop(upgraded);
+        let rows = stored_rows(&file.0);
+        assert!(matches!(delivered.acknowledge(), Err(Error::Identity)));
+        assert_eq!(stored_rows(&file.0), rows);
+        drop(old);
+        // Version 2's handle issues the same entry; the destination records
+        // one effect for its ID.
+        let mut db = current(ok(lineage.open(&file.0)));
+        let pending = ok(db.next_pending()).unwrap_or_else(|| panic!("still pending"));
+        assert_eq!(pending.delivery(), &record);
+        ok(ok(pending.deliver(&mut destination)).acknowledge());
+        assert_eq!(destination.delivered_count(), 1);
+        assert_eq!(ok(db.snapshot()).pending(), 0);
     });
 }
 

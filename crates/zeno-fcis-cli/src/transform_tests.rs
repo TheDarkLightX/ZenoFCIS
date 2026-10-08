@@ -19,11 +19,8 @@ use zeno_fcis_synthesis::finite_runtime::import_program;
 #[path = "../templates/withdrawal-queue/src/v2_contract.rs"]
 mod withdrawal_contract;
 
-/// The shell's own exhaustive comparison, which a program-successor store
-/// upgrade runs; compiled here so that it is checked against this checker.
-#[allow(dead_code, unreachable_pub)]
-#[path = "../../zeno-fcis-shell-sqlite/src/v2/equivalence.rs"]
-mod shell_equivalence;
+/// The actual shell library's program-successor comparison API.
+pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence as shell_equivalence;
 
 const GENEROUS: Limits = Limits {
     steps: DEFAULT_STEP_LIMIT,

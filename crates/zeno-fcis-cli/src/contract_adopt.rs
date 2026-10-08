@@ -131,7 +131,8 @@ fn plan(
     let candidate = read_attachment(candidate, "--candidate")?;
     let receipt = read_attachment(receipt, "--receipt")?;
     let adoptions = inputs.adoption_sources();
-    let sources = inputs.sources(&inputs.rules, &adoptions);
+    let evolutions = inputs.evolution_sources();
+    let sources = inputs.sources(&inputs.rules, &adoptions, &evolutions);
     // A directory holding other files is refused before any replay.
     let state = retained_state(
         dir,
@@ -265,7 +266,8 @@ fn report(dir: &Path, adopted: &Adopted, format: OutputFormat) -> u8 {
 fn refresh(dir: &Path, format: OutputFormat) -> u8 {
     let planned = Inputs::read(dir).and_then(|inputs| {
         let adoptions = inputs.adoption_sources();
-        let refreshed = refresh_receipts(inputs.sources(&inputs.rules, &adoptions))?;
+        let evolutions = inputs.evolution_sources();
+        let refreshed = refresh_receipts(inputs.sources(&inputs.rules, &adoptions, &evolutions))?;
         let rebound: Vec<usize> = inputs
             .adoptions
             .iter()

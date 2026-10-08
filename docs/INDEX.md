@@ -16,7 +16,7 @@
 12. [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md)
 13. [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
 14. [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
-15. [Formal tools](FORMAL_TOOLS_RC3.md)
+15. [Formal tools](FORMAL_TOOLS_RC3.md); [symbolic per-case checks](SYMBOLIC_CHECKS.md)
 16. [Mini Determinator](MINI_DETERMINATOR.md)
 17. [Mini Determinator QEMU kernel demo](QEMU_MINI_DETERMINATOR.md)
 18. [CLI reference](CLI_REFERENCE.md)
@@ -81,6 +81,8 @@
 - [V2 implementation and core verification plan](V2_VERIFIED_CORE_PLAN.md)
 - [2.1 and 2.2 plan](V2_1_V2_2_PLAN.md), the plan of record; the
   [earlier 2.1 roadmap](V2_1_FACTORY_PLAN.md) keeps its design notes
+- [V2.3 roadmap and Zeno Core Standard Library](V2_3_PLAN.md), a proposed
+  follow-on scope with explicit evidence and composition obligations
 - [System properties of finite transitions](SYSTEM_PROPERTIES.md)
 - [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md)
 - [Deterministic synthesis](DETERMINISTIC_SYNTHESIS.md)

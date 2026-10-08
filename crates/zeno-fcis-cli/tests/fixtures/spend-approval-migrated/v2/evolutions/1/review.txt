@@ -1,0 +1,20 @@
+layout-change: spend-approval version 1 -> spend-approval version 2
+The state's fields differ; the command, the context, the channels and every other type do not.
+admission: a G2 data migration, which exists today: `contract evolve --migration` takes a declarative migration from the old state to the new one, and it is admitted only by forward simulation over the old contract's whole declared input domain, at most 2^20 tuples: on the migrated state the new contract must make every old decision, send every old delivery and reach the migrated successor. A store then upgrades with the application's `--upgrade`.
+changes:
+- state field 124 `urgent` of type 108 `Flag` was added; it starts at false
+- case 3 "create: the clerk opens the request at its tier" changed: its successor value of state field 124 `urgent` changed
+- case 8 "approve: the CFO approves" changed: its successor value of state field 124 `urgent` changed
+- case 9 "approve: the CEO approves" changed: its successor value of state field 124 `urgent` changed
+- case 15 "execute: over the daily limit, the request is blocked and risk is alerted" changed: its successor value of state field 124 `urgent` changed
+- case 16 "execute: the payment is sent" changed: its successor value of state field 124 `urgent` changed
+- case 18 "cancel: any staff member cancels a pending request" changed: its successor value of state field 124 `urgent` changed
+- generated law 990 (the genesis state) changed with the genesis state
+- generated law 991 (every decision follows the case table) changed with the case table
+- the decision program changed: its instructions (98 nodes before, 98 after); its input domains
+- the read limit changed from 183 to 194
+- the write limit changed from 4 to 5
+- the byte limit changed from 239 to 242
+- the Step limit changed from 772 to 807
+not part of the contract:
+- variable `urgent` was added: `pre.100.124`

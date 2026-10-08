@@ -809,7 +809,13 @@ fn original_context_head_aba_and_second_handle_freshness_are_checked_before_publ
         zeno_fcis_shell::CommitStatus::IdempotentReplay
     );
     let mut destination = zeno_fcis_shell_sqlite::MemoryDestination::default();
-    while first.deliver_next_memory(&mut destination).unwrap() {}
+    while let Some(pending) = first.next_pending().unwrap() {
+        pending
+            .deliver(&mut destination)
+            .unwrap()
+            .acknowledge()
+            .unwrap();
+    }
     assert_eq!(destination.delivered_count(), 3);
     assert_eq!(first.snapshot().unwrap().pending(), 0);
     drop(first);
@@ -875,15 +881,18 @@ fn every_original_commit_crash_recovers_all_or_none_through_the_new_checked_path
                 3
             );
             let mut destination = zeno_fcis_shell_sqlite::MemoryDestination::default();
-            reopened
-                .deliver_next_memory_unacknowledged(&mut destination)
-                .unwrap()
-                .unwrap();
+            let pending = reopened.next_pending().unwrap().unwrap();
+            drop(pending.deliver(&mut destination).unwrap());
             assert_eq!(destination.delivered_count(), 1);
             drop(reopened);
             let mut reopened = prepared_counter::Shell::open(&path, &authority).unwrap();
-            assert!(reopened.deliver_next_memory(&mut destination).unwrap());
-            assert!(!reopened.deliver_next_memory(&mut destination).unwrap());
+            let pending = reopened.next_pending().unwrap().unwrap();
+            pending
+                .deliver(&mut destination)
+                .unwrap()
+                .acknowledge()
+                .unwrap();
+            assert!(reopened.next_pending().unwrap().is_none());
             assert_eq!(destination.delivered_count(), 1);
             assert_eq!(reopened.snapshot().unwrap().pending(), 0);
         } else {

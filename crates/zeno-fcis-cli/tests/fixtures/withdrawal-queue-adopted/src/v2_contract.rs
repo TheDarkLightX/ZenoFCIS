@@ -2421,6 +2421,14 @@ pub fn checked_authority<'a>(
     let catalog = checked_catalog(descriptor).map_err(BindFailure::Catalog)?;
     authority::bind(&catalog).map_err(BindFailure::Authority)
 }
+/// Original schema labels for a lineage version, for historical reports.
+pub fn schema_description(version: usize) -> Option<&'static s::Description<'static>> {
+    match version {
+        1 => Some(&v1::DESCRIPTION),
+        2 => Some(&DESCRIPTION),
+        _ => None,
+    }
+}
 /// Position in this application's contract lineage: 1 before any adoption.
 pub const VERSION: u32 = 2;
 /// Contract version 1, superseded by adoption 1 in v2/policy.json.
@@ -2431,7 +2439,7 @@ pub mod v1;
 /// `k + 1`'s. `zeno-fcis generate contract` replayed every one before writing
 /// this list, and a program-successor store upgrade binds the ones it spans.
 pub const ADOPTION_RECEIPTS: &[&str] =
-    &["d050dc81e8dc450e6a15a06d3f5828bbbac9f53db1edec3f87d56d2811d319eb"];
+    &["e11e4e07ee3e4fbc9b763f21ed3c9e854da6ae7e051152e01fc68c3f2dfdf03e"];
 /// Every contract version's checked catalog, oldest first and this one last,
 /// and `ADOPTION_RECEIPTS`, for a store upgrade or a lineage open. Each
 /// binding checks that version's complete retained schema and policy bytes.

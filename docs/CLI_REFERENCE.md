@@ -20,12 +20,16 @@ zeno-fcis backend list
 zeno-fcis backend inspect|verify [--tools FILE]
 zeno-fcis backend inventory-lean ROOT [--format human|json]
 zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--max-input-tuples N] [--receipt OUT]
+zeno-fcis transform check --original FILE --candidate FILE --symbolic --tools FILE [--step-limit N] [--max-input-tuples N] [--symbolic-receipt OUT] [--queries DIR]
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
 zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i64-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
 zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--format human|json]
 zeno-fcis contract export-program [<contract-dir>] --out FILE [--format human|json]
 zeno-fcis contract adopt [<app-dir>] --candidate FILE --receipt FILE --usage preserved|new-version [--format human|json]
 zeno-fcis contract refresh-receipts [<app-dir>] [--format human|json]
+zeno-fcis contract diff <old-dir> <new-dir> [--format human|json]
+zeno-fcis contract evolve [<app-dir>] --to <contract-dir> [--migration FILE [--shortcut FILE]...] [--format human|json]
+zeno-fcis contract check-symbolic [<contract-dir>] [--strengthening FILE] [--tools FILE] [--max-tuples N] [--out REPORT.json] [--queries DIR] [--format human|json]
 ```
 
 `new` refuses a nonempty target. `check` parses and elaborates in one command.
@@ -283,18 +287,17 @@ Formal commands apply the exit classes to each backend result:
 
 | Backend result | `prove` | `counterexample` | Meaning |
 | --- | ---: | ---: | --- |
-| CVC5 returns UNSAT with proof-shaped output | 2 | 2 | The proposal and output are retained. V1 does not independently check the proof. |
-| Z3 returns UNSAT | 2 | 2 | The result remains blocked because V1 has no Z3 proof checker. |
+| CVC5 returns UNSAT with proof-shaped output | 2 | 2 | The proposal and output are retained. The current path does not independently check the proof. |
+| Z3 returns UNSAT | 2 | 2 | The result remains blocked because the current path has no Z3 proof checker. |
 | CVC5 or Z3 returns SAT and the built-in evaluator replays the model | 1 | 0 | A normalized counterexample is retained. |
-| Qualified Lean returns `KernelChecked` with the configured exact axiom report | 0 | unavailable | The generated theorem passed the Lean kernel check under the recorded RC3 Linux x86-64 toolchain identity. |
-| A custom Lean tree reports kernel success | 2 | unavailable | The run is retained as unqualified evidence. |
+| `--backend lean` | 2 | 2 | The current public exporter refuses this unsupported mode. The historical exporter is test-only. |
 | Tool is missing, reports `unknown`, or supplies unsupported evidence | 2 | 2 | The requested result remains blocked. |
 | Tool crashes, times out, exceeds a bound, or encounters a filesystem failure | 3 | 3 | The bounded execution failed. |
 
-Exit code `0` from a Lean `prove` command covers the generated theorem, the
-qualified Lean `4.30.0` Linux x86-64 distribution, and the configured exact
-axiom report. Translation review and any promotion into existing ZenoFCIS
-evidence types remain separate steps.
+The retained `KernelChecked` evidence type does not provide a public Lean
+exporter. Restoring a checked symbolic route is explicit planned work; see the
+[V2.3 roadmap](V2_3_PLAN.md). The existing solver path remains attested unless
+the required independent proof checking and translation obligations are met.
 
 ## Finite synthesis
 
@@ -401,6 +404,30 @@ adopting a candidate whose `usage_preserved` is false changes the
 application's sealed observations and would be a new contract version. This
 command does not adopt candidates, and a receipt grants no application or
 publication authority.
+
+## Symbolic per-case checks
+
+`contract check-symbolic` and `transform check --symbolic` ask the pinned
+CVC5 and Z3 one query per rule case, for domains too large to enumerate. The
+[symbolic checks guide](SYMBOLIC_CHECKS.md) describes both commands, the
+strengthening file format, the report schema `zeno-fcis/symbolic-check/1`,
+the receipt schema `zeno-fcis/transform-symbolic-receipt/1`, the encoding's
+supported constructs and its limits.
+
+- A counterexample is replayed through the library evaluators before it is
+  reported (Checked, exit 1).
+- `holds` from enumeration of the whole domain is Proved (exit 0). `holds`
+  from the solvers is attested by CVC5, corroborated by Z3, not proved, and
+  exits 2, as a CVC5 `unsat` does for `prove`.
+- Anything undecided, including a solver disagreement without a replayed
+  model and a planted control that was not refuted, is `inconclusive`
+  (exit 2).
+- `transform check --symbolic` refuses a domain that fits
+  `--max-input-tuples`; the exhaustive check decides it. Its receipt is not a
+  `zeno-fcis/transform-receipt/1`: `transform replay`, `contract adopt`,
+  `contract refresh-receipts` and contract generation refuse it.
+
+Without `--symbolic`, `transform check` is unchanged.
 
 ## Checked optimizer
 
@@ -821,6 +848,132 @@ review observes the contract's behaviour on chosen inputs. It is not a proof
 about the rules, and a boundary set is not the domain; it does not replace
 the owner's review of the rules file.
 
+## Generated application command line
+
+An application built with `new --contract` has an operational command line
+of its own, in its `src/cli.rs`. Its package and binary are named after the
+application and its contract version, such as `spend-approval-v1`, so the
+builds of two versions of one application can share a target directory
+without sharing a library build or overwriting each other's binary.
+
+```text
+APP init DATABASE [--format human|json]
+APP submit DATABASE NAME=VALUE... [--format human|json]
+APP decide DATABASE NAME=VALUE... [--format human|json]
+APP state DATABASE [--format human|json]
+APP history DATABASE [--format human|json]
+APP pending DATABASE [--format human|json]
+APP deliver DATABASE --to FILE [--format human|json]
+APP deliver DATABASE --relay CONFIG.json [--format human|json]
+APP version [--format human|json]
+```
+
+- `init` publishes the contract's genesis state into a new store and creates
+  its empty submission journal, `DATABASE.submissions`. It refuses an
+  existing file.
+- `submit` decides one command on the store's current state and commits the
+  decision unless it is a reject. The command and context fields are written
+  by the names `project.zeno` gives them, as `NAME=VALUE`, or as
+  `command.NAME=VALUE` and `context.NAME=VALUE`, which is required when both
+  roots have a field of that name. A boolean is `true` or `false` (or 1 or
+  0), an integer a decimal number, and a sum a variant's name (or ID). Every
+  field must be given once. Each value is checked against its declared
+  domain by the decision-examples grammar of `src/examples.rs`, so an
+  unknown field, a missing one, a value of no declared form and a value
+  outside its declared range are refused with the field's name, and nothing
+  is written. The submission is recorded in the journal, and synchronized to
+  disk, before the commit. `submit` holds an exclusive lock on the journal
+  from before it reads the store's head until the commit's outcome, so
+  submissions to one store run one after another; when the commit does not
+  happen, for example because another program wrote the store in between,
+  its journal line is removed again. A line past the store's head, left by a
+  process that stopped before its commit's outcome, is removed by the next
+  `submit`. A missing journal of a store at genesis, such as one left by an
+  `init` that stopped after creating the store, is created empty by
+  `submit`, which is exactly its content. A missing journal of a store with
+  commits is refused with exit 3: the store does not hand out the
+  submissions the journal would hold, so it cannot be rebuilt. Restore it
+  from a backup; or create it as an empty file, after which `submit`
+  continues and `history` refuses the commits the journal does not record.
+  `init` never recreates a journal, since it refuses an existing store. A
+  reject writes nothing.
+- `decide` is a dry run of `submit`: the same Authority's decision on the
+  current state, printed, with nothing committed or recorded.
+- `state` prints the current state by field name, with the head: the
+  contract version the store runs, the commits after genesis, the pending
+  deliveries and the recorded upgrades.
+- `history` prints genesis and every commit with its command, context and
+  decision. It reads the submission journal and checks it against the
+  store's full read-only audit: every commit position has a submission, its
+  contract identity and command/context match the stored inputs, and the
+  Authority decides those original inputs again. The audit supplies pre-states
+  after each preceding migration or rename, and checks upgrades after the last
+  commit too. Original genesis, field names, variant labels and payload names
+  use their publishing version's checked schema, including when a store begins
+  at a later lineage member. Different journal inputs refuse even if they
+  could reach the same final state. A store with commits that `submit` did not
+  record, such as one made with `--decide`, is refused, and so is a journal
+  whose commit numbers do not strictly increase. `history` takes a shared
+  lock on the journal, so it never reads a submission between its journal
+  line and its commit. The lock is advisory: it orders the application's own
+  commands, not other programs that write the journal.
+- `pending` prints how many deliveries are pending and the oldest one, the
+  one `deliver` sends next; it delivers nothing.
+- `deliver --to FILE` sends every pending delivery, oldest first, to the file `FILE`.
+  Each delivery goes through the store's typed lifecycle, `Pending` to
+  `Delivered` through the library interpreter, is appended to the file as
+  one JSON line, its delivery ID first, the file is synchronized to disk,
+  and only then is the delivery acknowledged in the store. The file keeps
+  one line per delivery ID: a delivery whose line it already holds, from a
+  run whose acknowledgment did not reach the store, is not appended again,
+  and a different line under a held ID is refused with the delivery left
+  pending. A last line without its newline, left by an interrupted append,
+  is removed before the next append. Each delivery is acknowledged before
+  the next is sent, so a failure part way through keeps the deliveries
+  already sent and acknowledged; its message names them. The file
+  destination implements the application's `Destination` trait in
+  `src/session.rs`, the extension point for other transports.
+- `deliver --relay CONFIG.json` sends the same ordered entries through the
+  generated application's Python relay to an HTTP receiver or a queue file.
+  Choose one of `--to` and `--relay`. The configuration has schema
+  `zeno-fcis/relay-destination/1`, exactly one `http` or `queue` destination,
+  and optional `attempts` (1–8, default 5), `backoff` and `max_backoff`
+  (0–8 seconds), and `timeout` (0.001–30 seconds, default 10). A relative
+  queue path is relative to the configuration file. Python 3 is required.
+  Each attempt retains the delivery's original ID and canonical payload.
+  The store acknowledges it only after the worker reports success; a
+  failure leaves it pending. The worker has a 120-second process deadline.
+  Transport is at least once; an idempotent receiver can make retries one
+  effect. The worker's success report is trusted shell input, not a proof
+  of external settlement. `crash_at: "after-send"` is a test fault that
+  leaves a sent entry pending and exercises this retry boundary.
+- `version` prints the application's name, its contract version, its
+  contract identity and the ZenoFCIS release it was generated for. The
+  identity is a domain-separated SHA-256 commitment to the identity bytes of
+  the library Authority bound to the current contract version.
+
+Every command that reads a store opens it through the contract lineage, as
+`--audit` and `--decide` do, so the Authority of the version the store runs
+decides, and a store of another contract, or of a later version of this one,
+is refused with `Identity`. `submit`, `decide`, `pending` and `deliver` need
+a store at the build's own version and name `--upgrade` otherwise; `state`
+and `history` read a store at an earlier version too. The forms without a
+command, `NEW_DATABASE_PATH`, `--decide`, `--audit`, `--deliver`,
+`--upgrade` and `--migrate`, work as before. A database path that is a
+command's name must be written with a directory, such as `./state`.
+
+With `--format json`, each command prints one JSON object, with `status`
+first; an error prints `{"status":"error","error":{"code":...,"message":...}}`
+and also writes the message to stderr.
+
+| Code | Meaning |
+| ---: | --- |
+| 0 | completed: a submission committed (an accept or a committed failure), a decision that would commit, or a report |
+| 1 | refused: an input the contract does not declare, a store of another contract or version, or another refusal of the store or the Authority; nothing was written, except that `deliver` keeps the deliveries it completed before the refusal, which the message names |
+| 2 | the Authority rejected the command; nothing was written |
+| 3 | the journal or the delivery destination failed, or the journal of a store with commits is missing; as for 1, `deliver` keeps the deliveries it completed first |
+| 64 | the command line is malformed |
+
 ## Contract adoption and store upgrades
 
 `contract adopt DIR --candidate C.zcve --receipt R.json --usage
@@ -857,6 +1010,14 @@ Generation also refuses:
   could then refuse a decision. These are premises of a program successor's guarantee (below).
   Each adoption in the summary reports them as `premises`, with the Step
   usage, law Steps and limits behind them.
+
+Before it writes anything, the command also classifies the change from the
+version the adoption supersedes to the new version, with the classifier of
+[`contract diff`](#contract-change-classification), and refuses any kind but
+`program-successor`, naming the kind and the parts that changed. An adoption
+replaces only the decision program, and the Step limit that follows its node
+count, so this refusal never meets a valid adoption: it checks the generator
+against the classifier.
 
 On success the command writes, in this order, `v2/adoptions/N/program.zcve`
 and `v2/adoptions/N/receipt.json`, the generated contract, and last
@@ -905,8 +1066,8 @@ existing SQLite store with its whole lineage:
 
 | Command | Effect |
 | --- | --- |
-| `<app> --audit DB` | Replays each history segment under the version that published it and prints the head: the contract version the store runs, commits, pending deliveries and recorded upgrades. A store at any version of the application is audited, under the versions up to its own. |
-| `<app> --upgrade DB` | Records a checked upgrade from the version the store runs to this build's version. After a full audit, the two versions must have equal canonical state schema bytes and different identities. When the store's shell establishes all five premises below itself, from the two versions' contracts, the record is a `program-successor`, admitted at any state; it binds the number of input tuples on which the shell compared the two decision programs and the receipt digests this build declares for the adoptions between the two versions. A generated adoption normally establishes all five. When any premise is missing, the new contract's genesis laws must admit the current state through the library's genesis evaluation, and the record is a `genesis-admission` that binds that genesis publication. For generated contracts those laws include the initial-condition law 990, so the store must then be at its declared genesis state; otherwise the refusal names the missing premise. Either record binds both identities, the state root and the chain tip, and becomes the next chain link; the head's chain moves to it. Pending deliveries keep their IDs and commit order. The report names the kind. Any refusal writes nothing. |
+| `<app> --audit DB` | Replays each history segment under the version that published it and prints the head: the contract version the store runs, commits, pending deliveries and recorded upgrades. A store at any version of the application is audited, under the versions up to its own, so a new build checks an old store before `--upgrade`. The audit opens the file read-only, in one read transaction, and saves no checkpoint: it writes nothing. |
+| `<app> --upgrade DB` | Records a checked upgrade from the version the store runs to this build's version. After a full audit, the two versions must have different identities and, unless the lineage declares a data migration or a rename between them (below), equal canonical state schema bytes. When the store's shell establishes all five premises below itself, from the two versions' contracts, the record is a `program-successor`, admitted at any state; it binds the number of input tuples on which the shell compared the two decision programs and the receipt digests this build declares for the adoptions between the two versions. A generated adoption normally establishes all five. When any premise is missing, the new contract's genesis laws must admit the current state through the library's genesis evaluation, and the record is a `genesis-admission` that binds that genesis publication. For generated contracts those laws include the initial-condition law 990, so the store must then be at its declared genesis state; otherwise the refusal names the missing premise. When this build's lineage declares a behaviour change between the two versions, recorded by [`contract evolve`](#rule-changes-for-live-stores), neither route is tried: the record is a `behaviour-change`, admitted when every state law of this build's version and every inductive claim it declares hold on the store's current state, with no program comparison; the refusal names the law or claim that does not hold. When the lineage declares a data migration or a rename between two versions, recorded by [`contract evolve`](#data-migrations-and-renames), the state schemas may differ: the upgrade records one hop per such step, a `migration` admitted by the store's own forward simulation or a `rename` admitted when only names differ, each moving the head's state to the new layout, and one hop for each run of other steps between them, all at the same head in one transaction; the report describes the last hop. Every record binds both identities, the state root and the chain tip, and becomes the next chain link; the head's chain moves to it. Pending deliveries keep their IDs and commit order. The report names the kind. Any refusal writes nothing. |
 | `<app> --deliver DB` | Delivers every pending outbox entry of a store at this build's version, acknowledges each and prints their IDs. A store at an earlier version must be upgraded first. |
 | `<app> --migrate DB` | Converts a store created before upgrades were recorded (SQLite schema v9) to the current schema v10, after a complete audit under the version that created it. Any other schema, or a store under no version of the application, is refused and nothing is written. Opening or upgrading a v9 store without this step is refused. |
 | `<app> --decide DB` | Runs the decision examples as one session and leaves the outbox pending. Without a file at `DB`, the session starts at genesis in a new database, like `<app> NEW_DB`. An existing store must run this build's version; the session continues from the store's state, taking while one remains the first example whose pre-state is that state, and records each commit and its replay under a key of its own. A store at another version is refused and left as it was; one at an earlier version must be upgraded first. It is an aid for acceptance tests and maintenance, not an operational interface, which is planned for 2.2. |
@@ -969,14 +1130,513 @@ message saying what happened and what to do, and in parentheses the error's
 there is nothing to upgrade (Upgrade(SameContract))`.
 
 The library crate exposes the same operations as typed handles.
-`v2::Lineage::bind(catalogs, receipts)` binds a lineage, with the default
-comparison cap, and `Lineage::bind_with_cap` with another one; `Lineage::open`
+`v2::Lineage::bind(catalogs, receipts)` binds a lineage of adoptions, with
+the default comparison cap, and `Lineage::bind_with_cap` with another one;
+`Lineage::bind_steps(catalogs, steps)` binds one whose `v2::Step`s may also
+be behaviour changes, each with its review text and claims, data migrations
+(`v2::migration::Migration`) and renames;
+`Lineage::audit_read_only` audits a store at any version without writing;
+`Lineage::open`
 returns either a v9 store, whose only operation is `migrate`, or a v10 store
 that is current or superseded. `Superseded::upgrade` consumes its handle and
 returns the current one with the `UpgradeReceipt`. The pure
 `v2::upgrade::decide`, `v2::upgrade::Successor::establish` and
-`v2::equivalence::compare` make the decisions; the `zeno-fcis` binary itself
-does not open stores.
+`v2::equivalence::compare` make the decisions, `v2::behaviour` evaluates
+a behaviour change's laws and claims, and `v2::migration` simulates a
+migration and checks a rename; the `zeno-fcis` binary itself does not open
+stores.
+
+## Rule changes for live stores
+
+`contract evolve DIR --to NEW` replaces the contract of the application in
+`DIR` with the contract in `NEW`, a directory holding `project.zeno`,
+`v2/policy.json` and optionally `tests/decision-examples.txt`, after the
+owner's review, and regenerates the application's whole lineage. Without
+`--migration`, a rule change takes this path as a behaviour change,
+described here, and a rename as the exact rename tier; with `--migration`, a
+layout change or a rule change takes it as a data migration. Both of those
+are described in [Data migrations and renames](#data-migrations-and-renames).
+
+1. The command generates both contracts and classifies the change from the
+   application's current version to `NEW` with the classifier of
+   [`contract diff`](#contract-change-classification). A kind no path takes
+   is refused, naming the kind and the changed parts: a program successor is
+   adopted with `contract adopt` instead, a layout change needs
+   `--migration`, a rename takes none, and an identical or unrelated
+   contract has no path. A rule change keeps the schema and the channels
+   byte for byte, so a store keeps its state as it is. `NEW` may not list
+   adoptions or evolutions of its own; adopt in the application afterwards.
+2. The classifier's plain-language account of the change is the owner's
+   review. It is written as `v2/evolutions/N/review.txt`, one line per line of
+   `contract diff`'s human output, with `NEW`'s first version numbered after
+   the application's versions.
+3. The replaced contract is kept under `v2/evolutions/N/`: its
+   `project.zeno`, its `v2/policy.json` without `evolutions`, and its
+   adoptions' retained files, which move there from `v2/adoptions/`. Stores
+   may run any of its versions.
+4. The new `v2/policy.json` is `NEW`'s rules with an `evolutions` list: one
+   entry per replaced contract, oldest first, binding the SHA-256 of that
+   contract's last policy and of the review, and for a rename or a migration
+   its `kind`. `NEW`'s `tests/decision-examples.txt`, when present, replaces
+   the application's.
+
+Generation, by `contract evolve` and by every later `generate contract`,
+regenerates every version of every replaced contract from its kept files,
+numbers the whole lineage from 1, and requires each replaced contract's last
+policy to be the one its entry binds. It also computes each review again from
+the two contracts and requires it to be byte for byte the kept
+`review.txt` and the digest the entry binds, so neither the review nor
+either contract can be edited afterwards. The current version's
+`src/v2_contract.rs` then declares every earlier version as a module, lists
+`ADOPTION_RECEIPTS`, every adoption of the lineage in order, and
+`EVOLUTIONS`: for each behaviour change, the version it follows, the review
+text, included from its file, and the inductive claims of the contract it
+leads to, each compiled to a law program over the state. `with_lineage`
+passes all three. A contract that never evolved is generated exactly as
+before.
+
+On success the command writes, in this order: the kept contract and the
+review, the generated lineage, the examples, `project.zeno` when it changed,
+and `v2/policy.json`; last it removes `v2/adoptions/`, now kept under the
+evolution. Any refusal exits 1 and writes nothing. An interruption before the
+rules are written leaves the application at its contract and an evolution
+directory that the command refuses until it is removed. An interruption
+between `project.zeno` and the rules leaves the two inconsistent; generation
+then refuses them until they are restored, for instance from version control.
+
+Results use schema `zeno-fcis/cli/1`: `evolved` with `kind`, the
+classifier's kind of the change, `evolution` (`ordinal`, `directory`,
+`from_version`, `version`, `path`: `behaviour-change`, `rename` or
+`migration`, `superseded_policy_sha256`, `review_sha256`, `claims`,
+`review_path` and, for a migration, `migration`), `review`, the review's
+lines, `artifacts` and `summary`, whose `evolutions` lists every evolution
+of the lineage with its `kind`; or `error` with
+`contract-invalid` (exit 1), `contract-read-failed` (exit 3) or
+`evolution-write-failed` (exit 3). `contract refresh-receipts` rebinds only
+the current contract's receipts: a replaced contract's receipts must replay
+as they are.
+
+The store follows with the application's `--upgrade`, which records a
+`behaviour-change`. The SQLite shell admits it when, on the store's current
+state:
+
+- every state law of the new version holds: each law that applies at
+  genesis and to every committing decision, other than an
+  `InitialCondition` law; and
+- every inductive claim the new contract declares holds, each restated over
+  the state as `prove` restates its post-state. All inductive claims are
+  checked, whether or not `prove` ran for them.
+
+The shell evaluates them with the library's law evaluator through the
+verified core's genesis framing, over the new contract's descriptor with
+every other law's predicate replaced by `true`, so that the core decodes the
+state under the new contract's schema and evaluates each law and claim on
+it. No decision programs are compared, so the upgrade waits on no
+comparison. Genesis exactness, law 990, applies only to new stores: it is
+not evaluated, and the record lists it, with every other law that applies at
+genesis and is not a state law, as not evaluated. The record, magic
+`ZFCISV2-BEHAVIOUR`, binds the law and claim IDs that held, the laws not
+evaluated and the SHA-256 of each review between the two versions; the
+upgrade row stores the review texts beside it. An audit evaluates the laws
+and claims on the recorded state again and requires the stored texts to be
+the reviews this build declares; a build that declares other reviews, or an
+adoption, for the step refuses the store and says it may be intact.
+
+The upgrade report adds `behaviour`: `state_laws_held`, `claims_held`,
+`not_evaluated` and `reviews`, the review digests.
+
+What the upgrade establishes, at its true strength:
+
+- After the upgrade, every law holds on every later committed state, because
+  the Authority checks the laws at every commit.
+- Each inductive claim whose induction step holds, as `prove` attests it
+  for the laws the claim assumes, holds from the upgrade on: it holds at the
+  upgrade state, and every committed step preserves it. The upgrade itself
+  checks only the upgrade state; the step is `prove`'s.
+- Facts that rest only on reachability from the new contract's genesis do
+  not carry over, because the history was made under the old rules. A store
+  may hold a state the new contract could never reach from its own genesis;
+  only the laws and claims checked on it are known to hold there.
+
+`tools/check_contract_evolve.py` runs the study's change end to end: an
+escrow store with committed history, whose 14-day window refused a dispute
+14 days and one second after shipping, evolves to the 30-day window of
+`crates/zeno-fcis-cli/tests/fixtures/escrow-dispute-30`, is audited
+read-only by the new build, upgrades, and keeps committing: the same dispute
+is accepted and the split's payouts are delivered.
+
+## Data migrations and renames
+
+`contract evolve DIR --to NEW --migration m.json` takes a change that
+alters the state's layout, or a rule change, as a data migration: the
+migration file `m.json` maps the application's current state to `NEW`'s,
+and the change is admitted only by forward simulation. Without
+`--migration`, a `rename` is taken as the exact rename tier and needs no
+file. Everything else in [Rule changes for live
+stores](#rule-changes-for-live-stores) applies: the classification first,
+the review, the kept contract, the regenerated lineage, and nothing written
+on a refusal.
+
+The migration file, schema `zeno-fcis/migration/1`, gives every field of the
+new state record a value from the old state, by field ID:
+
+```json
+{
+  "schema": "zeno-fcis/migration/1",
+  "state": {
+    "120": {"from": 120},
+    "121": {"from": 121},
+    "124": {"default": false},
+    "125": {"from": 120, "map": {"150": 0, "151": 1, "152": 2, "153": 2, "154": 2}}
+  }
+}
+```
+
+- `{"from": f}` carries old field `f` over, under its own name or a new
+  one: a carried field or a rename. Its kind (Boolean, integer or variant)
+  must not change.
+- `{"default": v}` gives an added field the value `v`.
+- `{"from": f, "map": {..}}` takes the value from a table over old field
+  `f`'s values, which must list every one of them: one part of a split. Keys
+  are decimal integers, `false` or `true`.
+
+Values are written as the rules file writes them: `true` or `false`, an
+integer in the field's range, or a variant's ID. Every new field must be
+given a value, every old field must be carried into at least one new field,
+since a migration renames, adds and splits fields and drops none, and keys
+other than these are refused. Text fields have no finite domain and cannot
+be migrated. Deliveries are compared without a mapping: a layout change keeps
+every payload and destination type, and a change of either is classified
+`unrelated` and refused before any migration is read.
+
+**Admission by forward simulation.** `contract evolve` and every later
+`generate contract` compile the file against both contracts and run the
+SQLite shell's own simulation, compiled into the CLI from the shell's
+source, over the application's last version and `NEW`'s first, through the
+library's bound Authorities:
+
+- It enumerates every state of the old contract's declared state domain and
+  keeps those on which every state law of the old contract holds, as the
+  library's law evaluator decides through the core's genesis framing. A
+  store's state satisfies them however it got there: its genesis and every
+  commit are checked against them, a behaviour change checks the new laws
+  on the state it keeps, a rename keeps the laws, and the third item of
+  this list makes a migrated state satisfy the new laws. So the kept states include
+  every state a store can hold.
+- For each kept state `s`: when the old contract's genesis evaluation admits
+  `s`, the new contract's must admit `m(s)`. For a generated contract, whose
+  law 990 admits only its declared genesis state, this says that `m` maps
+  the old genesis state to the new one.
+- For each kept state `s`, every state law of the new contract must hold on
+  `m(s)`, observation `new-state-laws`. This holds even for a state no
+  commit of the old contract leads to, for instance one a behaviour change
+  kept; it is checked here, over every kept state, rather than on the
+  store's head at the upgrade, and every upgrade and audit re-runs it.
+- For each kept state and every command and context of the declared domain,
+  the new contract's publication over `m(s)` must give the same
+  observations as the old contract's over `s`: the same technical refusal,
+  or the same decision class and reason; the same deliveries in order, each
+  with its lane, ordinal, channel, destination, payload and idempotency
+  value as the library's candidate holds them; and for a commit a successor
+  state equal, byte for byte as the store would hold it, to `m` of the old
+  successor. Matching successor states alone admit nothing.
+
+The simulation runs only when the old contract's whole input domain, every
+state, command and context, has at most 2^20 = 1,048,576 tuples, the cap of
+[`contract review`](#contract-review). A larger domain is refused as
+inconclusive: no sampling, boundary set or solver result stands in for the
+enumeration, so solver evidence is not accepted for a migration. A refusal
+names the observation that differs, or the field without a value in its
+domain, and the input where it happened, as field values; a difference is a
+behaviour change, which takes the path above without `--migration` when the
+layout is unchanged.
+
+What an admitted migration establishes, at its true strength: every state
+the old contract's state laws allow maps to one the new contract's state
+laws allow, and from a mapped state the new contract makes the same
+decisions, sends the same deliveries and reaches the mapped successor. It covers those observations
+and no others: sealed identities, certificates, the delivery IDs of later
+commits and Step usage may differ. It rests on the enumeration of a finite
+declared domain through the library evaluator, which the shell repeats at
+every store upgrade and audit; it is not a proof about other domains.
+
+The migration is kept as `v2/evolutions/N/migration.json`, and the rules
+entry binds its SHA-256 with `"kind": "migration"` and `migration_sha256`;
+generation refuses an edited file. The current version's
+`src/v2_contract.rs` declares `STATE_STEPS`: each migration, field by field,
+and each rename, after the version it follows; and a superseded version
+whose schema a migration or rename changed keeps its own schema file,
+`v2/schema_v{k}.zcve`. A lineage without a migration or rename is generated
+exactly as before. The report's `evolution.migration` gives the file's
+`sha256`, `path`, the old contract's `states`, the
+`states_satisfying_state_laws`, the `genesis_states` among them, the
+`tuples_compared` and the `observations` compared.
+
+**Routes and shortcuts.** Migrations are built between consecutive
+versions, and an upgrade across several applies each in turn. `--shortcut
+FILE`, repeatable, adds a migration file with `"from_version": k` that maps
+version `k` directly to `NEW`. Version `k` must be the last version of an
+earlier contract this lineage evolved from, and every evolution since must
+be a migration or a rename, the new one included. The shortcut is admitted
+only when it agrees with the composed route of those consecutive steps: on
+every state of version `k`'s declared domain on which its state laws hold,
+and for every command and context, `NEW`'s publication over the shortcut's
+state gives the same observations as over the route's state, and the two
+states are the same. An agreeing shortcut is kept as
+`v2/evolutions/N/shortcuts/from-{k}.json`, bound in the rules entry's
+`shortcuts`, and checked again by every generation. A store upgrade applies
+the composed route, which the shortcut equals on every state checked.
+
+**Renames.** A `rename` changes only profile, type, field or variant names:
+the new policy, with the old schema and its commitments in place of its
+own, is byte for byte the old policy. `contract evolve` without
+`--migration` takes it, and the rules entry records `"kind": "rename"`.
+
+**Store upgrades.** The application's `--upgrade` records one hop per
+migration or rename step:
+
+- A `migration` record, magic `ZFCISV2-MIGRATION`: the store's shell runs
+  the same forward simulation itself, from the two versions' bound
+  catalogs, before it takes the write lock, and keeps the outcome for the
+  lineage value. It then migrates the store's current state, checks the target
+  state laws and freshly compiled target claims on that state, and moves the
+  head to it. Old-schema claim programs are not reused across the migration.
+  These current-state checks establish the admitted base, not a new theorem
+  that the claims hold on every future state. The record binds the SHA-256 of the migration's canonical
+  encoding (the shell's own, which `generate contract` compiles from
+  `migration.json`), the simulation's state, admitted-state, genesis-state
+  and tuple counts, the observations compared and the migrated state's
+  root; the upgrade row stores the encoding and the migrated state. With
+  nonempty target claims, format 2 also binds the evaluated claim programs,
+  IDs, state root, checked laws, unevaluated laws and owner review. Changing
+  a claim body while keeping its ID requires different admission evidence.
+  Empty target claims retain the existing format-1 record bytes.
+- A `rename` record, magic `ZFCISV2-RENAME`: the shell checks from the two
+  catalogs that only names differ, frames the state's payload again under
+  the new schema, and moves the head to it, at any state. The record binds
+  the new state's root, and the row stores the state.
+
+An audit re-derives each record: it re-runs the simulation, once per
+lineage value as the program comparison is, migrates or re-frames the
+recorded state again, and requires the stored encoding and state to be
+exactly those. The simulation is re-run on every open of a migrated store,
+not only in an explicit audit command, so that no open trusts a recorded
+count, and it is kept per lineage value, as the program-successor
+comparison already is. Its cost grows with the domain: about 3 seconds per
+open of the spend-approval store (14,592 tuples) in a debug build of the
+generated application and about 15 seconds per `contract evolve` or
+`generate contract` in a debug CLI. Scaled linearly to the cap of 2^20
+tuples, which no fixture approaches and which was not measured, that would
+be minutes per open and per generation; a contract with a domain near the
+cap pays that on every `--decide`, `--deliver` and `--audit` of a migrated
+store. A build that declares another migration, or another kind of step, for
+those versions refuses the store and says it may be intact; a stored state
+that is not the migration's is damage. Pending deliveries keep the IDs
+their commits bound, and each segment replays under its own contract.
+
+The upgrade report adds `migration`: `sha256`, the encoding's digest,
+`states`, `states_satisfying_state_laws`, `genesis_states`,
+`tuples_compared`, `observations`, `state_root` and `claims_held`.
+
+`tools/check_contract_migrate.py` runs the spend-approval migration end to
+end: two version 1 stores with committed history, one with a payment
+pending, are audited read-only by the migrated build and upgraded; the
+pending payment is delivered with its original ID, the other store keeps
+committing under version 2, and a later rename upgrades the first store at
+its executed state, after which all three segments replay. An executed
+spend-approval request is final, so the two properties are shown on two
+stores. It also shows each refusal: a broken delivery, a changed decision, a
+genesis that does not map, a disagreeing shortcut, a domain above the cap
+and a layout change without a migration.
+
+## Contract change classification
+
+`contract diff OLD NEW` reads two contract or application directories, each
+holding `project.zeno`, `v2/policy.json` and any adoptions, and generates
+each one's current version exactly as `generate contract` does, replaying
+every adoption receipt. It then decides exactly one kind of change from OLD
+to NEW, by comparing the two canonical policies and schemas and the structure
+the generator built them from, and names every changed item. It writes
+nothing. It decides only the structural kind: it runs no decision, so it
+never shows that a rule change preserves or changes decisions; the kind's
+admission path checks that.
+
+The kinds are tried in this fixed order, and the first whose condition holds
+is the kind of the change:
+
+| Kind | Condition | Admission path |
+|---|---|---|
+| `identical` | The canonical policies are byte-identical, so the contract identities are equal. | None is needed. |
+| `program-successor` | NEW's canonical policy, with its decision program's instructions and roots and its Step limit replaced by OLD's, is byte for byte OLD's policy. This is premise 1 of the F6.1 upgrade, the comparison the SQLite shell makes. | An F3 equivalence receipt and the F6.1 program-successor upgrade, admitted at any state. It exists today. |
+| `rename` | Both schemas declare the same types, fields and variants, with the same IDs and forms; some project, type, field or variant name differs; and NEW's policy, with OLD's schema and schema commitment in place of its own, is byte for byte OLD's policy. | G2's rename tier, admitted at any state; it exists today: [`contract evolve`](#data-migrations-and-renames) without `--migration`. |
+| `layout-change` | The state layout differs, while every other type and every channel is unchanged. Names, laws, cases, reasons, the genesis state and the decision program may differ too. | A G2 data migration, admitted by forward simulation over the old contract's whole declared input domain; it exists today: [`contract evolve --migration`](#data-migrations-and-renames). |
+| `rule-change` | The schemas are byte-identical and so are the channels. Since neither of the first two kinds holds, the policies differ in more than the decision program and its Step limit: in laws, cases, reasons or the genesis state. | G14.1's behaviour-change upgrade, which exists today: [`contract evolve`](#rule-changes-for-live-stores) records the change with this account, and a store upgrades when every state law of the new contract and every inductive claim it declares hold on the store's state. G2's forward simulation also exists today, for a rule change that preserves every decision: [`contract evolve --migration`](#data-migrations-and-renames). |
+| `unrelated` | Anything else. | Refused. |
+
+The terms:
+
+- **The state layout** is the state record, type 100, with each field's ID
+  and type, and the form of every type a state field has: a boolean, an
+  integer range, a text length range, or a sum's variant IDs. Names are not
+  part of it. A type a state field has counts as the state's only when no
+  command, context, payload or destination field has it and it is no channel's
+  destination or payload, on either side.
+- **Every other type** is the command and context roots, payloads and
+  destinations, the types their fields have, a type the state shares with
+  them, and any type nothing has.
+- **The channels** are each channel's ID, destination type and payload type.
+
+So `unrelated` covers: a channel added, removed or given another destination
+or payload type; a change to the command, the context, a payload, a
+destination, a shared type or an unused type; and names changed together
+with laws, cases, reasons, the genesis state or the decision program, which no
+single admission path takes. A renaming and another change can be two
+versions instead. A type's form includes its range: widening an integer type
+that both a state field and a command field have changes the command too, so
+the change is `unrelated`.
+
+The JSON document, schema `zeno-fcis/contract-diff/1`, depends only on the two
+contracts' files, not on where they are: the same command, or the same
+contracts copied elsewhere, prints the same bytes. It holds:
+
+- `kind`, and `precedence`, the six kinds in the order above;
+- `parts`, the parts of the contract that changed, in this order: `names`
+  (a name of an item on both sides), `state` (the state layout), `interface`
+  (every other type), `channels`, `reasons` (a declared reason or the class
+  its cases give it), `genesis`, `laws` (a compiled law, declared or
+  generated), `cases`, `program` (the decision program), `step-limit` and
+  `limits` (the read, write, byte or effect limit);
+- `old` and `new`: each version's application, its version number in its own
+  lineage, the SHA-256 of its policy, schema and decision program, the
+  program's node count and every limit;
+- `lineage`: `old_in_new`, the version of NEW's lineage whose policy is OLD's
+  current policy, with `receipts`, the receipt digests of NEW's adoptions after
+  it; and `new_in_old`, the earlier version of OLD's lineage that NEW is,
+  when it is one;
+- `admission`: whether one is `needed`, whether the change is `refused`, and
+  the `paths`, each with its `id` (`f6.1-program-successor`, `g2-rename`,
+  `g2-migration`, `g2-forward-simulation` or `g14.1-behaviour-change`), its
+  plan `feature`, whether it `exists_today` (every path does), and `when`
+  it applies. For a
+  program successor, `ready` says that NEW's lineage holds OLD below its
+  current version, so the receipts exist and the application's `--upgrade`
+  admits a store at OLD; when NEW is instead an earlier version of OLD's
+  lineage, no store goes back to it. `text` says the same in words;
+- `changes`, every changed item of the contract, and `notes`, every
+  difference that is not part of the contract. Each entry has an `item`, an
+  `id`, a `change` (`added`, `removed`, `renamed` or `changed`) and a
+  one-sentence `text`, with `old` and `new` values where they apply and, for a
+  changed case, law or program, the `aspects` that changed;
+- `summary`, the human output's lines.
+
+| `item` | `id` | Changes |
+|---|---|---|
+| `profile` | empty | The project's name, `renamed`. |
+| `type` | the type ID | `added`, `removed`, `renamed`, or `changed` in form. |
+| `field` | `TYPE.FIELD` | `added`, `removed`, `renamed`, or `changed` to another type. Its text says whose field it is: the state's, the command's, the context's or a payload's. |
+| `variant` | `TYPE.VARIANT` | `added`, `removed` or `renamed`; the text names the fields that have the sum, such as the command field whose variants are the command set. |
+| `channel` | the channel ID | `added`, `removed`, or `changed` destination or payload type. |
+| `reason` | the reason ID | `added`, `removed`, or `changed` from one class to another. |
+| `genesis` | the state field ID | `changed` value. |
+| `law` | the law ID | `added`, `removed`, or `changed`, with the aspects `formula`, `kind`, `scope`, or `program` when only its compiled program changed, as the generated laws 990 and 991 do when the genesis state or the cases change. |
+| `case` | the old index; the new index of an added case | `added`, `removed`, or `changed`, with the aspects `when`, `class`, `reason`, `post` and `outbox`. Cases are aligned in order by their content, with every variable replaced by its definition, along a longest common subsequence; within each run of unaligned cases the i-th old case pairs with the i-th new one, and the rest are removed or added. |
+| `program` | empty | `changed`, with the aspects `instructions`, `inputs` and `outputs`; `old` and `new` are the node counts. |
+| `limit` | `read`, `write`, `byte`, `effect` or `step` | `changed`. |
+
+The notes cover the application name, law, reason and channel names, reason
+precedences, the `rule` notes of aligned cases, rule variables (a removed and
+an added variable with one definition are reported as one renamed variable)
+and claims. None of them reaches the schema or the policy.
+
+The human output is the same account: the kind and both versions, what the
+kind means, the admission line, then one line per change and per note.
+
+Exit codes: 0 when classified, whatever the kind; 1 when a contract is
+invalid, as `generate contract` would refuse it, and 3 when a file cannot be
+read, both reported with schema `zeno-fcis/cli/1` and a `side`, `old` or
+`new`, and nothing written; 64 for usage.
+
+The classifier's `program-successor` comparison mirrors the shell's
+`v2::upgrade::program_successor` line for line. The CLI's unit tests compile
+the shell's upgrade and equivalence modules from their own source and check,
+on every planted pair of
+`crates/zeno-fcis-cli/tests/fixtures/contract-diff/pairs.json` and on both
+adoptions, in both directions, that the shell's comparison accepts exactly
+the pairs the classifier calls `identical` or `program-successor`, and that
+every pair the shell's F6.1 Tier A admission admits is a `program-successor`. The converse does not
+hold: Tier A also needs law 991 in both contracts, both Step premises and the
+two decision programs' equivalence, none of which the classifier checks. That
+is evidence on those pairs, not a proof for all contracts.
+
+## Delivery relay
+
+Two scripts in `tools/` deliver a store's pending entries to an external
+system. Both use only the Python standard library. The protocol and its
+strength are described in `docs/V2_SQLITE_STAGE.md`, "Relay protocol".
+
+```sh
+python3 tools/relay.py --export-command "APP --relay-export DB" \
+    --ack-command "APP --relay-acknowledge DB" --http URL
+python3 tools/relay.py --export-command "..." --ack-command "..." --queue FILE
+python3 tools/relay_receiver.py --record LEDGER.json [--port 0]
+```
+
+`tools/relay.py` runs the export command, which prints one line of JSON per
+pending delivery in commit order (`zeno-fcis/relay-export/1`), and makes one
+outbound call per delivery, in order: an HTTP POST to `--http URL` with the
+delivery ID as the `Idempotency-Key`, or a line appended to `--queue FILE`.
+Every attempt sends the same bytes. `--timeout` (default 10 seconds) limits
+the whole HTTP call, from connecting to the last byte of the answer, not each
+socket read: when it passes, the relay shuts the connection down and the call
+counts as timed out, even if the receiver was still answering. The relay
+connects directly to the URL's host and reads no proxy settings; `--http`
+must be an `http://` or `https://` URL. A call that fails or times out is
+retried up to `--attempts` times (default 5), waiting
+`--backoff` seconds (default 0.5) before the second attempt and doubling up
+to `--max-backoff` (default 8). After a successful call it runs the
+acknowledgment command with the delivery ID and the SHA-256 of the payload it
+sent appended. It prints a JSON report and keeps no state of its own.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Every exported delivery was sent and acknowledged. |
+| 2 | Usage error, or the export is malformed (including a payload whose SHA-256 is not its `payload_sha256`); nothing was sent. |
+| 3 | A delivery stays pending: its last attempt failed or timed out, or the receiver refused it for good (a 4xx answer other than 408 and 429). Later deliveries were not sent. |
+| 4 | The export command failed, or the store refused an acknowledgment. A store command still running after `--command-timeout` seconds (default 120) is killed and counts as failed; an acknowledgment cut off this way may or may not have committed, and the next run finds the delivery acknowledged or sends it again. A refusal as `AlreadyAcknowledged`, by an acknowledgment another relay made first, counts as acknowledged. |
+| 75 | An injected crash, from `--crash-at after-export`, `after-send` or `after-acknowledge`, with `:N` for the Nth time; for restart tests. |
+
+Transport is at least once: a relay stopped before an acknowledgment sends
+that delivery again on its next run, with the same ID and bytes. A receiver
+that honours idempotency keys sees each effect once. A queue file may hold
+the same line twice. A short append is cut back to the file's previous size,
+and an append to a file that does not end in a newline (a write stopped
+part-way) starts with one, so a cut line does not join the next. The consumer
+must keep the first line per `delivery_id` and skip any line that is not
+complete JSON.
+
+Only a 2xx answer to the POST itself counts as sent. The relay follows no
+redirect: a 3xx answer is a final refusal (exit 3, the delivery stays
+pending), because urllib would follow a 301, 302 or 303 with a GET that has
+no body.
+
+`tools/relay_receiver.py` is the test receiver: an HTTP server that records
+each new idempotency key as one effect, answers a repeat with the same body
+200 and a repeat with another body 409, and keeps its ledger in `--record`
+across restarts (`GET /` returns it). `--fail-first N` answers the first N
+requests 503 without recording them; `--hang-first N` makes the next N wait
+`--hang-seconds` (default 5) before answering, recording the effect first
+with `--hang-mode after` (the default) or nothing with `before`. It prints
+`listening http://HOST:PORT` when ready. It is a test fixture, not a
+production receiver.
+
+The withdrawal-queue template's application has the two commands the relay
+needs:
+
+| Command | Effect |
+| --- | --- |
+| `withdrawal-queue --payouts NEW_DB` | Makes the demonstration's sixteen decisions in a new database and stops before delivery, leaving both payouts pending. |
+| `withdrawal-queue --relay-export DB` | Prints the relay export of the store and writes nothing. |
+| `withdrawal-queue --relay-acknowledge DB ID SHA256` | Acknowledges one delivery by its ID and the SHA-256 of its payload, both 64 lowercase hexadecimal digits. Refuses `UnknownDelivery`, `PayloadMismatch` and `AlreadyAcknowledged` by name, exiting 1, and changes no delivery. |
 
 ## Bounded completion in 1.1.0
 

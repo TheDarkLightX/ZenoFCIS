@@ -9,8 +9,8 @@ use super::expr::Rounding;
 use super::graph::{Atom, LawOp, Observation, ScalarOp};
 use super::layout::{Syntax, assignment, statement};
 use super::model::{
-    Assignment, Branch, ChannelSchema, Contract, Domain, Expr, InputLeaf, Law, Plan, RootSchema,
-    ScalarDomain,
+    Assignment, Branch, ChannelSchema, CompiledClaim, Contract, Domain, Expr, InputLeaf, Law, Plan,
+    RootSchema, ScalarDomain,
 };
 
 const HEADER: &str = "\
@@ -37,10 +37,11 @@ use zeno_fcis_synthesis::finite::{
 };
 ";
 
-/// `{policy}` is the policy file the version includes.
+/// `{schema}` and `{policy}` are the schema and policy files the version
+/// includes.
 const ORIGINALS: &str = "\
 /// Exact actual original schema bytes.
-pub const ORIGINAL_SCHEMA: &[u8] = include_bytes!(\"../v2/schema.zcve\");
+pub const ORIGINAL_SCHEMA: &[u8] = include_bytes!(\"{schema}\");
 /// Complete reviewed library-encoded policy.
 pub const ORIGINAL_POLICY: &[u8] = include_bytes!(\"{policy}\");
 ";
@@ -71,9 +72,106 @@ const RECEIPTS_DOC: &str = "\
 /// this list, and a program-successor store upgrade binds the ones it spans.
 ";
 
+/// A contract whose lineage has evolutions passes the behaviour changes too.
+const EVOLVED_LINEAGE_DOC: &str = "\
+/// Every contract version's checked catalog, oldest first and this one last,
+/// with `ADOPTION_RECEIPTS` and `EVOLUTIONS`, for a store upgrade or a
+/// lineage open. Each binding checks that version's complete retained schema
+/// and policy bytes.
+pub fn with_lineage<R>(
+    f: impl FnOnce(
+        (
+            &[&catalog::BoundCatalog<'_>],
+            &[&str],
+            &[(u32, &str, &[(u32, &[l::Op<'static>], usize)])],
+        ),
+    ) -> R,
+) -> Result<R, catalog::Failure> {
+";
+
+const EVOLVED_RECEIPTS_DOC: &str = "\
+/// The SHA-256 of each adoption's `transform` receipt in this lineage, oldest
+/// first, whichever contract adopted it: each compares a version's decision
+/// program with the next version's. `zeno-fcis generate contract` replayed
+/// every one before writing this list, and a program-successor store upgrade
+/// binds the ones it spans.
+";
+
+const EVOLUTIONS_DOC: &str = "\
+/// Each behaviour change or migration, oldest first: the version it
+/// follows, the owner's review of it (the plain-language diff that
+/// `zeno-fcis contract evolve` recorded), and the inductive claims of the
+/// contract it leads to, each an ID, a law program over the state and its
+/// root. A store upgrade requires these claims and the target state laws
+/// on the current state, mapped first for a migration. Behaviour changes
+/// bind the review; migrations with claims bind it and their evaluated programs.
+";
+
+/// A contract whose lineage has a migration or rename passes those too.
+const STATE_STEPS_LINEAGE_DOC: &str = "\
+/// Every contract version's checked catalog, oldest first and this one last,
+/// with `ADOPTION_RECEIPTS`, `EVOLUTIONS` and `STATE_STEPS`, for a store
+/// upgrade or a lineage open. Each binding checks that version's complete
+/// retained schema and policy bytes.
+pub fn with_lineage<R>(
+    f: impl FnOnce(
+        (
+            &[&catalog::BoundCatalog<'_>],
+            &[&str],
+            &[(u32, &str, &[(u32, &[l::Op<'static>], usize)])],
+            &[(u32, Option<&[(u16, u8, i128, &[(i128, i128)])]>)],
+        ),
+    ) -> R,
+) -> Result<R, catalog::Failure> {
+";
+
+const STATE_STEPS_DOC: &str = "\
+/// Each step of this lineage that moves the state to another schema, oldest
+/// first: the version it follows, and the data migration that
+/// `zeno-fcis contract evolve --migration` recorded, or `None` for a rename.
+/// A migration lists every field of the new state record: its ID, where its
+/// value comes from (0 an old field, 1 a value, 2 a table over an old
+/// field's values), the old field or the value, and the table's
+/// (old value, new value) pairs. Values are 0 or 1 for a Boolean, the
+/// integer, or a variant's ID. A store upgrade admits a migration only by
+/// forward simulation over the old version's whole input domain and by
+/// checking its target claims on the mapped current state; a rename requires
+/// that nothing but names differ.
+";
+
+/// One evolution, as the current version's lineage declares it.
+#[derive(Clone, Debug)]
+pub(super) struct RenderedEvolution {
+    /// Its position among the evolutions, from 1: `v2/evolutions/{ordinal}`.
+    pub(super) ordinal: usize,
+    /// The version it follows, from 1.
+    pub(super) version: u32,
+    /// How a store follows it.
+    pub(super) step: RenderedStep,
+}
+
+/// How a store follows one evolution.
+#[derive(Clone, Debug)]
+pub(super) enum RenderedStep {
+    /// A behaviour change, with the inductive claims of the contract it
+    /// leads to.
+    BehaviourChange(Vec<CompiledClaim>),
+    /// A rename.
+    Rename,
+    /// A data migration.
+    Migration {
+        migration: super::migration::Compiled,
+        claims: Vec<CompiledClaim>,
+    },
+}
+
 /// Which version of a contract to render and where it sits in the lineage.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Options<'a> {
+    /// The schema file relative to `src/`: `../v2/schema.zcve`, or
+    /// `../v2/schema_v{k}.zcve` for a superseded version `k` whose schema a
+    /// migration or rename later changed.
+    pub(super) schema: &'a str,
     /// The policy file relative to `src/`: `../v2/policy.zcve` for the
     /// current version, `../v2/policy_v{k}.zcve` for superseded version `k`.
     pub(super) policy: &'a str,
@@ -83,6 +181,12 @@ pub(super) struct Options<'a> {
     /// superseded version, which the file declares as modules `v1`..; none
     /// for a superseded version, which is a leaf.
     pub(super) receipts: &'a [String],
+    /// The behaviour changes of the current version's lineage; empty for a
+    /// superseded version and for a lineage that never evolved, whose source
+    /// is then exactly as before evolutions existed. With evolutions, the
+    /// file declares modules `v1` to `v{version - 1}`, and `receipts` lists
+    /// only the adoptions.
+    pub(super) evolutions: &'a [RenderedEvolution],
 }
 
 const BINDING: &str = "\
@@ -119,7 +223,11 @@ pub(super) fn source(
     } else {
         IMPORTS
     });
-    text.push_str(&ORIGINALS.replace("{policy}", options.policy));
+    text.push_str(
+        &ORIGINALS
+            .replace("{schema}", options.schema)
+            .replace("{policy}", options.policy),
+    );
     item(
         &mut text,
         Some("Complete original named schema description."),
@@ -240,6 +348,28 @@ pub(super) fn source(
 /// The version number, the superseded versions as modules, the adoption
 /// receipts and `with_lineage`.
 fn lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError> {
+    text.push_str(
+        "/// Original schema labels for a lineage version, for historical reports.\n\
+        pub fn schema_description(version: usize) -> Option<&'static s::Description<'static>> {\n    match version {\n",
+    );
+    let previous = if options.evolutions.is_empty() {
+        options.receipts.len()
+    } else {
+        usize::try_from(options.version.saturating_sub(1)).map_err(|_| {
+            ContractError::new("contract lineage", "version does not fit this target")
+        })?
+    };
+    for version in 1..=previous {
+        let _ = writeln!(text, "        {version} => Some(&v{version}::DESCRIPTION),");
+    }
+    let _ = writeln!(
+        text,
+        "        {} => Some(&DESCRIPTION),\n        _ => None,\n    }}\n}}",
+        options.version
+    );
+    if !options.evolutions.is_empty() {
+        return evolved_lineage(text, options);
+    }
     let _ = write!(
         text,
         "/// Position in this application's contract lineage: 1 before any adoption.\n\
@@ -299,6 +429,168 @@ fn lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError>
             Syntax::path("ADOPTION_RECEIPTS"),
         ])
     };
+    let result = Syntax::call("Ok", vec![Syntax::call("f", vec![lineage])]);
+    let tail = statement(4, &result).ok_or_else(|| unrenderable("with_lineage"))?;
+    let _ = writeln!(text, "    {tail}\n}}");
+    Ok(())
+}
+
+/// The lineage of a version whose lineage has behaviour changes: modules
+/// `v1` to `v{version - 1}`, `ADOPTION_RECEIPTS`, `EVOLUTIONS` with each
+/// change's claims, and `with_lineage` passing all three.
+fn evolved_lineage(text: &mut String, options: Options<'_>) -> Result<(), ContractError> {
+    let _ = write!(
+        text,
+        "/// Position in this application's contract lineage, counting every adoption and\n\
+         /// behaviour change.\n\
+         pub const VERSION: u32 = {};\n",
+        options.version
+    );
+    let previous = options.version.saturating_sub(1);
+    for version in 1..=previous {
+        let _ = write!(
+            text,
+            "/// Contract version {version}, superseded by version {}.\n\
+             #[path = \"v2_contract_v{version}.rs\"]\n\
+             pub mod v{version};\n",
+            version + 1
+        );
+    }
+    text.push_str(EVOLVED_RECEIPTS_DOC);
+    item(
+        text,
+        None,
+        "pub const ADOPTION_RECEIPTS: &[&str] =",
+        &Syntax::slice(
+            options
+                .receipts
+                .iter()
+                .map(|receipt| Syntax::literal(format!("{receipt:?}")))
+                .collect(),
+        ),
+    )?;
+    let checked_changes: Vec<(&RenderedEvolution, &[CompiledClaim])> = options
+        .evolutions
+        .iter()
+        .filter_map(|evolution| match &evolution.step {
+            RenderedStep::BehaviourChange(claims) | RenderedStep::Migration { claims, .. } => {
+                Some((evolution, claims.as_slice()))
+            }
+            RenderedStep::Rename => None,
+        })
+        .collect();
+    let moves_state = options
+        .evolutions
+        .iter()
+        .any(|evolution| !matches!(evolution.step, RenderedStep::BehaviourChange(_)));
+    for (evolution, claims) in &checked_changes {
+        for claim in *claims {
+            item(
+                text,
+                None,
+                &format!(
+                    "const CLAIM_{}_{}: &[l::Op<'static>] =",
+                    evolution.ordinal, claim.id
+                ),
+                &Syntax::slice(claim.nodes.iter().map(law_op).collect()),
+            )?;
+        }
+    }
+    text.push_str(EVOLUTIONS_DOC);
+    item(
+        text,
+        None,
+        "pub const EVOLUTIONS: &[(u32, &str, &[(u32, &[l::Op<'static>], usize)])] =",
+        &Syntax::slice(
+            checked_changes
+                .iter()
+                .map(|(evolution, claims)| {
+                    Syntax::tuple(vec![
+                        Syntax::literal(evolution.version),
+                        Syntax::call(
+                            "include_str!",
+                            vec![Syntax::literal(format!(
+                                "\"../v2/evolutions/{}/review.txt\"",
+                                evolution.ordinal
+                            ))],
+                        ),
+                        Syntax::slice(
+                            claims
+                                .iter()
+                                .map(|claim| {
+                                    Syntax::tuple(vec![
+                                        Syntax::literal(claim.id),
+                                        Syntax::path(format!(
+                                            "CLAIM_{}_{}",
+                                            evolution.ordinal, claim.id
+                                        )),
+                                        Syntax::literal(claim.root),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ])
+                })
+                .collect(),
+        ),
+    )?;
+    if moves_state {
+        text.push_str(STATE_STEPS_DOC);
+        item(
+            text,
+            None,
+            "pub const STATE_STEPS: &[(u32, Option<&[(u16, u8, i128, &[(i128, i128)])]>)] =",
+            &Syntax::slice(
+                options
+                    .evolutions
+                    .iter()
+                    .filter_map(|evolution| {
+                        let migration = match &evolution.step {
+                            RenderedStep::BehaviourChange(_) => return None,
+                            RenderedStep::Rename => Syntax::path("None"),
+                            RenderedStep::Migration { migration, .. } => {
+                                Syntax::call("Some", vec![migration.syntax()])
+                            }
+                        };
+                        Some(Syntax::tuple(vec![
+                            Syntax::literal(evolution.version),
+                            migration,
+                        ]))
+                    })
+                    .collect(),
+            ),
+        )?;
+        text.push_str(STATE_STEPS_LINEAGE_DOC);
+    } else {
+        text.push_str(EVOLVED_LINEAGE_DOC);
+    }
+    let mut catalogs = Vec::new();
+    for version in 1..=previous {
+        let _ = write!(
+            text,
+            "    let contract_{version} = v{version}::Contract::new();\n    \
+             let descriptor_{version} = contract_{version}.descriptor();\n    \
+             let catalog_{version} = v{version}::checked_catalog(&descriptor_{version})?;\n"
+        );
+        catalogs.push(Syntax::reference(Syntax::path(format!(
+            "catalog_{version}"
+        ))));
+    }
+    text.push_str(
+        "    let contract = Contract::new();\n    \
+         let descriptor = contract.descriptor();\n    \
+         let catalog = checked_catalog(&descriptor)?;\n",
+    );
+    catalogs.push(Syntax::reference(Syntax::path("catalog")));
+    let mut parts = vec![
+        Syntax::slice(catalogs),
+        Syntax::path("ADOPTION_RECEIPTS"),
+        Syntax::path("EVOLUTIONS"),
+    ];
+    if moves_state {
+        parts.push(Syntax::path("STATE_STEPS"));
+    }
+    let lineage = Syntax::tuple(parts);
     let result = Syntax::call("Ok", vec![Syntax::call("f", vec![lineage])]);
     let tail = statement(4, &result).ok_or_else(|| unrenderable("with_lineage"))?;
     let _ = writeln!(text, "    {tail}\n}}");

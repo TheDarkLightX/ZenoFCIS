@@ -4,6 +4,12 @@ This matrix covers features on the `zeno-fcis` umbrella crate. The current
 workspace version is `1.1.0`; “core” means the implemented
 project-neutral library surface. Cargo API stability began at `1.0.0`.
 
+The normal application API is `zeno_fcis::program`, available without optional
+features. It binds complete declarations to the library-owned evaluator and
+private publication capabilities. Historical reference surfaces live under
+`zeno_fcis::legacy`; enabling a dependency feature does not restore a retired
+native authoring API.
+
 ## Environment labels
 
 - **`no_std + alloc`**: supported by the umbrella feature path with default
@@ -17,14 +23,14 @@ project-neutral library surface. Cargo API stability began at `1.0.0`.
 | Feature | Environment | Class | Enables |
 |---|---|---|---|
 | default (`std`) | Host `std` | Convenience | Standard-library support for the base project-neutral exports |
-| no optional feature | `no_std + alloc` | Core | Core, value, codec, project, patch, plan, receipt, pure shell, composition, and refinement primitives |
+| no optional feature | `no_std + alloc` | Core | Checked program declarations, catalog/program binding, evaluation and publication; historical reference primitives under `legacy` |
 | `rustcrypto-sha256` | `no_std + alloc` | Core provider | Pinned RustCrypto SHA-256 provider |
 | `verified-sha256` | `no_std + alloc` | Core provider | Independent libcrux SHA-256 provider |
 | `sha256-parity` | `no_std + alloc` | Assurance | Both providers and parity evidence |
 
-Production authorization currently selects the sealed approved provider path;
-a third-party `CommitmentHasher` remains suitable for reference and research
-APIs only.
+V2 program binding derives the library identity; applications cannot supply a
+hasher or decision callback to obtain publication authority. Cryptographic
+provider features also serve the historical reference APIs.
 
 ## Project construction
 
@@ -33,14 +39,16 @@ APIs only.
 | `authoring` | `no_std + alloc` | Authoring | Bounded `.zeno` compiler, canonical `ProjectSpec`, relational/temporal evaluator, builders, composition derivation, and Mini Determinator |
 | `schema` | `no_std + alloc` | Core | Closed schemas and schema-admitted values |
 | `catalog` | `no_std + alloc` | Core | Schema plus project reasons, effects, channels, authority rules, and limits |
-| `transition` | `no_std + alloc` | Core | Catalog-aware transitions and complete transition validation |
-| `laws` | `no_std + alloc` | Core assurance | Project law manifests, evidence subjects, and runtime law evaluation |
-| `authority` | `no_std + alloc` | Core authority | Transition + laws + approved provider + nominal commit authorization |
-| `domain-machines` | `no_std + alloc` | Project architecture | Fixed typed domain-machine matrices and canonical sequential execution |
-| `composed-program` | `no_std + alloc` | Project architecture | Authority + domain machines + root projection and one composed transition program |
+| `transition` | `no_std + alloc` | Historical | Native transition authoring is retired; normal transitions use `program` |
+| `laws` | `no_std + alloc` | Metadata | Law declarations and evidence subjects; the checked evaluator is reached through `program::law` |
+| `authority` | `no_std + alloc` | Core authority | Library-owned V2 authority and publication reexports |
+| `domain-machines` | `no_std + alloc` | Historical | Native domain-machine authoring is retired |
+| `composed-program` | `no_std + alloc` | Historical | Native composed-program authoring is retired |
 
-For a multi-domain application, `composed-program` is the recommended starting
-feature. For a single generated transition, `authority` is sufficient.
+Start both single- and multi-domain applications with complete declarations
+through `zeno_fcis::program`. Reusable component composition is planned in
+[G1](V2_1_V2_2_PLAN.md) and the [V2.3 roadmap](V2_3_PLAN.md); the retired crates
+do not implement it.
 
 ## Tooling and mounted runtimes
 
@@ -112,11 +120,8 @@ graph or production authority.
 # Project-neutral semantic values and reference semantics
 zeno-fcis = { version = "=1.1.0", default-features = false }
 
-# Single-domain, law-aware authorized transitions
-zeno-fcis = { version = "=1.1.0", default-features = false, features = ["authority"] }
-
-# Multi-domain deterministic composition
-zeno-fcis = { version = "=1.1.0", default-features = false, features = ["composed-program"] }
+# Normal checked application declarations, binding and evaluation
+zeno-fcis = { version = "=1.1.0", default-features = false }
 
 # Host-side starter generation
 zeno-fcis = { version = "=1.1.0", features = ["bootstrap"] }
@@ -136,21 +141,12 @@ zeno-fcis = { version = "=1.1.0", default-features = false, features = ["authori
 
 ## Deterministic-parallel status
 
-The composition APIs represent footprints, conflicts, commutativity evidence,
-and sequential-versus-composed parity. The fixed domain executor and composed
-program execute the canonical merge order sequentially.
+The historical composition evidence API represents footprints, conflicts,
+commutativity and sequential-versus-composed parity. Its external evidence
+verifier is a named trust boundary. Native domain and composed-program execution
+are retired; the normal route evaluates one complete checked program.
 
-Current claim:
-
-> ZenoFCIS supplies proof-carrying deterministic-parallel planning and
-> promotion surfaces with a canonical sequential oracle.
-
-Current nonclaim:
-
-> ZenoFCIS does not ship a concurrent scheduler, threaded shell, or production
-> parallel runtime.
-
-Production parallel promotion uses `CompleteFootprintWitness` for every
-component and independently checked equality with the canonical sequential
-result. Projects must still supply and qualify the concrete proof artifacts and
-verifier used to mint those witnesses.
+ZenoFCIS does not yet ship a production parallel component runtime. G10's
+planned parallel exhaustive checker is separate from parallel application
+execution. Component composition needs its own coupled invariants, binding and
+atomic publication evidence.

@@ -46,6 +46,20 @@ pub(super) fn with_authority<R>(
     })
 }
 
+/// Runs `use_catalog` on the policy bytes and the library's checked catalog
+/// of a contract, after the same catalog binding `encode` checks. Nothing is
+/// written.
+///
+/// # Errors
+/// Returns the library's catalog refusal, or `use_catalog`'s error.
+pub(super) fn with_catalog<R>(
+    contract: &Contract<'_>,
+    schema: &[u8],
+    use_catalog: impl FnOnce(&[u8], &catalog::BoundCatalog<'_>) -> Result<R, ContractError>,
+) -> Result<R, ContractError> {
+    bound(contract, schema, use_catalog)
+}
+
 /// Builds the library values the descriptor borrows, encodes the policy,
 /// checks the complete catalog binding and runs `use_bound` on the policy
 /// bytes and the bound catalog.
@@ -728,7 +742,7 @@ fn observation(value: Observation) -> l::Observation {
     }
 }
 
-fn law_op(op: &LawOp) -> l::Op<'_> {
+pub(super) fn law_op(op: &LawOp) -> l::Op<'_> {
     match op {
         LawOp::Literal(value) => l::Op::Literal(atom(value)),
         LawOp::Observe(value) => l::Op::Observe(observation(*value)),

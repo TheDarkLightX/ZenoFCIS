@@ -36,9 +36,9 @@ publish_order = [
     "zeno-fcis-authenticated-authority",
     "zeno-fcis-backend",
     "zeno-fcis-formal-tools",
+    "zeno-fcis-shell-sqlite",
     "zeno-fcis-cli",
     "zeno-fcis-adapter",
-    "zeno-fcis-shell-sqlite",
     "zeno-fcis-adapter-zenodex",
     "zeno-fcis",
 ]

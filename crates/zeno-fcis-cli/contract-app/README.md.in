@@ -57,6 +57,67 @@ in a new database at NEW_DATABASE_PATH and prints its summary: each
 decision's class; `bundles`, the number of committed decisions, genesis not
 counted; the `pending` outbox entries; and the `deliveries` made.
 
+## Operate it
+
+The binary has an operational command line; `cargo run --offline --` runs
+it from this directory. Fields are written by the names `project.zeno`
+gives them, and each value is checked against its declared domain.
+
+```text
+cargo run --offline -- init DATABASE_PATH
+cargo run --offline -- submit DATABASE_PATH NAME=VALUE...
+cargo run --offline -- decide DATABASE_PATH NAME=VALUE...
+cargo run --offline -- state DATABASE_PATH
+cargo run --offline -- history DATABASE_PATH
+cargo run --offline -- pending DATABASE_PATH
+cargo run --offline -- deliver DATABASE_PATH --to FILE
+cargo run --offline -- deliver DATABASE_PATH --relay CONFIG.json
+cargo run --offline -- version
+```
+
+- `init` creates a store at genesis and its submission journal,
+  `DATABASE_PATH.submissions`.
+- `submit` commits the decision on one command unless it is a reject, which
+  writes nothing; `decide` shows the decision without committing it.
+- `state` and `history` read the store back. `history` decides every
+  recorded submission again and checks it reaches the store's state.
+- `pending` shows the next delivery; `deliver` appends each pending delivery
+  to FILE as one JSON line, synchronized to disk, before acknowledging it,
+  and never appends a delivery ID twice.
+- `version` prints the contract version, the contract identity and the
+  ZenoFCIS release. The package name, `{package}`, includes the contract
+  version, so builds of two versions never share a library build.
+
+`deliver --relay CONFIG.json` uses the bundled reference relay instead of a
+file destination. It requires Python 3. The configuration has schema
+`zeno-fcis/relay-destination/1` and exactly one target: `http` (an HTTP or
+HTTPS URL) or `queue` (a file path, relative to the configuration directory).
+For example:
+
+```json
+{"schema":"zeno-fcis/relay-destination/1","http":"http://localhost:8080/payments"}
+```
+
+Each attempt carries the original delivery ID and canonical payload; the
+store acknowledges only after a successful send. Transport is at least once.
+A receiver must deduplicate that ID to apply each effect once. A successful
+HTTP response does not prove a bank settled a payment. Attempts are bounded
+to 1–8 (default 5), `timeout` to 0.001–30 seconds (default 10), and
+`backoff`/`max_backoff` to 0–8 seconds. Each worker has a 120-second total
+limit. Failures leave the delivery pending. `--to` and `--relay` are mutually
+exclusive.
+
+Each command takes `--format json`. Exit codes: 0 done, 1 refused, 2
+rejected by the Authority, 3 a file error, 64 a malformed command line. A
+refused or failed command writes nothing, except that `deliver` keeps the
+deliveries it completed before the failure and names them, and `submit`
+first creates the missing journal of a store at genesis. `submit` locks the
+journal while it commits, so submissions to one store run one at a time. The
+missing journal of a store with commits is refused: restore it from a
+backup, or create it empty, after which `history` refuses those commits.
+`docs/CLI_REFERENCE.md` in the ZenoFCIS source tree, section "Generated
+application command line", gives every rule.
+
 ## Contract versions
 
 `zeno-fcis contract adopt . --candidate C.zcve --receipt R.json --usage
@@ -73,7 +134,9 @@ catalogs of every version, which these commands use on an existing database:
 
 - `cargo run -- --audit DATABASE_PATH` replays each history segment under
   the version that published it and prints the head with the version the
-  store runs, whichever version of this application that is.
+  store runs, whichever version of this application that is. It opens the
+  database read-only and writes nothing, so a new build can check an old
+  store before upgrading it.
 - `cargo run -- --upgrade DATABASE_PATH` records the checked upgrade to this
   build's version. An adopted version differs from the one it replaced only
   in its decision program and Step limit. The store's shell checks the five
@@ -99,12 +162,37 @@ genesis in a new database. On an existing store, which must run this build's
 version (upgrade it first otherwise), it continues from the store's state:
 while one remains, the first example whose pre-state is that state is
 decided and committed. A store at another version is refused and left as it
-was. `--decide` is an aid for acceptance tests and maintenance, not an
-operational interface; an operational command line for applications is
-planned for 2.2. After the
+was. `--decide` is an aid for acceptance tests and maintenance; the commands
+under "Operate it" are the operational interface. After the
 `transform` checker changes its semantics version, `zeno-fcis contract
 refresh-receipts .` checks every adoption again and rebinds each receipt to
 the new checker; it refuses if anything but the checker identity would change.
+
+`zeno-fcis contract evolve . --to NEW_CONTRACT_DIR` replaces this
+application's contract with a rule change after review: `contract diff`'s
+classifier must call the change `rule-change` (same schema and channels),
+and its plain-language account is kept as the owner's review in
+`v2/evolutions/N/review.txt`, beside the replaced contract. `--upgrade` then
+moves a store across the change when every state law of the new contract
+and every inductive claim it declares hold on the store's state; genesis
+exactness, law 990, is not checked there, since it applies only to new
+stores. After the upgrade the Authority checks every law at each commit, as
+always, but facts that rest only on reachability from the new contract's
+genesis do not carry over to a store whose history was made under the old
+rules.
+
+`zeno-fcis contract evolve . --to NEW_CONTRACT_DIR --migration m.json`
+takes a change of the state's layout, or a rule change, as a data migration:
+`m.json` (`zeno-fcis/migration/1`) gives every new state field an old
+field's value, a default or a value from a table over an old field. It is
+admitted only by forward simulation over the old contract's whole declared
+input domain, at most 2^20 tuples: on every migrated state the new contract
+must make the same decisions, send the same deliveries and reach the
+migrated successor, and the old genesis state must map to the new one.
+`--upgrade` then runs the same simulation in the store's shell, moves the
+store's state to the new layout and keeps pending deliveries with their IDs.
+A change of names alone, `rename`, needs no migration and upgrades a store
+at any state.
 
 These checks cover the listed examples and the laws in `project.zeno`, which
 the Authority enforces on every decision. They do not show that the rules

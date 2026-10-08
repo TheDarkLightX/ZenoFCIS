@@ -1,6 +1,7 @@
 //! The reviewed rules file, `v2/policy.json`: leaf bindings, variables, the
-//! ordered decision cases, the genesis state, the kind of every law and the
-//! adopted candidate programs.
+//! ordered decision cases, the genesis state, the kind of every law, the
+//! adopted candidate programs and the earlier contracts a behaviour change
+//! replaced.
 //!
 //! Unknown and duplicate keys are refused, so no entry is silently ignored
 //! or overridden.
@@ -64,12 +65,164 @@ pub(crate) struct Adoption {
     pub(crate) superseded_policy_sha256: String,
 }
 
+/// One earlier contract that `zeno-fcis contract evolve` replaced, in
+/// evolution order. Evolution `n` keeps that contract's `project.zeno`,
+/// `v2/policy.json` and adoptions under `v2/evolutions/n/`, and the
+/// plain-language diff of the change at `v2/evolutions/n/review.txt`. It
+/// binds the SHA-256 of the replaced contract's last policy and of the review
+/// text, and its kind: a behaviour change when `kind` is absent, a rename, or
+/// a migration, which also binds the SHA-256 of `migration.json` and of each
+/// shortcut it keeps.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Evolution {
+    pub(crate) superseded_policy_sha256: String,
+    pub(crate) review_sha256: String,
+    pub(crate) kind: EvolutionKind,
+}
+
+/// How a store follows an evolution.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum EvolutionKind {
+    /// A reviewed rule change, admitted when the new contract's state laws
+    /// and claims hold on the store's state.
+    BehaviourChange,
+    /// Only names change; the store's state is framed again.
+    Rename,
+    /// A data migration, admitted by forward simulation.
+    Migration {
+        /// The SHA-256 of `migration.json`.
+        migration_sha256: String,
+        /// The shortcuts kept beside it, each from an earlier version.
+        shortcuts: Vec<Shortcut>,
+    },
+}
+
+impl EvolutionKind {
+    /// The kind's name in reports and in `v2/policy.json`.
+    pub(crate) fn name(&self) -> &'static str {
+        match self {
+            Self::BehaviourChange => "behaviour-change",
+            Self::Rename => "rename",
+            Self::Migration { .. } => "migration",
+        }
+    }
+}
+
+/// A migration directly from an earlier version, kept beside an
+/// evolution's migration as `shortcuts/from-{from_version}.json`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct Shortcut {
+    pub(crate) from_version: u32,
+    pub(crate) sha256: String,
+}
+
+/// The versioned schema of a migration file.
+pub(crate) const MIGRATION_SCHEMA: &str = "zeno-fcis/migration/1";
+/// The keys a migration file may hold.
+pub(super) const MIGRATION_KEYS: [&str; 3] = ["schema", "from_version", "state"];
+/// The keys of one entry of a migration file's `state`.
+pub(super) const MIGRATION_FIELD_KEYS: [&str; 3] = ["from", "default", "map"];
+
+/// A value a migration file writes: a Boolean, or an integer, which is a
+/// variant's ID for a variant field.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum MigrationValue {
+    Bool(bool),
+    Int(i128),
+}
+
+/// Where a new state field takes its value from, as a migration file writes it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum MigrationSource {
+    /// `{"from": f}`: old field `f`'s value.
+    From(u16),
+    /// `{"default": v}`: the value `v`.
+    Default(MigrationValue),
+    /// `{"from": f, "map": {"old value": v, ..}}`: a table over old field
+    /// `f`'s values; keys are decimal integers, or `false` and `true`.
+    Map(u16, Vec<(String, MigrationValue)>),
+}
+
+/// A parsed migration file, `zeno-fcis/migration/1`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct MigrationFile {
+    /// For a shortcut, the earlier version it migrates from.
+    pub(super) from_version: Option<u32>,
+    /// Each new state field, in file order.
+    pub(super) state: Vec<(u16, MigrationSource)>,
+}
+
+/// Reads a migration file; `place` names it in refusals.
+///
+/// # Errors
+/// A refusal naming the entry: unknown or duplicate keys, a wrong schema, a
+/// field ID that is not a `u16`, or an entry that is not one of the three
+/// forms.
+pub(super) fn read_migration(source: &str, place: &str) -> Result<MigrationFile, ContractError> {
+    let json: Json = serde_json::from_str(source)
+        .map_err(|error| ContractError::new(place, error.to_string()))?;
+    let file = Object::new(&json, place)?;
+    file.only(&MIGRATION_KEYS)?;
+    if file.text("schema")? != MIGRATION_SCHEMA {
+        return Err(file.error("schema", format!("must be \"{MIGRATION_SCHEMA}\"")));
+    }
+    let from_version = match file.optional("from_version") {
+        None => None,
+        Some(_) => Some(file.number::<u32>("from_version")?),
+    };
+    let state = file.object("state")?;
+    let value = |json: &Json, place: &str| match json {
+        Json::Bool(value) => Ok(MigrationValue::Bool(*value)),
+        Json::Int(value) => Ok(MigrationValue::Int(*value)),
+        _ => Err(ContractError::new(
+            place,
+            "must be true, false or an integer (a variant's ID for a variant field)",
+        )),
+    };
+    let mut fields = Vec::new();
+    for (key, entry) in state.entries() {
+        let place = state.place_of(key);
+        let id = self::id::<u16>(key, &place)?;
+        let entry = Object::new(entry, &place)?;
+        entry.only(&MIGRATION_FIELD_KEYS)?;
+        let source = match (
+            entry.optional("from"),
+            entry.optional("default"),
+            entry.optional("map"),
+        ) {
+            (Some(_), None, None) => MigrationSource::From(entry.number::<u16>("from")?),
+            (None, Some(default), None) => {
+                MigrationSource::Default(value(default, &entry.place_of("default"))?)
+            }
+            (Some(_), None, Some(_)) => {
+                let map = entry.object("map")?;
+                let cases = map
+                    .entries()
+                    .map(|(key, json)| Ok((key.to_owned(), value(json, &map.place_of(key))?)))
+                    .collect::<Result<_, ContractError>>()?;
+                MigrationSource::Map(entry.number::<u16>("from")?, cases)
+            }
+            _ => {
+                return Err(ContractError::new(
+                    &place,
+                    "must be {\"from\": old field}, {\"default\": value} or {\"from\": old field, \"map\": {old value: new value, ..}}",
+                ));
+            }
+        };
+        fields.push((id, source));
+    }
+    Ok(MigrationFile {
+        from_version,
+        state: fields,
+    })
+}
+
 /// Framework law IDs used when the rules file names none.
 const FAILURE_LAW: u32 = 908;
 const REJECT_LAW: u32 = 909;
 
 /// The keys a rules file may hold; `docs/CONTRACT_RULES.md` documents each.
-pub(super) const FILE_KEYS: [&str; 13] = [
+pub(super) const FILE_KEYS: [&str; 14] = [
     "schema",
     "template",
     "roots",
@@ -81,6 +234,7 @@ pub(super) const FILE_KEYS: [&str; 13] = [
     "framework_failure_law",
     "framework_reject_law",
     "adoptions",
+    "evolutions",
     // Reviewer notes; they do not affect the contract.
     "idempotency",
     "original_domain",
@@ -104,6 +258,17 @@ pub(super) const ADOPTION_KEYS: [&str; 4] = [
     "usage",
     "superseded_policy_sha256",
 ];
+
+/// The keys of one entry of `evolutions`.
+pub(super) const EVOLUTION_KEYS: [&str; 5] = [
+    "superseded_policy_sha256",
+    "review_sha256",
+    "kind",
+    "migration_sha256",
+    "shortcuts",
+];
+/// The keys of one entry of an evolution's `shortcuts`.
+pub(super) const SHORTCUT_KEYS: [&str; 2] = ["from_version", "sha256"];
 
 /// Decision class of a case.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -188,6 +353,8 @@ pub(super) enum Constant {
 
 #[derive(Clone, Debug)]
 pub(super) struct Case {
+    /// The `rule` note naming the rule for reviewers; not part of the contract.
+    pub(super) rule: Option<String>,
     pub(super) when: Ast,
     pub(super) class: Class,
     pub(super) reason: Option<u32>,
@@ -216,6 +383,7 @@ pub(super) struct Rules {
     pub(super) failure_law: u32,
     pub(super) reject_law: u32,
     pub(super) adoptions: Vec<Adoption>,
+    pub(super) evolutions: Vec<Evolution>,
 }
 
 impl Rules {
@@ -334,6 +502,15 @@ impl Rules {
                 .map(|(index, entry)| adoption(entry, &format!("{FILE} adoptions[{index}]")))
                 .collect::<Result<_, ContractError>>()?,
         };
+        let evolutions = match file.optional("evolutions") {
+            None => Vec::new(),
+            Some(_) => file
+                .array("evolutions")?
+                .iter()
+                .enumerate()
+                .map(|(index, entry)| evolution(entry, &format!("{FILE} evolutions[{index}]")))
+                .collect::<Result<_, ContractError>>()?,
+        };
         Ok(Self {
             template: template.to_owned(),
             leaf_bindings,
@@ -344,6 +521,7 @@ impl Rules {
             failure_law: law("framework_failure_law", FAILURE_LAW)?,
             reject_law: law("framework_reject_law", REJECT_LAW)?,
             adoptions,
+            evolutions,
         })
     }
 }
@@ -437,21 +615,187 @@ pub(super) fn with_receipt_digests(
     Ok(Json::Object(entries).render())
 }
 
+/// The rules file with one more evolution appended and every adoption
+/// removed, rendered as `with_adoption` renders it: the rules of a contract
+/// that evolved, kept as the current ones, whose own adoptions start again.
+/// `evolutions` takes the place of `adoptions` in the key order, or is added
+/// last.
+pub(crate) fn with_evolution(
+    source: &str,
+    earlier: &[Evolution],
+    evolution: &Evolution,
+) -> Result<String, ContractError> {
+    let json = parse(source)?;
+    let Json::Object(entries) = json else {
+        return Err(ContractError::new(FILE, "must be an object"));
+    };
+    let items: Vec<Json> = earlier
+        .iter()
+        .chain(std::iter::once(evolution))
+        .map(|evolution| {
+            let mut entry = vec![
+                (
+                    "superseded_policy_sha256".to_owned(),
+                    Json::Text(evolution.superseded_policy_sha256.clone()),
+                ),
+                (
+                    "review_sha256".to_owned(),
+                    Json::Text(evolution.review_sha256.clone()),
+                ),
+            ];
+            // A behaviour change, the first kind, writes no kind.
+            match &evolution.kind {
+                EvolutionKind::BehaviourChange => {}
+                EvolutionKind::Rename => {
+                    entry.push(("kind".to_owned(), Json::Text("rename".to_owned())));
+                }
+                EvolutionKind::Migration {
+                    migration_sha256,
+                    shortcuts,
+                } => {
+                    entry.push(("kind".to_owned(), Json::Text("migration".to_owned())));
+                    entry.push((
+                        "migration_sha256".to_owned(),
+                        Json::Text(migration_sha256.clone()),
+                    ));
+                    if !shortcuts.is_empty() {
+                        entry.push((
+                            "shortcuts".to_owned(),
+                            Json::Array(
+                                shortcuts
+                                    .iter()
+                                    .map(|shortcut| {
+                                        Json::Object(vec![
+                                            (
+                                                "from_version".to_owned(),
+                                                Json::Int(i128::from(shortcut.from_version)),
+                                            ),
+                                            (
+                                                "sha256".to_owned(),
+                                                Json::Text(shortcut.sha256.clone()),
+                                            ),
+                                        ])
+                                    })
+                                    .collect(),
+                            ),
+                        ));
+                    }
+                }
+            }
+            Json::Object(entry)
+        })
+        .collect();
+    let mut kept: Vec<(String, Json)> = entries
+        .into_iter()
+        .filter(|(key, _)| key != "adoptions" && key != "evolutions")
+        .collect();
+    kept.push(("evolutions".to_owned(), Json::Array(items)));
+    Ok(Json::Object(kept).render())
+}
+
+/// The rules file without its `evolutions`, rendered as `with_adoption`
+/// renders it: a replaced contract's rules as `v2/evolutions/n/` keeps them,
+/// its own adoptions included.
+pub(crate) fn without_evolutions(source: &str) -> Result<String, ContractError> {
+    let json = parse(source)?;
+    let Json::Object(entries) = json else {
+        return Err(ContractError::new(FILE, "must be an object"));
+    };
+    Ok(Json::Object(
+        entries
+            .into_iter()
+            .filter(|(key, _)| key != "evolutions")
+            .collect(),
+    )
+    .render())
+}
+
+/// The rules file without its `adoptions` and `evolutions`, rendered as
+/// `with_adoption` renders it: the first version of the contract it
+/// declares, as a lineage of its own.
+pub(super) fn first_version(source: &str) -> Result<String, ContractError> {
+    let json = parse(source)?;
+    let Json::Object(entries) = json else {
+        return Err(ContractError::new(FILE, "must be an object"));
+    };
+    Ok(Json::Object(
+        entries
+            .into_iter()
+            .filter(|(key, _)| key != "adoptions" && key != "evolutions")
+            .collect(),
+    )
+    .render())
+}
+
+fn sha256_text(entry: &Object<'_>, key: &str) -> Result<String, ContractError> {
+    let text = entry.text(key)?;
+    let hex = text.len() == 64
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    if hex {
+        Ok(text.to_owned())
+    } else {
+        Err(entry.error(key, "must be a lowercase hexadecimal SHA-256"))
+    }
+}
+
+fn evolution(json: &Json, place: &str) -> Result<Evolution, ContractError> {
+    let entry = Object::new(json, place)?;
+    entry.only(&EVOLUTION_KEYS)?;
+    let kind = match entry.optional("kind") {
+        None => None,
+        Some(_) => Some(entry.text("kind")?),
+    };
+    let only_migration = |key: &str| match (entry.optional(key), kind) {
+        (Some(_), Some("migration")) | (None, _) => Ok(()),
+        (Some(_), _) => Err(entry.error(key, "is written only for a migration")),
+    };
+    only_migration("migration_sha256")?;
+    only_migration("shortcuts")?;
+    let kind = match kind {
+        None => EvolutionKind::BehaviourChange,
+        Some("rename") => EvolutionKind::Rename,
+        Some("migration") => EvolutionKind::Migration {
+            migration_sha256: sha256_text(&entry, "migration_sha256")?,
+            shortcuts: match entry.optional("shortcuts") {
+                None => Vec::new(),
+                Some(_) => entry
+                    .array("shortcuts")?
+                    .iter()
+                    .enumerate()
+                    .map(|(index, json)| {
+                        let shortcut = Object::new(
+                            json,
+                            &format!("{}[{index}]", entry.place_of("shortcuts")),
+                        )?;
+                        shortcut.only(&SHORTCUT_KEYS)?;
+                        Ok(Shortcut {
+                            from_version: shortcut.number::<u32>("from_version")?,
+                            sha256: sha256_text(&shortcut, "sha256")?,
+                        })
+                    })
+                    .collect::<Result<_, ContractError>>()?,
+            },
+        },
+        Some(_) => {
+            return Err(entry.error(
+                "kind",
+                "must be \"rename\" or \"migration\"; a behaviour change writes no kind",
+            ));
+        }
+    };
+    Ok(Evolution {
+        superseded_policy_sha256: sha256_text(&entry, "superseded_policy_sha256")?,
+        review_sha256: sha256_text(&entry, "review_sha256")?,
+        kind,
+    })
+}
+
 fn adoption(json: &Json, place: &str) -> Result<Adoption, ContractError> {
     let entry = Object::new(json, place)?;
     entry.only(&ADOPTION_KEYS)?;
-    let digest = |key: &str| {
-        let text = entry.text(key)?;
-        let hex = text.len() == 64
-            && text
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
-        if hex {
-            Ok(text.to_owned())
-        } else {
-            Err(entry.error(key, "must be a lowercase hexadecimal SHA-256"))
-        }
-    };
+    let digest = |key: &str| sha256_text(&entry, key);
     let usage = entry.text("usage")?;
     Ok(Adoption {
         candidate_sha256: digest("candidate_sha256")?,
@@ -470,9 +814,10 @@ fn case(json: &Json, place: &str) -> Result<Case, ContractError> {
     let case = Object::new(json, place)?;
     // `rule` names the rule for reviewers; it does not affect the contract.
     case.only(&CASE_KEYS)?;
-    if case.optional("rule").is_some() {
-        case.text("rule")?;
-    }
+    let rule = match case.optional("rule") {
+        Some(_) => Some(case.text("rule")?.to_owned()),
+        None => None,
+    };
     let written = case.text("class")?;
     let class = Class::ALL
         .into_iter()
@@ -504,6 +849,7 @@ fn case(json: &Json, place: &str) -> Result<Case, ContractError> {
         })
         .collect::<Result<_, ContractError>>()?;
     Ok(Case {
+        rule,
         when: expression(case.field("when")?, &case.place_of("when"))?,
         class,
         reason,
@@ -685,6 +1031,11 @@ impl<'j> Object<'j> {
 trait Bounded: Sized {
     const MIN: Self;
     const MAX: Self;
+}
+
+impl Bounded for u16 {
+    const MIN: Self = u16::MIN;
+    const MAX: Self = u16::MAX;
 }
 
 impl Bounded for u32 {

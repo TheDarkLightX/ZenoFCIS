@@ -40,6 +40,7 @@ sign or leading zero.
 | `framework_failure_law` | no | Nonzero ID of the [framework committed-failure law](#framework-laws); default 908. |
 | `framework_reject_law` | no | Nonzero ID of the [framework reject law](#framework-laws); default 909. |
 | `adoptions` | no | Written by `zeno-fcis contract adopt`; see [Adoptions](#adoptions). |
+| `evolutions` | no | Written by `zeno-fcis contract evolve`; see [Evolutions](#evolutions). |
 | `idempotency` | no | A note for reviewers, text. Generation ignores it. |
 | `original_domain` | no | A note for reviewers, text. Generation ignores it. |
 
@@ -269,6 +270,108 @@ indentation, one entry per line), keeping its keys in order. Edit
 | `receipt_sha256` | SHA-256 of `v2/adoptions/N/receipt.json`, the `transform` receipt that compares it with the program it replaces. |
 | `usage` | `preserved` when the receipt reports equal Step usage on every input; otherwise `new-version`. |
 | `superseded_policy_sha256` | SHA-256 of the policy of the version this adoption superseded. Generation refuses any later edit that would change that version. |
+
+## Evolutions
+
+`zeno-fcis contract evolve DIR --to NEW` replaces an application's contract
+with a reviewed rule change (see
+[Rule changes for live stores](CLI_REFERENCE.md#rule-changes-for-live-stores)),
+a rename, or a layout or rule change with a data migration (see
+[Data migrations and renames](CLI_REFERENCE.md#data-migrations-and-renames)).
+The new `v2/policy.json` is `NEW`'s rules, without `adoptions`, with an
+`evolutions` list that the command appends to; edit it only through that
+command. Entry `N` describes the contract that evolution `N` replaced, which
+is kept under `v2/evolutions/N/` with its `project.zeno`, its
+`v2/policy.json` without `evolutions`, its adoptions under
+`v2/evolutions/N/v2/adoptions/`, and `review.txt`, the plain-language diff
+of the change that the owner reviewed; a migration also keeps
+`migration.json` and each shortcut as `shortcuts/from-{k}.json`.
+
+<!-- policy-keys: evolution -->
+| Key | Value |
+|---|---|
+| `superseded_policy_sha256` | SHA-256 of the last policy of the contract this evolution replaced. Generation regenerates that contract from its kept files and refuses any edit that would change it. |
+| `review_sha256` | SHA-256 of `v2/evolutions/N/review.txt`. Generation computes the review again from the two contracts and refuses a review or an edit that differs. |
+| `kind` | Absent for a behaviour change; `rename` or `migration` otherwise. Generation classifies the change again and refuses a kind the two contracts no longer make. |
+| `migration_sha256` | For a migration only: SHA-256 of `v2/evolutions/N/migration.json`. Generation refuses an edited file, compiles it and admits it again by forward simulation. |
+| `shortcuts` | For a migration only, optional: the shortcuts kept beside it, oldest starting version first. |
+
+Each entry of `shortcuts`:
+
+<!-- policy-keys: shortcut -->
+| Key | Value |
+|---|---|
+| `from_version` | The lineage version the shortcut migrates from, the last version of an earlier contract. |
+| `sha256` | SHA-256 of `v2/evolutions/N/shortcuts/from-{from_version}.json`. Generation refuses an edited file and checks the shortcut against the composed route again. |
+
+### Migration files
+
+A migration file, `zeno-fcis/migration/1`, maps the old state record to the
+new one, field by field. `contract evolve --migration FILE` reads it, and
+`--shortcut FILE` reads one with a `from_version`.
+
+<!-- policy-keys: migration -->
+| Key | Value |
+|---|---|
+| `schema` | `"zeno-fcis/migration/1"`. |
+| `from_version` | Only in a shortcut: the version it migrates from. A migration between consecutive versions has none. |
+| `state` | An object with one entry per field of the new state record, keyed by its decimal field ID. |
+
+Each entry of `state` is one of three forms, by its keys:
+
+<!-- policy-keys: migration-field -->
+| Key | Value |
+|---|---|
+| `from` | The decimal ID of an old state field. Alone, it carries that field's value over, under its own name or a new one; the field's kind (Boolean, integer, variant) must not change. |
+| `default` | Alone, the value of an added field: `true`, `false`, an integer in the field's range, or a variant's ID. |
+| `map` | With `from`, a table from every value of the old field to the new field's value: keys are decimal integers, `false` or `true`. It splits an old field into several new ones. |
+
+Every new field needs exactly one entry, and every old field must be carried
+into at least one new field: a migration renames, adds and splits fields,
+and drops none. Text fields cannot be migrated. Payloads and destinations
+have no mapping: every change a migration can take keeps their types.
+
+## Changing a contract
+
+Once stores run a contract, a change must be admitted by an upgrade path, and
+each kind of change needs a different one. `zeno-fcis contract diff OLD NEW`
+decides the kind of a change between two contract directories and names every
+changed item; the [CLI reference](CLI_REFERENCE.md#contract-change-classification)
+defines each kind exactly. In terms of the files:
+
+- **Identical:** only things outside the contract change: law, reason and
+  channel names, reason precedences, case `rule` notes, variable names or a
+  variable no case or law reads, the `template` name, claims, comments. The
+  canonical policy, and so the contract identity, stays the same; `contract
+  diff` lists these differences as notes.
+- **Program successor:** `contract adopt` replaced the decision program with a
+  checked candidate. The F6.1 upgrade admits it at any state.
+- **Rename:** only the project's name or a type, field or variant name in
+  `project.zeno` changes, with the same IDs. Rule variables may be renamed
+  with it, since they are not part of the contract. `contract evolve`
+  records it, and a store upgrades at any state.
+- **Layout change:** a state field is added, removed or given another type,
+  or a type that only state fields have changes, such as a variant added to
+  the state's status type. The genesis state and every committing case's
+  `post` change with it. `contract evolve --migration` records it with a
+  migration file, and a store upgrades when forward simulation over the old
+  contract's whole declared input domain finds every decision, delivery and
+  successor kept and every new state law holding on every migrated state.
+- **Rule change:** the schema and the channels stay the same, and a law's
+  formula, scope or kind, a case's `when`, class, reason, `post` or deliveries,
+  the order of the cases, the genesis state, or the set of reasons changes. A
+  reason is added with the case that uses it, and removed with its cases.
+  `contract evolve` records it, and a store upgrades when the new contract's
+  state laws and inductive claims hold on its state.
+- **Unrelated:** the command or context changes, including a variant added to
+  the command's action type; a payload or destination type changes; a channel
+  is added, removed or given another type; or a rename comes together with any
+  other change. No path admits it. Make a renaming its own version.
+
+`contract adopt` refuses any adoption that is not a program successor of the
+version it supersedes, and `contract evolve` any change that is not a rule
+change, a rename, or with a migration a layout or rule change, each before
+it writes anything.
 
 ## What generation checks, and what it does not
 

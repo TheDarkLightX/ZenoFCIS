@@ -23,7 +23,7 @@ const ENCODING_LIMIT: usize = 1 << 24;
 
 /// A typed value of a decision, owned.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum Value {
+pub(in crate::contract) enum Value {
     Bool(bool),
     I128(i128),
     U128(u128),
@@ -50,7 +50,7 @@ impl Value {
 
     /// The number decision examples write: 0 or 1 for a boolean, the value
     /// of an integer, the variant ID of a sum.
-    pub(super) fn number(&self) -> Option<i128> {
+    pub(in crate::contract) fn number(&self) -> Option<i128> {
         match self {
             Self::Bool(value) => Some(i128::from(*value)),
             Self::I128(value) => Some(*value),
@@ -60,7 +60,7 @@ impl Value {
         }
     }
 
-    pub(super) fn json(&self) -> serde_json::Value {
+    pub(in crate::contract) fn json(&self) -> serde_json::Value {
         use serde_json::json;
         match self {
             Self::Bool(value) => json!(value),
@@ -80,7 +80,7 @@ impl Value {
 }
 
 /// Field IDs with their values, in field order.
-pub(super) type Fields = Vec<(u16, Value)>;
+pub(in crate::contract) type Fields = Vec<(u16, Value)>;
 
 /// One outbox delivery of a decision.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -94,11 +94,11 @@ pub(super) struct Delivery {
 
 /// A complete decision of the library Authority.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct Decision {
-    pub(super) class: Class,
-    pub(super) reason: Option<u32>,
+pub(in crate::contract) struct Decision {
+    pub(in crate::contract) class: Class,
+    pub(in crate::contract) reason: Option<u32>,
     /// Successor state fields; empty for a reject.
-    pub(super) post: Fields,
+    pub(in crate::contract) post: Fields,
     pub(super) outbox: Vec<Delivery>,
     /// SHA-256 of the library's canonical encoding of the successor record.
     pub(super) post_digest: [u8; 32],
@@ -111,20 +111,20 @@ pub(super) struct Decision {
 
 /// What the Authority made of one input.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum Outcome {
+pub(in crate::contract) enum Outcome {
     Decision(Decision),
     Refused(Refusal),
 }
 
 /// A refusal of the library Authority.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(super) struct Refusal {
+pub(in crate::contract) struct Refusal {
     /// The refusal as the library reports it, such as `Core(Law(Violated))`.
-    pub(super) text: String,
-    pub(super) class: RefusalClass,
+    pub(in crate::contract) text: String,
+    pub(in crate::contract) class: RefusalClass,
     /// The law whose evaluation refused, as the library's law diagnostics
     /// name it; `None` when no law evaluation refused.
-    pub(super) law: Option<u32>,
+    pub(in crate::contract) law: Option<u32>,
 }
 
 impl std::fmt::Display for Refusal {
@@ -138,7 +138,7 @@ impl std::fmt::Display for Refusal {
 
 /// The stage of the library route that refused.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub(super) enum RefusalClass {
+pub(in crate::contract) enum RefusalClass {
     Law,
     Domain,
     Arithmetic,
@@ -157,7 +157,7 @@ impl RefusalClass {
         Self::Other,
     ];
 
-    pub(super) fn name(self) -> &'static str {
+    pub(in crate::contract) fn name(self) -> &'static str {
         match self {
             Self::Law => "law",
             Self::Domain => "domain",
@@ -225,7 +225,7 @@ enum AtomKind {
 
 /// Frames one root: a record of fields, or one scalar.
 #[derive(Debug)]
-struct RootFrame {
+pub(in crate::contract) struct RootFrame {
     root: u32,
     /// Field ID and position index of each value; one entry for a scalar root.
     positions: Vec<(u16, usize)>,
@@ -235,14 +235,14 @@ struct RootFrame {
 
 /// Frames input tuples as the envelopes the contract's Authority admits.
 #[derive(Debug)]
-pub(super) struct Framer {
+pub(in crate::contract) struct Framer {
     commitment: [u8; 32],
     kinds: Vec<AtomKind>,
-    roots: [RootFrame; 3],
+    pub(in crate::contract) roots: [RootFrame; 3],
 }
 
 impl Framer {
-    pub(super) fn new(positions: &[Position], contract: &Contract<'_>) -> Self {
+    pub(in crate::contract) fn new(positions: &[Position], contract: &Contract<'_>) -> Self {
         let kinds = positions
             .iter()
             .map(|position| match &position.domain {
@@ -302,7 +302,11 @@ impl Framer {
     }
 
     /// A record root's fields in field-ID order, as the library admits them.
-    fn fields(&self, root: &RootFrame, tuple: &[i64]) -> Vec<c::Field<'static>> {
+    pub(in crate::contract) fn fields(
+        &self,
+        root: &RootFrame,
+        tuple: &[i64],
+    ) -> Vec<c::Field<'static>> {
         let mut fields: Vec<c::Field<'static>> = root
             .positions
             .iter()
@@ -328,7 +332,11 @@ fn atom(kind: AtomKind, value: i64) -> c::Atom<'static> {
 }
 
 /// Evaluates one tuple with the bound Authority.
-pub(super) fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i64]) -> Outcome {
+pub(in crate::contract) fn evaluate(
+    authority: &Authority<'_>,
+    framer: &Framer,
+    tuple: &[i64],
+) -> Outcome {
     let frames = framer.frame(tuple);
     let evaluation = authority.evaluate(c::Raw {
         state: &frames[0],
@@ -358,7 +366,7 @@ pub(super) fn evaluate(authority: &Authority<'_>, framer: &Framer, tuple: &[i64]
 /// only. In a generated contract they are the laws declared `on commit,
 /// genesis`, every `StateInvariant` among them, and those declared `on any,
 /// genesis` other than an `InitialCondition`.
-pub(super) fn state_laws(descriptor: &c::Descriptor<'_>) -> Vec<u32> {
+pub(in crate::contract) fn state_laws(descriptor: &c::Descriptor<'_>) -> Vec<u32> {
     descriptor
         .laws
         .iter()
@@ -379,7 +387,7 @@ pub(super) fn state_laws(descriptor: &c::Descriptor<'_>) -> Vec<u32> {
 /// Authority refuses to commit such a state. A state law the evaluator never
 /// reached, which only a refusal of the whole frame causes, leaves the state
 /// counted as satisfying it, so that a law refusal on it stays a finding.
-pub(super) fn first_unsatisfied_state_law(
+pub(in crate::contract) fn first_unsatisfied_state_law(
     descriptor: &c::Descriptor<'_>,
     state_laws: &[u32],
     framer: &Framer,
