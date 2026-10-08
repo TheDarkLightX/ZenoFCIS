@@ -303,16 +303,26 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
     }
 }
 
-/// Digests of everything an uninterrupted scenario writes and reports,
-/// recorded from the base commit (39bc5e1) before this repair: the repair
-/// moves the replay reservation's write earlier and changes nothing else.
-const BASE_LEDGER_SHA256: &str = "5724eb1aa68e3d0e2d504aeca528dee6414a1ab838d230ba53ca795f64a0f790";
-const BASE_HEAD_SHA256: &str = "b005f1c035811baf99c20f065e8616fc095baf5c2765c3786e433eb97fafe4be";
-const BASE_OUTPUTS_SHA256: &str =
-    "caab6f05a3ff8c52ab2deb856fe72fc8ac1dec6aee6532bfa64a798a3f2d1131";
+/// Digests of the uninterrupted journey, bound to the current checker identity.
+/// The original 39bc5e1 baseline was replayed before this refresh. The verified
+/// shared checker changes its identity and derived request, receipt and ledger
+/// hashes; all other fields in these hashed records, including reservations,
+/// are unchanged. The separate elapsed-time transcript is not hashed here.
+const JOURNEY_CHECKER_ID: &str = "06625439ca5fd003036a7da9149219a108cd91393dfc51eed36a22337cdcaed4";
+const JOURNEY_LEDGER_SHA256: &str =
+    "7aa19215f385a61f68acaefc0e736b3ffaf93084173f6be180f9489376c7ce60";
+const JOURNEY_HEAD_SHA256: &str =
+    "699338fdba4ee9840691ca8c07d0b8a31a1f5ec34d04b7ac9ecab64eb6b4d7ee";
+const JOURNEY_OUTPUTS_SHA256: &str =
+    "a6083b058cb59a66180e8d07dff363f7117652602e9c660f956da18ffa8b8bb7";
 
 #[test]
-fn an_uninterrupted_resume_writes_and_reports_what_the_base_commit_did() {
+fn an_uninterrupted_resume_matches_the_source_bound_journey() {
+    assert_eq!(
+        crate::neural_loop::request::CheckerIdentity::current().evaluator_identity,
+        JOURNEY_CHECKER_ID,
+        "checker identity changed: replay the recorded journey before refreshing its digests"
+    );
     let scratch = Scratch::new();
     let session = scratch.session();
     let (exit, report) = open(
@@ -360,6 +370,10 @@ fn an_uninterrupted_resume_writes_and_reports_what_the_base_commit_did() {
     eprintln!("uninterrupted scenario digests: {found:?}");
     assert_eq!(
         found,
-        [BASE_LEDGER_SHA256, BASE_HEAD_SHA256, BASE_OUTPUTS_SHA256]
+        [
+            JOURNEY_LEDGER_SHA256,
+            JOURNEY_HEAD_SHA256,
+            JOURNEY_OUTPUTS_SHA256
+        ]
     );
 }

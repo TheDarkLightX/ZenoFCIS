@@ -21,7 +21,7 @@ use super::super::rules::{Constant, Rules};
 
 /// An admitted leaf domain, as the schema declares it.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum LeafDomain {
+pub(in crate::contract) enum LeafDomain {
     Bool,
     Int { min: i64, max: i64 },
     Sum { type_id: u32, variants: Vec<u16> },
@@ -39,17 +39,33 @@ impl LeafDomain {
         }
     }
 
-    /// Every value in ascending order. Callers enumerate only domains whose
-    /// size fits the tuple limit.
-    fn values(&self) -> Vec<i64> {
+    /// The first value in enumeration order, in constant time and space for
+    /// every domain; `None` for an empty domain. It equals the first element
+    /// of [`Self::values_within`] whenever that returns a list.
+    pub(in crate::contract) fn least(&self) -> Option<i64> {
         match self {
-            Self::Bool => vec![0, 1],
-            Self::Int { min, max } => (*min..=*max).collect(),
-            Self::Sum { variants, .. } => variants.iter().map(|id| i64::from(*id)).collect(),
+            Self::Bool => Some(0),
+            Self::Int { min, max } => (min <= max).then_some(*min),
+            Self::Sum { variants, .. } => variants.first().map(|id| i64::from(*id)),
         }
     }
 
-    pub(super) fn json(&self) -> Value {
+    /// Every value in enumeration order, or `None` when the domain holds
+    /// more than `limit` values or its size is unknown. The size is checked
+    /// before anything is allocated, so the list never holds more than
+    /// `limit` values and a wide declared range is never collected.
+    pub(in crate::contract) fn values_within(&self, limit: u64) -> Option<Vec<i64>> {
+        if self.size()? > u128::from(limit) {
+            return None;
+        }
+        Some(match self {
+            Self::Bool => vec![0, 1],
+            Self::Int { min, max } => (*min..=*max).collect(),
+            Self::Sum { variants, .. } => variants.iter().map(|id| i64::from(*id)).collect(),
+        })
+    }
+
+    pub(in crate::contract) fn json(&self) -> Value {
         match self {
             Self::Bool => json!({"kind": "bool"}),
             Self::Int { min, max } => {
@@ -94,17 +110,17 @@ pub(super) fn leaf_domain(
 
 /// One program input position: a root field, or a whole scalar root.
 #[derive(Clone, Debug)]
-pub(super) struct Position {
+pub(in crate::contract) struct Position {
     /// The rules name: `pre.100.110`, `command.101`, `context.102.130`.
-    pub(super) name: String,
-    pub(super) source: Source,
-    pub(super) field: Option<u16>,
-    pub(super) type_id: u32,
-    pub(super) domain: LeafDomain,
+    pub(in crate::contract) name: String,
+    pub(in crate::contract) source: Source,
+    pub(in crate::contract) field: Option<u16>,
+    pub(in crate::contract) type_id: u32,
+    pub(in crate::contract) domain: LeafDomain,
 }
 
 impl Position {
-    pub(super) fn json(&self) -> Value {
+    pub(in crate::contract) fn json(&self) -> Value {
         json!({
             "name": self.name,
             "source": match self.source {
@@ -121,7 +137,9 @@ impl Position {
 
 /// The program input positions in the order the program, and every decision
 /// example, reads them.
-pub(super) fn positions(declarations: &Declarations) -> Result<Vec<Position>, ContractError> {
+pub(in crate::contract) fn positions(
+    declarations: &Declarations,
+) -> Result<Vec<Position>, ContractError> {
     declarations
         .inputs()?
         .into_iter()
@@ -138,7 +156,7 @@ pub(super) fn positions(declarations: &Declarations) -> Result<Vec<Position>, Co
 }
 
 /// The number of tuples over the whole domain; `None` when it exceeds `u128`.
-pub(super) fn domain_size(positions: &[Position]) -> Option<u128> {
+pub(in crate::contract) fn domain_size(positions: &[Position]) -> Option<u128> {
     positions.iter().try_fold(1u128, |size, position| {
         size.checked_mul(position.domain.size()?)
     })
@@ -220,17 +238,25 @@ pub(super) fn input_set(
     if let Some(size) = domain_size
         && size <= limit
     {
-        let lists: Vec<Vec<i64>> = positions
-            .iter()
-            .map(|position| position.domain.values())
-            .collect();
-        return Ok(InputSet {
-            construction: Construction::FullDomain,
-            domain_size,
-            width,
-            values: product(&lists),
-            boundary: None,
-        });
+        // An empty domain has no tuples, whatever the other positions hold;
+        // otherwise every position has at most `size` values.
+        let lists: Option<Vec<Vec<i64>>> = if size == 0 {
+            Some(vec![Vec::new(); width.max(1)])
+        } else {
+            positions
+                .iter()
+                .map(|position| position.domain.values_within(max_tuples))
+                .collect()
+        };
+        if let Some(lists) = lists {
+            return Ok(InputSet {
+                construction: Construction::FullDomain,
+                domain_size,
+                width,
+                values: product(&lists),
+                boundary: None,
+            });
+        }
     }
     let constants = constants(rules, declarations, positions)?;
     let values: Vec<Vec<i64>> = positions
@@ -419,7 +445,8 @@ fn boundary_values(position: &Position, constants: &BTreeMap<u32, BTreeSet<i64>>
             }
             values.into_iter().collect()
         }
-        domain => domain.values(),
+        LeafDomain::Bool => vec![0, 1],
+        LeafDomain::Sum { variants, .. } => variants.iter().map(|id| i64::from(*id)).collect(),
     }
 }
 
@@ -557,6 +584,54 @@ fn collect(
             collect(condition, &[], positions, found);
             collect(then, &with(otherwise), positions, found);
             collect(otherwise, &with(then), positions, found);
+        }
+    }
+}
+
+#[cfg(test)]
+mod bounded_values {
+    use super::LeafDomain;
+
+    #[test]
+    fn a_wide_range_is_never_collected() {
+        let time = LeafDomain::Int {
+            min: 0,
+            max: 4_102_444_800,
+        };
+        assert_eq!(time.values_within(1 << 20), None);
+        assert_eq!(time.least(), Some(0));
+        let whole = LeafDomain::Int {
+            min: i64::MIN,
+            max: i64::MAX,
+        };
+        assert_eq!(whole.values_within(u64::MAX), None);
+        assert_eq!(whole.least(), Some(i64::MIN));
+    }
+
+    #[test]
+    fn the_limit_is_exact_and_least_is_the_first_listed_value() {
+        let ten = LeafDomain::Int { min: 0, max: 9 };
+        assert_eq!(ten.values_within(9), None);
+        assert_eq!(ten.values_within(10), Some((0..=9).collect()));
+        let domains = [
+            LeafDomain::Bool,
+            LeafDomain::Int { min: -3, max: 4 },
+            LeafDomain::Int { min: 7, max: 7 },
+            LeafDomain::Int { min: 5, max: 4 },
+            LeafDomain::Sum {
+                type_id: 105,
+                variants: vec![150, 151, 156],
+            },
+            LeafDomain::Sum {
+                type_id: 105,
+                variants: Vec::new(),
+            },
+        ];
+        for domain in domains {
+            match domain.values_within(64) {
+                Some(values) => assert_eq!(domain.least(), values.first().copied(), "{domain:?}"),
+                None => assert_eq!(domain.least(), None, "{domain:?}"),
+            }
         }
     }
 }

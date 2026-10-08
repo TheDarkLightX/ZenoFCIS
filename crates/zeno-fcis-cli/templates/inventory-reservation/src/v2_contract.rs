@@ -993,6 +993,13 @@ pub fn checked_authority<'a>(
     let catalog = checked_catalog(descriptor).map_err(BindFailure::Catalog)?;
     authority::bind(&catalog).map_err(BindFailure::Authority)
 }
+/// Original schema labels for a lineage version, for historical reports.
+pub fn schema_description(version: usize) -> Option<&'static s::Description<'static>> {
+    match version {
+        1 => Some(&DESCRIPTION),
+        _ => None,
+    }
+}
 /// Position in this application's contract lineage: 1 before any adoption.
 pub const VERSION: u32 = 1;
 /// Every contract version's checked catalog, oldest first and this one last,

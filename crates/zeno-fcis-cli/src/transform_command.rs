@@ -2,6 +2,9 @@
 //! module only reads and writes files and renders JSON; no result grants
 //! application authority.
 
+use crate::symbolic::equivalence::{self, Outcome};
+use crate::symbolic::verdict::Judgment;
+use crate::symbolic_command::Solvers;
 use crate::transform::{self, Inconclusive, Limits, Observation, Refusal, Rejection, Replay, Side};
 use clap::Subcommand;
 use serde_json::{Value, json};
@@ -33,8 +36,20 @@ pub(super) enum Command {
         #[arg(long, default_value_t = transform::DEFAULT_MAX_INPUT_TUPLES)]
         max_input_tuples: u64,
         /// Create a new receipt file when the programs are equivalent.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "symbolic")]
         receipt: Option<PathBuf>,
+        /// For a domain above --max-input-tuples: one CVC5 query per case of the original instead of enumerating. The result is solver-attested, never an exhaustive equivalence.
+        #[arg(long, requires = "tools")]
+        symbolic: bool,
+        /// Tools manifest (zeno-fcis/tools/2) naming the pinned CVC5 and, to corroborate it, Z3; for --symbolic.
+        #[arg(long, requires = "symbolic")]
+        tools: Option<PathBuf>,
+        /// Create a new symbolic receipt file (zeno-fcis/transform-symbolic-receipt/1) when every piece holds. No command that needs an exhaustive receipt reads it.
+        #[arg(long, requires = "symbolic")]
+        symbolic_receipt: Option<PathBuf>,
+        /// Write every query's SMT-LIB text and each solver's output to this new directory; for --symbolic.
+        #[arg(long, requires = "symbolic")]
+        queries: Option<PathBuf>,
     },
     /// Recompute a receipt from both programs and compare it byte for byte.
     Replay {
@@ -62,15 +77,27 @@ pub(super) fn run(command: Command) -> u8 {
             step_limit,
             max_input_tuples,
             receipt,
-        } => check(
-            &original,
-            &candidate,
-            Limits {
+            symbolic,
+            tools,
+            symbolic_receipt,
+            queries,
+        } => {
+            let limits = Limits {
                 steps: step_limit,
                 input_tuples: max_input_tuples,
-            },
-            receipt.as_deref(),
-        ),
+            };
+            match tools.filter(|_| symbolic) {
+                Some(tools) => symbolic_check(
+                    &original,
+                    &candidate,
+                    limits,
+                    &tools,
+                    symbolic_receipt.as_deref(),
+                    queries.as_deref(),
+                ),
+                None => check(&original, &candidate, limits, receipt.as_deref()),
+            }
+        }
         Command::Replay {
             receipt,
             original,
@@ -119,6 +146,118 @@ fn check(original: &Path, candidate: &Path, limits: Limits, receipt: Option<&Pat
     report["limits"] = json!({"steps": limits.steps, "input_tuples": limits.input_tuples});
     report["original_sha256"] = json!(transform::sha256_hex(&original));
     report["candidate_sha256"] = json!(transform::sha256_hex(&candidate));
+    (exit, report)
+}
+
+/// `transform check --symbolic`: the pure `symbolic::equivalence` check
+/// with the solvers the manifest admits. Equivalence is solver-attested and
+/// exits `BLOCKED`, as a CVC5 `unsat` does for `prove`; a replayed
+/// counterexample exits `INVALID`.
+fn symbolic_check(
+    original: &Path,
+    candidate: &Path,
+    limits: Limits,
+    tools: &Path,
+    receipt: Option<&Path>,
+    queries: Option<&Path>,
+) -> (u8, Value) {
+    if let Some(path) = receipt.filter(|path| path.symlink_metadata().is_ok()) {
+        return result(
+            crate::INVALID,
+            "receipt-exists",
+            json!({"path": path.display().to_string()}),
+        );
+    }
+    let (original, candidate) = match read_programs(original, candidate) {
+        Ok(pair) => pair,
+        Err(failure) => return failure,
+    };
+    let solvers = match Solvers::open(Some(tools), queries) {
+        Ok(solvers) if solvers.has_cvc5() => solvers,
+        Ok(_) => {
+            return result(
+                crate::BLOCKED,
+                "solvers-blocked",
+                json!({"message": "the tools manifest configures no CVC5, which --symbolic needs"}),
+            );
+        }
+        Err(message) => {
+            return result(
+                crate::BLOCKED,
+                "solvers-blocked",
+                json!({"message": message}),
+            );
+        }
+    };
+    let outcome = equivalence::check(&original, &candidate, limits, &mut |query| {
+        solvers.solve(query)
+    });
+    let identities = solvers.identities();
+    let (exit, mut report) = match outcome {
+        Outcome::Refused(refusal) => result(crate::INVALID, "refused", refusal_json(&refusal)),
+        Outcome::ExhaustiveFits { size, limit } => result(
+            crate::INVALID,
+            "refused",
+            json!({
+                "reason": "exhaustive-check-fits",
+                "domain_size": size.to_string(),
+                "max_input_tuples": limit,
+                "message": "the domain fits the exhaustive check, which decides it and writes an exhaustive receipt; run transform check without --symbolic"
+            }),
+        ),
+        Outcome::Equivalent(found) => {
+            let bytes = found.receipt(&identities);
+            if let Some(path) = receipt
+                && let Err(error) = crate::atomic_create(path, &bytes)
+            {
+                return io_failure(&error);
+            }
+            result(
+                crate::BLOCKED,
+                "attested-equivalent",
+                json!({
+                    "evidence": "attested",
+                    "receipt": found.receipt_value(&identities),
+                    "receipt_sha256": transform::sha256_hex(&bytes),
+                    "receipt_path": receipt.map(|path| path.display().to_string()),
+                    "queries": found.compared.json(),
+                }),
+            )
+        }
+        Outcome::Counterexample(found) => {
+            let piece = &found.compared.pieces[found.piece];
+            let replayed = match &piece.judgment {
+                Judgment::Refuted { witness, .. } => witness.json(),
+                _ => Value::Null,
+            };
+            result(
+                crate::INVALID,
+                "counterexample",
+                json!({
+                    "evidence": "checked",
+                    "piece": piece.label,
+                    "replayed": replayed,
+                    "queries": found.compared.json(),
+                }),
+            )
+        }
+        Outcome::Inconclusive(stop) => result(
+            crate::BLOCKED,
+            "inconclusive",
+            json!({
+                "cause": stop.cause,
+                "queries": stop.compared.as_ref().map(equivalence::Compared::json),
+            }),
+        ),
+    };
+    if let Some(message) = solvers.retention_failure() {
+        return result(crate::FAILURE, "io-error", json!({"message": message}));
+    }
+    report["mode"] = json!("symbolic");
+    report["limits"] = json!({"steps": limits.steps, "input_tuples": limits.input_tuples});
+    report["original_sha256"] = json!(transform::sha256_hex(&original));
+    report["candidate_sha256"] = json!(transform::sha256_hex(&candidate));
+    report["solvers"] = identities;
     (exit, report)
 }
 

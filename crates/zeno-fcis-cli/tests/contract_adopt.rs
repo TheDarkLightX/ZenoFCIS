@@ -460,14 +460,17 @@ fn an_adopted_contract_scaffolds_an_application_with_its_lineage() {
         "rust-toolchain.toml",
         "README.md",
         "src/lib.rs",
+        "src/cli.rs",
         "src/examples.rs",
         "src/session.rs",
+        "src/relay.rs",
+        "tools/relay.py",
         "src/main.rs",
         "tests/decisions.rs",
     ] {
         assert!(files.contains_key(name), "{name} missing");
     }
-    assert_eq!(files.len(), fixture_files.len() - 1 + 9);
+    assert_eq!(files.len(), fixture_files.len() - 1 + 12);
     let check = zeno(&[
         "generate".as_ref(),
         "contract".as_ref(),

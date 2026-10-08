@@ -118,11 +118,15 @@ pub fn journey(path: &Path) -> AppResult<String> {
     {
         return Err("exact replay was not idempotent".into());
     }
-    checked(shell.deliver_next_memory_unacknowledged(&mut destination.memory()))?
-        .ok_or("missing notification")?;
+    let pending = checked(shell.next_pending())?.ok_or("missing notification")?;
+    let delivered = checked(pending.deliver(&mut destination.memory()))?;
+    drop(delivered);
     drop(shell);
     let mut shell = checked(Shell::open(path, &authority))?;
-    while checked(shell.deliver_next_memory(&mut destination.memory()))? {}
+    while let Some(pending) = checked(shell.next_pending())? {
+        let delivered = checked(pending.deliver(&mut destination.memory()))?;
+        checked(delivered.acknowledge())?;
+    }
     let mut exit = prepare::PreparedBatch::start(
         &authority,
         &checked(shell.snapshot())?,
@@ -138,7 +142,10 @@ pub fn journey(path: &Path) -> AppResult<String> {
         prepare::MAX_PUBLICATION_BYTES,
         None,
     )?;
-    while checked(shell.deliver_next_memory(&mut destination.memory()))? {}
+    while let Some(pending) = checked(shell.next_pending())? {
+        let delivered = checked(pending.deliver(&mut destination.memory()))?;
+        checked(delivered.acknowledge())?;
+    }
     let snapshot = checked(shell.snapshot())?;
     if (
         decode_state(snapshot.state())?.count.0,

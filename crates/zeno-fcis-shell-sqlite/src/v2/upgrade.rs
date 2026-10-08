@@ -4,8 +4,8 @@
 //! otherwise writes nothing.
 //!
 //! An upgrade moves a store from the contract its current history segment
-//! was published under to a later contract of its lineage with the same state
-//! schema. The record names how the new contract admits the current state;
+//! was published under to a later contract of its lineage, with the same
+//! state schema unless the lineage declares a migration or rename. The record names how the new contract admits the current state;
 //! its magic bytes are the kind tag:
 //!
 //! - `program-successor`, magic `ZFCISV2-SUCCESSOR\0`: the shell itself
@@ -24,6 +24,38 @@
 //!   record binds that genesis publication. A generated contract's law 990
 //!   admits only its declared genesis state, so for such contracts this kind
 //!   is limited to stores at that state.
+//! - `behaviour-change`, magic `ZFCISV2-BEHAVIOUR\0`: the lineage declares a
+//!   behaviour change, a rule change the owner reviewed, between the two
+//!   versions. Every state law of the new contract and every inductive claim
+//!   the lineage declares for it held on the current state, as the shell
+//!   evaluated them through the library (see
+//!   [`behaviour`](crate::v2::behaviour)). No decision programs are compared.
+//!   Generated law 990, genesis exactness, applies only to new stores and is
+//!   not evaluated; the record lists every law it did not evaluate. The
+//!   record binds the law and claim IDs that held and the SHA-256 of each
+//!   owner review, the plain-language diff of the change, whose text the
+//!   upgrade row stores.
+//! - `migration`, magic `ZFCISV2-MIGRATION\0`: the lineage declares a data
+//!   migration between two consecutive versions, and the shell admitted it by
+//!   forward simulation over the old version's whole declared input domain
+//!   (see [`migration`](crate::v2::migration)). The upgrade rewrites the
+//!   head's state to the migrated state. The record binds the SHA-256 of the
+//!   migration's canonical encoding, the simulation's counts, the
+//!   observations it compared and the migrated state's root; the upgrade row
+//!   stores the encoding and the migrated state. If the target declares
+//!   inductive claims, they must hold on that mapped state; the record also
+//!   binds their programs through the canonical check-policy digest, the
+//!   checked law and claim IDs, and the owner review digest.
+//! - `rename`, magic `ZFCISV2-RENAME\0`: the lineage declares a rename
+//!   between two consecutive versions, and the new version's policy is the
+//!   old one's with the names substituted
+//!   ([`rename_exact`](crate::v2::migration::rename_exact)). The upgrade frames
+//!   the head's state again under the new schema, at any state. The record
+//!   binds the re-framed state's root, and the row stores the state.
+//!
+//! An upgrade across a migration or a rename takes one hop per such step,
+//! and one for each run of other steps between them, each hop its own
+//! record at the same head, all in one transaction.
 //!
 //! Every record also binds the ordinal, the head's sequence, both full
 //! identities, the state root and the chain tip it extends.
@@ -36,12 +68,15 @@ use zeno_fcis_synthesis::finite::{
     v2_composition::Descriptor, v2_laws as laws,
 };
 
+use super::behaviour::{Checked, Unmet};
 use super::equivalence::{self, Unestablished};
+use super::migration::{Simulated, Unsimulated};
 use super::{Error, hash};
 
 /// How an upgrade record shows that the new contract admits the store's
-/// state. Both magics, like a certificate's `ZFCISV2-CERT\0`, first differ
-/// at byte 8, so all three hash under `V2_CHAIN` without aliasing.
+/// state. Every magic, like a certificate's `ZFCISV2-CERT\0`, first differs
+/// from the others at byte 8, so all of them hash under `V2_CHAIN` without
+/// aliasing. A further kind takes a magic whose byte 8 is still unused.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum Kind {
@@ -50,28 +85,57 @@ pub enum Kind {
     ProgramSuccessor,
     /// The new contract's genesis evaluation admitted the current state.
     GenesisAdmission,
+    /// A reviewed rule change: the new contract's state laws and declared
+    /// claims held on the current state; see [`Behaviour`].
+    BehaviourChange,
+    /// A data migration admitted by forward simulation; see [`Migrated`].
+    Migration,
+    /// A rename: only the names of the schema differ, and the state is
+    /// framed again under the new ones.
+    Rename,
 }
 
 impl Kind {
-    /// The kind's name in reports: `program-successor` or `genesis-admission`.
+    /// The kind's name in reports: `program-successor`, `genesis-admission`,
+    /// `behaviour-change`, `migration` or `rename`.
     pub fn tag(self) -> &'static str {
         match self {
             Self::ProgramSuccessor => "program-successor",
             Self::GenesisAdmission => "genesis-admission",
+            Self::BehaviourChange => "behaviour-change",
+            Self::Migration => "migration",
+            Self::Rename => "rename",
         }
+    }
+
+    /// Whether an upgrade of this kind rewrites the head's state.
+    pub fn moves_state(self) -> bool {
+        matches!(self, Self::Migration | Self::Rename)
     }
 
     fn magic(self) -> &'static [u8] {
         match self {
             Self::ProgramSuccessor => b"ZFCISV2-SUCCESSOR\0",
             Self::GenesisAdmission => b"ZFCISV2-UPGRADE\0",
+            Self::BehaviourChange => b"ZFCISV2-BEHAVIOUR\0",
+            Self::Migration => b"ZFCISV2-MIGRATION\0",
+            Self::Rename => b"ZFCISV2-RENAME\0",
         }
     }
+
+    /// Every kind, in the order a stored record's magic is matched.
+    const ALL: [Self; 5] = [
+        Self::ProgramSuccessor,
+        Self::GenesisAdmission,
+        Self::BehaviourChange,
+        Self::Migration,
+        Self::Rename,
+    ];
 
     /// The kind a stored record claims by its magic; the shell then checks
     /// that claim in full.
     pub(super) fn of_record(record: &[u8]) -> Option<Self> {
-        [Self::ProgramSuccessor, Self::GenesisAdmission]
+        Self::ALL
             .into_iter()
             .find(|kind| record.starts_with(kind.magic()))
     }
@@ -188,6 +252,14 @@ impl fmt::Display for Premise {
                 f,
                 "premise 3: the comparison of the decision programs visited {visited} tuples, not the {expected} of their domain"
             ),
+            // CLI tests compile this module against the actual library's
+            // non-exhaustive comparison data. Production keeps exhaustive
+            // local matching so new variants still require a named message.
+            #[cfg(test)]
+            #[allow(unreachable_patterns)]
+            Self::Equivalence(_) => f.write_str(
+                "premise 3: equivalence of the decision programs could not be established",
+            ),
             Self::StepLimits => f.write_str(
                 "premise 4: a Step limit is below one Step per program node and law node, so it could refuse a decision",
             ),
@@ -212,6 +284,17 @@ pub enum Unsupported {
     /// The lineage's own catalogs do not establish the succession under its
     /// comparison cap; carries the missing premise.
     Premise(Premise),
+    /// A behaviour-change record is exact under the owner reviews the store
+    /// holds beside it, and those are not the ones the lineage declares for
+    /// the versions it spans, or the lineage declares no behaviour change
+    /// there. A record that does not match its own stored reviews is a
+    /// damaged history instead.
+    Reviews,
+    /// A migration or rename record spans versions between which the
+    /// lineage declares no such step, or another migration, or the
+    /// lineage's own catalogs do not admit it. A record that does not match
+    /// its own stored migration is a damaged history instead.
+    Migration,
 }
 
 impl fmt::Display for Unsupported {
@@ -223,6 +306,12 @@ impl fmt::Display for Unsupported {
             Self::Premise(premise) => write!(
                 f,
                 "this application's contracts do not establish it ({premise})"
+            ),
+            Self::Reviews => f.write_str(
+                "it is a behaviour change with other owner reviews than this application declares for those versions",
+            ),
+            Self::Migration => f.write_str(
+                "it is a migration or rename that this application does not declare, or does not admit, between those versions",
             ),
         }
     }
@@ -401,6 +490,223 @@ pub struct Genesis<'a> {
     pub poststate: &'a [u8],
 }
 
+/// A behaviour change the shell admitted: what held on the state and the
+/// owner reviews of the lineage's behaviour-change steps between the two
+/// versions, oldest first.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Behaviour {
+    checked: Checked,
+    reviews: Vec<Hash32>,
+}
+
+impl Behaviour {
+    /// What the shell evaluated on the state, with the SHA-256 of each owner
+    /// review text, oldest first.
+    pub(super) fn new(checked: Checked, reviews: Vec<Hash32>) -> Self {
+        Self { checked, reviews }
+    }
+
+    /// The new contract's state laws that held on the state, in law order.
+    pub fn laws(&self) -> &[u32] {
+        self.checked.laws()
+    }
+
+    /// The new contract's declared inductive claims that held on the state.
+    pub fn claims(&self) -> &[u32] {
+        self.checked.claims()
+    }
+
+    /// The laws that apply at genesis and were not evaluated, genesis
+    /// exactness among them: they constrain only new stores.
+    pub fn unevaluated(&self) -> &[u32] {
+        self.checked.unevaluated()
+    }
+
+    /// The SHA-256 of each owner review the record binds, oldest first.
+    pub fn reviews(&self) -> &[Hash32] {
+        &self.reviews
+    }
+
+    /// The format byte that opens a behaviour-change admission: version 1,
+    /// in which the laws listed as not evaluated were not evaluated.
+    const FORMAT: u8 = 1;
+
+    /// The admission as the record frames it: the format byte, then four
+    /// lists, each a big-endian `u32` count and its items: the law IDs that
+    /// held, the claim IDs that held and the law IDs not evaluated, each a
+    /// big-endian `u32`, then the review digests, 32 bytes each.
+    ///
+    /// # Errors
+    /// `Error::Range` for a list longer than `u32::MAX`.
+    pub(super) fn admission(&self) -> Result<Vec<u8>, Error> {
+        let mut bytes = vec![Self::FORMAT];
+        for ids in [self.laws(), self.claims(), self.unevaluated()] {
+            bytes.extend_from_slice(&count(ids.len())?);
+            for id in ids {
+                bytes.extend_from_slice(&id.to_be_bytes());
+            }
+        }
+        bytes.extend_from_slice(&count(self.reviews.len())?);
+        for review in &self.reviews {
+            bytes.extend_from_slice(review.as_bytes());
+        }
+        Ok(bytes)
+    }
+}
+
+/// A data migration the shell admitted: the SHA-256 of the migration's
+/// canonical encoding, what the forward simulation compared, the root of
+/// the migrated state and the target claims checked on it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Migrated {
+    migration: Hash32,
+    simulated: Simulated,
+    root: Hash32,
+    target: Option<(Behaviour, Hash32)>,
+}
+
+impl Migrated {
+    pub(super) fn new(
+        migration: Hash32,
+        simulated: Simulated,
+        root: Hash32,
+        checked: Checked,
+        review: Hash32,
+    ) -> Self {
+        Self {
+            migration,
+            simulated,
+            root,
+            target: checked
+                .claims_binding()
+                .map(|binding| (Behaviour::new(checked, vec![review]), binding)),
+        }
+    }
+
+    /// The SHA-256 of the migration's canonical encoding.
+    pub fn migration(&self) -> Hash32 {
+        self.migration
+    }
+
+    /// What the forward simulation compared.
+    pub fn simulated(&self) -> Simulated {
+        self.simulated
+    }
+
+    /// The root of the migrated state.
+    pub fn root(&self) -> Hash32 {
+        self.root
+    }
+
+    /// The target claims checked on the mapped current state.
+    pub fn claims(&self) -> &[u32] {
+        self.target
+            .as_ref()
+            .map_or(&[], |(target, _)| target.claims())
+    }
+
+    /// The format byte for targets without auxiliary claims. Version 2
+    /// appends the check policy digest, then the checked target laws, claims
+    /// and review digest using the behaviour-admission framing.
+    const FORMAT: u8 = 1;
+
+    /// The admission as the record frames it: the format byte, the
+    /// migration digest, the simulation's state, admitted-state,
+    /// genesis-state and tuple counts as big-endian `u64`s, the observation
+    /// bit set (genesis 1, decision 2, deliveries 4, successor 8) and the
+    /// migrated state's root.
+    pub(super) fn admission(&self) -> Result<Vec<u8>, Error> {
+        let mut bytes = vec![if self.target.is_some() {
+            2
+        } else {
+            Self::FORMAT
+        }];
+        bytes.extend_from_slice(self.migration.as_bytes());
+        for value in [
+            self.simulated.states(),
+            self.simulated.admitted(),
+            self.simulated.genesis(),
+            self.simulated.tuples(),
+        ] {
+            bytes.extend_from_slice(&value.to_be_bytes());
+        }
+        bytes.push(self.simulated.observations());
+        bytes.extend_from_slice(self.root.as_bytes());
+        if let Some((target, binding)) = &self.target {
+            bytes.extend_from_slice(binding.as_bytes());
+            bytes.extend_from_slice(&target.admission()?);
+        }
+        Ok(bytes)
+    }
+}
+
+/// A rename's admission as the record frames it: the format byte 1 and the
+/// root of the re-framed state.
+pub(super) fn rename_admission(root: Hash32) -> Vec<u8> {
+    let mut bytes = vec![1];
+    bytes.extend_from_slice(root.as_bytes());
+    bytes
+}
+
+fn count(len: usize) -> Result<[u8; 4], Error> {
+    Ok(u32::try_from(len).map_err(|_| Error::Range)?.to_be_bytes())
+}
+
+/// The owner review texts as the upgrade row stores them beside the record:
+/// each a big-endian `u64` length and its bytes, oldest first.
+///
+/// # Errors
+/// `Error::Range` for a length that cannot be framed.
+pub(super) fn framed_reviews(texts: &[&[u8]]) -> Result<Vec<u8>, Error> {
+    let mut bytes = Vec::new();
+    for text in texts {
+        bytes.extend_from_slice(
+            &u64::try_from(text.len())
+                .map_err(|_| Error::Range)?
+                .to_be_bytes(),
+        );
+        bytes.extend_from_slice(text);
+    }
+    Ok(bytes)
+}
+
+/// The review texts in stored bytes, or `None` when they are not exactly
+/// [`framed_reviews`] of some texts.
+pub(super) fn parse_reviews(mut bytes: &[u8]) -> Option<Vec<&[u8]>> {
+    let mut texts = Vec::new();
+    while !bytes.is_empty() {
+        let (length, rest) = bytes.split_first_chunk::<8>()?;
+        let length = usize::try_from(u64::from_be_bytes(*length)).ok()?;
+        if rest.len() < length {
+            return None;
+        }
+        let (text, rest) = rest.split_at(length);
+        texts.push(text);
+        bytes = rest;
+    }
+    Some(texts)
+}
+
+/// What the upgrade row of a migration or a rename stores beside the
+/// record: the migration's canonical encoding, empty for a rename, and the
+/// state the upgrade moved the head to, framed as [`framed_reviews`] frames
+/// texts.
+///
+/// # Errors
+/// `Error::Range` for a length that cannot be framed.
+pub(super) fn framed_move(description: &[u8], state: &[u8]) -> Result<Vec<u8>, Error> {
+    framed_reviews(&[description, state])
+}
+
+/// The description and state a migration or rename row stores, or `None`
+/// when the bytes are not exactly [`framed_move`] of two parts.
+pub(super) fn parse_move(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
+    match parse_reviews(bytes)?.as_slice() {
+        [description, state] => Some((description, state)),
+        _ => None,
+    }
+}
+
 /// How the new contract admits the current state.
 #[derive(Clone, Copy, Debug)]
 pub enum Admission<'a> {
@@ -413,6 +719,25 @@ pub enum Admission<'a> {
     /// did not commit the state; `Some` carries its technical refusal, such
     /// as the law that refused.
     Refused(Premise, Option<authority::Refusal>),
+    /// The lineage declares a behaviour change between the two versions,
+    /// and the new contract's state laws and claims held on the state.
+    Behaviour(&'a Behaviour),
+    /// The lineage declares a behaviour change between the two versions,
+    /// and this law or claim did not hold on the state.
+    Unmet(Unmet),
+    /// The lineage declares a migration between the two versions, and the
+    /// forward simulation admitted it.
+    Migration(&'a Migrated),
+    /// The lineage declares a migration between the two versions, and the
+    /// forward simulation, or the migration of the state, refused it.
+    Unsimulated(Unsimulated),
+    /// The lineage declares a rename between the two versions, the new
+    /// policy is the old one with the names substituted, and the state
+    /// framed again under the new names has this root.
+    Rename(Hash32),
+    /// The lineage declares a rename between the two versions, and the new
+    /// policy is not the old one with the names substituted.
+    NotRenamed,
 }
 
 /// What the shell established about the store and the two contracts.
@@ -459,6 +784,19 @@ pub enum Refusal {
         /// 990, which admits only the declared genesis state.
         refusal: Option<authority::Refusal>,
     },
+    /// The lineage declares a behaviour change between the two versions,
+    /// and the new contract does not admit the current state: a state law or
+    /// a declared claim does not hold there.
+    Behaviour(Unmet),
+    /// The lineage declares a migration between the two versions, and the
+    /// forward simulation does not admit it, or the store's state does not
+    /// migrate.
+    Migration(Unsimulated),
+    /// The mapped state fails a target state law or inductive claim.
+    MigrationState(Unmet),
+    /// The lineage declares a rename between the two versions, and the new
+    /// contract differs from the old one in more than names.
+    Rename,
 }
 
 /// A decided upgrade: its kind, the canonical record and the chain link it
@@ -470,6 +808,8 @@ pub struct Plan {
     chain: Hash32,
     premises: Option<Premises>,
     evidence: Vec<u8>,
+    behaviour: Option<Behaviour>,
+    migration: Option<Migrated>,
 }
 
 impl Plan {
@@ -494,27 +834,49 @@ impl Plan {
         self.premises
     }
 
-    /// The bound receipt digests, 32 bytes each, oldest first; empty for a
-    /// genesis admission.
+    /// The bound receipt digests, 32 bytes each, oldest first; empty for
+    /// any other kind than a program successor.
     pub fn evidence(&self) -> &[u8] {
         &self.evidence
+    }
+
+    /// For a behaviour change, what held on the state and the bound review
+    /// digests; `None` for any other kind.
+    pub fn behaviour(&self) -> Option<&Behaviour> {
+        self.behaviour.as_ref()
+    }
+
+    /// For a migration, what the record binds; `None` for any other kind.
+    pub fn migration(&self) -> Option<&Migrated> {
+        self.migration.as_ref()
     }
 }
 
 /// Decides one upgrade. Refusal order: state schema, same contract, then
 /// the admission. A program succession is preferred over a genesis
-/// admission whenever the shell established one.
+/// admission whenever the shell established one; a behaviour change is the
+/// only admission the shell tries when the lineage declares one between the
+/// two versions. A migration or a rename changes the state schema by
+/// design, so the schema check does not apply to it.
 ///
 /// # Errors
 /// Returns the refusal, or a length that cannot be framed.
 pub fn decide(facts: &Facts<'_>) -> Result<Plan, Error> {
-    if facts.from_schema != facts.schema {
+    let moves_state = matches!(
+        facts.admission,
+        Admission::Migration(_)
+            | Admission::Unsimulated(_)
+            | Admission::Rename(_)
+            | Admission::NotRenamed
+    );
+    if !moves_state && facts.from_schema != facts.schema {
         return Err(Error::Upgrade(Refusal::StateSchema));
     }
     if facts.from_identity == facts.identity {
         return Err(Error::Upgrade(Refusal::SameContract));
     }
-    let (kind, admitted, premises, evidence) = match facts.admission {
+    let mut migration = None;
+    let (kind, admitted, premises, evidence, behaviour) = match facts.admission {
         Admission::Successor(successor) => {
             let evidence = evidence_bytes(successor.receipts);
             (
@@ -522,6 +884,7 @@ pub fn decide(facts: &Facts<'_>) -> Result<Plan, Error> {
                 successor_admission(successor.premises, &evidence),
                 Some(successor.premises),
                 evidence,
+                None,
             )
         }
         Admission::Genesis(_, genesis) if genesis.poststate == facts.state => (
@@ -529,7 +892,33 @@ pub fn decide(facts: &Facts<'_>) -> Result<Plan, Error> {
             genesis.subject.to_vec(),
             None,
             Vec::new(),
+            None,
         ),
+        Admission::Behaviour(behaviour) => (
+            Kind::BehaviourChange,
+            behaviour.admission()?,
+            None,
+            Vec::new(),
+            Some(behaviour.clone()),
+        ),
+        Admission::Unmet(unmet) => {
+            return Err(Error::Upgrade(Refusal::Behaviour(unmet)));
+        }
+        Admission::Migration(migrated) => {
+            migration = Some(migrated.clone());
+            (
+                Kind::Migration,
+                migrated.admission()?,
+                None,
+                Vec::new(),
+                None,
+            )
+        }
+        Admission::Unsimulated(unsimulated) => {
+            return Err(Error::Upgrade(Refusal::Migration(unsimulated)));
+        }
+        Admission::Rename(root) => (Kind::Rename, rename_admission(root), None, Vec::new(), None),
+        Admission::NotRenamed => return Err(Error::Upgrade(Refusal::Rename)),
         Admission::Genesis(missing, _) => {
             return Err(Error::Upgrade(Refusal::Genesis {
                 missing,
@@ -557,6 +946,8 @@ pub fn decide(facts: &Facts<'_>) -> Result<Plan, Error> {
         chain,
         premises,
         evidence,
+        behaviour,
+        migration,
     })
 }
 
@@ -573,8 +964,9 @@ pub(super) fn successor_admission(premises: Premises, evidence: &[u8]) -> Vec<u8
 /// The canonical upgrade record: the kind's magic, the ordinal and head
 /// sequence, then the framed from-identity, identity, admission, state root
 /// and previous chain tip. The admission is the complete genesis publication
-/// for a genesis admission, and for a program successor the premises byte,
-/// the number of input tuples compared and the concatenated receipt digests.
+/// for a genesis admission; for a program successor the premises byte, the
+/// number of input tuples compared and the concatenated receipt digests; and
+/// for a behaviour change [`Behaviour`]'s framing.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn record_bytes(
     kind: Kind,

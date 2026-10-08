@@ -1,7 +1,8 @@
 //! Application contracts on disk.
 //!
 //! `zeno-fcis generate contract` reads an application's `project.zeno`,
-//! `v2/policy.json` and the retained files of every adoption it lists, and
+//! `v2/policy.json` and the retained files of every adoption and evolution it
+//! lists, and
 //! writes or checks `v2/schema.zcve`, `src/v2_contract.rs`, `v2/policy.zcve`
 //! and each superseded version's `src/v2_contract_v{k}.rs` and
 //! `v2/policy_v{k}.zcve`. `zeno-fcis new --contract` builds a new application
@@ -17,8 +18,9 @@ use serde_json::{Value, json};
 
 use crate::binding::{self, Refusal};
 use crate::contract::{
-    AdoptionSources, ContractError, ContractSources, GeneratedContract, adoption_directory,
-    generate_contract,
+    AdoptionSources, ContractError, ContractSources, EVOLUTION_MIGRATION, EVOLUTION_REVIEW,
+    EvolutionSources, GeneratedContract, adoption_directory, evolution_directory,
+    generate_contract, shortcut_file,
 };
 use crate::transform::sha256_hex;
 use crate::{
@@ -32,7 +34,7 @@ const INPUT_LIMIT: u64 = 16 * 1024 * 1024;
 pub(crate) const PROJECT: &str = "project.zeno";
 pub(crate) const RULES: &str = "v2/policy.json";
 pub(crate) const SCHEMA_ORIGIN: &str = "v2/schema-origin.json";
-const EXAMPLES: &str = "tests/decision-examples.txt";
+pub(crate) const EXAMPLES: &str = "tests/decision-examples.txt";
 const SCHEMA: &str = "v2/schema.zcve";
 const SOURCE: &str = "src/v2_contract.rs";
 const POLICY: &str = "v2/policy.zcve";
@@ -43,6 +45,12 @@ pub(crate) const ADOPTED_RECEIPT: &str = "receipt.json";
 /// The source every application built from a contract shares.
 const APPLICATION: &[(&str, &str)] = &[
     ("src/lib.rs", include_str!("../contract-app/src/lib.rs")),
+    ("src/cli.rs", include_str!("../contract-app/src/cli.rs")),
+    ("src/relay.rs", include_str!("../contract-app/src/relay.rs")),
+    (
+        "tools/relay.py",
+        include_str!("../contract-app/tools/relay.py"),
+    ),
     (
         "src/examples.rs",
         include_str!("../contract-app/src/examples.rs"),
@@ -95,12 +103,76 @@ pub(crate) struct AdoptionFiles {
     pub(crate) receipt: Vec<u8>,
 }
 
+/// The retained files of one evolution, read from `v2/evolutions/n/`.
+pub(crate) struct EvolutionFiles {
+    pub(crate) project: String,
+    pub(crate) rules: String,
+    pub(crate) adoptions: Vec<AdoptionFiles>,
+    pub(crate) review: Vec<u8>,
+    /// `migration.json`, for a migration.
+    pub(crate) migration: Option<Vec<u8>>,
+    /// Each shortcut the rules list, by the version it starts at.
+    pub(crate) shortcuts: Vec<(u32, Vec<u8>)>,
+}
+
 /// The inputs a contract is generated from, as read from `dir`.
 pub(crate) struct Inputs {
     pub(crate) project: String,
     pub(crate) rules: String,
     pub(crate) origin: Option<String>,
     pub(crate) adoptions: Vec<AdoptionFiles>,
+    pub(crate) evolutions: Vec<EvolutionFiles>,
+}
+
+/// How many entries the rules file lists under `key`; the generator
+/// validates the rules, this only counts the retained files to read.
+fn listed(rules: &str, key: &str) -> usize {
+    serde_json::from_str::<Value>(rules)
+        .ok()
+        .and_then(|rules| Some(rules.get(key)?.as_array()?.len()))
+        .unwrap_or(0)
+}
+
+/// For evolution `ordinal` of `rules`, whether it is a migration, and the
+/// version each of its shortcuts starts at. The generator validates the
+/// rules; this only finds the retained files to read.
+fn migration_files(rules: &str, ordinal: usize) -> (bool, Vec<u32>) {
+    let entry = serde_json::from_str::<Value>(rules).ok().and_then(|rules| {
+        rules
+            .get("evolutions")?
+            .as_array()?
+            .get(ordinal.checked_sub(1)?)
+            .cloned()
+    });
+    let Some(entry) = entry else {
+        return (false, Vec::new());
+    };
+    let migration = entry.get("kind").and_then(Value::as_str) == Some("migration");
+    let shortcuts = entry
+        .get("shortcuts")
+        .and_then(Value::as_array)
+        .map(|shortcuts| {
+            shortcuts
+                .iter()
+                .filter_map(|shortcut| u32::try_from(shortcut.get("from_version")?.as_u64()?).ok())
+                .collect()
+        })
+        .unwrap_or_default();
+    (migration, shortcuts)
+}
+
+/// The retained candidate and receipt of every adoption `rules` lists,
+/// under `base` in `dir`.
+fn read_adoptions(dir: &Path, base: &str, rules: &str) -> Result<Vec<AdoptionFiles>, Failure> {
+    (1..=listed(rules, "adoptions"))
+        .map(|ordinal| {
+            let directory = format!("{base}{}", adoption_directory(ordinal));
+            Ok(AdoptionFiles {
+                candidate: read_file(dir, &format!("{directory}/{ADOPTED_PROGRAM}"))?,
+                receipt: read_file(dir, &format!("{directory}/{ADOPTED_RECEIPT}"))?,
+            })
+        })
+        .collect()
 }
 
 impl Inputs {
@@ -112,18 +184,29 @@ impl Inputs {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(Failure::Read(format!("read {SCHEMA_ORIGIN}: {error}"))),
         };
-        // The generator validates the rules; this only counts the adoptions
-        // whose retained files it must be given.
-        let count = serde_json::from_str::<Value>(&rules)
-            .ok()
-            .and_then(|rules| Some(rules.get("adoptions")?.as_array()?.len()))
-            .unwrap_or(0);
-        let adoptions = (1..=count)
+        let adoptions = read_adoptions(dir, "", &rules)?;
+        let evolutions = (1..=listed(&rules, "evolutions"))
             .map(|ordinal| {
-                let directory = adoption_directory(ordinal);
-                Ok(AdoptionFiles {
-                    candidate: read_file(dir, &format!("{directory}/{ADOPTED_PROGRAM}"))?,
-                    receipt: read_file(dir, &format!("{directory}/{ADOPTED_RECEIPT}"))?,
+                let base = format!("{}/", evolution_directory(ordinal));
+                let era_rules = read_text(dir, &format!("{base}{RULES}"))?;
+                let (migration, shortcuts) = migration_files(&rules, ordinal);
+                Ok(EvolutionFiles {
+                    project: read_text(dir, &format!("{base}{PROJECT}"))?,
+                    adoptions: read_adoptions(dir, &base, &era_rules)?,
+                    rules: era_rules,
+                    review: read_file(dir, &format!("{base}{EVOLUTION_REVIEW}"))?,
+                    migration: migration
+                        .then(|| read_file(dir, &format!("{base}{EVOLUTION_MIGRATION}")))
+                        .transpose()?,
+                    shortcuts: shortcuts
+                        .into_iter()
+                        .map(|from| {
+                            Ok((
+                                from,
+                                read_file(dir, &format!("{base}{}", shortcut_file(from)))?,
+                            ))
+                        })
+                        .collect::<Result<_, Failure>>()?,
                 })
             })
             .collect::<Result<_, Failure>>()?;
@@ -132,6 +215,7 @@ impl Inputs {
             rules,
             origin,
             adoptions,
+            evolutions,
         })
     }
 
@@ -139,6 +223,7 @@ impl Inputs {
         &'a self,
         rules: &'a str,
         adoptions: &'a [AdoptionSources<'a>],
+        evolutions: &'a [EvolutionSources<'a>],
     ) -> ContractSources<'a> {
         ContractSources {
             project: &self.project,
@@ -146,7 +231,78 @@ impl Inputs {
             schema_origin: self.origin.as_deref(),
             adoptions,
             replayed: &[],
+            evolutions,
         }
+    }
+
+    /// Every evolution's retained files as the generator reads them.
+    pub(crate) fn evolution_sources(&self) -> Vec<EvolutionSources<'_>> {
+        self.evolutions
+            .iter()
+            .map(|files| EvolutionSources {
+                project: &files.project,
+                rules: &files.rules,
+                adoptions: files
+                    .adoptions
+                    .iter()
+                    .map(|adoption| AdoptionSources {
+                        candidate: &adoption.candidate,
+                        receipt: &adoption.receipt,
+                    })
+                    .collect(),
+                review: &files.review,
+                migration: files.migration.as_deref(),
+                shortcuts: files
+                    .shortcuts
+                    .iter()
+                    .map(|(_, bytes)| bytes.as_slice())
+                    .collect(),
+            })
+            .collect()
+    }
+
+    /// Every retained file, by path in the application: each adoption's
+    /// candidate and receipt, then each evolution's contract, adoptions and
+    /// review.
+    pub(crate) fn retained(&self) -> Vec<(String, Vec<u8>)> {
+        let mut files = Vec::new();
+        let adoptions = |files: &mut Vec<(String, Vec<u8>)>, base: &str, list: &[AdoptionFiles]| {
+            for (index, adoption) in list.iter().enumerate() {
+                let directory = format!("{base}{}", adoption_directory(index + 1));
+                files.push((
+                    format!("{directory}/{ADOPTED_PROGRAM}"),
+                    adoption.candidate.clone(),
+                ));
+                files.push((
+                    format!("{directory}/{ADOPTED_RECEIPT}"),
+                    adoption.receipt.clone(),
+                ));
+            }
+        };
+        adoptions(&mut files, "", &self.adoptions);
+        for (index, evolution) in self.evolutions.iter().enumerate() {
+            let base = format!("{}/", evolution_directory(index + 1));
+            files.push((
+                format!("{base}{PROJECT}"),
+                evolution.project.clone().into_bytes(),
+            ));
+            files.push((
+                format!("{base}{RULES}"),
+                evolution.rules.clone().into_bytes(),
+            ));
+            adoptions(&mut files, &base, &evolution.adoptions);
+            files.push((
+                format!("{base}{EVOLUTION_REVIEW}"),
+                evolution.review.clone(),
+            ));
+            if let Some(migration) = &evolution.migration {
+                files.push((format!("{base}{EVOLUTION_MIGRATION}"), migration.clone()));
+            }
+            for (from, shortcut) in &evolution.shortcuts {
+                files.push((format!("{base}{}", shortcut_file(*from)), shortcut.clone()));
+            }
+        }
+        files
     }
 
     pub(crate) fn adoption_sources(&self) -> Vec<AdoptionSources<'_>> {
@@ -161,7 +317,12 @@ impl Inputs {
 
     pub(crate) fn generate(&self) -> Result<GeneratedContract, Failure> {
         let adoptions = self.adoption_sources();
-        Ok(generate_contract(self.sources(&self.rules, &adoptions))?)
+        let evolutions = self.evolution_sources();
+        Ok(generate_contract(self.sources(
+            &self.rules,
+            &adoptions,
+            &evolutions,
+        ))?)
     }
 }
 
@@ -180,6 +341,9 @@ pub(crate) fn outputs(generated: &GeneratedContract) -> Vec<(String, &[u8])> {
             previous.source().as_bytes(),
         ));
         files.push((format!("v2/policy_v{version}.zcve"), previous.policy()));
+        if let Some(schema) = previous.schema() {
+            files.push((format!("v2/schema_v{version}.zcve"), schema));
+        }
     }
     files
 }
@@ -220,7 +384,8 @@ pub(crate) fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 /// `zeno-fcis new <dir> --contract <contract>`: an application built from
-/// `project.zeno`, `v2/policy.json`, the adoptions it lists and, when
+/// `project.zeno`, `v2/policy.json`, the adoptions and evolutions it lists
+/// and, when
 /// present, `tests/decision-examples.txt` in `contract`, and bound to the
 /// ZenoFCIS source tree `source`, or the tree this CLI was built from. `dir`
 /// exists and is empty.
@@ -233,7 +398,13 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
         };
         let generated = inputs.generate()?;
-        let package = generated.summary().application.clone();
+        // The contract version is part of the package name, so two versions
+        // of one application never share a cached build of its library.
+        let package = format!(
+            "{}-v{}",
+            generated.summary().application,
+            generated.summary().version
+        );
         let valid_package = package.len() <= 64
             && package.starts_with(|first: char| first.is_ascii_lowercase())
             && package
@@ -263,27 +434,20 @@ pub(crate) fn scaffold(dir: &Path, contract: &Path, source: Option<&Path>) -> u8
             (RULES.to_owned(), inputs.rules.clone().into_bytes()),
             (EXAMPLES.to_owned(), examples.into_bytes()),
         ];
-        for (index, adoption) in inputs.adoptions.iter().enumerate() {
-            let directory = adoption_directory(index + 1);
-            files.push((
-                format!("{directory}/{ADOPTED_PROGRAM}"),
-                adoption.candidate.clone(),
-            ));
-            files.push((
-                format!("{directory}/{ADOPTED_RECEIPT}"),
-                adoption.receipt.clone(),
-            ));
-        }
+        files.extend(inputs.retained());
         files.extend(
             outputs(&generated)
                 .into_iter()
                 .map(|(name, bytes)| (name, bytes.to_vec())),
         );
-        files.extend(
-            APPLICATION
-                .iter()
-                .map(|(name, source)| ((*name).to_owned(), source.as_bytes().to_vec())),
-        );
+        files.extend(APPLICATION.iter().map(|(name, source)| {
+            (
+                (*name).to_owned(),
+                source
+                    .replace("{zeno_fcis_version}", env!("CARGO_PKG_VERSION"))
+                    .into_bytes(),
+            )
+        }));
         if let Some(toolchain) = binding.toolchain {
             files.push(("rust-toolchain.toml".to_owned(), toolchain));
         }
@@ -368,8 +532,52 @@ pub(crate) fn export_program(dir: &Path, out: &Path, format: OutputFormat) -> u8
     OK
 }
 
-/// The summary a report carries.
+/// The summary a report carries. A lineage that evolved also lists each
+/// evolution under `evolutions`, with its kind, and for a migration what
+/// generation's forward simulation compared.
 pub(crate) fn summary_json(generated: &GeneratedContract) -> Value {
+    let mut value = adoption_summary_json(generated);
+    let evolutions = &generated.summary().evolutions;
+    if let (Value::Object(fields), false) = (&mut value, evolutions.is_empty()) {
+        fields.insert(
+            "evolutions".to_owned(),
+            evolutions
+                .iter()
+                .map(|evolution| {
+                    let mut entry = json!({
+                        "after_version": evolution.version,
+                        "kind": evolution.kind,
+                        "superseded_policy_sha256": evolution.superseded_policy_sha256,
+                        "review_sha256": evolution.review_sha256,
+                        "claims": evolution.claims,
+                    });
+                    if let (Value::Object(fields), Some(migration)) =
+                        (&mut entry, &evolution.migration)
+                    {
+                        fields.insert(
+                            "migration".to_owned(),
+                            json!({
+                                "sha256": migration.sha256,
+                                "states": migration.states[0],
+                                "states_satisfying_state_laws": migration.states[1],
+                                "genesis_states": migration.states[2],
+                                "tuples_compared": migration.tuples,
+                                "observations": ["genesis", "new-state-laws", "decision-class-and-reason", "deliveries", "successor-state"],
+                                "shortcuts": migration.shortcuts.iter().map(|(from, tuples)| json!({
+                                    "from_version": from, "tuples_compared": tuples
+                                })).collect::<Vec<_>>(),
+                            }),
+                        );
+                    }
+                    entry
+                })
+                .collect(),
+        );
+    }
+    value
+}
+
+fn adoption_summary_json(generated: &GeneratedContract) -> Value {
     let summary = generated.summary();
     json!({
         "application": summary.application,

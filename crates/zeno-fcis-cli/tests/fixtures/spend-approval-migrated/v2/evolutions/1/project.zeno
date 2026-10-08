@@ -1,0 +1,73 @@
+zeno 1;
+project 1 spend_approval;
+namespace 2 finance;
+// One payment request moves through an approval matrix by amount tier:
+// tier 0 needs no approval, tier 1 the CFO, tier 2 the CFO and the CEO, and
+// tier 3 also a board resolution. The clerk creates and executes it; the
+// shell authenticates the role and checks the daily limit.
+type 100 state Request;
+type 101 command RequestCommand;
+type 102 context Staff;
+type 103 destination Desk;
+type 104 payload Payment;
+type 105 int Tier in 0..=3;
+type 106 data Status;
+type 107 data Role;
+type 108 bool Flag;
+type 109 data Action;
+type 110 payload Alert;
+field 120 100 status 106;
+field 121 100 tier 105;
+field 122 100 cfo_ok 108;
+field 123 100 ceo_ok 108;
+field 130 101 action 109;
+field 131 101 tier_requested 105;
+field 140 102 role 107;
+field 141 102 board 108;
+field 142 102 within_limit 108;
+field 145 104 payment_tier 105;
+field 146 110 alert_tier 105;
+variant 150 106 Empty none;
+variant 151 106 Pending none;
+variant 152 106 Executed none;
+variant 153 106 Cancelled none;
+variant 154 106 Blocked none;
+variant 160 107 Nobody none;
+variant 161 107 Clerk none;
+variant 162 107 Cfo none;
+variant 163 107 Ceo none;
+variant 170 109 Create none;
+variant 171 109 Approve none;
+variant 172 109 Execute none;
+variant 173 109 Cancel none;
+reason 200 not_staff precedence 0;
+reason 201 wrong_status precedence 1;
+reason 202 wrong_role precedence 2;
+reason 203 already_approved precedence 3;
+reason 204 no_approval_needed precedence 4;
+reason 205 needs_cfo precedence 5;
+reason 206 needs_ceo precedence 6;
+reason 207 needs_board precedence 7;
+reason 208 over_daily_limit precedence 8;
+channel 300 payment destination 103 payload 104;
+channel 301 alert destination 103 payload 110;
+component 400 request {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  outbox outbox.301;
+  budget steps 64;
+}
+merge [400];
+// An executed request carries every approval its tier needs, and an empty
+// request carries nothing.
+law 500 executed_requests_are_approved on commit, genesis = (post.100.120 == 152 -> (post.100.121 >= 1 -> post.100.122 == 1) && (post.100.121 >= 2 -> post.100.123 == 1)) && (post.100.120 == 150 -> post.100.121 == 0 && post.100.122 == 0 && post.100.123 == 0);
+// Only the clerk executes, only an officer approves, and a tier 3 execution
+// needs the board.
+law 501 roles_are_respected on accept = (command.101.130 == 172 -> context.102.140 == 161 && post.100.120 == 152 && (post.100.121 == 3 -> context.102.141 == 1)) && (command.101.130 == 171 -> (context.102.140 == 162 || context.102.140 == 163) && post.100.120 == 151);
+// A blocked execution is the daily limit, and it keeps the approvals.
+law 502 limit_blocks_execution on failure = command.101.130 == 172 && context.102.142 == 0 && post.100.120 == 154 && post.100.122 == pre.100.122 && post.100.123 == pre.100.123;
+// An approval is never withdrawn while the request is pending.
+law 503 approvals_are_kept on commit = (pre.100.120 == 151 && post.100.120 == 151) -> (pre.100.122 == 1 -> post.100.122 == 1) && (pre.100.123 == 1 -> post.100.123 == 1);

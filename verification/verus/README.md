@@ -1,5 +1,16 @@
 # Shared-source Verus verification
 
+The V2.2 shared finite checker is being qualified separately in
+[the G11 proof plan](../../docs/G11_SHARED_CHECKER_PROOF_PLAN.md). Its
+[direct-source harness](checker.rs) includes the shipped CLI/SQLite checker,
+the public library data projection API and the unchanged real metered evaluator
+source closure. The public API requires fresh whole-unit proof and executable
+inventory qualification; the earlier frozen-core result does not cover it. `tools/check_checker.py` requires
+a successful pinned whole-unit proof, independently reviewed translated
+contracts and executable bodies, native checks through both consumers, stable
+source hashes, and the CI negative controls. An emitted candidate inventory or
+the cheap `v2-shared-finite-checker` ATDD scenario does not establish that gate.
+
 Six harnesses check actual shared source with the pinned verifier. Arithmetic
 has three obligations and four mutation controls; scalar admission/execution
 has 34 and 16; integer byte interpretation has nine and 14. The record-execution, protected-record

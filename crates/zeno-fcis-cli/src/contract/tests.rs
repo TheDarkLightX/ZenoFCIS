@@ -69,6 +69,7 @@ impl Template {
             schema_origin: Some(&self.origin),
             adoptions: &[],
             replayed: &[],
+            evolutions: &[],
         }
     }
 
@@ -839,6 +840,7 @@ merge [400];
         schema_origin: None,
         adoptions: &[],
         replayed: &[],
+        evolutions: &[],
     }) else {
         panic!("a scalar state must be refused")
     };
@@ -1855,7 +1857,8 @@ fn the_rules_reference_documents_exactly_what_the_generator_reads() {
     use super::expr::{FUNCTIONS, OPERATORS};
     use super::model::required_declaration;
     use super::rules::{
-        ADOPTION_KEYS, CASE_KEYS, DELIVERY_KEYS, FILE_KEYS, LEAVES, LawKind, ROOT_KEYS,
+        ADOPTION_KEYS, CASE_KEYS, DELIVERY_KEYS, EVOLUTION_KEYS, FILE_KEYS, LEAVES, LawKind,
+        MIGRATION_FIELD_KEYS, MIGRATION_KEYS, ROOT_KEYS, SHORTCUT_KEYS,
     };
     for (table, keys) in [
         ("file", FILE_KEYS.as_slice()),
@@ -1863,6 +1866,10 @@ fn the_rules_reference_documents_exactly_what_the_generator_reads() {
         ("case", CASE_KEYS.as_slice()),
         ("delivery", DELIVERY_KEYS.as_slice()),
         ("adoption", ADOPTION_KEYS.as_slice()),
+        ("evolution", EVOLUTION_KEYS.as_slice()),
+        ("shortcut", SHORTCUT_KEYS.as_slice()),
+        ("migration", MIGRATION_KEYS.as_slice()),
+        ("migration-field", MIGRATION_FIELD_KEYS.as_slice()),
         ("leaf-bindings", LEAVES.as_slice()),
     ] {
         assert_eq!(names(&documented(table)), keys, "{table}");

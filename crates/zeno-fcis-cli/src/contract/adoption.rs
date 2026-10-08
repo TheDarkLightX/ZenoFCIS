@@ -10,7 +10,7 @@ use crate::transform::{self, Replayed};
 
 use super::{
     Adoption, AdoptionSources, ContractError, ContractSources, GeneratedContract, Usage,
-    adoption_directory, generate_contract, replay_reason, unchanged, with_adoption,
+    adoption_directory, diff, generate_contract, replay_reason, unchanged, with_adoption,
 };
 
 /// A candidate program whose receipt replayed against the application's
@@ -68,10 +68,14 @@ impl CheckedCandidate {
     /// The rules with this adoption appended, binding the policy of the
     /// version it supersedes, and the whole lineage generated from them. No
     /// receipt is enumerated again: generation reuses this command's replays.
+    /// The new version must be a program successor of the one it supersedes,
+    /// as `contract diff` classifies the two.
     ///
     /// # Errors
     /// The rules' or the generator's refusal, such as `preserved` usage
-    /// that the receipt contradicts, or a lineage that would repeat a version.
+    /// that the receipt contradicts, or a lineage that would repeat a version;
+    /// or a new version of any other kind than a program successor, naming
+    /// the kind.
     pub(crate) fn plan(
         self,
         sources: ContractSources<'_>,
@@ -91,13 +95,24 @@ impl CheckedCandidate {
         });
         let mut replayed = self.current.replayed().to_vec();
         replayed.push(self.replayed.clone());
-        let generated = generate_contract(ContractSources {
+        let planned = ContractSources {
             rules: &rules,
             adoptions: &adoptions,
             replayed: &replayed,
             ..sources
-        })?;
+        };
+        let generated = generate_contract(planned)?;
         let ordinal = adoptions.len();
+        // Only a program successor is admitted at any state by the F6.1
+        // upgrade; an adoption replaces nothing but the decision program, so
+        // this cross-checks the generator against the classifier.
+        let change = diff::between(sources, &self.current, planned, &generated)
+            .map_err(|refused| refused.error)?;
+        diff::require_successor(
+            &change,
+            &format!("v2/policy.json adoptions[{}]", ordinal - 1),
+            ordinal,
+        )?;
         Ok(AdoptionPlan {
             ordinal,
             directory: adoption_directory(ordinal),

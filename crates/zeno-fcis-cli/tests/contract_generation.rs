@@ -205,7 +205,7 @@ fn invalid_rules_and_missing_files_are_reported() {
 
 /// What `new --contract` writes: the contract, its generated files, the
 /// shared application source and the binding to this source tree.
-const APPLICATION_FILES: [&str; 15] = [
+const APPLICATION_FILES: [&str; 18] = [
     "Cargo.toml",
     "Cargo.lock",
     "rust-toolchain.toml",
@@ -216,8 +216,11 @@ const APPLICATION_FILES: [&str; 15] = [
     "v2/policy.zcve",
     "src/v2_contract.rs",
     "src/lib.rs",
+    "src/cli.rs",
     "src/examples.rs",
     "src/session.rs",
+    "src/relay.rs",
+    "tools/relay.py",
     "src/main.rs",
     "tests/decisions.rs",
     "tests/decision-examples.txt",
@@ -277,7 +280,13 @@ fn an_application_built_from_a_contract_is_current_and_complete() {
         assert!(read(app.join(name)) == read(contract.join(name)), "{name}");
     }
     let manifest = String::from_utf8(read(app.join("Cargo.toml"))).unwrap_or_default();
-    assert!(manifest.contains("name = \"dual-approval\""));
+    // The package name carries the contract version.
+    assert!(manifest.contains("name = \"dual-approval-v1\""));
+    let cli = String::from_utf8(read(app.join("src/cli.rs"))).unwrap_or_default();
+    assert!(cli.contains(&format!(
+        "ZENO_FCIS_VERSION: &str = \"{}\";",
+        env!("CARGO_PKG_VERSION")
+    )));
     assert!(manifest.contains(&format!("\"={}\"", env!("CARGO_PKG_VERSION"))));
     assert_eq!(contract_check(&app), Some(0));
     // The binding: this tree's packages, lock and toolchain.

@@ -7,9 +7,14 @@
 //!
 //! A store starts under one Authority. A checked upgrade appends a chained
 //! record that moves the head to a later contract of the application's
-//! lineage with the same state schema: a program successor at any state, and
-//! any other contract only when its genesis laws admit the current state (see
-//! [`upgrade`](crate::v2::upgrade)). Each history segment replays under the
+//! lineage with the same state schema: a program successor at any state; a
+//! reviewed behaviour change when the new contract's state laws and declared
+//! claims hold on the current state; and any other contract only when its
+//! genesis laws admit the current state (see
+//! [`upgrade`](crate::v2::upgrade)). A declared data migration, admitted by
+//! forward simulation, or a declared rename, admitted when only names differ,
+//! also moves the head's state to the new schema (see
+//! [`migration`](crate::v2::migration)). Each history segment replays under the
 //! Authority it was published with, so a store with upgrades is opened through
 //! its [`Lineage`](crate::v2::Lineage), oldest version first, which yields a
 //! typed handle.
@@ -20,28 +25,51 @@
 //! detecting that needs a tip held outside the file, such as an
 //! [`UpgradeReceipt`](crate::v2::UpgradeReceipt) or a private
 //! [`Checkpoint`](crate::v2::Checkpoint).
+//!
+//! Deliveries follow a typed lifecycle, `Pending` → `Delivered` →
+//! acknowledged. [`next_pending`](crate::v2::V2SqliteShell::next_pending)
+//! issues the oldest pending delivery as a [`Pending`](crate::v2::Pending)
+//! token that holds the handle's exclusive borrow; delivering consumes it into
+//! a [`Delivered`](crate::v2::Delivered) token, and acknowledging consumes
+//! that. `Pending` states what the types enforce and what stays a run-time
+//! check.
+//!
+//! An external relay reaches the same lifecycle across processes: the
+//! [`relay`](crate::v2::relay) module exports the pending deliveries as an
+//! ordered stream of lines and acknowledges one delivery by its ID and the
+//! SHA-256 of its payload, refusing an unknown, mismatched or already
+//! acknowledged acknowledgment with a named error and no write.
 
 use crate::CrashPoint;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use std::{cell::Cell, fmt, path::Path};
 use zeno_fcis_codec::{
-    CanonicalEncode, DecodeLimits, Domain, EncodeError, Hash32, commitment, decode_value,
+    CanonicalEncode, CommitmentHasher, DecodeLimits, Domain, EncodeError, Hash32, commitment,
+    decode_value,
 };
 use zeno_fcis_crypto::{RustCryptoSha256, verify_approved_provider};
 use zeno_fcis_plan::OutboxEntry;
-use zeno_fcis_shell::{CommitStatus, IdempotentDestination, MemoryDestination};
+use zeno_fcis_shell::{CommitStatus, MemoryDestination};
 use zeno_fcis_synthesis::finite::{
     v2_authority::{Authority, Publication, PublicationOutcome, WireDelivery},
     v2_composition::{Kind, Raw},
 };
 
+/// The behaviour-change admission: the new contract's state laws and
+/// declared claims on the store's state.
+pub mod behaviour;
 mod compact;
+mod delivery;
 pub mod equivalence;
 mod lineage;
+/// Data migrations admitted by forward simulation, and the rename tier.
+pub mod migration;
+pub mod relay;
 /// The pure upgrade decision and the lineage assignment.
 pub mod upgrade;
 pub use compact::{compact_publication, expand_publication};
-pub use lineage::{Lineage, Opened, Store, Superseded, V9Store};
+pub use delivery::{Delivered, Pending};
+pub use lineage::{Lineage, Opened, Step, Store, Superseded, V9Store};
 
 /// The tables of schema v9, which v10 keeps unchanged.
 const HISTORY: &str = "
@@ -89,8 +117,9 @@ CREATE TABLE v2_checkpoints (
 /// `sequence` is the head each one was recorded at; `identity` is the full
 /// identity of the contract upgraded to; `publication` is the admission the
 /// record binds: that contract's compact genesis publication over the state
-/// at the head for a genesis admission, or the adoption receipt digests for a
-/// program successor. The record's magic names its kind.
+/// at the head for a genesis admission, the adoption receipt digests for a
+/// program successor, or the owner review texts, framed, for a behaviour
+/// change. The record's magic names its kind.
 const UPGRADES: &str = "
 CREATE TABLE v2_upgrades (
  ordinal INTEGER PRIMARY KEY CHECK(ordinal>0),
@@ -184,6 +213,40 @@ impl Snapshot {
     }
 }
 
+/// Original inputs of one commit, retained only after its publication and
+/// certificate replay successfully. This owned reporting data grants no authority.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuditedCommit {
+    /// Commit position, from one.
+    pub sequence: u64,
+    /// Position of the publishing contract in the supplied lineage, from one.
+    pub contract_version: usize,
+    /// Exact state after all upgrades at the preceding head.
+    pub prestate: Vec<u8>,
+    /// Original command envelope.
+    pub command: Vec<u8>,
+    /// Original context envelope.
+    pub context: Vec<u8>,
+    /// Original successor state envelope.
+    pub poststate: Vec<u8>,
+}
+
+/// A full read-only audit with original genesis and committing inputs.
+/// All values come from one read transaction; they are reports, not capabilities.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuditedHistory {
+    /// The contract at the checked head, from one.
+    pub contract_version: usize,
+    /// The coherent head, including upgrades after the final commit.
+    pub snapshot: Snapshot,
+    /// The contract that published the store's actual genesis, from one.
+    pub genesis_contract_version: usize,
+    /// Original genesis envelope, before any migration or rename.
+    pub genesis: Vec<u8>,
+    /// Every checked committing invocation, oldest first.
+    pub commits: Vec<AuditedCommit>,
+}
+
 /// Durable certificate bound to the actual pre-state root and core publication.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitReceipt {
@@ -217,6 +280,8 @@ pub struct UpgradeReceipt {
     from_identity: Vec<u8>,
     identity: Vec<u8>,
     receipts: Vec<Hash32>,
+    behaviour: Option<upgrade::Behaviour>,
+    migration: Option<upgrade::Migrated>,
     record: Vec<u8>,
 }
 impl UpgradeReceipt {
@@ -242,6 +307,17 @@ impl UpgradeReceipt {
     pub fn receipts(&self) -> &[Hash32] {
         &self.receipts
     }
+    /// For a behaviour change, the state laws and claims that held on the
+    /// state, the laws not evaluated and the owner review digests; `None`
+    /// for any other kind.
+    pub fn behaviour(&self) -> Option<&upgrade::Behaviour> {
+        self.behaviour.as_ref()
+    }
+    /// For a migration, the migration digest, what the forward simulation
+    /// compared and the migrated state's root; `None` for any other kind.
+    pub fn migration(&self) -> Option<&upgrade::Migrated> {
+        self.migration.as_ref()
+    }
     /// The commit position the upgrade was recorded at; later commits run
     /// under the new contract.
     pub fn version(&self) -> u64 {
@@ -265,9 +341,12 @@ impl UpgradeReceipt {
     }
 }
 
-/// Exact pending data, retained in commit order rather than hash order.
+/// One stored delivery: its place in commit order, rather than hash order,
+/// its exact content and its certificate-bound ID. Plain data that grants
+/// nothing: only a [`Pending`] token delivers, and only a [`Delivered`] token
+/// acknowledges.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Pending {
+pub struct Delivery {
     sequence: u64,
     lane: u8,
     ordinal: u32,
@@ -280,7 +359,7 @@ pub struct Pending {
     delivery_id: Hash32,
     entry_hash: Hash32,
 }
-impl Pending {
+impl Delivery {
     /// Owning commit position.
     pub fn version(&self) -> u64 {
         self.sequence
@@ -402,18 +481,31 @@ fn prepare(connection: &Connection, members: Members<'_, '_>, to_last: bool) {
         return;
     };
     for (index, stored) in segments.upgrades.iter().enumerate() {
-        if upgrade::Kind::of_record(&stored.record) == Some(upgrade::Kind::ProgramSuccessor) {
+        if matches!(
+            upgrade::Kind::of_record(&stored.record),
+            Some(upgrade::Kind::ProgramSuccessor | upgrade::Kind::Migration)
+        ) {
             let (from, to) = (segments.position(index), segments.position(index + 1));
             // The outcome, failures included, is kept for the transaction.
-            let _ = lineage.establish(connection, from, to);
+            let _ = lineage.prepare_pair(connection, from, to);
         }
     }
     let (current, last) = (
         segments.position(segments.current()),
         authorities.len().saturating_sub(1),
     );
-    if to_last && authorities[current].identity() != authorities[last].identity() {
-        let _ = lineage.establish(connection, current, last);
+    if !to_last || authorities[current].identity() == authorities[last].identity() {
+        return;
+    }
+    for (from, to) in lineage.hops(current, last) {
+        // An upgrade across a behaviour change compares no programs, and a
+        // rename compares none either.
+        let moves = to == from + 1 && lineage.moves_state(from);
+        if (moves || lineage.reviews(from, to).is_empty())
+            && !matches!(lineage.steps().get(from), Some(Step::Rename) if moves)
+        {
+            let _ = lineage.prepare_pair(connection, from, to);
+        }
     }
 }
 
@@ -434,9 +526,10 @@ fn settle<T>(
         match attempt(connection, &missing) {
             Err(Error::Unsettled) => match (members.lineage(), missing.take()) {
                 (Some(lineage), Some((from, to))) => {
-                    // The outcome, a missing premise included, is kept for
-                    // the next attempt; only an error ends here.
-                    let _established = lineage.establish(connection, from, to)?;
+                    // The outcome, a missing premise or a refused
+                    // simulation included, is kept for the next attempt;
+                    // only an error ends here.
+                    lineage.prepare_pair(connection, from, to)?;
                 }
                 _ => return Err(Error::Unsettled),
             },
@@ -966,105 +1059,6 @@ impl<'a, 'p> V2SqliteShell<'a, 'p> {
         }
         complete_bundle(&self.anchor, replay_id, publication)
     }
-    /// Recompute the owning publication before returning the oldest pending obligation.
-    pub fn next_pending(&mut self) -> Result<Option<Pending>, Error> {
-        self.synchronize()?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let segments = check_cached_tip(
-            &tx,
-            &self.anchor,
-            self.data_version,
-            self.members.authorities(),
-        )?;
-        let position: Option<(i64,i64,i64)> = tx.query_row("SELECT sequence,lane,ordinal FROM v2_deliveries WHERE acknowledged=0 ORDER BY sequence,lane,ordinal LIMIT 1", [], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
-        let result = match position {
-            None => None,
-            Some((sequence, lane, ordinal)) => {
-                let row = load_commit(&tx, sequence)?;
-                let state = previous_state(&tx, sequence)?;
-                check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
-                Some(load_pending(&tx, sequence, lane, ordinal)?)
-            }
-        };
-        tx.commit()?;
-        Ok(result)
-    }
-    /// Acknowledge only the exact validated content. The host's observation remains trusted.
-    pub fn acknowledge(&mut self, delivery_id: Hash32, observed: Hash32) -> Result<(), Error> {
-        self.synchronize()?;
-        let tx = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let segments = check_cached_tip(
-            &tx,
-            &self.anchor,
-            self.data_version,
-            self.members.authorities(),
-        )?;
-        let sequence: i64 = tx
-            .query_row(
-                "SELECT sequence FROM v2_deliveries WHERE delivery_id=?1",
-                [delivery_id.as_bytes().as_slice()],
-                |r| r.get(0),
-            )
-            .optional()?
-            .ok_or(Error::Delivery)?;
-        let row = load_commit(&tx, sequence)?;
-        let state = previous_state(&tx, sequence)?;
-        check_commit(&tx, self.members.authorities(), &segments, &row, &state)?;
-        let expected: Vec<u8> = tx.query_row(
-            "SELECT entry_hash FROM v2_deliveries WHERE delivery_id=?1",
-            [delivery_id.as_bytes().as_slice()],
-            |r| r.get(0),
-        )?;
-        if parse_hash(&expected)? != observed {
-            return Err(Error::Delivery);
-        }
-        tx.execute(
-            "UPDATE v2_deliveries SET acknowledged=1 WHERE delivery_id=?1",
-            [delivery_id.as_bytes().as_slice()],
-        )?;
-        tx.commit()?;
-        Ok(())
-    }
-    /// Deliver through the concrete library memory interpreter, then acknowledge.
-    /// A crash between those steps is safe to retry with the same content-bound ID.
-    pub fn deliver_next_memory(
-        &mut self,
-        destination: &mut MemoryDestination,
-    ) -> Result<bool, Error> {
-        let Some((delivery_id, observed)) = self.deliver_next_memory_unacknowledged(destination)?
-        else {
-            return Ok(false);
-        };
-        self.acknowledge(delivery_id, observed)?;
-        Ok(true)
-    }
-    /// Deliver through the concrete interpreter while retaining the pending DB entry.
-    /// The returned exact identity/content pair can be acknowledged after a restart.
-    pub fn deliver_next_memory_unacknowledged(
-        &mut self,
-        destination: &mut MemoryDestination,
-    ) -> Result<Option<(Hash32, Hash32)>, Error> {
-        let interpreter = BoundMemoryInterpreter::bind(destination, self.delivery_interpreter)?;
-        let Some(pending) = self.next_pending()? else {
-            return Ok(None);
-        };
-        let entry = OutboxEntry::new(
-            pending.ordinal,
-            pending.channel,
-            decode_value(&pending.destination, DecodeLimits::default())
-                .map_err(|_| Error::Delivery)?,
-            decode_value(&pending.payload, DecodeLimits::default()).map_err(|_| Error::Delivery)?,
-        );
-        let observed = interpreter
-            .destination
-            .deliver(pending.delivery_id, pending.entry_hash, &entry)
-            .map_err(|_| Error::Delivery)?;
-        Ok(Some((pending.delivery_id, observed)))
-    }
 }
 
 // A binding reaches only the concrete library interpreter. No callback, trait
@@ -1335,10 +1329,17 @@ fn check_commit(
 }
 /// Recompute one upgrade record at the head it was recorded at, re-checking
 /// the admission its kind claims: a genesis admission replays the stored
-/// genesis publication over the state, and a program successor establishes
+/// genesis publication over the state; a program successor establishes
 /// all five premises again from the two versions' catalogs, exactly as the
 /// upgrade did, and requires the stored receipt digests to be the ones the
-/// lineage declares for the versions the record spans.
+/// lineage declares for the versions the record spans; a behaviour
+/// change evaluates the new version's state laws and declared claims on the
+/// recorded state again and requires the stored review texts to be the ones
+/// the lineage declares; a migration takes the lineage's own forward
+/// simulation of the step it declares, migrates the recorded state again
+/// and requires the stored migration and state to be exactly those; and a
+/// rename checks the two catalogs' exactness and frames the state again.
+/// Returns the state a migration or rename moved the head to.
 fn check_upgrade(
     connection: &Connection,
     lineage: &[Authority<'_>],
@@ -1346,7 +1347,7 @@ fn check_upgrade(
     segments: &Segments,
     index: usize,
     anchor: &Anchor,
-) -> Result<(), Error> {
+) -> Result<Option<Vec<u8>>, Error> {
     let upgrade = &segments.upgrades[index];
     let ordinal = u64::try_from(index)
         .ok()
@@ -1367,6 +1368,7 @@ fn check_upgrade(
     }
     let sequence = u64::try_from(anchor.sequence).map_err(|_| Error::Range)?;
     let kind = upgrade::Kind::of_record(&upgrade.record).ok_or(Error::History)?;
+    let mut moved = None;
     let admission = match kind {
         upgrade::Kind::GenesisAdmission => {
             let full = expand_publication(&upgrade.identity, &upgrade.publication)?;
@@ -1386,8 +1388,9 @@ fn check_upgrade(
             let (Some(declarer), true) = (declared.lineage, new < declared.len) else {
                 return Err(Error::Identity);
             };
-            let Some(receipts) = declarer.receipts().get(old..new) else {
-                return Err(Error::Identity);
+            let Some(receipts) = declarer.adoption_receipts(old, new) else {
+                // The lineage declares another step than an adoption there.
+                return Err(Error::Succession(upgrade::Unsupported::Receipts));
             };
             // Every premise, established from the lineage's own catalogs
             // before this transaction; the record must bind the same tuple
@@ -1430,6 +1433,145 @@ fn check_upgrade(
             }
             upgrade::successor_admission(premises, &evidence)
         }
+        upgrade::Kind::BehaviourChange => {
+            let (Some(declarer), true) = (declared.lineage, new < declared.len) else {
+                return Err(Error::Identity);
+            };
+            let reviews = declarer.reviews(old, new);
+            let declared_texts = upgrade::framed_reviews(&reviews)?;
+            // The admission is derived again: the new version's laws and
+            // claims, as this lineage declares them, at the recorded state.
+            let checked = behaviour::check(
+                declarer.catalogs()[new],
+                declarer.claims(new),
+                &anchor.state,
+            )
+            .map_err(|_| Error::History)?;
+            if reviews.is_empty() || upgrade.publication != declared_texts {
+                // A record exact under the reviews stored beside it was made
+                // with another declaration of this lineage; any other is
+                // damaged.
+                let exact = upgrade::parse_reviews(&upgrade.publication)
+                    .filter(|texts| !texts.is_empty())
+                    .map(|texts| {
+                        let stored = upgrade::Behaviour::new(
+                            checked.clone(),
+                            texts.iter().map(|text| sha256(text)).collect(),
+                        );
+                        let record = upgrade::record_bytes(
+                            kind,
+                            ordinal,
+                            sequence,
+                            from,
+                            &upgrade.identity,
+                            &stored.admission()?,
+                            anchor.root,
+                            anchor.chain,
+                        )?;
+                        Ok::<_, Error>(
+                            upgrade.record == record
+                                && hash(zeno_fcis_codec::domains::V2_CHAIN, &record)?
+                                    == upgrade.chain,
+                        )
+                    })
+                    .transpose()?
+                    .unwrap_or(false);
+                return Err(if exact {
+                    Error::Succession(upgrade::Unsupported::Reviews)
+                } else {
+                    Error::History
+                });
+            }
+            upgrade::Behaviour::new(checked, reviews.iter().map(|text| sha256(text)).collect())
+                .admission()?
+        }
+        upgrade::Kind::Migration | upgrade::Kind::Rename => {
+            let (Some(declarer), true) = (declared.lineage, new < declared.len) else {
+                return Err(Error::Identity);
+            };
+            let (description, stored) =
+                upgrade::parse_move(&upgrade.publication).ok_or(Error::History)?;
+            let catalogs = declarer.catalogs();
+            // The lineage must declare exactly this step between the two
+            // consecutive versions the record spans.
+            let step = (new == old + 1)
+                .then(|| declarer.steps().get(old).copied())
+                .flatten();
+            let (admission, state) = match (kind, step) {
+                (
+                    upgrade::Kind::Migration,
+                    Some(lineage::Step::Migration {
+                        migration, review, ..
+                    }),
+                ) => {
+                    let Some(simulated) = declarer.simulated(old) else {
+                        declared.missing.set(Some((old, new)));
+                        return Err(Error::Unsettled);
+                    };
+                    let encoding = migration.encode().map_err(|_| Error::Range)?;
+                    if description != encoding {
+                        // A record exact under the migration stored beside
+                        // it was made with another declaration of this
+                        // lineage; any other is damaged.
+                        let digest = sha256(description);
+                        let exact = hash(zeno_fcis_codec::domains::V2_CHAIN, &upgrade.record)?
+                            == upgrade.chain
+                            && upgrade
+                                .record
+                                .windows(32)
+                                .any(|window| window == digest.as_bytes());
+                        return Err(if exact {
+                            Error::Succession(upgrade::Unsupported::Migration)
+                        } else {
+                            Error::History
+                        });
+                    }
+                    let simulated = simulated
+                        .map_err(|_| Error::Succession(upgrade::Unsupported::Migration))?;
+                    let state = migration::migrate_state(
+                        catalogs[old],
+                        catalogs[new],
+                        &migration,
+                        &anchor.state,
+                    )
+                    .map_err(|_| Error::History)?;
+                    let root = hash(zeno_fcis_codec::domains::V2_STATE, &state)?;
+                    (
+                        upgrade::Migrated::new(
+                            sha256(&encoding),
+                            simulated,
+                            root,
+                            behaviour::check(catalogs[new], declarer.claims(new), &state).map_err(
+                                |unmet| Error::Upgrade(upgrade::Refusal::MigrationState(unmet)),
+                            )?,
+                            sha256(review),
+                        )
+                        .admission()?,
+                        state,
+                    )
+                }
+                (upgrade::Kind::Rename, Some(lineage::Step::Rename)) => {
+                    if !description.is_empty() {
+                        return Err(Error::History);
+                    }
+                    if !migration::rename_exact(catalogs[old], catalogs[new])
+                        .map_err(|_| Error::Range)?
+                    {
+                        return Err(Error::Succession(upgrade::Unsupported::Migration));
+                    }
+                    let state = migration::reframe(catalogs[old], catalogs[new], &anchor.state)
+                        .ok_or(Error::History)?;
+                    let root = hash(zeno_fcis_codec::domains::V2_STATE, &state)?;
+                    (upgrade::rename_admission(root), state)
+                }
+                _ => return Err(Error::Succession(upgrade::Unsupported::Migration)),
+            };
+            if state != stored {
+                return Err(Error::History);
+            }
+            moved = Some(state);
+            admission
+        }
     };
     let record = upgrade::record_bytes(
         kind,
@@ -1447,7 +1589,7 @@ fn check_upgrade(
     {
         return Err(Error::History);
     }
-    Ok(())
+    Ok(moved)
 }
 /// Check every upgrade recorded at the anchor's head and advance its chain.
 fn apply_upgrades(
@@ -1462,7 +1604,12 @@ fn apply_upgrades(
         if upgrade.sequence > anchor.sequence {
             break;
         }
-        check_upgrade(connection, lineage, declared, segments, consumed, anchor)?;
+        if let Some(state) =
+            check_upgrade(connection, lineage, declared, segments, consumed, anchor)?
+        {
+            anchor.root = hash(zeno_fcis_codec::domains::V2_STATE, &state)?;
+            anchor.state = state;
+        }
         anchor.chain = upgrade.chain;
         consumed += 1;
     }
@@ -1475,8 +1622,22 @@ fn audit_tail(
     lineage: &[Authority<'_>],
     declared: Declared<'_, '_, '_>,
     segments: &Segments,
+    anchor: Anchor,
+    consumed: usize,
+) -> Result<Anchor, Error> {
+    audit_tail_with_inputs(
+        connection, lineage, declared, segments, anchor, consumed, None,
+    )
+}
+
+fn audit_tail_with_inputs(
+    connection: &Connection,
+    lineage: &[Authority<'_>],
+    declared: Declared<'_, '_, '_>,
+    segments: &Segments,
     mut anchor: Anchor,
     mut consumed: usize,
+    mut commits: Option<&mut Vec<AuditedCommit>>,
 ) -> Result<Anchor, Error> {
     let mut statement = connection
         .prepare("SELECT sequence FROM v2_commits WHERE sequence>?1 ORDER BY sequence")?;
@@ -1503,6 +1664,16 @@ fn audit_tail(
             return Err(Error::History);
         }
         check_commit(connection, lineage, segments, &row, &anchor.state)?;
+        if let Some(commits) = commits.as_mut() {
+            commits.push(AuditedCommit {
+                sequence: u64::try_from(sequence).map_err(|_| Error::History)?,
+                contract_version: segments.position(consumed) + 1,
+                prestate: anchor.state.clone(),
+                command: row.command.clone(),
+                context: row.context.clone(),
+                poststate: row.post.clone(),
+            });
+        }
         anchor = Anchor {
             sequence,
             state: row.post,
@@ -1599,9 +1770,43 @@ fn read_anchor(connection: &Connection) -> Result<Anchor, Error> {
         chain: parse_hash(&chain)?,
     })
 }
+/// The state the last migration or rename recorded at head `sequence` moved
+/// the head to, among the upgrades with ordinal at most `upto` when given;
+/// `None` when none of them moved the state. The audit checks every stored
+/// state against its record before any operation relies on it.
+fn moved_state(
+    connection: &Connection,
+    sequence: i64,
+    upto: Option<usize>,
+) -> Result<Option<Vec<u8>>, Error> {
+    let upto = match upto {
+        Some(upto) => i64::try_from(upto).map_err(|_| Error::Range)?,
+        None => i64::MAX,
+    };
+    let mut statement = connection.prepare(
+        "SELECT record,publication FROM v2_upgrades WHERE sequence=?1 AND ordinal<=?2 ORDER BY ordinal DESC",
+    )?;
+    let rows = statement
+        .query_map(params![sequence, upto], |r| {
+            Ok((r.get::<_, Vec<u8>>(0)?, r.get::<_, Vec<u8>>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    for (record, publication) in rows {
+        if upgrade::Kind::of_record(&record).is_some_and(upgrade::Kind::moves_state) {
+            let (_, state) = upgrade::parse_move(&publication).ok_or(Error::History)?;
+            return Ok(Some(state.to_vec()));
+        }
+    }
+    Ok(None)
+}
+/// The state a commit at `sequence` started from: the state after every
+/// event at the previous head, a migration or rename included.
 fn previous_state(connection: &Connection, sequence: i64) -> Result<Vec<u8>, Error> {
     if sequence <= 0 {
         return Err(Error::History);
+    }
+    if let Some(state) = moved_state(connection, sequence - 1, None)? {
+        return Ok(state);
     }
     if sequence == 1 {
         Ok(connection.query_row(
@@ -1626,11 +1831,19 @@ fn check_tip(connection: &Connection, segments: &Segments, anchor: &Anchor) -> R
     if count != anchor.sequence || max != anchor.sequence {
         return Err(Error::History);
     }
-    if anchor.sequence > 0 {
-        let row = load_commit(connection, anchor.sequence)?;
-        if row.post != anchor.state || row.post_root != anchor.root {
-            return Err(Error::History);
+    match moved_state(connection, anchor.sequence, None)? {
+        Some(state) => {
+            if state != anchor.state {
+                return Err(Error::History);
+            }
         }
+        None if anchor.sequence > 0 => {
+            let row = load_commit(connection, anchor.sequence)?;
+            if row.post != anchor.state || row.post_root != anchor.root {
+                return Err(Error::History);
+            }
+        }
+        None => {}
     }
     if segments.tip_chain(connection, anchor.sequence)? != anchor.chain
         || segments
@@ -1656,23 +1869,33 @@ fn check_checkpoint(
     {
         return Err(Error::History);
     }
-    if c.anchor.sequence > 0 {
-        let row = load_commit(connection, c.anchor.sequence)?;
-        if row.post_root != c.anchor.root || row.post != c.anchor.state {
-            return Err(Error::History);
-        }
-    }
     let consumed = segments.consumed_at(connection, &c.anchor)?;
+    match moved_state(connection, c.anchor.sequence, Some(consumed))? {
+        Some(state) => {
+            if state != c.anchor.state {
+                return Err(Error::History);
+            }
+        }
+        None if c.anchor.sequence > 0 => {
+            let row = load_commit(connection, c.anchor.sequence)?;
+            if row.post_root != c.anchor.root || row.post != c.anchor.state {
+                return Err(Error::History);
+            }
+        }
+        None => {}
+    }
     let (root, chain): (Vec<u8>, Vec<u8>) = connection.query_row(
         "SELECT root,chain FROM v2_checkpoints WHERE sequence=?1",
         [c.anchor.sequence],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
-    if parse_hash(&root)? != c.anchor.root {
-        return Err(Error::History);
-    }
+    // A later save at the same head, after an upgrade, replaces the marker;
+    // after a migration or rename it holds another root too.
     if parse_hash(&chain)? != c.anchor.chain {
         return Err(Error::Checkpoint);
+    }
+    if parse_hash(&root)? != c.anchor.root {
+        return Err(Error::History);
     }
     Ok(consumed)
 }
@@ -1839,17 +2062,17 @@ fn insert_deliveries(
     }
     Ok(())
 }
-fn load_pending(
+fn load_delivery(
     connection: &Connection,
     sequence: i64,
     lane: i64,
     ordinal: i64,
-) -> Result<Pending, Error> {
+) -> Result<Delivery, Error> {
     let row = connection.query_row("SELECT channel,destination_root,payload_root,destination,payload,marker,delivery_id,entry_hash,acknowledged FROM v2_deliveries WHERE sequence=?1 AND lane=?2 AND ordinal=?3", params![sequence,lane,ordinal], |r| Ok((r.get::<_,i64>(0)?,r.get::<_,i64>(1)?,r.get::<_,i64>(2)?,r.get::<_,Vec<u8>>(3)?,r.get::<_,Vec<u8>>(4)?,r.get::<_,Vec<u8>>(5)?,r.get::<_,Vec<u8>>(6)?,r.get::<_,Vec<u8>>(7)?,r.get::<_,i64>(8)?)))?;
     if !(0..=1).contains(&row.8) || !(0..=1).contains(&lane) {
         return Err(Error::Delivery);
     }
-    Ok(Pending {
+    Ok(Delivery {
         sequence: u64::try_from(sequence).map_err(|_| Error::Range)?,
         lane: lane as u8,
         ordinal: u32::try_from(ordinal).map_err(|_| Error::Range)?,
@@ -1879,7 +2102,7 @@ fn check_deliveries(
     }
     for (lane, ds) in [(0_u8, p.effects()), (1_u8, p.outbox())] {
         for d in ds {
-            let actual = load_pending(connection, sequence, lane as i64, d.ordinal() as i64)?;
+            let actual = load_delivery(connection, sequence, lane as i64, d.ordinal() as i64)?;
             let (id, entry) = delivery_commitments(p, lane, d, certificate)?;
             if actual.channel != d.channel()
                 || actual.destination_root != d.destination_root()
@@ -2086,6 +2309,11 @@ fn provider() -> Result<(), Error> {
 fn hash(domain: Domain<'static>, bytes: &[u8]) -> Result<Hash32, Error> {
     Ok(commitment::<RustCryptoSha256>(domain, bytes)?)
 }
+/// Plain SHA-256 with no domain, as `sha256sum` and the command line's file
+/// digests compute it: what an owner review's digest is.
+fn sha256(bytes: &[u8]) -> Hash32 {
+    <RustCryptoSha256 as CommitmentHasher>::hash(bytes)
+}
 fn framed_hash(domain: Domain<'static>, parts: &[&[u8]]) -> Result<Hash32, Error> {
     let mut bytes = Vec::new();
     for part in parts {
@@ -2124,7 +2352,8 @@ pub enum Error {
     Identity,
     /// The library refused to bind a lineage catalog into an Authority.
     Authority,
-    /// A lineage needs at least one version and exactly one adoption receipt
+    /// A lineage needs at least one version and exactly one step, an
+    /// adoption receipt, a behaviour change, a migration or a rename,
     /// between each version and the next.
     Lineage,
     /// The store no longer holds this checkpoint: its head was saved again
@@ -2148,6 +2377,15 @@ pub enum Error {
     Delivery,
     /// The stored or bound delivery interpreter differs from the actual library source.
     Interpreter,
+    /// A relay acknowledgment names a delivery ID the store does not hold.
+    /// Nothing was written.
+    UnknownDelivery,
+    /// A relay acknowledgment names a delivery the store already holds as
+    /// acknowledged. Nothing was written.
+    AlreadyAcknowledged,
+    /// A relay acknowledgment carries a payload hash other than the SHA-256
+    /// of the stored payload. Nothing was written.
+    PayloadMismatch,
     /// Complete command/state/authorization/bundle bytes exceed the requested limit.
     Capacity {
         /// Actual complete four-component aggregate.
@@ -2157,13 +2395,13 @@ pub enum Error {
     },
     /// The pure upgrade decision refused; see [`upgrade::Refusal`].
     Upgrade(upgrade::Refusal),
-    /// The store holds a program-successor upgrade that the lineage it was
-    /// opened with does not support; see [`upgrade::Unsupported`]. The store
-    /// may be intact. Nothing was written.
+    /// The store holds a program-successor, behaviour-change, migration or
+    /// rename upgrade that the lineage it was opened with does not support; see
+    /// [`upgrade::Unsupported`]. The store may be intact. Nothing was written.
     Succession(upgrade::Unsupported),
-    /// Needed program comparisons stayed unavailable across the bounded
-    /// transaction retries: another connection changed the store, or the
-    /// shared comparison cache stayed busy. Nothing was written.
+    /// Needed program comparisons or migration simulations stayed unavailable
+    /// across the bounded transaction retries: another connection changed the
+    /// store, or a shared memo stayed busy. Nothing was written.
     Unsettled,
     /// An explicitly requested interruption was injected.
     InjectedCrash(CrashPoint),
@@ -2211,7 +2449,7 @@ impl fmt::Display for Error {
                 "the library refused to bind a contract version of the lineage: regenerate the contract and rebuild the application with the same ZenoFCIS version",
             ),
             Self::Lineage => f.write_str(
-                "the contract lineage is malformed: it needs at least one version and exactly one adoption receipt between each version and the next; regenerate the contract",
+                "the contract lineage is malformed: it needs at least one version and exactly one step, an adoption receipt, a behaviour change, a migration or a rename, between each version and the next; regenerate the contract",
             ),
             Self::Checkpoint => f.write_str(
                 "the store no longer holds this checkpoint, because its head was saved again after an upgrade at the same head: open it from a newer checkpoint or with a full audit",
@@ -2240,12 +2478,21 @@ impl fmt::Display for Error {
             Self::Interpreter => f.write_str(
                 "the delivery interpreter differs from the one the store was created with: deliver with the ZenoFCIS version that created the store",
             ),
+            Self::UnknownDelivery => f.write_str(
+                "the acknowledgment names a delivery ID this store does not hold, so nothing was written: acknowledge only IDs this store exported",
+            ),
+            Self::AlreadyAcknowledged => f.write_str(
+                "the acknowledgment names a delivery this store already holds as acknowledged, so nothing was written: the delivery needs no further acknowledgment",
+            ),
+            Self::PayloadMismatch => f.write_str(
+                "the acknowledgment's payload hash differs from the SHA-256 of the stored payload, so nothing was written and the delivery stays pending: acknowledge with the hash of the payload the store exported",
+            ),
             Self::Capacity { required, declared } => write!(
                 f,
                 "the complete publication needs {required} bytes, more than the declared limit of {declared}, so nothing was written: raise the limit or publish a smaller decision"
             ),
             Self::Upgrade(upgrade::Refusal::StateSchema) => f.write_str(
-                "upgrade refused: the new contract's state schema differs from the store's, and an upgrade never migrates data; keep the state schema, or start a new application",
+                "upgrade refused: the new contract's state schema differs from the store's, and the application declares no migration or rename between them; declare a migration with `zeno-fcis contract evolve --migration`, keep the state schema, or start a new application",
             ),
             Self::Upgrade(upgrade::Refusal::SameContract) => f.write_str(
                 "upgrade refused: the store already runs this contract version, so there is nothing to upgrade",
@@ -2262,12 +2509,32 @@ impl fmt::Display for Error {
                     "; a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
                 )
             }
+            Self::Upgrade(upgrade::Refusal::Migration(unsimulated)) => write!(
+                f,
+                "upgrade refused: the declared data migration is not admitted, because {unsimulated}; nothing was written: declare a migration that keeps every observation, or take the change as a reviewed behaviour change"
+            ),
+            Self::Upgrade(upgrade::Refusal::Rename) => f.write_str(
+                "upgrade refused: the new contract differs from the store's in more than names, so it is not a rename; nothing was written: regenerate the application, whose lineage then declares the change it is",
+            ),
+            Self::Upgrade(upgrade::Refusal::MigrationState(unmet)) => write!(
+                f, "migration refused: the mapped state does not satisfy the target contract, because {unmet}; nothing was written: use a state satisfying the target laws and claims or revise the target contract"
+            ),
+            Self::Upgrade(upgrade::Refusal::Behaviour(unmet)) => write!(
+                f,
+                "upgrade refused: the reviewed rule change does not admit this store, because {unmet}; nothing was written: change the store's state through the old contract until the new rules hold, or change the new rules"
+            ),
+            Self::Succession(upgrade::Unsupported::Migration) => f.write_str(
+                "the store holds a migration or rename upgrade that this application does not support: it does not declare, or does not admit, that step between those versions; nothing was written: open the store with the build that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
+            Self::Succession(upgrade::Unsupported::Reviews) => f.write_str(
+                "the store holds a behaviour-change upgrade that this application does not support: it is a behaviour change with other owner reviews than this application declares for those versions; nothing was written: open the store with the build that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
             Self::Succession(unsupported) => write!(
                 f,
                 "the store holds a program-successor upgrade that this application does not support: {unsupported}; nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too"
             ),
             Self::Unsettled => f.write_str(
-                "the store or its shared comparison cache stayed busy while the shell checked the decision programs it needs, so nothing was written: try again when other connections and comparisons are idle",
+                "the store or its shared comparison or simulation cache stayed busy while the shell checked the decision programs or migrations it needs, so nothing was written: try again when other connections, comparisons and simulations are idle",
             ),
             Self::InjectedCrash(point) => write!(
                 f,
@@ -2353,12 +2620,21 @@ mod message_tests {
             Error::Concurrent => "Concurrent",
             Error::Delivery => "Delivery",
             Error::Interpreter => "Interpreter",
+            Error::UnknownDelivery => "UnknownDelivery",
+            Error::AlreadyAcknowledged => "AlreadyAcknowledged",
+            Error::PayloadMismatch => "PayloadMismatch",
             Error::Capacity { .. } => "Capacity",
             Error::Upgrade(upgrade::Refusal::StateSchema) => "Upgrade(StateSchema)",
             Error::Upgrade(upgrade::Refusal::SameContract) => "Upgrade(SameContract)",
             Error::Upgrade(upgrade::Refusal::Genesis { .. }) => "Upgrade(Genesis)",
+            Error::Upgrade(upgrade::Refusal::Behaviour(_)) => "Upgrade(Behaviour)",
+            Error::Upgrade(upgrade::Refusal::Migration(_)) => "Upgrade(Migration)",
+            Error::Upgrade(upgrade::Refusal::MigrationState(_)) => "Upgrade(MigrationState)",
+            Error::Upgrade(upgrade::Refusal::Rename) => "Upgrade(Rename)",
             Error::Succession(upgrade::Unsupported::Receipts) => "Succession(Receipts)",
+            Error::Succession(upgrade::Unsupported::Reviews) => "Succession(Reviews)",
             Error::Succession(upgrade::Unsupported::Premise(_)) => "Succession(Premise)",
+            Error::Succession(upgrade::Unsupported::Migration) => "Succession(Migration)",
             Error::Unsettled => "Unsettled",
             Error::InjectedCrash(_) => "InjectedCrash",
         }
@@ -2401,7 +2677,7 @@ mod message_tests {
             ),
             (
                 Error::Lineage,
-                "the contract lineage is malformed: it needs at least one version and exactly one adoption receipt between each version and the next; regenerate the contract",
+                "the contract lineage is malformed: it needs at least one version and exactly one step, an adoption receipt, a behaviour change, a migration or a rename, between each version and the next; regenerate the contract",
             ),
             (
                 Error::Checkpoint,
@@ -2440,6 +2716,18 @@ mod message_tests {
                 "the delivery interpreter differs from the one the store was created with: deliver with the ZenoFCIS version that created the store",
             ),
             (
+                Error::UnknownDelivery,
+                "the acknowledgment names a delivery ID this store does not hold, so nothing was written: acknowledge only IDs this store exported",
+            ),
+            (
+                Error::AlreadyAcknowledged,
+                "the acknowledgment names a delivery this store already holds as acknowledged, so nothing was written: the delivery needs no further acknowledgment",
+            ),
+            (
+                Error::PayloadMismatch,
+                "the acknowledgment's payload hash differs from the SHA-256 of the stored payload, so nothing was written and the delivery stays pending: acknowledge with the hash of the payload the store exported",
+            ),
+            (
                 Error::Capacity {
                     required: 70_000,
                     declared: 65_536,
@@ -2448,7 +2736,7 @@ mod message_tests {
             ),
             (
                 Error::Upgrade(upgrade::Refusal::StateSchema),
-                "upgrade refused: the new contract's state schema differs from the store's, and an upgrade never migrates data; keep the state schema, or start a new application",
+                "upgrade refused: the new contract's state schema differs from the store's, and the application declares no migration or rename between them; declare a migration with `zeno-fcis contract evolve --migration`, keep the state schema, or start a new application",
             ),
             (
                 Error::Upgrade(upgrade::Refusal::SameContract),
@@ -2471,6 +2759,47 @@ mod message_tests {
                 "upgrade refused: the new contract is not a program successor of the store's (premise 3: the two decision programs differ on input tuple 41 of their declared domain, counting from 0 in enumeration order), and its genesis laws do not admit the store's current state (the library refused: Core(Law(Violated))); a generated contract admits only its declared genesis state, so adopt the change as a program successor, or upgrade a store still at genesis",
             ),
             (
+                Error::Upgrade(upgrade::Refusal::MigrationState(
+                    behaviour::Unmet::Unevaluable,
+                )),
+                "migration refused: the mapped state does not satisfy the target contract, because the new contract's laws and claims cannot be evaluated on the store's current state; nothing was written: use a state satisfying the target laws and claims or revise the target contract",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Behaviour(behaviour::Unmet::Law {
+                    id: 500,
+                    failure: LawFailure::Violated,
+                })),
+                "upgrade refused: the reviewed rule change does not admit this store, because state law 500 of the new contract is false on the store's current state; nothing was written: change the store's state through the old contract until the new rules hold, or change the new rules",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Behaviour(behaviour::Unmet::Claim {
+                    id: 600,
+                    failure: LawFailure::Undefined,
+                })),
+                "upgrade refused: the reviewed rule change does not admit this store, because inductive claim 600 of the new contract has no value on the store's current state; nothing was written: change the store's state through the old contract until the new rules hold, or change the new rules",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Migration(
+                    migration::Unsimulated::Differs {
+                        observation: migration::Observation::Deliveries,
+                        ordinal: 7,
+                    },
+                )),
+                "upgrade refused: the declared data migration is not admitted, because the observation `deliveries` differs between the old and the new contract at input tuple 7, so this is a behaviour change, not a migration; nothing was written: declare a migration that keeps every observation, or take the change as a reviewed behaviour change",
+            ),
+            (
+                Error::Upgrade(upgrade::Refusal::Rename),
+                "upgrade refused: the new contract differs from the store's in more than names, so it is not a rename; nothing was written: regenerate the application, whose lineage then declares the change it is",
+            ),
+            (
+                Error::Succession(upgrade::Unsupported::Migration),
+                "the store holds a migration or rename upgrade that this application does not support: it does not declare, or does not admit, that step between those versions; nothing was written: open the store with the build that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
+            (
+                Error::Succession(upgrade::Unsupported::Reviews),
+                "the store holds a behaviour-change upgrade that this application does not support: it is a behaviour change with other owner reviews than this application declares for those versions; nothing was written: open the store with the build that upgraded it, and restore it from a trusted copy if that build refuses it too",
+            ),
+            (
                 Error::Succession(upgrade::Unsupported::Receipts),
                 "the store holds a program-successor upgrade that this application does not support: it names other adoption receipts than this application declares for those versions; nothing was written: open the store with the build and comparison cap that upgraded it, and restore it from a trusted copy if that build refuses it too",
             ),
@@ -2485,7 +2814,7 @@ mod message_tests {
             ),
             (
                 Error::Unsettled,
-                "the store or its shared comparison cache stayed busy while the shell checked the decision programs it needs, so nothing was written: try again when other connections and comparisons are idle",
+                "the store or its shared comparison or simulation cache stayed busy while the shell checked the decision programs or migrations it needs, so nothing was written: try again when other connections, comparisons and simulations are idle",
             ),
             (
                 Error::InjectedCrash(CrashPoint::AfterCommit),
@@ -2502,6 +2831,6 @@ mod message_tests {
             assert!(format!("{error:?}").starts_with(stem), "{error:?}");
             covered.insert(name);
         }
-        assert_eq!(covered.len(), 24, "{covered:?}");
+        assert_eq!(covered.len(), 33, "{covered:?}");
     }
 }

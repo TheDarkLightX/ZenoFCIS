@@ -1,0 +1,441 @@
+{
+  "note": "Planted contract changes for `contract diff`. Each side is a base directory relative to crates/zeno-fcis-cli and text edits, each of which must match exactly `count` times. Every expected change and note is item:id:change; an omitted list is not compared. The unit tests in src/contract/diff/tests.rs and the integration test tests/contract_diff.rs read this table, and the unit tests also check the SQLite shell's F6.1 Tier A admission on every pair.",
+  "pairs": [
+    {
+      "name": "identical",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "kind": "identical",
+      "changes": [],
+      "notes": []
+    },
+    {
+      "name": "outside-the-contract",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "law 503 approvals_are_kept",
+            "to": "law 503 approvals_stay",
+            "count": 1
+          },
+          {
+            "file": "project.zeno",
+            "from": "reason 207 needs_board precedence 7;\nreason 208 over_daily_limit precedence 8;",
+            "to": "reason 207 needs_board precedence 8;\nreason 208 daily_limit_exceeded precedence 7;",
+            "count": 1
+          },
+          {
+            "file": "project.zeno",
+            "from": "channel 301 alert ",
+            "to": "channel 301 risk_alert ",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"rule\": \"only staff can act\"",
+            "to": "\"rule\": \"staff only\"",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"requested\"",
+            "to": "\"tier_asked\"",
+            "count": 2
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"template\": \"spend-approval\"",
+            "to": "\"template\": \"spend-approval-renamed\"",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "identical",
+      "changes": [],
+      "notes": [
+        "application::changed",
+        "law-name:503:renamed",
+        "reason-name:208:renamed",
+        "channel-name:301:renamed",
+        "reason-precedence:207:changed",
+        "reason-precedence:208:changed",
+        "case-rule:0:changed",
+        "variable:requested:renamed"
+      ]
+    },
+    {
+      "name": "field-renamed",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "field 120 100 status 106;",
+            "to": "field 120 100 phase 106;",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "status",
+            "to": "phase",
+            "count": 5
+          }
+        ]
+      },
+      "kind": "rename",
+      "changes": [
+        "field:100.120:renamed"
+      ],
+      "notes": [
+        "variable:status:renamed"
+      ]
+    },
+    {
+      "name": "field-added",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "field 123 100 ceo_ok 108;",
+            "to": "field 123 100 ceo_ok 108;\nfield 124 100 urgent 108;",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"123\": \"ceo_ok\"}",
+            "to": "\"123\": \"ceo_ok\", \"124\": false}",
+            "count": 4
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"123\": true}",
+            "to": "\"123\": true, \"124\": false}",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"123\": false}",
+            "to": "\"123\": false, \"124\": false}",
+            "count": 2
+          }
+        ]
+      },
+      "kind": "layout-change",
+      "changes": [
+        "field:100.124:added",
+        "case:3:changed",
+        "case:8:changed",
+        "case:9:changed",
+        "case:15:changed",
+        "case:16:changed",
+        "case:18:changed",
+        "law:990:changed",
+        "law:991:changed",
+        "program::changed",
+        "limit:read:changed",
+        "limit:write:changed",
+        "limit:byte:changed",
+        "limit:step:changed"
+      ],
+      "notes": []
+    },
+    {
+      "name": "state-type-retyped",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "variant 154 106 Blocked none;",
+            "to": "variant 154 106 Blocked none;\nvariant 155 106 Archived none;",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "layout-change",
+      "changes": [
+        "variant:106.155:added",
+        "program::changed"
+      ],
+      "notes": []
+    },
+    {
+      "name": "law-formula-changed",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "(post.100.121 == 3 -> context.102.141 == 1)",
+            "to": "(post.100.121 >= 2 -> context.102.141 == 1)",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "rule-change",
+      "changes": [
+        "law:501:changed",
+        "limit:step:changed"
+      ],
+      "notes": []
+    },
+    {
+      "name": "case-guard-changed",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "v2/policy.json",
+            "from": "\"action == 172 && tier >= 1 && !cfo_ok\"",
+            "to": "\"action == 172 && tier >= 2 && !cfo_ok\"",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "rule-change",
+      "changes": [
+        "case:12:changed",
+        "law:991:changed",
+        "program::changed",
+        "limit:step:changed"
+      ],
+      "notes": []
+    },
+    {
+      "name": "reason-added",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "reason 208 over_daily_limit precedence 8;",
+            "to": "reason 208 over_daily_limit precedence 8;\nreason 209 needs_board_to_open precedence 9;",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "    {\"rule\": \"create: the clerk opens the request at its tier\"",
+            "to": "    {\"rule\": \"create: a tier 3 request needs the board\", \"when\": \"action == 170 && requested == 3 && !board\",\n     \"class\": \"Reject\", \"reason\": 209, \"post\": {}, \"outbox\": []},\n    {\"rule\": \"create: the clerk opens the request at its tier\"",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "rule-change",
+      "changes": [
+        "reason:209:added",
+        "case:3:added",
+        "law:991:changed",
+        "program::changed",
+        "limit:read:changed",
+        "limit:step:changed"
+      ],
+      "notes": []
+    },
+    {
+      "name": "reason-removed",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "reason 204 no_approval_needed precedence 4;\nreason 205 needs_cfo precedence 5;\nreason 206 needs_ceo precedence 6;\nreason 207 needs_board precedence 7;\nreason 208 over_daily_limit precedence 8;",
+            "to": "reason 205 needs_cfo precedence 4;\nreason 206 needs_ceo precedence 5;\nreason 207 needs_board precedence 6;\nreason 208 over_daily_limit precedence 7;",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "    {\"rule\": \"approve: tier 0 needs no approval\", \"when\": \"action == 171 && tier == 0\",\n     \"class\": \"Reject\", \"reason\": 204, \"post\": {}, \"outbox\": []},\n",
+            "to": "",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "rule-change",
+      "changes": [
+        "reason:204:removed",
+        "case:7:removed",
+        "law:991:changed",
+        "program::changed",
+        "limit:read:changed",
+        "limit:step:changed"
+      ],
+      "notes": [
+        "reason-precedence:205:changed",
+        "reason-precedence:206:changed",
+        "reason-precedence:207:changed",
+        "reason-precedence:208:changed"
+      ]
+    },
+    {
+      "name": "channel-changed",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "channel 301 alert destination 103 payload 110;",
+            "to": "channel 301 alert destination 103 payload 104;",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"payload\": {\"146\": \"tier\"}",
+            "to": "\"payload\": {\"145\": \"tier\"}",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "unrelated",
+      "changes": [
+        "channel:301:changed",
+        "case:15:changed",
+        "law:991:changed"
+      ],
+      "notes": []
+    },
+    {
+      "name": "channel-added",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "channel 301 alert destination 103 payload 110;",
+            "to": "channel 301 alert destination 103 payload 110;\nchannel 302 audit destination 103 payload 104;",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "unrelated",
+      "changes": [
+        "channel:302:added"
+      ],
+      "notes": []
+    },
+    {
+      "name": "command-set-changed",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "variant 173 109 Cancel none;",
+            "to": "variant 173 109 Cancel none;\nvariant 174 109 Escalate none;",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "unrelated",
+      "changes": [
+        "variant:109.174:added",
+        "program::changed"
+      ],
+      "notes": []
+    },
+    {
+      "name": "renamed-and-rule-changed",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/spend-approval",
+        "edits": [
+          {
+            "file": "project.zeno",
+            "from": "field 120 100 status 106;",
+            "to": "field 120 100 phase 106;",
+            "count": 1
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "status",
+            "to": "phase",
+            "count": 5
+          },
+          {
+            "file": "v2/policy.json",
+            "from": "\"action == 172 && tier >= 1 && !cfo_ok\"",
+            "to": "\"action == 172 && tier >= 2 && !cfo_ok\"",
+            "count": 1
+          }
+        ]
+      },
+      "kind": "unrelated",
+      "changes": [
+        "field:100.120:renamed",
+        "case:12:changed",
+        "law:991:changed",
+        "program::changed",
+        "limit:step:changed"
+      ],
+      "notes": [
+        "variable:status:renamed"
+      ]
+    },
+    {
+      "name": "other-application",
+      "old": {
+        "base": "tests/fixtures/spend-approval"
+      },
+      "new": {
+        "base": "tests/fixtures/escrow"
+      },
+      "kind": "unrelated"
+    },
+    {
+      "name": "withdrawal-queue-adoption",
+      "old": {
+        "base": "templates/withdrawal-queue"
+      },
+      "new": {
+        "base": "tests/fixtures/withdrawal-queue-adopted"
+      },
+      "kind": "program-successor",
+      "changes": [
+        "program::changed",
+        "limit:step:changed"
+      ],
+      "notes": []
+    }
+  ]
+}
