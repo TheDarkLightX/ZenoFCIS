@@ -50,6 +50,7 @@ feature file. This keeps Gherkin prose outside execution authority.
 
 | Scenario ID | Acceptance boundary |
 |---|---|
+| `bounded-collections-pipes` | Entry/item/snapshot bounds, canonical backend parity, immutable refusal, FIFO order and pending-ID pipe contracts. |
 | `minimal-core` | Immutable transition and logical budget example. |
 | `checked-backend` | Bounded tool-neutral backend request example. |
 | `zal-dialogue` | Deterministic finite-FSM help and explanation, paired language views, exact-revision human review, terminal/MCP shared state, UI-state doubles, and actual sample-domain factory replay. Native browser and model-provider access remain separate. |
