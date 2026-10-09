@@ -1,0 +1,24 @@
+zeno 1;
+project 1 consumable_budget;
+namespace 2 core;
+type 100 state Budget;
+type 101 command Spend;
+type 102 context Operator;
+type 105 int Units in 0..=${C};
+type 108 bool Authorized;
+field 110 100 remaining 105;
+field 120 101 amount 105;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+reason 201 insufficient_budget precedence 1;
+component 400 budget {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= ${C};
+law 501 conservation on accept = post.100.110 + command.101.120 == pre.100.110;
+law 502 authorized_nonincreasing_budget on accept = context.102.130 == 1 && post.100.110 <= pre.100.110;

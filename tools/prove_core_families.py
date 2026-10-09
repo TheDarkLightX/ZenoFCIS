@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Issue/replay finite certificates for the three closed G1 data families.
+"""Issue/replay finite certificates for the ten closed component data families.
 
 The certificate is Identified data. Only successful exhaustive replay establishes
 its finite Proved claim (ADR 0003), under the explicitly named trusted base.
@@ -26,12 +26,22 @@ RUNTIME_SCHEMA = 'zeno-fcis/core-family-runtime-source/1'
 GENERATED_TEST_OUTPUT = 'crates/zeno-fcis-generated-code-tests/python'
 INPUTS = ('tools/instantiate_core.py', 'tools/check_core_components.py',
           'tools/prove_core_families.py', 'tools/test_data/core_components/reference.py')
-NATIVE_REPORT_SHA256 = 'ed41a32a80dffb3a41893e46a048c5167effd3946a9b543a96ae71e7ce73ac83'
-COUNTS = {'reservation-pool': (9, 2216), 'rate-limiter': (9, 2646), 'approval-queue': (3, 1296)}
+NATIVE_REPORT_SHA256 = '150de442ff39d54f3cf9a19be5dd0ca5578b791ed34190233e7f4f079bf53f8c'
+COUNTS = {'reservation-pool': (9, 2216), 'rate-limiter': (9, 2646), 'approval-queue': (3, 1296),
+          'bounded-counter': (8, 176), 'consumable-budget': (8, 568),
+          'versioned-register': (8, 30664), 'idempotency-slot': (8, 61328),
+          'retry-budget': (8, 352), 'finite-phase-machine': (8, 176), 'logical-deadline': (8, 8096)}
 CONSERVATION = {
     'reservation-pool': 'Reserve and Release preserve a+r; Consume subtracts exactly q; Replenish adds exactly q. Supplied authorization is not authentication or physical asset evidence.',
     'rate-limiter': 'Every accepted request charges one unit. Only now>=start+W resets the window, and its first request charges one. Supplied time is bounded0..6, not a clock attestation.',
     'approval-queue': 'Each accepted Vote adds one previously unset supplied principal slot and frames other slots. Execute preserves votes and requires K; Enqueue introduces no votes. Slots do not authenticate humans.',
+    'bounded-counter': 'Each accepted Inc adds exactly one and Dec subtracts exactly one within 0..C.',
+    'consumable-budget': 'Every accepted Spend satisfies remaining_post+amount=remaining_pre. Zero spends are allowed; no refill is modeled.',
+    'versioned-register': 'Write requires the expected version and advances it exactly once without wrapping, preserving the supplied new value. Logical concurrency is not a store operation.',
+    'idempotency-slot': 'Matching the retained key cannot replace its value. A different key replaces the slot; historical exactly-once delivery is not established.',
+    'retry-budget': 'Attempt consumes one remaining unit. Finish closes once without a charge. This does not schedule or execute retries.',
+    'finite-phase-machine': 'Advance increments exactly once; Reset is accepted only at the final phase and returns to zero. No external completion is inferred.',
+    'logical-deadline': 'Tick requires now>=last_seen and now>=deadline, preserves the deadline, records now and reaches the deadline once. Supplied logical time is not a clock attestation.',
 }
 
 
@@ -169,7 +179,7 @@ def observed_rows(packet, expected, manifest, family):
     tuples = list(itertools.product(*manifest['input_domains']))
     require([tuple(map(int, row['input'])) for row in expected] == tuples, 'reference does not cover the entire product')
     width = core.definition(family)['state_width']
-    normalized, accepts = [], {str(action): 0 for action in manifest['input_domains'][width]}
+    normalized, accepts = [], {name: 0 for name in core.COMMANDS[family][1].values()}
     rejects = 0
     for text, values, reference in zip(rows, tuples, expected):
         written, decision = text.split(' | ')
@@ -184,7 +194,7 @@ def observed_rows(packet, expected, manifest, family):
             require(cls == 'Accept', 'unexpected decision class')
             require([field['field'] for field in fields] == list(range(110, 110 + width)), 'successor fields differ')
             post = [int(field['value']['variant'] if isinstance(field['value'], dict) else field['value']) for field in fields]
-            accepts[str(values[width])] += 1
+            accepts[core.command_name(family, values)] += 1
         deliveries = table['outboxes'][int(outbox_index)]['deliveries']
         actual = {'class': cls, 'reason': reason, 'post': post, 'deliveries': deliveries}
         require(actual == reference['expected'], f'actual decision differs at {values}')
@@ -205,7 +215,10 @@ def collect(family, cli, work, snapshot):
         packet = core.read_json((directory / 'review.json').read_text())
         expected = [row for row in reference if row['family'] == family.replace('-', '_') and row['parameters'] == parameters]
         observations = observed_rows(packet, expected, manifest, family)
-        laws = [500, 501, 908, 909, 990, 991] if family == 'rate-limiter' else [500, 501, 502, 908, 909, 990, 991]
+        application_laws = [500, 501] if family == 'rate-limiter' else [500, 501, 502]
+        if family == 'retry-budget':
+            application_laws.append(503)
+        laws = application_laws + [908, 909, 990, 991]
         require(generated['summary']['law_ids'] == laws, 'applicable law inventory differs')
         artifact_hashes = {name: core.digest((directory / 'contract' / name).read_bytes())
                            for name in ('v2/schema.zcve', 'v2/policy.zcve', 'src/v2_contract.rs')}
@@ -241,30 +254,24 @@ def qualify(cli, work):
     """Real bad policies, replay tampering and normal generated-app references."""
     reports = {'law_mutants': [], 'tampered_certificates': [], 'app_references': []}
     for family in core.FAMILIES:
-        directory = work / (family + '-bad-policy'); directory.mkdir()
         parameters = core.definition(family)['instances'][0]
-        manifest = core.instantiate(family, parameters, directory / 'contract', include_proof=False)
-        path = directory / 'contract/v2/policy.json'
-        policy = core.read_json(path.read_text())
-        if family == 'reservation-pool':
-            next(case for case in policy['cases'] if case['when'] == 'action == 150')['post']['111'] = 'reserved'
-        elif family == 'rate-limiter':
-            policy['cases'][-1]['post']['111'] = 'used'
-        else:
-            next(case for case in policy['cases'] if case['when'] == 'action == 161')['post']['111'] = 'v0'
-        path.write_bytes(encoded(policy))
-        run(cli, directory, 'generate', ['generate', 'contract', directory / 'contract'])
-        run(cli, directory, 'review', ['contract', 'review', directory / 'contract', '--out', directory / 'review.json'], 1)
-        packet = core.read_json((directory / 'review.json').read_text())
-        require(packet['summary']['law_refusal_findings'] > 0, 'bad family lacked a lawful-prestate law refusal')
-        try:
-            observed_rows(packet, [], manifest, family)
-        except ValueError as error:
-            require('technical refusal' in str(error), 'bad family failed for a different reason')
-        else:
-            raise ValueError('bad family acquired a finite certificate')
-        reports['law_mutants'].append({'family': family, 'refusals': packet['summary']['refusals'],
-                                       'review_sha256': core.digest((directory / 'review.json').read_bytes())})
+        policy = core.read_json(core.source(family, parameters, include_proof=False)['v2/policy.json'].decode())
+        for name, changed in checks.law_mutants(family, policy):
+            directory = work / (family + '-bad-policy-' + name); directory.mkdir()
+            manifest = core.instantiate(family, parameters, directory / 'contract', include_proof=False)
+            (directory / 'contract/v2/policy.json').write_bytes(encoded(changed))
+            run(cli, directory, 'generate', ['generate', 'contract', directory / 'contract'])
+            run(cli, directory, 'review', ['contract', 'review', directory / 'contract', '--out', directory / 'review.json'], 1)
+            packet = core.read_json((directory / 'review.json').read_text())
+            require(packet['summary']['law_refusal_findings'] > 0, 'bad family lacked a lawful-prestate law refusal')
+            try:
+                observed_rows(packet, [], manifest, family)
+            except ValueError as error:
+                require('technical refusal' in str(error), 'bad family failed for a different reason')
+            else:
+                raise ValueError('bad family acquired a finite certificate')
+            reports['law_mutants'].append({'family': family, 'mutation': name, 'refusals': packet['summary']['refusals'],
+                                           'review_sha256': core.digest((directory / 'review.json').read_bytes())})
     for name in ('missing-parameter', 'narrow-domain', 'wrong-decision', 'wrong-binary',
                  'stale-family', 'stale-runtime', 'inflated-status'):
         directory = work / name; directory.mkdir()
@@ -325,7 +332,7 @@ def main():
     parser.add_argument('mode', choices=('issue', 'replay', 'qualify'))
     parser.add_argument('--cli', type=Path, required=True)
     parser.add_argument('--work-dir', type=Path, required=True)
-    parser.add_argument('--native-report', type=Path, help='required for issue: preserved all21 native qualification report')
+    parser.add_argument('--native-report', type=Path, help='required for issue: retained all77 native qualification report')
     parser.add_argument('--certificates', type=Path, help='replay-only alternate certificate data directory')
     args = parser.parse_args()
     cli, work = args.cli.resolve(), args.work_dir.resolve()
@@ -344,6 +351,12 @@ def main():
         require(args.native_report is not None, 'issue requires the retained native report')
         require(core.digest(args.native_report.read_bytes()) == NATIVE_REPORT_SHA256, 'native report identity differs')
         native = core.read_json(args.native_report.read_text())
+        require(native['schema'] == 'zeno-fcis/core-seed-check/1' and
+                native['evidence'] == 'complete-finite-execution' and
+                native['raw_tuples'] == 107518 and len(native['instances']) == 77,
+                'native report does not cover the complete catalogue')
+        require(native['runtime_source_sha256'] == core.digest(encoded(runtime)),
+                'native report checked a different compiler/evaluator source')
         require(not PROOFS.exists(), 'refusing to overwrite an existing certificate set')
     else:
         require(load(certificates_dir / 'runtime-source.json') == runtime, 'runtime source changed')
@@ -368,7 +381,7 @@ def main():
         for family, certificate in certificates.items():
             compare_certificate(load(certificates_dir / f'{family}.json'), certificate)
     report = {'schema': 'zeno-fcis/core-family-replay/1', 'mode': args.mode, 'status': 'passed',
-              'evidence_level': 'Proved', 'scope': '21 closed parameter instances and 6158 raw transition inputs only',
+              'evidence_level': 'Proved', 'scope': '77 closed parameter instances and 107518 raw transition inputs only',
               'authority': 'none', 'owner_adoption': False,
               'certificates': {family: core.digest(encoded(certificate)) for family, certificate in certificates.items()}}
     (work / 'report.json').write_bytes(encoded(report))

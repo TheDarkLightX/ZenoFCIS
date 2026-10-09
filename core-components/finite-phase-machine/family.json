@@ -1,0 +1,49 @@
+{
+  "schema": "zeno-fcis/core-seed-family/1",
+  "family": "finite-phase-machine",
+  "version": 1,
+  "instances": [
+    {
+      "C": 1
+    },
+    {
+      "C": 2
+    },
+    {
+      "C": 3
+    },
+    {
+      "C": 4
+    },
+    {
+      "C": 5
+    },
+    {
+      "C": 6
+    },
+    {
+      "C": 7
+    },
+    {
+      "C": 8
+    }
+  ],
+  "input_intervals": [
+    [
+      0,
+      "${C}"
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "state_width": 1,
+  "authority": "none",
+  "family_theorem": null,
+  "qualification": "source-bound-certificate-required"
+}

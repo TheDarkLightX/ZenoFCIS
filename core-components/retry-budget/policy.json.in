@@ -1,0 +1,76 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "retry-budget-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "106": [
+      "Bool"
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "remaining": "pre.100.110",
+    "closed": "pre.100.111",
+    "finish": "command.101.120",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "closed",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!finish && remaining == 0",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "finish",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining",
+        "111": "true"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining - 1",
+        "111": "false"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": ${C},
+    "111": false
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality",
+    "503": "DebitCreditEffectEquality"
+  }
+}
