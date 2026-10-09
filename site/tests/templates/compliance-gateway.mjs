@@ -15,7 +15,7 @@ const RULES = {
   178: "PartiallyVerifiedLarge", 179: "RepeatOffender", 180: "MediumRiskLarge", 181: "DefaultAllow",
 };
 
-export const laws = { Accept: [500, 501, 502], CommittedFailure: [500, 503], Reject: [509] };
+export const laws = { Accept: [500, 501, 502, 991], CommittedFailure: [500, 503, 991], Reject: [509, 991] };
 
 // Inputs refused before any decision, with the stage that refuses them.
 export const refusals = [

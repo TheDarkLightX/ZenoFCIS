@@ -1,6 +1,5 @@
-//! The withdrawal-queue example's authority, synthesized controller step,
-//! and law checker, run in the browser over the library's in-memory
-//! reference shell.
+//! The withdrawal-queue example's checked V2 contract, run in the browser
+//! with genuine publications and an ephemeral local store.
 //!
 //! The step, the report, and the C ABI are `zeno-fcis-site-common`'s. This
 //! crate names the application's types, its exact genesis, and the mapping
@@ -10,14 +9,9 @@
 use withdrawal_queue::{
     authority,
     bindings::GeneratedProject,
-    delivery::Destination,
     deposit,
     generated::{Caller, Flag, Lane, TickContext, Vault, VaultCommand},
-    genesis_state,
-    laws::VaultLaws,
-    profile,
-    program::VaultProgram,
-    request, tick,
+    genesis_state, profile, request, tick, v2_contract,
 };
 use zeno_fcis_site_common::{
     Application, Authority, Json, Map, Names, Request, RustCryptoSha256, SchemaAdmittedEnvelope,
@@ -39,14 +33,14 @@ fn admit_root(vault: &Vault) -> Result<SchemaAdmittedEnvelope, String> {
 
 impl Application for WithdrawalQueue {
     const NAME: &'static str = "withdrawal-queue";
-    type Program = VaultProgram;
-    type Laws = VaultLaws;
-    type Destination = Destination;
     type Command = VaultCommand;
     type Context = TickContext;
 
-    fn authority() -> Result<Authority<Self>, String> {
-        authority()
+    fn with_authority<R>(f: impl FnOnce(&Authority<'_>) -> R) -> Result<R, String> {
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor)?;
+        Ok(f(&authority))
     }
 
     fn names() -> Result<Names, String> {
@@ -206,13 +200,13 @@ mod tests {
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<WithdrawalQueue>::new().unwrap();
         let accept = demo.step(&deposit_of(1, "Operator")).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 503]);
+        assert_eq!(law_ids(&accept), [500, 501, 502, 503, 991]);
         assert_eq!(accept["laws"][3]["name"], "tick_follows_the_controller");
         demo.step(&deposit_of(2, "Operator")).unwrap();
         // A fourth unit fits the capacity of 4; a fifth is rejected.
         let reject = demo.step(&deposit_of(2, "Operator")).unwrap();
         assert_eq!(reject["reason"]["name"], "over_capacity");
-        assert_eq!(law_ids(&reject), [509]);
+        assert_eq!(law_ids(&reject), [509, 991]);
     }
 
     #[test]

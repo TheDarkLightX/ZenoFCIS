@@ -1,23 +1,23 @@
-//! One application, decided by its unchanged authority.
+//! Browser-owned state updated only from genuine V2 publications.
 //!
-//! A step follows the template's own `invoke`, with the SQLite shell replaced
-//! by the library's in-memory [`AuthorizedShellState`]: schema admission
-//! through the generated bindings, `admit_invocation`, `execute`, then, for
-//! an accept or a committed failure, the commit and the exact replay check.
-//! The page supplies every context value, including any time; nothing here
-//! reads a clock.
+//! Every invocation binds the template's checked contract and replays its
+//! exact original inputs and subject. The browser shell is ephemeral: it
+//! provides neither durable storage, authentication nor external delivery.
 
 #![forbid(unsafe_code)]
 
-use crate::application::{Application, Authority, Shell, Transition};
+use crate::application::Application;
 use crate::render::Names;
 use serde_json::{Value as Json, json};
 use std::fmt::Debug;
-use zeno_fcis_authority::{AuthorizationDecodeLimits, AuthorizedShellState};
-use zeno_fcis_codec::{CanonicalEncode, Domain, Hash32, commitment};
-use zeno_fcis_core::Decision;
+use std::marker::PhantomData;
+use zeno_fcis_authority::{Publication, PublicationOutcome, WireDelivery};
+use zeno_fcis_codec::{
+    CanonicalEncode, DecodeLimits, Domain, Hash32, commitment, decode_envelope, decode_value,
+};
 use zeno_fcis_crypto::RustCryptoSha256;
-use zeno_fcis_shell::{CommitStatus, OutboxRecord};
+use zeno_fcis_synthesis::finite::v2_composition::{Class, Kind, Raw};
+use zeno_fcis_value::Value;
 
 /// Which check refused a request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -26,12 +26,11 @@ pub enum Stage {
     Input,
     /// The schema refused a value before any decision.
     Admission,
-    /// The authority refused to admit or execute the invocation.
+    /// The authority refused the invocation or publication.
     Authority,
-    /// The shell refused the publication or its exact replay.
+    /// The browser shell refused publication or its exact replay.
     Commit,
 }
-
 impl Stage {
     /// The stage's name in a refusal.
     #[must_use]
@@ -44,16 +43,14 @@ impl Stage {
         }
     }
 }
-
-/// A refused request: no decision was made, and nothing changed.
+/// A refused request; browser state has not changed.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Refusal {
     stage: Stage,
     message: String,
 }
-
 impl Refusal {
-    /// A refusal at `stage`, with the text the page shows.
+    /// A refusal at the indicated stage.
     #[must_use]
     pub fn new(stage: Stage, message: impl Into<String>) -> Self {
         Self {
@@ -61,154 +58,226 @@ impl Refusal {
             message: message.into(),
         }
     }
-
-    /// Which check refused the request.
+    /// The check that refused the request.
     #[must_use]
     pub const fn stage(&self) -> Stage {
         self.stage
     }
-
-    /// The refusal as the page receives it.
+    /// The page's refusal report.
     #[must_use]
     pub fn to_json(&self) -> Json {
-        json!({ "error": self.message, "stage": self.stage.label() })
+        json!({"error":self.message,"stage":self.stage.label()})
     }
 }
-
-/// Renders an error at `stage` as the templates render their own: with `Debug`.
 fn refused<E: Debug>(stage: Stage) -> impl Fn(E) -> Refusal {
     move |error| Refusal::new(stage, format!("{error:?}"))
 }
-
-/// A template's own text, already rendered, at `stage`.
 fn refused_text(stage: Stage) -> impl Fn(String) -> Refusal {
     move |message| Refusal::new(stage, message)
 }
-
-/// A failed publication consumes the shell; only a reset restores one.
-fn consumed() -> Refusal {
-    Refusal::new(
-        Stage::Commit,
-        "the shell was consumed by a failed publication; reset the demo",
-    )
-}
-
-/// What the ABI drives: one demo, whichever application it runs.
+/// The bounded C ABI drives any one template's demo.
 pub trait DemoInstance {
-    /// Decides one request; see [`Demo::step`].
+    /// Decide a request and publish its committing result.
     ///
     /// # Errors
-    ///
-    /// A refused request; see [`Demo::step`].
+    /// Returns an input, admission, authority or commit refusal.
     fn step(&mut self, input: &str) -> Result<Json, Refusal>;
-
-    /// The current state; see [`Demo::state`].
+    /// Read the browser shell's current state.
     ///
     /// # Errors
-    ///
-    /// A consumed shell; see [`Demo::state`].
+    /// Returns a malformed retained-envelope refusal.
     fn state(&self) -> Result<Json, Refusal>;
 }
-
-/// A template's authority over an in-memory shell.
-pub struct Demo<A: Application> {
-    authority: Authority<A>,
-    names: Names,
-    shell: Option<Shell<A>>,
-    /// Decisions executed so far; numbers each invocation's replay identity.
-    steps: u64,
-    /// Candidates in the order they were published. The reference shell keeps
-    /// its records in canonical order, by candidate identity, which is not
-    /// the order a reader expects the outbox in.
-    committed: Vec<Hash32>,
+/// One ephemeral shell, cloned to stage an atomic first commit and replay.
+#[derive(Clone)]
+struct BrowserState {
+    identity: Vec<u8>,
+    state: Vec<u8>,
+    root: Hash32,
+    subjects: Vec<(Hash32, Vec<u8>)>,
+    outbox: Vec<Json>,
 }
-
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Commit {
+    Committed,
+    IdempotentReplay,
+}
+/// A template's genuine V2 publications over browser-owned state.
+pub struct Demo<A: Application> {
+    names: Names,
+    shell: BrowserState,
+    policy_id: Hash32,
+    genesis_id: Hash32,
+    steps: u64,
+    application: PhantomData<A>,
+}
 impl<A: Application> Demo<A> {
-    /// Builds the authority and a shell at the exact genesis.
+    /// Check the exact template genesis before installing browser state.
     ///
     /// # Errors
-    ///
-    /// The template's own refusal to build its authority, its names, or its
-    /// genesis, or the authority's refusal to authorize that genesis.
+    /// Returns a template binding, genesis or encoding refusal.
     pub fn new() -> Result<Self, Refusal> {
-        let authority = A::authority().map_err(refused_text(Stage::Authority))?;
         let names = A::names().map_err(refused_text(Stage::Authority))?;
-        let genesis = A::genesis().map_err(refused_text(Stage::Admission))?;
-        let genesis = authority
-            .authorize_genesis(genesis)
-            .map_err(refused(Stage::Authority))?;
-        let shell =
-            AuthorizedShellState::new(&authority, genesis).map_err(refused(Stage::Commit))?;
+        let initial = A::genesis().map_err(refused_text(Stage::Admission))?;
+        let initial = initial
+            .envelope()
+            .canonical_bytes()
+            .map_err(refused(Stage::Admission))?;
+        let (identity, state, genesis_id) =
+            A::with_authority(|authority| match authority.publish_genesis(&initial) {
+                PublicationOutcome::Commit(publication) => {
+                    if publication.evaluation().kind() != Kind::Genesis
+                        || publication.poststate() != initial
+                    {
+                        return Err(Refusal::new(
+                            Stage::Authority,
+                            "genesis changed the initial state",
+                        ));
+                    }
+                    Ok((
+                        authority.identity().to_vec(),
+                        publication.poststate().to_vec(),
+                        Self::digest("genesis", publication.subject())?,
+                    ))
+                }
+                other => Err(Refusal::new(
+                    Stage::Authority,
+                    format!("genesis: {other:?}"),
+                )),
+            })
+            .map_err(refused_text(Stage::Authority))??;
+        decode_envelope(&state, DecodeLimits::default()).map_err(refused(Stage::Commit))?;
+        let policy_id = Self::digest("policy", &identity)?;
+        let root = Self::digest("state", &state)?;
         Ok(Self {
-            authority,
             names,
-            shell: Some(shell),
+            shell: BrowserState {
+                identity,
+                state,
+                root,
+                subjects: Vec::new(),
+                outbox: Vec::new(),
+            },
+            policy_id,
+            genesis_id,
             steps: 0,
-            committed: Vec::new(),
+            application: PhantomData,
         })
     }
-
-    /// A domain-separated commitment under `example/<NAME>/<label>`, as the
-    /// template's `profile::digest` makes it.
     fn digest(label: &str, bytes: &[u8]) -> Result<Hash32, Refusal> {
-        let label = format!("example/{}/{label}", A::NAME);
-        let domain = Domain::new(&label, 1).map_err(refused(Stage::Authority))?;
+        let name = format!("example/{}/{label}", A::NAME);
+        let domain = Domain::new(&name, 1).map_err(refused(Stage::Authority))?;
         commitment::<RustCryptoSha256>(domain, bytes).map_err(refused(Stage::Authority))
     }
-
-    /// One published entry, with its delivery identity and acknowledgement.
-    fn outbox_json(&self, record: &OutboxRecord) -> Json {
-        let entry = record.entry();
-        json!({
-            "candidate_id": record.candidate_id().to_string(),
-            "ordinal": record.ordinal(),
-            "channel": entry.channel(),
-            "channel_name": self.names.channel(entry.channel()),
-            "destination": self.names.render(entry.destination()),
-            "payload": self.names.render(entry.payload()),
-            "delivery_id": record.delivery_id().to_string(),
-            "entry_hash": record.entry_hash().to_string(),
-            "acknowledged": record.acknowledged(),
-        })
+    fn render_state(&self, state: &[u8]) -> Result<Json, Refusal> {
+        let envelope =
+            decode_envelope(state, DecodeLimits::default()).map_err(refused(Stage::Commit))?;
+        Ok(self.names.render(&envelope.into_value()))
     }
-
-    /// The state, the shell's root and counts, every entry in the outbox in
-    /// the order it was published, and the identities the shell is pinned to.
+    fn outbox_json(&self, candidate: Hash32, delivery: &WireDelivery) -> Result<Json, Refusal> {
+        let destination = decode_value(delivery.destination(), DecodeLimits::default())
+            .map_err(refused(Stage::Commit))?;
+        let payload = decode_value(delivery.payload(), DecodeLimits::default())
+            .map_err(refused(Stage::Commit))?;
+        let entry = Value::tuple(vec![
+            Value::unsigned(u128::from(delivery.ordinal())),
+            Value::unsigned(u128::from(delivery.channel())),
+            Value::unsigned(u128::from(delivery.destination_root())),
+            Value::unsigned(u128::from(delivery.payload_root())),
+            Value::bytes(delivery.destination().to_vec()).map_err(refused(Stage::Commit))?,
+            Value::bytes(delivery.payload().to_vec()).map_err(refused(Stage::Commit))?,
+            Value::bytes(delivery.idempotency().to_vec()).map_err(refused(Stage::Commit))?,
+        ])
+        .map_err(refused(Stage::Commit))?;
+        let entry_hash = Self::digest(
+            "entry",
+            &entry.canonical_bytes().map_err(refused(Stage::Commit))?,
+        )?;
+        let mut delivery_bytes = candidate.as_bytes().to_vec();
+        delivery_bytes.extend_from_slice(entry_hash.as_bytes());
+        let delivery_id = Self::digest("delivery", &delivery_bytes)?;
+        Ok(
+            json!({"candidate_id":candidate.to_string(),"ordinal":delivery.ordinal(),"channel":delivery.channel(),
+            "channel_name":self.names.channel(delivery.channel()),"destination":self.names.render(&destination),"payload":self.names.render(&payload),
+            "delivery_id":delivery_id.to_string(),"entry_hash":entry_hash.to_string(),"acknowledged":false}),
+        )
+    }
+    /// Consume a genuine capability. Replay is checked before comparing the
+    /// current state because its original state predates the first commit.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "The shell consumes ownership of each non-Clone publication capability."
+    )]
+    fn commit(
+        &self,
+        shell: &mut BrowserState,
+        replay: Hash32,
+        publication: Publication<'_>,
+    ) -> Result<(Commit, Vec<Json>), Refusal> {
+        if publication.identity() != shell.identity
+            || publication.evaluation().kind() != Kind::Transition
+        {
+            return Err(Refusal::new(
+                Stage::Commit,
+                "publication identity or kind mismatch",
+            ));
+        }
+        if let Some((_, subject)) = shell.subjects.iter().find(|(key, _)| *key == replay) {
+            return if subject == publication.subject() {
+                Ok((Commit::IdempotentReplay, Vec::new()))
+            } else {
+                Err(Refusal::new(
+                    Stage::Commit,
+                    "replay key refers to a different publication",
+                ))
+            };
+        }
+        if publication.evaluation().raw().state != shell.state {
+            return Err(Refusal::new(Stage::Commit, "publication prestate mismatch"));
+        }
+        let id = Self::publication_id(replay, publication.subject())?;
+        let post = publication.poststate().to_vec();
+        self.render_state(&post)?;
+        let root = Self::digest("state", &post)?;
+        let outbox = publication
+            .outbox()
+            .iter()
+            .map(|delivery| self.outbox_json(id, delivery))
+            .collect::<Result<Vec<_>, _>>()?;
+        // All fallible validation and encoding precedes publication into
+        // the staging shell.
+        let subject = publication.subject().to_vec();
+        shell.state = post;
+        shell.root = root;
+        shell.subjects.push((replay, subject));
+        shell.outbox.extend(outbox.clone());
+        Ok((Commit::Committed, outbox))
+    }
+    fn publication_id(replay: Hash32, subject: &[u8]) -> Result<Hash32, Refusal> {
+        let bytes = Value::tuple(vec![
+            Value::bytes(replay.as_bytes().to_vec()).map_err(refused(Stage::Commit))?,
+            Value::bytes(subject.to_vec()).map_err(refused(Stage::Commit))?,
+        ])
+        .map_err(refused(Stage::Commit))?
+        .canonical_bytes()
+        .map_err(refused(Stage::Commit))?;
+        Self::digest("publication", &bytes)
+    }
+    /// Read the state, local history counts and queued entries.
     ///
     /// # Errors
-    ///
-    /// A shell consumed by a failed publication.
+    /// Returns a malformed retained-state envelope refusal.
     pub fn state(&self) -> Result<Json, Refusal> {
-        let shell = self.shell.as_ref().ok_or_else(consumed)?;
-        let reference = shell.reference_state();
-        let mut records: Vec<&OutboxRecord> = reference.outbox_records().iter().collect();
-        records.sort_by_key(|record| {
-            let published = self
-                .committed
-                .iter()
-                .position(|candidate| *candidate == record.candidate_id().hash());
-            (published, record.ordinal())
-        });
-        Ok(json!({
-            "state": self.names.render(reference.state()),
-            "root": reference.root().to_string(),
-            "bundles": reference.bundles().len(),
-            "outbox": records.into_iter().map(|record| self.outbox_json(record)).collect::<Vec<_>>(),
-            "policy_id": shell.policy_id().to_string(),
-            "genesis_id": shell.genesis_id().to_string(),
-            "steps": self.steps,
-        }))
+        Ok(
+            json!({"state":self.render_state(&self.shell.state)?,"root":self.shell.root.to_string(),"bundles":self.shell.subjects.len(),
+            "outbox":self.shell.outbox,"policy_id":self.policy_id.to_string(),"genesis_id":self.genesis_id.to_string(),"steps":self.steps}),
+        )
     }
-
-    /// Decides one request, publishes what commits, and reports the decision:
-    /// its kind and reason, each law's status, the state before and after,
-    /// the entries it queued, and its authorization or rejection identity.
+    /// Publish actual original inputs and replay the same capability's subject.
+    /// All fallible work precedes replacement of the browser shell.
     ///
     /// # Errors
-    ///
-    /// A request the page mis-shaped, a value the schema refuses, an
-    /// invocation the authority refuses, or a publication the shell refuses.
-    /// The stage names which; none of them changes the state.
+    /// Returns a refusal without changing browser state, history or outbox.
     pub fn step(&mut self, input: &str) -> Result<Json, Refusal> {
         let request: Json = serde_json::from_str(input)
             .map_err(|error| Refusal::new(Stage::Input, format!("invalid JSON: {error}")))?;
@@ -216,127 +285,78 @@ impl<A: Application> Demo<A> {
             return Err(Refusal::new(Stage::Input, "a request is a JSON object"));
         };
         let (command, context) = A::parse(&fields).map_err(refused_text(Stage::Input))?;
-        let shell = self.shell.as_ref().ok_or_else(consumed)?;
-        let before = shell.reference_state().state().clone();
-        let root = A::admit_state(before.clone()).map_err(refused_text(Stage::Admission))?;
         let (command, context) =
             A::admit(&command, &context).map_err(refused_text(Stage::Admission))?;
-        let replay = format!("browser-demo-step-{}", self.steps);
-        let witness = self
-            .authority
-            .admit_invocation(
-                root,
-                command,
-                context,
-                Self::digest("principal", b"browser demo principal")?,
-                Self::digest(
-                    "authentication",
-                    b"trusted page input; no remote authentication",
-                )?,
-                Self::digest("replay", replay.as_bytes())?,
-            )
-            .map_err(refused(Stage::Authority))?;
-        let decision = self
-            .authority
-            .execute(witness)
-            .map_err(refused(Stage::Authority))?;
-        self.steps += 1;
-        let before = self.names.render(&before);
-        let root_before = shell.reference_state().root().to_string();
-        match decision {
-            Decision::Reject(rejected) => {
-                let reject = rejected.into_reason();
-                Ok(json!({
-                    "decision": "Reject",
-                    "reason": self.names.reason(reject.rejection().reason_id().get()),
-                    "laws": self.names.laws(reject.law_evaluation()),
-                    "before": before,
-                    "after": before,
-                    "roots": { "before": root_before, "after": root_before },
-                    "outbox": [],
-                    "authorization_id": Json::Null,
-                    "rejection_id": reject.rejection_id().to_string(),
-                    "commit": Json::Null,
-                    "bundles": shell.reference_state().bundles().len(),
-                }))
-            }
-            Decision::Accept(accepted) => {
-                self.commit(accepted.into_candidate(), None, &before, &root_before)
-            }
-            Decision::CommittedFailure(failed) => {
-                let (transition, reason) = failed.into_parts();
-                self.commit(transition, Some(reason.get()), &before, &root_before)
-            }
-        }
-    }
-
-    /// Publishes an authorized transition, then re-authorizes its canonical
-    /// bytes and requires the second publication to be an idempotent replay,
-    /// exactly as the templates' `invoke` does.
-    fn commit(
-        &mut self,
-        transition: Transition<A>,
-        reason: Option<u32>,
-        before: &Json,
-        root_before: &str,
-    ) -> Result<Json, Refusal> {
-        let shell = self.shell.take().ok_or_else(consumed)?;
-        let candidate_id = transition.body().candidate_id();
-        let authorization_id = transition.authorization_id().to_string();
-        let laws = self.names.laws(transition.law_evaluation());
-        let bytes = transition
+        let command = command
+            .envelope()
             .canonical_bytes()
-            .map_err(refused(Stage::Commit))?;
-        let published = shell.commit(transition).map_err(refused(Stage::Commit))?;
-        if published.status() != CommitStatus::Committed {
-            return Err(Refusal::new(Stage::Commit, "expected first publication"));
+            .map_err(refused(Stage::Admission))?;
+        let context = context
+            .envelope()
+            .canonical_bytes()
+            .map_err(refused(Stage::Admission))?;
+        let before = self.render_state(&self.shell.state)?;
+        let next_step = self
+            .steps
+            .checked_add(1)
+            .ok_or_else(|| Refusal::new(Stage::Commit, "step counter overflow"))?;
+        let replay = Self::digest("replay", &self.steps.to_be_bytes())?;
+        let (report, staged) = A::with_authority(|authority| {
+            if authority.identity() != self.shell.identity { return Err(Refusal::new(Stage::Authority,"authority identity changed")); }
+            let raw = Raw { state: &self.shell.state, command: &command, context: &context };
+            match authority.publish(raw) {
+                PublicationOutcome::Reject(evaluation) => {
+                    let candidate = evaluation.result().map_err(refused(Stage::Authority))?;
+                    if candidate.class() != Class::Reject { return Err(Refusal::new(Stage::Authority,"unexpected rejection class")); }
+                    let subject = evaluation.subject().map_err(refused(Stage::Authority))?;
+                    let rejection = Self::digest("rejection", subject)?;
+                    Ok((json!({"decision":"Reject","reason":candidate.reason().map(|id|self.names.reason(id)),
+                        "laws":self.names.laws(evaluation.diagnostics()),"before":before,"after":before,
+                        "roots":{"before":self.shell.root.to_string(),"after":self.shell.root.to_string()},"outbox":[],
+                        "authorization_id":Json::Null,"rejection_id":rejection.to_string(),"commit":Json::Null,"bundles":self.shell.subjects.len()}),None))
+                }
+                PublicationOutcome::Commit(publication) => {
+                    let candidate = publication.evaluation().result().map_err(refused(Stage::Authority))?;
+                    let decision = match candidate.class() { Class::Accept => "Accept", Class::CommittedFailure => "CommittedFailure",
+                        _ => return Err(Refusal::new(Stage::Authority,"unexpected committing class")) };
+                    let reason = candidate.reason().map(|id|self.names.reason(id));
+                    let laws = self.names.laws(publication.evaluation().diagnostics());
+                    let subject = publication.subject().to_vec();
+                    let id = Self::publication_id(replay, &subject)?;
+                    let mut staged = self.shell.clone();
+                    let (status,outbox) = self.commit(&mut staged,replay,publication)?;
+                    if status != Commit::Committed { return Err(Refusal::new(Stage::Commit,"expected first publication")); }
+                    let replayed = match authority.replay_publication(raw,&subject) {
+                        PublicationOutcome::Commit(replayed) => replayed,
+                        other => return Err(Refusal::new(Stage::Commit,format!("exact replay: {other:?}"))),
+                    };
+                    let committed_state = staged.state.clone();
+                    let committed_root = staged.root;
+                    let committed_counts = (staged.subjects.len(),staged.outbox.len());
+                    let (status,repeated_entries) = self.commit(&mut staged,replay,replayed)?;
+                    if status != Commit::IdempotentReplay || !repeated_entries.is_empty() || staged.state != committed_state || staged.root != committed_root
+                        || (staged.subjects.len(),staged.outbox.len()) != committed_counts {
+                        return Err(Refusal::new(Stage::Commit,"exact replay was not idempotent"));
+                    }
+                    let report = json!({"decision":decision,"reason":reason,"laws":laws,"before":before,"after":self.render_state(&staged.state)?,
+                        "roots":{"before":self.shell.root.to_string(),"after":staged.root.to_string()},"outbox":outbox,
+                        "authorization_id":id.to_string(),"rejection_id":Json::Null,"commit":{"status":"Committed","replay":"IdempotentReplay"},"bundles":staged.subjects.len()});
+                    Ok((report,Some(staged)))
+                }
+                other => Err(Refusal::new(Stage::Authority,format!("publication: {other:?}"))),
+            }
+        }).map_err(refused_text(Stage::Authority))??;
+        if let Some(shell) = staged {
+            self.shell = shell;
         }
-        let replayed = self
-            .authority
-            .reauthorize_canonical_transition(&bytes, AuthorizationDecodeLimits::default())
-            .map_err(refused(Stage::Commit))?;
-        let replayed = published
-            .into_state()
-            .commit(replayed)
-            .map_err(refused(Stage::Commit))?;
-        if replayed.status() != CommitStatus::IdempotentReplay {
-            return Err(Refusal::new(
-                Stage::Commit,
-                "exact replay was not idempotent",
-            ));
-        }
-        let shell = replayed.into_state();
-        let reference = shell.reference_state();
-        let outbox: Vec<Json> = reference
-            .outbox_records()
-            .iter()
-            .filter(|record| record.candidate_id() == candidate_id)
-            .map(|record| self.outbox_json(record))
-            .collect();
-        let report = json!({
-            "decision": if reason.is_some() { "CommittedFailure" } else { "Accept" },
-            "reason": reason.map(|id| self.names.reason(id)),
-            "laws": laws,
-            "before": before,
-            "after": self.names.render(reference.state()),
-            "roots": { "before": root_before, "after": reference.root().to_string() },
-            "outbox": outbox,
-            "authorization_id": authorization_id,
-            "rejection_id": Json::Null,
-            "commit": { "status": "Committed", "replay": "IdempotentReplay" },
-            "bundles": reference.bundles().len(),
-        });
-        self.shell = Some(shell);
-        self.committed.push(candidate_id.hash());
+        self.steps = next_step;
         Ok(report)
     }
 }
-
 impl<A: Application> DemoInstance for Demo<A> {
     fn step(&mut self, input: &str) -> Result<Json, Refusal> {
         Self::step(self, input)
     }
-
     fn state(&self) -> Result<Json, Refusal> {
         Self::state(self)
     }

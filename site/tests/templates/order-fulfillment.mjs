@@ -13,7 +13,7 @@ const CALLERS = { 170: "Customer", 171: "PaymentProvider", 172: "Carrier" };
 const PAYMENT_ACTIONS = { 175: "Capture", 176: "Void" };
 const CALLBACKS = ["PaymentCaptured", "PaymentDeclined"];
 
-export const laws = { Accept: [500, 501, 502, 503, 504, 505], CommittedFailure: [500, 506], Reject: [509] };
+export const laws = { Accept: [500, 501, 502, 503, 504, 505, 991], CommittedFailure: [500, 506, 991], Reject: [509, 991] };
 
 // Inputs refused before any decision, with the stage that refuses them.
 export const refusals = [

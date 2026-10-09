@@ -15,9 +15,9 @@ const SWAPS = { 170: "NoSwap", 171: "PendingBuy", 172: "PendingSell" };
 const ASSETS = { 183: "Quote", 184: "Base" };
 
 export const laws = {
-  Accept: [500, 501, 502, 503, 504, 505, 506, 507],
-  CommittedFailure: [500, 501, 502, 508],
-  Reject: [509],
+  Accept: [500, 501, 502, 503, 504, 505, 506, 507, 991],
+  CommittedFailure: [500, 501, 502, 508, 991],
+  Reject: [509, 991],
 };
 
 // Inputs refused before any decision, with the stage that refuses them.

@@ -19,26 +19,30 @@
   <section aria-labelledby="about-heading" class="prose">
     <h2 id="about-heading">Proposers, judges, and the shell</h2>
     <p>
-      A <strong>proposer</strong> suggests a decision. It may be an AI agent, a
-      synthesized core, or hand-written code.
+      A <strong>proposer</strong> submits a command. A person, service or AI
+      agent can propose one; the checked core decides what it means.
     </p>
     <p>
-      The <strong>judge</strong> is the commit authority with its laws. It admits
-      the request against the schema, runs the program, evaluates every law that
-      applies to the decision, and mints an authorization only for a decision
-      that satisfies them. A decision that breaks a law is never authorized, so
-      it never reaches a shell.
+      The <strong>judge</strong> is the library's V2 authority. It checks the
+      original request against the declared schema, evaluates the complete
+      decision policy and every applicable law, and issues a publication only
+      when those checks permit a commit. Each example supplies a declarative
+      contract rather than a hand-written decision or law callback.
     </p>
     <p>
-      The <strong>imperative shell</strong> only persists and delivers. On a
-      server it is SQLite with an outbox; in this page it is the library's
-      in-memory reference shell, which the authority itself checks before each
-      publication.
+      The <strong>imperative shell</strong> stores checked decisions and handles
+      delivery. On a server it is SQLite with an outbox. This page uses an
+      ephemeral browser store that consumes genuine publications and checks
+      replay; it queues entries without delivering them. Its storage behavior
+      is tested, not formally verified.
     </p>
     <p>
       Each example below is a template exactly as <code>zeno-fcis new</code>
-      writes it, built for WebAssembly without its SQLite shell. Its authority,
-      program, and law checker are the same source that decides on a server.
+      writes it, built for WebAssembly without its SQLite shell. Its contract,
+      authority and decision and law evaluators are the same source that decides
+      on a server. The library's functional core is formally verified against
+      its stated specifications; the policy must still express the intended
+      rules, and deployment assumptions remain explicit.
       The page only supplies each request and its context, including any time,
       and shows what the authority returned. The first section has already
       run its README's demonstration in this browser; every other example's
@@ -55,8 +59,8 @@
         failed login is a <em>committed failure</em>: the login fails, but the
         attempt is recorded. Every request carries its time, and the decision
         never reads a clock. Only a request marked <em>admin</em> may unlock.
-        Alerts leave through the outbox. The proposer is the example's
-        hand-written program. The rules, in the order they apply, are in the
+        Alerts are queued in the outbox. The complete decision is evaluated
+        from the example's V2 contract. The rules, in the order they apply, are in the
         template's
         <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/account-lockout/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/account-lockout/README.md</code> in
@@ -66,38 +70,32 @@
         <summary>What is checked, and at what strength</summary>
         <ul>
           <li>
-            Laws in <code>project.zeno</code> are evaluated at run time within
-            their declared scopes: 500 on every commit, 501 and 502 on accepts,
-            and 503 on committed failures; law 509
-            is the framework's rule that a rejection publishes nothing. The
-            panel shows each law's status as the evaluation reports it.
+            The V2 authority evaluates the complete declared policy over the
+            original inputs, constructs the decision and checks every
+            applicable law. A committing result carries a genuine publication;
+            a rejection publishes nothing. The panel reports the actual law
+            diagnostics.
           </li>
           <li>
-            The template's own tests, which run on a host and not in this page,
-            compare the executed application with a reference model of the
-            README's rules on 20 examples and 606 grid inputs, give the law
-            checker faulty decisions to refuse, and probe determinism.
+            The library's functional core is verified against its formal
+            specifications with a named trusted base. The authored policy
+            still needs review against the intended rules. Input authentication,
+            browser storage, display and external delivery remain host concerns.
           </li>
           <li>
-            Claim 600 states that the action laws alone keep the lock
-            invariant. CVC5 answers <code>unsat</code> for its induction step
-            over the declared integer ranges: that answer is <em>attested</em>,
-            not proved. Z3's <code>unsat</code> is recorded as unsupported
-            evidence, and there is no Lean export for inductive claims.
+            <code>site/tests/replay.mjs</code> runs 20 independent decision
+            examples and the README's demonstration through this compiled
+            module, comparing decisions, reasons, state, outbox and applicable
+            laws. Every commit is followed by an actual idempotent replay.
+            These integration checks detect disagreements; they do not prove
+            the browser or a deployment correct.
           </li>
           <li>
-            This module is checked by a headless replay
-            (<code>site/tests/replay.mjs</code>, run by
-            <code>site/build.py</code>) that runs the template's 20
-            decision examples and the README's demonstration through it and
-            compares every outcome with the examples file and with the gate's
-            expected summary.
+            Earlier synthesis, model and solver evidence is retained in the
+            template's README and private historical oracle. The hand-written
+            adapters described there do not execute this page's V2 decisions.
           </li>
-          <li>
-            The time and the admin flag are trusted page inputs, as the README
-            says of its own context: a deployment must authenticate them before
-            admission.
-          </li>
+          <li>The time and admin flag are supplied inputs. A deployment must establish the caller’s permissions and trusted time.</li>
         </ul>
       </details>
     </div>
@@ -114,8 +112,8 @@
         provider can recognize a retry, and a callback that arrives twice or
         late is rejected and changes nothing. A declined payment is a
         <em>committed failure</em>: the order returns to <code>Placed</code>
-        and keeps its attempt count. The proposer is the example's
-        hand-written state machine. The rules, in the order they apply, are in
+        and keeps its attempt count. Its complete state machine is declared
+        in the V2 contract. The rules, in the order they apply, are in
         the template's
         <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/order-fulfillment/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/order-fulfillment/README.md</code>).
@@ -124,36 +122,32 @@
         <summary>What is checked, and at what strength</summary>
         <ul>
           <li>
-            Laws 500 to 506, written in <code>project.zeno</code>, are evaluated
-            at run time within their declared scopes: 500 on
-            every commit, 501 to 505 on accepts, 506 on committed failures; law
-            509 is the framework's rule that a rejection publishes nothing. In
-            Rust, because formulas cannot see them: the rejection reason, the
-            exact request, the absence of effects, and the genesis.
+            The V2 authority evaluates the complete declared policy over the
+            original inputs, constructs the decision and checks every
+            applicable law. A committing result carries a genuine publication;
+            a rejection publishes nothing. The panel reports the actual law
+            diagnostics.
           </li>
           <li>
-            The template's own tests, which run on a host and not in this page,
-            explore the application from genesis and find 20 reachable states,
-            run 1,440 commands from them through admission, the authority, the
-            program, the law checker, the committed patch, and the outbox
-            against a reference model of the README's rules, compare 23
-            examples, give the law checker faulty decisions to refuse, and
-            probe determinism on 400 inputs. All of these are detectors, in the
-            README's words: agreement shows that these runs matched, not that
-            the application is correct for every possible deployment. No claim
-            is submitted to a solver.
+            The library's functional core is verified against its formal
+            specifications with a named trusted base. The authored policy
+            still needs review against the intended rules. Input authentication,
+            browser storage, display and external delivery remain host concerns.
           </li>
           <li>
-            This module is checked by the headless replay
-            (<code>site/tests/replay.mjs</code>) that runs the template's 23
-            decision examples, each from an order reached from genesis, and the
-            README's demonstration through it.
+            <code>site/tests/replay.mjs</code> runs 23 independent decision
+            examples and the README's demonstration through this compiled
+            module, comparing decisions, reasons, state, outbox and applicable
+            laws. Every commit is followed by an actual idempotent replay.
+            These integration checks detect disagreements; they do not prove
+            the browser or a deployment correct.
           </li>
           <li>
-            The caller is a trusted page input, as the README says of its own
-            context: a deployment must authenticate each caller before
-            admission.
+            Earlier synthesis, model and solver evidence is retained in the
+            template's README and private historical oracle. The hand-written
+            adapters described there do not execute this page's V2 decisions.
           </li>
+          <li>The caller and provider responses are supplied inputs. A deployment must authenticate them before admission.</li>
         </ul>
       </details>
     </div>
@@ -166,12 +160,9 @@
       <p>
         The stock of one product: units are available to sell or reserved for
         an order; shipping sends reserved units out, and restocking brings
-        units in. The decision core is <em>synthesized</em>:
-        <code>synthesis.json</code> states the rules as a relation over every
-        input, and <code>zeno-fcis synth</code> selected a program that
-        satisfies it on all 432 of them. A conservation law keeps the count of
-        units exactly right. The proposer is that synthesized step, behind a
-        hand-written operator check. The rules are in the template's
+        units in. The complete V2 decision contract includes the operator
+        check, action rules and conservation law that keeps the count of units
+        exactly right. The library evaluates them together. The rules are in the template's
         <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/inventory-reservation/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/inventory-reservation/README.md</code>).
       </p>
@@ -179,43 +170,32 @@
         <summary>What is checked, and at what strength</summary>
         <ul>
           <li>
-            The synthesized step: <code>zeno-fcis synth run</code> evaluates
-            hole assignments over all 432 inputs and selects the first that
-            satisfies the contract on every one. In the README's words, that
-            selection is exhaustive verification against the contract, for the
-            program as the library's interpreter runs it; <code>synth
-            verify</code> replays the emitted Rust and Python on every input.
-            It is only as right as the contract, which
-            <code>tools/check_synthesis.py</code> compares with a separate
-            restatement of the rules.
+            The V2 authority evaluates the complete declared policy over the
+            original inputs, constructs the decision and checks every
+            applicable law. A committing result carries a genuine publication;
+            a rejection publishes nothing. The panel reports the actual law
+            diagnostics.
           </li>
           <li>
-            Laws 500 to 502 are evaluated at run time on every accepted
-            decision before it can be published: the bounds, the conservation
-            of units, and each action's exact movement; law 508 records that
-            the application never commits a failure, and law 509 that a
-            rejection publishes nothing. In Rust: the rejection reason, the
-            exact shipment request, and the absence of effects.
+            The library's functional core is verified against its formal
+            specifications with a named trusted base. The authored policy
+            still needs review against the intended rules. Input authentication,
+            browser storage, display and external delivery remain host concerns.
           </li>
           <li>
-            The template's own tests, on a host, run all 864 admitted inputs
-            through admission, the authority, the adapter, the law checker, the
-            committed patch, and the outbox, check that all 36 states are
-            reachable from genesis, compare 20 examples, give the law checker
-            faulty decisions to refuse, and probe determinism on 216 inputs.
-            For this finite domain the conformance test covers every decision
-            the application can make; all of these are detectors. No claim is
-            submitted to a solver.
+            <code>site/tests/replay.mjs</code> runs 20 independent decision
+            examples and the README's demonstration through this compiled
+            module, comparing decisions, reasons, state, outbox and applicable
+            laws. Every commit is followed by an actual idempotent replay.
+            These integration checks detect disagreements; they do not prove
+            the browser or a deployment correct.
           </li>
           <li>
-            This module is checked by the headless replay that runs the
-            template's 20 decision examples, each from a stock reached from
-            genesis, and the README's demonstration through it.
+            Earlier synthesis, model and solver evidence is retained in the
+            template's README and private historical oracle. The hand-written
+            adapters described there do not execute this page's V2 decisions.
           </li>
-          <li>
-            The operator flag is a trusted page input, as the README says of
-            its own context.
-          </li>
+          <li>The operator flag is a supplied input. The core enforces the guard; the host must establish the operator’s identity.</li>
         </ul>
       </details>
     </div>
@@ -231,9 +211,8 @@
         features, and every decision names the rule that fired. A blocked
         transfer is a <em>committed failure</em> that adds a strike; three
         strikes freeze the account until a reviewer reinstates it. Review
-        tickets and block alerts leave through the outbox. The proposer is a
-        step that <code>zeno-fcis synth</code> selected from the rule base, and
-        the law checker evaluates the rule base itself as a second judge. The
+        tickets and block alerts are queued in the outbox. The V2 contract
+        declares the complete decision and its laws from the rule base. The
         rules are in the template's
         <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/compliance-gateway/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/compliance-gateway/README.md</code>).
@@ -242,53 +221,32 @@
         <summary>What is checked, and at what strength</summary>
         <ul>
           <li>
-            The rule base is checked over all 720 combinations of its features
-            to be consistent, total, and live, and a rule base that fails is
-            refused at build time. The synthesized step was selected on all 720
-            inputs and replayed by <code>synth verify</code> in Rust, Python,
-            and JavaScript; in the README's words, that is exhaustive
-            verification against the contract, which is only as right as its
-            derivation from the rule base, checked by two evaluators that share
-            nothing with the synthesizer.
+            The V2 authority evaluates the complete declared policy over the
+            original inputs, constructs the decision and checks every
+            applicable law. A committing result carries a genuine publication;
+            a rejection publishes nothing. The panel reports the actual law
+            diagnostics.
           </li>
           <li>
-            Laws are evaluated at run time within their declared scopes: 500 on
-            every commit, 501 and 502 on accepts, and 503 on committed failures;
-            law 509 is the framework's rule that a
-            rejection publishes nothing. In Rust: the rule base itself, the
-            kind of decision and its reason, the exact ticket or alert, the
-            absence of effects, and a zero genesis.
+            The library's functional core is verified against its formal
+            specifications with a named trusted base. The authored policy
+            still needs review against the intended rules. Input authentication,
+            browser storage, display and external delivery remain host concerns.
           </li>
           <li>
-            Claim 600 states that the laws alone keep the strikes within their
-            bounds, for every integer. CVC5 answers <code>unsat</code> for its
-            induction step: that answer is <em>attested</em>, not
-            independently checked, and not proved. Z3's <code>unsat</code> is
-            recorded as unsupported evidence, and there is no Lean export for
-            inductive claims. The step says something about this application
-            only together with <code>tests/claims.rs</code>, which checks the
-            base case, the observer, and the law manifest.
+            <code>site/tests/replay.mjs</code> runs 28 independent decision
+            examples and the README's demonstration through this compiled
+            module, comparing decisions, reasons, state, outbox and applicable
+            laws. Every commit is followed by an actual idempotent replay.
+            These integration checks detect disagreements; they do not prove
+            the browser or a deployment correct.
           </li>
           <li>
-            The template's own tests, on a host, run all 2,880 admitted inputs
-            through admission, the authority, the adapter, the law checker, the
-            committed patch, and the outbox, compare 28 examples that reach
-            every rule, give the law checker faulty decisions to refuse, and
-            probe determinism on 144 inputs. All of these are detectors. A
-            restatement of the rule base in Tau Language has been run to
-            completion on a six-input sample only; no agreement on the whole
-            table is claimed.
+            Earlier synthesis, model and solver evidence is retained in the
+            template's README and private historical oracle. The hand-written
+            adapters described there do not execute this page's V2 decisions.
           </li>
-          <li>
-            This module is checked by the headless replay that runs the
-            template's 28 decision examples, each from a standing reached from
-            genesis, and the README's demonstration through it.
-          </li>
-          <li>
-            The identity tier, the reviewer flag, the amount band, and the
-            risk rating are trusted page inputs, as the README says of its own
-            context: a deployment must establish them before admission.
-          </li>
+          <li>The identity tier, reviewer flag, amount band and risk rating are supplied inputs. A deployment must establish them before admission.</li>
         </ul>
       </details>
     </div>
@@ -304,9 +262,8 @@
         checked controller. The tick's context carries an alarm; an honored
         alarm pauses payouts, but every requested withdrawal is still paid:
         alarms delay, they never freeze. Raise the alarm here and keep
-        ticking to watch it. The proposer for ticks is a controller step that
-        <code>zeno-fcis synth</code> selected; deposits and requests are
-        hand-written rules. The rules are in the template's
+        ticking to watch it. The V2 contract declares deposits, requests and
+        the controller's tick behavior as one complete decision. The rules are in the template's
         <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/withdrawal-queue/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/withdrawal-queue/README.md</code>).
       </p>
@@ -314,60 +271,32 @@
         <summary>What is checked, and at what strength</summary>
         <ul>
           <li>
-            The controller step was synthesized and exhaustively checked
-            against the tick rules on all 384 inputs, and replayed by
-            <code>synth verify</code> in Rust, Python, and JavaScript. The
-            table that step defines, with the vault's contract, was
-            <em>certified by OrbitSynthesis's checker</em> for every input
-            sequence: it printed <code>ACCEPT</code> over 26 reachable product
-            states and 208 transitions, and rejected two wrong tables with a
-            counterexample cycle each; <code>tests/controller.rs</code>
-            re-checks it with an independent implementation of the same
-            decision procedure. In the README's words, the liveness claim is a
-            checked property of the finite model, not of the running
-            application by itself; the refinement law connects each concrete
-            tick to that model, tick by tick at run time, and it is not a
-            machine-checked proof. The response bound is 8 ticks.
+            The V2 authority evaluates the complete declared policy over the
+            original inputs, constructs the decision and checks every
+            applicable law. A committing result carries a genuine publication;
+            a rejection publishes nothing. The panel reports the actual law
+            diagnostics.
           </li>
           <li>
-            Laws 500 to 503 are evaluated at run time on every committing
-            decision before it can be published; law 508 records that the
-            application never commits a failure, and law 509 that a rejection
-            publishes nothing. In Rust: the rejection reason, the exact payout
-            request, the absence of effects, the genesis, and the refinement of
-            each tick against the contract's transition table and the certified
-            table's row.
+            The library's functional core is verified against its formal
+            specifications with a named trusted base. The authored policy
+            still needs review against the intended rules. Input authentication,
+            browser storage, display and external delivery remain host concerns.
           </li>
           <li>
-            Claims 600 and 601 state that the action laws alone keep the vault
-            solvent and the pause in range, for every integer. CVC5 answers
-            <code>unsat</code> for both induction steps: <em>attested</em>, not
-            independently checked, and not proved. Z3's <code>unsat</code> is
-            recorded as unsupported evidence, and there is no Lean export for
-            inductive claims. <code>tests/claims.rs</code> checks the base case,
-            the observer, and the law manifest.
+            <code>site/tests/replay.mjs</code> runs 25 of 26 independent decision
+            examples and the README's demonstration through this compiled
+            module, comparing decisions, reasons, state, outbox and applicable
+            laws. Every commit is followed by an actual idempotent replay.
+            These integration checks detect disagreements; they do not prove
+            the browser or a deployment correct. An example whose state cannot be reached from genesis is named in the replay output and checked separately by the template’s conformance tests.
           </li>
           <li>
-            The template's own tests, on a host, explore 420 reachable vaults
-            and 3,360 decisions against a reference model of the rules, check
-            that a requested withdrawal is paid within 8 ticks under every path
-            in the grid, compare 26 examples, give the law checker faulty
-            decisions to refuse, and probe determinism on 120 inputs. All of
-            these are detectors.
+            Earlier synthesis, model and solver evidence is retained in the
+            template's README and private historical oracle. The hand-written
+            adapters described there do not execute this page's V2 decisions.
           </li>
-          <li>
-            This module is checked by the headless replay that runs 25 of the
-            template's 26 decision examples, each from a vault reached from
-            genesis, and the README's demonstration through it; the one example
-            whose vault no sequence of requests reaches is named in the
-            replay's output, and the template's conformance test decides it
-            from the admitted vault.
-          </li>
-          <li>
-            The caller and the alarm are trusted page inputs, as the README
-            says of its own context: the property checked says what the vault
-            does with an alarm, not whether the alarm was right.
-          </li>
+          <li>The caller and alarm are supplied inputs. The controller checks behavior given an alarm; it does not establish whether the alarm is correct.</li>
         </ul>
       </details>
     </div>
@@ -387,8 +316,8 @@
         shaped after ZenoDEX's <code>SwapIntent</code>, and the DEX's
         settlements and failures come back as commands. Here the agent is
         scripted: a fixed list of proposals, good and bad, shown below as a
-        proposer; no model is called. The proposer's core was selected by
-        <code>zeno-fcis synth</code> over the guard's facts. The rules are in
+        proposer; no model is called. The library evaluates the guard's
+        complete V2 contract over the original supplied facts. The rules are in
         the template's
         <a href="https://github.com/TheDarkLightX/ZenoFCIS/blob/main/crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md">README</a>
         (<code>crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md</code>).
@@ -397,55 +326,32 @@
         <summary>What is checked, and at what strength</summary>
         <ul>
           <li>
-            The decision core was synthesized on all 6,144 tuples of an action
-            and the guard's eleven facts, and replayed by <code>synth
-            verify</code> in Rust, Python, and JavaScript; in the README's
-            words, that selection is exhaustive verification against the
-            contract, for the program as the library's interpreter runs it. A
-            small hand-written adapter computes the facts with checked
-            arithmetic.
+            The V2 authority evaluates the complete declared policy over the
+            original inputs, constructs the decision and checks every
+            applicable law. A committing result carries a genuine publication;
+            a rejection publishes nothing. The panel reports the actual law
+            diagnostics.
           </li>
           <li>
-            Laws are evaluated at run time within their declared scopes:
-            500 to 502 on every commit, 503 to 507 on
-            accepts, 508 on committed failures; law 509 is the framework's rule
-            that a rejection publishes nothing. In Rust: the rejection reason,
-            the exact request, the absence of effects, and the genesis.
+            The library's functional core is verified against its formal
+            specifications with a named trusted base. The authored policy
+            still needs review against the intended rules. Input authentication,
+            browser storage, display and external delivery remain host concerns.
           </li>
           <li>
-            Claims 600 and 601 state that the action laws alone keep the
-            reserve, a non-negative base, the day's committed value within the
-            budget, and the swap bookkeeping, for every integer. CVC5 answers
-            <code>unsat</code> for both induction steps: <em>attested</em>, not
-            independently checked, and not proved. Z3's <code>unsat</code> is
-            recorded as unsupported evidence, and there is no Lean export for
-            inductive claims. <code>tests/claims.rs</code> checks the base case,
-            the observer, and the law manifest.
+            <code>site/tests/replay.mjs</code> runs 29 of 30 independent decision
+            examples and the README's demonstration through this compiled
+            module, comparing decisions, reasons, state, outbox and applicable
+            laws. Every commit is followed by an actual idempotent replay.
+            These integration checks detect disagreements; they do not prove
+            the browser or a deployment correct. An example whose state cannot be reached from genesis is named in the replay output and checked separately by the template’s conformance tests.
           </li>
           <li>
-            The template's own tests, on a host, decide 25,094 inputs against a
-            reference model of the rules, including a search of everything one
-            day can reach from genesis, along whose every path the accepted
-            proposals commit at most the budget; compare 30 examples; give the
-            law checker faulty decisions to refuse; and probe determinism on
-            864 inputs. All of these are detectors.
+            Earlier synthesis, model and solver evidence is retained in the
+            template's README and private historical oracle. The hand-written
+            adapters described there do not execute this page's V2 decisions.
           </li>
-          <li>
-            This module is checked by the headless replay that runs 29 of the
-            template's 30 decision examples, each from a treasury reached from
-            genesis, and the README's demonstration through it; the one example
-            whose treasury no sequence of requests reaches is named in the
-            replay's output, and the template's conformance test decides it
-            from the admitted treasury.
-          </li>
-          <li>
-            The caller, the tick, the oracle price and its time, and the model
-            identity are trusted page inputs, as the README says of its own
-            context: a deployment must authenticate the caller, read its own
-            clock and price feed, and bind the model identity from its own
-            records before admission. The guard bounds what the treasury
-            commits against the oracle price, not the market.
-          </li>
+          <li>The caller, time, oracle price and its time, and model identity are supplied inputs. A deployment must establish them; the guard bounds committed swaps against the supplied oracle, not the market.</li>
         </ul>
       </details>
     </div>

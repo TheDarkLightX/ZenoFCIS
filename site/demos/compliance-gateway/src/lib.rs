@@ -1,6 +1,5 @@
-//! The compliance-gateway example's authority, synthesized step, rule base,
-//! and law checker, run in the browser over the library's in-memory
-//! reference shell.
+//! The compliance-gateway example's checked V2 contract, run in the browser
+//! with genuine publications and an ephemeral local store.
 //!
 //! The step, the report, and the C ABI are `zeno-fcis-site-common`'s. This
 //! crate names the application's types, its exact genesis, and the mapping
@@ -11,13 +10,8 @@ use compliance_gateway::{
     authority,
     bindings::GeneratedProject,
     context,
-    delivery::Destination,
     generated::{CallerContext, CounterpartyRisk, GatewayCommand, Region, Standing},
-    genesis_state,
-    laws::GatewayLaws,
-    profile,
-    program::GatewayProgram,
-    reinstate, screen,
+    genesis_state, profile, reinstate, screen, v2_contract,
 };
 use zeno_fcis_site_common::{
     Application, Authority, Json, Map, Names, Request, RustCryptoSha256, SchemaAdmittedEnvelope,
@@ -39,14 +33,14 @@ fn admit_root(standing: &Standing) -> Result<SchemaAdmittedEnvelope, String> {
 
 impl Application for ComplianceGateway {
     const NAME: &'static str = "compliance-gateway";
-    type Program = GatewayProgram;
-    type Laws = GatewayLaws;
-    type Destination = Destination;
     type Command = GatewayCommand;
     type Context = CallerContext;
 
-    fn authority() -> Result<Authority<Self>, String> {
-        authority()
+    fn with_authority<R>(f: impl FnOnce(&Authority<'_>) -> R) -> Result<R, String> {
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor)?;
+        Ok(f(&authority))
     }
 
     fn names() -> Result<Names, String> {
@@ -212,11 +206,11 @@ mod tests {
         let failure = demo
             .step(&screening("Sanctioned", 0, "Low", 3, false))
             .unwrap();
-        assert_eq!(law_ids(&failure), [500, 503]);
+        assert_eq!(law_ids(&failure), [500, 503, 991]);
         let accept = demo.step(&reinstatement(3, true)).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502]);
+        assert_eq!(law_ids(&accept), [500, 501, 502, 991]);
         let reject = demo.step(&reinstatement(3, true)).unwrap();
-        assert_eq!(law_ids(&reject), [509]);
+        assert_eq!(law_ids(&reject), [509, 991]);
     }
 
     #[test]
