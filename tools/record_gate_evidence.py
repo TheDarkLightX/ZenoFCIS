@@ -197,6 +197,8 @@ def pinned_steps() -> list[tuple[str, list[str], dict[str, str]]]:
                                                  "--", "--ignored", "--exact"], {}))
         steps.append(("pinned-inductive-steps", [*formal, "tests::pinned_inductive_steps_agree_with_exhaustive_replay",
                                                  "--", "--ignored", "--exact"], {}))
+        steps.append(("pinned-symbolic-checks", [*CARGO, "test", "-p", "zeno-fcis-cli", "--locked", "--test",
+                                                 "symbolic_cli", "pinned_symbolic_", "--", "--ignored"], {}))
     if cvc5:
         for test in ("system::tests::pinned_system_smt_agrees_with_exhaustive_check",
                      "system::tests::pinned_solver_route_agrees_with_exhaustive_route_on_small_programs"):

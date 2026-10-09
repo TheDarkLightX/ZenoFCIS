@@ -25,6 +25,15 @@ Feature: Preserve historical composition evidence and current checked authority
     Then the authoritative rows reconstruct the exact committed candidate
     And external work remains a replay-safe outbox delivery obligation
     And every store error reads as one line saying what happened and what to do
+    And delivery is a typed lifecycle in which acknowledging an undelivered entry, acknowledging twice, reusing a consumed token, making a token outside the store or keeping one past its handle does not compile
+    And each documented misuse fails on the pinned stable compiler with exactly its stated error code while its paired example compiles
+
+  @atdd-v2-shared-finite-checker
+  Scenario: Bind both finite comparison callers to one checker and reject incomplete proof evidence
+    Given the shared package checker and its reviewed complete executable inventory
+    When the qualification gate admission and rejection tests run
+    Then missing contracts, changed routes and unrelated mutation failures are refused
+    And the whole-unit proof and actual mutation executions remain separate required qualification checks
 
   @atdd-security-hotspots
   Scenario: Rank security hotspots without interpreting source as instructions

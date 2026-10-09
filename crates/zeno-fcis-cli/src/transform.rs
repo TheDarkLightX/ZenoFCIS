@@ -1,8 +1,8 @@
 //! Pure checker for `zeno-fcis transform`: exhaustive comparison of two
 //! canonical finite scalar programs, with a canonical equivalence receipt.
 //!
-//! It lives in the CLI crate because the library's evaluator digest covers the
-//! synthesis crate, the root Cargo.toml and Cargo.lock.
+//! This CLI adapter owns admission and receipts. Its finite comparison core is
+//! the same source used by SQLite upgrades; no evaluator identity source changes.
 //!
 //! No I/O, clock or ambient state. Both programs must pass the library
 //! importer's complete admission and share the exact ordered input and output
@@ -18,8 +18,8 @@ use serde_json::{Value, json};
 use zeno_fcis_codec::CommitmentHasher;
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_synthesis::finite::{
-    Domain, Error, MAX_NODES, PROFILE, Program, V2_EXECUTION_PROFILE, V2ExecutionFailure, V2Limits,
-    V2Resource, execute_v2, v2_authority::EVALUATOR, v2_zero_limits,
+    Domain, Error, PROFILE, Program, V2_EXECUTION_PROFILE, V2ExecutionFailure, V2ScalarProgram,
+    v2_authority::EVALUATOR,
 };
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
@@ -30,7 +30,7 @@ pub(crate) const RECEIPT_SCHEMA: &str = "zeno-fcis/transform-receipt/1";
 pub(crate) const ENUMERATION: &str = "ordered-product-last-input-fastest-v1";
 /// Each instruction attempt costs one Step and an admitted program has at most
 /// `MAX_NODES` nodes, so no admitted program is refused at this budget.
-pub(crate) const FULL_BUDGET: u64 = MAX_NODES as u64;
+pub(crate) use crate::finite_checker::FULL_BUDGET;
 /// The default declared Step limit; it never binds.
 pub(crate) const DEFAULT_STEP_LIMIT: u64 = FULL_BUDGET;
 /// Default ceiling on the number of input tuples one check may enumerate.
@@ -61,25 +61,7 @@ pub(crate) enum Side {
     Candidate,
 }
 
-/// One program's full-budget result for one input tuple.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct Observation {
-    /// Complete output tuple, or the evaluator's exact failure.
-    pub(crate) result: Result<Vec<i64>, V2ExecutionFailure>,
-    /// True Step usage: instruction attempts, including a trapping one.
-    pub(crate) steps: u64,
-}
-
-/// Step usage over the whole domain, from the full-budget runs.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) struct Usage {
-    /// Largest Step usage on any tuple: original, then candidate.
-    pub(crate) max_steps: [u64; 2],
-    /// Tuples on which the candidate uses more Steps than the original.
-    pub(crate) candidate_uses_more: u64,
-    /// Whether the two programs use equal Steps on every tuple.
-    pub(crate) usage_preserved: bool,
-}
+pub(crate) use crate::finite_checker::{Observation, Usage, advance, domain_size, first_tuple};
 
 /// Why a check produced no equivalence.
 #[derive(Debug, Eq, PartialEq)]
@@ -193,58 +175,20 @@ pub(crate) fn check(
     limits: Limits,
 ) -> Result<Equivalence, Rejection> {
     let pair = admit(original, candidate, limits.input_tuples)?;
-    let meter = v2_zero_limits().with_limit(V2Resource::Step, FULL_BUDGET);
+    let left = scalar(&pair.original);
+    let right = scalar(&pair.candidate);
+    let complete =
+        crate::finite_checker::compare_with_usage(&left, &right, limits.input_tuples, limits.steps)
+            .map_err(|error| comparison_rejection(error, &pair.original, &pair.candidate))?;
     let domains = pair.original.inputs();
-    let mut tally = Tally::default();
-    let mut input = first_tuple(domains);
-    // The odometer drives the enumeration. The separately computed product
-    // bounds it, and only an exact match of the two completes it.
-    let mut visited = 0_u64;
-    loop {
-        if visited == pair.size {
-            return Err(Rejection::Inconclusive(Inconclusive::CoverageMismatch {
-                expected: pair.size,
-                visited: visited.saturating_add(1),
-            }));
-        }
-        let left = observe(&pair.original, &input, meter);
-        let right = observe(&pair.candidate, &input, meter);
-        if left.result != right.result {
-            return Err(Rejection::Counterexample(Counterexample {
-                ordinal: visited,
-                input,
-                original: left,
-                candidate: right,
-            }));
-        }
-        tally.record(left.steps, right.steps, limits.steps);
-        visited += 1;
-        if !advance(domains, &mut input) {
-            break;
-        }
-    }
-    if visited != pair.size {
-        return Err(Rejection::Inconclusive(Inconclusive::CoverageMismatch {
-            expected: pair.size,
-            visited,
-        }));
-    }
-    let usage = tally.usage();
-    if tally.over_limit != [0, 0] {
-        return Err(Rejection::Inconclusive(Inconclusive::BudgetBoundary {
-            over_limit: tally.over_limit,
-            minimum_limit: usage.max_steps[0].max(usage.max_steps[1]),
-            usage,
-        }));
-    }
     Ok(Equivalence {
         original: Artifact::new(original, &pair.original),
         candidate: Artifact::new(candidate, &pair.candidate),
         inputs: domains.to_vec(),
         outputs: pair.original.outputs().to_vec(),
         limits,
-        inputs_checked: visited,
-        usage,
+        inputs_checked: complete.0,
+        usage: complete.1,
     })
 }
 
@@ -254,33 +198,69 @@ fn admit(original: &[u8], candidate: &[u8], input_tuples: u64) -> Result<Pair, R
         import_program(original).map_err(|error| not_admitted(Side::Original, &error))?;
     let candidate =
         import_program(candidate).map_err(|error| not_admitted(Side::Candidate, &error))?;
-    if original.inputs() != candidate.inputs() {
-        return Err(Rejection::Refused(Refusal::InputAbi {
+    let size =
+        crate::finite_checker::validate_pair(&scalar(&original), &scalar(&candidate), input_tuples)
+            .map_err(|error| comparison_rejection(error, &original, &candidate))?;
+    Ok(Pair {
+        original,
+        candidate,
+        size,
+    })
+}
+
+fn scalar(program: &Program) -> V2ScalarProgram<'_> {
+    V2ScalarProgram {
+        inputs: program.inputs(),
+        outputs: program.outputs(),
+        nodes: program.nodes(),
+        roots: program.roots(),
+    }
+}
+
+fn comparison_rejection(
+    error: crate::finite_checker::Failure,
+    original: &Program,
+    candidate: &Program,
+) -> Rejection {
+    use crate::finite_checker::Failure;
+    match error {
+        Failure::InputAbi => Rejection::Refused(Refusal::InputAbi {
             original: original.inputs().to_vec(),
             candidate: candidate.inputs().to_vec(),
-        }));
-    }
-    if original.outputs() != candidate.outputs() {
-        return Err(Rejection::Refused(Refusal::OutputAbi {
+        }),
+        Failure::OutputAbi => Rejection::Refused(Refusal::OutputAbi {
             original: original.outputs().to_vec(),
             candidate: candidate.outputs().to_vec(),
-        }));
-    }
-    let size = domain_size(original.inputs())
-        .map_err(|position| Rejection::Refused(Refusal::EmptyInputDomain { position }))?;
-    match size
-        .and_then(|size| u64::try_from(size).ok())
-        .filter(|size| *size <= input_tuples)
-    {
-        Some(size) => Ok(Pair {
+        }),
+        Failure::EmptyInputDomain { position } => {
+            Rejection::Refused(Refusal::EmptyInputDomain { position })
+        }
+        Failure::DomainTooLarge { size, limit } => {
+            Rejection::Inconclusive(Inconclusive::DomainTooLarge { size, limit })
+        }
+        Failure::Counterexample {
+            ordinal,
+            input,
             original,
             candidate,
-            size,
+        } => Rejection::Counterexample(Counterexample {
+            ordinal,
+            input,
+            original,
+            candidate,
         }),
-        None => Err(Rejection::Inconclusive(Inconclusive::DomainTooLarge {
-            size,
-            limit: input_tuples,
-        })),
+        Failure::CoverageMismatch { expected, visited } => {
+            Rejection::Inconclusive(Inconclusive::CoverageMismatch { expected, visited })
+        }
+        Failure::BudgetBoundary {
+            over_limit,
+            minimum_limit,
+            usage,
+        } => Rejection::Inconclusive(Inconclusive::BudgetBoundary {
+            over_limit,
+            minimum_limit,
+            usage,
+        }),
     }
 }
 
@@ -290,91 +270,6 @@ fn not_admitted(side: Side, error: &Error) -> Rejection {
         _ => "unclassified",
     };
     Rejection::Refused(Refusal::NotAdmitted { side, code })
-}
-
-/// Exact number of tuples in the product of `domains`; `None` when it exceeds
-/// `u128::MAX`. `Err` names the first empty domain. Zero domains give one
-/// empty tuple.
-pub(crate) fn domain_size(domains: &[Domain]) -> Result<Option<u128>, usize> {
-    let mut size = Some(1_u128);
-    for (position, domain) in domains.iter().enumerate() {
-        let (min, max) = domain.bounds();
-        if min > max {
-            return Err(position);
-        }
-        // `max - min` fits in u64, so the width is at most 2^64.
-        let width = u128::from(max.abs_diff(min)) + 1;
-        size = size.and_then(|size| size.checked_mul(width));
-    }
-    Ok(size)
-}
-
-/// The first tuple in enumeration order: every input at its minimum.
-pub(crate) fn first_tuple(domains: &[Domain]) -> Vec<i64> {
-    domains.iter().map(|domain| domain.bounds().0).collect()
-}
-
-/// Steps `tuple` to its successor, last input fastest. Returns false after the
-/// last tuple, leaving the first one in place. An input is incremented only
-/// while it is below its maximum, so no value overflows at an `i64` endpoint.
-pub(crate) fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
-    for (value, domain) in tuple.iter_mut().zip(domains).rev() {
-        let (min, max) = domain.bounds();
-        if *value < max {
-            *value += 1;
-            return true;
-        }
-        *value = min;
-    }
-    false
-}
-
-fn observe(program: &Program, input: &[i64], meter: V2Limits) -> Observation {
-    let (result, usage) = execute_v2(
-        program.inputs(),
-        program.outputs(),
-        program.nodes(),
-        program.roots(),
-        input,
-        meter,
-    )
-    .into_parts();
-    Observation {
-        result,
-        steps: usage.used(V2Resource::Step),
-    }
-}
-
-/// Step accounting over tuples whose results already matched.
-#[derive(Default)]
-struct Tally {
-    max_steps: [u64; 2],
-    over_limit: [u64; 2],
-    candidate_uses_more: u64,
-    usage_differs: bool,
-}
-
-impl Tally {
-    fn record(&mut self, original: u64, candidate: u64, limit: u64) {
-        for (side, steps) in [original, candidate].into_iter().enumerate() {
-            self.max_steps[side] = self.max_steps[side].max(steps);
-            if steps > limit {
-                self.over_limit[side] += 1;
-            }
-        }
-        if candidate > original {
-            self.candidate_uses_more += 1;
-        }
-        self.usage_differs |= candidate != original;
-    }
-
-    fn usage(&self) -> Usage {
-        Usage {
-            max_steps: self.max_steps,
-            candidate_uses_more: self.candidate_uses_more,
-            usage_preserved: !self.usage_differs,
-        }
-    }
 }
 
 impl Equivalence {
@@ -728,4 +623,4 @@ fn hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 #[path = "transform_tests.rs"]
-mod tests;
+pub(crate) mod tests;

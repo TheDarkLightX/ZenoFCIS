@@ -7,6 +7,8 @@ mod binding;
 mod compliance_gateway;
 mod contract;
 mod contract_adopt;
+mod contract_diff;
+mod contract_evolve;
 mod contract_files;
 mod durable_counter;
 mod inventory_reservation;
@@ -19,6 +21,9 @@ mod order_fulfillment;
 mod prepared_counter;
 mod purity;
 mod review_command;
+mod shell_v2;
+mod symbolic;
+mod symbolic_command;
 mod synth;
 mod transform;
 mod transform_command;
@@ -38,6 +43,7 @@ use zeno_fcis_formal_tools::{
     execute_tool, export_inductive_smt, export_smt, inspect_lean_toolchain, load_tools_manifest,
     retain_run, verify_tool,
 };
+pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence::finite_checker;
 use zeno_fcis_spec::{
     ClaimDecl, ClaimMode, Diagnostic, DiagnosticSet, GraphFormat, PathResolution, ProjectLimits,
     ProjectSpec, ProjectionPath, ProjectionRoot, SourceLimits, StableId, Substance, claim_paths,
@@ -119,14 +125,21 @@ struct Cli {
     command: Command,
 }
 
-/// The `contract` group: F2's advisory review, F6's checked adoption and the
-/// export of a contract's decision program.
+/// The `contract` group: F2's advisory review, F6's checked adoption, G8's
+/// change classification, G14.1's reviewed rule change and the export of a
+/// contract's decision program.
 #[derive(Subcommand)]
 enum ContractCommand {
     #[command(flatten)]
     Review(review_command::Command),
     #[command(flatten)]
     Adopt(contract_adopt::Command),
+    #[command(flatten)]
+    Diff(contract_diff::Command),
+    #[command(flatten)]
+    Evolve(contract_evolve::Command),
+    #[command(flatten)]
+    Symbolic(symbolic_command::Command),
     /// Write the contract's current decision program in the canonical program encoding that optimize, transform and loop read.
     ExportProgram {
         /// Application or contract directory holding project.zeno, v2/policy.json and any adoptions.
@@ -168,7 +181,7 @@ enum Command {
         #[command(subcommand)]
         command: loop_command::Command,
     },
-    /// Review an application's contract (advisory) or adopt a checked candidate program into its lineage.
+    /// Review an application's contract (advisory), adopt a checked candidate program into its lineage, or classify a change between two contracts.
     Contract {
         #[command(subcommand)]
         command: ContractCommand,
@@ -369,6 +382,9 @@ fn run(command: Command) -> u8 {
         Command::Contract { command } => match command {
             ContractCommand::Review(command) => review_command::run(command),
             ContractCommand::Adopt(command) => contract_adopt::run(command),
+            ContractCommand::Diff(command) => contract_diff::run(command),
+            ContractCommand::Evolve(command) => contract_evolve::run(command),
+            ContractCommand::Symbolic(command) => symbolic_command::run(command),
             ContractCommand::ExportProgram { dir, out, format } => {
                 contract_files::export_program(&dir, &out, format)
             }
@@ -560,9 +576,19 @@ fn describe_effects(path: &[String]) -> Value {
                 None,
             ),
             ["transform", "check"] => (
-                &["original-program", "candidate-program"],
-                &["optional-equivalence-receipt"],
-                false,
+                &[
+                    "original-program",
+                    "candidate-program",
+                    "optional-tools-manifest",
+                    "optional-toolchain-files",
+                ],
+                &[
+                    "optional-equivalence-receipt",
+                    "optional-symbolic-receipt",
+                    "optional-query-directory",
+                    "temporary-files",
+                ],
+                true,
                 None,
             ),
             ["transform", "replay"] => (
@@ -637,6 +663,43 @@ fn describe_effects(path: &[String]) -> Value {
                     "generated-artifacts",
                 ],
                 false,
+                None,
+            ),
+            ["contract", "diff"] => (
+                &["application-contract", "adopted-artifacts"],
+                &[],
+                false,
+                None,
+            ),
+            ["contract", "evolve"] => (
+                &[
+                    "application-contract",
+                    "adopted-artifacts",
+                    "evolved-artifacts",
+                    "new-contract",
+                ],
+                &[
+                    "application-contract",
+                    "adopted-artifacts",
+                    "evolved-artifacts",
+                    "generated-artifacts",
+                ],
+                false,
+                None,
+            ),
+            ["contract", "check-symbolic"] => (
+                &[
+                    "application-contract",
+                    "optional-strengthening",
+                    "optional-tools-manifest",
+                    "optional-toolchain-files",
+                ],
+                &[
+                    "optional-symbolic-report",
+                    "optional-query-directory",
+                    "temporary-files",
+                ],
+                true,
                 None,
             ),
             ["contract", "export-program"] => (

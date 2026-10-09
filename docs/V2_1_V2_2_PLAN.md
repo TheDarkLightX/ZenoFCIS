@@ -57,6 +57,9 @@ features. Every feature here therefore follows six rules:
    or a reviewed identity change.
 6. **Plans record decisions and acceptance.** Agent assignments, evidence custody
    and history belong in commits and review records.
+7. **2.2 is built in stages, each with one integration target.** A stage is done
+   when its target passes. Work outside the current stage starts only when it
+   cannot delay that target (see "2.2 stages").
 
 ## Architecture
 
@@ -514,6 +517,43 @@ and larger program limits (G3).
 
 ## 2.2 features
 
+### 2.2 stages
+
+2.2 holds nineteen feature contracts, and its main risk is breadth. By the
+owner's decision of 2026-10-05 it is built in three stages. 2.2 starts after
+the 2.1 review repairs land.
+
+**Stage 1: one operational journey.** The target is one application taken
+through its whole life from the generated command line alone:
+
+1. **create** an app from the spend-approval contract (F1);
+2. **submit** commands: a request is created, approved and executed (G14.3);
+3. **deliver** its effects: the payment reaches an idempotent test receiver
+   exactly once, through the typed delivery API and the relay (G13, G9);
+4. **change** its contract: a rule change, shown first as a plain-language diff
+   and then admitted on the live database (G8, G14.1);
+5. **migrate** its database: a state layout change with a declared migration,
+   admitted by forward simulation over every observation G2 names (G2);
+6. **replay** its history: a full audit replays all three segments, each under
+   its own contract, with every delivery and its original ID intact.
+
+- **Features:** G8, G13, G14.3, G9, G14.1 and G2, and nothing else.
+- **Acceptance:** one ATDD scenario runs the six steps in order, and each
+  feature's own acceptance list passes. Each refusal on the way, such as a
+  mismatched upgrade path or an invalid migration, writes nothing.
+- **Why spend-approval:** its domain is small enough to check a migration on
+  every input. Apps with money or time ranges are too large for that, so a
+  migration of such an app is not shown in stage 1. It would rest on solver
+  evidence, which is attested and not proved (G14.2).
+
+**Stage 2: stronger checking and reuse.** G11 comes first, then G10, G1, G7 and
+G14.4. G14.2 was built alongside stage 1's first features because it shares no
+code with them; it is integrated when it passes review and is not part of the
+journey.
+
+**Stage 3: the rest.** G3 (after the 2.1 release), G14.5, G12, G4, G5, G6 and
+G14.6. G12, G4, G6 and G14.6 can slip to 2.3 without blocking anything else.
+
 ### G1. Reusable verified component families
 
 Parameterized building blocks, for example:
@@ -522,9 +562,8 @@ Parameterized building blocks, for example:
 - a rate limiter with window W and limit N;
 - an approval queue with quorum K.
 
-Each family is a parameterized F1 rules file with laws. `zeno-fcis prove`
-(the existing solver and Lean route over declared integer ranges) proves, for
-every parameter value in the declared range, that:
+Each family is a parameterized F1 rules file with laws. Its evidence must cover
+every parameter value in the declared range and establish that:
 
 - every applicable law holds on every decision, so the component never hits a
   law refusal;
@@ -532,8 +571,14 @@ every parameter value in the declared range, that:
 
 Instantiating a family yields an F1 app that carries the proof reference.
 
+The current public Lean exporter returns `UnsupportedMode`; its historical
+implementation is test-only. A qualified family proof route must therefore be
+implemented or supplied by source-bound component theorems, not inferred from
+the retained `KernelChecked` status. SMT-only evidence remains Attested. The
+[V2.3 roadmap](V2_3_PLAN.md) expands the G1 seeds without moving this requirement.
+
 **Acceptance.**
-- Three families, each proved over its whole parameter range and reported with
+- Three families, each checked over its whole parameter range and reported with
   its true evidence status (Attested for a solver result, KernelChecked for Lean,
   per ADR 0003).
 - Every instance passes F2 review and its generated tests.
@@ -552,13 +597,25 @@ could migrate only stores still at genesis; this is the same issue as F6's
 H1. The check:
 
 - `m` maps the old genesis state to the new genesis state;
-- for every admitted old input that commits, the new Authority also commits
-  on `m(state)`, and the new successor equals `m(old successor)`. Optionally
-  the decision class, reason and deliveries also match.
+- for every admitted old input, the new Authority on `m(state)` gives the same
+  observations. The check compares every one of them, and the upgrade record
+  names them:
+  - the decision class and the reason, for refusals as well as commits;
+  - the successor state, which must equal `m(old successor)`;
+  - every delivery, in order: channel, destination and payload. A payout must
+    be the same payout. When the migration changes a payload's schema it
+    declares the payload mapping, and deliveries are compared through it.
+
+  Matching successor states alone admits nothing. A migration that does not
+  preserve one of these observations is a behaviour change, which is G14.1.
 
 Every state reachable under the old contract then maps to one reachable under
 the new, so the migrated store satisfies every new law and proved invariant at
-any point in its history. The check is exhaustive over the F2/F3 domain;
+any point in its history, and from a mapped state the new contract makes the
+same decisions and sends the same deliveries. The guarantee covers the
+observations listed above and no others: sealed identities, certificates,
+delivery IDs issued after the upgrade and Step usage may differ.
+The check is exhaustive over the F2/F3 domain;
 boundary-set runs are advisory only. F6.1's Tier A program-successor upgrade is
 the identity case (`m` is the identity) and shares this path.
 
@@ -570,7 +627,8 @@ Two further rules:
   and the upgrade is admitted at any state.
 - **Routes:** migrations are built only between consecutive versions, or a
   shortcut must agree with the composed route. Samples use states whose
-  carried-over fields hold non-default values and compare successor states.
+  carried-over fields hold non-default values and compare every preserved
+  observation, not only successor states.
 
 (Source of the forward-simulation framing: the 2026-10-05 assessment of
 Nakahata's Algebraic Architecture Theory preprint, arXiv:2609.27638. That
@@ -668,17 +726,22 @@ by comparing canonical bytes and structure:
 | Program successor | only the decision program and its Step limit | at any state; needs an F3 receipt (F6.1) |
 | Rename | only names | at any state; exact change (G2) |
 | Layout change | the state layout | forward-simulated migration (G2) |
-| Law or case change | laws or cases | forward simulation (G2) |
+| Rule change | laws or cases, with the layout unchanged | forward simulation when every old decision is preserved (G2); otherwise the behaviour-change upgrade (G14.1) |
 | Unrelated | anything else | refused |
 
-It prints a plain-language summary. Upgrade commands refuse a path that does
-not match the classification.
+The classifier decides only the structural kind. It runs no semantic check, so
+for a rule change it names both paths, and the path's own check (G2 or G14.1)
+decides which one applies.
+
+It prints a plain-language summary that says which paths exist today. Upgrade
+commands refuse a path that does not match the classification.
 
 **Acceptance.**
 - Every adoption fixture and a set of planted changes are classified
   correctly.
 - A mismatched path is refused with no write.
-- The summary names every changed law, case and field.
+- The summary names every changed law, case, field, command, channel and
+  reason.
 
 ### G9. Delivery relay for real systems
 
@@ -744,10 +807,15 @@ It uses the already-verified evaluator's specification. As in the existing
 gates, a native harness and a source digest tie the shipped checker to the
 verified code. G10's parallel wrapper merges over this core.
 
+The unit serves both equivalence judges: `transform check` in the CLI, and the
+comparison the store shell runs itself before it admits a program-successor
+upgrade (added by the 2.1 review repair). Two tested judges that must agree
+become one proved core, so they cannot diverge.
+
 **Acceptance.**
 - The proof passes with the pinned toolchain.
-- The shipped code is the verified code.
-- All F3 tests and planted defects pass.
+- The shipped code is the verified code, in the CLI and in the store shell.
+- All F3 tests and planted defects pass, and so do the shell's upgrade tests.
 - CI runs the checker's mutation controls.
 
 ### G12. Optimizer depth and real-model evaluation
@@ -841,7 +909,7 @@ behaviour-change tier in the shell's upgrade.
 - **Admission:** at the store's current state, every state law of the new
   contract holds and every proved inductive claim of the new contract holds.
   Genesis exactness (law 990) applies only to new stores.
-- **Owner review:** the G8 classifier labels the change a behaviour change. Its
+- **Owner review:** the G8 classifier labels the change a rule change. Its
   plain-language diff is recorded with the upgrade.
 - **Record:** a chained upgrade record, as in F6. Each segment replays under its
   own contract.
@@ -893,7 +961,12 @@ adapters:
     whose proof is not independently checked). A disagreement between the
     solvers is inconclusive;
   - every run includes planted controls that must fail;
-  - a symbolic result never replaces the exhaustive check where that fits.
+  - a symbolic result never replaces the exhaustive check where that fits;
+  - an answer's evidence class travels with it into every report, receipt and
+    record that cites it. No admission path takes a `ProposedUnsat` answer as
+    proof: `contract adopt`, store upgrades and loop replacements accept only
+    an exhaustive receipt, until a solver certificate is independently
+    checked.
 
 **Acceptance.**
 - The escrow conservation law, with its strengthening, holds on every case.
@@ -1010,8 +1083,10 @@ These come from the study's minor findings:
 5. Independent review and full CI at the exact head both pass.
 6. The Linux archive's install journey passes.
 
-**For 2.2:** the same six conditions, applied to G1 through G14. The G3 core change
-also re-runs every proof gate and regenerates all identities and certificates.
+**For 2.2:** the same six conditions, applied to G1 through G14, stage by stage.
+Stage 1 is done when its operational journey passes at an independently
+reviewed head. The G3 core change also re-runs every proof gate and regenerates
+all identities and certificates.
 
 ## Order and estimate
 
@@ -1033,13 +1108,14 @@ All estimates are in agent working days.
   three builders working in parallel. F7 and the release remain.
 - **2.2:** about 110–170 working days serially, including the additions and
   G14, or about 11–17 weeks in parallel.
-- **Build order:**
-  1. G8 classifier, G13 typed delivery API, G2 migrations, G9 relay, G14.3 app
-     CLI, then G14.1 rule changes (after G8);
-  2. G1 components, G7 authoring, G10 throughput, G11 verified checker, G14.2
-     symbolic checks, then G14.4 Tau kit;
-  3. G3 wider values (after the 2.1 release, with G14.5 if it needs the core),
-     G12, G4, G5, G6, G14.6.
+- **Build order,** by the stages under "2.2 stages":
+  1. Stage 1, the operational journey on spend-approval: G8 classifier and G13
+     typed delivery API first, then G14.3 app CLI and G9 relay, then G14.1 rule
+     changes (after G8) and G2 migrations, then the journey scenario.
+  2. Stage 2: G11 verified checker first, then G10 throughput, G1 components,
+     G7 authoring and G14.4 Tau kit (after G14.2, which is already built).
+  3. Stage 3: G3 wider values (after the 2.1 release, with G14.5 if it needs
+     the core), G12, G4, G5, G6, G14.6.
 - **Can slip to 2.3 without blocking anything else:** G12, G4, G6 and G14.6.
 
 G3 starts only after the 2.1 release, because it changes the verified core that

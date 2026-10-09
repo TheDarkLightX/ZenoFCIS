@@ -34,6 +34,8 @@ use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::ValidationLimits;
 #[cfg(feature = "sqlite")]
 use zeno_fcis_shell::CommitStatus;
+#[cfg(feature = "sqlite")]
+use zeno_fcis_shell_sqlite::v2::relay;
 use zeno_fcis_synthesis::finite::v2_composition as composition;
 #[cfg(feature = "sqlite")]
 use zeno_fcis_synthesis::finite::{v2_authority::PublicationOutcome, v2_composition::Class};
@@ -223,69 +225,21 @@ pub fn journey(path: &Path) -> AppResult<String> {
     let authority = authority(&descriptor)?;
     let destination = Destination::default();
     let mut shell = create(path, &authority)?;
-    let steps = [
-        (deposit(2), Caller::Operator, false, "Accept"),
-        (deposit(2), Caller::Operator, false, "Accept"),
-        (deposit(1), Caller::Operator, false, "Reject"),
-        (request(Lane::A, 2), Caller::OwnerB, false, "Reject"),
-        (request(Lane::A, 2), Caller::OwnerA, false, "Accept"),
-        (request(Lane::A, 1), Caller::OwnerA, false, "Reject"),
-        (request(Lane::B, 2), Caller::OwnerB, false, "Accept"),
-        (tick(), Caller::Keeper, true, "Accept"),
-        (tick(), Caller::Keeper, true, "Accept"),
-        (tick(), Caller::Keeper, true, "Accept"),
-        (tick(), Caller::Keeper, true, "Accept"),
-        (tick(), Caller::Keeper, true, "Accept"),
-        (tick(), Caller::Keeper, false, "Accept"),
-        (tick(), Caller::Keeper, false, "Accept"),
-        (tick(), Caller::Keeper, true, "Accept"),
-        (request(Lane::A, 1), Caller::OwnerA, false, "Reject"),
-    ];
-    let (mut deposited, mut ticks) = (0, 0);
-    let mut outcomes = Vec::new();
-    let mut payout_ticks = Vec::new();
-    for (step, (command, caller, alarm, expected)) in steps.into_iter().enumerate() {
-        let before = checked(shell.snapshot())?;
-        let is_deposit = command.action == VaultAction::Deposit;
-        let is_tick = command.action == VaultAction::Tick;
-        let amount = command.amount.0;
-        let outcome = invoke(
-            &mut shell,
-            &authority,
-            command,
-            caller,
-            alarm,
-            &format!("journey-{step}"),
-        )?;
-        if outcome != expected {
-            return Err(format!("step {step}: expected {expected}, got {outcome}"));
-        }
-        let after = checked(shell.snapshot())?;
-        if outcome == "Reject" && after != before {
-            return Err(format!("step {step}: a rejection published data"));
-        }
-        if outcome == "Accept" && is_deposit {
-            deposited += amount;
-        }
-        if outcome == "Accept" && is_tick {
-            ticks += 1;
-            if after.pending() > before.pending() {
-                payout_ticks.push(ticks);
-            }
-        }
-        outcomes.push(format!("\"{outcome}\""));
-    }
+    let Decided {
+        outcomes,
+        deposited,
+        payout_ticks,
+    } = decide_journey(&mut shell, &authority)?;
     let pending = checked(shell.next_pending())?.ok_or("missing pending payout")?;
     // Model interruption after the destination records delivery but before SQLite acknowledges it.
-    let delivered = checked(shell.deliver_next_memory_unacknowledged(&mut destination.memory()))?
-        .ok_or("missing pending delivery")?;
-    if delivered != (pending.delivery_id(), pending.entry_hash()) {
-        return Err("destination observed a different pending entry".into());
-    }
+    let delivered = checked(pending.deliver(&mut destination.memory()))?;
+    drop(delivered);
     drop(shell);
     let mut shell = checked(Shell::open(path, &authority))?;
-    while checked(shell.deliver_next_memory(&mut destination.memory()))? {}
-    checked(shell.acknowledge(pending.delivery_id(), pending.entry_hash()))?;
+    while let Some(pending) = checked(shell.next_pending())? {
+        let delivered = checked(pending.deliver(&mut destination.memory()))?;
+        checked(delivered.acknowledge())?;
+    }
     let snapshot = checked(shell.snapshot())?;
     let state = decode_state(snapshot.state())?;
     let paid = deposited - state.balance.0;
@@ -316,5 +270,164 @@ pub fn journey(path: &Path) -> AppResult<String> {
         summary.1,
         summary.2,
         summary.3
+    ))
+}
+
+/// The journey's decisions before delivery: the accepted ones, the
+/// deposits they made, and the ticks that paid out.
+#[cfg(feature = "sqlite")]
+struct Decided {
+    outcomes: Vec<String>,
+    deposited: i128,
+    payout_ticks: Vec<i128>,
+}
+
+/// Runs the journey's sixteen decisions on a new store, leaving its two
+/// payouts pending.
+#[cfg(feature = "sqlite")]
+fn decide_journey(shell: &mut Shell<'_, '_>, authority: &Authority<'_>) -> AppResult<Decided> {
+    let steps = [
+        (deposit(2), Caller::Operator, false, "Accept"),
+        (deposit(2), Caller::Operator, false, "Accept"),
+        (deposit(1), Caller::Operator, false, "Reject"),
+        (request(Lane::A, 2), Caller::OwnerB, false, "Reject"),
+        (request(Lane::A, 2), Caller::OwnerA, false, "Accept"),
+        (request(Lane::A, 1), Caller::OwnerA, false, "Reject"),
+        (request(Lane::B, 2), Caller::OwnerB, false, "Accept"),
+        (tick(), Caller::Keeper, true, "Accept"),
+        (tick(), Caller::Keeper, true, "Accept"),
+        (tick(), Caller::Keeper, true, "Accept"),
+        (tick(), Caller::Keeper, true, "Accept"),
+        (tick(), Caller::Keeper, true, "Accept"),
+        (tick(), Caller::Keeper, false, "Accept"),
+        (tick(), Caller::Keeper, false, "Accept"),
+        (tick(), Caller::Keeper, true, "Accept"),
+        (request(Lane::A, 1), Caller::OwnerA, false, "Reject"),
+    ];
+    let (mut deposited, mut ticks) = (0, 0);
+    let mut outcomes = Vec::new();
+    let mut payout_ticks = Vec::new();
+    for (step, (command, caller, alarm, expected)) in steps.into_iter().enumerate() {
+        let before = checked(shell.snapshot())?;
+        let is_deposit = command.action == VaultAction::Deposit;
+        let is_tick = command.action == VaultAction::Tick;
+        let amount = command.amount.0;
+        let outcome = invoke(
+            shell,
+            authority,
+            command,
+            caller,
+            alarm,
+            &format!("journey-{step}"),
+        )?;
+        if outcome != expected {
+            return Err(format!("step {step}: expected {expected}, got {outcome}"));
+        }
+        let after = checked(shell.snapshot())?;
+        if outcome == "Reject" && after != before {
+            return Err(format!("step {step}: a rejection published data"));
+        }
+        if outcome == "Accept" && is_deposit {
+            deposited += amount;
+        }
+        if outcome == "Accept" && is_tick {
+            ticks += 1;
+            if after.pending() > before.pending() {
+                payout_ticks.push(ticks);
+            }
+        }
+        outcomes.push(format!("\"{outcome}\""));
+    }
+    Ok(Decided {
+        outcomes,
+        deposited,
+        payout_ticks,
+    })
+}
+
+/// Runs the journey's sixteen decisions on a new store and stops before
+/// delivery, so the store keeps both payouts pending for a relay to send.
+///
+/// Returns a JSON summary.
+///
+/// # Errors
+///
+/// A decision whose outcome differs from the journey's, or a refusal from
+/// `invoke`, `create`, or the shell.
+#[cfg(feature = "sqlite")]
+pub fn payouts(path: &Path) -> AppResult<String> {
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor)?;
+    let mut shell = create(path, &authority)?;
+    let Decided {
+        outcomes,
+        payout_ticks,
+        ..
+    } = decide_journey(&mut shell, &authority)?;
+    let snapshot = checked(shell.snapshot())?;
+    if (snapshot.version(), snapshot.pending()) != (12, 2) || payout_ticks != [4, 8] {
+        return Err(format!(
+            "decisions differ from the journey: {} bundles, {} pending, payout ticks {payout_ticks:?}",
+            snapshot.version(),
+            snapshot.pending()
+        ));
+    }
+    Ok(format!(
+        "{{\"status\":\"decided\",\"decisions\":[{}],\"bundles\":{},\"pending\":{}}}",
+        outcomes.join(","),
+        snapshot.version(),
+        snapshot.pending()
+    ))
+}
+
+/// The relay export of an existing store: one line of JSON per pending
+/// delivery, in commit order (see `zeno_fcis_shell_sqlite::v2::relay`).
+///
+/// # Errors
+///
+/// A store the shell refuses to open or audit.
+#[cfg(feature = "sqlite")]
+pub fn relay_export(path: &Path) -> AppResult<String> {
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor)?;
+    let mut shell = checked(Shell::open(path, &authority))?;
+    let lines: Vec<String> = checked(shell.export_pending())?
+        .iter()
+        .map(relay::export_line)
+        .collect();
+    Ok(lines.join("\n"))
+}
+
+/// Acknowledges one delivery of an existing store for a relay, by its ID
+/// and the SHA-256 of the payload the relay sent, both in hexadecimal.
+///
+/// Returns a JSON summary.
+///
+/// # Errors
+///
+/// Malformed hexadecimal, or the shell's refusal by name: `UnknownDelivery`,
+/// `AlreadyAcknowledged` or `PayloadMismatch`, each with no write.
+#[cfg(feature = "sqlite")]
+pub fn relay_acknowledge(path: &Path, id: &str, payload_sha256: &str) -> AppResult<String> {
+    let parse = |text: &str, name: &str| {
+        relay::parse_hex_hash(text)
+            .ok_or_else(|| format!("{name}: expected 64 lowercase hexadecimal digits"))
+    };
+    let (id, hash) = (
+        parse(id, "delivery ID")?,
+        parse(payload_sha256, "payload hash")?,
+    );
+    let contract = v2_contract::Contract::new();
+    let descriptor = contract.descriptor();
+    let authority = authority(&descriptor)?;
+    let mut shell = checked(Shell::open(path, &authority))?;
+    checked(relay::acknowledge(&mut shell, id, hash))?;
+    let snapshot = checked(shell.snapshot())?;
+    Ok(format!(
+        "{{\"status\":\"acknowledged\",\"delivery_id\":\"{}\",\"pending\":{}}}",
+        relay::hex(id.as_bytes()),
+        snapshot.pending()
     ))
 }

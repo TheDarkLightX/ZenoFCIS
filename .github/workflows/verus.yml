@@ -10,6 +10,10 @@ on:
       - "crates/zeno-fcis-crypto/**"
       - "crates/zeno-fcis-value/**"
       - "crates/zeno-fcis-cli/templates/**"
+      - "crates/zeno-fcis-cli/src/**"
+      - "crates/zeno-fcis-cli/tests/transform_cli.rs"
+      - "crates/zeno-fcis-shell-sqlite/**"
+      - "crates/zeno-fcis-cli/tests/fixtures/transform-check/**"
       - "verification/verus/**"
       - "tools/check_*.py"
       - "tools/test_check_*.py"
@@ -41,6 +45,7 @@ jobs:
           - {gate: shared-runtime, script: check_verus.py, output: receipt.json}
           - {gate: finite-execution, script: check_finite_execution.py, output: receipt.json}
           - {gate: metered-execution, script: check_metered_execution.py, output: receipt.json}
+          - {gate: shared-finite-checker, script: check_checker.py, output: run}
           - {gate: canonical-bytes, script: check_canonical_bytes.py, output: receipt.json}
           - {gate: protected-input, script: check_protected_input.py, output: receipt.json}
           - {gate: envelope-frame, script: check_envelope_frame_v2.py, output: receipt.json}

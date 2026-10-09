@@ -1,0 +1,10 @@
+{
+  "schema": "zeno-fcis/migration/1",
+  "state": {
+    "120": {"from": 120},
+    "121": {"from": 121},
+    "122": {"from": 122},
+    "123": {"from": 123},
+    "124": {"default": false}
+  }
+}

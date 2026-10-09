@@ -5,18 +5,27 @@
 //! generate contract` turns them into `src/v2_contract.rs`, `v2/schema.zcve`
 //! and `v2/policy.zcve`. The library Authority makes every decision and
 //! checks every law. This crate frames inputs, keeps publications in SQLite
-//! and delivers the outbox; it holds no decision or law code.
+//! and delivers the outbox; it holds no decision or law code. `src/cli.rs`
+//! is its operational command line.
 #![forbid(unsafe_code)]
 
 /// The generated contract: schema, decision program, laws and genesis state.
 pub mod v2_contract;
 
+/// The operational command line: `init`, `submit`, `decide`, `state`,
+/// `history`, `pending`, `deliver` and `version`.
+#[cfg(feature = "sqlite")]
+pub mod cli;
 mod examples;
+#[cfg(feature = "sqlite")]
+mod relay;
 #[cfg(feature = "sqlite")]
 mod session;
 #[cfg(feature = "sqlite")]
 pub use session::{
-    Delivered, Head, Summary, Upgraded, audit, decide, deliver, journey, migrate, upgrade,
+    Current, Decision, Delivered, Destination, Entry, Failure, FileDestination, Head, History,
+    Outgoing, Sent, Summary, Upgraded, Waiting, audit, current, decide, deliver, deliver_to,
+    history, identity, init, journal_path, journey, migrate, pending, preview, submit, upgrade,
 };
 
 use zeno_fcis_codec::{CanonicalEncode, Envelope, Hash32};

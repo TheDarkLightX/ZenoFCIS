@@ -57,6 +57,11 @@ jobs:
             -p zeno-fcis-shell-sqlite \
             --doc --all-features --locked
 
+      - name: Delivery misuse examples fail with their stated compiler errors
+        run: |
+          python3 tools/test_check_compile_fail.py
+          python3 tools/check_compile_fail.py
+
       - name: no_std decoder and authority surfaces
         run: |
           cargo +1.97.1 check \

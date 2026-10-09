@@ -242,6 +242,74 @@ fn call(name: &str, arguments: Vec<Ast>) -> Result<Ast, String> {
         })
 }
 
+/// The expression as rule text, with only the parentheses its operators
+/// need: `parse` reads it back as the same tree, except that a negative
+/// integer constant reads back as a negated one.
+pub(super) fn render(ast: &Ast) -> String {
+    let mut text = String::new();
+    write(ast, 0, &mut text);
+    text
+}
+
+/// Writes `ast` where only operators binding at least as tightly as `level`
+/// may stand without parentheses.
+fn write(ast: &Ast, level: u8, out: &mut String) {
+    let call = |name: &str, arguments: &[&Ast], out: &mut String| {
+        out.push_str(name);
+        out.push('(');
+        for (index, argument) in arguments.iter().enumerate() {
+            if index > 0 {
+                out.push_str(", ");
+            }
+            write(argument, 0, out);
+        }
+        out.push(')');
+    };
+    match ast {
+        Ast::Bool(value) => out.push_str(if *value { "true" } else { "false" }),
+        Ast::Int(value) => out.push_str(&value.to_string()),
+        Ast::Name(name) => out.push_str(name),
+        Ast::Not(inner) => {
+            out.push('!');
+            write(inner, 8, out);
+        }
+        Ast::Neg(inner) => {
+            out.push('-');
+            write(inner, 8, out);
+        }
+        Ast::Binary(operator, left, right) => {
+            let precedence = operator.precedence();
+            let enclosed = precedence < level;
+            if enclosed {
+                out.push('(');
+            }
+            // `->` is right associative; the others associate left.
+            let (left_level, right_level) = if *operator == Binary::Implies {
+                (precedence + 1, precedence)
+            } else {
+                (precedence, precedence + 1)
+            };
+            write(left, left_level, out);
+            let token = OPERATORS
+                .iter()
+                .find(|(_, candidate)| candidate == operator)
+                .map_or("?", |(token, _)| token);
+            out.push(' ');
+            out.push_str(token);
+            out.push(' ');
+            write(right, right_level, out);
+            if enclosed {
+                out.push(')');
+            }
+        }
+        Ast::Choose(condition, then, otherwise) => {
+            call("choose", &[condition, then, otherwise], out);
+        }
+        Ast::Div(Rounding::Floor, left, right) => call("div_floor", &[left, right], out),
+        Ast::Div(Rounding::Ceil, left, right) => call("div_ceil", &[left, right], out),
+    }
+}
+
 /// Replaces rule variables by their definitions; a variable may not refer to
 /// itself, directly or through others.
 pub(super) fn expand(ast: &Ast, variables: &BTreeMap<String, Ast>) -> Result<Ast, String> {

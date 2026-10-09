@@ -1,0 +1,78 @@
+zeno 1;
+project 1 escrow;
+namespace 2 market;
+// One escrowed order. The buyer funds it, the seller ships, and the buyer
+// confirms or disputes; an arbiter splits a disputed escrow. Time arrives in
+// the context as Unix seconds; amounts are cents.
+type 100 state Escrow;
+type 101 command EscrowCommand;
+type 102 context Caller;
+type 103 destination PaymentsDesk;
+type 104 payload Payout;
+type 105 data Status;
+type 106 data Party;
+type 107 data Action;
+type 108 int Money in 0..=100000000;
+type 109 int UnixTime in 0..=4102444800;
+field 110 100 status 105;
+field 111 100 held 108;
+field 112 100 funded 108;
+field 113 100 to_seller 108;
+field 114 100 to_buyer 108;
+field 115 100 funded_at 109;
+field 116 100 shipped_at 109;
+field 120 101 action 107;
+field 121 101 amount 108;
+field 122 101 refund 108;
+field 130 102 caller 106;
+field 131 102 now 109;
+field 140 104 payee 106;
+field 141 104 payout_amount 108;
+variant 150 105 Created none;
+variant 151 105 Funded none;
+variant 152 105 Shipped none;
+variant 153 105 Disputed none;
+variant 154 105 Completed none;
+variant 155 105 Resolved none;
+variant 156 105 Cancelled none;
+variant 160 106 Nobody none;
+variant 161 106 Buyer none;
+variant 162 106 Seller none;
+variant 163 106 Arbiter none;
+variant 170 107 Fund none;
+variant 171 107 Ship none;
+variant 172 107 Confirm none;
+variant 173 107 Dispute none;
+variant 174 107 Resolve none;
+variant 175 107 Cancel none;
+variant 176 107 Claim none;
+reason 200 not_a_party precedence 0;
+reason 201 wrong_status precedence 1;
+reason 202 wrong_party precedence 2;
+reason 203 zero_amount precedence 3;
+reason 204 ship_deadline_passed precedence 4;
+reason 205 dispute_window_closed precedence 5;
+reason 206 refund_exceeds_held precedence 6;
+reason 207 seller_missed_deadline precedence 7;
+reason 208 ship_deadline_open precedence 8;
+reason 209 dispute_window_open precedence 9;
+channel 300 payout destination 103 payload 104;
+component 400 escrow {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+// Funds are conserved: what is held plus what was paid out is what was funded.
+law 500 funds_conserved on commit, genesis = post.100.111 + post.100.113 + post.100.114 == post.100.112;
+// A settled escrow holds nothing.
+law 501 settled_escrow_holds_nothing on commit, genesis = (post.100.110 == 154 || post.100.110 == 155 || post.100.110 == 156) -> post.100.111 == 0;
+// Payouts and the funded total never shrink.
+law 502 payouts_never_shrink on commit = post.100.113 >= pre.100.113 && post.100.114 >= pre.100.114 && post.100.112 >= pre.100.112;
+// Only the arbiter splits a disputed escrow.
+law 503 arbiter_alone_splits on accept = command.101.120 == 174 -> context.102.130 == 163 && post.100.110 == 155 && post.100.111 == 0;
+// A refund without the seller's consent needs the missed ship deadline.
+law 504 refund_needs_missed_deadline on failure = post.100.110 == 156 && context.102.130 == 161 && context.102.131 > pre.100.115 + 604800;

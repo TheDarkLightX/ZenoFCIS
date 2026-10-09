@@ -1,0 +1,1791 @@
+{
+  "schema": "zeno-fcis/core-candidate-catalog/design-1",
+  "authority": "none",
+  "status": "review-candidate; every entry is designed, not implemented or proved",
+  "source_subjects": {
+    "v22_checkout": "/tmp/zenofcis-v22-completion-20261007",
+    "v22_head": "a1ce03e2bcd917ecb9a61a29be429f5ca09a85b8",
+    "zal_checkout": "/tmp/zenofcis-proof-challenge-20261007",
+    "zal_head": "7eafb5c6524d1b2ba76e9437cb534b5234b1b106"
+  },
+  "scope_note": "V2.2 G1 first three parameterized families remain V2.2 work. V2.3 standardizes packaging and expands reuse; no silent deferral. Listed bounded parameters are proposed support, subject to all exact-instance limits.",
+  "first_release_ids": [
+    "bounded_counter",
+    "consumable_budget",
+    "reservation_pool",
+    "approval_quorum",
+    "versioned_register",
+    "idempotent_request_slot",
+    "capped_retry",
+    "finite_fsm",
+    "logical_deadline",
+    "epoch_quota"
+  ],
+  "existing_limits": {
+    "synthesis_input_tuples": 65536,
+    "synthesis_output_tuples": 4096,
+    "synthesis_work_nodes": 100000000,
+    "synthesis_input_fields": 16,
+    "synthesis_output_fields": 16,
+    "factory_input_fields": 32,
+    "factory_output_fields": 16,
+    "decision_nodes": 256,
+    "transform_default_input_tuples": 100000000
+  },
+  "cores": [
+    {
+      "rank": 1,
+      "id": "bounded_counter",
+      "name": "Bounded counter",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "C=1..7; Q=1..3",
+      "state": "value:0..C",
+      "command": "Adjust(delta:-Q..Q)",
+      "context": "authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "0<=value<=C",
+        "accept changes by exactly delta",
+        "reject preserves state"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "C=7; value=4; Adjust(+3); authorized=true -> Accept(value=7)"
+      ],
+      "required_rejection_examples": [
+        "C=7; value=7; Adjust(+1); authorized=true -> Reject(over-capacity), value=7",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "Adjust with authorized=false -> Reject(unauthorized), unchanged value and no effects."
+      ],
+      "composition_assumptions": [
+        "One owner of value; delta unit fixed; permission is supplied evidence, not authenticated by this core.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [],
+      "reference_sources": [
+        "durable-counter"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "increment/decrement to each endpoint",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "zero delta policy",
+          "expected": "Accept unchanged with no effects; record that zero is an explicit admitted no-op."
+        },
+        {
+          "case": "boundary arithmetic",
+          "expected": "Exact in-range endpoint adjustment accepts; mathematical out-of-range adjustment rejects without wrapped arithmetic."
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "id": "consumable_budget",
+      "name": "Consumable budget",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "B=1..7; Q=1..3",
+      "state": "spent:0..B",
+      "command": "Spend(amount:0..Q) | Reset",
+      "context": "authorized:Bool; reset_authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "0<=spent<=B",
+        "accepted spend adds exact amount",
+        "only authorized reset clears",
+        "rejection never refunds"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "B=7; spent=4; Spend(3); authorized=true -> Accept(spent=7)"
+      ],
+      "required_rejection_examples": [
+        "B=7; spent=6; Spend(2); authorized=true -> Reject(budget-exceeded), spent=6",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "zero amount declared no-op or refusal -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Budget resets are an explicit command; callers cannot turn failed downstream work into a refund.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "bounded_counter"
+      ],
+      "reference_sources": [
+        "agent-treasury-guard"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "spend exact remaining budget",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "authorized reset",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "id": "reservation_pool",
+      "name": "Reservation pool",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "C=1..7; Q=1..3",
+      "state": "available:0..C; held:0..C",
+      "command": "Reserve(q:0..Q) | Release(q) | Consume(q) | Replenish(q)",
+      "context": "authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "available+held<=C",
+        "reserve/release conserve total",
+        "consume removes q",
+        "replenish adds q"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "C=5; (available,held)=(3,2); Reserve(2); authorized=true -> Accept(1,4)"
+      ],
+      "required_rejection_examples": [
+        "C=5; (available,held)=(1,4); Reserve(2); authorized=true -> Reject(insufficient-available), (1,4)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Owns aggregate capacity; caller must bind holdings to requests. New total-cap invariant is intentional, not claimed equal to existing template per-field bounds.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "bounded_counter"
+      ],
+      "reference_sources": [
+        "inventory-reservation"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "reserve exact available",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "release exact held",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "consume and replenish boundaries",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "id": "approval_quorum",
+      "name": "Three-principal approval quorum",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "N=3 fixed structural slots; K=1..3",
+      "state": "a0:Bool; a1:Bool; a2:Bool; executed:Bool",
+      "command": "Approve(principal:0..2) | Execute",
+      "context": "authenticated_principal:0..2; executor_authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "votes distinct",
+        "execution only at count>=K",
+        "execute at most once",
+        "vote cannot impersonate context"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "K=2; votes=(true,false,false); Approve(1); authenticated_principal=1 -> Accept(votes=(true,true,false))"
+      ],
+      "required_rejection_examples": [
+        "K=2; votes=(true,false,false),executed=false; Execute; executor_authorized=true -> Reject(quorum-not-met)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "repeat execution refusal -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Approval epoch/request identity bound by wrapper; role identities are authenticated by shell. No arbitrary-sized set assumed.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "bounded_counter"
+      ],
+      "reference_sources": [
+        "spend-approval fixture to be selected"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "each principal first approval",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "exact K execution",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "duplicate vote defined as unchanged accept",
+          "expected": "Accept unchanged, no extra vote and no effects."
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "id": "versioned_register",
+      "name": "Version-checked register",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "V=1..7; X=1..3",
+      "state": "revision:0..V; value:0..X",
+      "command": "Set(expected_revision:0..V, value:0..X)",
+      "context": "authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "accept iff authorized, expected=current, current<V",
+        "increment exactly once",
+        "stale/overflow unchanged"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "V=7; (revision,value)=(2,1); Set(2,3); authorized=true -> Accept(3,3)"
+      ],
+      "required_rejection_examples": [
+        "V=7; (revision,value)=(3,1); Set(2,3); authorized=true -> Reject(stale), (3,1)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "stale and exhausted version -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Version is per object and never wraps; shell CAS must bind actual snapshot so a pure match is not a storage lock.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [],
+      "reference_sources": [
+        "durable-counter"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "same-value write still advances version",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "last permitted revision",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "id": "idempotent_request_slot",
+      "name": "Single-request idempotency slot",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "key=0..3; payload_tag=0..1; result=0..1",
+      "state": "phase:{empty,pending,done}; key; payload_tag; result",
+      "command": "Begin(key, payload_tag) | Finish(key,result)",
+      "context": "authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "same key/payload replay does not repeat effect",
+        "conflicting payload refused",
+        "completion bound to pending key"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "empty; Begin(1,0); authorized=true -> Accept(pending,key=1,tag=0), one execute-intent"
+      ],
+      "required_rejection_examples": [
+        "pending,key=1,tag=0; Begin(1,1); authorized=true -> Reject(key-conflict), unchanged",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Finite payload tag is exact toy-domain identity, not a hash or general request digest. No eviction/reuse; one slot lifetime. Downstream receiver idempotency remains separate.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "versioned_register"
+      ],
+      "reference_sources": [
+        "order-fulfillment"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "first begin",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "same-payload retry unchanged with no intent",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "finish and cached done retry",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "id": "capped_retry",
+      "name": "Capped retry lifecycle",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "A=1..3",
+      "state": "attempts:0..A; phase:{ready,inflight,done}",
+      "command": "Start | Failed(attempt:0..A) | Succeeded(attempt:0..A)",
+      "context": "authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects",
+        "CommittedFailure: exact recorded successor/reason, reserved attempts retained"
+      ],
+      "invariants": [
+        "each Start consumes attempt",
+        "callback exact current inflight attempt",
+        "failure never refunds",
+        "no start after done"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "A=3; attempts=2,phase=ready; Start; authorized=true -> Accept(attempts=3,phase=inflight), attempt-intent(3)"
+      ],
+      "required_rejection_examples": [
+        "A=3; attempts=3,phase=ready; Start; authorized=true -> Reject(attempts-exhausted), unchanged",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "No wall-clock/backoff promise; callbacks require authenticated source and logical attempt binding; downstream effects use slot/idempotency composition.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "bounded_counter"
+      ],
+      "reference_sources": [
+        "order-fulfillment"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "last allowed start",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "matching success",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "matching failure as explicit CommittedFailure with attempts retained",
+          "expected": "CommittedFailure records ready phase while retaining attempts; no refund or retry intent."
+        }
+      ]
+    },
+    {
+      "rank": 8,
+      "id": "finite_fsm",
+      "name": "Explicit finite state machine",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "states=2..4; events=1..4; facts=0..2; fixed reviewed transition table",
+      "state": "control:declared enum",
+      "command": "event:declared enum",
+      "context": "every declared fact:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "unique enabled rule",
+        "explicit default reject",
+        "initial and all committing states satisfy declared invariants"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "pending; approve; authorized=true -> Accept(approved)"
+      ],
+      "required_rejection_examples": [
+        "pending; approve; authorized=false -> Reject(unauthorized), pending",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Current ZAL is unordered/disjoint; factory policy is ordered. Preserve disjointness before canonical lowering; state-only invariants do not prove authorization implications.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [],
+      "reference_sources": [
+        "ZAL finite-fsm/1"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "every intended transition has a feasible successful input",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "every terminal-state policy",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "unmatched default and overlapping-rule rejection",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 9,
+      "id": "logical_deadline",
+      "name": "Logical deadline gate",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "T=1..7; D=1..3; T+D<=10",
+      "state": "last_seen:0..T; deadline:0..T+D; phase:{idle,armed,done}",
+      "command": "Arm | Fire | Cancel",
+      "context": "now:0..T; authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "no accepted time regression",
+        "arm deadline=now+D",
+        "Fire only armed and now>=deadline",
+        "done cannot refire"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "D=2; last_seen=2,deadline=4,phase=armed; Fire; now=4,authorized=true -> Accept(last_seen=4,phase=done)"
+      ],
+      "required_rejection_examples": [
+        "D=2; last_seen=2,deadline=4,phase=armed; Fire; now=3,authorized=true -> Reject(not-due), unchanged",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "now is explicit authenticated logical time; no wakeup/liveness/wall-clock accuracy promise; eager addition must fit domain on every evaluated branch.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "finite_fsm"
+      ],
+      "reference_sources": [
+        "account-lockout"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "arm and exact-deadline firing",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "cancel before firing",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "maximum safe deadline",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 10,
+      "id": "epoch_quota",
+      "name": "Monotone epoch quota",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "first-ten-supported-profile",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "E=1..3; Q=1..7; A=1..3",
+      "state": "epoch:0..E; used:0..Q",
+      "command": "Consume(amount:0..A)",
+      "context": "epoch:0..E; authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "same epoch accumulates",
+        "later epoch resets then consumes",
+        "older epoch rejects",
+        "used<=Q"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "Q=5; stored(epoch,used)=(1,5); Consume(2); context epoch=2,authorized=true -> Accept(epoch=2,used=2)"
+      ],
+      "required_rejection_examples": [
+        "Q=5; stored(epoch,used)=(2,3); Consume(1); context epoch=1,authorized=true -> Reject(epoch-regressed), unchanged",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Epoch derivation/freshness is a shell fact; no decision-side division or implicit daily reset; shared quota has one owner.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "consumable_budget"
+      ],
+      "reference_sources": [
+        "agent-treasury-guard"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "same-epoch exact remaining quota",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "epoch advance reset",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "epoch jump explicit policy",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 11,
+      "id": "fenced_lease",
+      "name": "Single-owner fenced lease",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "owner=0..2; fence=0..7; time=0..7; duration=1..2",
+      "state": "owner; fence; deadline; active:Bool",
+      "command": "Acquire(owner) | Renew(owner,fence) | Release(owner,fence)",
+      "context": "now; authenticated_owner",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "active owner exclusive",
+        "acquisition increments nonwrapping fence",
+        "stale fence cannot renew/release"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "inactive,fence=2; Acquire(1); now=2,authenticated_owner=1 -> Accept(active,owner=1,fence=3,deadline=4)"
+      ],
+      "required_rejection_examples": [
+        "active,owner=1,fence=3; Release(1,2); authenticated_owner=1 -> Reject(stale-fence)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Every protected downstream write must enforce fence; lease model alone cannot exclude stale external actors.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "versioned_register",
+        "logical_deadline"
+      ],
+      "reference_sources": [
+        "new declarations"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "acquire after expiry",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "renew current lease",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "release current fence",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 12,
+      "id": "circuit_breaker",
+      "name": "Bounded circuit breaker",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "threshold=1..3; time=0..7; cooldown=1..2",
+      "state": "failures:0..3; mode:{closed,open,probe}; deadline",
+      "command": "Permit | Failed | Succeeded",
+      "context": "now; authenticated_result:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects",
+        "CommittedFailure: exact recorded successor/reason, reserved attempts retained"
+      ],
+      "invariants": [
+        "threshold opens",
+        "no permits during cooldown",
+        "one probe",
+        "success closes and resets"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "threshold=2; mode=closed,failures=0; Permit; now=1 -> Accept(mode=closed), one permitted-attempt intent"
+      ],
+      "required_rejection_examples": [
+        "open,deadline=4; Permit; now=3 -> Reject(cooldown)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Bind outcome to permitted attempt; unsolicited results and concurrent probes require owned identity/atomic shell.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "capped_retry",
+        "logical_deadline"
+      ],
+      "reference_sources": [
+        "new declarations"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "threshold failure opens",
+          "expected": "CommittedFailure records open mode, exact threshold failure count and cooldown deadline; no new permitted operation."
+        },
+        {
+          "case": "one post-deadline probe",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "successful probe closes",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "threshold=2; closed,failures=1; Failed; authenticated_result=true -> CommittedFailure(open,failures=2)",
+          "expected": "CommittedFailure: records open mode at threshold; no new permitted operation."
+        }
+      ]
+    },
+    {
+      "rank": 13,
+      "id": "single_escrow",
+      "name": "Single fixed-denomination escrow",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "amount=0..7",
+      "state": "held:0..7; phase:{empty,locked,released,refunded}",
+      "command": "Lock(q) | Release | Refund",
+      "context": "payer_authorized:Bool; release_authorized:Bool; refund_authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "held conserved until one terminal payout",
+        "release/refund mutually exclusive"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "empty,held=0; Lock(3); payer_authorized=true -> Accept(locked,held=3)"
+      ],
+      "required_rejection_examples": [
+        "released,held=0; Refund; refund_authorized=true -> Reject(terminal)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Ledger debit must be atomic with Lock; emitted payout is intention, not settlement; no real-money assurance before shell/receiver qualification.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "reservation_pool",
+        "finite_fsm"
+      ],
+      "reference_sources": [
+        "withdrawal-queue"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "lock exact amount",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "one authorized release",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "one alternate refund path",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 14,
+      "id": "two_account_transfer",
+      "name": "Two-account conserved transfer",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "total C=1..7; amount Q=1..3",
+      "state": "left:0..C; right:0..C",
+      "command": "Move(direction:{left,right},q:0..Q)",
+      "context": "authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "left+right conserved",
+        "no negative balances",
+        "exact debit equals credit"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "C=5; (left,right)=(3,2); Move(right,2); authorized=true -> Accept(1,4)"
+      ],
+      "required_rejection_examples": [
+        "C=5; (left,right)=(1,4); Move(right,2); authorized=true -> Reject(insufficient-funds)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Single denomination and atomic common snapshot; no fees/minting/cross-ledger settlement implied.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "bounded_counter"
+      ],
+      "reference_sources": [
+        "inventory-reservation"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "both directions",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "exact full debit",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "zero amount policy",
+          "expected": "Accept unchanged with no effects; record that zero is an explicit admitted no-op."
+        }
+      ]
+    },
+    {
+      "rank": 15,
+      "id": "two_bin_inventory",
+      "name": "Two-bin inventory transfer",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "capacity each=1..5; quantity=1..3",
+      "state": "a:0..5; b:0..5",
+      "command": "MoveAToB(q) | MoveBToA(q)",
+      "context": "authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "total conserved",
+        "each capacity respected",
+        "reject leaves both unchanged"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "caps=5; (a,b)=(3,2); MoveAToB(2); authorized=true -> Accept(1,4)"
+      ],
+      "required_rejection_examples": [
+        "caps=5; (a,b)=(3,4); MoveAToB(2); authorized=true -> Reject(destination-full)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "source-empty refusal -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Fixed two bins only; no dynamic SKU map; capacities independently bound and units identical.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "reservation_pool",
+        "two_account_transfer"
+      ],
+      "reference_sources": [
+        "inventory-reservation"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "both directions",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "exact destination fill",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 16,
+      "id": "two_lane_round_robin",
+      "name": "Two-lane round-robin selector",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "two fixed lanes; no unbounded queue",
+      "state": "next:{0,1}",
+      "command": "Choose",
+      "context": "ready0:Bool; ready1:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "choose ready lane only",
+        "when both ready choose next and flip",
+        "no ready -> reject"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "next=0; Choose; ready0=true,ready1=true -> Accept(chosen=0,next=1)"
+      ],
+      "required_rejection_examples": [
+        "next=1; Choose; ready0=false,ready1=false -> Reject(none-ready)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "One selection occurrence shared with downstream dequeue; fairness needs repeated scheduling and persistent readiness assumptions.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "finite_fsm"
+      ],
+      "reference_sources": [
+        "new declarations"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "both-ready alternating trace",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "only-other-ready trace",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "single-ready policy",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 17,
+      "id": "debounce_gate",
+      "name": "Bounded debounce gate",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "time=0..7; delay=1..2",
+      "state": "value:Bool; pending:Bool; deadline:0..9; last_seen:0..7",
+      "command": "Observe(value:Bool) | Flush",
+      "context": "now:0..7",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "emit only current pending value after delay",
+        "newer observation supersedes",
+        "monotone accepted time"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "value=true,pending=true,deadline=4,last_seen=2; Flush; now=4 -> Accept(pending=false), emit(true)"
+      ],
+      "required_rejection_examples": [
+        "value=true,pending=true,deadline=4,last_seen=2; Flush; now=3 -> Reject(not-due)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "no-pending refusal -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "No automatic timer delivery; event order explicit; input stream integrity outside core.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "logical_deadline"
+      ],
+      "reference_sources": [
+        "new declarations"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "superseding observation",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "exact deadline flush",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 18,
+      "id": "discrete_token_bucket",
+      "name": "Discrete refill token bucket",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "supported-profile-follow-on",
+      "profile": "Bool/checked-i64 fixed scalar fields",
+      "parameter_domain": "capacity=1..7; refill quantum=1..3; debit=0..3",
+      "state": "tokens:0..7; tick:0..3",
+      "command": "Refill | Consume(q)",
+      "context": "tick:0..3; authorized:Bool",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "0<=tokens<=capacity",
+        "refill once per exact next tick, clamped",
+        "debit exact and sufficient"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "capacity=5,refill=2; tokens=4,tick=1; Refill; context tick=2 -> Accept(tokens=5,tick=2)"
+      ],
+      "required_rejection_examples": [
+        "tokens=1; Consume(2); authorized=true -> Reject(insufficient-tokens)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "duplicate tick refusal -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Fixed increment; skipped tick policy rejects instead of multiplying elapsed time; not a continuous-rate guarantee.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "consumable_budget",
+        "epoch_quota"
+      ],
+      "reference_sources": [
+        "new declarations"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "saturating logical refill",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "exact-balance debit",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 19,
+      "id": "bounded_idempotency_map",
+      "name": "Bounded keyed idempotency map",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "wider-profile-pending",
+      "profile": "requires separate wider-value or compound profile qualification",
+      "parameter_domain": "K=1..16; finite key/payload/result domains fixed per instance",
+      "state": "bounded canonical key->payload/result entries",
+      "command": "Begin(key,payload) | Finish(key,result)",
+      "context": "authenticated caller",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "unique keys",
+        "conflict refusal",
+        "completed repeats produce same result without new effect"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "empty map; Begin(k1,p0) -> Accept(entry k1 pending), one intent"
+      ],
+      "required_rejection_examples": [
+        "map[k1]=p0; Begin(k1,p1) -> Reject(key-conflict)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Eviction must not permit replay within supported horizon; maps/encoding/core admission need new qualification.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "idempotent_request_slot"
+      ],
+      "reference_sources": [
+        "requires qualified bounded-map profile"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "insert to exact capacity",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "replay existing key at capacity",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "explicit retention/eviction policy",
+          "expected": "No eviction in first qualified instance; full map refuses new key and accepts exact retained replay."
+        }
+      ]
+    },
+    {
+      "rank": 20,
+      "id": "bounded_fifo",
+      "name": "Bounded FIFO lifecycle",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "wider-profile-pending",
+      "profile": "requires separate wider-value or compound profile qualification",
+      "parameter_domain": "K=1..16; finite message/sequence domains",
+      "state": "queue<=K; monotone next sequence",
+      "command": "Enqueue(message) | Ack(head_sequence)",
+      "context": "authenticated producer/consumer",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "FIFO ordering",
+        "no ack of non-head",
+        "each sequence nonwrapping",
+        "reject preserves queue"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "queue=[(1,a)]; Enqueue(b) -> Accept([(1,a),(2,b)])"
+      ],
+      "required_rejection_examples": [
+        "queue=[(1,a),(2,b)]; Ack(2) -> Reject(not-head)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "empty/full refusals -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Ack proves modeled consumption only; external delivery remains at-least-once with receiver idempotency.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "versioned_register",
+        "capped_retry"
+      ],
+      "reference_sources": [
+        "requires qualified bounded-sequence profile"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "enqueue to capacity",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "ack exact head",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 21,
+      "id": "multiasset_ledger",
+      "name": "Bounded multiasset ledger",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "wider-profile-pending",
+      "profile": "requires separate wider-value or compound profile qualification",
+      "parameter_domain": "accounts<=8; assets<=4; amounts<=qualified bound",
+      "state": "canonical account/asset balances and explicit supply",
+      "command": "Transfer | Mint | Burn",
+      "context": "authenticated role and denomination",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "conservation per asset",
+        "mint/burn explicit supply delta",
+        "no cross-asset netting"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "A/USD=3,B/USD=1; Transfer(A,B,USD,2) -> Accept(A/USD=1,B/USD=3)"
+      ],
+      "required_rejection_examples": [
+        "A/USD=1,A/EUR=9; Transfer(A,B,USD,2) -> Reject(insufficient-USD)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "mixed-denomination refusal -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Full denomination/custody key mandatory; scalar aggregate conservation is insufficient.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "two_account_transfer",
+        "bounded_idempotency_map"
+      ],
+      "reference_sources": [
+        "requires G3 compound/map qualification"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "transfer each asset independently",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "authorized mint/burn",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 22,
+      "id": "u128_budget",
+      "name": "Full-width unsigned budget",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "wider-profile-pending",
+      "profile": "requires separate wider-value or compound profile qualification",
+      "parameter_domain": "limit and amounts:0..2^128-1",
+      "state": "spent:U128; limit:U128",
+      "command": "Spend(U128) | AuthorizedReset",
+      "context": "authenticated role",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "checked addition",
+        "spent<=limit",
+        "no narrowing or wrap"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "spent=0,limit=2^127; Spend(2^127) -> Accept(spent=2^127)"
+      ],
+      "required_rejection_examples": [
+        "spent=2^128-1,limit=2^128-1; Spend(1) -> Reject(overflow-or-budget), unchanged",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail",
+        "overflow refusal precedence -> Reject with named precedence, unchanged state and no effects (arithmetic/invalid encoding may be typed technical refusal)."
+      ],
+      "composition_assumptions": [
+        "Cannot enumerate full width; needs checked arithmetic theorem plus actual codec/evaluator refinement, not scaled toy evidence.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "consumable_budget"
+      ],
+      "reference_sources": [
+        "requires G3 qualified U128 decision interpreter"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "2^63 and 2^127 successes",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "maximum exact spend",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 23,
+      "id": "fixedpoint_allocation",
+      "name": "Exact fixed-point allocation",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "wider-profile-pending",
+      "profile": "requires separate wider-value or compound profile qualification",
+      "parameter_domain": "total U128; finite recipients<=8; fixed scale and rounding policy",
+      "state": "remaining; per-recipient allocations; dust",
+      "command": "Allocate(weights)",
+      "context": "authenticated allocation policy",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "allocated+dust=total",
+        "explicit floor/tie order",
+        "no overflow of products"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "total=5,weights=(1,1),floor then dust to first -> Accept(allocations=(3,2),dust=0)"
+      ],
+      "required_rejection_examples": [
+        "total=5,weights=(0,0) -> Reject(zero-weight-total)",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Rounding/dust ownership part of contract; no floating point or native-width multiplication without proof.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "u128_budget",
+        "multiasset_ledger"
+      ],
+      "reference_sources": [
+        "requires G3 wide arithmetic and qualified multiplication/division"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "nondivisible allocation",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "one recipient",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "maximum product bound",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    },
+    {
+      "rank": 24,
+      "id": "portfolio_exposure_guard",
+      "name": "Bounded portfolio exposure guard",
+      "status": "designed-not-implemented-not-proved",
+      "phase": "wider-profile-pending",
+      "profile": "requires separate wider-value or compound profile qualification",
+      "parameter_domain": "assets<=4; U128 quantities; fixed-point prices; bounded timestamps",
+      "state": "per-asset held/pending; budget; last timestamp",
+      "command": "Propose | Settle | Fail",
+      "context": "authenticated oracle prices/times, actor, model version",
+      "outcomes": [
+        "Accept: exact successor and declared effect data",
+        "Reject: reason, unchanged state, no effects"
+      ],
+      "invariants": [
+        "per-asset pending conservation",
+        "budget/reserve/slippage bounds",
+        "stale/mismatched callback refusal"
+      ],
+      "finite_domain_support": {
+        "instance_status": "not-enumerated",
+        "eligibility": "Exact state x command x context product, scalar field/node limits and full synthesis relation work must fit; refuse instead of sample",
+        "parameter_status": "Proposed bounded specialization domain; no reusable parameter theorem established",
+        "initial_example_domain": "Use smallest stated domain including each witness; compute exact cardinality in manifest before generation"
+      },
+      "required_success_examples": [
+        "fresh authenticated price; proposal fits reserve and budget -> Accept(exact pending debit), one intent"
+      ],
+      "required_rejection_examples": [
+        "same proposal with stale price -> Reject(stale-price), unchanged",
+        "malformed/out-of-domain input refused before any successor/effect",
+        "rejection precedence checked when two guards fail"
+      ],
+      "composition_assumptions": [
+        "Advisory policy safety only; no profitability/market/liquidity guarantee; settlement and oracle authenticity are external obligations.",
+        "Same immutable invocation; explicit ownership, frame, abort policy and shared invariant required"
+      ],
+      "reuse_dependencies": [
+        "multiasset_ledger",
+        "fixedpoint_allocation",
+        "fenced_lease",
+        "idempotent_request_slot"
+      ],
+      "reference_sources": [
+        "agent-treasury-guard",
+        "requires G3 wide/compound arithmetic"
+      ],
+      "assurance": {
+        "current": "DesignOnly (planning label, no runtime evidence)",
+        "target_instance": "Exact finite relation check and actual generated Authority conformance, with source/domain/tool binding",
+        "target_family": "Evidence covers every parameter in the stated range and exact specialization/refinement: a checked Lean theorem (KernelChecked), source-bound Verus theorem, or exhaustive checked coverage of the whole bounded parameter/instance space may support its named scoped claim. No such evidence exists for this catalog. SMT-only remains Attested; preserve ADR statuses.",
+        "shell": "Independent publication/storage/delivery qualification required"
+      },
+      "pending_proof_obligations": [
+        "Nonempty legal genesis and closure of invariant for every committing transition",
+        "Successful realizability/nonvacuity of every intended command class",
+        "Complete failure/rejection precedence and unchanged-state/effect law",
+        "Exact eager arithmetic, typed encoding and generated-artifact correspondence",
+        "Whole stated parameter range and exact specialization/refinement, with theorem or complete bounded enumeration; no extrapolation from examples",
+        "Composition-specific shared invariant and atomicity"
+      ],
+      "required_edge_cases": [
+        {
+          "case": "exact-bound authorized proposal",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "matching settlement",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        },
+        {
+          "case": "failure refund with declared nonrefund budget policy",
+          "expected": "Accept with exact declared successor/effects; invariant and encoding checks pass."
+        }
+      ]
+    }
+  ],
+  "g1_seed_relationship": {
+    "reservation_pool": "V2.2 G1 seed remains required; V2.3 package may add explicitly new total-cap semantics",
+    "epoch_quota": "Candidate fixed-window specialization of V2.2 G1 rate limiter; prove mapping, do not rename a different contract as equivalent",
+    "approval_quorum": "Candidate fixed-three-principal specialization of V2.2 G1 approval family; bind identity/epoch assumptions"
+  }
+}

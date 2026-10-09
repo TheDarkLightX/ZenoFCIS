@@ -86,13 +86,27 @@ def build_app(app: Path) -> Path:
     whichever one was linked last; `cargo run` could execute another
     application's build. Each application's first build here is its only one.
     """
-    applications.run(["cargo", "+1.97.1", "build", "--locked", "--offline"], app)
-    package = tomllib.loads((app / "Cargo.toml").read_text())["package"]["name"]
-    # Cargo reads a relative target directory from where it runs.
-    target = Path(os.environ["CARGO_TARGET_DIR"])
-    target = target if target.is_absolute() else app / target
+    manifest = (app / "Cargo.toml").resolve()
+    package = tomllib.loads(manifest.read_text())["package"]["name"]
+    output = applications.run(
+        ["cargo", "+1.97.1", "build", "--locked", "--offline", "--message-format=json"],
+        app, capture=True)
+    executables = []
+    for line in output.splitlines():
+        record = json.loads(line)
+        if (record.get("reason") == "compiler-artifact"
+                and "bin" in record.get("target", {}).get("kind", [])
+                and record["target"].get("name") == package
+                and Path(record.get("manifest_path", "")).resolve() == manifest
+                and isinstance(record.get("executable"), str) and record["executable"]):
+            executable = Path(record["executable"])
+            executables.append(executable if executable.is_absolute() else app / executable)
+    if len(executables) != 1:
+        raise RuntimeError(f"expected one built binary for {package}, found {len(executables)}")
+    if not executables[0].is_file():
+        raise RuntimeError(f"cargo reported no regular binary at {executables[0]}")
     binary = app / f"{package}.bin"
-    shutil.copy2(target / "debug" / package, binary)
+    shutil.copy2(executables[0], binary)
     return binary
 
 
