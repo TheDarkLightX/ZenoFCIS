@@ -16,7 +16,29 @@ from string import Template
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "core-components"
-FAMILIES = ("reservation-pool", "rate-limiter", "approval-queue")
+FAMILIES = ("reservation-pool", "rate-limiter", "approval-queue", "bounded-counter",
+            "consumable-budget", "versioned-register", "idempotency-slot",
+            "retry-budget", "finite-phase-machine", "logical-deadline")
+# Classify declared command kinds for nonvacuity; this does not decide a rule.
+# None denotes a single command with numeric arguments, not one command per
+# argument value. In particular Write(expected_version=C) cannot succeed.
+COMMANDS = {
+    "reservation-pool": (2, {150: "Reserve", 151: "Release", 152: "Consume", 153: "Replenish"}),
+    "rate-limiter": (2, {150: "Acquire"}),
+    "approval-queue": (4, {160: "Enqueue", 161: "Vote", 162: "Execute"}),
+    "bounded-counter": (1, {150: "Inc", 151: "Dec"}),
+    "consumable-budget": (None, {None: "Spend"}),
+    "versioned-register": (None, {None: "Write"}),
+    "idempotency-slot": (None, {None: "Record"}),
+    "retry-budget": (2, {0: "Attempt", 1: "Finish"}),
+    "finite-phase-machine": (1, {0: "Advance", 1: "Reset"}),
+    "logical-deadline": (None, {None: "Tick"}),
+}
+
+
+def command_name(family: str, values) -> str:
+    offset, labels = COMMANDS[family]
+    return labels[None if offset is None else int(values[offset])]
 
 
 def digest(data: bytes) -> str:
@@ -109,12 +131,30 @@ def instantiate(family: str, parameters: dict[str, int], output: Path, *, includ
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("family", choices=FAMILIES)
-    parser.add_argument("output", type=Path)
+    parser.add_argument("family", choices=FAMILIES, nargs="?")
+    parser.add_argument("output", type=Path, nargs="?")
     parser.add_argument("--param", action="append", default=[], metavar="NAME=INTEGER")
+    discovery = parser.add_mutually_exclusive_group()
+    discovery.add_argument("--list", action="store_true", help="list the closed component catalogue")
+    discovery.add_argument("--show", action="store_true", help="show one family's declared scope without installing it")
     args = parser.parse_args()
     parameters = {}
     try:
+        if args.list:
+            if args.family or args.output or args.param:
+                raise ValueError("--list does not accept a family, output or parameters")
+            print(json.dumps(list(FAMILIES)))
+            return
+        if args.show:
+            if not args.family or args.output or args.param:
+                raise ValueError("--show requires a family and no output or parameters")
+            print(json.dumps({"definition": definition(args.family),
+                              "command_kinds": list(COMMANDS[args.family][1].values()),
+                              "certificate": "installation requires a fresh source-bound reference; replay required"},
+                             sort_keys=True))
+            return
+        if not args.family or not args.output:
+            raise ValueError("installation requires a family and a fresh output directory")
         for item in args.param:
             if not re.fullmatch(r"[A-Z]+=[0-9]+", item):
                 raise ValueError(f"expected NAME=INTEGER, got {item!r}")

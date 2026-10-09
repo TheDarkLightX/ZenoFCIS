@@ -1,0 +1,52 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "consumable-budget-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "remaining": "pre.100.110",
+    "amount": "command.101.120",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "amount > remaining",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining - amount"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": ${C}
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation",
+    "502": "DebitCreditEffectEquality"
+  }
+}

@@ -1,0 +1,28 @@
+zeno 1;
+project 1 retry_budget;
+namespace 2 core;
+type 100 state RetryBudget;
+type 101 command Attempt;
+type 102 context Operator;
+type 105 int Units in 0..=${C};
+type 106 bool Flag;
+type 108 bool Authorized;
+field 110 100 remaining 105;
+field 111 100 closed 106;
+field 120 101 finish 106;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+reason 201 closed precedence 1;
+reason 202 retries_exhausted precedence 2;
+component 400 retry_budget {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= ${C};
+law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= ${C};
+law 502 exact_finish on accept = (command.101.120 == 1 -> (post.100.110 == pre.100.110 && post.100.111 == 1));
+law 503 exact_attempt on accept = (command.101.120 == 0 -> (post.100.110 + 1 == pre.100.110 && post.100.111 == 0));

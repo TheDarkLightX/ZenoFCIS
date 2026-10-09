@@ -190,6 +190,24 @@ class CertificateBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'technical refusal'):
             proof.observed_rows(packet, [], manifest, 'approval-queue')
 
+    def test_reject_all_cannot_acquire_a_finite_certificate(self):
+        family = 'versioned-register'
+        files = core.source(family, {'C': 1}, include_proof=False)
+        manifest = core.read_json(files['core-instance.json'].decode())
+        values = list(itertools.product(*manifest['input_domains']))
+        # Even a matching reference and clean-looking packet cannot establish
+        # useful behavior without an accepted Write in the full actual table.
+        expected = [{'input': list(row), 'expected': {'class': 'Reject', 'reason': 200,
+                    'post': list(row[:2]), 'deliveries': []}} for row in values]
+        count = len(values)
+        packet = {'inputs': {'construction': 'full-domain', 'count': count, 'domain_size': str(count)},
+                  'summary': {'refusals': {'count': 0}, 'findings': 0,
+                              'examples': {'compared': count, 'disagreements': 0}},
+                  'decision_table': {'rows': [' '.join(map(str, row)) + ' | Reject 200 0 0' for row in values],
+                                     'post_states': [{'fields': []}], 'outboxes': [{'deliveries': []}]}}
+        with self.assertRaisesRegex(ValueError, 'vacuous command behavior'):
+            proof.observed_rows(packet, expected, manifest, family)
+
 
 if __name__ == '__main__':
     unittest.main()
