@@ -1,0 +1,3 @@
+# Minimal reactive synthesis subject for the Tau/ZenoFCIS evidence bridge.
+# For every current bv input, emit the same bv value.
+G(o1[t]:bv = i1[t]:bv).
