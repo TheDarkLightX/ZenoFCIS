@@ -7,7 +7,7 @@ use std::{
 use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Envelope, Hash32, commitment, decode_value};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_plan::OutboxEntry;
-use zeno_fcis_shell::{CommitStatus, MemoryDestination};
+use zeno_fcis_shell::{CommitStatus, IdempotentDestination, MemoryDestination};
 use zeno_fcis_shell_sqlite::{
     CrashPoint,
     v2::{CommitReceipt, Error, V2SqliteShell},
@@ -27,6 +27,17 @@ pub mod durable_counter;
 
 fn ok<T, E: std::fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("unexpected refusal: {error:?}"))
+}
+/// Delivers and acknowledges the oldest pending entry; whether there was one.
+fn deliver_next(
+    db: &mut V2SqliteShell<'_, '_>,
+    destination: &mut MemoryDestination,
+) -> Result<bool, Error> {
+    let Some(pending) = db.next_pending()? else {
+        return Ok(false);
+    };
+    pending.deliver(destination)?.acknowledge()?;
+    Ok(true)
 }
 fn with_authority(step: Option<u64>, run: impl FnOnce(&Authority<'_>)) {
     let contract = durable_counter::Contract::new();
@@ -197,39 +208,81 @@ fn every_injected_commit_interruption_is_atomic() {
 #[test]
 fn deliveries_follow_commit_order_even_when_delivery_hashes_are_reversed() {
     with_authority(None, |a| {
-        let cmd = command(120);
+        let increment = command(120);
+        let failure = command(121);
         let ctx = context(true);
         let mut witnessed = false;
-        for failures in 0..=3 {
-            let initial = state(0, failures);
-            let post = state(1, failures);
-            // The original genesis law requires both counters to be zero.
-            // Reach each tested state through genuine failure publications.
-            let start = state(0, 0);
-            let mut db = ok(V2SqliteShell::create_in_memory(a, genesis(a, &start)));
-            let failure = command(121);
-            for previous in 0..failures {
-                let before = state(0, previous);
-                ok(db.commit(
-                    Hash32::new([30 + previous as u8; 32]),
-                    publication(a, &before, &failure, &ctx),
-                ));
+        let mut cases = 0;
+        // Enumerate every legal two-command path in the declared 0..=3
+        // counter domain. Delivery IDs bind the evaluator, so a fixed subset
+        // need not contain a reversed pair after a legitimate identity change.
+        for count in 0..=3 {
+            for failures in 0..=3 {
+                for first_variant in [120, 121] {
+                    for second_variant in [120, 121] {
+                        let first_count = count + i128::from(first_variant == 120);
+                        let first_failures = failures + i128::from(first_variant == 121);
+                        if first_count + i128::from(second_variant == 120) > 3
+                            || first_failures + i128::from(second_variant == 121) > 3
+                        {
+                            continue;
+                        }
+                        cases += 1;
+                        let initial = state(count, failures);
+                        let post = state(first_count, first_failures);
+                        // Reach each state through genuine publications from
+                        // the original zero-counter genesis; drain this prefix.
+                        let start = state(0, 0);
+                        let mut db = ok(V2SqliteShell::create_in_memory(a, genesis(a, &start)));
+                        for previous in 0..count {
+                            let before = state(previous, 0);
+                            ok(db.commit(
+                                Hash32::new([10 + previous as u8; 32]),
+                                publication(a, &before, &increment, &ctx),
+                            ));
+                        }
+                        for previous in 0..failures {
+                            let before = state(count, previous);
+                            ok(db.commit(
+                                Hash32::new([30 + previous as u8; 32]),
+                                publication(a, &before, &failure, &ctx),
+                            ));
+                        }
+                        let mut destination = MemoryDestination::default();
+                        while ok(deliver_next(&mut db, &mut destination)) {}
+                        let first_command = command(first_variant);
+                        ok(db.commit(
+                            Hash32::new([4; 32]),
+                            publication(a, &initial, &first_command, &ctx),
+                        ));
+                        let first = ok(db.next_pending())
+                            .unwrap_or_else(|| panic!("missing first delivery"))
+                            .delivery()
+                            .clone();
+                        let second_command = command(second_variant);
+                        ok(db.commit(
+                            Hash32::new([6; 32]),
+                            publication(a, &post, &second_command, &ctx),
+                        ));
+                        let oldest = ok(db.next_pending())
+                            .unwrap_or_else(|| panic!("missing first delivery"));
+                        assert_eq!(oldest.delivery(), &first);
+                        ok(ok(oldest.deliver(&mut destination)).acknowledge());
+                        let second = ok(db.next_pending())
+                            .unwrap_or_else(|| panic!("missing second delivery"))
+                            .delivery()
+                            .clone();
+                        let prefix_version = (count + failures) as u64;
+                        assert_eq!(
+                            (first.version(), second.version()),
+                            (prefix_version + 1, prefix_version + 2)
+                        );
+                        witnessed |= first.delivery_id() > second.delivery_id();
+                    }
+                }
             }
-            while let Some(pending) = ok(db.next_pending()) {
-                ok(db.acknowledge(pending.delivery_id(), pending.entry_hash()));
-            }
-            ok(db.commit(Hash32::new([4; 32]), publication(a, &initial, &cmd, &ctx)));
-            let first = ok(db.next_pending()).unwrap_or_else(|| panic!("missing first delivery"));
-            ok(db.commit(Hash32::new([6; 32]), publication(a, &post, &cmd, &ctx)));
-            assert_eq!(ok(db.next_pending()), Some(first.clone()));
-            ok(db.acknowledge(first.delivery_id(), first.entry_hash()));
-            let second = ok(db.next_pending()).unwrap_or_else(|| panic!("missing second delivery"));
-            assert_eq!(
-                (first.version(), second.version()),
-                (failures as u64 + 1, failures as u64 + 2)
-            );
-            witnessed |= first.delivery_id() > second.delivery_id();
         }
+        assert_eq!(cases, 34);
         assert!(
             witnessed,
             "corpus must actually distinguish commit order from hash order"
@@ -245,15 +298,30 @@ fn destination_retry_and_acknowledgement_bind_exact_committed_content() {
         let ctx = context(true);
         let mut db = ok(V2SqliteShell::create_in_memory(a, genesis(a, &initial)));
         ok(db.commit(Hash32::new([6; 32]), publication(a, &initial, &cmd, &ctx)));
-        let p = ok(db.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
+        let pending = ok(db.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
+        let record = pending.delivery().clone();
+        // A destination that already holds this delivery ID with other
+        // content refuses it, and the entry stays pending.
+        let mut colliding = MemoryDestination::default();
+        let entry = OutboxEntry::new(
+            record.ordinal(),
+            record.channel(),
+            ok(decode_value(record.destination(), DecodeLimits::default())),
+            ok(decode_value(record.payload(), DecodeLimits::default())),
+        );
+        ok(colliding.deliver(record.delivery_id(), Hash32::ZERO, &entry));
         assert!(matches!(
-            db.acknowledge(p.delivery_id(), Hash32::ZERO),
+            pending.deliver(&mut colliding),
             Err(Error::Delivery)
         ));
-        assert_eq!(ok(db.next_pending()), Some(p));
+        assert_eq!(colliding.delivered_count(), 1);
+        assert_eq!(
+            ok(db.next_pending()).map(|token| token.delivery().clone()),
+            Some(record)
+        );
         let mut destination = MemoryDestination::default();
-        assert!(ok(db.deliver_next_memory(&mut destination)));
-        assert!(!ok(db.deliver_next_memory(&mut destination)));
+        assert!(ok(deliver_next(&mut db, &mut destination)));
+        assert!(!ok(deliver_next(&mut db, &mut destination)));
         assert_eq!(destination.delivered_count(), 1);
         ok(db.audit());
     });
@@ -468,11 +536,76 @@ fn two_live_handles_revalidate_external_commits_and_refuse_stale_capabilities() 
         let post = state(1, 0);
         ok(second.commit(Hash32::new([14; 32]), publication(a, &post, &cmd, &ctx)));
         assert_eq!(ok(first.snapshot()), ok(second.snapshot()));
+        let mut destination = MemoryDestination::default();
         let pending = ok(first.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
-        assert_eq!(pending.version(), 1);
-        ok(first.acknowledge(pending.delivery_id(), pending.entry_hash()));
+        assert_eq!(pending.delivery().version(), 1);
+        ok(ok(pending.deliver(&mut destination)).acknowledge());
         assert_eq!(ok(second.snapshot()).pending(), 1);
-        assert_eq!(ok(second.next_pending()).map(|p| p.version()), Some(2));
+        assert_eq!(
+            ok(second.next_pending()).map(|token| token.delivery().version()),
+            Some(2)
+        );
+    });
+}
+
+#[test]
+fn tokens_from_two_handles_deliver_one_entry_once_and_leave_it_acknowledged() {
+    with_authority(None, |a| {
+        let file = StoreFile::new();
+        let initial = state(0, 0);
+        let (cmd, ctx) = (command(120), context(true));
+        let mut first = ok(V2SqliteShell::create(&file.0, a, genesis(a, &initial)));
+        ok(first.commit(Hash32::new([19; 32]), publication(a, &initial, &cmd, &ctx)));
+        let mut second = ok(V2SqliteShell::open(&file.0, a));
+        let mut destination = MemoryDestination::default();
+        // The types bind a token to the handle that issued it, not to the
+        // file: two handles each issue a token for the same entry.
+        let from_first = ok(first.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
+        let from_second = ok(second.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
+        assert_eq!(from_first.delivery(), from_second.delivery());
+        let delivered_first = ok(from_first.deliver(&mut destination));
+        let delivered_second = ok(from_second.deliver(&mut destination));
+        // The destination honours the delivery ID: one effect.
+        assert_eq!(destination.delivered_count(), 1);
+        ok(delivered_first.acknowledge());
+        // The second acknowledgment audits the store the first connection
+        // wrote, finds the entry acknowledged and leaves it so.
+        ok(delivered_second.acknowledge());
+        let external = ok(Connection::open(&file.0));
+        let rows: (i64, i64) = ok(external.query_row(
+            "SELECT count(*),sum(acknowledged) FROM v2_deliveries",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ));
+        assert_eq!(rows, (1, 1));
+        assert!(ok(first.next_pending()).is_none());
+        assert!(ok(second.next_pending()).is_none());
+        ok(first.audit());
+    });
+}
+
+#[test]
+fn acknowledging_checks_the_store_again_and_a_refused_entry_stays_pending() {
+    with_authority(None, |a| {
+        let file = StoreFile::new();
+        let initial = state(0, 0);
+        let (cmd, ctx) = (command(120), context(true));
+        let mut db = ok(V2SqliteShell::create(&file.0, a, genesis(a, &initial)));
+        ok(db.commit(Hash32::new([20; 32]), publication(a, &initial, &cmd, &ctx)));
+        let mut destination = MemoryDestination::default();
+        let pending = ok(db.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
+        let delivered = ok(pending.deliver(&mut destination));
+        // Another connection alters the stored entry after it was delivered.
+        let external = ok(Connection::open(&file.0));
+        ok(external.execute("UPDATE v2_deliveries SET payload=x'00'", []));
+        assert!(delivered.acknowledge().is_err());
+        let acknowledged: i64 = ok(external.query_row(
+            "SELECT sum(acknowledged) FROM v2_deliveries",
+            [],
+            |r| r.get(0),
+        ));
+        assert_eq!(acknowledged, 0);
+        assert!(db.next_pending().is_err());
     });
 }
 
@@ -533,17 +666,18 @@ fn outbox_id_matches_the_original_library_entry_and_delivery_before_ack_can_retr
         ok(db.commit(Hash32::new([17; 32]), p));
         let pending = ok(db.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
         assert_eq!(
-            (pending.delivery_id(), pending.entry_hash()),
+            (
+                pending.delivery().delivery_id(),
+                pending.delivery().entry_hash()
+            ),
             (expected_id, expected_hash)
         );
         // Simulate the window after destination delivery and before DB ack.
         let mut destination = MemoryDestination::default();
-        assert_eq!(
-            ok(db.deliver_next_memory_unacknowledged(&mut destination)),
-            Some((expected_id, expected_hash))
-        );
+        drop(ok(pending.deliver(&mut destination)));
+        assert_eq!(destination.delivered_count(), 1);
         assert_eq!(ok(db.snapshot()).pending(), 1);
-        assert!(ok(db.deliver_next_memory(&mut destination)));
+        assert!(ok(deliver_next(&mut db, &mut destination)));
         assert_eq!(destination.delivered_count(), 1);
         assert_eq!(ok(db.snapshot()).pending(), 0);
         ok(db.audit());
@@ -594,7 +728,7 @@ fn changed_delivery_interpreter_refuses_open_checkpoint_and_live_delivery() {
         ));
         let mut destination = MemoryDestination::default();
         assert!(matches!(
-            db.deliver_next_memory(&mut destination),
+            deliver_next(&mut db, &mut destination),
             Err(Error::Interpreter)
         ));
         assert_eq!(destination.delivered_count(), 0);

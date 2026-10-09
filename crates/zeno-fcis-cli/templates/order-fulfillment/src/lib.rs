@@ -240,15 +240,14 @@ pub fn journey(path: &Path) -> AppResult<String> {
     }
     let pending = checked(shell.next_pending())?.ok_or("missing pending request")?;
     // Model interruption after the destination records delivery but before SQLite acknowledges it.
-    let delivered = checked(shell.deliver_next_memory_unacknowledged(&mut destination.memory()))?
-        .ok_or("missing pending delivery")?;
-    if delivered != (pending.delivery_id(), pending.entry_hash()) {
-        return Err("destination observed a different pending entry".into());
-    }
+    let delivered = checked(pending.deliver(&mut destination.memory()))?;
+    drop(delivered);
     drop(shell);
     let mut shell = checked(Shell::open(path, &authority))?;
-    while checked(shell.deliver_next_memory(&mut destination.memory()))? {}
-    checked(shell.acknowledge(pending.delivery_id(), pending.entry_hash()))?;
+    while let Some(pending) = checked(shell.next_pending())? {
+        let delivered = checked(pending.deliver(&mut destination.memory()))?;
+        checked(delivered.acknowledge())?;
+    }
     let snapshot = checked(shell.snapshot())?;
     let state = decode_state(snapshot.state())?;
     let summary = (

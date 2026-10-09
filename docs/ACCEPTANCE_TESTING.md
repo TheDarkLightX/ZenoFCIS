@@ -79,6 +79,7 @@ feature file. This keeps Gherkin prose outside execution authority.
 | `rc3-process-boundary` | Timeout, solver names, and execution bind to exact checked bytes. |
 | `rc3-cli-json-contract` | Valid and invalid projects return versioned deterministic JSON. |
 | `rc3-package-binary-inventory` | Every declared binary receives one unique checked archive. |
+| `symbolic-per-case-checks` | Solver queries per rule case encode what the library runs, replay every counterexample, stay inconclusive on `unknown` or a disagreement, and run on the pinned CVC5 and Z3 when `ZENO_FCIS_CVC5` and `ZENO_FCIS_Z3` are set; otherwise that part prints its documented SKIP line. |
 
 The permanent adopter-acceptance workflow runs the checker and complete
 portfolio from the exact source revision.

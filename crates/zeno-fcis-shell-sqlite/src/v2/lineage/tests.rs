@@ -7,9 +7,7 @@ use zeno_fcis_codec::{CanonicalEncode, Envelope};
 use zeno_fcis_synthesis::finite::{Op, V2Resource, canonical_v2::schema, v2_catalog as catalog};
 use zeno_fcis_value::{Field, Value};
 
-#[allow(dead_code, unreachable_pub)]
-#[path = "../../../../zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs"]
-mod counter;
+use crate::v2::delivery::durable as counter;
 
 fn ok<T, E: std::fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("unexpected refusal: {error:?}"))
@@ -166,4 +164,31 @@ fn a_shared_comparison_never_blocks_a_checkpoint_open_while_it_holds_sqlite() {
     });
     assert_eq!(shared.comparisons(), 1, "both opens reuse one comparison");
     assert!(shared.settled(0, 1).is_some());
+}
+
+#[test]
+fn a_shared_simulation_lookup_does_not_wait_for_a_busy_memo() {
+    let contract = counter::Contract::new();
+    let descriptor = contract.descriptor();
+    let catalog = ok(counter::checked_catalog(&descriptor));
+    let catalogs = [&catalog];
+    let lineage = ok(Lineage::bind(&catalogs, &[]));
+    let mut simulating = ok(lineage.simulated.lock());
+    // Even a completed entry is unavailable while another simulation holds
+    // the shared memo. Transaction callers must retry outside SQLite.
+    simulating.insert(0, Err(Unsimulated::Shape));
+    let (finished, result) = mpsc::channel();
+    std::thread::scope(|scope| {
+        let lookup = scope.spawn(|| ok(finished.send(lineage.simulated(0))));
+        let observed = result.recv_timeout(Duration::from_secs(2));
+        // Release before joining so a blocking regression fails cleanly.
+        drop(simulating);
+        ok(lookup.join());
+        assert!(matches!(observed, Ok(None)), "lookup waited: {observed:?}");
+    });
+    assert!(matches!(
+        lineage.simulated(0),
+        Some(Err(Unsimulated::Shape))
+    ));
+    assert_eq!(lineage.simulations(), 0, "a lookup never runs a simulation");
 }

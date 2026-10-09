@@ -2834,7 +2834,7 @@
       "signature_sha256": "ab36553cdfff611ffb03269678156f2448285909704ec223c558916838a81e78"
     },
     "catalog_v2::execution_v2::authority::evaluator::EVALUATOR": {
-      "body_sha256": "00cab08d7c434a1d31e6ad0fa405af5e3e57a5ec8777310bc7a4bf9bb86fa94d",
+      "body_sha256": "7e62f03347ad03f85fe65982a3c3c0c212d8d680d53f83db3ba3f984cf13e79c",
       "ensures": 0,
       "ensures_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "mode": "Spec",

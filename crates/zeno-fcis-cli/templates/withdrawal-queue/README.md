@@ -530,6 +530,24 @@ tick, at the bound. It then interrupts payout delivery, reopens the
 database, finishes delivery, and checks that the balance equals the deposits
 minus the payouts. It prints a JSON summary.
 
+To send the payouts to a real system instead, the binary has three more
+modes for the reference relay, `tools/relay.py` in the ZenoFCIS checkout:
+
+```sh
+withdrawal-queue --payouts NEW_DATABASE_PATH
+withdrawal-queue --relay-export DATABASE_PATH
+withdrawal-queue --relay-acknowledge DATABASE_PATH DELIVERY_ID PAYLOAD_SHA256
+```
+
+`--payouts` makes the same sixteen decisions and stops before delivery, so
+both payouts stay pending. `--relay-export` prints one line of JSON per
+pending delivery, in commit order, and writes nothing. `--relay-acknowledge`
+marks one delivery acknowledged; it refuses an unknown delivery ID, a payload
+hash other than the SHA-256 of the stored payload, and a delivery already
+acknowledged, each by name and without changing any delivery. The relay
+delivers at least once and sends the delivery ID as the idempotency key, so
+a receiver that honours that key sees each payout once.
+
 The destination keeps an in-memory idempotency ledger, which survives the
 database reopen only within one process. A real destination must persist its
 delivery IDs and entry hashes. The context's `caller` and `alarm`, and the

@@ -1309,6 +1309,7 @@ dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
  "zeno-fcis-formal-tools",
+ "zeno-fcis-shell-sqlite",
  "zeno-fcis-spec",
  "zeno-fcis-synthesis",
 ]

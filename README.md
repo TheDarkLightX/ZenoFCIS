@@ -395,6 +395,12 @@ change, which makes it a new contract version. A contract that changes anything 
 a law, upgrades only a store whose state its genesis laws admit; for a
 generated contract that is the declared genesis state. See the
 [CLI reference](docs/CLI_REFERENCE.md#contract-adoption-and-store-upgrades).
+`zeno-fcis contract diff OLD NEW` names the kind of a change between two
+contracts, identical, program successor, rename, layout change, rule change
+or unrelated, with every changed item and the upgrade path the kind needs.
+It decides only the structural kind and runs no decision. Today only a
+program successor has a path that admits a store at any state. See
+[contract change classification](docs/CLI_REFERENCE.md#contract-change-classification).
 
 ## Authoring and checked synthesis
 

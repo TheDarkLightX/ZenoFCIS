@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use zeno_fcis_spec::{
-    LawScope, ProjectLimits, SourceLimits, TypeKind, elaborate_project, parse_project,
+    ClaimDecl, LawScope, ProjectLimits, SourceLimits, TypeKind, elaborate_project, parse_project,
 };
 
 use super::ContractError;
@@ -61,6 +61,8 @@ pub(super) struct Channel {
 #[derive(Debug)]
 pub(super) struct Law {
     pub(super) id: u32,
+    /// The law's name, which is not part of the contract.
+    pub(super) name: String,
     pub(super) scope: LawScope,
     pub(super) genesis: bool,
     pub(super) formula: Ast,
@@ -118,6 +120,22 @@ pub(super) struct Declarations {
     pub(super) channels: Vec<Channel>,
     pub(super) reasons: Vec<u32>,
     pub(super) laws: Vec<Law>,
+    /// Declarations that are not part of the contract, kept for reports such
+    /// as `contract diff`.
+    pub(super) notes: Notes,
+}
+
+/// What `project.zeno` declares beside the contract: the names of channels
+/// and reasons, reason precedences and the claims. None of it reaches the
+/// schema or the policy.
+#[derive(Debug, Default)]
+pub(super) struct Notes {
+    /// Channel ID to name.
+    pub(super) channels: BTreeMap<u32, String>,
+    /// Reason ID to name and precedence.
+    pub(super) reasons: BTreeMap<u32, (String, u32)>,
+    /// The claims, in ID order.
+    pub(super) claims: Vec<ClaimDecl>,
 }
 
 impl Declarations {
@@ -276,6 +294,7 @@ impl Declarations {
                 })?;
                 Ok(Law {
                     id,
+                    name: law.name().as_str().to_owned(),
                     scope: applicability.scope(),
                     genesis: applicability.genesis(),
                     formula,
@@ -300,6 +319,24 @@ impl Declarations {
                 .map(|reason| reason.id().get())
                 .collect(),
             laws,
+            notes: Notes {
+                channels: project
+                    .channels()
+                    .iter()
+                    .map(|channel| (channel.id().get(), channel.name().as_str().to_owned()))
+                    .collect(),
+                reasons: project
+                    .reasons()
+                    .iter()
+                    .map(|reason| {
+                        (
+                            reason.id().get(),
+                            (reason.name().as_str().to_owned(), reason.precedence()),
+                        )
+                    })
+                    .collect(),
+                claims: project.claims().to_vec(),
+            },
         })
     }
 

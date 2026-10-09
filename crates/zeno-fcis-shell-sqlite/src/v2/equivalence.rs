@@ -19,20 +19,22 @@
 //!
 //! Pure: no SQLite, I/O, clock, threads or ambient state, and no allocation
 //! that grows with the domain. One tuple is stepped in place like an odometer;
-//! no list of tuples or of a range's values is ever built. The file depends on
-//! `zeno-fcis-synthesis` alone, so the CLI's tests compile it next to F3 and
-//! check that the two agree.
+//! no list of tuples or of a range's values is ever built. The shared checker
+//! source is owned by this library; the CLI calls its public data API. Their
+//! compatibility tests retain frozen expected results.
 
-use zeno_fcis_synthesis::finite::{
-    Domain, MAX_NODES, V2Resource, V2ScalarProgram, execute_v2, v2_zero_limits,
-};
+use zeno_fcis_synthesis::finite::V2ScalarProgram;
+#[path = "equivalence/checker.rs"]
+mod checker;
+#[path = "equivalence/checker_api.rs"]
+pub mod finite_checker;
+#[cfg(test)]
+use checker::{advance, domain_size};
+#[cfg(test)]
+use zeno_fcis_synthesis::finite::Domain;
 
-/// The default cap on the input tuples one comparison may enumerate: F3's
-/// default.
+/// The default cap on the input tuples one comparison may enumerate: F3's default.
 pub const DEFAULT_MAX_INPUT_TUPLES: u64 = 100_000_000;
-
-/// The Step budget of every run: no admitted program can exhaust it.
-const FULL_BUDGET: u64 = MAX_NODES as u64;
 
 /// A completed comparison that found the two programs equal on every input
 /// tuple. Only [`compare`] constructs one.
@@ -107,108 +109,33 @@ pub fn compare(
     candidate: &V2ScalarProgram<'_>,
     max_input_tuples: u64,
 ) -> Result<Equal, Unestablished> {
-    if original.inputs != candidate.inputs {
-        return Err(Unestablished::InputAbi);
-    }
-    if original.outputs != candidate.outputs {
-        return Err(Unestablished::OutputAbi);
-    }
-    let domains = original.inputs;
-    let size =
-        domain_size(domains).map_err(|position| Unestablished::EmptyInputDomain { position })?;
-    let size = size
-        .and_then(|size| u64::try_from(size).ok())
-        .filter(|size| *size <= max_input_tuples)
-        .ok_or(Unestablished::DomainTooLarge {
-            size,
-            cap: max_input_tuples,
-        })?;
-    if original.nodes == candidate.nodes && original.roots == candidate.roots {
-        return Ok(Equal {
-            tuples: size,
-            enumerated: false,
-        });
-    }
-    let mut input: Vec<i64> = domains.iter().map(|domain| domain.bounds().0).collect();
-    // The odometer drives the enumeration. The separately computed product
-    // bounds it, and only an exact match of the two completes it.
-    let mut visited = 0_u64;
-    loop {
-        if visited == size {
-            return Err(Unestablished::CoverageMismatch {
-                expected: size,
-                visited: visited.saturating_add(1),
-            });
-        }
-        if run(original, &input) != run(candidate, &input) {
-            return Err(Unestablished::Counterexample { ordinal: visited });
-        }
-        visited += 1;
-        if !advance(domains, &mut input) {
-            break;
-        }
-    }
-    if visited != size {
-        return Err(Unestablished::CoverageMismatch {
-            expected: size,
-            visited,
-        });
-    }
-    Ok(Equal {
-        tuples: visited,
-        enumerated: true,
-    })
-}
-
-/// Exact number of tuples in the product of `domains`; `None` when it exceeds
-/// `u128::MAX`. `Err` names the first empty domain. Zero domains give one
-/// empty tuple.
-fn domain_size(domains: &[Domain]) -> Result<Option<u128>, usize> {
-    let mut size = Some(1_u128);
-    for (position, domain) in domains.iter().enumerate() {
-        let (min, max) = domain.bounds();
-        if min > max {
-            return Err(position);
-        }
-        // `max - min` fits in u64, so the width is at most 2^64.
-        let width = u128::from(max.abs_diff(min)) + 1;
-        size = size.and_then(|size| size.checked_mul(width));
-    }
-    Ok(size)
-}
-
-/// Steps `tuple` to its successor, last input fastest. Returns false after
-/// the last tuple. An input is incremented only while it is below its
-/// maximum, so no value overflows at an `i64` endpoint.
-fn advance(domains: &[Domain], tuple: &mut [i64]) -> bool {
-    for (value, domain) in tuple.iter_mut().zip(domains).rev() {
-        let (min, max) = domain.bounds();
-        if *value < max {
-            *value += 1;
-            return true;
-        }
-        *value = min;
-    }
-    false
-}
-
-/// One full-budget run: the complete output tuple or the evaluator's exact
-/// failure. Step usage is not part of the result.
-fn run(
-    program: &V2ScalarProgram<'_>,
-    input: &[i64],
-) -> Result<Vec<i64>, zeno_fcis_synthesis::finite::V2ExecutionFailure> {
-    let meter = v2_zero_limits().with_limit(V2Resource::Step, FULL_BUDGET);
-    execute_v2(
-        program.inputs,
-        program.outputs,
-        program.nodes,
-        program.roots,
-        input,
-        meter,
-    )
-    .into_parts()
-    .0
+    checker::compare_equal(original, candidate, max_input_tuples)
+        .map(|equal| Equal {
+            tuples: equal.tuples(),
+            enumerated: equal.enumerated(),
+        })
+        .map_err(|error| match error {
+            checker::Failure::InputAbi => Unestablished::InputAbi,
+            checker::Failure::OutputAbi => Unestablished::OutputAbi,
+            checker::Failure::EmptyInputDomain { position } => {
+                Unestablished::EmptyInputDomain { position }
+            }
+            checker::Failure::DomainTooLarge { size, limit } => {
+                Unestablished::DomainTooLarge { size, cap: limit }
+            }
+            checker::Failure::Counterexample { ordinal, .. } => {
+                Unestablished::Counterexample { ordinal }
+            }
+            checker::Failure::CoverageMismatch { expected, visited } => {
+                Unestablished::CoverageMismatch { expected, visited }
+            }
+            // The equality-only route has no Step-boundary branch. Keep mapping
+            // total and fail closed if that internal invariant ever changes.
+            checker::Failure::BudgetBoundary { .. } => Unestablished::CoverageMismatch {
+                expected: 0,
+                visited: 0,
+            },
+        })
 }
 
 #[cfg(test)]

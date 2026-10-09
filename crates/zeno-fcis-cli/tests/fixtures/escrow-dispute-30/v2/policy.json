@@ -1,0 +1,439 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "escrow",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ]
+  },
+  "variables": {
+    "status": "pre.100.110",
+    "held": "pre.100.111",
+    "funded": "pre.100.112",
+    "to_seller": "pre.100.113",
+    "to_buyer": "pre.100.114",
+    "funded_at": "pre.100.115",
+    "shipped_at": "pre.100.116",
+    "action": "command.101.120",
+    "amount": "command.101.121",
+    "refund": "command.101.122",
+    "caller": "context.102.130",
+    "now": "context.102.131",
+    "ship_deadline": "funded_at + 604800",
+    "dispute_deadline": "shipped_at + 2592000"
+  },
+  "cases": [
+    {
+      "rule": "only a party to the order can act",
+      "when": "caller == 160",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "fund: only a new escrow",
+      "when": "action == 170 && status != 150",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "fund: only the buyer",
+      "when": "action == 170 && caller != 161",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "fund: a positive amount",
+      "when": "action == 170 && amount == 0",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "fund: the buyer funds the escrow",
+      "when": "action == 170",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "111": "amount",
+        "112": "amount",
+        "113": "to_seller",
+        "114": "to_buyer",
+        "115": "now",
+        "116": "shipped_at"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "ship: only a funded escrow",
+      "when": "action == 171 && status != 151",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "ship: only the seller",
+      "when": "action == 171 && caller != 162",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "ship: before the ship deadline",
+      "when": "action == 171 && now > ship_deadline",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "ship: the seller ships",
+      "when": "action == 171",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 152,
+        "111": "held",
+        "112": "funded",
+        "113": "to_seller",
+        "114": "to_buyer",
+        "115": "funded_at",
+        "116": "now"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "confirm: only a shipped escrow",
+      "when": "action == 172 && status != 152",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "confirm: only the buyer",
+      "when": "action == 172 && caller != 161",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "confirm: the buyer confirms; the seller is paid",
+      "when": "action == 172",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 154,
+        "111": 0,
+        "112": "funded",
+        "113": "to_seller + held",
+        "114": "to_buyer",
+        "115": "funded_at",
+        "116": "shipped_at"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payments-desk",
+          "payload": {
+            "140": 162,
+            "141": "held"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "dispute: only a shipped escrow",
+      "when": "action == 173 && status != 152",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "dispute: only the buyer",
+      "when": "action == 173 && caller != 161",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "dispute: within the dispute window",
+      "when": "action == 173 && now > dispute_deadline",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "dispute: the buyer disputes",
+      "when": "action == 173",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 153,
+        "111": "held",
+        "112": "funded",
+        "113": "to_seller",
+        "114": "to_buyer",
+        "115": "funded_at",
+        "116": "shipped_at"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "resolve: only a disputed escrow",
+      "when": "action == 174 && status != 153",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "resolve: only the arbiter",
+      "when": "action == 174 && caller != 163",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "resolve: the refund is at most the held amount",
+      "when": "action == 174 && refund > held",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "resolve: no refund; the seller is paid",
+      "when": "action == 174 && refund == 0",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 155,
+        "111": 0,
+        "112": "funded",
+        "113": "to_seller + held",
+        "114": "to_buyer",
+        "115": "funded_at",
+        "116": "shipped_at"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payments-desk",
+          "payload": {
+            "140": 162,
+            "141": "held"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "resolve: full refund; the buyer is paid",
+      "when": "action == 174 && refund == held",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 155,
+        "111": 0,
+        "112": "funded",
+        "113": "to_seller",
+        "114": "to_buyer + held",
+        "115": "funded_at",
+        "116": "shipped_at"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payments-desk",
+          "payload": {
+            "140": 161,
+            "141": "held"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "resolve: split",
+      "when": "action == 174",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 155,
+        "111": 0,
+        "112": "funded",
+        "113": "to_seller + held - refund",
+        "114": "to_buyer + refund",
+        "115": "funded_at",
+        "116": "shipped_at"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payments-desk",
+          "payload": {
+            "140": 161,
+            "141": "refund"
+          },
+          "idempotency_ordinal": 0
+        },
+        {
+          "ordinal": 1,
+          "channel": 300,
+          "destination": "payments-desk",
+          "payload": {
+            "140": 162,
+            "141": "held - refund"
+          },
+          "idempotency_ordinal": 1
+        }
+      ]
+    },
+    {
+      "rule": "cancel: only a funded escrow",
+      "when": "action == 175 && status != 151",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "cancel: only the buyer",
+      "when": "action == 175 && caller != 161",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "cancel: only after the ship deadline",
+      "when": "action == 175 && now <= ship_deadline",
+      "class": "Reject",
+      "reason": 208,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "cancel: the seller missed the ship deadline; the buyer is refunded",
+      "when": "action == 175",
+      "class": "CommittedFailure",
+      "reason": 207,
+      "post": {
+        "110": 156,
+        "111": 0,
+        "112": "funded",
+        "113": "to_seller",
+        "114": "to_buyer + held",
+        "115": "funded_at",
+        "116": "shipped_at"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payments-desk",
+          "payload": {
+            "140": 161,
+            "141": "held"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "claim: only a shipped escrow",
+      "when": "action == 176 && status != 152",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "claim: only the seller",
+      "when": "action == 176 && caller != 162",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "claim: only after the dispute window",
+      "when": "action == 176 && now <= dispute_deadline",
+      "class": "Reject",
+      "reason": 209,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "claim: the window closed; the seller is paid",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 154,
+        "111": 0,
+        "112": "funded",
+        "113": "to_seller + held",
+        "114": "to_buyer",
+        "115": "funded_at",
+        "116": "shipped_at"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payments-desk",
+          "payload": {
+            "140": 162,
+            "141": "held"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 150,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0,
+    "115": 0,
+    "116": 0
+  },
+  "law_kinds": {
+    "500": "AssetConservation",
+    "501": "StateInvariant",
+    "502": "AssetConservation",
+    "503": "AuthoritySubjectRecipient",
+    "504": "CommittedFailureEffects"
+  },
+  "framework_reject_law": 509
+}

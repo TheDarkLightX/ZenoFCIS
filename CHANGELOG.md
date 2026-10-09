@@ -6,6 +6,173 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+- Migration admission now checks freshly compiled target claims on the mapped
+  current state and rechecks them during history replay. Records with claims
+  use format 2 and bind the exact evaluated claim programs and review; empty
+  claim sets retain format 1. Refused multihop upgrades write nothing.
+- Historical reports use the original audited genesis and committing inputs,
+  with each version's checked schema labels. Migrations at zero commits or
+  after the last commit are replayed by the existing store audit. A journal
+  with different stored inputs now refuses even when it could reach the same
+  state; historical reports grant no publication or delivery capability.
+
+- Connect generated applications to the reference relay with
+  `deliver DATABASE --relay CONFIG.json`. The bounded worker sends original
+  delivery IDs and canonical payloads by HTTP or queue append, and the
+  application's typed lifecycle acknowledges only after success. Crashes
+  leave entries pending for retry; transport is at least once and receiver
+  idempotency is required for one effect. Add `operational-journey`, which
+  runs a real generated spend-approval application through creation,
+  submissions, relay crash/restart, a live rule change, a data migration,
+  and replay of all three contract segments. It checks refused changes
+  leave files unchanged and compares retained delivery IDs and payloads.
+
+- Add an operational command line to applications built with `zeno-fcis new
+  --contract`: `init`, `submit`, `decide` (a dry run), `state`, `history`,
+  `pending`, `deliver` and `version`, each with `--format human|json` and
+  exit codes 0, 1, 2, 3 and 64. Commands and context fields are written by
+  name and checked against their declared domains by the decision-examples
+  grammar; a reject or a refused input writes nothing. Every command opens
+  the store through the contract lineage. `deliver --to FILE` appends each
+  pending delivery to a file as one JSON line, synchronized to disk before
+  the store acknowledges it, and keeps one line per delivery ID; the file is
+  the one implementation of the application's `Destination` trait, the
+  extension point for other transports. `history` reads a submission
+  journal beside the store and checks it against the store's audited original
+  contract identities and inputs. `submit` holds an
+  exclusive lock on the journal across reading the store's head and
+  committing, and removes its line again when the commit does not happen,
+  so two submissions at once can no longer leave a journal line for a
+  commit that lost the race; `history` reads under a shared lock and
+  refuses a journal whose commit numbers do not strictly increase.
+  `submit` creates the missing journal of a store at genesis, such as one
+  an interrupted `init` left, and refuses the missing journal of a store
+  with commits, naming the remedies: restore it, or create it empty and
+  accept that `history` refuses those commits. A
+  `deliver` that fails part way through names the deliveries it already
+  sent and acknowledged. Generated package and
+  binary names now include the contract version, such as
+  `spend-approval-v1`, so builds of two versions share no library build;
+  the replay keys `--decide` derives change with the name. The forms
+  without a command, including `--decide`, are unchanged.
+
+- Add a delivery relay protocol to the SQLite shell. In the new
+  `v2::relay` module, `V2SqliteShell::export_pending` lists every pending
+  delivery in commit order, after replaying each owning commit, and writes
+  nothing; `relay::export_line` writes one as a line of JSON
+  (`zeno-fcis/relay-export/1`) with the delivery ID, channel, destination,
+  payload, the payload's SHA-256 and its place in commit order. An
+  acknowledgment from outside the process goes through the typed lifecycle:
+  `relay::acknowledge` calls the new `V2SqliteShell::pending_by_id`,
+  `Pending::relayed` and `Delivered::acknowledge`. It is bound to the
+  delivery ID and the payload's SHA-256, and three new `v2::Error` variants
+  name its refusals: `UnknownDelivery`, `PayloadMismatch` and
+  `AlreadyAcknowledged`. A refusal changes no delivery and no commit.
+  Existing delivery calls behave as before. Two standard-library scripts
+  use the protocol: `tools/relay.py`, the reference relay, sends each
+  delivery by HTTP POST with the delivery ID as the idempotency key, or
+  appends it to a queue file, retries with bounded backoff and then
+  acknowledges it; `tools/relay_receiver.py` is an idempotent test
+  receiver that can fail or time out on request. Transport is at least
+  once, every attempt carries the same delivery ID and payload, and a
+  receiver that honours idempotency keys sees each effect once. The
+  withdrawal-queue template's application gains `--payouts`,
+  `--relay-export` and `--relay-acknowledge`, and the app journey check
+  delivers its two payouts through the real store and the relay to the
+  test receiver, exactly once each, across injected crashes after the
+  export, after a send and after an acknowledgment, a receiver failure and
+  a receiver timeout. The relay follows no HTTP redirect, since urllib
+  would resend a redirected POST as a GET without its body; a 3xx answer is
+  a final refusal and the delivery stays pending. A queue append does not
+  merge a cut line with the next one, and a queue consumer skips any line
+  that is not complete JSON. An acknowledgment through `Pending::relayed`
+  rests on the relay's report of its call, not on the types. The relay's
+  `--timeout` limits a whole HTTP call, not each socket read: a receiver
+  that answers a byte at a time is cut off at the deadline and the delivery
+  stays pending (the test receiver's `--hang-mode drip` checks this), and
+  `--command-timeout` kills a store command that hangs. The relay reads no
+  proxy settings. No dependency was added.
+- Add data-migrating upgrades (G2). `zeno-fcis contract evolve <app> --to
+  <contract> --migration m.json` takes a layout change, or a rule change, as
+  a data migration: `m.json`, schema `zeno-fcis/migration/1`, gives every new
+  state field an old field's value (carried or renamed), a default, or a
+  value from a total table over an old field (a split), and drops no old
+  field. It is admitted only by forward simulation, which the new
+  `v2::migration` module of the SQLite shell runs and the CLI compiles from
+  the shell's own source: over every state of the old contract's declared
+  domain on which its state laws hold and every command and context, the new
+  Authority's publication over the migrated state must give the old one's
+  technical refusal or decision class and reason, the same deliveries, and
+  a successor equal to the migrated old successor, the old genesis state
+  must map to one the new genesis laws admit, and every new state law must
+  hold on every migrated state (observation `new-state-laws`, so a state a
+  behaviour change kept cannot be migrated into one the new laws forbid). A domain above 2^20 tuples, the
+  review's cap, is refused as inconclusive; no solver evidence is accepted.
+  The migration is kept as `v2/evolutions/N/migration.json` and bound in the
+  rules entry (`kind`, `migration_sha256`); every generation simulates it
+  again. `--shortcut` adds a migration from an earlier version, admitted only
+  when it agrees with the composed route of consecutive migrations on every
+  state checked. Without `--migration`, a `rename` evolves as the exact rename
+  tier. A superseded version whose schema a migration or rename changed keeps
+  `v2/schema_v{k}.zcve`, and the current source declares `STATE_STEPS`;
+  a lineage without either generates byte for byte as before. The shell gains
+  `v2::Step::Migration` and `v2::Step::Rename` and two upgrade kinds,
+  `migration` (magic `ZFCISV2-MIGRATION`) and `rename` (magic
+  `ZFCISV2-RENAME`), which move the head's state to the new layout; an
+  upgrade records one hop per such step and one per run of other steps. The
+  migration record binds the SHA-256 of the migration's canonical encoding,
+  the simulation's counts, the observations compared and the migrated
+  state's root; the row stores the encoding and the state. Audits re-run the
+  simulation, once per lineage value, and re-derive the state; a lineage
+  that declares another step refuses the store as
+  `upgrade::Unsupported::Migration`. A store's checkpoint saved before a hop
+  at the same head now opens as `Error::Checkpoint`, since the chain is
+  compared before the root. The classifier's `rename`, `layout-change` and
+  rule-change texts and paths now say G2's paths exist. A generated
+  application's `--upgrade` report gains `migration`.
+  `tools/check_contract_migrate.py` and the `data-migration-upgrade`
+  acceptance scenario migrate live spend-approval stores, deliver a pending
+  payment with its original ID, keep committing, rename at any state, and
+  show every refusal. A refusal of a given migration file names the file
+  given with `--migration` or `--shortcut`, not the path it would be kept
+  at, and a migrated state without an encoding under the new framing is
+  reported as such rather than as a field without a value.
+- Add rule changes for live stores (G14.1). `zeno-fcis contract evolve
+  <app> --to <contract>` classifies the change with the `contract diff`
+  classifier and refuses any kind but `rule-change`, naming it. For a rule
+  change it records the classifier's plain-language account as the owner's
+  review in `v2/evolutions/N/review.txt`, keeps the replaced contract and its
+  adoptions under `v2/evolutions/N/`, writes the new rules with an
+  `evolutions` entry binding the replaced policy's and the review's SHA-256,
+  and regenerates the whole lineage. Generation regenerates every replaced
+  contract, numbers the lineage from 1, recomputes each review and refuses an
+  edited one; a contract that never evolved is generated byte for byte as
+  before. The SQLite shell gains a third upgrade kind, `behaviour-change`
+  (magic `ZFCISV2-BEHAVIOUR`), taken whenever the lineage, bound with the new
+  `v2::Lineage::bind_steps` and `v2::Step`, declares a behaviour change
+  between the two versions: every state law of the new contract and every
+  inductive claim the lineage declares for it must hold on the store's
+  state, evaluated by the library's law evaluator through the core's genesis
+  framing (`v2::behaviour`), with no program comparison. Genesis exactness,
+  law 990, is not evaluated and the record lists it as such. The record binds
+  the law and claim IDs that held and the review digests, the upgrade row
+  stores the review texts, and an audit evaluates the laws again at the
+  recorded state. A failing law or claim refuses with nothing written
+  (`upgrade::Refusal::Behaviour`); a lineage that declares other reviews for
+  the step refuses the store as `upgrade::Unsupported::Reviews`. After the
+  upgrade every law holds on every later committed state because the
+  Authority checks it at each commit, and each claim whose induction step
+  holds holds from the upgrade on; facts that rest only on reachability from
+  the new contract's genesis do not carry over. `v2::Lineage::audit_read_only`
+  audits a store at any version without writing, and a generated
+  application's `--audit` now uses it, so it no longer saves a checkpoint.
+  Its `--upgrade` report gains `behaviour`. `tools/check_contract_evolve.py`
+  and the `rule-change-upgrade` acceptance scenario run the study's escrow
+  dispute-window change, 14 to 30 days, on a store with committed history.
+  The classifier's `rule-change` admission text and its
+  `g14.1-behaviour-change` path now say the path exists. `v2::Lineage::receipts`
+  is replaced by `v2::Lineage::steps`, since a step need not be an adoption;
+  `v2::Lineage::bind` still binds a lineage of adoptions alone.
 - Fix `zeno-fcis loop`, whose resume could run checker work without
   charging it. `resume`, `candidate` and `run` first resume the session,
   which replays its checked incumbent and stored counterexamples. The
@@ -70,7 +237,115 @@ embedded in ZenoFCIS values.
   overflow checks and debug assertions still on. For the withdrawal queue
   one comparison takes about 3 seconds in a release build and about 4 in a
   debug build.
-
+- Add `zeno-fcis contract diff OLD NEW [--format human|json]` (G8). It
+  generates both contracts as `generate contract` does and decides exactly
+  one kind of change, the first that holds in a fixed order: `identical`
+  (byte-identical canonical policies), `program-successor` (only the decision
+  program and its Step limit differ, the comparison the SQLite shell makes
+  for an F6.1 upgrade), `rename` (only project, type, field or variant names
+  differ), `layout-change` (the state layout differs, every other type and
+  channel does not), `rule-change` (the schema and channels are the same; the
+  laws, cases, reasons or genesis state are not) and `unrelated`. Its
+  plain-language summary names every changed type, field, variant, channel,
+  reason, law, case, genesis value, program and limit, lists differences
+  outside the contract as notes, and states the admission path the kind
+  needs and whether it exists today: only the F6.1 upgrade admits a store at
+  any state; a rule change names both G2's forward simulation and G14.1's
+  behaviour-change upgrade. It decides only the structural kind and runs no
+  decision, so it never shows that a change preserves decisions. The JSON document has the versioned schema
+  `zeno-fcis/contract-diff/1` and is the same for the same contracts wherever
+  they are. `contract adopt` now classifies the change from the superseded
+  version to the new one and refuses, before any write, every kind but a
+  program successor, naming the kind. The CLI's unit tests compile the
+  shell's upgrade and equivalence modules from their own source and check, on
+  every planted pair of `tests/fixtures/contract-diff/pairs.json` and both
+  adoptions, in both directions, that the shell's policy comparison
+  (`upgrade::program_successor`, premise 1) accepts exactly the pairs the
+  classifier calls identical or program successors, and that every pair the
+  shell's Tier A admission admits is a program successor. The converse does not hold: Tier A also needs
+  law 991, both Step premises and the two programs' equivalence, which the
+  classifier does not check. The eight templates' generated contracts are
+  byte-identical.
+- `tools/check_compile_fail.py` checks why each misuse example of the SQLite
+  shell's delivery lifecycle fails, on the pinned stable toolchain without
+  `RUSTC_BOOTSTRAP`. It compiles every example from the doc comments rustdoc
+  runs, after confirming they are the blocks rustdoc lists, and reads rustc's
+  JSON diagnostics: each misuse must fail with exactly one error carrying the
+  code its fence and prose state, and its paired example must compile. Planted
+  controls in `tools/test_check_compile_fail.py` show that a misuse failing for
+  another reason, failing with an extra error, or compiling is refused. The
+  ATDD SQLite scenario and the strict SQLite history workflow run both; the
+  `RUSTC_BOOTSTRAP` instruction in `docs/V2_SQLITE_STAGE.md` is replaced.
+- The SQLite shell's delivery is now a typed lifecycle of consuming tokens,
+  `Pending` → `Delivered` → acknowledged. `V2SqliteShell::next_pending`
+  issues the oldest pending entry as a `v2::Pending` token, `Pending::deliver`
+  hands it to the library memory destination and returns a `v2::Delivered`
+  token, and `Delivered::acknowledge` marks the entry acknowledged. Only the
+  store makes a token, and each token holds the exclusive borrow of the
+  handle that issued it. Acknowledging an undelivered entry, acknowledging
+  twice, reusing a consumed token, making a token outside the crate, taking a
+  second token from a handle while one is live, and keeping a token past its
+  handle therefore do not compile; rustdoc `compile_fail` examples on
+  `Pending` and `Delivered` show each, beside a compiling example written the
+  same way apart from the misuse. The run-time checks are those of the calls
+  they replace: the store is audited and the owning commit replayed before a
+  token is issued and again before an acknowledgment, which compares the hash
+  the destination reported with the stored one. Two handles on one file still
+  issue their own tokens. The record that was `v2::Pending` is now
+  `v2::Delivery`, plain data that grants nothing. `acknowledge(delivery_id,
+  observed)`, `deliver_next_memory` and `deliver_next_memory_unacknowledged`
+  are removed, with no shim; deliver every pending entry with
+  `while let Some(pending) = shell.next_pending()? { pending.deliver(&mut destination)?.acknowledge()?; }`.
+  The eight templates, the contract application's session and `--deliver`,
+  and the oracle's current journey copies (`normal.rs`) use the tokens; its
+  frozen `original/` snapshots, which nothing in the repository builds, keep
+  their old text. Delivery IDs, commit order, acknowledged state and every
+  stored row are unchanged.
+  The stores `--deliver` writes, before and after an upgrade, and the
+  prepared-counter journey's store are byte-identical. The other journeys no
+  longer repeat a saved acknowledgment after reopening their store, since a
+  token cannot outlive its handle, so their stores differ only in the SQLite
+  header's two change counters; replaying that one statement reproduces the
+  old bytes.
+  `docs/V2_SQLITE_STAGE.md` states what the types enforce, what stays a
+  run-time check, and how G9's relay will use the API.
+- Add `zeno-fcis contract check-symbolic` and `transform check --symbolic`
+  for domains too large to enumerate (`docs/SYMBOLIC_CHECKS.md`). They run
+  the pinned CVC5 and Z3 through the formal-tools adapter, one query per
+  committing case and state law, or per case of the original program.
+  `check-symbolic` takes an optional strengthening file
+  (`zeno-fcis/strengthening/1`), assumed on every pre-state and checked on
+  every successor and on genesis, and writes a `zeno-fcis/symbolic-check/1`
+  report. A counterexample counts only after it replays through the library
+  evaluators and the bound Authority (Checked, exit 1). A solver-only
+  "holds" is attested by CVC5, corroborated by Z3, not proved: CVC5's proof is
+  not checked, and the command exits 2. `unknown`, timeouts, unsupported
+  constructs, solver disagreements without a replayed model, and planted
+  controls that are not refuted are inconclusive (exit 2). Where the domain
+  fits the enumeration cap, `check-symbolic` also enumerates it, and
+  enumeration decides (Proved, exit 0); `transform check --symbolic` refuses
+  such a domain. On the app study's escrow (more than 2^128 tuples), funds
+  conservation with the strengthening "a Created escrow has paid nothing out"
+  holds on all 9 committing cases, attested by CVC5 and corroborated by Z3;
+  without the strengthening it is refuted on the Fund case with a replayed
+  counterexample. The symbolic transform receipt
+  (`zeno-fcis/transform-symbolic-receipt/1`) is refused by `transform
+  replay`, `contract adopt`, `contract refresh-receipts` and generation.
+  `transform check` without `--symbolic` is unchanged; `describe transform`
+  now declares its optional tool execution and files.
+- `contract review` no longer lists a declared range in full unless the
+  domain fits its tuple cap: the domain's values come from a bounded API that
+  checks the size before allocating. A domain with an empty position beside a
+  wide range is now an empty input set without listing the wide range. This
+  is meant to preserve behaviour: review packets are byte-identical to the
+  previous build's on the 8 templates and the 3 contract fixtures. The bug it
+  removes made `contract check-symbolic` request 32.8 GB for the escrow's time
+  range before this release; a regression test now runs that check under a
+  1 GiB address-space limit.
+- `zeno-fcis-formal-tools` adds `SmtSession`, `ScriptAnswer` and `ScriptRun`:
+  a CVC5 or Z3 admitted once with the same hash, version and private-copy
+  checks as `execute_tool`, running caller-built SMT-LIB scripts through the
+  same two-run protocol. It classifies answers without replaying them.
 - `zeno-fcis new` now binds every Cargo application it writes, from
   `--contract` and from the `durable-counter`, `prepared-counter` and example
   templates, to a ZenoFCIS source tree. Before, a generated application

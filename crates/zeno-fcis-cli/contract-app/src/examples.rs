@@ -199,6 +199,19 @@ impl Shape {
             channels,
         })
     }
+
+    /// Checks `value` against the declared domain of input `index`: the
+    /// state fields, then the command, then the context, in program order.
+    ///
+    /// # Errors
+    /// Returns an index past the inputs, or a value outside the domain.
+    pub(crate) fn check_input(&self, index: usize, value: i128) -> Result<i128, String> {
+        let input = self
+            .inputs
+            .get(index)
+            .ok_or_else(|| format!("the contract reads {} inputs", self.inputs.len()))?;
+        input.domain.check(value, &input.name(""))
+    }
 }
 
 /// Parses every example line of `text`.
@@ -237,8 +250,8 @@ fn example(line: &str, number: usize, shape: &Shape) -> Result<Line, String> {
             shape.inputs.len()
         ));
     }
-    for (value, input) in inputs.iter().zip(&shape.inputs) {
-        input.domain.check(*value, &input.name(""))?;
+    for (index, value) in inputs.iter().enumerate() {
+        shape.check_input(index, *value)?;
     }
     let mut words = decision.split_whitespace();
     let class = match words.next() {

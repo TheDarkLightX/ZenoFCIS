@@ -370,9 +370,9 @@ fn describe_declares_transform_effects() {
     assert_eq!(
         group["subcommands"][0]["effects"],
         json!({
-            "classification": "declared", "executes_tools": false, "read_only_flag": null,
-            "reads": ["original-program", "candidate-program"],
-            "writes": ["optional-equivalence-receipt"]
+            "classification": "declared", "executes_tools": true, "read_only_flag": null,
+            "reads": ["original-program", "candidate-program", "optional-tools-manifest", "optional-toolchain-files"],
+            "writes": ["optional-equivalence-receipt", "optional-symbolic-receipt", "optional-query-directory", "temporary-files"]
         })
     );
     let replay = &group["subcommands"][1];

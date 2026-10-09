@@ -19,18 +19,29 @@
 //! change one, an adoption that leaves the program unchanged, and a lineage
 //! that would repeat a version, so an application keeps the Authorities of
 //! its whole lineage and every store can follow it.
+//!
+//! A rules file may also list evolutions: earlier contracts that `zeno-fcis
+//! contract evolve` replaced with a reviewed rule change. Each is retained
+//! under `v2/evolutions/n/` with its own adoptions and the owner's review,
+//! and generation regenerates every one of its versions, numbering the
+//! whole lineage from 1, checks the policy the evolution bound, and computes
+//! the review again from the two contracts: it must be byte for byte the
+//! retained text.
 
 mod adoption;
 mod declarations;
+pub(crate) mod diff;
 mod expr;
 mod graph;
 mod layout;
+mod migration;
 mod model;
 mod policy;
 mod render;
 pub(crate) mod review;
 mod rules;
 mod schema;
+pub(crate) mod symbolic;
 #[cfg(test)]
 mod tests;
 
@@ -38,20 +49,85 @@ use std::fmt;
 
 use zeno_fcis_codec::{CommitmentHasher, commitment, domains};
 use zeno_fcis_crypto::RustCryptoSha256;
+use zeno_fcis_synthesis::finite::{v2_authority as authority, v2_catalog as catalog};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
 use crate::transform::{self, Inconclusive, Rejection, Replay, Replayed};
 pub(crate) use adoption::{Adopted, AdoptionPlan, CheckedCandidate};
 use declarations::Declarations;
-use model::Contract;
+pub(crate) use diff::Path as EvolutionPath;
+use model::{CompiledClaim, Contract};
 use rules::Rules;
 use rules::with_receipt_digests;
-pub(crate) use rules::{Adoption, Usage, with_adoption};
+pub(crate) use rules::{
+    Adoption, Evolution, EvolutionKind, Shortcut, Usage, with_adoption, with_evolution,
+    without_evolutions,
+};
+
+/// The evolutions a rules file lists, after the rules validate.
+///
+/// # Errors
+/// The rules' refusal.
+pub(crate) fn listed_evolutions(rules: &str) -> Result<Vec<Evolution>, ContractError> {
+    Ok(Rules::read(rules)?.evolutions)
+}
 
 /// The directory of adoption `n`'s retained files, relative to the
 /// application: `v2/adoptions/n/program.zcve` and `v2/adoptions/n/receipt.json`.
 pub(crate) fn adoption_directory(ordinal: usize) -> String {
     format!("v2/adoptions/{ordinal}")
+}
+
+/// The directory of evolution `n`'s retained files, relative to the
+/// application: the replaced contract's `project.zeno`, `v2/policy.json` and
+/// `v2/adoptions/k/`, and the owner's review, `review.txt`.
+pub(crate) fn evolution_directory(ordinal: usize) -> String {
+    format!("v2/evolutions/{ordinal}")
+}
+
+/// The owner's review of an evolution, inside `evolution_directory`.
+pub(crate) const EVOLUTION_REVIEW: &str = "review.txt";
+
+/// An evolution's data migration, inside `evolution_directory`.
+pub(crate) const EVOLUTION_MIGRATION: &str = "migration.json";
+
+/// A shortcut migration kept beside an evolution's migration, inside
+/// `evolution_directory`: `shortcuts/from-{k}.json`.
+pub(crate) fn shortcut_file(from_version: u32) -> String {
+    format!("shortcuts/from-{from_version}.json")
+}
+
+/// One earlier contract that an evolution replaced, as retained under
+/// `v2/evolutions/n/`.
+#[derive(Clone, Debug)]
+pub(crate) struct EvolutionSources<'a> {
+    /// Its `project.zeno`.
+    pub(crate) project: &'a str,
+    /// Its `v2/policy.json`, with its own adoptions and no evolutions.
+    pub(crate) rules: &'a str,
+    /// Its adoptions' retained files, in order.
+    pub(crate) adoptions: Vec<AdoptionSources<'a>>,
+    /// `review.txt`: the plain-language diff from its last version to the
+    /// next contract's first version.
+    pub(crate) review: &'a [u8],
+    /// `migration.json`, for a migration.
+    pub(crate) migration: Option<&'a [u8]>,
+    /// Each shortcut the rules list for it, in order.
+    pub(crate) shortcuts: Vec<&'a [u8]>,
+}
+
+impl EvolutionSources<'_> {
+    /// Its files as a contract of their own.
+    fn sources(&self) -> ContractSources<'_> {
+        ContractSources {
+            project: self.project,
+            rules: self.rules,
+            schema_origin: None,
+            adoptions: &self.adoptions,
+            replayed: &[],
+            evolutions: &[],
+        }
+    }
 }
 
 /// One adoption's retained files, in adoption order.
@@ -79,6 +155,8 @@ pub(crate) struct ContractSources<'a> {
     /// Receipts already replayed in this command over exactly these bytes;
     /// generation replays every other one.
     pub(crate) replayed: &'a [Replayed],
+    /// The retained files of every evolution the rules list, in order.
+    pub(crate) evolutions: &'a [EvolutionSources<'a>],
 }
 
 /// A superseded contract version, emitted beside the current one.
@@ -86,9 +164,18 @@ pub(crate) struct ContractSources<'a> {
 pub(crate) struct PreviousContract {
     source: String,
     policy: Vec<u8>,
+    /// The version's own schema, when a later migration or rename changed
+    /// the schema: `v2/schema_v{k}.zcve`.
+    schema: Option<Vec<u8>>,
 }
 
 impl PreviousContract {
+    /// `v2/schema_v{k}.zcve`, for a version whose schema differs from the
+    /// current one; `None` when it shares `v2/schema.zcve`.
+    pub(crate) fn schema(&self) -> Option<&[u8]> {
+        self.schema.as_deref()
+    }
+
     /// `src/v2_contract_v{k}.rs`.
     pub(crate) fn source(&self) -> &str {
         &self.source
@@ -110,6 +197,9 @@ pub(crate) struct GeneratedContract {
     summary: ContractSummary,
     program: Vec<u8>,
     replayed: Vec<Replayed>,
+    /// The inductive claims compiled for a behaviour change or migration into this
+    /// contract; computed only when generation needs them.
+    claims: Vec<CompiledClaim>,
 }
 
 impl GeneratedContract {
@@ -173,8 +263,43 @@ pub(crate) struct ContractSummary {
     pub(crate) step_budget: u64,
     /// See `read_budget`.
     pub(crate) byte_budget: u64,
-    /// Each adoption as its receipt replayed it, oldest first.
+    /// Each adoption of the current contract as its receipt replayed it,
+    /// oldest first.
     pub(crate) adoptions: Vec<AdoptionSummary>,
+    /// Each behaviour change of the lineage, oldest first.
+    pub(crate) evolutions: Vec<EvolutionSummary>,
+}
+
+/// One evolution of a lineage, after generation recomputed its review.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct EvolutionSummary {
+    /// The version it follows, from 1.
+    pub(crate) version: u32,
+    /// The SHA-256 of the replaced contract's last policy.
+    pub(crate) superseded_policy_sha256: String,
+    /// The SHA-256 of the owner's review text.
+    pub(crate) review_sha256: String,
+    /// The inductive claims of the contract it leads to, which a store
+    /// upgrade across it checks on the target state; empty for a rename.
+    pub(crate) claims: Vec<u32>,
+    /// How a store follows it.
+    pub(crate) kind: &'static str,
+    /// For a migration, what generation's forward simulation compared.
+    pub(crate) migration: Option<MigrationSummary>,
+}
+
+/// A data migration of a lineage, after generation simulated it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct MigrationSummary {
+    /// The SHA-256 of `migration.json`.
+    pub(crate) sha256: String,
+    /// The old version's declared states, those its state laws hold on, and
+    /// those its genesis evaluation admits.
+    pub(crate) states: [u64; 3],
+    /// The input tuples compared.
+    pub(crate) tuples: u64,
+    /// Each shortcut: the version it starts at and the tuples compared.
+    pub(crate) shortcuts: Vec<(u32, u64)>,
 }
 
 /// One adoption, after its receipt replayed.
@@ -208,6 +333,58 @@ pub(crate) struct StepBound {
     pub(crate) laws: u64,
     /// The Step limit of the superseded version, then of the new one.
     pub(crate) limits: [u64; 2],
+}
+
+/// The current version of a generated contract as the generator's model:
+/// the declarations, rules and schema it was generated from, and the
+/// contract with every adoption's candidate applied.
+struct Current<'a> {
+    declarations: &'a Declarations,
+    rules: &'a Rules,
+    contract: &'a Contract<'a>,
+    schema: &'a [u8],
+    generated: &'a GeneratedContract,
+}
+
+/// Rebuilds the generator's model of the current version of `generated`,
+/// which `generate_contract(sources)` returned, and runs `use_current` on
+/// it. No receipt is replayed again, because generation replayed every one;
+/// the rebuilt schema and policy must be the generated ones.
+///
+/// # Errors
+/// Returns a refusal of the sources, a rebuilt contract that differs from
+/// `generated`, or `use_current`'s error.
+fn with_current<R>(
+    sources: ContractSources<'_>,
+    generated: &GeneratedContract,
+    use_current: impl FnOnce(Current<'_>) -> Result<R, ContractError>,
+) -> Result<R, ContractError> {
+    let rules = Rules::read(sources.rules)?;
+    let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
+    let schema = schema::encode(&declarations)?;
+    let mut contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
+    for (index, files) in sources.adoptions.iter().enumerate() {
+        let candidate = import_program(files.candidate).map_err(|error| {
+            ContractError::new(
+                format!("v2/policy.json adoptions[{index}]"),
+                format!("the library refuses the candidate: {error}"),
+            )
+        })?;
+        contract.adopt(&candidate, &format!("adoptions[{index}]"))?;
+    }
+    if schema != generated.schema() || policy::encode(&contract, &schema)? != generated.policy() {
+        return Err(ContractError::new(
+            "v2/policy.zcve",
+            "the contract rebuilt from these files differs from the generated one",
+        ));
+    }
+    use_current(Current {
+        declarations: &declarations,
+        rules: &rules,
+        contract: &contract,
+        schema: &schema,
+        generated,
+    })
 }
 
 /// Why no contract was generated: the file and entry, and the reason.
@@ -359,13 +536,585 @@ pub(crate) fn refresh_receipts(
     })
 }
 
+/// Where one contract's versions sit in a lineage that evolved: the
+/// versions of the earlier contracts before it, the adoption receipts among
+/// them and the behaviour changes. The default is a contract that never
+/// evolved, whose output is exactly as before evolutions existed.
+#[derive(Default)]
+struct Placement<'a> {
+    /// The number of versions before this contract's first one.
+    offset: usize,
+    /// The rendered versions of earlier contracts, oldest first, whose
+    /// policies this contract's versions must not repeat; empty to classify
+    /// a change before that check.
+    previous: &'a [PreviousContract],
+    /// The adoption receipt digests of earlier contracts, oldest first.
+    receipts: &'a [String],
+    /// The behaviour changes before this contract, with their claims.
+    evolutions: &'a [render::RenderedEvolution],
+    /// This contract's last version is superseded too: its source is a
+    /// leaf, `src/v2_contract_v{k}.rs`.
+    superseded: bool,
+    /// Compile this contract's inductive claims.
+    claims: bool,
+    /// The current contract's schema, in a lineage with a migration or
+    /// rename: a version whose schema differs keeps its own schema file.
+    current_schema: Option<&'a [u8]>,
+}
+
 fn generate(
     sources: ContractSources<'_>,
     receipts: Receipts,
 ) -> Result<GeneratedContract, ContractError> {
     let rules = Rules::read(sources.rules)?;
+    if sources.evolutions.len() != rules.evolutions.len() {
+        return Err(ContractError::new(
+            "v2/policy.json evolutions",
+            format!(
+                "lists {} evolutions but the retained files of {} were supplied",
+                rules.evolutions.len(),
+                sources.evolutions.len()
+            ),
+        ));
+    }
+    if rules.evolutions.is_empty() {
+        return generate_era(sources, receipts, &Placement::default());
+    }
+    // A lineage that moves the state keeps each earlier schema beside the
+    // versions that ran it; one that never did generates as before.
+    let moves_state = rules
+        .evolutions
+        .iter()
+        .any(|evolution| evolution.kind != EvolutionKind::BehaviourChange);
+    let current_schema = if moves_state {
+        Some(schema::encode(&Declarations::read(
+            sources.project,
+            &rules.leaf_bindings,
+        )?)?)
+    } else {
+        None
+    };
+    let mut previous: Vec<PreviousContract> = Vec::new();
+    let mut adopted: Vec<String> = Vec::new();
+    let mut evolutions: Vec<render::RenderedEvolution> = Vec::new();
+    let mut summaries = Vec::new();
+    // Each earlier contract's last version as generated, for shortcuts.
+    let mut eras: Vec<(ContractSources<'_>, GeneratedContract)> = Vec::new();
+    for (index, (entry, era)) in rules.evolutions.iter().zip(sources.evolutions).enumerate() {
+        let ordinal = index + 1;
+        let directory = evolution_directory(ordinal);
+        let place = format!("v2/policy.json evolutions[{index}]");
+        let within = |error: ContractError| {
+            ContractError::new(format!("{directory}/{}", error.place()), error.reason())
+        };
+        if !Rules::read(era.rules)
+            .map_err(within)?
+            .evolutions
+            .is_empty()
+        {
+            return Err(ContractError::new(
+                format!("{directory}/v2/policy.json evolutions"),
+                "an earlier contract keeps no evolutions of its own; only the current rules list them",
+            ));
+        }
+        let old_sources = era.sources();
+        // A replaced contract's receipts must replay as they are: only the
+        // current contract's receipts are ever rebound.
+        let old = generate_era(
+            old_sources,
+            Receipts::Replay,
+            &Placement {
+                offset: previous.len(),
+                previous: &previous,
+                receipts: &adopted,
+                superseded: true,
+                current_schema: current_schema.as_deref(),
+                ..Placement::default()
+            },
+        )
+        .map_err(within)?;
+        if transform::sha256_hex(old.policy()) != entry.superseded_policy_sha256 {
+            return Err(ContractError::new(
+                format!("{place}.superseded_policy_sha256"),
+                format!(
+                    "differs from the last policy of the contract in {directory}: an edit there \
+                     changes versions that existing stores may run"
+                ),
+            ));
+        }
+        adopted.extend(
+            old.summary
+                .adoptions
+                .iter()
+                .map(|adoption| adoption.receipt_sha256.clone()),
+        );
+        previous.extend(old.previous.iter().cloned());
+        previous.push(PreviousContract {
+            source: old.source.clone(),
+            policy: old.policy.clone(),
+            schema: current_schema
+                .as_deref()
+                .is_some_and(|current| current != old.schema.as_slice())
+                .then(|| old.schema.clone()),
+        });
+        let (project, next_rules) = match sources.evolutions.get(index + 1) {
+            Some(next) => (next.project, next.rules),
+            None => (sources.project, sources.rules),
+        };
+        let first = rules::first_version(next_rules)?;
+        let next = ContractSources {
+            project,
+            rules: &first,
+            schema_origin: None,
+            adoptions: &[],
+            replayed: &[],
+            evolutions: &[],
+        };
+        let review = evolution_review(old_sources, &old, next, &previous, &adopted, &entry.kind)?;
+        if transform::sha256_hex(review.text.as_bytes()) != entry.review_sha256 {
+            return Err(ContractError::new(
+                format!("{place}.review_sha256"),
+                "differs from the review these two contracts have: the account of the change \
+                 `contract evolve` recorded is recomputed from them, and an edit to either \
+                 contract changes it",
+            ));
+        }
+        if era.review != review.text.as_bytes() {
+            return Err(ContractError::new(
+                format!("{directory}/{EVOLUTION_REVIEW}"),
+                "differs from the review these two contracts have; `contract evolve` wrote it, \
+                 and it must not be edited",
+            ));
+        }
+        let version = u32::try_from(previous.len())
+            .map_err(|_| ContractError::new("v2/policy.json evolutions", "too many versions"))?;
+        let (step, migration_summary) = match &entry.kind {
+            EvolutionKind::BehaviourChange => (
+                render::RenderedStep::BehaviourChange(review.claims.clone()),
+                None,
+            ),
+            EvolutionKind::Rename => (render::RenderedStep::Rename, None),
+            EvolutionKind::Migration {
+                migration_sha256,
+                shortcuts,
+            } => {
+                let file = format!("{directory}/{EVOLUTION_MIGRATION}");
+                let bytes = era.migration.ok_or_else(|| {
+                    ContractError::new(&file, "is missing; the rules list a migration")
+                })?;
+                if transform::sha256_hex(bytes) != *migration_sha256 {
+                    return Err(ContractError::new(
+                        format!("{place}.migration_sha256"),
+                        format!(
+                            "differs from {file}: `contract evolve` checked and recorded it, and \
+                             it must not be edited"
+                        ),
+                    ));
+                }
+                let (compiled, simulated) =
+                    checked_migration(old_sources, &old, next, &review.generated, bytes, &file)?;
+                if era.shortcuts.len() != shortcuts.len() {
+                    return Err(ContractError::new(
+                        format!("{place}.shortcuts"),
+                        format!(
+                            "lists {} shortcuts but {} files were supplied",
+                            shortcuts.len(),
+                            era.shortcuts.len()
+                        ),
+                    ));
+                }
+                let mut checked = Vec::new();
+                for (shortcut, bytes) in shortcuts.iter().zip(&era.shortcuts) {
+                    let file = format!("{directory}/{}", shortcut_file(shortcut.from_version));
+                    if transform::sha256_hex(bytes) != shortcut.sha256 {
+                        return Err(ContractError::new(
+                            &file,
+                            "differs from the SHA-256 the rules bind; it must not be edited",
+                        ));
+                    }
+                    let route: Vec<usize> = summaries
+                        .iter()
+                        .position(|summary: &EvolutionSummary| {
+                            summary.version == shortcut.from_version
+                        })
+                        .map(|start| (start..index).collect())
+                        .ok_or_else(|| {
+                            ContractError::new(
+                                &file,
+                                format!(
+                                    "starts at version {}, which no earlier migration or rename \
+                                     left: a shortcut starts at the last version of an earlier \
+                                     contract this lineage evolved from",
+                                    shortcut.from_version
+                                ),
+                            )
+                        })?;
+                    let mut steps = Vec::new();
+                    for earlier in &route {
+                        match &evolutions[*earlier].step {
+                            render::RenderedStep::Migration { migration, .. } => {
+                                steps.push(Some(migration));
+                            }
+                            render::RenderedStep::Rename => steps.push(None),
+                            render::RenderedStep::BehaviourChange(_) => {
+                                return Err(ContractError::new(
+                                    &file,
+                                    format!(
+                                        "crosses evolution {}, a behaviour change, whose route keeps \
+                                         no observations; a shortcut crosses only migrations and \
+                                         renames",
+                                        earlier + 1
+                                    ),
+                                ));
+                            }
+                        }
+                    }
+                    steps.push(Some(&compiled));
+                    let contracts: Vec<(ContractSources<'_>, &GeneratedContract)> = route
+                        .iter()
+                        .map(|earlier| (eras[*earlier].0, &eras[*earlier].1))
+                        .chain([(old_sources, &old), (next, &review.generated)])
+                        .collect();
+                    let tuples = checked_shortcut(&contracts, &steps, bytes, shortcut, &file)?;
+                    checked.push((shortcut.from_version, tuples));
+                }
+                let summary = MigrationSummary {
+                    sha256: migration_sha256.clone(),
+                    states: [
+                        simulated.states(),
+                        simulated.admitted(),
+                        simulated.genesis(),
+                    ],
+                    tuples: simulated.tuples(),
+                    shortcuts: checked,
+                };
+                (
+                    render::RenderedStep::Migration {
+                        migration: compiled,
+                        claims: review.claims.clone(),
+                    },
+                    Some(summary),
+                )
+            }
+        };
+        summaries.push(EvolutionSummary {
+            version,
+            superseded_policy_sha256: entry.superseded_policy_sha256.clone(),
+            review_sha256: entry.review_sha256.clone(),
+            claims: match &step {
+                render::RenderedStep::BehaviourChange(claims)
+                | render::RenderedStep::Migration { claims, .. } => {
+                    claims.iter().map(|claim| claim.id).collect()
+                }
+                _ => Vec::new(),
+            },
+            kind: entry.kind.name(),
+            migration: migration_summary,
+        });
+        evolutions.push(render::RenderedEvolution {
+            ordinal,
+            version,
+            step,
+        });
+        eras.push((old_sources, old));
+    }
+    let mut generated = generate_era(
+        sources,
+        receipts,
+        &Placement {
+            offset: previous.len(),
+            previous: &previous,
+            receipts: &adopted,
+            evolutions: &evolutions,
+            ..Placement::default()
+        },
+    )?;
+    previous.append(&mut generated.previous);
+    generated.previous = previous;
+    generated.summary.evolutions = summaries;
+    Ok(generated)
+}
+
+/// A migration file compiled against the last version of `old` and the
+/// first of `new`, generated as `old_generated` and `new_generated`, and
+/// admitted by the shell's forward simulation; `place` names the file.
+///
+/// # Errors
+/// The file's refusal, or the simulation's, in words.
+fn checked_migration(
+    old: ContractSources<'_>,
+    old_generated: &GeneratedContract,
+    new: ContractSources<'_>,
+    new_generated: &GeneratedContract,
+    bytes: &[u8],
+    place: &str,
+) -> Result<(migration::Compiled, crate::shell_v2::migration::Simulated), ContractError> {
+    let text =
+        std::str::from_utf8(bytes).map_err(|_| ContractError::new(place, "is not UTF-8 text"))?;
+    let file = rules::read_migration(text, place)?;
+    if file.from_version.is_some() {
+        return Err(ContractError::new(
+            format!("{place} from_version"),
+            "marks a shortcut; a migration between consecutive versions names no from_version",
+        ));
+    }
+    with_current(old, old_generated, |old| {
+        with_current(new, new_generated, |new| {
+            let compiled = migration::compile(&file, old.declarations, new.declarations, place)?;
+            let names = migration::field_names(old.declarations);
+            let simulated = policy::with_catalog(old.contract, old.schema, |_, from| {
+                policy::with_catalog(new.contract, new.schema, |_, to| {
+                    migration::simulate(from, to, &compiled, &names, place)
+                })
+            })?;
+            Ok((compiled, simulated))
+        })
+    })
+}
+
+/// Runs `use_catalogs` on the checked catalog of the current version of
+/// each contract, in order.
+///
+/// # Errors
+/// A contract's refusal, or `use_catalogs`'s.
+fn with_catalogs<R>(
+    contracts: &[(ContractSources<'_>, &GeneratedContract)],
+    use_catalogs: &mut dyn FnMut(&[&catalog::BoundCatalog<'_>]) -> Result<R, ContractError>,
+) -> Result<R, ContractError> {
+    fn nest<R>(
+        rest: &[(ContractSources<'_>, &GeneratedContract)],
+        bound: &[&catalog::BoundCatalog<'_>],
+        use_catalogs: &mut dyn FnMut(&[&catalog::BoundCatalog<'_>]) -> Result<R, ContractError>,
+    ) -> Result<R, ContractError> {
+        let Some(((sources, generated), rest)) = rest.split_first() else {
+            return use_catalogs(bound);
+        };
+        with_current(*sources, generated, |current| {
+            policy::with_catalog(current.contract, current.schema, |_, checked| {
+                let more: Vec<&catalog::BoundCatalog<'_>> =
+                    bound.iter().copied().chain([checked]).collect();
+                nest(rest, &more, use_catalogs)
+            })
+        })
+    }
+    nest(contracts, &[], use_catalogs)
+}
+
+/// Checks a shortcut: the migration file `bytes`, from the first of
+/// `contracts` directly to the last, against the composed route of `steps`
+/// (a migration, or `None` for a rename) between consecutive contracts.
+/// Returns the input tuples compared.
+///
+/// # Errors
+/// A shortcut whose `from_version` differs from the rules', a file the
+/// compiler refuses, or a shortcut that disagrees with the route, in words.
+fn checked_shortcut(
+    contracts: &[(ContractSources<'_>, &GeneratedContract)],
+    steps: &[Option<&migration::Compiled>],
+    bytes: &[u8],
+    shortcut: &rules::Shortcut,
+    place: &str,
+) -> Result<u64, ContractError> {
+    use crate::shell_v2::migration as shell;
+    let text =
+        std::str::from_utf8(bytes).map_err(|_| ContractError::new(place, "is not UTF-8 text"))?;
+    let file = rules::read_migration(text, place)?;
+    if file.from_version != Some(shortcut.from_version) {
+        return Err(ContractError::new(
+            format!("{place} from_version"),
+            format!(
+                "must be {}, the version the rules bind this shortcut to",
+                shortcut.from_version
+            ),
+        ));
+    }
+    let declarations = |sources: &ContractSources<'_>| {
+        let rules = Rules::read(sources.rules)?;
+        Declarations::read(sources.project, &rules.leaf_bindings)
+    };
+    let (Some(first), Some(last)) = (contracts.first(), contracts.last()) else {
+        return Err(ContractError::new(place, "has no route"));
+    };
+    let (old, new) = (declarations(&first.0)?, declarations(&last.0)?);
+    let compiled = migration::compile(&file, &old, &new, place)?;
+    let names = migration::field_names(&old);
+    with_catalogs(contracts, &mut |catalogs| {
+        let (Some(from), Some(to)) = (catalogs.first(), catalogs.last()) else {
+            return Err(ContractError::new(place, "has no route"));
+        };
+        let target = authority::bind(to).map_err(|refusal| {
+            ContractError::new(
+                place,
+                format!("the library refuses to bind a contract: {refusal:?}"),
+            )
+        })?;
+        let route = |state: &[u8]| {
+            let mut state = state.to_vec();
+            for (index, step) in steps.iter().enumerate() {
+                let (old, new) = (catalogs.get(index)?, catalogs.get(index + 1)?);
+                state = match step {
+                    Some(migration) => migration
+                        .with_shell(|migration| shell::migrate_state(old, new, migration, &state))
+                        .ok()?,
+                    None => shell::reframe(old, new, &state)?,
+                };
+            }
+            Some(state)
+        };
+        compiled
+            .with_shell(|shortcut| shell::agrees(from, to, &target, shortcut, route))
+            .map_err(|unsimulated| {
+                ContractError::new(
+                    place,
+                    format!(
+                        "the shortcut disagrees with the composed route of consecutive migrations: {}",
+                        migration::describe(unsimulated, from, &names)
+                    ),
+                )
+            })
+    })
+}
+
+/// A change's review, recomputed, the contract it leads to as generated,
+/// and the target contract's freshly compiled claims for state admission.
+pub(crate) struct Review {
+    /// The plain-language account of `contract diff`, one line each, each
+    /// ending in a newline.
+    pub(crate) text: String,
+    claims: Vec<CompiledClaim>,
+    generated: GeneratedContract,
+}
+
+/// The review of an evolution of `kind` from `old`, generated as
+/// `old_generated` at its place in the lineage, to `new`, the first version
+/// of the contract that replaces it, whose versions follow `previous` (which
+/// ends with `old`'s last version). The classifier must put the change on
+/// the path the kind records. The new contract's versions are not checked
+/// against `previous` here, so that a change of another kind, an identical
+/// contract included, is refused with its kind; generating the whole
+/// lineage checks them.
+///
+/// # Errors
+/// Either contract's refusal, or a change that the kind's path does not
+/// take, naming its kind.
+fn evolution_review(
+    old: ContractSources<'_>,
+    old_generated: &GeneratedContract,
+    new: ContractSources<'_>,
+    previous: &[PreviousContract],
+    adopted: &[String],
+    kind: &EvolutionKind,
+) -> Result<Review, ContractError> {
+    let new_generated = generate_era(
+        new,
+        Receipts::Replay,
+        &Placement {
+            offset: previous.len(),
+            receipts: adopted,
+            superseded: true,
+            claims: matches!(
+                kind,
+                EvolutionKind::BehaviourChange | EvolutionKind::Migration { .. }
+            ),
+            ..Placement::default()
+        },
+    )?;
+    let change =
+        diff::between(old, old_generated, new, &new_generated).map_err(|refused| refused.error)?;
+    let with_migration = matches!(kind, EvolutionKind::Migration { .. });
+    let path = diff::evolution_path(&change, with_migration)?;
+    let expected = match kind {
+        EvolutionKind::BehaviourChange => diff::Path::BehaviourChange,
+        EvolutionKind::Rename => diff::Path::Rename,
+        EvolutionKind::Migration { .. } => diff::Path::Migration,
+    };
+    if path != expected {
+        return Err(ContractError::new(
+            "v2/policy.json evolutions",
+            format!(
+                "an evolution recorded as `{}` is classified `{}`: the two contracts no longer \
+                 make the change `contract evolve` recorded",
+                kind.name(),
+                change.kind().name()
+            ),
+        ));
+    }
+    let mut text = String::new();
+    for line in change.lines() {
+        text.push_str(&line);
+        text.push('\n');
+    }
+    Ok(Review {
+        text,
+        claims: new_generated.claims.clone(),
+        generated: new_generated,
+    })
+}
+
+/// The review that `zeno-fcis contract evolve` records when the contract of
+/// an application, generated from `app` as `app_generated`, is replaced by
+/// the contract `new`, which has no adoptions or evolutions of its own, and
+/// the path the change takes: the new contract's first version follows
+/// every version of the application, and the classifier's kind.
+/// `with_migration` says whether a migration file was given.
+///
+/// # Errors
+/// Either contract's refusal, or a change no path takes, naming its kind.
+pub(crate) fn evolve_change(
+    app: ContractSources<'_>,
+    app_generated: &GeneratedContract,
+    new: ContractSources<'_>,
+    with_migration: bool,
+) -> Result<(String, diff::Path, &'static str), ContractError> {
+    let adopted: Vec<String> = app_generated
+        .summary
+        .adoptions
+        .iter()
+        .map(|adoption| adoption.receipt_sha256.clone())
+        .collect();
+    let new_generated = generate_era(
+        new,
+        Receipts::Replay,
+        &Placement {
+            offset: app_generated.previous.len() + 1,
+            receipts: &adopted,
+            superseded: true,
+            ..Placement::default()
+        },
+    )?;
+    let change =
+        diff::between(app, app_generated, new, &new_generated).map_err(|refused| refused.error)?;
+    let path = diff::evolution_path(&change, with_migration)?;
+    let mut text = String::new();
+    for line in change.lines() {
+        text.push_str(&line);
+        text.push('\n');
+    }
+    Ok((text, path, change.kind().name()))
+}
+
+/// Generates one contract of a lineage, placed after `placement`'s earlier
+/// versions; see [`generate`].
+fn generate_era(
+    sources: ContractSources<'_>,
+    receipts: Receipts,
+    placement: &Placement<'_>,
+) -> Result<GeneratedContract, ContractError> {
+    let offset = placement.offset;
+    let rules = Rules::read(sources.rules)?;
     let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
     let schema = schema::encode(&declarations)?;
+    // A version a migration or rename superseded keeps its own schema.
+    let own_schema = placement
+        .current_schema
+        .is_some_and(|current| current != schema.as_slice());
+    let schema_file = |version: u32| {
+        if own_schema {
+            format!("../v2/schema_v{version}.zcve")
+        } else {
+            "../v2/schema.zcve".to_owned()
+        }
+    };
     let commitment = schema_commitment(&schema)?;
     if let Some(origin) = sources.schema_origin {
         check_origin(origin, &schema, &commitment)?;
@@ -477,18 +1226,21 @@ fn generate(
         let law_steps = contract.law_steps();
         let superseded_limit = contract.budgets.step;
         replays.push(replayed);
-        let version_number = u32::try_from(version)
+        let version_number = u32::try_from(offset + version)
             .map_err(|_| ContractError::new("v2/policy.json adoptions", "too many adoptions"))?;
         previous.push(PreviousContract {
             source: render::source(
                 &contract,
                 render::Options {
-                    policy: &format!("../v2/policy_v{version}.zcve"),
+                    schema: &schema_file(version_number),
+                    policy: &format!("../v2/policy_v{version_number}.zcve"),
                     version: version_number,
                     receipts: &[],
+                    evolutions: &[],
                 },
             )?,
             policy,
+            schema: own_schema.then(|| schema.clone()),
         });
         // Replay admitted the candidate; this import gives its nodes.
         let candidate = import_program(files.candidate).map_err(|error| {
@@ -532,25 +1284,47 @@ fn generate(
             program_nodes: [before, contract.nodes.len()],
         });
     }
-    let version = u32::try_from(adoptions.len() + 1)
+    let version = u32::try_from(offset + adoptions.len() + 1)
         .map_err(|_| ContractError::new("v2/policy.json adoptions", "too many adoptions"))?;
-    let receipts: Vec<String> = adoptions
+    let receipts: Vec<String> = placement
+        .receipts
         .iter()
-        .map(|adoption| adoption.receipt_sha256.clone())
+        .cloned()
+        .chain(
+            adoptions
+                .iter()
+                .map(|adoption| adoption.receipt_sha256.clone()),
+        )
         .collect();
+    let leaf = format!("../v2/policy_v{version}.zcve");
+    let leaf_schema = schema_file(version);
     let source = render::source(
         &contract,
-        render::Options {
-            policy: "../v2/policy.zcve",
-            version,
-            receipts: &receipts,
+        if placement.superseded {
+            render::Options {
+                schema: &leaf_schema,
+                policy: &leaf,
+                version,
+                receipts: &[],
+                evolutions: &[],
+            }
+        } else {
+            render::Options {
+                schema: "../v2/schema.zcve",
+                policy: "../v2/policy.zcve",
+                version,
+                receipts: &receipts,
+                evolutions: placement.evolutions,
+            }
         },
     )?;
     let policy = policy::encode(&contract, &schema)?;
     // An identity binds the policy, so a repeated policy is a repeated
     // identity, which no store could tell apart from the earlier version.
-    let policies: Vec<&[u8]> = previous
+    let policies: Vec<&[u8]> = placement
+        .previous
         .iter()
+        .chain(&previous)
         .map(PreviousContract::policy)
         .chain(std::iter::once(policy.as_slice()))
         .collect();
@@ -559,18 +1333,30 @@ fn generate(
             .iter()
             .position(|policy| policy == repeated)
         {
+            let earlier_versions = placement.previous.len();
+            let place = match later.checked_sub(earlier_versions + 1) {
+                Some(index) => format!("v2/policy.json adoptions[{index}]"),
+                None => "v2/policy.json evolutions".to_owned(),
+            };
+            // Versions this check was not given come first.
+            let unchecked = offset - earlier_versions.min(offset);
             return Err(ContractError::new(
-                format!("v2/policy.json adoptions[{}]", later - 1),
+                place,
                 format!(
                     "version {} would repeat version {}: a contract's identity binds its policy, \
                      so stores could not tell them apart. Adopt a program no earlier version ran",
-                    later + 1,
-                    earlier + 1
+                    unchecked + later + 1,
+                    unchecked + earlier + 1
                 ),
             ));
         }
     }
     let program = program_bytes(&contract.program()?)?;
+    let claims = if placement.claims {
+        model::compiled_claims(&declarations, &rules, &contract.laws)?
+    } else {
+        Vec::new()
+    };
     let summary = ContractSummary {
         application: rules.template.clone(),
         version,
@@ -583,6 +1369,7 @@ fn generate(
         step_budget: contract.budgets.step,
         byte_budget: contract.budgets.byte,
         adoptions,
+        evolutions: Vec::new(),
     };
     Ok(GeneratedContract {
         schema,
@@ -592,6 +1379,7 @@ fn generate(
         summary,
         program,
         replayed: replays,
+        claims,
     })
 }
 

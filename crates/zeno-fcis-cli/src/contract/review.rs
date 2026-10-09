@@ -11,8 +11,8 @@
 //! nothing and changes no application file; its packet is canonical JSON,
 //! byte-identical on repeat.
 
-mod domain;
-mod evaluate;
+pub(super) mod domain;
+pub(super) mod evaluate;
 mod examples;
 mod mutants;
 mod packet;

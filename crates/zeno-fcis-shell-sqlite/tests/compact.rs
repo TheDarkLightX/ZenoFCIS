@@ -31,6 +31,17 @@ pub mod prepared;
 fn ok<T, E: std::fmt::Debug>(r: Result<T, E>) -> T {
     r.unwrap_or_else(|e| panic!("unexpected refusal: {e:?}"))
 }
+/// Delivers and acknowledges the oldest pending entry; whether there was one.
+fn deliver_next(
+    db: &mut V2SqliteShell<'_, '_>,
+    destination: &mut MemoryDestination,
+) -> Result<bool, Error> {
+    let Some(pending) = db.next_pending()? else {
+        return Ok(false);
+    };
+    pending.deliver(destination)?.acknowledge()?;
+    Ok(true)
+}
 fn with_authority(step: Option<u64>, run: impl FnOnce(&Authority<'_>, &Authority<'_>)) {
     let contract = prepared::Contract::new();
     let mut definition = contract.descriptor();
@@ -343,8 +354,11 @@ fn reopen_checkpoint_exact_replay_and_interrupted_delivery() {
         let checkpoint = ok(db.checkpoint());
         let snapshot = ok(db.snapshot());
         let mut memory = MemoryDestination::default();
-        let delivered = ok(db.deliver_next_memory_unacknowledged(&mut memory));
-        assert!(delivered.is_some());
+        let pending = ok(db.next_pending()).unwrap_or_else(|| panic!("missing delivery"));
+        // The destination records the delivery; the process stops before
+        // the store acknowledges it.
+        drop(ok(pending.deliver(&mut memory)));
+        assert_eq!(memory.delivered_count(), 1);
         assert_eq!(ok(db.snapshot()).pending(), 1);
         drop(db);
         let mut db = ok(V2SqliteShell::open_at_checkpoint(&source.0, a, &checkpoint));
@@ -354,8 +368,8 @@ fn reopen_checkpoint_exact_replay_and_interrupted_delivery() {
             CommitStatus::IdempotentReplay
         );
         assert_eq!(ok(db.snapshot()), snapshot);
-        assert!(ok(db.deliver_next_memory(&mut memory)));
-        assert!(!ok(db.deliver_next_memory(&mut memory)));
+        assert!(ok(deliver_next(&mut db, &mut memory)));
+        assert!(!ok(deliver_next(&mut db, &mut memory)));
         assert_eq!(memory.delivered_count(), 1);
         assert_eq!(ok(db.snapshot()).pending(), 0);
         let PublicationOutcome::Commit(g) = a.replay_genesis_publication(&pre, &genesis_bytes)
@@ -465,8 +479,9 @@ fn malformed_missing_truncated_replaced_binding_refuses_live_reopen_import_and_r
             }
             assert!(db.binding().is_err());
             assert!(db.audit().is_err());
+            // The store issues no delivery token, and none can be made
+            // outside it (see the compile-fail examples on `v2::Pending`).
             assert!(db.next_pending().is_err());
-            assert!(db.acknowledge(Hash32::ZERO, Hash32::ZERO).is_err());
             assert!(V2SqliteShell::open(&temp.0, a).is_err());
             assert!(V2SqliteShell::open_at_checkpoint(&temp.0, a, &checkpoint).is_err());
             let sequence: i64 =
@@ -616,7 +631,7 @@ fn every_durable_field_and_schema_tamper_refuses_without_relabeling_or_delivery(
             let external = ok(Connection::open(&temp.0));
             ok(external.execute(mutation, []));
             let mut memory = MemoryDestination::default();
-            assert!(db.deliver_next_memory(&mut memory).is_err());
+            assert!(deliver_next(&mut db, &mut memory).is_err());
             assert_eq!(memory.delivered_count(), 0);
             assert!(V2SqliteShell::open(&temp.0, a).is_err());
         }
@@ -702,15 +717,17 @@ fn delivery_id_is_independently_derived_from_full_publication_and_certificate() 
         ok(db.commit(key, p));
         let pending = ok(db.next_pending()).unwrap_or_else(|| panic!("missing notice"));
         assert_eq!(
-            (pending.delivery_id(), pending.entry_hash()),
+            (
+                pending.delivery().delivery_id(),
+                pending.delivery().entry_hash()
+            ),
             (expected_id, expected_hash)
         );
         let mut memory = MemoryDestination::default();
-        assert_eq!(
-            ok(db.deliver_next_memory_unacknowledged(&mut memory)),
-            Some((expected_id, expected_hash))
-        );
-        assert!(ok(db.deliver_next_memory(&mut memory)));
+        // Delivered and not acknowledged: the store issues the entry again,
+        // and acknowledging it checks the hash the destination reported.
+        drop(ok(pending.deliver(&mut memory)));
+        assert!(ok(deliver_next(&mut db, &mut memory)));
         assert_eq!(memory.delivered_count(), 1);
         assert_eq!(ok(db.snapshot()).pending(), 0);
     });
@@ -929,11 +946,13 @@ fn fresh_allowed_operation_after_recurrent_head_has_a_distinct_delivery_id() {
         assert_eq!(final_state.state(), state(1));
         assert_eq!((final_state.version(), final_state.pending()), (3, 3));
         let mut identities = std::collections::BTreeSet::new();
-        while let Some(entry) = ok(db.next_pending()) {
-            assert!(identities.insert(entry.delivery_id()));
-            ok(db.acknowledge(entry.delivery_id(), entry.entry_hash()));
+        let mut memory = MemoryDestination::default();
+        while let Some(pending) = ok(db.next_pending()) {
+            assert!(identities.insert(pending.delivery().delivery_id()));
+            ok(ok(pending.deliver(&mut memory)).acknowledge());
         }
         assert_eq!(identities.len(), 3);
+        assert_eq!(memory.delivered_count(), 3);
         assert_eq!(ok(db.snapshot()).pending(), 0);
         ok(db.audit());
     });

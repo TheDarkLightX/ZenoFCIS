@@ -783,6 +783,74 @@ fn laws(
     Ok(laws)
 }
 
+/// One inductive claim compiled to a law program over the state, which a
+/// behaviour-change upgrade evaluates on the store's state: it reads only
+/// `post.` fields, which a genesis frame binds to the state itself.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct CompiledClaim {
+    pub(super) id: u32,
+    pub(super) nodes: Vec<LawOp>,
+    pub(super) root: usize,
+}
+
+/// Every inductive claim of `declarations`, in ID order, its invariant
+/// restated over `post.` and compiled as a law is. A claim of another mode
+/// says nothing about states and is not compiled.
+///
+/// # Errors
+/// A claim whose invariant has no law form here, reads anything but the
+/// state, or has the ID of one of `laws`, which the library would refuse.
+pub(super) fn compiled_claims(
+    declarations: &Declarations,
+    rules: &Rules,
+    laws: &[Law],
+) -> Result<Vec<CompiledClaim>, ContractError> {
+    use zeno_fcis_spec::{ClaimFormula, ClaimMode, ProjectionRoot, invariant_at};
+    let mut compiled = Vec::new();
+    for claim in &declarations.notes.claims {
+        if claim.mode() != ClaimMode::Inductive {
+            continue;
+        }
+        let id = claim.id().get();
+        let place = format!("project.zeno claim {id}");
+        let failed = |reason: String| ContractError::new(&place, reason);
+        if laws.iter().any(|law| law.id == id) {
+            return Err(failed(
+                "has the ID of a law of the contract; a behaviour-change upgrade evaluates both,                  so give the claim an ID of its own"
+                    .to_owned(),
+            ));
+        }
+        let ClaimFormula::Relational(invariant) = claim.formula() else {
+            return Err(failed("is inductive but not relational".to_owned()));
+        };
+        let over_state = invariant_at(invariant, ProjectionRoot::Post).ok_or_else(|| {
+            failed("reads more than the state, so it cannot be checked on a state".to_owned())
+        })?;
+        let ast = expr::law(&over_state)
+            .map_err(|reason| failed(format!("{reason} has no contract form")))?;
+        let formula = expr::expand(&ast, &rules.variables).map_err(failed)?;
+        let mut graph = LawGraph::new(declarations);
+        let value = graph.compile(&formula).map_err(failed)?;
+        let root = graph.boolean(value).map_err(failed)?;
+        if let Some(name) = graph.table.nodes.iter().find_map(|node| match node {
+            LawOp::Observe(observation) | LawOp::ObserveWhen(_, observation, _) => {
+                absent_at_genesis(observation)
+            }
+            _ => None,
+        }) {
+            return Err(failed(format!(
+                "reads `{name}`, which a state does not hold"
+            )));
+        }
+        compiled.push(CompiledClaim {
+            id,
+            nodes: graph.table.nodes,
+            root: root.index,
+        });
+    }
+    Ok(compiled)
+}
+
 /// The scope, whether genesis applies, and how `project.zeno` writes them,
 /// that a law of `kind` must be declared with; `None` for any scope.
 pub(super) fn required_declaration(kind: LawKind) -> Option<(LawScope, bool, &'static str)> {

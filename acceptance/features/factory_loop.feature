@@ -3,6 +3,19 @@ Feature: Check a candidate program before the factory may use it
   Untrusted proposers may suggest a smaller program. The factory accepts one
   only with a receipt from an exhaustive comparison on the verified evaluator.
 
+  @atdd-operational-journey
+  Scenario: Operate, deliver, evolve, migrate and replay one live application
+    Given a fresh application generated from the spend-approval contract
+    When its command line creates, approves and executes a payment request
+    Then its dry run leaves the database and submission journal unchanged
+    And relay delivery survives a crash after sending with two attempts and one idempotent receiver effect
+    And a reviewed rule change upgrades the live store while a program successor on that route writes nothing
+    And a forward-simulated layout migration keeps the decisions and pending delivery identifiers
+    And a bad migration is refused without changing application files
+    And the audit and submission history replay eight commits across three contract versions
+    And every delivered identifier and canonical payload is retained
+    And skipped steps, duplicate effects and changed migration observations fail the gate
+
   @atdd-checked-transform
   Scenario: Accept a candidate program only with an exhaustive equivalence receipt
     Given an original finite program and a candidate with the same input and output ABI
@@ -57,6 +70,41 @@ Feature: Check a candidate program before the factory may use it
     And each history segment replays under its own contract and pending deliveries are delivered exactly once with their original identifiers
     And a different schema, a refused genesis, a missing old contract, an altered record, an unreplayable receipt, a false usage claim, an unchanged program and an edit to a superseded version each refuse with nothing written
 
+  @atdd-rule-change-upgrade
+  Scenario: Change the rules of a live store after the owner reviews the change
+    Given an escrow application whose store committed a funding and a shipment, and refused a dispute 14 days and one second after shipping
+    When `contract evolve` replaces its contract with the study's 30-day dispute window, which `contract diff` classifies as a rule change
+    Then the replaced contract and the plain-language diff are kept under `v2/evolutions/1/`, the rules bind both by SHA-256, and generation recomputes the diff and refuses an edited one
+    And the new build audits the old store without changing a byte of it
+    And `--upgrade` records a behaviour change: every state law of the new contract holds on the store's state, genesis exactness law 990 is reported as not evaluated, no decision programs are compared, and the record binds the review's digest while the store keeps its text
+    And the store keeps committing: the same late dispute is now accepted, the escrow is split and both payouts are delivered, and an audit replays both segments, each under its own contract
+    And a new state law or a declared claim that fails on the store's state refuses the upgrade naming it, with nothing written
+    And a program successor, a layout change without a migration, an identical contract and an unrelated one are refused by `contract evolve` naming their kind, with nothing written
+    And a forged or altered behaviour-change record, and a lineage that declares another review or an adoption for the step, refuse the store
+
+  @atdd-data-migration-upgrade
+  Scenario: Migrate the data of a live store across a layout change
+    Given two spend-approval stores with committed history, one with a payment pending and one with a request awaiting approval
+    When `contract evolve --migration` takes the spend-approval contract with an added urgent flag, which `contract diff` classifies as a layout change, with a migration that carries every old field and sets the flag to false
+    Then the migration is admitted only by forward simulation over every state of the old contract's declared domain on which its state laws hold and every command and context: the genesis state maps, every migrated state satisfies the new contract's state laws, and every decision class and reason, every delivery and every successor state is kept
+    And the migration is kept under `v2/evolutions/1/`, the rules bind it by SHA-256, and generation simulates it again and refuses an edited one
+    And the new build audits both stores without changing a byte of them
+    And `--upgrade` records a migration: the store's shell runs the same simulation itself, moves the state to the new layout, and the record binds the migration's digest, the tuples compared and the migrated state's root
+    And the pending payment is delivered with the ID its old commit bound, the other store keeps committing under the new contract, and audits replay every segment under its own contract
+    And a later rename of the flag is admitted at any state, after which all three segments replay
+    And a migration that breaks a delivery, one that changes a decision, one whose genesis does not map, one that maps a state the old laws allow to one a new state law forbids, a shortcut that disagrees with the composed route of consecutive migrations, a domain above the cap of 2^20 tuples and a layout change without a migration are each refused with nothing written
+    And a forged migrated state, and a lineage that declares another migration, a rename or an adoption for the step, refuse the store
+
+  @atdd-contract-diff
+  Scenario: Classify a contract change and name every changed item
+    Given an old and a new contract directory
+    When `contract diff` generates both as `generate contract` does and compares their canonical policies, schemas and structure
+    Then exactly one kind is decided, the first that holds in a fixed order: identical, program-successor, rename, layout-change, rule-change or unrelated
+    And a field renamed throughout is a rename, an added state field or a retyped state type is a layout change, a changed law formula, case guard or reason set is a rule change, and a changed channel or command set is unrelated
+    And the summary names every changed law, case, field, variant, channel and reason, and the admission path the kind needs, saying which paths exist today
+    And every adoption is a program successor, `contract adopt` refuses every other kind before it writes, the SQLite shell's own policy comparison accepts exactly the pairs called identical or program successors, and its Tier A admission admits only program successors
+    And the document is byte-identical on repeat and for copies of the same contracts elsewhere, and a refusal names the side and writes nothing
+
   @atdd-app-journey
   Scenario: Build, optimize, adopt and upgrade applications through their command lines alone
     Given the app study's escrow and spend-approval contracts as CLI test fixtures
@@ -66,4 +114,7 @@ Feature: Check a candidate program before the factory may use it
     And a version 1 store with four commits and a pending payment upgrades to version 2 as a program successor at commit 4 and delivers the payment under its original identifier
     And the version 1 build then refuses the store, and a store at another version refuses `--decide` and keeps its bytes
     And a version 1 store away from genesis upgrades at commit 2, keeps committing under version 2 with `--decide`, and its audit replays both segments
+    And the version 1 and version 2 builds, sharing one target directory, print different identities with `version`
+    And the spend-approval operation runs through the generated command line alone: `init`, a request created, approved by the CFO and the CEO and executed with `submit`, its payment delivered to a file exactly once with `deliver`, then `history` and `state` read back
+    And a rejected, unknown or out-of-range submission writes nothing, and the version 1 build refuses the upgraded store with `Identity`
     And a CLI built as the release build builds it holds no path of this checkout, refuses `new` without `--source` and binds with it
