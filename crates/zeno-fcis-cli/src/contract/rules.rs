@@ -222,7 +222,7 @@ const FAILURE_LAW: u32 = 908;
 const REJECT_LAW: u32 = 909;
 
 /// The keys a rules file may hold; `docs/CONTRACT_RULES.md` documents each.
-pub(super) const FILE_KEYS: [&str; 14] = [
+pub(super) const FILE_KEYS: [&str; 15] = [
     "schema",
     "template",
     "roots",
@@ -231,6 +231,7 @@ pub(super) const FILE_KEYS: [&str; 14] = [
     "cases",
     "genesis",
     "law_kinds",
+    "delivery_laws",
     "framework_failure_law",
     "framework_reject_law",
     "adoptions",
@@ -372,6 +373,20 @@ pub(super) struct Delivery {
     pub(super) idempotency: u128,
 }
 
+/// Bounded observations of actual candidate deliveries for one authored law.
+#[derive(Clone, Debug)]
+pub(super) struct DeliveryLaw {
+    pub(super) max_deliveries: u32,
+    pub(super) observations: BTreeMap<String, DeliveryObservation>,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct DeliveryObservation {
+    pub(super) channel: u32,
+    /// None counts deliveries; Some sums this payload field as I128.
+    pub(super) field: Option<u16>,
+}
+
 #[derive(Clone, Debug)]
 pub(super) struct Rules {
     pub(super) template: String,
@@ -380,6 +395,7 @@ pub(super) struct Rules {
     pub(super) cases: Vec<Case>,
     pub(super) genesis: BTreeMap<u16, Constant>,
     pub(super) law_kinds: BTreeMap<u32, LawKind>,
+    pub(super) delivery_laws: BTreeMap<u32, DeliveryLaw>,
     pub(super) failure_law: u32,
     pub(super) reject_law: u32,
     pub(super) adoptions: Vec<Adoption>,
@@ -434,7 +450,7 @@ impl Rules {
             .map(|(name, value)| {
                 let place = declared.place_of(name);
                 let root = name.split('.').next().unwrap_or("");
-                if matches!(root, "pre" | "post" | "command" | "context") {
+                if matches!(root, "pre" | "post" | "command" | "context" | "outbox") {
                     return Err(ContractError::new(
                         place,
                         "variable names may not start with a root",
@@ -518,6 +534,7 @@ impl Rules {
             cases,
             genesis,
             law_kinds,
+            delivery_laws: delivery_laws(&file)?,
             failure_law: law("framework_failure_law", FAILURE_LAW)?,
             reject_law: law("framework_reject_law", REJECT_LAW)?,
             adoptions,
@@ -933,6 +950,54 @@ fn leaf(value: &Json, place: &str) -> Result<Leaf, ContractError> {
             r#"expected ["Bool"], ["I128", min, max] or ["Text", min, max] with min <= max"#,
         )
     })
+}
+
+/// Parse through the same duplicate-key/integer-only rules reader.
+fn delivery_laws(file: &Object<'_>) -> Result<BTreeMap<u32, DeliveryLaw>, ContractError> {
+    let Some(_) = file.optional("delivery_laws") else {
+        return Ok(BTreeMap::new());
+    };
+    let entries = file.object("delivery_laws")?;
+    entries
+        .entries()
+        .map(|(key, value)| {
+            let place = entries.place_of(key);
+            let law = Object::new(value, &place)?;
+            law.only(&["max_deliveries", "observations"])?;
+            let max_deliveries = law.number::<u32>("max_deliveries")?;
+            if max_deliveries > 64 {
+                return Err(law.error("max_deliveries", "must be at most 64"));
+            }
+            let observations = law.object("observations")?;
+            let observations = observations
+                .entries()
+                .map(|(name, value)| {
+                    let observation = Object::new(value, &observations.place_of(name))?;
+                    observation.only(&["channel", "field"])?;
+                    Ok((
+                        name.to_owned(),
+                        DeliveryObservation {
+                            channel: observation.number("channel")?,
+                            field: observation
+                                .optional("field")
+                                .map(|_| observation.number("field"))
+                                .transpose()?,
+                        },
+                    ))
+                })
+                .collect::<Result<BTreeMap<_, _>, ContractError>>()?;
+            if observations.is_empty() || observations.len() > 16 {
+                return Err(law.error("observations", "needs from 1 to 16 observations"));
+            }
+            Ok((
+                id(key, &place)?,
+                DeliveryLaw {
+                    max_deliveries,
+                    observations,
+                },
+            ))
+        })
+        .collect()
 }
 
 /// One JSON object of the rules file, with the place it was read from.

@@ -2,7 +2,7 @@
 //! the law programs. A node is reused when an identical node of the same kind
 //! exists, so node numbering depends only on the order of compilation.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::declarations::{Declarations, Form, Input, Kind as TypeKind};
 use super::expr::{Ast, Binary, Rounding};
@@ -348,13 +348,32 @@ impl Graph for ScalarGraph<'_> {
 /// One law program over the observations of a candidate transition.
 pub(super) struct LawGraph<'d> {
     pub(super) table: Table<LawOp>,
+    bindings: BTreeMap<String, Ref>,
+    used_bindings: BTreeSet<String>,
     declarations: &'d Declarations,
 }
 
 impl<'d> LawGraph<'d> {
+    pub(super) fn bind(&mut self, name: String, value: Ref) {
+        self.bindings.insert(name, value);
+    }
+
+    pub(super) fn require_bindings_used(&self) -> Result<(), String> {
+        if let Some(name) = self
+            .bindings
+            .keys()
+            .find(|name| !self.used_bindings.contains(*name))
+        {
+            return Err(format!("unused delivery observation `{name}`"));
+        }
+        Ok(())
+    }
+
     pub(super) fn new(declarations: &'d Declarations) -> Self {
         Self {
             table: Table::new(),
+            bindings: BTreeMap::new(),
+            used_bindings: BTreeSet::new(),
             declarations,
         }
     }
@@ -472,6 +491,10 @@ impl Graph for LawGraph<'_> {
     }
 
     fn name(&mut self, name: &str) -> Result<Ref, String> {
+        if let Some(value) = self.bindings.get(name).copied() {
+            self.used_bindings.insert(name.to_owned());
+            return Ok(value);
+        }
         let observation = self.observation(name)?;
         self.observe(observation, Kind::Int, None, Atom::I128(0))
     }

@@ -23,6 +23,11 @@ zeno-fcis transform check --original FILE --candidate FILE [--step-limit N] [--m
 zeno-fcis transform check --original FILE --candidate FILE --symbolic --tools FILE [--step-limit N] [--max-input-tuples N] [--symbolic-receipt OUT] [--queries DIR]
 zeno-fcis transform replay --receipt FILE --original FILE --candidate FILE [--max-input-tuples N]
 zeno-fcis optimize --program FILE [--strategy FILE] [--profile functional-bool-v1|checked-i64-v1] [--with-candidate FILE]... [--candidate-out OUT] [--receipt OUT] [--max-input-tuples N]
+zeno-fcis contract draft start --session DIR --intent FILE --project FILE --provenance TEXT [--examples FILE] [--rounds 4] [--max-tuples 4096]
+zeno-fcis contract draft propose --session DIR --revision SHA256 --rules FILE --provenance TEXT
+zeno-fcis contract draft questions|check --session DIR
+zeno-fcis contract draft label --session DIR --revision SHA256 --examples FILE --provenance TEXT
+zeno-fcis contract draft finalize --session DIR --revision SHA256 --out NEW_DIR
 zeno-fcis contract review [<app-dir>] [--out PACKET.json] [--max-tuples N] [--format human|json]
 zeno-fcis contract export-program [<contract-dir>] --out FILE [--format human|json]
 zeno-fcis contract adopt [<app-dir>] --candidate FILE --receipt FILE --usage preserved|new-version [--format human|json]
@@ -1647,3 +1652,78 @@ instructions; they never execute supplied code. See
 [bounded completion](BOUNDED_COMPLETION.md) for commands and evidence limits.
 The `prepared-counter` template connects preparation to independently checked
 nominal authorization and atomic state/outbox publication.
+
+
+## Examples-first contract drafting
+
+`contract draft` is a local authoring conversation with explicit operations.
+`start` captures a plain-language intent file, fixed `project.zeno`, optional
+initial [decision examples](CONTRACT_RULES.md), and supplied provenance. An
+agent or owner then supplies a **complete rules file** with `propose`. There
+is no hosted model, automatic prose interpretation, or automatic labeler.
+Every response is JSON (`zeno-fcis/contract-draft/1`) with `authority: none`
+and `hosted_model: off`. Use the returned `revision` for the next mutation.
+
+`propose` reserves and saves an attempt before running the existing F1 generator
+and library binding. Invalid rules, refused assessments, raw proposal text,
+provenance and the preceding revision remain in `draft.json`. The first
+bindable proposal fixes the canonical schema and program input order for later
+rounds. Changing that shape requires a new session. Rules with existing adoption
+or evolution histories need the existing lineage workflows, not this new-contract
+workflow. `questions` returns the current F2 packet, including its decision table,
+distinguishing inputs and proposed answers. **A proposed answer is not a label.**
+
+Supply expected decisions through `label --examples FILE --provenance TEXT`,
+bound to the current revision. Each line uses the existing shared grammar:
+`inputs | class reason poststate | deliveries`. Inputs are canonical program
+positions (state, command, context); Boolean/integer/sum observations are supported.
+Rejects repeat the prestate; deliveries name channel and numeric payload fields.
+The comparator checks class, reason, every poststate field, delivery count, channel
+and payload. Destination bytes and delivery identity are not observations in this
+grammar. Neither the parser nor an agent's claimed provenance authenticates an owner.
+Initial and additional labels are assumed requirements, retained without overwriting
+older labels, and rechecked against every later proposal. Contradictory labels need
+an explicitly revised new session; this version does not retract labels.
+
+`check` recomputes F1/F2 and exits 1 unless at least one parsed supplied label exists,
+every current distinguishing input is labeled, and no comparison or F2 finding
+fails. Newly supplied examples can change F2's probe bases and produce more
+questions; repeat `questions`, `label`, or `propose` until ready. `finalize` applies
+the same fresh check at the specified revision and writes a new contract directory:
+project/rules/examples, generated schema/policy/Rust, intent, complete transcript,
+and `draft-finalized.json`. The report lists each compared label and difference,
+question coverage, assumed provenance, and the full advisory F2 packet. A proposal
+operation exiting 0 only means the assessment ran, not that finalization is ready.
+
+Limits are fixed at start: 1–8 proposal rounds (default 4), 1–4096 F2 tuples per
+assessment (default 4096), at most 1024 combined decision examples and 1024 label
+submissions, 1 MiB per source/provenance and combined examples, and 16 MiB per
+serialized transcript. A malformed proposal consumes a round. The final permitted
+proposal may finalize if ready; an unresolved exhausted session cannot. Missing
+labels, stale revisions, invalid rules, interrupted assessments and failed checks
+never finalize. A process interrupted after reservation retains a consumed pending
+attempt; submit another proposal if budget remains. A process crash can leave
+`draft.lock` (or a sibling output publication lock); recover it only after checking
+that no operation still owns it. Saved sessions are local mutable tooling data,
+not tamper-proof records or authentication credentials.
+
+Finalization writes into an exclusively owned sibling staging directory and renames
+it only after all files and the receipt succeed. A write failure exposes no target
+and cleans only that staging directory. Existing targets, including empty directories
+and dangling links, are refused. All draft publishers serialize on a canonical-parent,
+output-name lock. **Other tools must not concurrently change that output name or its
+parent**: portable filesystem rename lacks a no-replace primitive; this is ordinary
+cooperating-tool concurrency, not a hostile-filesystem guarantee.
+
+After separate intent review, `zeno-fcis new APP --contract NEW_DIR --source TREE`
+uses the existing scaffold. A finalized draft grants no runtime Publication,
+adoption or deployment approval. F2 remains bounded, advisory evidence relative to
+supplied examples and declared laws; undistinguished mutants, unprobed inputs,
+reachability and omitted requirements are unresolved, not proved correct.
+
+The G7 fixtures in `crates/zeno-fcis-cli/tests/fixtures/contract-draft/` expose three
+intent summaries and rewritten complete proposals. They preserve the initial
+example files' recorded review provenance. Extra test labels come from a simulated
+supplier evaluating the retained original template, never from the submitted
+proposal. Fixture replay and generated-app tests do not establish a live owner
+interaction or correct automatic translation of prose.

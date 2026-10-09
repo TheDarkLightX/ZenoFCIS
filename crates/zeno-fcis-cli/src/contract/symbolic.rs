@@ -301,6 +301,13 @@ impl Context<'_> {
             .map(|(index, _)| index)
             .collect();
         let mut causes = Vec::new();
+        if !self.rules.delivery_laws.is_empty() {
+            causes.push(format!(
+                "unsupported delivery observations in laws {:?}: enforced by the library at runtime, \
+                 but not symbolic state-law targets; this check cannot prove these delivery laws",
+                self.rules.delivery_laws.keys().collect::<Vec<_>>()
+            ));
+        }
 
         // Genesis: the base of the induction the clauses rest on.
         let genesis = self.genesis_tuple();

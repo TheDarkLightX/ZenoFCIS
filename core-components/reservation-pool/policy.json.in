@@ -1,0 +1,107 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "reservation-pool-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "available": "pre.100.110",
+    "reserved": "pre.100.111",
+    "action": "command.101.120",
+    "quantity": "command.101.121",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "available + reserved > ${C}",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && quantity > available",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "(action == 151 || action == 152) && quantity > reserved",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 153 && available + reserved + quantity > ${C}",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available - quantity",
+        "111": "reserved + quantity"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available + quantity",
+        "111": "reserved - quantity"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 152",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available",
+        "111": "reserved - quantity"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available + quantity",
+        "111": "reserved"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": ${C},
+    "111": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation",
+    "502": "DebitCreditEffectEquality"
+  }
+}

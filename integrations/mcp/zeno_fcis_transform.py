@@ -33,6 +33,14 @@ def _absolute(path: str) -> Path:
     return Path(path).expanduser().resolve()
 
 
+def _new_path(path: str) -> Path:
+    """Resolve only the parent; the CLI must see and refuse an existing final link."""
+    if not isinstance(path, str) or not path:
+        raise TransformToolError("A nonempty path is required")
+    expanded = Path(path).expanduser()
+    return expanded.parent.resolve() / expanded.name
+
+
 def _cli() -> str:
     command = os.environ.get("ZENO_FCIS_CLI") or shutil.which("zeno-fcis")
     if not command:
@@ -103,4 +111,83 @@ def transform_replay(session_path: str) -> dict[str, Any]:
     return _loop(["resume", "--session", str(_absolute(session_path))])
 
 
-TOOLS = (transform_request, transform_candidate, transform_replay)
+DRAFT_SCHEMA = "zeno-fcis/contract-draft/1"
+DRAFT_NOTE = ("Supplied intent labels are assumptions, not authenticated owner approval. "
+              "F2 is advisory; finalization writes a draft, never adopts or publishes it.")
+
+
+def _draft(operation: str, arguments: list[str]) -> dict[str, Any]:
+    """Fixed CLI operation; all parsing, evaluation and state transitions stay in Rust."""
+    try:
+        result = subprocess.run([_cli(), "contract", "draft", operation, *arguments],
+                                capture_output=True, text=True, timeout=120, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise TransformToolError(f"draft process did not complete: {error}") from error
+    try:
+        report = json.loads(result.stdout)
+    except ValueError as error:
+        raise TransformToolError(f"CLI returned invalid draft JSON (exit {result.returncode})") from error
+    if (not isinstance(report, dict) or report.get("schema") != DRAFT_SCHEMA
+            or report.get("authority") != "none" or report.get("hosted_model") != "off"):
+        raise TransformToolError("Unexpected draft schema, authority or hosted-model claim")
+    return {"exit_code": result.returncode, "report": report, "stderr": result.stderr[:1000],
+            "authority": "none", "note": DRAFT_NOTE}
+
+
+def _supplied(name: str, value: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise TransformToolError(f"{name} must be nonempty")
+    return value
+
+
+def contract_draft_start(session_path: str, intent_path: str, project_path: str,
+                         provenance: str, examples_path: str = "", rounds: int = 4,
+                         max_tuples: int = 4096) -> dict[str, Any]:
+    """Start from intent and optional supplied examples. No hosted model or authentication."""
+    arguments = ["--session", str(_new_path(session_path)), "--intent", str(_absolute(intent_path)),
+                 "--project", str(_absolute(project_path)), "--provenance", _supplied("provenance", provenance),
+                 "--rounds", _bounded("rounds", rounds, 1, 8),
+                 "--max-tuples", _bounded("max_tuples", max_tuples, 1, 4096)]
+    if examples_path:
+        arguments.extend(["--examples", str(_absolute(examples_path))])
+    return _draft("start", arguments)
+
+
+def contract_draft_propose(session_path: str, revision: str, rules_path: str,
+                           provenance: str) -> dict[str, Any]:
+    """Spend a bounded attempt on a complete supplied rules file; retain invalid proposals."""
+    return _draft("propose", ["--session", str(_absolute(session_path)),
+                             "--revision", _supplied("revision", revision),
+                             "--rules", str(_absolute(rules_path)),
+                             "--provenance", _supplied("provenance", provenance)])
+
+
+def contract_draft_questions(session_path: str) -> dict[str, Any]:
+    """Return the library's F2 table and current distinguishing questions; suggestions are not labels."""
+    return _draft("questions", ["--session", str(_absolute(session_path))])
+
+
+def contract_draft_label(session_path: str, revision: str, examples_path: str,
+                         provenance: str) -> dict[str, Any]:
+    """Record explicitly supplied expected decisions for this exact revision's questions."""
+    return _draft("label", ["--session", str(_absolute(session_path)),
+                           "--revision", _supplied("revision", revision),
+                           "--examples", str(_absolute(examples_path)),
+                           "--provenance", _supplied("provenance", provenance)])
+
+
+def contract_draft_check(session_path: str) -> dict[str, Any]:
+    """Rebind and compare all expected observations; no label means no success."""
+    return _draft("check", ["--session", str(_absolute(session_path))])
+
+
+def contract_draft_finalize(session_path: str, revision: str, out_path: str) -> dict[str, Any]:
+    """Write a new labeled draft only when the current proposal passes; never adopt it."""
+    return _draft("finalize", ["--session", str(_absolute(session_path)),
+                              "--revision", _supplied("revision", revision),
+                              "--out", str(_new_path(out_path))])
+
+
+TOOLS = (transform_request, transform_candidate, transform_replay,
+         contract_draft_start, contract_draft_propose, contract_draft_questions,
+         contract_draft_label, contract_draft_check, contract_draft_finalize)

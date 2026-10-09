@@ -1,0 +1,1 @@
+Two counters start at zero and range from zero to three. Denied requests reject with 200 before checking capacity. Increment (120) accepts and increments count; RecordFailure (121) commits failure 202 and increments failures. Reject a full selected counter with 201. A commit sends exactly one new-state notification on channel 300 to local-observer.

@@ -444,6 +444,48 @@ pub(crate) fn review(sources: ReviewSources<'_>, max_tuples: u64) -> Result<Revi
     })
 }
 
+/// Drafting uses the same example grammar, framing and observation comparison
+/// as F2. The shape binds canonical schema bytes and input order, not rules.
+pub(crate) fn draft_examples(
+    sources: ReviewSources<'_>,
+) -> Result<(String, Vec<DraftExample>), ContractError> {
+    let rules = Rules::read(sources.rules)?;
+    let declarations = Declarations::read(sources.project, &rules.leaf_bindings)?;
+    let schema = schema::encode(&declarations)?;
+    let contract = Contract::build(&declarations, &rules, schema_commitment(&schema)?)?;
+    let positions = domain::positions(&declarations)?;
+    let shape = crate::transform::canonical_json(&json!({
+        "schema": evaluate::hex(&schema),
+        "positions": positions.iter().map(domain::Position::json).collect::<Vec<_>>(),
+    }));
+    let shape = evaluate::hex(&evaluate::digest(shape.as_bytes()));
+    let framer = Framer::new(&positions, &contract);
+    let width = declarations.state_fields()?.len();
+    let checked = policy::with_authority(&contract, &schema, |authority| {
+        examples::parse(sources.examples.unwrap_or_default(), authority.descriptor()).map(|items| {
+            items
+                .into_iter()
+                .map(|example| {
+                    let outcome = evaluate::evaluate(authority, &framer, &example.inputs);
+                    DraftExample {
+                        input: example.inputs.clone(),
+                        text: example.text.clone(),
+                        difference: examples::agrees(&example, &outcome, width).err(),
+                    }
+                })
+                .collect()
+        })
+    })??;
+    Ok((shape, checked))
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub(crate) struct DraftExample {
+    pub(crate) input: Vec<i64>,
+    pub(crate) text: String,
+    pub(crate) difference: Option<String>,
+}
+
 /// The finding a group of refused inputs makes when a law refused them and
 /// their pre-states satisfy every state law, with the case the library's
 /// program evaluator selects for the first of them.

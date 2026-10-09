@@ -1,0 +1,69 @@
+{
+  "schema": "zeno-fcis/core-seed-family/1",
+  "family": "reservation-pool",
+  "version": 1,
+  "instances": [
+    {
+      "C": 1,
+      "Q": 1
+    },
+    {
+      "C": 2,
+      "Q": 1
+    },
+    {
+      "C": 2,
+      "Q": 2
+    },
+    {
+      "C": 3,
+      "Q": 1
+    },
+    {
+      "C": 3,
+      "Q": 2
+    },
+    {
+      "C": 3,
+      "Q": 3
+    },
+    {
+      "C": 4,
+      "Q": 1
+    },
+    {
+      "C": 4,
+      "Q": 2
+    },
+    {
+      "C": 4,
+      "Q": 3
+    }
+  ],
+  "input_intervals": [
+    [
+      0,
+      "${C}"
+    ],
+    [
+      0,
+      "${C}"
+    ],
+    [
+      150,
+      153
+    ],
+    [
+      1,
+      "${Q}"
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "state_width": 2,
+  "authority": "none",
+  "family_theorem": null,
+  "qualification": "pending"
+}

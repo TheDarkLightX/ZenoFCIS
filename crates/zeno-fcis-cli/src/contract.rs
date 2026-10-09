@@ -30,7 +30,11 @@
 
 mod adoption;
 mod declarations;
+mod delivery;
 pub(crate) mod diff;
+pub(crate) mod draft;
+#[cfg(test)]
+mod draft_tests;
 mod expr;
 mod graph;
 mod layout;

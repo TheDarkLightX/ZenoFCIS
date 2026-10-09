@@ -679,6 +679,9 @@ printing and compiler boundaries. Fiat-Crypto applies only to modular
 cryptographic arithmetic, not financial accounting. Adopting either tool is a
 separate decision.
 
+Reports: [verus-spec-check compatibility](VERUS_SPEC_CHECK_COMPATIBILITY.md)
+and [Fiat-Crypto compatibility](FIAT_CRYPTO_COMPATIBILITY.md).
+
 ### G7. Examples-first contract authoring
 
 **Problem.** Owners think in concrete decisions ("this request should be

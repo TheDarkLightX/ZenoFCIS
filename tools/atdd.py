@@ -47,6 +47,12 @@ def historical_oracle(test_filter: str, *, exact: bool = False) -> tuple[str, ..
 
 
 SCENARIOS: dict[str, AcceptanceScenario] = {
+    "delivery-accounting-laws": AcceptanceScenario(
+        "Enforce bounded delivery counts and amounts on actual candidates",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "contract::delivery::tests::"),
+         ("python3", "tools/check_delivery_laws.py")),
+    ),
     "minimal-core": AcceptanceScenario(
         "Run the immutable functional core example",
         (
@@ -113,6 +119,15 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
          ("python3", "integrations/zal/oracles/explanation_oracle.py"),
          ("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked"),
          ("python3", "integrations/zal/run.py", "qualify", "integrations/zal/examples/order.zal")),
+    ),
+    "core-component-families": AcceptanceScenario(
+        "Replay every supported finite component instance and refuse bad family evidence",
+        (("cargo", "+1.97.1", "build", "-p", "zeno-fcis-cli", "--locked", "--offline",
+          "--target", "x86_64-unknown-linux-gnu", "--target-dir",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")))),
+         ("python3", "tools/check_core_components.py", "--finite-proof", "--cli",
+          str(Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) /
+              "x86_64-unknown-linux-gnu" / "debug" / "zeno-fcis"))),
     ),
     "bounded-completion": AcceptanceScenario(
         "Verify finite exits and prepare bounded chunks without publication authority",
@@ -239,6 +254,14 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "loop_command::tests::"),
          ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "loop_cli", "--locked"),
          ("python3", "integrations/mcp/test_transform_tools.py")),
+    ),
+    "contract-draft": AcceptanceScenario(
+        "Draft three contracts through explicitly supplied decision labels",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--bin", "zeno-fcis", "--locked",
+          "draft_", "--", "--test-threads=1"),
+         ("cargo", "+1.97.1", "test", "-p", "zeno-fcis-cli", "--test", "contract_draft", "--locked",
+          "--", "--include-ignored", "--test-threads=1"),
+         ("python3", "integrations/mcp/test_draft_tools.py")),
     ),
     "contract-review": AcceptanceScenario(
         "Review a contract with distinguishing examples before it is trusted",

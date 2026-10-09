@@ -620,6 +620,9 @@ fn laws(
             format!("must give a kind to exactly the declared laws {declared:?}"),
         ));
     }
+    if let Some(id) = rules.delivery_laws.keys().find(|id| !declared.contains(id)) {
+        return Err(rules_error("delivery_laws", format!("undeclared law {id}")));
+    }
     let mut laws = Vec::new();
     for law in &declarations.laws {
         let place = format!("project.zeno law {}", law.id);
@@ -635,8 +638,25 @@ fn laws(
         let failed = |reason: String| ContractError::new(&place, reason);
         let formula = expr::expand(&law.formula, &rules.variables).map_err(failed)?;
         let mut graph = LawGraph::new(declarations);
+        let bound = rules
+            .delivery_laws
+            .get(&law.id)
+            .map(|delivery| {
+                if law.genesis {
+                    return Err("delivery observations have no value at genesis".to_owned());
+                }
+                super::delivery::bind(&mut graph, declarations, rules, delivery)
+            })
+            .transpose()
+            .map_err(failed)?;
         let value = graph.compile(&formula).map_err(failed)?;
-        let root = graph.boolean(value).map_err(failed)?;
+        let mut root = graph.boolean(value).map_err(failed)?;
+        graph.require_bindings_used().map_err(failed)?;
+        if let Some(bound) = bound {
+            root = graph
+                .op(Op::And(bound.index, root.index), Kind::Bool)
+                .map_err(failed)?;
+        }
         // The library evaluates every node of a law that applies.
         if law.genesis
             && let Some(name) = graph.table.nodes.iter().find_map(|node| match node {
