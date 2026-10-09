@@ -53,6 +53,11 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
           "contract::delivery::tests::"),
          ("python3", "tools/check_delivery_laws.py")),
     ),
+    "bounded-collections-pipes": AcceptanceScenario(
+        "Bound immutable canonical collections and profile-bound FIFO messages",
+        (("cargo", "+1.97.1", "test", "-p", "zeno-fcis-collections",
+          "--all-features", "--locked", "--test", "bounded_contract"),),
+    ),
     "minimal-core": AcceptanceScenario(
         "Run the immutable functional core example",
         (
