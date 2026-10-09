@@ -1,0 +1,5 @@
+// Overlay for ../escrow/project.zeno. Cumulative seller and buyer payouts
+// increase by the amounts actually enqueued, including committed refunds.
+// Funding can increase held funds without paying out, so pre-held - post-held
+// alone would be the wrong formula for all committing cases.
+law 510 payouts_equal_released on commit = outbox.104 <= 2 && outbox.104.141 == (post.100.113 - pre.100.113) + (post.100.114 - pre.100.114);

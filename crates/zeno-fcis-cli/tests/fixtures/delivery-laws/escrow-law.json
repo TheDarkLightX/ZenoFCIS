@@ -1,0 +1,9 @@
+{
+  "510": {
+    "max_deliveries": 2,
+    "observations": {
+      "outbox.104": {"channel": 300},
+      "outbox.104.141": {"channel": 300, "field": 141}
+    }
+  }
+}

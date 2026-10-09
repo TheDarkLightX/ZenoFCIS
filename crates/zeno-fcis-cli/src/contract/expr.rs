@@ -406,8 +406,9 @@ fn value(expression: &ValueExpr) -> Result<Ast, String> {
                 ProjectionRoot::Post => "post",
                 ProjectionRoot::Command => "command",
                 ProjectionRoot::Context => "context",
-                ProjectionRoot::Effects | ProjectionRoot::Outbox | ProjectionRoot::Events => {
-                    return Err("effect, outbox and event projections".to_owned());
+                ProjectionRoot::Outbox => "outbox",
+                ProjectionRoot::Effects | ProjectionRoot::Events => {
+                    return Err("effect and event projections".to_owned());
                 }
             };
             let mut name = root.to_owned();

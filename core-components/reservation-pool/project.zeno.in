@@ -1,0 +1,35 @@
+zeno 1;
+project 1 reservation_pool;
+namespace 2 core;
+type 100 state Pool;
+type 101 command Request;
+type 102 context Operator;
+type 105 int Units in 0..=${C};
+type 106 int Quantity in 1..=${Q};
+type 107 data Action;
+type 108 bool Authorized;
+field 110 100 available 105;
+field 111 100 reserved 105;
+field 120 101 action 107;
+field 121 101 quantity 106;
+field 130 102 authorized 108;
+variant 150 107 Reserve none;
+variant 151 107 Release none;
+variant 152 107 Consume none;
+variant 153 107 Replenish none;
+reason 200 not_authorized precedence 1;
+reason 201 insufficient_available precedence 2;
+reason 202 insufficient_reserved precedence 3;
+reason 203 over_capacity precedence 4;
+reason 204 invalid_state precedence 0;
+component 400 pool {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+law 500 capacity on commit, genesis = post.100.110 + post.100.111 <= ${C};
+law 501 conservation on accept = ((command.101.120 == 150 || command.101.120 == 151) -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111) && (command.101.120 == 152 -> post.100.110 + post.100.111 + command.101.121 == pre.100.110 + pre.100.111) && (command.101.120 == 153 -> post.100.110 + post.100.111 == pre.100.110 + pre.100.111 + command.101.121);
+law 502 exact_movement on accept = context.102.130 == 1 && (command.101.120 == 150 -> post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (command.101.120 == 151 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 152 -> post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 153 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 == pre.100.111);

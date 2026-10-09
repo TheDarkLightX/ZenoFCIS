@@ -83,6 +83,30 @@ not a new application version, and grants no authority. The handlers live in
 `python3 integrations/mcp/test_transform_tools.py` (set `ZENO_FCIS_CLI` or build
 the CLI first); `test_server.py` lists them with the other tools.
 
+Six examples-first drafting tools use the same CLI through the existing transform
+integration: `contract_draft_start(session_path, intent_path, project_path,
+provenance, examples_path="", rounds=4, max_tuples=4096)`,
+`contract_draft_propose(session_path, revision, rules_path, provenance)`,
+`contract_draft_questions(session_path)`,
+`contract_draft_label(session_path, revision, examples_path, provenance)`,
+`contract_draft_check(session_path)`, and
+`contract_draft_finalize(session_path, revision, out_path)`. Start from an intent
+file and fixed declarations, supply a complete rules proposal, present F2's
+questions to the owner, then submit explicitly supplied expected decisions.
+Repeat with the returned exact revision. Hosted models stay off; an MCP agent
+is the external proposer. Do not convert a suggested answer into an owner label.
+
+Draft reports separate assessed proposals from a ready/finalized draft. Every
+label's supplied provenance is an assumption, not authentication or adoption
+permission. The mutable session grants no authority. Finalization rechecks all
+labels and questions, writes a new draft only on agreement, and remains advisory.
+See the [CLI workflow, bounds and concurrency contract](CLI_REFERENCE.md#examples-first-contract-drafting).
+`DraftToolsTest` in `test_draft_tools.py` checks wrapper routing/refusals with
+mocked processes; those controls do not establish native CLI behavior. Its
+`NativeDraftPathTest` requires a built CLI and checks existing-path preservation
+through the wrappers. The G7 acceptance scenario also exercises native drafting
+and generated apps. None of these fixtures establishes a real owner conversation.
+
 Install the skill in Codex from this checkout:
 
 ```sh

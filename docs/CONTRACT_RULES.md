@@ -37,6 +37,7 @@ sign or leading zero.
 | `cases` | yes | The ordered decision table; see [Cases](#cases). |
 | `genesis` | yes | State field ID to its value in the genesis state, for every state field: a JSON boolean, an integer, or a variant ID for a sum field. |
 | `law_kinds` | yes | Law ID to [law kind](#law-kinds), for exactly the laws `project.zeno` declares. |
+| `delivery_laws` | no | Law ID to bounded channel counts and numeric payload observations; see [Delivery laws](#delivery-laws). |
 | `framework_failure_law` | no | Nonzero ID of the [framework committed-failure law](#framework-laws); default 908. |
 | `framework_reject_law` | no | Nonzero ID of the [framework reject law](#framework-laws); default 909. |
 | `adoptions` | no | Written by `zeno-fcis contract adopt`; see [Adoptions](#adoptions). |
@@ -92,7 +93,7 @@ rules they encode:
 ```
 
 A variable may use other variables but not itself, directly or through
-others. Its name may not start with `pre`, `post`, `command` or `context`.
+others. Its name may not start with `pre`, `post`, `command`, `context` or `outbox`.
 Variables apply in `when`, `post` and payload expressions, which are
 expanded before they are compiled.
 
@@ -207,8 +208,8 @@ adds the genesis state. A law that applies at genesis reads only `post`
 fields: genesis has no pre-state, command or context. Law formulas read
 `pre.100.F`, `post.100.F`, `command.101[.F]` and `context.102[.F]`, and may
 use `*`, `div_floor` and `div_ceil`. Quantifiers, sums, named predicates,
-free variables, `div_exact` and effect, outbox and event projections have
-no contract form. The library Authority evaluates every law that applies on
+free variables, `div_exact` and effect and event projections have
+no contract form. Outbox projections require the explicit delivery-law bindings below. The library Authority evaluates every law that applies on
 every decision, and a decision that breaks one is not committed.
 
 ### Law kinds
@@ -230,6 +231,85 @@ scope the law must be declared with; at least one law must be a
 | `CommittedFailureEffects` | `on failure` | What a committed failure must satisfy. Required when any case is a `CommittedFailure`. |
 | `DecisionConformance` | `on any` | Every decision. |
 | `InitialCondition` | `on any, genesis` | The genesis state. |
+
+### Delivery laws
+
+An optional `delivery_laws` object binds each delivery-observing law to a
+static maximum and declared channels. For example, the escrow fixture has
+payload type 104, channel 300 and integer payload field 141. State fields
+113 and 114 are cumulative payments to the seller and buyer:
+
+```text
+law 510 payouts_equal_released on commit = outbox.104 <= 2 && outbox.104.141 == (post.100.113 - pre.100.113) + (post.100.114 - pre.100.114);
+```
+
+```json
+"delivery_laws": {
+  "510": {
+    "max_deliveries": 2,
+    "observations": {
+      "outbox.104": {"channel": 300},
+      "outbox.104.141": {"channel": 300, "field": 141}
+    }
+  }
+}
+```
+
+Give law 510 kind `AssetConservation` in `law_kinds`. The existing escrow
+state-conservation law relates cumulative payments to funded and held amounts;
+this additional law relates each payment increase to actual candidate
+deliveries. Funding increases held funds without paying out, so a bare
+`pre-held - post-held` formula would wrongly refuse funding.
+
+`outbox.P` counts deliveries on its explicitly bound channel, whose payload
+type must be `P`. `outbox.P.F` sums field `F` of that channel's payloads as
+checked signed 128-bit integers. `F` must be an I128 field of payload record
+`P`; boolean, sum, text, nested and unsigned amounts are unsupported. Root
+paths use payload **type** IDs, while the JSON mapping supplies **channel**
+IDs. Multiple distinct payload types/channels can appear in one law. Channels
+sharing a payload type need separate laws; ambiguous mappings are refused.
+These observations are law-only, not decision-program inputs.
+
+`max_deliveries` must be an integer in 0..=64, at least the largest outbox
+of any case. It bounds the complete outbox, including nonmatching channels.
+There must be 1..=16 observations per entry. Every mapped law must be declared,
+every mapped projection used, and every outbox projection mapped. Missing,
+extra, duplicate, unused, wrong-type or unresolved entries refuse generation.
+The usual law-kind scope requirements still apply; delivery laws bearing
+`, genesis` are refused because genesis has no candidate outbox.
+
+The compiler conjoins `actual_outbox_length <= max_deliveries` with the
+formula. For each bounded slot it guards the channel read by actual length,
+and guards a payload read by both length and channel equality. Missing slots
+and nonmatching channels contribute zero; their absent fields are not read.
+A matching missing field, wrong atom type or checked addition overflow
+refuses the whole decision. A false bound never authorizes truncating a
+longer outbox. These are observations of the actual candidate, independent
+of the predictions in the case table and its conformance law.
+
+All nodes run through the existing library law evaluator and shared meter.
+Every node charges Step; active observations charge Read, inactive guarded
+reads do not. Generated limits account for all compiled law nodes and possible
+reads. Compilation adds O(max_deliveries × observations) nodes, with an
+inactive observation retained at bound zero so the selected field remains
+bound. The channel, field, bound and law graph enter ordinary canonical
+policy bytes and checked identity. No new core operation or authority is added.
+`on commit` covers Accept and CommittedFailure; an applicable Reject law
+observes the structurally required empty outbox. A committing-only law is
+skipped on Reject according to its declared scope.
+
+`contract check-symbolic` does not support delivery observations as proof
+targets. Its report explicitly lists that unsupported coverage and cannot
+return Proved or Attested for such a contract; a checked counterexample to
+another target can still make the report Refuted. Runtime enforcement and
+finite examples do not prove that a law expresses the owner's intent, that
+all reachable transitions satisfy it without refusal, or that an external
+recipient performed a payment. The CLI compiler remains outside the verified
+core assurance boundary.
+
+The [escrow overlay](../crates/zeno-fcis-cli/tests/fixtures/delivery-laws/README.md)
+retains a two-delivery double-payment control: the bound admits both entries,
+while the accounting equality refuses their excessive sum.
 
 ### Framework laws
 

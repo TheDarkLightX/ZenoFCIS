@@ -1,0 +1,128 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "inventory-reservation",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "105": [
+      "I128",
+      0,
+      5
+    ],
+    "106": [
+      "I128",
+      1,
+      3
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "available": "pre.100.110",
+    "reserved": "pre.100.111",
+    "action": "command.101.120",
+    "quantity": "command.101.121",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && available < quantity",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "(action == 151 || action == 152) && reserved < quantity",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "(action == 150 && 5 < reserved + quantity) || ((action == 151 || action == 153) && 5 < available + quantity)",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available - quantity",
+        "111": "reserved + quantity"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available + quantity",
+        "111": "reserved - quantity"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 152",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available",
+        "111": "reserved - quantity"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "warehouse",
+          "payload": {
+            "140": "quantity"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available + quantity",
+        "111": "reserved"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation",
+    "502": "DebitCreditEffectEquality"
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "framework_reject_law": 509,
+  "framework_failure_law": 508
+}

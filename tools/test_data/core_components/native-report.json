@@ -1,0 +1,2374 @@
+{
+  "authority": "none",
+  "cli_sha256": "18d6739713367d780b9d9edbddb5da79850ef5cc68710c9eaca2b961674d3b82",
+  "evidence": "complete-finite-execution",
+  "family_theorem": null,
+  "independent_reference_sha256": "126b6fb20905c13ce4133f15602b1d966a131826469af9cfabd93b360cad68b9",
+  "instances": [
+    {
+      "app_tests_sha256": "9f0ebc40dafd3ca6f4abe9ca7f09ef577ab3620981687d260325e818792ded85",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "8f9cdbae6892347c9982e7a4737f1f555077a9bc4955152c3e46800ff8f22bc5",
+      "generated_sha256": {
+        "src/v2_contract.rs": "72d0dc626cea70c7ee4ba03b7d78b061c66ac7dae80086a46f5d5a9e721a4ee8",
+        "v2/policy.zcve": "71d424db3e20fc724c3013a0a5ff627021979a177e8afa7befe3f29418f039f1",
+        "v2/schema.zcve": "aacd1eab58e1eede40e998548391b9cd471b23cfef0529f673cb4e89e4f5c818"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 32,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 1,
+          "Q": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "9f615c9353ec4580d39c0c5793132352ddbfaee4ed56806392e3799e61a24754",
+        "source_sha256": {
+          "examples/c1-q1.txt": "0380cb52f15cb55e2569d13337f3227c095387b0b8a2ad8c5b558d3876d6cc58",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 4,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c1-q1",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 388
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 335,
+        "outputs": 5,
+        "policy_bytes": 24109,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "5e6a532018cb8072bdbfa4c83bace8d5f28d3ffca3eae4efb0a4ff0d1a926d11"
+    },
+    {
+      "app_tests_sha256": "7607882ee280201cff354ac093a85f44b521d3d34d116ca040e908ebfe3728d7",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "37b02e5af4fb4a7b1d3f3c2b6e56cf83380fd9031163b24ca6fb9b43f94c576f",
+      "generated_sha256": {
+        "src/v2_contract.rs": "e9d9c6230b98dcb5072febe9b787106cccd9ce6c728d67f36be012bae5c573ad",
+        "v2/policy.zcve": "1915ccea87c451b0dbdae544453e0a52299ac4a7623c1d8637ef6ad990c2573f",
+        "v2/schema.zcve": "53cd064d19aec90b14a932c97038a3f1b8b63125b7ccf8b277a563735b85e59e"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 72,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 2,
+          "Q": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "fdca0faf021ded49b2e63f3dca41412a8c9c8f9200edaa14dbf85c65a74014e0",
+        "source_sha256": {
+          "examples/c2-q1.txt": "cc4c85a6853fe2cc467d9ab396ce07e8acef3d5ada583fd60d64ae929ac0f88e",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 9,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c2-q1",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 388
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 335,
+        "outputs": 5,
+        "policy_bytes": 24109,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "0f7758d09f94ae70849294bb33bce5b639c658d153f580b7c28d4f6ec478a48f"
+    },
+    {
+      "app_tests_sha256": "c9ae6973d570d11e9b6f6846de5e3f2f1af781cda044c8f95f848a79472371ab",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "f3e11cb1211bbf45a9ee1b0a88f64bcc34c8176cd0fce3ea0dfe8406c6328e86",
+      "generated_sha256": {
+        "src/v2_contract.rs": "e863c5381b8ec6d07afd9a3ff0bd1d9918f7d05fd75f68cb357680bce93f27fe",
+        "v2/policy.zcve": "9577fcc3bb3a81ef909c7dc6b758234051653fe3f64435854754214ef87470eb",
+        "v2/schema.zcve": "541eaf28fdb1f67fdb8c6013857b706b3195c4267d8184478be58d0523c0c159"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 144,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 2,
+          "Q": 2
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "114fb35ea6ed91dd10be2119f5a3d1eb7ac914a7762ca537a40b40b790f1150c",
+        "source_sha256": {
+          "examples/c2-q2.txt": "f14210bc5c1b17a3d3b089c272a1b37131e780806b0bc3e52dbcf9101258b8ec",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 9,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c2-q2",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 388
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 335,
+        "outputs": 5,
+        "policy_bytes": 24109,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "fbb18b6b8d4fd47d731f25bb47246dbbf718ca0d0cfde9fa3e686a0994c28ea1"
+    },
+    {
+      "app_tests_sha256": "00604286c85a747e8b4739316d59b800c8883d41a97aeb56757073e4cc591477",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "769656d651f388b3efea361684da2721e8b2d693d37089361632cf4251ecabe6",
+      "generated_sha256": {
+        "src/v2_contract.rs": "269dee2d1419a49f5fe5d8361c4b50c9e8e1e35e832c83b8a2fc44800d450984",
+        "v2/policy.zcve": "b5601a8f5981d61fbf7543b19c5605ed89b250feead4f03046b3e6f7d88b5738",
+        "v2/schema.zcve": "4873e4fcb2619c26ed20747a1c59955142fc58602aa186316cf0d772a8e55254"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 128,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 3,
+          "Q": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "e575e99d576b62e8c6833e22dfdb3e457048c47f301196cf57c53687fc429da5",
+        "source_sha256": {
+          "examples/c3-q1.txt": "9a6de58420de8b6f03760d1b4ffbfaec57982966a43a1ac6ddf19b2c336a2412",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 16,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c3-q1",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 389
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 336,
+        "outputs": 5,
+        "policy_bytes": 24160,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "f482d5e62928ee8d3665f977836b5f4e2bfa3a172a2c133f87e52105cc6ce934"
+    },
+    {
+      "app_tests_sha256": "d493632ae627b5b3184a2371740437e93ceebac2764f1d7e68c87a03fb2668c0",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "d8eddc8d5549c31c021008cc0512bfb772d2cec8b343940311c86c6fadd3b678",
+      "generated_sha256": {
+        "src/v2_contract.rs": "262e1973269cfd4e8d579c861b066f5ec67d6e1f64ff79d820d19af44d3b2a65",
+        "v2/policy.zcve": "9e8c3f04e8873534fe304a9746fb74da36511bf08af2d7905bdd025e33bd03cf",
+        "v2/schema.zcve": "1daf91924b3056e77781109cd1cd72f6fa435469e9614e73ac550335eea51a72"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 256,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 3,
+          "Q": 2
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "24c017ca938100897d88b5703bdaf0efeac486a39d992796a23d6aa8978ce95a",
+        "source_sha256": {
+          "examples/c3-q2.txt": "d7aa1644ec6dc908efce55c6e0bf533926834b9e3c9c1a0a62f22710739fda6a",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 16,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c3-q2",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 389
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 336,
+        "outputs": 5,
+        "policy_bytes": 24160,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "cb540ceae8179a3029a1920c3f344e73e397096d3b721c60b4127b3755f3066b"
+    },
+    {
+      "app_tests_sha256": "b0f8116bf62428ea37f34d269839acdc1f53a48606f1aefeb3d52c0cf727ed64",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "3552e0824c623c3365b0269eb759d670e93a8498d9916c602a4028fd47f0c8df",
+      "generated_sha256": {
+        "src/v2_contract.rs": "f88d83017fb65f23817aef1d9d468f7e015a591946609fcd46b36dc7fde438d1",
+        "v2/policy.zcve": "3b589f6c9114d9387c4537e302913a5c8510e67f9e9e9526912d2c8c4eda5131",
+        "v2/schema.zcve": "1bc993960c678d4b5ab48eaccff989fbaf2b692c992199fc29d7a73d07f8d528"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 384,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 3,
+          "Q": 3
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "d8e57b6509f9320ede98f287aa9fe8a0d4d1694af28adb925f54b371cc1b4018",
+        "source_sha256": {
+          "examples/c3-q3.txt": "878361b63a91aa76cf1d02e10a0adf032e48c99fc27be55b98ed8b332fbddb87",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 16,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c3-q3",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 389
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 336,
+        "outputs": 5,
+        "policy_bytes": 24160,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "85a7f91a5545f2584ebf7e9845d548c0d5993c3b1924d02cf2d535c25de01406"
+    },
+    {
+      "app_tests_sha256": "b83b0620143cce15bb40deb828cf21e03ab4065fbf93875490e3b37878d38835",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "87dc16504104d8ca04f49287d378f59162c9becc7ec7f488084a26b3735392b5",
+      "generated_sha256": {
+        "src/v2_contract.rs": "32884ddfdfdbb333845036eac1c80bd7e50d867a330132e20241962a6ffb0f7c",
+        "v2/policy.zcve": "e266b017dbca59e838f40dd7bc4d7a9ca24e468a8af5baa8f202b9314e421c73",
+        "v2/schema.zcve": "e3a6fae0ede66576df52fbf84cd0a0e74fc913f6d2e079b38b6c83768c1b4150"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 200,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 4,
+          "Q": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "f7b8f6202c32d15949c0621413aefa6a07924d1b27e7a00b9e5589ca57af5431",
+        "source_sha256": {
+          "examples/c4-q1.txt": "98bb1ba7201a7d70ca303f79384202ecde84cae99e15e1442d1e301ec3977208",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 25,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c4-q1",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 389
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 336,
+        "outputs": 5,
+        "policy_bytes": 24160,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "ef1b5990e5660dc7c1fa0cb87c0eefd461549a8f76e35e983a4c0059c9f94c6e"
+    },
+    {
+      "app_tests_sha256": "e159df7df9d795d90a2b620310f565ec0d9b48179fb3c955b00a6bdbd5bb724f",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "b13416bc8df1d0f520524ddfbbea449a68fa6bbb116756f821525d113f95f355",
+      "generated_sha256": {
+        "src/v2_contract.rs": "03ec230821de291cecd04666162942728cc80ed1a7d7ac57e6232989a562069b",
+        "v2/policy.zcve": "3bec52f55703c8d67a50f16175d16cf9e31f058eed96628f9ffce04742a1f730",
+        "v2/schema.zcve": "c7c490e04f186a24534324a3b7246bd76abb45a7f90f1ff2ba97283f79185314"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 400,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 4,
+          "Q": 2
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "6dddd70c08824450f414766e86ca53fd83e6526ae290eaeb9019ac394f567b2d",
+        "source_sha256": {
+          "examples/c4-q2.txt": "e2b2a6e152e6182521084acc3150331a50891ecc8767ebefdf597a7fb09dfd70",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 25,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c4-q2",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 389
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 336,
+        "outputs": 5,
+        "policy_bytes": 24160,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "5946d7b2263c528d830c9f8371c37baeb6a5eb3478c1af3fa50bbb98e4423f94"
+    },
+    {
+      "app_tests_sha256": "431f94b0ec5a6dafbf64b3ffd0db19c31a702d6a1b346a4e7b44360893180747",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "ebf60531f9cfe97fe2537f5b45ccc9fbfadd6a7df7172343dc7879cc3a0205de",
+      "generated_sha256": {
+        "src/v2_contract.rs": "9a12f4f0cd31b7171cc5f94ff329538f7717fe48eab8caf0ff05c09bd7f4e0b1",
+        "v2/policy.zcve": "faaae8508618f33c7bb444b18e0f0f89e0f9d6521072fa39e95b804e3bfee8a8",
+        "v2/schema.zcve": "2860aa9ab1688a8cd2d407950980b14d0122fc7b6f5cbe06aaebea52429cd97c"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "reservation-pool",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            150,
+            151,
+            152,
+            153
+          ],
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 600,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "C": 4,
+          "Q": 3
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "bf0d4f9917bc6caec3b810b6e06cea50e74608de87cfad9a3bdefd453b14b098",
+        "source_sha256": {
+          "examples/c4-q3.txt": "674c8b77a5c215e664e2bffe756064488a583b87bc619dd7b62ae045a30e801e",
+          "family.json": "47478548b34e2f817cb55b474038fe8c4c27eb71dd41c2e6a6f1acf1b1ad723e",
+          "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+          "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+        },
+        "state_tuples": 25,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "reservation-pool-c4-q3",
+        "budgets": {
+          "byte": 229,
+          "read": 123,
+          "step": 389
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 336,
+        "outputs": 5,
+        "policy_bytes": 24160,
+        "program_nodes": 48,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "8d36272a8f5dbe40e41fb05561ac162bd5a2a7e93d31ae7c78857fc1a7ce3454"
+    },
+    {
+      "app_tests_sha256": "69970e57f345fdf83546f7fb511dfa769c0475b6e9e5e304ecae02d2e53fd2d6",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "379e0c0a311c80d7e75cc2dd7c3f135fee69f0bcd018e2a13cf06a33b5474784",
+      "generated_sha256": {
+        "src/v2_contract.rs": "cc857dfda22b30e9ad6de1e73779b802c98037d2d09c4658965d4d97543ba6e4",
+        "v2/policy.zcve": "5b416d9147bacc852f13f2508de378c0cc49300d241913ee89d14236011f9c1b",
+        "v2/schema.zcve": "91ec3927c2c8937cc837d18c9cd4dd0b80929bac67dfaf4ca0230618895106d3"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 196,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 1,
+          "W": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "4f93c2e12c9124781594638e047f547c92564a3b8954cef4e4c2aea15a5f6c9c",
+        "source_sha256": {
+          "examples/n1-w1.txt": "9abcb1d6d7fef22e2ba4b0e2bc1476b4401328c7e772d35abd61d505f54edbc8",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 14,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n1-w1",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 214
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 188,
+        "outputs": 2,
+        "policy_bytes": 14039,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "1ad8b8705a74ec34aa72d53d157ca1c166ad64d821fc2731d88a5e1901121137"
+    },
+    {
+      "app_tests_sha256": "a0c690894dc14ac5912273d6dd6a76618c0ba07bda1248003fb1be7c2fe92c0c",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "9bc772b5e7dbc6e8788a0ed951eb5e5106c743ec04173f32c2ce8505c22d893c",
+      "generated_sha256": {
+        "src/v2_contract.rs": "4fee53c5502c140b7353fc993670f867a206e571908333825c386631d27cdc35",
+        "v2/policy.zcve": "7b5ca6c609e133da7debe84c48fa40caf1abb73332a602be9014d2fbaaffa86f",
+        "v2/schema.zcve": "e20766ba88eb8f6f802f77c5fdebd4625bf2774248b363060ea744762b2d07e5"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 294,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 2,
+          "W": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "2ac69b9ad8130c0736c36c19b46c018ebbef0be1668ea8f529d8d3dac41675a3",
+        "source_sha256": {
+          "examples/n2-w1.txt": "810e31a7eca20dbcbbbba97c9b8f067fd50fb67b47f6474fa3c13060b32a1a17",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 21,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n2-w1",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 214
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 188,
+        "outputs": 2,
+        "policy_bytes": 14039,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "ef70a21dc207a265c4796542adada6277e387fe306f10ede8b688fead1ba01ca"
+    },
+    {
+      "app_tests_sha256": "dcd7fb75bda6616c2ee30cf7ae8ce352f75b15355a6269cc5ab7d6306b42c195",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "dbe5140b8c5a61e77f6ba3d62dff72825191cb0fdfd8e1b8a6553bc208de8a1e",
+      "generated_sha256": {
+        "src/v2_contract.rs": "353c9c62b7c0b715aef0df3b683a9e60fd4b0616d9eb5f6e928b15ecdcfa4415",
+        "v2/policy.zcve": "16bf77540fbb008bcd73d84b4cd7300b37302cbb19654f9ec3fc793b40eb5601",
+        "v2/schema.zcve": "1d71ae7b2eb993d9482500aa4bd146a7cc8df6b45cd0f3ec157ef2fec68d7090"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 392,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 3,
+          "W": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "ddba7435d5cc3b89b38d9dddf776b39e5bc140ebd3199f2aab6d0765ae7edfa2",
+        "source_sha256": {
+          "examples/n3-w1.txt": "e7472499656668f3abdb08d252e5cd5a09c39fa3b43e7b8e0725ad82b0c16773",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 28,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n3-w1",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 215
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 189,
+        "outputs": 2,
+        "policy_bytes": 14090,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "d46b2855875300ebd8df5fcdf0410f205a8fc04cfe422cea84c0c6c12dccafdb"
+    },
+    {
+      "app_tests_sha256": "d643556820e0c69bd49ba46451c6bd69b4e7cc96400324b82fee2da32fb04dbd",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "1edb4f6eac0c5491efa2feaaa1dc138b7fd21ad17c4ad4b4cbd0a5814e68be14",
+      "generated_sha256": {
+        "src/v2_contract.rs": "1dea7cbb51a3bb910f8796dc9a5c75ac4284bf51863b9b2a775daf37ba9e765c",
+        "v2/policy.zcve": "030fd1009110a15d68c02213c248c91a60402dc1b3391f73b9b654adf1f95fe3",
+        "v2/schema.zcve": "91ec3927c2c8937cc837d18c9cd4dd0b80929bac67dfaf4ca0230618895106d3"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 196,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 1,
+          "W": 2
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "0baa08b0eb3bcfd39080114ce2a678de8a96cca8109e3eb6ccac512732afafb6",
+        "source_sha256": {
+          "examples/n1-w2.txt": "4e8528158d2ed874e60299f0d3fce64219c70bc69350f8243f626a13d7906759",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 14,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n1-w2",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 215
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 189,
+        "outputs": 2,
+        "policy_bytes": 14090,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "490318d7b26e99b4ab1ba364638e46518df73f8d793a1d6347a1cd3e56850911"
+    },
+    {
+      "app_tests_sha256": "b1bda45f01ef2dee4e590fbd3b347d1987d315b0621c7e5eafe5f47e22c4197d",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "eb80df2a068098afb462969d467c916ee2768b5d087728a3736befb5b4848953",
+      "generated_sha256": {
+        "src/v2_contract.rs": "45053783a32505ab69fdf91260d89e7fe9dc730ed02f67247101c8864e486ec9",
+        "v2/policy.zcve": "cefb615cbb7e845b774bb8d810b404a00554e212af415d6589b3e12614193e9f",
+        "v2/schema.zcve": "e20766ba88eb8f6f802f77c5fdebd4625bf2774248b363060ea744762b2d07e5"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 294,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 2,
+          "W": 2
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "01ff50803db1ab012566bf3bc8f223b4e132413b610583138649004837fafbb2",
+        "source_sha256": {
+          "examples/n2-w2.txt": "8fc16fa189304ee20f116f1917db2a4d164ac4da44a7e555d6417f9a826040e7",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 21,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n2-w2",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 215
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 189,
+        "outputs": 2,
+        "policy_bytes": 14090,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "7c84bd07e9c2938b3619c4ddc933a631a8d2bd3cb5e92943090c886528a0bf5e"
+    },
+    {
+      "app_tests_sha256": "62ce6a76cedfa04b2c15089cc1f10718efcbd0531f5cc186fd1cb83ace50467b",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "966a1bbecf17bf2c8e246cd8821698529a0b5892e876f91b4492b9a252a810b3",
+      "generated_sha256": {
+        "src/v2_contract.rs": "c9b322f26f094863deb805d0efa7383361fd580fee87920d9602272c1c8b532f",
+        "v2/policy.zcve": "168ab0ece5b449fc7cdffa291f546a21e49cb5ae3de8c0f734fc25100555c175",
+        "v2/schema.zcve": "1d71ae7b2eb993d9482500aa4bd146a7cc8df6b45cd0f3ec157ef2fec68d7090"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 392,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 3,
+          "W": 2
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "cc8eb6c272caa3a03f7c14a354330b404f5c0981fbd93632db60d45516709589",
+        "source_sha256": {
+          "examples/n3-w2.txt": "b9f9d46024e5c40ef9625a28aaab3dfa134477e237d0ceb8b45702e5e6fbc823",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 28,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n3-w2",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 216
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 190,
+        "outputs": 2,
+        "policy_bytes": 14141,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "10670d9fdd19aa26bad8b34838c750e8d3dcd6614fca0b7f76f744cefc697f3e"
+    },
+    {
+      "app_tests_sha256": "1337139a851ea5b132d0833c9c1b06bd7e9fc9a1f9ce595f6085a5c42524cc05",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "d55c8d3142d0ff50f7e430fed922d7fd081c1b258b2a0d5b1a71967071a7cab8",
+      "generated_sha256": {
+        "src/v2_contract.rs": "ef9dbccc7d26b65a0ff8167d92c63ab07a7492996bbd5bae063788e9c00e48bd",
+        "v2/policy.zcve": "f014cde71be82d7c8232c2fc68909e44298dbb88e28631f5c276f65619533793",
+        "v2/schema.zcve": "91ec3927c2c8937cc837d18c9cd4dd0b80929bac67dfaf4ca0230618895106d3"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 196,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 1,
+          "W": 3
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "cd8574c2202adc1f36cd123bade2b698a4dd21d1145a949e1eaaf9b1bcd0dc6b",
+        "source_sha256": {
+          "examples/n1-w3.txt": "b7556950b5a22e0575fd877b16a33c90785a4d40823fcbc0b7dcc3d537d9ce80",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 14,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n1-w3",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 216
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 190,
+        "outputs": 2,
+        "policy_bytes": 14141,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "b9d7810ffc4cb2d5a001ddf3178dd7deca150f3a77486d7425bd49b003100961"
+    },
+    {
+      "app_tests_sha256": "a6aaf43a74438352e6252b6910021feb5718d53c451d5fe3fd1a976f1636f211",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "2488bed11339f7fe8838b3be4d13235d1190db03cd26e554c6044f2a6facc742",
+      "generated_sha256": {
+        "src/v2_contract.rs": "79d8bb54ad33ffa9056e0676146240c93159c62a40d6b40f04665f5f586d7109",
+        "v2/policy.zcve": "d32f530a1b85bfcd6703bcb8b10ee6f4ce9d5b404e20a9226774007e1ad58c38",
+        "v2/schema.zcve": "e20766ba88eb8f6f802f77c5fdebd4625bf2774248b363060ea744762b2d07e5"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 294,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 2,
+          "W": 3
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "b58af0d23b3a075a5c5dc07f382239ac0a1ee3ccf12c16cca6e6a9fccbee6f02",
+        "source_sha256": {
+          "examples/n2-w3.txt": "2d60f893e3d795f6e70f2e9f4fd7c02b0b4ff65e26638242927c527c613f6335",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 21,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n2-w3",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 216
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 190,
+        "outputs": 2,
+        "policy_bytes": 14141,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "ac3b6ea9f84a7e4326365b3805fb21895a28207c741e495ebe9cf0fe0e9799d6"
+    },
+    {
+      "app_tests_sha256": "bcb8c8e152ebb9a6442d8ef7c0d9afdd9c249d14c4b2ac2574914eeed6a22c78",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "076effe8504ba0476849df828dddb8899ae2c13390c1eea80f352579309dfaf6",
+      "generated_sha256": {
+        "src/v2_contract.rs": "5be39a148cc3a245b9c2637a4232ea008f99f1cadba9614e02b429852f1a8da1",
+        "v2/policy.zcve": "fe7cd3e8aff2e110101759c4625db532dc1c4b5663a64650413da733353cd326",
+        "v2/schema.zcve": "1d71ae7b2eb993d9482500aa4bd146a7cc8df6b45cd0f3ec157ef2fec68d7090"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "rate-limiter",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1,
+            2,
+            3
+          ],
+          [
+            150
+          ],
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 392,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "N": 3,
+          "W": 3
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "a9364203abd5b48b2e19d663f76097e3a9d53abec96912e830f6cf0abdc50e78",
+        "source_sha256": {
+          "examples/n3-w3.txt": "c51572d50fc8f8a183ec6acf47e8d4b2c7fc5e405684e73b3876b030869cbdd9",
+          "family.json": "31053a295398975e6d7b9546dde2f3cfb384751de7f9d9660e142e8e08bdefc4",
+          "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+          "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+        },
+        "state_tuples": 28,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "rate-limiter-n3-w3",
+        "budgets": {
+          "byte": 222,
+          "read": 108,
+          "step": 216
+        },
+        "law_ids": [
+          500,
+          501,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 190,
+        "outputs": 2,
+        "policy_bytes": 14141,
+        "program_nodes": 21,
+        "schema_types": 6,
+        "version": 1
+      },
+      "review_sha256": "3974617e987c1d99d45006d5c3d58f5aa2e27ee3316438625191e178eb7674ea"
+    },
+    {
+      "app_tests_sha256": "72adba7a962184cc877d9f22f019e019ade9db9be91069255dd1b2d73198bf1a",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "36346900099878b3948bf19f1fd151a01d924398351a628559a60ad0c880ebc3",
+      "generated_sha256": {
+        "src/v2_contract.rs": "f48d5b3bc39430d9485c6b4db3e3603488b43c8f06ee47f6f0a7996e67570cfa",
+        "v2/policy.zcve": "d85f2d32cef4b3768cb381787d8f5ca0fd9fff161ea02e8102e1a1a67ae5c9ed",
+        "v2/schema.zcve": "b041f232ed17265f6829f567b59a3dde94ac36223d400bf1581100e93baabeb4"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "approval-queue",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            150,
+            151,
+            152
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            160,
+            161,
+            162
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 432,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "K": 1
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "2ebe9b08826cf1d4f0ad2d80284945432f0c2267ab54130ecea715aecf79d058",
+        "source_sha256": {
+          "examples/k1.txt": "a597b3b6dff08d8a8bf36b2aad7310fa77361fced3ade89c13c8306dfcd73a9f",
+          "family.json": "1278874740e6e16bc1b89690709b4bcc6e243472b4e924278cf63eb0fc664252",
+          "policy.json.in": "9eff2a0b7f49138ef1b2ca3410652e7148e1330b9bf5d9447417d9cbae069402",
+          "project.zeno.in": "17f776c9aaa2fb8c3c2c4dd514822fa12e6a04ce51636679568333bfc5e2c32e"
+        },
+        "state_tuples": 24,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "approval-queue-k1",
+        "budgets": {
+          "byte": 210,
+          "read": 141,
+          "step": 541
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 446,
+        "outputs": 4,
+        "policy_bytes": 31379,
+        "program_nodes": 90,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "c8c24ab9f13ebc2b82340ab83000c58d5082e4ad96286b619ffe40dfd14000ed"
+    },
+    {
+      "app_tests_sha256": "6e8980cc8a71a1cec7eb53506b0266e75eff38d03f7e2c24b235544e846d4546",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "d4a7b9b62e1df14665a4addeb62929e58dd5dcbd4338440bc525335bbf36a7a2",
+      "generated_sha256": {
+        "src/v2_contract.rs": "61c6eb5de717311f9ed38187bdae4ad9a62ea7935fb665f813868137d5cdff02",
+        "v2/policy.zcve": "039055660c20588c2f25cd84e5dd806f0a35327dec0096e04ca6946075989384",
+        "v2/schema.zcve": "b041f232ed17265f6829f567b59a3dde94ac36223d400bf1581100e93baabeb4"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "approval-queue",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            150,
+            151,
+            152
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            160,
+            161,
+            162
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 432,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "K": 2
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "ee5457e57068dbdb235412a7f79f277fb5eec465917a390af1bcdda1e2d13753",
+        "source_sha256": {
+          "examples/k2.txt": "a147a82ccdd328572fbaf2755bb1b30d2cea84e2b377df54f778955044f8a7bb",
+          "family.json": "1278874740e6e16bc1b89690709b4bcc6e243472b4e924278cf63eb0fc664252",
+          "policy.json.in": "9eff2a0b7f49138ef1b2ca3410652e7148e1330b9bf5d9447417d9cbae069402",
+          "project.zeno.in": "17f776c9aaa2fb8c3c2c4dd514822fa12e6a04ce51636679568333bfc5e2c32e"
+        },
+        "state_tuples": 24,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "approval-queue-k2",
+        "budgets": {
+          "byte": 210,
+          "read": 141,
+          "step": 541
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 446,
+        "outputs": 4,
+        "policy_bytes": 31379,
+        "program_nodes": 90,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "930e377b65128e19b1a0473f7f9665fa99e4b2b3984b1a98d4919ef893f2be20"
+    },
+    {
+      "app_tests_sha256": "d44da31da77a3038e102c84867cd98f7c721c7950b7b18203caae6a91c5fd192",
+      "binding": {
+        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "packages": [
+          "zeno-fcis-authority",
+          "zeno-fcis-catalog",
+          "zeno-fcis-codec",
+          "zeno-fcis-compose",
+          "zeno-fcis-core",
+          "zeno-fcis-crypto",
+          "zeno-fcis-evidence",
+          "zeno-fcis-laws",
+          "zeno-fcis-patch",
+          "zeno-fcis-plan",
+          "zeno-fcis-project",
+          "zeno-fcis-receipt",
+          "zeno-fcis-refine",
+          "zeno-fcis-schema",
+          "zeno-fcis-shell",
+          "zeno-fcis-shell-sqlite",
+          "zeno-fcis-spec",
+          "zeno-fcis-synthesis",
+          "zeno-fcis-transition",
+          "zeno-fcis-value"
+        ]
+      },
+      "consumer_lock_sha256": "defee2a58df1d18d3d1cf2843a07a3ee87e72635152e2ab9fd94b6dd58890fd8",
+      "generated_sha256": {
+        "src/v2_contract.rs": "07058b774b83f3ffa685ab218d6bdbf2e7024bbc3851cd6b0d554f467db861fd",
+        "v2/policy.zcve": "b4e97484ebb341a63391359cd18361ea9e63958b7e01333db10c2552b37864d9",
+        "v2/schema.zcve": "b041f232ed17265f6829f567b59a3dde94ac36223d400bf1581100e93baabeb4"
+      },
+      "instance": {
+        "authority": "none",
+        "examples_provenance": "independent Root reference from public semantics; not owner labels",
+        "family": "approval-queue",
+        "family_theorem": null,
+        "input_domains": [
+          [
+            150,
+            151,
+            152
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            160,
+            161,
+            162
+          ],
+          [
+            0,
+            1,
+            2
+          ],
+          [
+            0,
+            1
+          ]
+        ],
+        "input_tuples": 432,
+        "owner_adoption": false,
+        "parameter_range_evidence": "pending",
+        "parameters": {
+          "K": 3
+        },
+        "schema": "zeno-fcis/core-seed-instance/1",
+        "source_set_sha256": "ea992c64f87b696c371421696e05aa0bdca8df99cbac64dba4629af1187211bc",
+        "source_sha256": {
+          "examples/k3.txt": "7e6f8bfbae98fac8d479b366d878f2604829ff6c28e25f393e21594b68e2ba10",
+          "family.json": "1278874740e6e16bc1b89690709b4bcc6e243472b4e924278cf63eb0fc664252",
+          "policy.json.in": "9eff2a0b7f49138ef1b2ca3410652e7148e1330b9bf5d9447417d9cbae069402",
+          "project.zeno.in": "17f776c9aaa2fb8c3c2c4dd514822fa12e6a04ce51636679568333bfc5e2c32e"
+        },
+        "state_tuples": 24,
+        "version": 1
+      },
+      "program": {
+        "adoptions": [],
+        "application": "approval-queue-k3",
+        "budgets": {
+          "byte": 210,
+          "read": 141,
+          "step": 542
+        },
+        "law_ids": [
+          500,
+          501,
+          502,
+          908,
+          909,
+          990,
+          991
+        ],
+        "law_nodes": 447,
+        "outputs": 4,
+        "policy_bytes": 31430,
+        "program_nodes": 90,
+        "schema_types": 7,
+        "version": 1
+      },
+      "review_sha256": "e279657ad94a152eba3adb876f1193d5db9a9a1aa73efc709b4fc061ba1b939b"
+    }
+  ],
+  "law_violating_mutants": [
+    {
+      "family": "reservation-pool",
+      "law_refusal_findings": 1,
+      "review_sha256": "0f3b9304e083d777d48b916ac485d2e8c2235a832d33bbeaecff5077b2440c76"
+    },
+    {
+      "family": "rate-limiter",
+      "law_refusal_findings": 1,
+      "review_sha256": "868bcff230e3f2c483633e756c6886aff59c810107717527a9243808c5246901"
+    },
+    {
+      "family": "approval-queue",
+      "law_refusal_findings": 1,
+      "review_sha256": "6d9695f54282e89375de86bb03bb8a7c41d84cf1440dbbd071b2eb94280b0980"
+    }
+  ],
+  "owner_adoption": false,
+  "raw_tuples": 6158,
+  "schema": "zeno-fcis/core-seed-check/1"
+}

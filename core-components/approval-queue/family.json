@@ -1,0 +1,50 @@
+{
+  "schema": "zeno-fcis/core-seed-family/1",
+  "family": "approval-queue",
+  "version": 1,
+  "instances": [
+    {
+      "K": 1
+    },
+    {
+      "K": 2
+    },
+    {
+      "K": 3
+    }
+  ],
+  "input_intervals": [
+    [
+      150,
+      152
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      160,
+      162
+    ],
+    [
+      0,
+      2
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "state_width": 4,
+  "authority": "none",
+  "family_theorem": null,
+  "qualification": "pending"
+}

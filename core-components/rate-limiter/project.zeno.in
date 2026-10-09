@@ -1,0 +1,29 @@
+zeno 1;
+project 1 rate_limiter;
+namespace 2 core;
+type 100 state Window;
+type 101 command Request;
+type 102 context Clock;
+type 105 int Time in 0..=6;
+type 106 int Usage in 0..=${N};
+type 108 bool Authorized;
+field 110 100 start 105;
+field 111 100 used 106;
+field 130 102 now 105;
+field 131 102 authorized 108;
+variant 150 101 Acquire none;
+reason 200 not_authorized precedence 0;
+reason 201 before_window precedence 1;
+reason 202 quota_exhausted precedence 2;
+component 400 limiter {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 64;
+}
+merge [400];
+// The scalar quota invariant is domain-tautological; exact_charge below
+// supplies the substantive no-free-request and no-spurious-reset obligation.
+law 500 quota on commit, genesis = post.100.111 >= 0 && post.100.111 <= ${N};
+law 501 exact_charge on accept = context.102.131 == 1 && context.102.130 >= pre.100.110 && (context.102.130 < pre.100.110 + ${W} -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111 + 1) && (context.102.130 >= pre.100.110 + ${W} -> post.100.110 == context.102.130 && post.100.111 == 1);

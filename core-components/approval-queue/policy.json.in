@@ -1,0 +1,108 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "approval-queue-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "phase": "pre.100.110",
+    "v0": "pre.100.111",
+    "v1": "pre.100.112",
+    "v2": "pre.100.113",
+    "votes": "v0 + v1 + v2",
+    "action": "command.101.120",
+    "principal": "context.102.130",
+    "authorized": "context.102.131"
+  },
+  "cases": [
+    {
+      "when": "(phase == 150 && votes != 0) || (phase == 152 && votes < ${K})",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "phase == 152 || (action == 160 && phase != 150) || (action != 160 && phase != 151)",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 161 && ((principal == 0 && v0) || (principal == 1 && v1) || (principal == 2 && v2))",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 162 && votes < ${K}",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 160",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "111": false,
+        "112": false,
+        "113": false
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 161",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 151,
+        "111": "v0 || principal == 0",
+        "112": "v1 || principal == 1",
+        "113": "v2 || principal == 2"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": 152,
+        "111": "v0",
+        "112": "v1",
+        "113": "v2"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 150,
+    "111": false,
+    "112": false,
+    "113": false
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation"
+  }
+}

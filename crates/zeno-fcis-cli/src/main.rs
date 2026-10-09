@@ -10,6 +10,7 @@ mod contract_adopt;
 mod contract_diff;
 mod contract_evolve;
 mod contract_files;
+mod draft_command;
 mod durable_counter;
 mod inventory_reservation;
 mod loop_command;
@@ -132,6 +133,8 @@ struct Cli {
 enum ContractCommand {
     #[command(flatten)]
     Review(review_command::Command),
+    #[command(flatten)]
+    Draft(draft_command::Command),
     #[command(flatten)]
     Adopt(contract_adopt::Command),
     #[command(flatten)]
@@ -381,6 +384,7 @@ fn run(command: Command) -> u8 {
         Command::Loop { command } => loop_command::run(command),
         Command::Contract { command } => match command {
             ContractCommand::Review(command) => review_command::run(command),
+            ContractCommand::Draft(command) => draft_command::run(command),
             ContractCommand::Adopt(command) => contract_adopt::run(command),
             ContractCommand::Diff(command) => contract_diff::run(command),
             ContractCommand::Evolve(command) => contract_evolve::run(command),
@@ -543,7 +547,8 @@ fn describe_effects(path: &[String]) -> Value {
             | ["synth", "completion"]
             | ["transform"]
             | ["loop"]
-            | ["contract"] => {
+            | ["contract"]
+            | ["contract", "draft"] => {
                 return json!({"classification": "command-group"});
             }
             ["describe"]
@@ -626,6 +631,21 @@ fn describe_effects(path: &[String]) -> Value {
             ),
             ["loop", "resume"] => (&["session-directory"], &["session-directory"], false, None),
             ["loop", "encode"] => (&["program-json"], &["canonical-program"], false, None),
+            ["contract", "draft", "start" | "propose" | "label"] => (
+                &["draft-session", "supplied-intent-rules-labels"],
+                &["draft-session"],
+                false,
+                None,
+            ),
+            ["contract", "draft", "questions" | "check"] => {
+                (&["draft-session"], &["temporary-draft-lock"], false, None)
+            }
+            ["contract", "draft", "finalize"] => (
+                &["draft-session"],
+                &["new-draft-contract", "temporary-draft-lock"],
+                false,
+                None,
+            ),
             ["contract", "review"] => (
                 &["application-contract", "decision-examples"],
                 &["optional-review-packet"],

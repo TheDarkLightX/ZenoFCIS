@@ -1,0 +1,71 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "rate-limiter-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "start": "pre.100.110",
+    "used": "pre.100.111",
+    "now": "context.102.130",
+    "authorized": "context.102.131"
+  },
+  "cases": [
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now < start",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now < start + ${W} && used == ${N}",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now >= start + ${W}",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "now",
+        "111": 1
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "start",
+        "111": "used + 1"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AssetConservation"
+  }
+}
