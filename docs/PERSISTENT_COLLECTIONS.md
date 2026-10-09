@@ -41,8 +41,10 @@ All dependency versions are pinned exactly per ZenoFCIS dependency policy.
 
 ### Deterministic Resource Bounds
 
-- No explicit size limits in the adapter layer; bounds are inherited from
-  `zeno-fcis-value`'s `Value::Map` validation.
+- The original adapters have no explicit size limits; bounds are inherited
+  from `zeno-fcis-value`'s `Value::Map` validation. Optional immutable wrappers
+  add explicit entry, framed-item and complete snapshot byte bounds; see
+  [bounded collections and pipes](BOUNDED_COLLECTIONS_AND_PIPES.md).
 - `BTreeMapBackend`: O(n) clone per insert/remove (no structural sharing).
 - `RpdsBackend`: shared hash-trie nodes; hash collisions can increase lookup
   and update work. Materializing canonical order requires sorting the entries.

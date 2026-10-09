@@ -288,3 +288,6 @@ pub type ImblBackend = OrderedMap;
 #[cfg(test)]
 #[allow(missing_docs, clippy::panic)]
 mod tests;
+
+pub mod bounded;
+pub mod pipe;
