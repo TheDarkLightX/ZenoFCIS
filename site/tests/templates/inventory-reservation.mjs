@@ -10,7 +10,7 @@ import { integer, kind, lines, named, reason } from "../examples.mjs";
 const ACTIONS = { 150: "Reserve", 151: "Release", 152: "Ship", 153: "Restock" };
 const LARGEST_QUANTITY = 3;
 
-export const laws = { Accept: [500, 501, 502], CommittedFailure: [500, 508], Reject: [509] };
+export const laws = { Accept: [500, 501, 502, 991], CommittedFailure: [500, 508, 991], Reject: [509, 991] };
 
 // Inputs refused before any decision, with the stage that refuses them.
 export const refusals = [

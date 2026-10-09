@@ -1,5 +1,5 @@
-//! The order-fulfillment example's authority, program, and law checker, run
-//! in the browser over the library's in-memory reference shell.
+//! The order-fulfillment example's checked V2 contract, run in the browser
+//! with genuine publications and an ephemeral local store.
 //!
 //! The step, the report, and the C ABI are `zeno-fcis-site-common`'s. This
 //! crate names the application's types, its exact genesis, and the mapping
@@ -10,12 +10,8 @@ use order_fulfillment::{
     authority,
     bindings::GeneratedProject,
     command,
-    delivery::Destination,
     generated::{Caller, CallerContext, Order, OrderAction, OrderCommand},
-    genesis_state,
-    laws::OrderLaws,
-    profile,
-    program::OrderProgram,
+    genesis_state, profile, v2_contract,
 };
 use zeno_fcis_site_common::{
     Application, Authority, Json, Map, Names, Request, RustCryptoSha256, SchemaAdmittedEnvelope,
@@ -37,14 +33,14 @@ fn admit_root(order: &Order) -> Result<SchemaAdmittedEnvelope, String> {
 
 impl Application for OrderFulfillment {
     const NAME: &'static str = "order-fulfillment";
-    type Program = OrderProgram;
-    type Laws = OrderLaws;
-    type Destination = Destination;
     type Command = OrderCommand;
     type Context = CallerContext;
 
-    fn authority() -> Result<Authority<Self>, String> {
-        authority()
+    fn with_authority<R>(f: impl FnOnce(&Authority<'_>) -> R) -> Result<R, String> {
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor)?;
+        Ok(f(&authority))
     }
 
     fn names() -> Result<Names, String> {
@@ -208,13 +204,13 @@ mod tests {
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<OrderFulfillment>::new().unwrap();
         let accept = demo.step(&request("Checkout", "Customer")).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 503, 504, 505]);
+        assert_eq!(law_ids(&accept), [500, 501, 502, 503, 504, 505, 991]);
         let failure = demo
             .step(&callback("PaymentDeclined", 1, "PaymentProvider"))
             .unwrap();
-        assert_eq!(law_ids(&failure), [500, 506]);
+        assert_eq!(law_ids(&failure), [500, 506, 991]);
         let reject = demo.step(&request("ParcelDelivered", "Carrier")).unwrap();
-        assert_eq!(law_ids(&reject), [509]);
+        assert_eq!(law_ids(&reject), [509, 991]);
     }
 
     #[test]

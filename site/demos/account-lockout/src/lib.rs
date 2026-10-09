@@ -1,5 +1,5 @@
-//! The account-lockout example's authority, program, and law checker, run in
-//! the browser over the library's in-memory reference shell.
+//! The account-lockout example's checked V2 contract, run in the browser
+//! with genuine publications and an ephemeral local store.
 //!
 //! The step, the report, and the C ABI are `zeno-fcis-site-common`'s. This
 //! crate names the application's types, its exact genesis, and the mapping
@@ -10,12 +10,8 @@ use account_lockout::{
     authority,
     bindings::GeneratedProject,
     context,
-    delivery::Destination,
     generated::{Account, AccountCommand, RequestContext},
-    genesis_state,
-    laws::AccountLaws,
-    profile,
-    program::AccountProgram,
+    genesis_state, profile, v2_contract,
 };
 use zeno_fcis_site_common::{
     Application, Authority, Json, Map, Names, Request, RustCryptoSha256, SchemaAdmittedEnvelope,
@@ -37,14 +33,14 @@ fn admit_root(account: &Account) -> Result<SchemaAdmittedEnvelope, String> {
 
 impl Application for AccountLockout {
     const NAME: &'static str = "account-lockout";
-    type Program = AccountProgram;
-    type Laws = AccountLaws;
-    type Destination = Destination;
     type Command = AccountCommand;
     type Context = RequestContext;
 
-    fn authority() -> Result<Authority<Self>, String> {
-        authority()
+    fn with_authority<R>(f: impl FnOnce(&Authority<'_>) -> R) -> Result<R, String> {
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor)?;
+        Ok(f(&authority))
     }
 
     fn names() -> Result<Names, String> {
@@ -134,6 +130,32 @@ mod tests {
     }
 
     #[test]
+    fn identical_new_requests_are_distinct_commits_and_each_replay_is_idempotent() {
+        let mut demo = Demo::<AccountLockout>::new().unwrap();
+        let initial = demo.state().unwrap();
+        let input = request("AdminUnlock", 0, true);
+        let first = demo.step(&input).unwrap();
+        let second = demo.step(&input).unwrap();
+        assert_eq!(first["decision"], "Accept");
+        assert_eq!(second["decision"], "Accept");
+        assert_eq!(first["before"], initial["state"]);
+        assert_eq!(second["after"], initial["state"]);
+        assert_eq!(first["roots"]["after"], second["roots"]["after"]);
+        assert_eq!(first["bundles"], 1);
+        assert_eq!(second["bundles"], 2);
+        assert_eq!(first["commit"]["replay"], "IdempotentReplay");
+        assert_eq!(second["commit"]["replay"], "IdempotentReplay");
+        assert_ne!(first["authorization_id"], second["authorization_id"]);
+        assert_ne!(
+            first["outbox"][0]["delivery_id"],
+            second["outbox"][0]["delivery_id"]
+        );
+        let final_state = demo.state().unwrap();
+        assert_eq!(final_state["bundles"], 2);
+        assert_eq!(final_state["outbox"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
     fn three_failed_logins_lock_the_account_and_queue_a_named_alert() {
         let mut demo = Demo::<AccountLockout>::new().unwrap();
         let first = demo.step(&request("LoginFailed", 1000, false)).unwrap();
@@ -200,11 +222,11 @@ mod tests {
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<AccountLockout>::new().unwrap();
         let failure = demo.step(&request("LoginFailed", 1000, false)).unwrap();
-        assert_eq!(law_ids(&failure), [500, 503]);
+        assert_eq!(law_ids(&failure), [500, 503, 991]);
         let accept = demo.step(&request("LoginSucceeded", 1010, false)).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502]);
+        assert_eq!(law_ids(&accept), [500, 501, 502, 991]);
         let reject = demo.step(&request("AdminUnlock", 1020, false)).unwrap();
-        assert_eq!(law_ids(&reject), [509]);
+        assert_eq!(law_ids(&reject), [509, 991]);
         assert_eq!(accept["laws"][1]["name"], "login_clears_failures");
         assert_eq!(reject["laws"][0]["name"], "reject_publishes_nothing");
     }
