@@ -36,6 +36,7 @@
 - [Composed root projection conformance](COMPOSED_ROOT_PROJECTION_CONFORMANCE.md)
 - [Project relational laws](PROJECT_RELATIONAL_LAWS.md)
 - [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md)
+- [Policy-bound genesis authorization](GENESIS_AUTHORIZATION.md)
 - [Candidate and commit boundary](CANDIDATE_COMMIT_BOUNDARY.md)
 
 ## Formal tools and runtime refinement

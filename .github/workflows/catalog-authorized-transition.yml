@@ -32,7 +32,7 @@ jobs:
       - name: Format
         run: cargo +1.97.1 fmt --all -- --check
 
-      - name: Compile authority and concrete commit port
+      - name: Compile genesis, transition authority, and concrete commit port
         run: |
           cargo +1.97.1 clippy \
             -p zeno-fcis-crypto \
@@ -41,7 +41,7 @@ jobs:
             -p zeno-fcis-shell-sqlite \
             --all-targets --all-features --locked -- -D warnings
 
-      - name: Authority, substitution, replay, and crash laws
+      - name: Genesis, authority, substitution, replay, and crash laws
         run: |
           cargo +1.97.1 test \
             -p zeno-fcis-crypto \
