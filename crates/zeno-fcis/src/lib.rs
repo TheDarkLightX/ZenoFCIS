@@ -1,7 +1,73 @@
-//! Umbrella exports for the ZenoFCIS semantic, candidate, composition, and refinement kernel.
+//! Supported umbrella for the ZenoFCIS functional core and integration layers.
+//!
+//! Start with [`prelude`] and enable only the feature that owns the boundary
+//! being integrated. The low-level re-exports remain available for advanced,
+//! reference, and adapter implementations.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+
+/// Curated imports for application code.
+///
+/// This module intentionally excludes raw candidate sealing and reference-shell
+/// commit functions. Production projects should construct catalogued
+/// transitions, verify project laws, and publish only through nominal
+/// authorization.
+pub mod prelude {
+    pub use crate::{
+        Accepted, AdmittedEnvelope, AdmittedValue, AsciiText, Budget, BudgetExceeded, BudgetLimits,
+        BudgetUsed, BudgetedDecision, CanonicalEncode, Decision, DecisionKind, Domain, Failed,
+        Hash32, NonEmptyVec, OwnedBytes, ProjectProfile, RegistryEntry, RegistryKind, Rejected,
+        Resource, SemanticId, StableName, StableReason, Transition, Value,
+    };
+
+    #[cfg(feature = "catalog")]
+    pub use crate::{
+        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, ProjectCatalog,
+        ReasonDefinition, ReasonDisposition,
+    };
+
+    #[cfg(feature = "transition")]
+    pub use crate::{
+        CataloguedTransitionBuilder, ExpectedInvocationBindings, TransitionDecision,
+        TransitionError, TransitionLimits,
+    };
+
+    #[cfg(feature = "laws")]
+    pub use crate::{
+        LawDefinition, LawManifest, ProjectLawEngine, VerifiedProjectLaws, verify_project_laws,
+    };
+
+    #[cfg(feature = "authority")]
+    pub use crate::{
+        AuthorizedShellState, BoundInterpreter, CatalogCommitAuthority, CatalogTransitionProgram,
+        ExecutionBinding, InvocationWitness, StateDomainBinding,
+    };
+
+    #[cfg(feature = "rustcrypto-sha256")]
+    pub use crate::RustCryptoSha256;
+
+    #[cfg(feature = "domain-machines")]
+    pub use crate::{
+        DomainMachine, EnvelopeBinding, ExecutableComposition, FixedInvocationMatrix,
+        FixedOutputMatrix, FixedStateMatrix, MachineInterface, TypedPathBinding,
+    };
+
+    #[cfg(feature = "composed-program")]
+    pub use crate::{
+        ComposedDomainProgram, ExternalOutput, ProjectionPlan, derive_semantic_program_hash,
+    };
+
+    #[cfg(feature = "backend")]
+    pub use crate::{
+        BackendEngine, BackendError, BackendIdentity, BackendLimits, BackendOperation,
+        BackendRequest, BackendRequestTemplate, BackendResponse, BackendVerifier,
+        VerificationDecision, VerifiedBackendRun, execute_verified,
+    };
+
+    #[cfg(feature = "bootstrap")]
+    pub use crate::{BootstrapLimits, BootstrapSpec, generate_project};
+}
 
 #[cfg(feature = "mounted-runtime")]
 /// Strict project-neutral mounted-runtime adapters and replay fixtures.
