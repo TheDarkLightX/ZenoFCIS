@@ -20,7 +20,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
 
-use zeno_fcis_catalog::{CatalogError, ProjectCatalog};
+use zeno_fcis_catalog::{CatalogError, ProjectCatalog, ValueFlowKind};
 use zeno_fcis_codec::{CanonicalEncode, CommitmentHasher, Domain, EncodeError, Hash32, commitment};
 use zeno_fcis_core::DecisionKind;
 use zeno_fcis_evidence::{CoverageDeclaration, EvidenceEnvelope, SourceBindings};
@@ -191,6 +191,10 @@ impl DecisionScope {
             Self::CommittedFailure => matches!(decision, DecisionKind::CommittedFailure),
             Self::Committing => !matches!(decision, DecisionKind::Reject),
         }
+    }
+
+    const fn covers_committing(self) -> bool {
+        self.applies(DecisionKind::Accept) && self.applies(DecisionKind::CommittedFailure)
     }
 }
 
@@ -1332,6 +1336,7 @@ where
     V: LawEvidenceVerifier,
 {
     limits.validate()?;
+    validate_catalog_law_requirements(catalog, &manifest)?;
     if manifest.definitions.len()
         > usize::try_from(limits.max_definitions).map_err(|_| LawError::ResourceLimit)?
         || evidence.len()
@@ -1474,6 +1479,98 @@ where
         engine,
         marker: PhantomData,
     })
+}
+
+fn validate_catalog_law_requirements(
+    catalog: &ProjectCatalog,
+    manifest: &LawManifest,
+) -> Result<(), LawError> {
+    let mut required = BTreeSet::new();
+    let mut custom_claims = BTreeSet::new();
+    let semantics = catalog
+        .manifest()
+        .effects()
+        .iter()
+        .map(|definition| definition.semantics())
+        .chain(
+            catalog
+                .manifest()
+                .channels()
+                .iter()
+                .map(|definition| definition.semantics()),
+        );
+    for operation in semantics {
+        if !operation.is_value_moving() {
+            continue;
+        }
+        for flow in operation.flows().iter().copied() {
+            required.insert(LawKind::AssetConservation);
+            required.insert(LawKind::AuthoritySubjectRecipient);
+            match flow.kind() {
+                ValueFlowKind::Transfer
+                | ValueFlowKind::EscrowLock
+                | ValueFlowKind::EscrowRelease
+                | ValueFlowKind::ExternalValueDelivery => {
+                    required.insert(LawKind::DebitCreditEffectEquality);
+                }
+                ValueFlowKind::Mint | ValueFlowKind::Burn => {
+                    required.insert(LawKind::MintBurnAuthorization);
+                }
+                ValueFlowKind::FeeCharge => {
+                    required.insert(LawKind::DebitCreditEffectEquality);
+                    required.insert(LawKind::FeeAndRounding);
+                }
+                ValueFlowKind::Settlement | ValueFlowKind::Custom => {
+                    required.insert(LawKind::MintBurnAuthorization);
+                    required.insert(LawKind::DebitCreditEffectEquality);
+                    required.insert(LawKind::FeeAndRounding);
+                }
+            }
+            if let Some(claim) = flow.custom_claim() {
+                custom_claims.insert(claim);
+            }
+        }
+    }
+    for kind in required {
+        let policy = manifest
+            .families
+            .iter()
+            .find(|policy| policy.kind == kind)
+            .ok_or(LawError::IncompleteFamilyPolicy)?;
+        if !matches!(policy.disposition, LawFamilyDisposition::Required) {
+            return Err(LawError::CatalogRequiredFamilyNotApplicable(kind));
+        }
+        let mut definitions = manifest
+            .definitions
+            .iter()
+            .filter(|definition| definition.kind == kind);
+        let covers_accept = definitions
+            .clone()
+            .any(|definition| definition.scope.applies(DecisionKind::Accept));
+        let covers_committed_failure =
+            definitions.any(|definition| definition.scope.applies(DecisionKind::CommittedFailure));
+        if !covers_accept || !covers_committed_failure {
+            return Err(LawError::MissingCommittingCoverage(kind));
+        }
+    }
+    for (claim_id, claim_hash) in custom_claims {
+        let definition = manifest
+            .definitions
+            .binary_search_by_key(&claim_id, LawDefinition::id)
+            .ok()
+            .map(|index| &manifest.definitions[index])
+            .ok_or(LawError::MissingCustomValueLaw(claim_id))?;
+        if definition.claim_hash != claim_hash {
+            return Err(LawError::CustomValueLawClaimMismatch(claim_id));
+        }
+        if !definition.scope.covers_committing() {
+            return Err(LawError::MissingCustomValueLawCoverage(claim_id));
+        }
+        if !definition.evidence.requires_retained_evidence() {
+            return Err(LawError::CustomValueLawRequiresEvidence(claim_id));
+        }
+    }
+    Ok(())
 }
 
 /// Successful complete per-invocation law evaluation.
@@ -1884,6 +1981,18 @@ pub enum LawError {
     MissingRequiredFamily(LawKind),
     /// An inapplicable family contains a hidden definition.
     DefinitionForInapplicableFamily(LawKind),
+    /// The exact catalog carries value but marks a derived economic family inapplicable.
+    CatalogRequiredFamilyNotApplicable(LawKind),
+    /// A catalog-required economic family does not cover both committing decisions.
+    MissingCommittingCoverage(LawKind),
+    /// A custom value flow names no law in the complete manifest.
+    MissingCustomValueLaw(SemanticId),
+    /// A custom value flow's claim differs from the registered law claim.
+    CustomValueLawClaimMismatch(SemanticId),
+    /// A custom value-flow law does not cover both committing decisions.
+    MissingCustomValueLawCoverage(SemanticId),
+    /// A custom value-flow law lacks independently retained evidence.
+    CustomValueLawRequiresEvidence(SemanticId),
     /// Two definitions share one stable identifier.
     DuplicateLawId,
     /// Two definitions share one stable name.
@@ -1961,7 +2070,10 @@ impl core::error::Error for LawError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeno_fcis_catalog::{CatalogLimits, CatalogManifest};
+    use zeno_fcis_catalog::{
+        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, HashRequirement,
+        OperationSemantics, ValueFlow, ValueFlowKind,
+    };
     use zeno_fcis_evidence::{Assumption, EvidenceResult, ToolIdentity};
     use zeno_fcis_project::{DomainPrefix, ProfileBindings, ProjectProfile};
     use zeno_fcis_refine::ToolKind;
@@ -2114,9 +2226,24 @@ mod tests {
     }
 
     fn catalog(manifest: &LawManifest) -> ProjectCatalog {
+        catalog_with_effects(manifest, Vec::new())
+    }
+
+    fn catalog_with_effects(
+        manifest: &LawManifest,
+        effects: Vec<EffectDefinition>,
+    ) -> ProjectCatalog {
+        catalog_with_operations(manifest, effects, Vec::new())
+    }
+
+    fn catalog_with_operations(
+        manifest: &LawManifest,
+        effects: Vec<EffectDefinition>,
+        channels: Vec<ChannelDefinition>,
+    ) -> ProjectCatalog {
         let schema = schema();
         let catalog_manifest =
-            CatalogManifest::try_new::<TestHasher>(Vec::new(), Vec::new(), Vec::new())
+            CatalogManifest::try_new::<TestHasher>(Vec::new(), effects, channels)
                 .unwrap_or_else(|error| panic!("catalog manifest: {error}"));
         let mut entries = vec![
             root_entry(RegistryKind::StateType, 1, "state"),
@@ -2161,6 +2288,213 @@ mod tests {
             CatalogLimits::default(),
         )
         .unwrap_or_else(|error| panic!("catalog: {error}"))
+    }
+
+    fn complete_manifest(missing: Option<LawKind>, narrowed: Option<LawKind>) -> LawManifest {
+        let families = LawKind::ALL
+            .iter()
+            .copied()
+            .map(|kind| {
+                if Some(kind) == missing {
+                    LawFamilyPolicy::not_applicable(kind, hash(&[kind as u8, 0x55]))
+                        .unwrap_or_else(|error| panic!("family: {error}"))
+                } else {
+                    LawFamilyPolicy::required(kind)
+                }
+            })
+            .collect();
+        let definitions = LawKind::ALL
+            .iter()
+            .copied()
+            .filter(|kind| Some(*kind) != missing)
+            .map(|kind| {
+                let label = match kind {
+                    LawKind::StateInvariant => "complete-state",
+                    LawKind::AssetConservation => "complete-conservation",
+                    LawKind::MintBurnAuthorization => "complete-mint-burn",
+                    LawKind::DebitCreditEffectEquality => "complete-debit-credit",
+                    LawKind::FeeAndRounding => "complete-fee-rounding",
+                    LawKind::AuthoritySubjectRecipient => "complete-authority",
+                    LawKind::RejectNoAuthority => "complete-reject",
+                    LawKind::CommittedFailureEffects => "complete-failure",
+                };
+                let scope = match kind {
+                    LawKind::StateInvariant => DecisionScope::Committing,
+                    LawKind::RejectNoAuthority => DecisionScope::Reject,
+                    LawKind::CommittedFailureEffects => DecisionScope::CommittedFailure,
+                    _ if Some(kind) == narrowed => DecisionScope::Accept,
+                    _ => DecisionScope::Committing,
+                };
+                law(
+                    300 + kind as u32,
+                    label,
+                    kind,
+                    scope,
+                    LawEvidenceRequirement::RuntimeOnly,
+                )
+            })
+            .collect();
+        LawManifest::try_new(families, definitions)
+            .unwrap_or_else(|error| panic!("complete manifest: {error}"))
+    }
+
+    fn value_effect(kind: ValueFlowKind) -> EffectDefinition {
+        let flow = ValueFlow::standard(kind, hash(b"asset-domain"))
+            .unwrap_or_else(|error| panic!("flow: {error}"));
+        EffectDefinition::try_new(
+            id(20),
+            name("value-effect"),
+            TypeId::new(1),
+            HashRequirement::Present,
+            HashRequirement::Present,
+            OperationSemantics::value(vec![flow], hash(b"classification"))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
+            hash(b"value-policy"),
+        )
+        .unwrap_or_else(|error| panic!("effect: {error}"))
+    }
+
+    #[test]
+    fn value_flows_mechanically_require_their_economic_law_families() {
+        let cases = [
+            (ValueFlowKind::Transfer, LawKind::AssetConservation),
+            (ValueFlowKind::Transfer, LawKind::DebitCreditEffectEquality),
+            (ValueFlowKind::Mint, LawKind::MintBurnAuthorization),
+            (ValueFlowKind::FeeCharge, LawKind::FeeAndRounding),
+            (
+                ValueFlowKind::ExternalValueDelivery,
+                LawKind::AuthoritySubjectRecipient,
+            ),
+        ];
+        for (flow, missing) in cases {
+            let manifest = complete_manifest(Some(missing), None);
+            let catalog = catalog_with_effects(&manifest, vec![value_effect(flow)]);
+            assert_eq!(
+                validate_catalog_law_requirements(&catalog, &manifest),
+                Err(LawError::CatalogRequiredFamilyNotApplicable(missing))
+            );
+        }
+    }
+
+    #[test]
+    fn settlement_requires_every_economic_family() {
+        for missing in [
+            LawKind::AssetConservation,
+            LawKind::MintBurnAuthorization,
+            LawKind::DebitCreditEffectEquality,
+            LawKind::FeeAndRounding,
+            LawKind::AuthoritySubjectRecipient,
+        ] {
+            let manifest = complete_manifest(Some(missing), None);
+            let catalog =
+                catalog_with_effects(&manifest, vec![value_effect(ValueFlowKind::Settlement)]);
+            assert_eq!(
+                validate_catalog_law_requirements(&catalog, &manifest),
+                Err(LawError::CatalogRequiredFamilyNotApplicable(missing))
+            );
+        }
+    }
+
+    #[test]
+    fn economic_laws_must_cover_accept_and_committed_failure() {
+        for narrowed in [
+            LawKind::AssetConservation,
+            LawKind::MintBurnAuthorization,
+            LawKind::DebitCreditEffectEquality,
+            LawKind::FeeAndRounding,
+            LawKind::AuthoritySubjectRecipient,
+        ] {
+            let manifest = complete_manifest(None, Some(narrowed));
+            let catalog =
+                catalog_with_effects(&manifest, vec![value_effect(ValueFlowKind::Settlement)]);
+            assert_eq!(
+                validate_catalog_law_requirements(&catalog, &manifest),
+                Err(LawError::MissingCommittingCoverage(narrowed))
+            );
+        }
+    }
+
+    #[test]
+    fn separate_accept_and_failure_definitions_may_cover_one_family() {
+        let base = complete_manifest(None, None);
+        let mut definitions = base.definitions().to_vec();
+        definitions.retain(|definition| definition.kind() != LawKind::AssetConservation);
+        definitions.push(law(
+            401,
+            "accept-conservation",
+            LawKind::AssetConservation,
+            DecisionScope::Accept,
+            LawEvidenceRequirement::RuntimeOnly,
+        ));
+        definitions.push(law(
+            402,
+            "failure-conservation",
+            LawKind::AssetConservation,
+            DecisionScope::CommittedFailure,
+            LawEvidenceRequirement::RuntimeOnly,
+        ));
+        let manifest = LawManifest::try_new(base.families().to_vec(), definitions)
+            .unwrap_or_else(|error| panic!("split manifest: {error}"));
+        let catalog =
+            catalog_with_effects(&manifest, vec![value_effect(ValueFlowKind::Settlement)]);
+        assert_eq!(
+            validate_catalog_law_requirements(&catalog, &manifest),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn custom_value_flow_requires_exact_independently_evidenced_law() {
+        let manifest = complete_manifest(None, None);
+        let flow = ValueFlow::custom(
+            hash(b"asset-domain"),
+            id(301),
+            hash(b"complete-conservation"),
+        )
+        .unwrap_or_else(|error| panic!("flow: {error}"));
+        let effect = EffectDefinition::try_new(
+            id(20),
+            name("custom-value-effect"),
+            TypeId::new(1),
+            HashRequirement::Present,
+            HashRequirement::Present,
+            OperationSemantics::value(vec![flow], hash(b"custom-classification"))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
+            hash(b"custom-policy"),
+        )
+        .unwrap_or_else(|error| panic!("effect: {error}"));
+        let catalog = catalog_with_effects(&manifest, vec![effect]);
+        assert_eq!(
+            validate_catalog_law_requirements(&catalog, &manifest),
+            Err(LawError::CustomValueLawRequiresEvidence(id(301)))
+        );
+    }
+
+    #[test]
+    fn external_value_channel_derives_the_same_nonwaivable_laws() {
+        let manifest = complete_manifest(Some(LawKind::DebitCreditEffectEquality), None);
+        let flow = ValueFlow::standard(
+            ValueFlowKind::ExternalValueDelivery,
+            hash(b"channel-asset-domain"),
+        )
+        .unwrap_or_else(|error| panic!("flow: {error}"));
+        let channel = ChannelDefinition::try_new(
+            id(30),
+            name("value-delivery"),
+            TypeId::new(1),
+            TypeId::new(1),
+            OperationSemantics::value(vec![flow], hash(b"channel-classification"))
+                .unwrap_or_else(|error| panic!("semantics: {error}")),
+            hash(b"delivery-policy"),
+        )
+        .unwrap_or_else(|error| panic!("channel: {error}"));
+        let catalog = catalog_with_operations(&manifest, Vec::new(), vec![channel]);
+        assert_eq!(
+            validate_catalog_law_requirements(&catalog, &manifest),
+            Err(LawError::CatalogRequiredFamilyNotApplicable(
+                LawKind::DebitCreditEffectEquality
+            ))
+        );
     }
 
     fn proof_input(catalog: &ProjectCatalog, artifact: &[u8]) -> LawEvidenceInput {
