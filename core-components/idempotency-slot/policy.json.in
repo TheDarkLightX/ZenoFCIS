@@ -1,0 +1,62 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "idempotency-slot-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "106": [
+      "Bool"
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "seen": "pre.100.110",
+    "key": "pre.100.111",
+    "value": "pre.100.112",
+    "cmd_key": "command.101.120",
+    "cmd_value": "command.101.121",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "seen && key == cmd_key && value != cmd_value",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "true",
+        "111": "cmd_key",
+        "112": "cmd_value"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": false,
+    "111": 0,
+    "112": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+  }
+}

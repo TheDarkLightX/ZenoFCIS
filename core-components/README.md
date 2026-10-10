@@ -1,31 +1,34 @@
-# Bounded F1 component seeds
+# Zeno Core component catalogue
 
-These three data packages propose reusable application behavior through the
+These ten data packages describe reusable application behavior through the
 existing F1 compiler, library Authority and generated SQLite application. They
 add no Rust decision callback, alternate evaluator or authority API. They are
-V2.2 G1 source work and V2.3 seeds, not a completed standard-library release.
+V2.2 G1 source work extended for V2.3. Coupled application compositions and the
+remaining V2.3 release gates are separate work.
 
 The [finite certificate route](FINITE_PROOFS.md) covers every declared parameter
-instance and all 6,158 raw inputs, including invalid prestates. It executes the
+instance and all 107,518 raw inputs, including invalid prestates. It executes the
 mandatory Authority and checks class, reason, successor fields and deliveries
 against an independent complete reference. Qualification also requires three
-actual law-violating policies, seven certificate tampering controls, and proof
-references surviving ordinary scaffolding for all 21 instances.
+actual law-violating policies for the original three families and fourteen for
+the additional seven, seven certificate tampering controls, and proof
+references surviving ordinary scaffolding for all 77 instances.
 
 Stored certificates have level **Identified**. Successful current-build exhaustive
 replay supports **Proved for this complete finite scope**, under the named trusted
 base in the certificate document. Source-hash agreement alone does not replay a
 proof. The reference was authored by a separate agent from the public semantics
-before that agent read these templates; it is test-only, not an owner adoption
+before that agent read these templates; the seven additions retain the separately
+written Root guard-chain references. The reference is test-only, not an owner adoption
 label. This route establishes no Lean `KernelChecked` or unbounded family theorem.
 
-The separate retained generated-app report records all 84 native tests across
-21 applications: independent examples, genesis, persistent commit/replay and the
-shared parser. Its SHA256 is
-`ed41a32a80dffb3a41893e46a048c5167effd3946a9b543a96ae71e7ce73ac83`.
-Certificate issuance inherits that genesis evidence only when every canonical
-generated artifact is identical. A new transition replay does not rerun those
-native tests or prove a general temporal induction theorem.
+The separate retained generated-app report must record all four native tests
+for every one of the 77 applications: independent examples, genesis, persistent
+commit/replay and the shared parser. Its exact identity is pinned by
+`NATIVE_REPORT_SHA256` in the certificate issuer. Certificate issuance inherits
+that genesis evidence only when every canonical generated artifact is identical.
+A new transition replay does not rerun those native tests or prove a general
+temporal induction theorem.
 
 ## Instantiate and use
 
@@ -36,6 +39,8 @@ crate trees. From the source tree, with the parent output directory already
 present and the locked dependencies available locally:
 
 ```sh
+python3 tools/instantiate_core.py --list
+python3 tools/instantiate_core.py versioned-register --show
 component_target="$PWD/target/core-components"
 component_host="$(rustc +1.97.1 -vV | sed -n 's/^host: //p')"
 cargo +1.97.1 build -p zeno-fcis-cli --locked --offline \
@@ -57,7 +62,7 @@ replay-required certificate reference. Its provenance comment also survives
 Generation and review do not authorize production use.
 
 Generated READMEs explain the application commands. Shell code authenticates
-principals/authorization, obtains time and owns persistence. All three seeds
+principals/authorization, obtains time and owns persistence. All ten components
 return plain complete successor data or business Reject with unchanged state.
 They emit no deliveries; consuming inventory or executing approval here records
 logical state, not an external shipment or payment.
@@ -69,15 +74,52 @@ logical state, not an external shipment or payment.
 | Reservation | C=1..4, Q=1..min(C,3): 9 | 8 Q (C+1)^2; max 600 | (C+1)^2; max 25 |
 | Rate limiter | W=1..3, N=1..3: 9 | 98 (N+1); max 392 | 7 (N+1); max 28 |
 | Approval | K=1..3: 3 | 432 | 24 |
+| Bounded counter | C=1..8: 8 | 4 (C+1); max 36 | C+1; max 9 |
+| Consumable budget | C=1..8: 8 | 2 (C+1)^2; max 162 | C+1; max 9 |
+| Versioned register | C=1..8: 8 | 2 (C+1)^4; max 13,122 | (C+1)^2; max 81 |
+| Idempotency slot | C=1..8: 8 | 4 (C+1)^4; max 26,244 | 2 (C+1)^2; max 162 |
+| Retry budget | C=1..8: 8 | 8 (C+1); max 72 | 2 (C+1); max 18 |
+| Finite phase machine | C=1..8: 8 | 4 (C+1); max 36 | C+1; max 9 |
+| Logical deadline | C=1..8: 8 | 4 (C+1)^3; max 2,916 | 2 (C+1)^2; max 162 |
 
-Totals: 2,216 reservation + 2,646 rate + 1,296 approval = 6,158 raw
-input tuples across all 21 instances. Input products include invalid but
+Totals: the original three families' 6,158 inputs plus 744 counter/budget inputs
+and 100,616 inputs for the five other families = 107,518 raw input tuples across
+all 77 instances. Input products include invalid but
 schema-admitted prestates, every supplied authorization value and every command.
 They are not reachable-state samples. There is no synthesis output enumeration:
 ordinary F1 compiles the ordered cases and F2 enumerates actual Authority inputs.
 Actual graph sizes, output counts and Step budgets are recorded by execution
 qualification, not inferred from these products. Unsupported parameters fail;
 there is no fallback to boundary sampling or silently narrower schemas.
+
+Nonvacuity is checked for every intended command kind, including both counter
+directions, Attempt/Finish and Advance/Reset. A numeric argument is not a command
+kind: a versioned-register Write whose expected version is already C necessarily
+rejects, because this bounded profile never wraps or increases beyond C.
+
+## Additional components
+
+- [Bounded counter](bounded-counter/README.md): authorized one-unit increments
+  and decrements within 0..C, with unchanged rejection at either boundary.
+- [Consumable budget](consumable-budget/README.md): exact subtraction of the
+  requested amount; zero spends are allowed and no refill is modeled.
+- [Versioned register](versioned-register/README.md): a supplied expected version
+  must match, and an accepted write advances the version exactly once.
+- [Idempotency slot](idempotency-slot/README.md): conflicting values for the
+  retained key reject; matching pairs accept unchanged. A new key replaces the
+  slot, so this does not remember every historical key.
+- [Retry budget](retry-budget/README.md): Attempt consumes one unit; Finish
+  closes without charging. The component does not perform or schedule retries.
+- [Finite phase machine](finite-phase-machine/README.md): Advance increments;
+  Reset is accepted only at the final phase and returns to zero.
+- [Logical deadline](logical-deadline/README.md): a supplied, nonregressive Tick
+  at or after the deadline records that value and marks the deadline reached.
+  The component neither reads a clock nor establishes physical time.
+
+These use fixed local declaration IDs and own one state root each. Copying their
+data beside another component is not a composition proof. Rebinding IDs, global
+resource conservation and atomic joint decisions need a complete composed
+descriptor with its own coupled laws and negative controls.
 
 ## Reservation pool
 
@@ -163,13 +205,14 @@ python3 tools/check_core_components.py --cli /path/to/zeno-fcis \
 ```
 
 Run it only under the allocated test slot and resource wrapper (4 GiB,
-swap 0, CPU 100%, one Cargo job). It sequentially instantiates all 21 parameter
+swap 0, CPU 100%, one Cargo job). It sequentially instantiates all 77 parameter
 values, generates and regeneration-checks, performs full F2 review, requires
-zero technical refusals over every raw tuple and exact agreement with all 6,158
+zero technical refusals over every raw tuple and exact agreement with all 107,518
 independent expectations, scaffolds each app, validates the dependency binding,
 and runs its generated tests (genesis, every example, persistent commit/replay,
-and shared parser). It plants a lost reservation credit, a free quota request
-and a lost approval vote; each must cause an actual lawful-prestate law refusal.
+and shared parser). It plants seventeen policy faults, including lost reservation
+credit, free quota requests, lost approval votes, incorrect successor updates
+and removed authorization guards; each must cause an actual lawful-prestate law refusal.
 The report binds source inputs, artifacts, CLI, review packets and test logs.
 
 The fixed verifier inventory, source-bound certificate replay, global acceptance,

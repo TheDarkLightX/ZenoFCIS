@@ -1,6 +1,5 @@
-//! The agent-treasury-guard example's authority, adapter, synthesized core,
-//! and law checker, run in the browser over the library's in-memory
-//! reference shell.
+//! The agent-treasury-guard example's checked V2 contract, run in the browser
+//! with genuine publications and an ephemeral local store.
 //!
 //! The step, the report, and the C ABI are `zeno-fcis-site-common`'s. This
 //! crate names the application's types, its exact genesis, and the mapping
@@ -10,15 +9,9 @@
 use agent_treasury_guard::{
     authority,
     bindings::GeneratedProject,
-    context,
-    delivery::Destination,
-    failed,
+    context, failed,
     generated::{Caller, Direction, GuardContext, ModelId, Treasury, TreasuryCommand},
-    genesis_state,
-    laws::GuardLaws,
-    profile,
-    program::GuardProgram,
-    propose, settled,
+    genesis_state, profile, propose, settled, v2_contract,
 };
 use zeno_fcis_site_common::{
     Application, Authority, Json, Map, Names, Request, RustCryptoSha256, SchemaAdmittedEnvelope,
@@ -40,14 +33,14 @@ fn admit_root(treasury: &Treasury) -> Result<SchemaAdmittedEnvelope, String> {
 
 impl Application for AgentTreasuryGuard {
     const NAME: &'static str = "agent-treasury-guard";
-    type Program = GuardProgram;
-    type Laws = GuardLaws;
-    type Destination = Destination;
     type Command = TreasuryCommand;
     type Context = GuardContext;
 
-    fn authority() -> Result<Authority<Self>, String> {
-        authority()
+    fn with_authority<R>(f: impl FnOnce(&Authority<'_>) -> R) -> Result<R, String> {
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor)?;
+        Ok(f(&authority))
     }
 
     fn names() -> Result<Names, String> {
@@ -259,11 +252,14 @@ mod tests {
         let accept = demo
             .step(&proposal("BuyBase", 2, 2, "Agent", 1, 1))
             .unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502, 503, 504, 505, 506, 507]);
+        assert_eq!(
+            law_ids(&accept),
+            [500, 501, 502, 503, 504, 505, 506, 507, 991]
+        );
         let failed_swap = demo.step(&failure(1, "Dex", 2)).unwrap();
-        assert_eq!(law_ids(&failed_swap), [500, 501, 502, 508]);
+        assert_eq!(law_ids(&failed_swap), [500, 501, 502, 508, 991]);
         let reject = demo.step(&failure(1, "Dex", 3)).unwrap();
-        assert_eq!(law_ids(&reject), [509]);
+        assert_eq!(law_ids(&reject), [509, 991]);
     }
 
     #[test]

@@ -76,6 +76,79 @@ def approval(quorum, values):
     raise ValueError("action outside the declared finite domain")
 
 
+# Added from the separately retained Root guard-chain references, before their
+# policy integration. These functions are test expectations, never callbacks.
+def counter(capacity, values):
+    value, action, authorized = values
+    if not authorized:
+        return result(200, (value,))
+    if action == 150:
+        return result(201, (value,)) if value == capacity else result(None, (value + 1,))
+    if action == 151:
+        return result(202, (value,)) if value == 0 else result(None, (value - 1,))
+    raise ValueError("action outside the declared finite domain")
+
+
+def budget(capacity, values):
+    remaining, amount, authorized = values
+    if not authorized:
+        return result(200, (remaining,))
+    return result(201, (remaining,)) if amount > remaining else result(None, (remaining - amount,))
+
+
+def register(capacity, values):
+    value, version, expected, new, authorized = values
+    pre = value, version
+    if not authorized:
+        return result(200, pre)
+    if expected != version:
+        return result(201, pre)
+    return result(202, pre) if version == capacity else result(None, (new, version + 1))
+
+
+def slot(capacity, values):
+    seen, key, value, new_key, new_value, authorized = values
+    pre = seen, key, value
+    if not authorized:
+        return result(200, pre)
+    if seen and key == new_key and value != new_value:
+        return result(201, pre)
+    return result(None, (1, new_key, new_value))
+
+
+def retry(capacity, values):
+    remaining, closed, finish, authorized = values
+    pre = remaining, closed
+    if not authorized:
+        return result(200, pre)
+    if closed:
+        return result(201, pre)
+    if finish:
+        return result(None, (remaining, 1))
+    return result(202, pre) if remaining == 0 else result(None, (remaining - 1, 0))
+
+
+def phase(capacity, values):
+    old, reset, authorized = values
+    if not authorized:
+        return result(200, (old,))
+    if reset:
+        return result(None, (0,)) if old == capacity else result(201, (old,))
+    return result(202, (old,)) if old == capacity else result(None, (old + 1,))
+
+
+def deadline(capacity, values):
+    due, last, reached, now, authorized = values
+    pre = due, last, reached
+    if not authorized:
+        return result(200, pre)
+    if now < last:
+        return result(201, pre)
+    if reached:
+        return result(202, pre)
+    return result(203, pre) if now < due else result(None, (due, now, 1))
+
+
 def cases():
     for capacity in range(1, 5):
         for maximum in range(1, min(capacity, 3) + 1):
@@ -96,13 +169,31 @@ def cases():
         for values in itertools.product(*domains):
             yield {"family": "approval_queue", "parameters": {"K": quorum},
                    "input": list(values), "expected": approval(quorum, values)}
+    for capacity in range(1, 9):
+        units = range(capacity + 1)
+        definitions = (
+            ("bounded_counter", [units, range(150, 152), [0, 1]], counter),
+            ("consumable_budget", [units, units, [0, 1]], budget),
+            ("versioned_register", [units, units, units, units, [0, 1]], register),
+            ("idempotency_slot", [[0, 1], units, units, units, units, [0, 1]], slot),
+            ("retry_budget", [units, [0, 1], [0, 1], [0, 1]], retry),
+            ("finite_phase_machine", [units, [0, 1], [0, 1]], phase),
+            ("logical_deadline", [units, units, [0, 1], units, [0, 1]], deadline),
+        )
+        for family, domains, transition in definitions:
+            for values in itertools.product(*domains):
+                yield {"family": family, "parameters": {"C": capacity},
+                       "input": list(values), "expected": transition(capacity, values)}
 
 
 if __name__ == "__main__":
     rows = list(cases())
     counts = {family: sum(row["family"] == family for row in rows)
-              for family in ("reservation_pool", "rate_limiter", "approval_queue")}
-    assert counts == {"reservation_pool": 2216, "rate_limiter": 2646, "approval_queue": 1296}
+              for family in sorted({row["family"] for row in rows})}
+    assert counts == {"reservation_pool": 2216, "rate_limiter": 2646, "approval_queue": 1296,
+                      "bounded_counter": 176, "consumable_budget": 568,
+                      "versioned_register": 30664, "idempotency_slot": 61328,
+                      "retry_budget": 352, "finite_phase_machine": 176, "logical_deadline": 8096}
     output = Path(__file__).with_name("component-independent-expected.json")
     assert not output.exists()
     output.write_text(json.dumps({"format": "g1-independent-expected/1", "authority": "none",

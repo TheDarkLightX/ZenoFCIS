@@ -502,12 +502,11 @@ dependencies = [
  "serde_json",
  "zeno-fcis-authority",
  "zeno-fcis-codec",
- "zeno-fcis-core",
  "zeno-fcis-crypto",
  "zeno-fcis-laws",
  "zeno-fcis-schema",
- "zeno-fcis-shell",
  "zeno-fcis-spec",
+ "zeno-fcis-synthesis",
  "zeno-fcis-value",
 ]
 

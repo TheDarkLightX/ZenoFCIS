@@ -1,0 +1,26 @@
+# Candidate reference from the public semantics in TASK.md; independent review pending.
+# Test expectations; no owner adoption or family proof.
+0 0 0 | reject 200 0 | -
+0 0 1 | accept - 1 | -
+0 1 0 | reject 200 0 | -
+0 1 1 | reject 201 0 | -
+1 0 0 | reject 200 1 | -
+1 0 1 | accept - 2 | -
+1 1 0 | reject 200 1 | -
+1 1 1 | reject 201 1 | -
+2 0 0 | reject 200 2 | -
+2 0 1 | accept - 3 | -
+2 1 0 | reject 200 2 | -
+2 1 1 | reject 201 2 | -
+3 0 0 | reject 200 3 | -
+3 0 1 | accept - 4 | -
+3 1 0 | reject 200 3 | -
+3 1 1 | reject 201 3 | -
+4 0 0 | reject 200 4 | -
+4 0 1 | accept - 5 | -
+4 1 0 | reject 200 4 | -
+4 1 1 | reject 201 4 | -
+5 0 0 | reject 200 5 | -
+5 0 1 | reject 202 5 | -
+5 1 0 | reject 200 5 | -
+5 1 1 | accept - 0 | -

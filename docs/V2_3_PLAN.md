@@ -1,8 +1,9 @@
 # ZenoFCIS V2.3: reusable formally checked cores
 
-Status: owner-requested roadmap draft, 2026-10-07. This document does not claim
-that its features are implemented, proved, or released. V2.2 retains its existing
-completion requirements; this roadmap does not silently defer them.
+Status: owner-requested roadmap, updated 2026-10-09. The component catalogue has
+passed the local qualification described below; integration and release gates
+remain pending. Other sections retain their stated completion obligations.
+V2.2 retains its existing requirements; this roadmap does not silently defer them.
 
 ## Intended result
 
@@ -35,12 +36,21 @@ They remain V2.2 work. V2.3 expands those seeds into a curated library: first te
 well-supported components, then a larger catalog driven by useful applications.
 Hundreds of cores are a growth target, not the initial release criterion.
 
-The first ten candidates are bounded counters, consumable budgets, reservation
-pools, approval quorums, versioned registers, idempotency slots, capped retries,
-finite state machines, logical deadlines, and epoch quotas. Six proposed apps
-exercise their combinations: warehouse reservations, expense approval, reliable
-jobs, document release, API quotas, and equipment booking. These are designs;
-they have not been implemented or qualified as standard-library components.
+The [initial ten-family catalogue](../core-components/README.md) contains
+reservation pools, fixed-window rate limiters, single-request approval queues,
+bounded counters, consumable budgets, versioned registers, idempotency slots,
+retry budgets, finite phase machines and logical deadlines. Local qualification
+covered all 77 declared parameter instances and all 107,518 raw inputs, 308
+required generated-app native tests, 17 actual law mutants, seven certificate
+tamper controls and proof references in all 77 scaffolded apps. Stored references
+remain Identified; exhaustive replay supports Proved only for their closed finite
+scope under the [named trusted base](../core-components/FINITE_PROOFS.md).
+
+Six proposed apps still need coupled implementations and evidence: warehouse
+reservations, expense approval, reliable jobs, document release, API quotas and
+equipment booking. Isolated catalogue qualification does not discharge their
+cross-component obligations. A separate epoch-quota core remains a candidate;
+the current rate limiter has fixed-window semantics.
 
 Every published core must include:
 

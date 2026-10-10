@@ -1,5 +1,5 @@
-//! The inventory-reservation example's authority, synthesized step, and law
-//! checker, run in the browser over the library's in-memory reference shell.
+//! The inventory-reservation example's checked V2 contract, run in the browser
+//! with genuine publications and an ephemeral local store.
 //!
 //! The step, the report, and the C ABI are `zeno-fcis-site-common`'s. This
 //! crate names the application's types, its exact genesis, and the mapping
@@ -9,13 +9,8 @@
 use inventory_reservation::{
     authority,
     bindings::GeneratedProject,
-    delivery::Destination,
     generated::{OperatorFlag, Stock, StockAction, StockCommand, StockContext},
-    genesis_state,
-    laws::StockLaws,
-    profile,
-    program::StockProgram,
-    request,
+    genesis_state, profile, request, v2_contract,
 };
 use zeno_fcis_site_common::{
     Application, Authority, Json, Map, Names, Request, RustCryptoSha256, SchemaAdmittedEnvelope,
@@ -37,14 +32,14 @@ fn admit_root(stock: &Stock) -> Result<SchemaAdmittedEnvelope, String> {
 
 impl Application for InventoryReservation {
     const NAME: &'static str = "inventory-reservation";
-    type Program = StockProgram;
-    type Laws = StockLaws;
-    type Destination = Destination;
     type Command = StockCommand;
     type Context = StockContext;
 
-    fn authority() -> Result<Authority<Self>, String> {
-        authority()
+    fn with_authority<R>(f: impl FnOnce(&Authority<'_>) -> R) -> Result<R, String> {
+        let contract = v2_contract::Contract::new();
+        let descriptor = contract.descriptor();
+        let authority = authority(&descriptor)?;
+        Ok(f(&authority))
     }
 
     fn names() -> Result<Names, String> {
@@ -177,10 +172,10 @@ mod tests {
     fn law_statuses_follow_the_manifest_scopes() {
         let mut demo = Demo::<InventoryReservation>::new().unwrap();
         let accept = demo.step(&request("Restock", 1, true)).unwrap();
-        assert_eq!(law_ids(&accept), [500, 501, 502]);
+        assert_eq!(law_ids(&accept), [500, 501, 502, 991]);
         assert_eq!(accept["laws"][1]["name"], "units_conserved");
         let reject = demo.step(&request("Restock", 1, false)).unwrap();
-        assert_eq!(law_ids(&reject), [509]);
+        assert_eq!(law_ids(&reject), [509, 991]);
     }
 
     #[test]

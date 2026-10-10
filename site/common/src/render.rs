@@ -3,9 +3,10 @@
 use serde_json::{Value as Json, json};
 use std::collections::BTreeMap;
 use std::fmt::Write;
-use zeno_fcis_laws::{LawEvaluation, LawManifest, LawStatus};
+use zeno_fcis_laws::LawManifest;
 use zeno_fcis_spec::ProjectSpec;
-use zeno_fcis_value::Value;
+use zeno_fcis_synthesis::finite::v2_laws::{Diagnostic, Failure as LawFailure, Verdict};
+use zeno_fcis_value::{Value, ValueRef};
 
 /// The names the authored project and the law manifest give to what a
 /// report shows: reasons, laws, record fields, enumerated variants, and
@@ -35,6 +36,7 @@ impl Names {
                 .definitions()
                 .iter()
                 .map(|law| (law.id().get(), text(law.name().as_str())))
+                .chain([(991, "decision_conformance".to_owned())])
                 .collect(),
             fields: project
                 .fields()
@@ -74,19 +76,19 @@ impl Names {
 
     /// Each law's status, as the authority's law evaluation reports it.
     #[must_use]
-    pub fn laws(&self, evaluation: &LawEvaluation) -> Json {
+    pub fn laws(&self, diagnostics: &[Diagnostic]) -> Json {
         Json::Array(
-            evaluation
-                .observations()
+            diagnostics
                 .iter()
-                .map(|observation| {
-                    let id = observation.law_id().get();
-                    let status = match observation.status() {
-                        LawStatus::Satisfied => "Satisfied",
-                        LawStatus::Violated => "Violated",
-                        LawStatus::Indeterminate => "Indeterminate",
+                .filter_map(|observation| {
+                    let id = observation.id;
+                    let status = match observation.verdict {
+                        Verdict::Skipped => return None,
+                        Verdict::Satisfied => "Satisfied",
+                        Verdict::Refused(LawFailure::Violated) => "Violated",
+                        _ => "Indeterminate",
                     };
-                    json!({ "id": id, "name": self.laws.get(&id), "status": status })
+                    Some(json!({ "id": id, "name": self.laws.get(&id), "status": status }))
                 })
                 .collect(),
         )
@@ -97,48 +99,49 @@ impl Names {
     /// number, text as a string.
     #[must_use]
     pub fn render(&self, value: &Value) -> Json {
-        match value {
-            Value::Unit => Json::Null,
-            Value::Bool(flag) => Json::Bool(*flag),
-            Value::I128(integer) => number(*integer),
-            Value::U128(integer) => u64::try_from(*integer)
+        match value.view() {
+            ValueRef::Unit => Json::Null,
+            ValueRef::Bool(flag) => Json::Bool(flag),
+            ValueRef::I128(integer) => number(integer),
+            ValueRef::U128(integer) => u64::try_from(integer)
                 .map_or_else(|_| Json::String(integer.to_string()), Json::from),
-            Value::Bytes(bytes) => {
+            ValueRef::Bytes(bytes) => {
                 Json::String(bytes.iter().fold(String::new(), |mut hex, byte| {
                     // Writing into a String cannot fail.
                     let _ = write!(hex, "{byte:02x}");
                     hex
                 }))
             }
-            Value::Text(text) => Json::String(text.to_string()),
-            Value::Enum { type_id, variant }
-            | Value::Sum {
+            ValueRef::Text(text) => Json::String(text.to_string()),
+            ValueRef::Enum { type_id, variant }
+            | ValueRef::Sum {
                 type_id,
                 variant,
                 payload: None,
-            } => self.variant(*type_id, *variant),
-            Value::Sum {
+            } => self.variant(type_id, variant),
+            ValueRef::Sum {
                 type_id,
                 variant,
                 payload: Some(payload),
             } => {
-                json!({ "variant": self.variant(*type_id, *variant), "payload": self.render(payload) })
+                json!({ "variant": self.variant(type_id, variant), "payload": self.render(payload) })
             }
-            Value::Tuple(items) | Value::Vector(items) => {
+            ValueRef::Tuple(items) | ValueRef::Vector(items) => {
                 Json::Array(items.iter().map(|item| self.render(item)).collect())
             }
-            Value::Record(fields) => Json::Object(
+            ValueRef::Record(fields) => Json::Object(
                 fields
                     .iter()
                     .map(|field| (self.field(field.id()), self.render(field.value())))
                     .collect(),
             ),
-            Value::Map(entries) => Json::Array(
+            ValueRef::Map(entries) => Json::Array(
                 entries
                     .iter()
                     .map(|entry| json!([self.render(entry.key()), self.render(entry.value())]))
                     .collect(),
             ),
+            _ => json!({ "unsupported_kind": format!("{:?}", value.kind()) }),
         }
     }
 

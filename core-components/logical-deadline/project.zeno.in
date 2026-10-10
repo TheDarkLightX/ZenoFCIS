@@ -1,0 +1,29 @@
+zeno 1;
+project 1 logical_deadline;
+namespace 2 core;
+type 100 state Deadline;
+type 101 command Tick;
+type 102 context Operator;
+type 105 int Units in 0..=${C};
+type 106 bool Flag;
+type 108 bool Authorized;
+field 110 100 deadline 105;
+field 111 100 last_seen 105;
+field 112 100 reached 106;
+field 120 101 now 105;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+reason 201 regressive_now precedence 1;
+reason 202 already_reached precedence 2;
+reason 203 deadline_not_met precedence 3;
+component 400 deadline {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= ${C} && 0 <= post.100.111 && post.100.111 <= ${C};
+law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= ${C} && 0 <= post.100.111 && post.100.111 <= ${C};
+law 502 exact_deadline on accept = command.101.120 >= pre.100.111 && command.101.120 >= pre.100.110 && post.100.110 == pre.100.110 && post.100.111 == command.101.120 && post.100.112 == 1;

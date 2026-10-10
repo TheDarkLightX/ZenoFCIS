@@ -11,7 +11,7 @@ const COMMANDS = { 120: "LoginSucceeded", 121: "LoginFailed", 122: "AdminUnlock"
 const ALERT_KINDS = { 150: "Locked", 151: "Unlocked" };
 const LOCK_SECONDS = 900;
 
-export const laws = { Accept: [500, 501, 502], CommittedFailure: [500, 503], Reject: [509] };
+export const laws = { Accept: [500, 501, 502, 991], CommittedFailure: [500, 503, 991], Reject: [509, 991] };
 
 // Inputs refused before any decision, with the stage that refuses them.
 export const refusals = [

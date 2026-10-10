@@ -1656,7 +1656,7 @@ fn compiled_contracts_reproduce_their_committed_policy_bytes() {
     check!(gateway, "compliance-gateway");
 }
 // Exact groups retain all 131 examples and exactly six genesis/replay checks.
-// The two slow applications use batches of at most five unchanged examples.
+// The three slow applications use batches of at most five unchanged examples.
 macro_rules! retained_genesis {
     ($module:ident,$index:expr) => {{
         println!("retained {} genesis: bind", APPS[$index].name);
@@ -1752,8 +1752,32 @@ fn retained_complete_examples_genesis_and_replay_account_lockout() {
     retained_examples_and_genesis!(account, 3, 20);
 }
 #[test]
-fn retained_complete_examples_genesis_and_replay_withdrawal_queue() {
-    retained_examples_and_genesis!(vault, 4, 26);
+fn retained_examples_and_replay_withdrawal_queue_00_04() {
+    retained_examples_batch!(vault, 4, 26, 0, 5);
+}
+#[test]
+fn retained_examples_and_replay_withdrawal_queue_05_09() {
+    retained_examples_batch!(vault, 4, 26, 5, 10);
+}
+#[test]
+fn retained_examples_and_replay_withdrawal_queue_10_14() {
+    retained_examples_batch!(vault, 4, 26, 10, 15);
+}
+#[test]
+fn retained_examples_and_replay_withdrawal_queue_15_19() {
+    retained_examples_batch!(vault, 4, 26, 15, 20);
+}
+#[test]
+fn retained_examples_and_replay_withdrawal_queue_20_24() {
+    retained_examples_batch!(vault, 4, 26, 20, 25);
+}
+#[test]
+fn retained_examples_and_replay_withdrawal_queue_25_25() {
+    retained_examples_batch!(vault, 4, 26, 25, 26);
+}
+#[test]
+fn retained_genesis_and_replay_withdrawal_queue() {
+    retained_genesis!(vault, 4);
 }
 #[test]
 fn retained_examples_and_replay_agent_treasury_guard_00_04() {
