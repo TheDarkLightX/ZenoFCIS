@@ -18,6 +18,7 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/LLM_USAGE.md: authority rules for model-assisted work
 - docs/ARCHITECTURE.md: dependency rings
 - docs/RC1_RELEASE_NOTES.md: candidate surface and final-release blockers
+- docs/V1_RELEASE_CHECKLIST.md: exact-source tag, publication, evidence, and rollback runbook
 - docs/PACKAGING.md: package authority and retained artifacts
 - docs/RELEASE_ASSURANCE.md: repository gates and nonclaims
 

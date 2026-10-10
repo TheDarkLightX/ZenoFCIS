@@ -1,0 +1,16 @@
+# This file declares review ownership. Repository branch-protection settings
+# must require CODEOWNERS approval for it to become an enforced merge gate.
+* @TheDarkLightX
+
+# Release, assurance, and public-contract surfaces receive explicit ownership.
+/.github/ @TheDarkLightX
+/release/ @TheDarkLightX
+/tools/check_assurance.py @TheDarkLightX
+/tools/check_library_docs.py @TheDarkLightX
+/tools/rc1_package.py @TheDarkLightX
+/Cargo.toml @TheDarkLightX
+/Cargo.lock @TheDarkLightX
+/deny.toml @TheDarkLightX
+/SECURITY.md @TheDarkLightX
+/crates/ @TheDarkLightX
+/docs/ @TheDarkLightX

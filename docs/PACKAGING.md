@@ -60,6 +60,12 @@ or creating a GitHub release remains an owner action after review.
 The repository's permanent workflows are read-only. This package does not add
 a write-enabled release workflow or weaken that policy.
 
+The complete owner procedure for exact-head review, signed tagging,
+dependency-ordered crates.io publication, release evidence, and failure
+recovery is the [V1 release checklist](V1_RELEASE_CHECKLIST.md). The permanent
+release-candidate workflow also runs on `v1.0.0-rc.*` tags so the immutable tag
+is packaged through the same read-only gate used during review.
+
 ## Nonclaims
 
 Successful packaging proves that the declared artifacts are reproducibly

@@ -2,6 +2,11 @@
 
 This document defines the release gate for the complete ZenoFCIS library family. A passing build is necessary evidence. It is not an audit, a deployment authorization, or proof that a downstream profile is economically correct.
 
+The [V1 release checklist](V1_RELEASE_CHECKLIST.md) gives the ordered owner
+procedure for freezing one exact commit, rerunning this gate, creating the
+signed tag, publishing crates, retaining evidence, and responding to a partial
+or failed release.
+
 ## Authority boundary
 
 The pure crates define decisions, canonical values, patches, plans, receipts,
