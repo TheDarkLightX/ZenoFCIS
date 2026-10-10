@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-codec"
-version = "1.1.0"
+version = "2.3.0-rc.1"
 dependencies = [
  "sha2",
  "zeno-fcis-value",
@@ -509,14 +509,14 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-spec"
-version = "1.1.0"
+version = "2.3.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
 ]
 
 [[package]]
 name = "zeno-fcis-value"
-version = "1.1.0"
+version = "2.3.0-rc.1"
 
 [[package]]
 name = "zmij"

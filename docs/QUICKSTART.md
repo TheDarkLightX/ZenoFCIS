@@ -18,7 +18,8 @@ ProjectProfile + ProjectCatalog
     -> authorized shell publication
 ```
 
-The workspace is version `1.1.0`, extending the stable V1 Cargo API. The APIs
+This candidate is version `2.3.0-rc.1`; the older `1.1.0` workflow below is
+retained compatibility guidance, not the normal V2 route. The APIs
 below support project adoption; production deployment qualification remains
 specific to the application, laws, storage and delivery destination.
 

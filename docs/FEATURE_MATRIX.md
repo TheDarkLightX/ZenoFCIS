@@ -1,5 +1,9 @@
 # ZenoFCIS feature matrix
 
+This guide is included in the `2.3.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 This matrix covers features on the `zeno-fcis` umbrella crate. The current
 workspace version is `1.1.0`; “core” means the implemented
 project-neutral library surface. Cargo API stability began at `1.0.0`.

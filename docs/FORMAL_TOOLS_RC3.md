@@ -1,5 +1,9 @@
 # Formal tools in V1
 
+This guide is included in the `2.3.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 Normal V2 retains SMT authoring, fail-closed process diagnostics, and Lean
 runtime inspection. The shallow Lean obligation factories and their renderer
 are private test references. Normal `prove --backend lean` reports

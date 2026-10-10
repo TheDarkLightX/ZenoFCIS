@@ -15,38 +15,38 @@ default = ["sqlite"]
 sqlite = ["dep:zeno-fcis-shell-sqlite"]
 
 [dependencies]
-zeno-fcis-authority = "=1.1.0"
-zeno-fcis-catalog = "=1.1.0"
-zeno-fcis-codec = "=1.1.0"
-zeno-fcis-compose = "=1.1.0"
-zeno-fcis-core = "=1.1.0"
-zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
-zeno-fcis-evidence = "=1.1.0"
-zeno-fcis-laws = "=1.1.0"
-zeno-fcis-patch = "=1.1.0"
-zeno-fcis-plan = "=1.1.0"
-zeno-fcis-project = "=1.1.0"
-zeno-fcis-schema = "=1.1.0"
-zeno-fcis-shell = "=1.1.0"
-zeno-fcis-shell-sqlite = { version = "=1.1.0", optional = true }
-zeno-fcis-spec = "=1.1.0"
-zeno-fcis-synthesis = "=1.1.0"
-zeno-fcis-transition = "=1.1.0"
-zeno-fcis-value = "=1.1.0"
+zeno-fcis-authority = "=2.3.0-rc.1"
+zeno-fcis-catalog = "=2.3.0-rc.1"
+zeno-fcis-codec = "=2.3.0-rc.1"
+zeno-fcis-compose = "=2.3.0-rc.1"
+zeno-fcis-core = "=2.3.0-rc.1"
+zeno-fcis-crypto = { version = "=2.3.0-rc.1", features = ["rustcrypto"] }
+zeno-fcis-evidence = "=2.3.0-rc.1"
+zeno-fcis-laws = "=2.3.0-rc.1"
+zeno-fcis-patch = "=2.3.0-rc.1"
+zeno-fcis-plan = "=2.3.0-rc.1"
+zeno-fcis-project = "=2.3.0-rc.1"
+zeno-fcis-schema = "=2.3.0-rc.1"
+zeno-fcis-shell = "=2.3.0-rc.1"
+zeno-fcis-shell-sqlite = { version = "=2.3.0-rc.1", optional = true }
+zeno-fcis-spec = "=2.3.0-rc.1"
+zeno-fcis-synthesis = "=2.3.0-rc.1"
+zeno-fcis-transition = "=2.3.0-rc.1"
+zeno-fcis-value = "=2.3.0-rc.1"
 
 [build-dependencies]
-zeno-fcis-authority = "=1.1.0"
-zeno-fcis-bootstrap = "=1.1.0"
-zeno-fcis-catalog = "=1.1.0"
-zeno-fcis-codec = "=1.1.0"
-zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
-zeno-fcis-core = "=1.1.0"
-zeno-fcis-laws = "=1.1.0"
-zeno-fcis-project = "=1.1.0"
-zeno-fcis-schema = "=1.1.0"
-zeno-fcis-spec = "=1.1.0"
-zeno-fcis-synthesis = "=1.1.0"
-zeno-fcis-value = "=1.1.0"
+zeno-fcis-authority = "=2.3.0-rc.1"
+zeno-fcis-bootstrap = "=2.3.0-rc.1"
+zeno-fcis-catalog = "=2.3.0-rc.1"
+zeno-fcis-codec = "=2.3.0-rc.1"
+zeno-fcis-crypto = { version = "=2.3.0-rc.1", features = ["rustcrypto"] }
+zeno-fcis-core = "=2.3.0-rc.1"
+zeno-fcis-laws = "=2.3.0-rc.1"
+zeno-fcis-project = "=2.3.0-rc.1"
+zeno-fcis-schema = "=2.3.0-rc.1"
+zeno-fcis-spec = "=2.3.0-rc.1"
+zeno-fcis-synthesis = "=2.3.0-rc.1"
+zeno-fcis-value = "=2.3.0-rc.1"
 
 # The demonstration needs the shell; the library alone builds without it.
 [[bin]]

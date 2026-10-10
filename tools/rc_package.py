@@ -39,7 +39,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "2ffb98016ee7c29d001ea981067e047a23020043f29a16005731e5215667bcba"
+    "393d21a7f2326dab4e26d78c74dfccfdc657e4a4bab117bbd85460c0ff0e6f1c"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -377,7 +377,30 @@ def validate_package_set() -> tuple[dict[str, object], dict[str, object]]:
         package_set(), cargo_metadata(complete=False)
     )
     validate_developer_tooling(require_string(configured, "version"))
+    validate_scaffold_versions(require_string(configured, "version"))
     return configured, metadata
+
+
+def validate_scaffold_versions(version: str, root: Path = ROOT) -> None:
+    """Check emitted dependency pins before any release build or app journey."""
+    package_roots = {
+        str(tomllib.loads(path.read_text())["package"]["name"]): path.parent
+        for path in (root / "crates").glob("*/Cargo.toml")
+    }
+    templates = root / "crates/zeno-fcis-cli/templates"
+    paths = [directory / "Cargo.toml.in" for directory in sorted(templates.iterdir())
+             if directory.is_dir()]
+    if not paths:
+        raise RcError("release has no application templates")
+    paths.append(root / "crates/zeno-fcis-cli/contract-app/Cargo.toml.in")
+    for path in paths:
+        document = tomllib.loads(path.read_text().replace("{version}", version))
+        try:
+            selected = generated_application.generated_dependency_closure(document, package_roots, version)
+        except RuntimeError as error:
+            raise RcError(f"{path.relative_to(root)}: {error}") from error
+        if not selected:
+            raise RcError(f"{path.relative_to(root)}: no library dependency pins")
 
 
 def run_self_test(configured: dict[str, object], metadata: dict[str, object]) -> None:
