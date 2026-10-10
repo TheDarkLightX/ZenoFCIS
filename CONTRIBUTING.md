@@ -27,7 +27,15 @@ npm ci --ignore-scripts
 python3 tools/check_probity.py
 ```
 
-Before submitting a change, run:
+Before submitting an ordinary change, run checks appropriate to its scope.
+Documentation changes need the documentation guard, affected-link checks and
+`git diff --check`. Code and tooling changes need relevant tests, formatting,
+linting and any affected proof or source-identity checks. Record the checks
+performed and their limits. A full acceptance run is not a prerequisite for
+every commit or push.
+
+When preparing a new version for release, including a release candidate, run
+the complete suite on the exact release source and inspect every result:
 
 ```bash
 python3 tools/check_assurance.py --self-test

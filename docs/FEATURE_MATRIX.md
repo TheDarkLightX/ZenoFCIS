@@ -1,8 +1,12 @@
 # ZenoFCIS feature matrix
 
-This matrix covers features on the `zeno-fcis` umbrella crate. The current
-workspace version is `1.1.0`; “core” means the implemented
-project-neutral library surface. Cargo API stability began at `1.0.0`.
+This matrix covers the current `zeno-fcis` umbrella source API. The development
+workspace still declares `1.1.0`, but the breaking V2 API below requires a pinned
+source dependency. The historical `1.1.0` package and its API stability promise
+have their own scope. Use the matching source tag for the public
+[2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md), as described in
+[installation](INSTALLATION.md). Their only advertised host executable is the
+Linux x86_64 GNU CLI; crates.io and other host binaries are not claimed.
 
 The normal application API is `zeno_fcis::program`, available without optional
 features. It binds complete declarations to the library-owned evaluator and
@@ -46,9 +50,13 @@ provider features also serve the historical reference APIs.
 | `composed-program` | `no_std + alloc` | Historical | Native composed-program authoring is retired |
 
 Start both single- and multi-domain applications with complete declarations
-through `zeno_fcis::program`. Reusable component composition is planned in
-[G1](V2_1_V2_2_PLAN.md) and the [V2.3 roadmap](V2_3_PLAN.md); the retired crates
-do not implement it.
+through `zeno_fcis::program`. V2.2 has the three G1 finite component families;
+V2.3 expands the [catalogue](../core-components/README.md) to ten families,
+77 declared instances and 107,518 raw inputs. Stored references are Identified;
+successful exhaustive replay supports Proved for the closed finite scope under
+the [named trusted base](../core-components/FINITE_PROOFS.md). Coupled applications
+and composition obligations remain work in the [V2.3 plan](V2_3_PLAN.md).
+The retired crates do not supply a composed runtime or discharge those obligations.
 
 ## Tooling and mounted runtimes
 
@@ -75,6 +83,13 @@ bounded refinement evidence.
 The backend protocol can be implemented by public Lean, SMT/Z3, CVC5, Kani,
 Flux, or other adapters. Users with private ESSO access can implement it in a
 private crate. No backend decides release or commit authority by itself.
+
+Crucible is a separate experimental repository. Native FCIS integration,
+multi-profile search and a reusable proof registry remain planned. The
+[research status](RESEARCH_STATUS.md) distinguishes its public increment from
+private Library composition, receipt, resource and diagnostic experiments.
+Those follow-on results are not included in the candidate binaries; the private
+packets were not independently replayed for this documentation update.
 
 ## Reference data structures and shells
 
@@ -116,27 +131,31 @@ graph or production authority.
 
 ## Common selections
 
+These are alternative dependency declarations against a checkout of
+`v2.3.0-rc.1` at `../ZenoFCIS`. Select one declaration with the features your
+application needs; the current API is not supplied by `version = "=1.1.0"`.
+
 ```toml
 # Project-neutral semantic values and reference semantics
-zeno-fcis = { version = "=1.1.0", default-features = false }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false }
 
 # Normal checked application declarations, binding and evaluation
-zeno-fcis = { version = "=1.1.0", default-features = false }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false }
 
 # Host-side starter generation
-zeno-fcis = { version = "=1.1.0", features = ["bootstrap"] }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", features = ["bootstrap"] }
 
 # Concrete local authorized persistence
-zeno-fcis = { version = "=1.1.0", features = ["sqlite-shell"] }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", features = ["sqlite-shell"] }
 
 # Candidate-bound authenticated index publication
-zeno-fcis = { version = "=1.1.0", features = ["authenticated-authority"] }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", features = ["authenticated-authority"] }
 
 # Tool-neutral checked backend protocol
-zeno-fcis = { version = "=1.1.0", default-features = false, features = ["backend"] }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false, features = ["backend"] }
 
 # Pure authoring compiler and Mini Determinator
-zeno-fcis = { version = "=1.1.0", default-features = false, features = ["authoring"] }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false, features = ["authoring"] }
 ```
 
 ## Deterministic-parallel status

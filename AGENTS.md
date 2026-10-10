@@ -51,4 +51,15 @@ Keep combined output bounded. Set a useful per-call output limit, return only th
 
 When the optional pinned Probity hook is installed, obey `probity.config.ts`.
 Treat it as a deterministic development guardrail, not proof or release
-authority. Run `python3 tools/atdd.py run --all` immediately before committing.
+authority.
+
+Scale validation to the change. Ordinary commits and pushes do not require the
+full acceptance suite. For documentation, check the affected documents and
+links; for code or tooling, run the relevant tests and checks. Record what ran
+and any remaining gaps without implying that the full suite passed.
+
+Run `python3 tools/atdd.py run --all` and inspect its complete passing result
+when preparing a new version for release, including release candidates. Bind
+that result to the exact release source and retain the other applicable release
+gates. This policy supersedes older per-commit full-suite instructions in plans
+and handoffs; it does not waive proof obligations for changed semantics.
