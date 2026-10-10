@@ -18,7 +18,7 @@ pub const MAX_FIELDS: usize = 16;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
 #[cfg(verus_keep_ghost)]
-mod spec;
+pub(super) mod spec;
 
 /// Closed scalar domain. Boolean wire values are exactly the integers 0 and 1.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
@@ -165,7 +165,7 @@ pub(super) fn admitted(domains: &[Domain], values: &[i64]) -> bool {
         None
     },
 ))]
-fn at(values: &[i64], id: u16) -> Option<i64> {
+pub(super) fn at(values: &[i64], id: u16) -> Option<i64> {
     let index = id as usize;
     if index < values.len() {
         Some(values[index])
@@ -177,7 +177,7 @@ fn at(values: &[i64], id: u16) -> Option<i64> {
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
     ensures result == spec::node(*op, input@, values@),
 ))]
-fn evaluate_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i64, Failure> {
+pub(super) fn evaluate_node(op: &Op, input: &[i64], values: &[i64]) -> Result<i64, Failure> {
     match *op {
         Op::Input(id) => match at(input, id) {
             Some(value) => Ok(value),

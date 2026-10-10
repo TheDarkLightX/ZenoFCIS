@@ -66,7 +66,7 @@ def fingerprint(node: list) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def inventory(source: str, namespace: str) -> dict:
+def inventory(source: str, namespace: str, body_functions: tuple[str, ...] = ()) -> dict:
     functions = {}
     for node in parse_vir(source):
         if not node or node[0] != "Function":
@@ -99,7 +99,7 @@ def inventory(source: str, namespace: str) -> dict:
             "requires_sha256": fingerprint(requires),
             "ensures_sha256": fingerprint(ensures),
         }
-        if mode == "Spec":
+        if mode == "Spec" or name in body_functions:
             functions[name]["body_sha256"] = fingerprint(body)
     if not functions:
         raise ValueError("VIR log has no functions from the required namespace")
@@ -111,7 +111,14 @@ def require_coverage(source: str, profile: dict) -> dict:
             or not profile["namespace"].endswith("::")
             or not isinstance(profile.get("functions"), dict) or not profile["functions"]):
         raise ValueError("malformed VIR coverage profile")
-    observed = inventory(source, profile["namespace"])
+    body_functions = profile.get("body_covered_functions", [])
+    if (not isinstance(body_functions, list)
+            or any(not isinstance(name, str) for name in body_functions)
+            or len(set(body_functions)) != len(body_functions)):
+        raise ValueError("malformed operational body coverage")
+    observed = inventory(source, profile["namespace"], tuple(body_functions))
+    if any(name not in observed or observed[name]["mode"] != "Exec" for name in body_functions):
+        raise ValueError("operational body coverage names a missing or non-runtime function")
     expected = profile["functions"]
     if set(observed) != set(expected):
         missing = sorted(set(expected) - set(observed))
