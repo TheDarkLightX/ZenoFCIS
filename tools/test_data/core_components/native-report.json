@@ -1,14 +1,14 @@
 {
   "authority": "none",
-  "cli_sha256": "18d6739713367d780b9d9edbddb5da79850ef5cc68710c9eaca2b961674d3b82",
+  "cli_sha256": "65b80ed20ca5b9bbdcc34b8c8c1f4cd7d30431cd136cd650047e81f2589c0c38",
   "evidence": "complete-finite-execution",
   "family_theorem": null,
   "independent_reference_sha256": "126b6fb20905c13ce4133f15602b1d966a131826469af9cfabd93b360cad68b9",
   "instances": [
     {
-      "app_tests_sha256": "9f0ebc40dafd3ca6f4abe9ca7f09ef577ab3620981687d260325e818792ded85",
+      "app_tests_sha256": "1c6d1b042c7593fe6147f17ffa6c118dd5265496079c25a3bfebcfd8c4633f4c",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -32,7 +32,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "8f9cdbae6892347c9982e7a4737f1f555077a9bc4955152c3e46800ff8f22bc5",
+      "consumer_lock_sha256": "4795ea944e4cc681a83350829215ca88dad8af9591c93ee5ef2b32c4f4f222d0",
       "generated_sha256": {
         "src/v2_contract.rs": "72d0dc626cea70c7ee4ba03b7d78b061c66ac7dae80086a46f5d5a9e721a4ee8",
         "v2/policy.zcve": "71d424db3e20fc724c3013a0a5ff627021979a177e8afa7befe3f29418f039f1",
@@ -43,6 +43,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -108,12 +109,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "5e6a532018cb8072bdbfa4c83bace8d5f28d3ffca3eae4efb0a4ff0d1a926d11"
+      "review_sha256": "be5b363f4ca0585c9618113d9f65aa414ab7feceffe49c2af2f213ac8cdb9fa8"
     },
     {
-      "app_tests_sha256": "7607882ee280201cff354ac093a85f44b521d3d34d116ca040e908ebfe3728d7",
+      "app_tests_sha256": "55546ba28b2aa4aa9c9dee8b915ba72e30c758a643f028536dda91a332f267b9",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -137,7 +138,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "37b02e5af4fb4a7b1d3f3c2b6e56cf83380fd9031163b24ca6fb9b43f94c576f",
+      "consumer_lock_sha256": "6d778adbc96a0b427e2e3cb58583c9128c37ba472ff963448d7d7333749e39b9",
       "generated_sha256": {
         "src/v2_contract.rs": "e9d9c6230b98dcb5072febe9b787106cccd9ce6c728d67f36be012bae5c573ad",
         "v2/policy.zcve": "1915ccea87c451b0dbdae544453e0a52299ac4a7623c1d8637ef6ad990c2573f",
@@ -148,6 +149,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -215,12 +217,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "0f7758d09f94ae70849294bb33bce5b639c658d153f580b7c28d4f6ec478a48f"
+      "review_sha256": "3358e74b8e1952db915a82d62e3a806e36bba7ed831cd66433f5c6d0a8e93309"
     },
     {
-      "app_tests_sha256": "c9ae6973d570d11e9b6f6846de5e3f2f1af781cda044c8f95f848a79472371ab",
+      "app_tests_sha256": "9a2f2e59aed2f667b0b84ca5490999a7159b725836786d752f48beb2b90e0188",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -244,7 +246,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "f3e11cb1211bbf45a9ee1b0a88f64bcc34c8176cd0fce3ea0dfe8406c6328e86",
+      "consumer_lock_sha256": "3d90a010dd54b604a9e03315eb4b8e2c915c5fa36d1a02b2e5f0fc196fea1a1a",
       "generated_sha256": {
         "src/v2_contract.rs": "e863c5381b8ec6d07afd9a3ff0bd1d9918f7d05fd75f68cb357680bce93f27fe",
         "v2/policy.zcve": "9577fcc3bb3a81ef909c7dc6b758234051653fe3f64435854754214ef87470eb",
@@ -255,6 +257,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -323,12 +326,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "fbb18b6b8d4fd47d731f25bb47246dbbf718ca0d0cfde9fa3e686a0994c28ea1"
+      "review_sha256": "912629f96d937aea4321c7625e16c8ad35891ef82c495f9df33813beac820772"
     },
     {
-      "app_tests_sha256": "00604286c85a747e8b4739316d59b800c8883d41a97aeb56757073e4cc591477",
+      "app_tests_sha256": "e9d58a58c2ffeaa14e24b23385c6ef88e9963d043b4d8ae339d8eb2639185fc5",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -352,7 +355,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "769656d651f388b3efea361684da2721e8b2d693d37089361632cf4251ecabe6",
+      "consumer_lock_sha256": "80901daab3bf8c9c9f9289571989d557bd0a9d26a8723c214fc444488038b1fd",
       "generated_sha256": {
         "src/v2_contract.rs": "269dee2d1419a49f5fe5d8361c4b50c9e8e1e35e832c83b8a2fc44800d450984",
         "v2/policy.zcve": "b5601a8f5981d61fbf7543b19c5605ed89b250feead4f03046b3e6f7d88b5738",
@@ -363,6 +366,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -432,12 +436,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "f482d5e62928ee8d3665f977836b5f4e2bfa3a172a2c133f87e52105cc6ce934"
+      "review_sha256": "68bb56f1dac5faf3feeb65044165cfe6ecb4cfecdf3171543ee7b72e272d5680"
     },
     {
-      "app_tests_sha256": "d493632ae627b5b3184a2371740437e93ceebac2764f1d7e68c87a03fb2668c0",
+      "app_tests_sha256": "7782cbc5c3a89b67fb679f23194982e683129f49a7d4d94921c93733cfa6136d",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -461,7 +465,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "d8eddc8d5549c31c021008cc0512bfb772d2cec8b343940311c86c6fadd3b678",
+      "consumer_lock_sha256": "818d09ab5d91dbf58da0d6ef11de24fd937fd539caac3161ce7472b7467ac596",
       "generated_sha256": {
         "src/v2_contract.rs": "262e1973269cfd4e8d579c861b066f5ec67d6e1f64ff79d820d19af44d3b2a65",
         "v2/policy.zcve": "9e8c3f04e8873534fe304a9746fb74da36511bf08af2d7905bdd025e33bd03cf",
@@ -472,6 +476,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -542,12 +547,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "cb540ceae8179a3029a1920c3f344e73e397096d3b721c60b4127b3755f3066b"
+      "review_sha256": "89ab342cd268b1151b746634e65871115f55afa80a9eac8ee191e42ea9db4ae4"
     },
     {
-      "app_tests_sha256": "b0f8116bf62428ea37f34d269839acdc1f53a48606f1aefeb3d52c0cf727ed64",
+      "app_tests_sha256": "eb4389ac2a4fcd297ff9261659cc6d501b22c7804004d6620b1ea8384b39d50c",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -571,7 +576,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "3552e0824c623c3365b0269eb759d670e93a8498d9916c602a4028fd47f0c8df",
+      "consumer_lock_sha256": "6a9aae26fffa6d20e937bf3e974ddc69af8cfd5c03745c7b68dde5e3373f5c9f",
       "generated_sha256": {
         "src/v2_contract.rs": "f88d83017fb65f23817aef1d9d468f7e015a591946609fcd46b36dc7fde438d1",
         "v2/policy.zcve": "3b589f6c9114d9387c4537e302913a5c8510e67f9e9e9526912d2c8c4eda5131",
@@ -582,6 +587,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -653,12 +659,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "85a7f91a5545f2584ebf7e9845d548c0d5993c3b1924d02cf2d535c25de01406"
+      "review_sha256": "980dd81ae3c23d3696ff363292c63377ea9a6e1910e42e636d0f2f555610ac6b"
     },
     {
-      "app_tests_sha256": "b83b0620143cce15bb40deb828cf21e03ab4065fbf93875490e3b37878d38835",
+      "app_tests_sha256": "ee90d45f5e8343b1ff118a8a34631e478ce46d881e4a80318cae219533f52cba",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -682,7 +688,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "87dc16504104d8ca04f49287d378f59162c9becc7ec7f488084a26b3735392b5",
+      "consumer_lock_sha256": "7b5e1e496317ff6d94891572fb424a8c8b23ab881067cc0869b17f0316b136e7",
       "generated_sha256": {
         "src/v2_contract.rs": "32884ddfdfdbb333845036eac1c80bd7e50d867a330132e20241962a6ffb0f7c",
         "v2/policy.zcve": "e266b017dbca59e838f40dd7bc4d7a9ca24e468a8af5baa8f202b9314e421c73",
@@ -693,6 +699,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -764,12 +771,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "ef1b5990e5660dc7c1fa0cb87c0eefd461549a8f76e35e983a4c0059c9f94c6e"
+      "review_sha256": "9e3441a177f8ac5b0d60cd267f063013dd264f866bb9dc0532211d8a763927b0"
     },
     {
-      "app_tests_sha256": "e159df7df9d795d90a2b620310f565ec0d9b48179fb3c955b00a6bdbd5bb724f",
+      "app_tests_sha256": "6348a0407f0d2510ef0bc638b0463bc2d09ebaf9c8d338c87ecbcb9d2d92c45e",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -793,7 +800,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "b13416bc8df1d0f520524ddfbbea449a68fa6bbb116756f821525d113f95f355",
+      "consumer_lock_sha256": "11222c3c281868153aec9c0ea8706bf96d5d7e47b1adb9e8242f706423b6b74c",
       "generated_sha256": {
         "src/v2_contract.rs": "03ec230821de291cecd04666162942728cc80ed1a7d7ac57e6232989a562069b",
         "v2/policy.zcve": "3bec52f55703c8d67a50f16175d16cf9e31f058eed96628f9ffce04742a1f730",
@@ -804,6 +811,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -876,12 +884,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "5946d7b2263c528d830c9f8371c37baeb6a5eb3478c1af3fa50bbb98e4423f94"
+      "review_sha256": "bbe33e219f63c45bc3a7417ea1a5ebb69d0d35a3092161ccc59c198ffbd48ada"
     },
     {
-      "app_tests_sha256": "431f94b0ec5a6dafbf64b3ffd0db19c31a702d6a1b346a4e7b44360893180747",
+      "app_tests_sha256": "14e3b35810c3ccb300c27dbb7a29cbc1b956067dba791d38e6c2c44191e6034d",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -905,7 +913,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "ebf60531f9cfe97fe2537f5b45ccc9fbfadd6a7df7172343dc7879cc3a0205de",
+      "consumer_lock_sha256": "311d2ae0ebb2e120594516c428776afe59910d985da17cd088b6d685efe4a323",
       "generated_sha256": {
         "src/v2_contract.rs": "9a12f4f0cd31b7171cc5f94ff329538f7717fe48eab8caf0ff05c09bd7f4e0b1",
         "v2/policy.zcve": "faaae8508618f33c7bb444b18e0f0f89e0f9d6521072fa39e95b804e3bfee8a8",
@@ -916,6 +924,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "reservation-pool",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -989,12 +998,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "8d36272a8f5dbe40e41fb05561ac162bd5a2a7e93d31ae7c78857fc1a7ce3454"
+      "review_sha256": "53ca06e01b62881e307a60437af333df897767e99b9fac454d22d49616fa49b5"
     },
     {
-      "app_tests_sha256": "69970e57f345fdf83546f7fb511dfa769c0475b6e9e5e304ecae02d2e53fd2d6",
+      "app_tests_sha256": "06d1f196b9f4aef2112627648bae249532569d741aa669eec40bac89481dad8e",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1018,7 +1027,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "379e0c0a311c80d7e75cc2dd7c3f135fee69f0bcd018e2a13cf06a33b5474784",
+      "consumer_lock_sha256": "d518fa790414a7da1e7cfaef351824fe866f9afc9a11fdec7e7c08c4718fac3c",
       "generated_sha256": {
         "src/v2_contract.rs": "cc857dfda22b30e9ad6de1e73779b802c98037d2d09c4658965d4d97543ba6e4",
         "v2/policy.zcve": "5b416d9147bacc852f13f2508de378c0cc49300d241913ee89d14236011f9c1b",
@@ -1029,6 +1038,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1101,12 +1111,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "1ad8b8705a74ec34aa72d53d157ca1c166ad64d821fc2731d88a5e1901121137"
+      "review_sha256": "7084c3296a4f70eade3ffb4a5252aafab3703349ad0159c0e99310c5053622ea"
     },
     {
-      "app_tests_sha256": "a0c690894dc14ac5912273d6dd6a76618c0ba07bda1248003fb1be7c2fe92c0c",
+      "app_tests_sha256": "0ff09310d757bc7212b6b867e32e80c2c02995c5d0fcf30691baf23d33ac9d76",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1130,7 +1140,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "9bc772b5e7dbc6e8788a0ed951eb5e5106c743ec04173f32c2ce8505c22d893c",
+      "consumer_lock_sha256": "6ef9e76780c1fbc24b33f2127f3c72715ec9de4a280d3095e792e0a9b5989be2",
       "generated_sha256": {
         "src/v2_contract.rs": "4fee53c5502c140b7353fc993670f867a206e571908333825c386631d27cdc35",
         "v2/policy.zcve": "7b5ca6c609e133da7debe84c48fa40caf1abb73332a602be9014d2fbaaffa86f",
@@ -1141,6 +1151,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1214,12 +1225,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "ef70a21dc207a265c4796542adada6277e387fe306f10ede8b688fead1ba01ca"
+      "review_sha256": "bbcf147000743927f609dded85a201871e90ba6c3041ab5ed1e972e623f3d97a"
     },
     {
-      "app_tests_sha256": "dcd7fb75bda6616c2ee30cf7ae8ce352f75b15355a6269cc5ab7d6306b42c195",
+      "app_tests_sha256": "861144b73363ad38a1212544e32e504d066e1326f7b46441b39f1d88eb22fd59",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1243,7 +1254,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "dbe5140b8c5a61e77f6ba3d62dff72825191cb0fdfd8e1b8a6553bc208de8a1e",
+      "consumer_lock_sha256": "7e10e82568dc1e6bfb5b2457f19419e464728c420f39a82663abb25463490ff2",
       "generated_sha256": {
         "src/v2_contract.rs": "353c9c62b7c0b715aef0df3b683a9e60fd4b0616d9eb5f6e928b15ecdcfa4415",
         "v2/policy.zcve": "16bf77540fbb008bcd73d84b4cd7300b37302cbb19654f9ec3fc793b40eb5601",
@@ -1254,6 +1265,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1328,12 +1340,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "d46b2855875300ebd8df5fcdf0410f205a8fc04cfe422cea84c0c6c12dccafdb"
+      "review_sha256": "e74ae3c2f36028f144736670843841092cf4d3254dac3ed0f68bc97ceb36cc2a"
     },
     {
-      "app_tests_sha256": "d643556820e0c69bd49ba46451c6bd69b4e7cc96400324b82fee2da32fb04dbd",
+      "app_tests_sha256": "e713d067b0ff536f8112ba19cd3e56cdec671533445b1ecfac8ebaabc90885f8",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1357,7 +1369,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "1edb4f6eac0c5491efa2feaaa1dc138b7fd21ad17c4ad4b4cbd0a5814e68be14",
+      "consumer_lock_sha256": "55b35a376de9021b1b104ca65b7d9017fc6e0b0c384e6df3721174b1053a0f61",
       "generated_sha256": {
         "src/v2_contract.rs": "1dea7cbb51a3bb910f8796dc9a5c75ac4284bf51863b9b2a775daf37ba9e765c",
         "v2/policy.zcve": "030fd1009110a15d68c02213c248c91a60402dc1b3391f73b9b654adf1f95fe3",
@@ -1368,6 +1380,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1440,12 +1453,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "490318d7b26e99b4ab1ba364638e46518df73f8d793a1d6347a1cd3e56850911"
+      "review_sha256": "2859c6557aa01128a01945691812ac030655a72e5f74ed08e8e54ae0f2bfccf5"
     },
     {
-      "app_tests_sha256": "b1bda45f01ef2dee4e590fbd3b347d1987d315b0621c7e5eafe5f47e22c4197d",
+      "app_tests_sha256": "7ad5bb0b3fc0fc094924fcc8e0b42a55a4f175d854e5392726cc8f3523852a1c",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1469,7 +1482,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "eb80df2a068098afb462969d467c916ee2768b5d087728a3736befb5b4848953",
+      "consumer_lock_sha256": "170ad1edb6d09572fb7e10b7cb9750e67acc53f9e3baa9886f69a15f64ed2b00",
       "generated_sha256": {
         "src/v2_contract.rs": "45053783a32505ab69fdf91260d89e7fe9dc730ed02f67247101c8864e486ec9",
         "v2/policy.zcve": "cefb615cbb7e845b774bb8d810b404a00554e212af415d6589b3e12614193e9f",
@@ -1480,6 +1493,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1553,12 +1567,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "7c84bd07e9c2938b3619c4ddc933a631a8d2bd3cb5e92943090c886528a0bf5e"
+      "review_sha256": "53bc3b933bc18597fe78760cc75027a15481e459bf61aac5630d8b2f43f46572"
     },
     {
-      "app_tests_sha256": "62ce6a76cedfa04b2c15089cc1f10718efcbd0531f5cc186fd1cb83ace50467b",
+      "app_tests_sha256": "de791520fc2788daf6c6ccc2523d9ac7163221420273072604df9c085191894e",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1582,7 +1596,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "966a1bbecf17bf2c8e246cd8821698529a0b5892e876f91b4492b9a252a810b3",
+      "consumer_lock_sha256": "08d6c5465366270aa4674ee4bd10d865b4c94d35df9a3d47e5d8cfa2ae75b27d",
       "generated_sha256": {
         "src/v2_contract.rs": "c9b322f26f094863deb805d0efa7383361fd580fee87920d9602272c1c8b532f",
         "v2/policy.zcve": "168ab0ece5b449fc7cdffa291f546a21e49cb5ae3de8c0f734fc25100555c175",
@@ -1593,6 +1607,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1667,12 +1682,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "10670d9fdd19aa26bad8b34838c750e8d3dcd6614fca0b7f76f744cefc697f3e"
+      "review_sha256": "b4b7a83591f9e62f0c2bc3d42c599ba55cfd2549a6f2eb0fa52591b36b70d5d9"
     },
     {
-      "app_tests_sha256": "1337139a851ea5b132d0833c9c1b06bd7e9fc9a1f9ce595f6085a5c42524cc05",
+      "app_tests_sha256": "68cd68064170701ad6efc74807a19a9c706a778ffcacfa18301080c4eb043154",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1696,7 +1711,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "d55c8d3142d0ff50f7e430fed922d7fd081c1b258b2a0d5b1a71967071a7cab8",
+      "consumer_lock_sha256": "34463e7cf92b963adfd46ee8d9cbcf329456a7a1f7f42a7e09541c3b62754452",
       "generated_sha256": {
         "src/v2_contract.rs": "ef9dbccc7d26b65a0ff8167d92c63ab07a7492996bbd5bae063788e9c00e48bd",
         "v2/policy.zcve": "f014cde71be82d7c8232c2fc68909e44298dbb88e28631f5c276f65619533793",
@@ -1707,6 +1722,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1779,12 +1795,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "b9d7810ffc4cb2d5a001ddf3178dd7deca150f3a77486d7425bd49b003100961"
+      "review_sha256": "3aac2a622af3dc31b1a71d9ee73c8ded2ddcf583ca54157bce0640166cc39ed4"
     },
     {
-      "app_tests_sha256": "a6aaf43a74438352e6252b6910021feb5718d53c451d5fe3fd1a976f1636f211",
+      "app_tests_sha256": "46d4dca0f5628826f155d5facf4db56963f7ce66150448eb65f16c192c7cdedb",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1808,7 +1824,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "2488bed11339f7fe8838b3be4d13235d1190db03cd26e554c6044f2a6facc742",
+      "consumer_lock_sha256": "671e0dc302b94762e571f73a759b46e0cb230b81c04ba4fe1fbec7b266f21128",
       "generated_sha256": {
         "src/v2_contract.rs": "79d8bb54ad33ffa9056e0676146240c93159c62a40d6b40f04665f5f586d7109",
         "v2/policy.zcve": "d32f530a1b85bfcd6703bcb8b10ee6f4ce9d5b404e20a9226774007e1ad58c38",
@@ -1819,6 +1835,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -1892,12 +1909,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "ac3b6ea9f84a7e4326365b3805fb21895a28207c741e495ebe9cf0fe0e9799d6"
+      "review_sha256": "42cb7d3a19ed99bbfeda09b515696fc3e6532aa724112e72111f197bd656339e"
     },
     {
-      "app_tests_sha256": "bcb8c8e152ebb9a6442d8ef7c0d9afdd9c249d14c4b2ac2574914eeed6a22c78",
+      "app_tests_sha256": "f7452200e5a5e545cc83e58fa4dea17f0307bef7b8acc9c73e6b998d74a4ee94",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1921,7 +1938,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "076effe8504ba0476849df828dddb8899ae2c13390c1eea80f352579309dfaf6",
+      "consumer_lock_sha256": "7d8b2a228133f307fb1d7a1fc64525084f725e6103a96d52e6664a06539b2b6a",
       "generated_sha256": {
         "src/v2_contract.rs": "5be39a148cc3a245b9c2637a4232ea008f99f1cadba9614e02b429852f1a8da1",
         "v2/policy.zcve": "fe7cd3e8aff2e110101759c4625db532dc1c4b5663a64650413da733353cd326",
@@ -1932,6 +1949,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "rate-limiter",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             0,
@@ -2006,12 +2024,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "3974617e987c1d99d45006d5c3d58f5aa2e27ee3316438625191e178eb7674ea"
+      "review_sha256": "6971b3cadab7285e588557fba7fa15ba5db462b5aacbc69192fd814d5206c266"
     },
     {
-      "app_tests_sha256": "72adba7a962184cc877d9f22f019e019ade9db9be91069255dd1b2d73198bf1a",
+      "app_tests_sha256": "d943b5ae4d4cc0bc6ee0fdf83f34742098d82cc06856101aa1e00172a90cefe2",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2035,7 +2053,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "36346900099878b3948bf19f1fd151a01d924398351a628559a60ad0c880ebc3",
+      "consumer_lock_sha256": "5484f36816ff57b4982219d44e4bb0dbc79a7f6b80d5b5f67a595d9fca9fa35b",
       "generated_sha256": {
         "src/v2_contract.rs": "f48d5b3bc39430d9485c6b4db3e3603488b43c8f06ee47f6f0a7996e67570cfa",
         "v2/policy.zcve": "d85f2d32cef4b3768cb381787d8f5ca0fd9fff161ea02e8102e1a1a67ae5c9ed",
@@ -2046,6 +2064,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "approval-queue",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             150,
@@ -2120,12 +2139,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "c8c24ab9f13ebc2b82340ab83000c58d5082e4ad96286b619ffe40dfd14000ed"
+      "review_sha256": "35f174f48c4c48d628a8b87951291a7d448f840206869db659aa485236a9b06f"
     },
     {
-      "app_tests_sha256": "6e8980cc8a71a1cec7eb53506b0266e75eff38d03f7e2c24b235544e846d4546",
+      "app_tests_sha256": "f9debb752febfcdb9360a5f135d8e1081b1b2264056ad74ced09e81bee33c21e",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2149,7 +2168,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "d4a7b9b62e1df14665a4addeb62929e58dd5dcbd4338440bc525335bbf36a7a2",
+      "consumer_lock_sha256": "58ebba8c3010ccc6de8df44278e543c15f46bd859ecf059869682de24fb90b5c",
       "generated_sha256": {
         "src/v2_contract.rs": "61c6eb5de717311f9ed38187bdae4ad9a62ea7935fb665f813868137d5cdff02",
         "v2/policy.zcve": "039055660c20588c2f25cd84e5dd806f0a35327dec0096e04ca6946075989384",
@@ -2160,6 +2179,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "approval-queue",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             150,
@@ -2234,12 +2254,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "930e377b65128e19b1a0473f7f9665fa99e4b2b3984b1a98d4919ef893f2be20"
+      "review_sha256": "625bb0c282c799439b70a693e7009aad0cd8915432e45f3d75629baaf69100fd"
     },
     {
-      "app_tests_sha256": "d44da31da77a3038e102c84867cd98f7c721c7950b7b18203caae6a91c5fd192",
+      "app_tests_sha256": "f1004dd75b46e3dbf7482d493dc3fe1730c86a9583b134c6c223350512acce71",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "a0c05557b8af2df3774d6993c4333a8bb2990f9f0821f916a5668a0d7b1e439d",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2263,7 +2283,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "defee2a58df1d18d3d1cf2843a07a3ee87e72635152e2ab9fd94b6dd58890fd8",
+      "consumer_lock_sha256": "b6d3b9b0b050e22f4e27056be474225ebc6d6471809c2ebdd588aafa81c526b3",
       "generated_sha256": {
         "src/v2_contract.rs": "07058b774b83f3ffa685ab218d6bdbf2e7024bbc3851cd6b0d554f467db861fd",
         "v2/policy.zcve": "b4e97484ebb341a63391359cd18361ea9e63958b7e01333db10c2552b37864d9",
@@ -2274,6 +2294,7 @@
         "examples_provenance": "independent Root reference from public semantics; not owner labels",
         "family": "approval-queue",
         "family_theorem": null,
+        "finite_family_certificate": null,
         "input_domains": [
           [
             150,
@@ -2348,24 +2369,24 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "e279657ad94a152eba3adb876f1193d5db9a9a1aa73efc709b4fc061ba1b939b"
+      "review_sha256": "e5d03f37f2f14d7f57e80d941b8a71e1957a1dbc441e1c7a4f04e0577febad7a"
     }
   ],
   "law_violating_mutants": [
     {
       "family": "reservation-pool",
       "law_refusal_findings": 1,
-      "review_sha256": "0f3b9304e083d777d48b916ac485d2e8c2235a832d33bbeaecff5077b2440c76"
+      "review_sha256": "7433453bcd05037d19c1799ef262d7fbb898c9125e0ee4049e92243345865ae3"
     },
     {
       "family": "rate-limiter",
       "law_refusal_findings": 1,
-      "review_sha256": "868bcff230e3f2c483633e756c6886aff59c810107717527a9243808c5246901"
+      "review_sha256": "3625c1f8ddab06c584fbbb3b983514df759402aa8f4023f1ed575b2c5dfc2208"
     },
     {
       "family": "approval-queue",
       "law_refusal_findings": 1,
-      "review_sha256": "6d9695f54282e89375de86bb03bb8a7c41d84cf1440dbbd071b2eb94280b0980"
+      "review_sha256": "49d49a5c21d20cffcd9ac0071f8a3a5d23662c35e2e4aac840ed25c5ebd80415"
     }
   ],
   "owner_adoption": false,

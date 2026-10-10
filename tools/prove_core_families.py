@@ -26,7 +26,7 @@ RUNTIME_SCHEMA = 'zeno-fcis/core-family-runtime-source/1'
 GENERATED_TEST_OUTPUT = 'crates/zeno-fcis-generated-code-tests/python'
 INPUTS = ('tools/instantiate_core.py', 'tools/check_core_components.py',
           'tools/prove_core_families.py', 'tools/test_data/core_components/reference.py')
-NATIVE_REPORT_SHA256 = 'ed41a32a80dffb3a41893e46a048c5167effd3946a9b543a96ae71e7ce73ac83'
+NATIVE_REPORT_SHA256 = 'ac8b1e750339ac95b95a2837e200d1f24e6d491c0089a341a1dd81efc75bdac9'
 COUNTS = {'reservation-pool': (9, 2216), 'rate-limiter': (9, 2646), 'approval-queue': (3, 1296)}
 CONSERVATION = {
     'reservation-pool': 'Reserve and Release preserve a+r; Consume subtracts exactly q; Replenish adds exactly q. Supplied authorization is not authentication or physical asset evidence.',

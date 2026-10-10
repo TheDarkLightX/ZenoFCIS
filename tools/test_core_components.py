@@ -1,6 +1,7 @@
 """Data-boundary controls for component instantiation; no decision evaluator."""
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 import check_core_components as checks
@@ -8,6 +9,13 @@ import instantiate_core as core
 
 
 class ComponentDataTests(unittest.TestCase):
+    def test_qualification_can_rebuild_stale_references_without_weakening_installation(self):
+        with mock.patch('prove_core_families.validate_reference',
+                        side_effect=ValueError('stale compiler/evaluator source')):
+            self.assertEqual(len(checks.static_check()), 21)
+            with self.assertRaisesRegex(ValueError, 'stale compiler/evaluator source'):
+                core.source('approval-queue', {'K': 1})
+
     def test_full_independent_domain_is_present(self):
         instances = checks.static_check()
         self.assertEqual(len(instances), 21)

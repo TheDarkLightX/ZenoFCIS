@@ -1,6 +1,8 @@
 # Release packaging
 
-This document describes the ZenoFCIS `1.1.0` artifact set.
+This document describes the ZenoFCIS `2.2.0-rc.1` candidate artifact set.
+The candidate procedure is in [the current checklist](RELEASE_CHECKLIST.md);
+the historical stable V1 checklists keep their original release scope.
 
 ## Package set
 

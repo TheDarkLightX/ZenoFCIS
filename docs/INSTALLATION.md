@@ -1,7 +1,31 @@
 # Installation
 
-ZenoFCIS `1.1.0` is the stable Rust library release. Rust `1.97.1` is
-the minimum supported toolchain.
+This source packages ZenoFCIS `2.2.0-rc.1`, a release candidate. Rust `1.97.1`
+is the minimum supported toolchain. The stable `1.1.0` release has the older API;
+it does not provide the candidate's breaking V2 application path.
+
+## Candidate binary and pinned source
+
+Download the Linux x86_64 GNU CLI archive and checksum bundle from the matching
+[GitHub prerelease](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1).
+Check `SHA256SUMS`, extract the binary archive, and run `zeno-fcis --version`;
+it must print `zeno-fcis 2.2.0-rc.1`. The CLI has no daemon. The candidate
+does not advertise macOS or Windows binaries.
+
+For library use, clone the repository and select that exact tag:
+
+```bash
+git clone https://github.com/TheDarkLightX/ZenoFCIS.git
+cd ZenoFCIS
+git checkout v2.2.0-rc.1
+git verify-tag v2.2.0-rc.1
+```
+
+Verify the tag against the signer's independently obtained public key. Use the
+normal [V2 program API](V2_PROGRAM_API_MIGRATION.md), or scaffold an application
+with `zeno-fcis new APP --contract CONTRACT --source /absolute/path/to/ZenoFCIS`.
+The command's `--source` option binds generated dependencies to this checkout.
+This candidate is not claimed to have been published to crates.io.
 
 ## Application dependency
 
@@ -10,9 +34,7 @@ application:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.1.0", default-features = false, features = [
-    "composed-program",
-] }
+zeno-fcis = { path = "../ZenoFCIS/crates/zeno-fcis", default-features = false }
 ```
 
 The default feature supplies the foundational `std` surface. Semantic users
@@ -27,8 +49,8 @@ crate:
 
 ```toml
 [dependencies]
-zeno-fcis-core = { version = "=1.1.0", default-features = false }
-zeno-fcis-codec = { version = "=1.1.0", default-features = false }
+zeno-fcis-core = { path = "../ZenoFCIS/crates/zeno-fcis-core", default-features = false }
+zeno-fcis-codec = { path = "../ZenoFCIS/crates/zeno-fcis-codec", default-features = false }
 ```
 
 All ZenoFCIS crates in one dependency graph should use the same exact release
@@ -39,12 +61,12 @@ version.
 ```bash
 git clone https://github.com/TheDarkLightX/ZenoFCIS.git
 cd ZenoFCIS
-git checkout v1.1.0
+git checkout v2.2.0-rc.1
 cargo +1.97.1 test --workspace --all-features --locked
 ```
 
 The signed release tag identifies the source used to build the published
-packages. See the [release notes](V1_RELEASE_NOTES.md) for compatibility and
+packages. See the [release notes](RELEASE_NOTES.md) for compatibility and
 assurance boundaries.
 
 ## Optional coding-agent guardrails
@@ -67,13 +89,13 @@ The core library does not require a daemon. V2 ships one host binary, the
 authoring CLI:
 
 ```bash
-cargo +1.97.1 install zeno-fcis-cli --version 1.1.0 --locked
+cargo +1.97.1 install --path crates/zeno-fcis-cli --locked
 zeno-fcis check project.zeno
 ```
 
 V1's `mount-zenodex-zusd` diagnostic parity tool is not shipped in V2. Its
 pinned assertions remain in the private kernel-law oracle, and a checked
-full-width zUSD profile is planned for V2.1.
+full-width zUSD profile is still unfinished and is not advertised by this candidate.
 
 ## Offline verification
 

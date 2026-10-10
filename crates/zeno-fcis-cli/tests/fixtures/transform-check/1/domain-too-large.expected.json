@@ -1,16 +1,1 @@
-{
-  "authority": "none",
-  "candidate_sha256": "841e5a6b38cfbd41ab0578544aa9bce56ee6457644dc22930d5ba89bb654deed",
-  "detail": {
-    "cause": "domain-too-large",
-    "domain_size": "9",
-    "max_input_tuples": 8
-  },
-  "limits": {
-    "input_tuples": 8,
-    "steps": 256
-  },
-  "original_sha256": "6e5d73446417168fd634e0d57d598bcba82eb1c12a9106e799e5b1c2d9948d84",
-  "schema": "zeno-fcis/transform-result/1",
-  "status": "inconclusive"
-}
+{"authority":"none","candidate_sha256":"841e5a6b38cfbd41ab0578544aa9bce56ee6457644dc22930d5ba89bb654deed","detail":{"cause":"domain-too-large","domain_size":"9","max_input_tuples":8},"limits":{"input_tuples":8,"steps":256},"original_sha256":"6e5d73446417168fd634e0d57d598bcba82eb1c12a9106e799e5b1c2d9948d84","schema":"zeno-fcis/transform-result/1","status":"inconclusive"}

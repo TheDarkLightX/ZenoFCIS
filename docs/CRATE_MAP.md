@@ -1,5 +1,9 @@
 # ZenoFCIS crate map
 
+This guide is included in the `2.2.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
 All public workspace crates are version `1.1.0`, extending the stable V1 API.

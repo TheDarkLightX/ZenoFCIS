@@ -18,7 +18,7 @@ libcrux = ["zeno-fcis-codec/libcrux"]
 parity = ["rustcrypto", "libcrux"]
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.1.0", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-codec = { version = "=2.2.0-rc.1", path = "../zeno-fcis-codec", default-features = false }
 
 [dev-dependencies]
 criterion = "=0.5.1"
