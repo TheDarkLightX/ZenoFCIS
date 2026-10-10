@@ -2,6 +2,7 @@
 
 use super::*;
 use alloc::vec;
+use zeno_fcis_codec::CanonicalEncode;
 
 fn identity() -> Program {
     Program::try_new(
@@ -11,6 +12,52 @@ fn identity() -> Program {
         vec![0],
     )
     .unwrap_or_else(|error| panic!("identity program: {error}"))
+}
+
+#[test]
+fn canonical_program_import_rejects_hostile_artifacts() {
+    let program = identity();
+    let bytes = program
+        .value()
+        .canonical_bytes()
+        .unwrap_or_else(|error| panic!("canonical program: {error}"));
+    assert_eq!(
+        crate::finite_runtime::import_program(&bytes),
+        Ok(program.clone())
+    );
+
+    let mut trailing = bytes.clone();
+    trailing.push(0);
+    assert!(crate::finite_runtime::import_program(&trailing).is_err());
+    assert!(crate::finite_runtime::import_program(&bytes[..bytes.len() - 1]).is_err());
+
+    let mut wrong_profile = program.value();
+    if let Value::Tuple(fields) = &mut wrong_profile {
+        fields[0] = Value::Text("other-profile".into());
+    }
+    assert!(
+        crate::finite_runtime::import_program(
+            &wrong_profile
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("changed profile: {error}"))
+        )
+        .is_err()
+    );
+
+    let mut bad_reference = program.value();
+    if let Value::Tuple(fields) = &mut bad_reference
+        && let Value::Tuple(nodes) = &mut fields[2]
+    {
+        nodes[0] = Value::Tuple(vec![Value::I128(0), Value::I128(99)].into());
+    }
+    assert!(
+        crate::finite_runtime::import_program(
+            &bad_reference
+                .canonical_bytes()
+                .unwrap_or_else(|error| panic!("changed node: {error}"))
+        )
+        .is_err()
+    );
 }
 
 #[test]
