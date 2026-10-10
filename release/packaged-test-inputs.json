@@ -137,7 +137,7 @@
       "package": "zeno-fcis-shell-sqlite",
       "target": "test:behaviour_change",
       "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs",
-      "sha256": "47345177951ad6299d3cda05c5d5cdbbcd044931d5ee5ff4119a0ca3abc2c108"
+      "sha256": "8d74bca25a7457b3b39a3ac3fe3a594372f7b1c7a5d523cbb71461ae33726861"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -281,7 +281,7 @@
       "package": "zeno-fcis-shell-sqlite",
       "target": "test:upgrade",
       "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs",
-      "sha256": "47345177951ad6299d3cda05c5d5cdbbcd044931d5ee5ff4119a0ca3abc2c108"
+      "sha256": "8d74bca25a7457b3b39a3ac3fe3a594372f7b1c7a5d523cbb71461ae33726861"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
