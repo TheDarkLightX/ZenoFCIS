@@ -1,0 +1,28 @@
+zeno 1;
+project 1 idempotency_slot;
+namespace 2 core;
+type 100 state Slot;
+type 101 command Record;
+type 102 context Operator;
+type 105 int Units in 0..=${C};
+type 106 bool Flag;
+type 108 bool Authorized;
+field 110 100 seen 106;
+field 111 100 key 105;
+field 112 100 value 105;
+field 120 101 command_key 105;
+field 121 101 command_value 105;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+reason 201 conflicting_replay precedence 1;
+component 400 slot {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 bounded on commit, genesis = 0 <= post.100.111 && post.100.111 <= ${C} && 0 <= post.100.112 && post.100.112 <= ${C};
+law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.111 && post.100.111 <= ${C} && 0 <= post.100.112 && post.100.112 <= ${C};
+law 502 exact_record on accept = post.100.110 == 1 && post.100.111 == command.101.120 && post.100.112 == command.101.121 && ((pre.100.110 == 1 && pre.100.111 == command.101.120) -> post.100.112 == pre.100.112);

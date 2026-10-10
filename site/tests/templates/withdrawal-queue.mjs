@@ -12,7 +12,7 @@ const LANES = { 170: "A", 171: "B" };
 const STATUSES = { 180: "Empty", 181: "Arrived", 182: "Pending" };
 const CALLERS = { 190: "Operator", 191: "OwnerA", 192: "OwnerB", 193: "Keeper" };
 
-export const laws = { Accept: [500, 501, 502, 503], CommittedFailure: [500, 508], Reject: [509] };
+export const laws = { Accept: [500, 501, 502, 503, 991], CommittedFailure: [500, 508, 991], Reject: [509, 991] };
 
 // Inputs refused before any decision, with the stage that refuses them.
 export const refusals = [

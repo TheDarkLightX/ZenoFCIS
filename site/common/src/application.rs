@@ -2,40 +2,11 @@
 
 use crate::render::Names;
 use serde_json::{Map, Value as Json};
-use std::fmt::Debug;
-use zeno_fcis_authority::{
-    AuthorizedShellState, CatalogAuthorizedTransition, CatalogCommitAuthority,
-    CatalogTransitionProgram,
-};
-use zeno_fcis_crypto::RustCryptoSha256;
-use zeno_fcis_laws::ProjectLawEngine;
 use zeno_fcis_schema::{SchemaAdmittedEnvelope, SchemaAdmittedTypeEnvelope};
 use zeno_fcis_value::Value;
 
-/// The template's commit authority: the type its own `Authority` alias names.
-pub type Authority<A> = CatalogCommitAuthority<
-    RustCryptoSha256,
-    <A as Application>::Program,
-    <A as Application>::Laws,
-    <A as Application>::Destination,
->;
-
-/// The in-memory shell, pinned to the same provider, program, laws, and
-/// destination type as the template's authority.
-pub type Shell<A> = AuthorizedShellState<
-    RustCryptoSha256,
-    <A as Application>::Program,
-    <A as Application>::Laws,
-    <A as Application>::Destination,
->;
-
-/// A decision the authority authorized to commit.
-pub type Transition<A> = CatalogAuthorizedTransition<
-    RustCryptoSha256,
-    <A as Application>::Program,
-    <A as Application>::Laws,
-    <A as Application>::Destination,
->;
+/// The template's genuine library-owned V2 authority.
+pub type Authority<'p> = zeno_fcis_authority::Authority<'p>;
 
 /// A generated application, as its demo crate presents it.
 ///
@@ -44,29 +15,23 @@ pub type Transition<A> = CatalogAuthorizedTransition<
 /// demo crate writes on its own is [`parse`](Self::parse), the mapping from
 /// the page's request to the template's typed command and context.
 pub trait Application: 'static {
-    /// The template's name, as `zeno-fcis new --template` takes it. The
-    /// digests that identify the principal, the authentication evidence, and
-    /// each replay are labelled `example/<NAME>/...`, as in the template's
-    /// `invoke`.
+    /// The template's name, as `zeno-fcis new --template` takes it. Browser
+    /// state, publication and replay digests use `example/<NAME>/...` domains.
+    /// These local identifiers do not authenticate the supplied context.
     const NAME: &'static str;
-    /// The template's program: the `P` of its `Authority`.
-    type Program: CatalogTransitionProgram<RustCryptoSha256, Error: Debug>;
-    /// The template's law checker: the `L` of its `Authority`.
-    type Laws: ProjectLawEngine;
-    /// The template's delivery adapter, the `I` of its `Authority`; nothing
-    /// delivers in a page, and the authority holds it only as a marker.
-    type Destination;
     /// The generated command type.
     type Command;
     /// The generated context type.
     type Context;
 
-    /// The template's `authority()`.
+    /// Borrow the template's checked authority while its contract and
+    /// descriptor remain alive. This host closure manages ownership;
+    /// the library evaluates the declared decisions and laws.
     ///
     /// # Errors
     ///
     /// The template's own refusal to build its authority, rendered as text.
-    fn authority() -> Result<Authority<Self>, String>;
+    fn with_authority<R>(f: impl FnOnce(&Authority<'_>) -> R) -> Result<R, String>;
 
     /// The names of the reasons, fields, variants, and channels of
     /// `project.zeno`, and of every law in the manifest.

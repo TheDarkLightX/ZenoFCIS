@@ -10,8 +10,23 @@ import instantiate_core as core
 class ComponentDataTests(unittest.TestCase):
     def test_full_independent_domain_is_present(self):
         instances = checks.static_check()
-        self.assertEqual(len(instances), 21)
-        self.assertEqual(sum(item['input_tuples'] for item in instances), 6158)
+        self.assertEqual(len(instances), 77)
+        self.assertEqual(sum(item['input_tuples'] for item in instances), 107518)
+
+    def test_numeric_arguments_are_not_command_kinds(self):
+        rows = [row for row in checks.expected_cases()
+                if row['family'] == 'versioned_register' and row['parameters'] == {'C': 1}]
+        self.assertEqual({core.command_name('versioned-register', row['input']) for row in rows}, {'Write'})
+        self.assertTrue(any(row['expected']['class'] == 'Accept' for row in rows))
+        self.assertFalse(any(row['input'][2] == 1 and row['expected']['class'] == 'Accept' for row in rows))
+        self.assertEqual(core.command_name('retry-budget', [1, 0, 0, 1]), 'Attempt')
+        self.assertEqual(core.command_name('retry-budget', [1, 0, 1, 1]), 'Finish')
+
+    def test_static_construction_does_not_invent_a_certificate(self):
+        files = core.source('versioned-register', {'C': 1}, include_proof=False)
+        manifest = core.read_json(files['core-instance.json'].decode())
+        self.assertIsNone(manifest['finite_family_certificate'])
+        self.assertEqual(manifest['parameter_range_evidence'], 'pending')
 
     def test_outside_closed_parameter_space_is_refused(self):
         invalid = [
@@ -26,6 +41,9 @@ class ComponentDataTests(unittest.TestCase):
             ('approval-queue', {'K': 1, 'OTHER': 0}),
             ('../approval-queue', {'K': 1}),
         ]
+        for family in core.FAMILIES[3:]:
+            invalid.extend((family, parameters) for parameters in
+                           ({'C': 0}, {'C': 9}, {'C': True}, {'C': 1.0}, {'C': '1'}, {}, {'C': 1, 'EXTRA': 0}))
         for family, parameters in invalid:
             with self.subTest(family=family, parameters=parameters):
                 with self.assertRaises(ValueError):

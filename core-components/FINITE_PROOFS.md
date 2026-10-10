@@ -5,17 +5,26 @@ artifacts and replay result before asserting a successful proof. It does not
 reclassify the earlier native-test report or add a Lean backend.
 
 For each family, the theorem quantifies over every declared parameter instance
-and every member of the entire raw state/command/context product. The three
-products are unchanged: 9 reservation instances/2,216 inputs; 9 fixed-window
+and every member of the entire raw state/command/context product. The original
+three products are unchanged: 9 reservation instances/2,216 inputs; 9 fixed-window
 rate instances/2,646 inputs; 3 single-request approval instances/1,296 inputs.
+The seven additional products cover C=1..8 each: counter/176 inputs, budget/568,
+versioned register/30,664, idempotency slot/61,328, retry budget/352, finite phase
+machine/176 and logical deadline/8,096. Together these are 77 instances and
+107,518 raw inputs. The catalogue table gives each exact input product.
 
 On all those inputs, the actual mandatory library Authority returns a business
 decision, every applicable transition law passes, and the complete class,
 reason, successor fields and deliveries agree with the independent reference.
-There is a feasible acceptance for every intended command, and rejection is
+There is a feasible acceptance for every intended command kind, and rejection is
 unchanged and delivery-free. Invalid schema-admitted prestates are included:
 state invariants apply at genesis/commit; malformed prestates business-Reject
 under the reject/conformance laws, without a hidden law refusal.
+
+Numeric arguments are not separate command kinds. The register has one Write
+command; expected_version=C cannot accept under a bounded, nonwrapping version
+policy. The check still requires an actual accepted Write, both counter
+directions, both retry actions and both phase-machine actions.
 
 Reservation conservation includes explicit external inputs/outputs: Reserve and
 Release conserve available+reserved; Consume removes exactly quantity;
@@ -31,7 +40,7 @@ scope**, using named exhaustive library interpretation. A stored certificate
 alone is **Identified**. `KernelChecked` is not used: no Lean kernel checked
 this argument. Solver status is irrelevant to this finite route. Genesis is
 separate: the retained generated-native report checks each exact genesis and
-all 84 native tests; this transition certificate does not replay those logs or
+all 308 required native tests; this transition certificate does not replay those logs or
 claim a new genesis/temporal induction theorem. Issuance verifies identical
 canonical artifacts against that native report, preserving its actual scope.
 
@@ -47,7 +56,7 @@ those initial bindings. Any input or executable drift refuses issuance before
 certificate files or a successful report are written; a late snapshot cannot
 substitute changed source for the source used during checking.
 
-Three canonical JSON certificates bind the family templates, every example,
+Ten canonical JSON certificates bind the family templates, every example,
 checker/instantiator sources, compiler/evaluator source inventory, exact CLI
 binary, every domain and parameter, canonical schema/policy/Rust artifacts,
 Authority identity, laws and complete normalized decision digest. Certificates
@@ -88,7 +97,7 @@ of local Cargo target settings. The offline build needs the locked dependencies
 already available locally.
 
 This checks an isolated copy of the declared source inputs, issues fresh
-certificates for that CLI, replays all 6,158 raw transitions, and runs the law,
+certificates for that CLI, replays all 107,518 raw transitions, and runs the law,
 tampering and scaffold-reference controls. It preserves the stored certificate
 set. The output names the evidence directory; failures retain their logs there.
 Genesis evidence is inherited only when the canonical artifacts match the
@@ -111,7 +120,7 @@ SHA256 and machine execution. These are named assumptions, not a newly proved
 implementation theorem. The independent reference supplies intended finite
 behavior; owner labels and release approval remain absent.
 
-Qualification requires real law-mutant refusals, missing-parameter/domain/
+Qualification requires seventeen real law-mutant refusals across the ten families, missing-parameter/domain/
 decision/source/binary tampering controls, source freshness and proof references
 surviving normal scaffolding with identical canonical artifacts. A failed,
 partial, timed-out or stale check issues no passing certificate. Run heavy work

@@ -1,0 +1,71 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "finite-phase-machine-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "106": [
+      "Bool"
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "phase": "pre.100.110",
+    "reset": "command.101.120",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "reset && phase != ${C}",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!reset && phase == ${C}",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "reset",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "0"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "phase + 1"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+  }
+}

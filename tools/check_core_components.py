@@ -8,6 +8,7 @@ A successful report is bounded execution evidence, not a family kernel proof.
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import itertools
 import json
@@ -22,7 +23,40 @@ from pathlib import Path
 import instantiate_core as core
 
 REFERENCE = core.ROOT / "tools/test_data/core_components/reference.py"
-REFERENCE_SHA256 = "126b6fb20905c13ce4133f15602b1d966a131826469af9cfabd93b360cad68b9"
+REFERENCE_SHA256 = "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
+
+# Actual policy faults, not fake verdicts. Each must reach an applicable law.
+# (name, case guard, post field or None for guard, original, replacement)
+LAW_MUTATIONS = {
+    "reservation-pool": (("lost-reservation", "action == 150", "111", "reserved + quantity", "reserved"),),
+    "rate-limiter": (("free-request", "true", "111", "used + 1", "used"),),
+    "approval-queue": (("lost-vote", "action == 161", "111", "v0 || principal == 0", "v0"),),
+    "bounded-counter": (("lost-increment", "action == 150", "110", "value + 1", "value"),
+                        ("authorization", "!authorized", None, "!authorized", "false")),
+    "consumable-budget": (("free-spend", "true", "110", "remaining - amount", "remaining"),
+                          ("authorization", "!authorized", None, "!authorized", "false")),
+    "versioned-register": (("lost-version", "true", "111", "version + 1", "version"),
+                           ("authorization", "!authorized", None, "!authorized", "false")),
+    "idempotency-slot": (("lost-record", "true", "110", "true", "false"),
+                         ("authorization", "!authorized", None, "!authorized", "false")),
+    "retry-budget": (("free-attempt", "true", "110", "remaining - 1", "remaining"),
+                     ("authorization", "!authorized", None, "!authorized", "false")),
+    "finite-phase-machine": (("lost-advance", "true", "110", "phase + 1", "phase"),
+                             ("authorization", "!authorized", None, "!authorized", "false")),
+    "logical-deadline": (("lost-deadline", "true", "112", "true", "false"),
+                         ("authorization", "!authorized", None, "!authorized", "false")),
+}
+
+
+def law_mutants(family, policy):
+    for name, guard, field, before, after in LAW_MUTATIONS[family]:
+        changed = copy.deepcopy(policy)
+        cases = [case for case in changed["cases"] if case["when"] == guard]
+        require(len(cases) == 1, f"{family}: mutation case changed")
+        target, key = (cases[0], "when") if field is None else (cases[0]["post"], field)
+        require(target[key] == before, f"{family}: mutation expression changed")
+        target[key] = after
+        yield name, changed
 
 
 def require(condition, message):
@@ -53,7 +87,9 @@ def static_check():
     for family in core.FAMILIES:
         spec = core.definition(family)
         for parameters in spec["instances"]:
-            files = core.source(family, parameters)
+            # Static data checking and qualification do not consume certificates.
+            # The ordinary installer still requires a fresh stored reference.
+            files = core.source(family, parameters, include_proof=False)
             manifest = core.read_json(files["core-instance.json"].decode())
             expected = [row for row in rows if row["family"] == family.replace("-", "_")
                         and row["parameters"] == parameters]
@@ -66,12 +102,13 @@ def static_check():
                     f"{family} {parameters}: independent inputs do not cover the exact full product")
             require(len(written) == manifest["input_tuples"], "input count differs")
             state_width = spec["state_width"]
-            command_offset = state_width
-            actions = manifest["input_domains"][command_offset]
-            for action in actions:
-                require(any(row["input"][command_offset] == action and
+            commands = set(core.COMMANDS[family][1].values())
+            require({core.command_name(family, row["input"]) for row in expected} == commands,
+                    f"{family}: declared command kinds differ from the input product")
+            for command in commands:
+                require(any(core.command_name(family, row["input"]) == command and
                             row["expected"]["class"] == "Accept" for row in expected),
-                        f"{family}: command {action} lacks a positive witness")
+                        f"{family}: command {command} lacks a positive witness")
             require(any(row["expected"]["class"] == "Reject" for row in expected),
                     f"{family}: no business refusal witness")
             for row in expected:
@@ -79,7 +116,7 @@ def static_check():
                     require(row["expected"]["post"] == row["input"][:state_width],
                             "reference reject changes state")
             instances.append(manifest)
-    require(len(instances) == 21 and sum(x["input_tuples"] for x in instances) == 6158,
+    require(len(instances) == 77 and sum(x["input_tuples"] for x in instances) == 107518,
             "supported family range drifted")
     return instances
 
@@ -124,7 +161,7 @@ def execute(cli, work, target, instances):
         directory = work / name
         directory.mkdir()
         contract, app = directory / "contract", directory / "app"
-        core.instantiate(family, parameters, contract)
+        core.instantiate(family, parameters, contract, include_proof=False)
         print(f"checking {name}: {manifest['input_tuples']} raw tuples", flush=True)
         run([cli, "generate", "contract", contract, "--format", "json"], core.ROOT,
             directory / "generate.log", environment)
@@ -159,20 +196,16 @@ def execute(cli, work, target, instances):
                         "binding": binding, "consumer_lock_sha256": graph["lock_sha256"]})
     mutants = []
     for family in core.FAMILIES:
-        directory = work / (family + "-mutant")
-        core.instantiate(family, core.definition(family)["instances"][0], directory)
-        policy_path = directory / "v2/policy.json"
-        policy = core.read_json(policy_path.read_text())
-        if family == "reservation-pool":
-            next(case for case in policy["cases"] if case["when"] == "action == 150")["post"]["111"] = "reserved"
-        elif family == "rate-limiter":
-            policy["cases"][-1]["post"]["111"] = "used"
-        else:
-            next(case for case in policy["cases"] if case["when"] == "action == 161")["post"]["111"] = "v0"
-        policy_path.write_text(json.dumps(policy, indent=2) + "\n")
-        checked = review(cli, directory, directory / "review.json", directory / "review.log", environment, mutant=True)
-        mutants.append({"family": family, "law_refusal_findings": checked["summary"]["law_refusal_findings"],
-                        "review_sha256": core.digest((directory / "review.json").read_bytes())})
+        parameters = core.definition(family)["instances"][0]
+        policy = core.read_json(core.source(family, parameters, include_proof=False)["v2/policy.json"].decode())
+        for name, changed in law_mutants(family, policy):
+            directory = work / (family + "-mutant-" + name)
+            core.instantiate(family, parameters, directory, include_proof=False)
+            (directory / "v2/policy.json").write_text(json.dumps(changed, indent=2) + "\n")
+            checked = review(cli, directory, directory / "review.json", directory / "review.log", environment, mutant=True)
+            mutants.append({"family": family, "mutation": name,
+                            "law_refusal_findings": checked["summary"]["law_refusal_findings"],
+                            "review_sha256": core.digest((directory / "review.json").read_bytes())})
     return {"instances": reports, "law_violating_mutants": mutants}
 
 
@@ -236,7 +269,7 @@ def finite_proof(cli, work):
                 'replay report refers to a different certificate')
     report = {'schema': 'zeno-fcis/core-family-current-build-check/1',
               'status': 'passed', 'authority': 'none', 'owner_adoption': False,
-              'instances': 21, 'raw_transition_inputs': 6158,
+              'instances': 77, 'raw_transition_inputs': 107518,
               'cli_sha256': initial['cli_sha256'],
               'runtime_source_sha256': core.digest(proof.encoded(initial['runtime'])),
               'certificates': replayed['certificates'],
@@ -273,10 +306,17 @@ def main():
         require(cli.is_file(), "CLI does not exist; build it under the assigned resource slot")
         require(not any(path == Path('/dev/shm') or Path('/dev/shm') in path.parents for path in (work, target)),
                 "use disk-backed test directories")
+        import prove_core_families as proof
+        initial = proof.snapshot_inputs(cli)
         work.mkdir(parents=False, exist_ok=False)
         target.mkdir(parents=True, exist_ok=True)
-        report.update(execute(cli, work, target, instances))
-        report.update(evidence="complete-finite-execution", cli_sha256=core.digest(cli.read_bytes()))
+        try:
+            report.update(execute(cli, work, target, instances))
+        finally:
+            proof.require_unchanged_inputs(cli, initial)
+        report.update(evidence="complete-finite-execution", cli_sha256=initial['cli_sha256'],
+                      runtime_source_sha256=core.digest(proof.encoded(initial['runtime'])),
+                      source_binding=initial)
         (work / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps({key: value for key, value in report.items() if key != "instances"} |
                      {"instances": len(instances)}, sort_keys=True))

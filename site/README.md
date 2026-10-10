@@ -1,8 +1,9 @@
 # ZenoFCIS demo site
 
 A static page that runs the six example applications in the browser, each
-through its own commit authority, program, and law checker, compiled to
-WebAssembly, with the library's in-memory reference shell in place of SQLite:
+through its generated V2 contract and the library-owned decision and law
+evaluators, compiled to WebAssembly, with an ephemeral browser store in
+place of SQLite:
 account-lockout, order-fulfillment, inventory-reservation,
 compliance-gateway, withdrawal-queue, and agent-treasury-guard. Every example
 adds only its request mapping, its description, and its examples reader to
@@ -17,8 +18,8 @@ the shared shape described here. The Pages workflow publishes only from
   checkout.
 - `package.json`: marks the scripts as ES modules for Node, which runs the
   tests. The page needs no package, and nothing is installed.
-- `common/`: what every module shares. `src/demo.rs` is the step over the
-  library's `AuthorizedShellState`, following each template's `invoke`, and
+- `common/`: what every module shares. `src/demo.rs` runs the V2 authority,
+  consumes genuine publications into browser-owned state, and constructs
   the JSON report; `src/render.rs` names every reported value as
   `project.zeno` names it (fields, variants, reasons, channels) and every law
   as the manifest does; `src/request.rs` reads the page's request field by
@@ -97,9 +98,16 @@ Then open `http://localhost:8000/ZenoFCIS/`.
 
 Each request carries its command and its context, which the page supplies;
 no module reads a clock. A step runs schema admission through the generated
-bindings, `admit_invocation`, `execute`, and, for an accept or a committed
-failure, the commit and the exact replay check, as the template's `invoke`
-does. The report gives the decision kind, the reason, each law's status as
+bindings and `Authority::publish` over the original envelopes. An accept or
+a committed failure produces a genuine `Publication`, consumed by the
+browser store. The step then recomputes `Authority::replay_publication` and
+commits that publication under the same replay key, requiring an idempotent
+result with unchanged state, history count and outbox. New requests receive
+distinct keys even if their inputs and decisions are identical. A conflicting
+key, wrong identity or stale prestate is refused. All fallible work occurs on
+owned staging state before the live browser store is replaced.
+
+The report gives the decision kind, the reason, each law's status as
 the law evaluation reports it, the state before and after, the entries it
 queued, and the authorization or rejection identity, every value under the
 name `project.zeno` gives it.
@@ -139,16 +147,21 @@ entry scrolls into view only when the viewer caused it. A page that loaded
 from the subpath alone is a page whose relative paths hold. Each template has
 its own browser capture so that a failure identifies the template involved.
 
-The strength of what each template itself checks is stated in its README and
-repeated in its section of the page, in the README's own scoped words: laws
-evaluated at run time within their declared decision scopes; tests on a host, which are
-detectors; a synthesized step selected and exhaustively checked on every
-input of its contract (inventory-reservation, compliance-gateway,
-withdrawal-queue, agent-treasury-guard); a controller table certified by
-OrbitSynthesis's checker for the finite model, not the running application
-by itself (withdrawal-queue); and induction steps that CVC5 attests with
-`unsat`, which is not proved (account-lockout, compliance-gateway,
-withdrawal-queue, agent-treasury-guard).
+The normal decision path uses each template's complete declarative V2 policy;
+it calls no application-owned decision or law callback. The library's Verus
+verification establishes its implementation against its stated specifications
+and trusted base. The authored policy still needs review against intended
+behavior. Independent examples and host conformance tests detect policy and
+integration mistakes; they do not prove that a deployment meets every
+requirement. Earlier synthesis, controller and solver evidence remains
+documented in the template READMEs and private historical oracle. That evidence
+does not describe a hand-written adapter running in this page.
+
+The browser store is a tested host implementation, not a formally verified
+durable shell. State and queued entries live only in memory, no entry is
+delivered, and supplied caller, time and oracle facts are not authenticated.
+The displayed hashes identify local artifacts; they do not establish caller
+authority or external settlement.
 
 ## Publishing
 

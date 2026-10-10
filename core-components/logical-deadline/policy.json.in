@@ -1,0 +1,75 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "logical-deadline-${INSTANCE}",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "106": [
+      "Bool"
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "deadline": "pre.100.110",
+    "last_seen": "pre.100.111",
+    "reached": "pre.100.112",
+    "now": "command.101.120",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now < last_seen",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "reached",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now < deadline",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "deadline",
+        "111": "now",
+        "112": "true"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": ${C},
+    "111": 0,
+    "112": false
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "DebitCreditEffectEquality",
+    "502": "DebitCreditEffectEquality"
+  }
+}
