@@ -16,10 +16,13 @@ approved provider token
 + exact ProjectCatalog
 + state-domain binding
 + transition/interpreter/deployment/replay-policy bindings
++ verified project-law set and exact runtime law-engine type
 + schema-admitted pre-state, command, and authenticated context
 + principal and authentication-evidence commitments
 + replay identity
 + execution by the shell-owned reviewed transition program
+    -> complete structural transition validation
+    -> fresh evaluation of every applicable project law
     -> CatalogAuthorizationDecision
     -> CatalogAuthorizedTransition for Accept or CommittedFailure only
 ```
@@ -35,20 +38,23 @@ Only `CatalogAuthorizedTransition` may cross a production commit port.
   evidence, effect interpreter, deployment, and replay policy.
 - Schema-admitted pre-state, command, and authenticated-context envelopes.
 - Nonzero principal, authentication-evidence, and replay commitments.
-- The exact nominal transition-program and interpreter types owned by the
-  commit authority. Callers cannot submit a prebuilt `TransitionDecision` for
-  authorization.
+- A complete `VerifiedProjectLaws` value binding the catalog, law manifest,
+  retained formal evidence, runtime checker build, and independent evidence
+  verifier.
+- The exact nominal transition-program, project-law engine, and interpreter
+  types owned by the commit authority. Callers cannot submit a prebuilt
+  `TransitionDecision` or select a checker per invocation.
 
 The command and context commitments are rederived from the externally supplied
 envelopes. They are never copied from the decision being validated.
 
 ## Outputs
 
-- `CatalogAuthorizedTransition<H, P, I>` for `Accept` and
+- `CatalogAuthorizedTransition<H, P, L, I>` for `Accept` and
   `CommittedFailure`.
 - A noncommittable catalog-authorized rejection value for `Reject`.
-- A versioned `AuthorizationId` that binds the exact policy, invocation,
-  candidate, bundle, decision class, reason, and roots.
+- A versioned `AuthorizationId` that binds the exact policy, invocation, law
+  set, law evaluation, candidate, bundle, decision class, reason, and roots.
 - Exact canonical authorization bytes for persistence and replay comparison.
 
 The existing `CandidateId` remains the implementation-neutral semantic
@@ -59,9 +65,18 @@ identity. `AuthorizationId` is the deployment-specific production identity.
 `CatalogAuthorizedTransition` has private fields and has no `Default`, decoder,
 `Deref`, public from-parts constructor, or conversion from `CommitBundle` or
 `NormalizedDecision`. Construction is possible only after complete validation
-under an `AuthorizationPolicy<H, P, I>` created with a
-`VerifiedProvider<H>`. `P` is invoked inside `CatalogCommitAuthority::execute`;
-the decision is never an external constructor input.
+under an `AuthorizationPolicy<H, P, L, I>` created with a
+`VerifiedProvider<H>` and `VerifiedProjectLaws<H, L>`. `P` is invoked inside
+`CatalogCommitAuthority::execute`; the decision is never an external
+constructor input. `L` is carried nominally through the policy, invocation,
+authorization, bound interpreter, and shell, preventing a different checker
+type from minting a value accepted by that commit port.
+
+The law manifest and evidence protocol are tool-neutral. Public deployments
+can mount Lean, Z3, CVC5, Kani, Flux, or other checked adapters. An owner with
+private ESSO access can mount an ESSO checker in a private crate through the
+same interfaces; public ZenoFCIS has no ESSO dependency or universal ESSO
+requirement.
 
 The generic `CommitmentHasher` trait remains available to reference and
 research APIs. Production authorization accepts only the sealed
@@ -78,6 +93,8 @@ ports accept the nominal authorized value.
 - The exact pinned SHA-256 provider implementation selected by the policy.
 - Schema, project-profile, catalog, transition, patch, plan, receipt, and pure
   reference-shell validation.
+- The reviewed project-law definitions, per-invocation law engine, and any
+  independently mounted retained-evidence verifier selected by the release.
 - For SQLite, SQLite transaction and durability behavior under the documented
   configuration.
 - The ingress authenticator, reviewed transition implementation, effect
@@ -92,6 +109,9 @@ External-library types do not appear in protocol-facing authorization values.
   bounds.
 - Transition patches, footprints, reasons, effects, outbox entries, state
   depth, and state nodes retain `TransitionLimits` and `CatalogLimits`.
+- Law definitions, retained evidence bytes, and per-invocation observations
+  retain `LawLimits`; the default maximum retained artifact volume is 64 MiB
+  and the hard maximum law/observation count is 4,096.
 - Domain names are nonempty ASCII and bounded by the canonical `u16` length.
 - Authorization encoding adds a fixed number of hashes and bounded canonical
   blobs; it does not introduce an unbounded collection.
@@ -128,6 +148,15 @@ Wall-clock timeout is not protocol evidence.
 12. Interpreter ownership: a concrete interpreter enters SQLite only through a
     private-construction `BoundInterpreter` minted by the same authority, then
     remains owned by that shell for delivery.
+13. Law completeness: every law family is required or explicitly inapplicable;
+    every applicable law is evaluated exactly once for the complete invocation
+    and decision surface.
+14. Law fail-closure: a missing, extra, duplicate, violated, indeterminate, or
+    engine-failed observation prevents construction of authorization.
+15. Law identity: the policy and authorization body bind the exact law-set,
+    runtime engine build, evidence verifier, and per-invocation evaluation.
+16. Nominal checker: a different law-engine type cannot mint an authorization,
+    interpreter token, or shell state of the selected production type.
 
 ## Negative Cases
 
@@ -135,6 +164,9 @@ Validation fails for a changed command, context, principal, authentication
 evidence, replay identity, pre-state, catalog, profile, precedence, state
 domain, provider, provider-build evidence, transition build, interpreter,
 deployment, replay policy, candidate, bundle, decision class, reason, or root.
+Validation also fails for a mismatched law catalog or source binding, changed
+law manifest, changed engine/verifier identity, incomplete observation set, or
+any violated or indeterminate law.
 
 SQLite additionally fails closed for a policy mismatch, replay collision,
 candidate-to-authorization collision, populated legacy database without
@@ -144,8 +176,8 @@ authorization records, partial transaction, or corrupted stored identity.
 
 - The ingress layer has authenticated the context and principal represented by
   the supplied commitments.
-- Owner review selected the exact transition, interpreter, deployment, and
-  replay-policy commitments.
+- Owner review selected the exact transition, project-law engine, retained
+  evidence verifier, interpreter, deployment, and replay-policy commitments.
 - Collision resistance holds for the approved SHA-256 provider.
 - The concrete shell protects its database and process authority according to
   its deployment threat model.
@@ -158,8 +190,11 @@ authorization records, partial transaction, or corrupted stored identity.
   or refinement proof.
 - Known-answer verification identifies a sealed provider and checks fixed
   vectors; it does not prove the complete compiled binary or hardware.
-- This boundary does not yet prove project invariants or value conservation;
-  issue #58 remains required before value-moving production promotion.
+- The framework requires relational laws before authorization, but it does not
+  invent a project's conservation equations or prove that a dishonest checker
+  implementation matches its manifest. Each promoted profile still needs
+  independently reviewed definitions, checkers, and retained proof evidence
+  at the coverage level it claims.
 - This boundary does not reconstruct exact decoded SQLite bundle/outbox set
   equality; issue #55 remains required before delivery qualification.
 - [Flux: Liquid Types for Rust](https://doi.org/10.1145/3591283) is relevant
