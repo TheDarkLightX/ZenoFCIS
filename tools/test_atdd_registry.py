@@ -118,7 +118,7 @@ TEMPLATE_PROFILE_TESTS = ["miri_bounded_profile_" + suffix for _, _, suffix, _ i
 TEMPLATE_RETAINED = [('durable_counter', 'counter', 0, 12), ('inventory_reservation', 'stock', 1, 20), ('order_fulfillment', 'order', 2, 23), ('account_lockout', 'account', 3, 20), ('withdrawal_queue', 'vault', 4, 26), ('agent_treasury_guard', 'treasury', 5, 30)]
 TEMPLATE_RETAINED_CALLS = {}
 for suffix, module, index, count in TEMPLATE_RETAINED:
-    if suffix in {"order_fulfillment", "agent_treasury_guard"}:
+    if suffix in {"order_fulfillment", "withdrawal_queue", "agent_treasury_guard"}:
         for start in range(0, count, 5):
             end = min(start + 5, count)
             name = f"retained_examples_and_replay_{suffix}_{start:02}_{end - 1:02}"
@@ -205,6 +205,16 @@ def template_profile_problems(source):
 
 
 class RepairedRegistryTests(unittest.TestCase):
+    def test_registry_failure_stops_run_before_expensive_checks(self):
+        command = ("python3", "tools/test_atdd_registry.py")
+        with mock.patch.object(atdd, "parse_args", return_value=mock.Mock(command="run", all=True)), \
+                mock.patch.object(atdd, "run_command", side_effect=subprocess.CalledProcessError(1, command)) as run, \
+                mock.patch.object(atdd, "run_scenario") as scenarios, \
+                contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(atdd.main(), 1)
+        run.assert_called_once_with(command)
+        scenarios.assert_not_called()
+
     def test_repaired_commands_reference_existing_targets(self):
         for scenario in REPAIRED:
             for command in atdd.SCENARIOS[scenario].commands:
@@ -286,7 +296,7 @@ class RepairedRegistryTests(unittest.TestCase):
         ] + [("run", "--example", path.stem) for path in (synthesis / "examples").glob("*.rs")]
         self.assertEqual(collections.Counter(actual), collections.Counter(expected))
         template = [row for row in rows if row["target"] == "--test v2_template_contracts"]
-        self.assertEqual(len(template), 26)
+        self.assertEqual(len(template), 32)
         self.assertEqual(sum("test" not in row for row in template), 1)
         self.assertTrue(all("--skip" not in row["target"] for row in template))
 
@@ -383,7 +393,7 @@ class RepairedRegistryTests(unittest.TestCase):
         self.assertEqual(sum_native, 2_175_778)
 
         inventory = sorted(re.findall(r"#\[test\]\s*(?:#\[ignore[^\n]*\n\s*)?fn (\w+)\(", rust))
-        self.assertEqual(len(inventory), 32)
+        self.assertEqual(len(inventory), 38)
         inventories = {target: inventory}
         ignored = {target: []}
         arguments = miri_exclusions.miri_test_arguments(remainder)
@@ -393,7 +403,7 @@ class RepairedRegistryTests(unittest.TestCase):
                 args = miri_exclusions.miri_test_arguments(row)
             return run_miri_coverage_check(workflow, row, names, honour_skip=skip, ignored=ignore, test_args=args)
         # The remainder keeps the four native-only skips first, then skips the
-        # twenty-five exact-test groups; each exact-test group runs its one test.
+        # thirty-one exact-test groups; each exact-test group runs its one test.
         self.assertEqual(coverage(), arguments + " " + shlex.join([a for name in isolated for a in ("--skip", name)]))
         for row in exact:
             self.assertEqual(coverage(row), "-- " + shlex.join(["--exact", row["test"]]))
@@ -480,6 +490,9 @@ class RepairedRegistryTests(unittest.TestCase):
                                  "retained_examples_batch!(treasury, 5, 29, 25, 30);"))
         self.assertTrue(problems("retained_examples_batch!(order, 2, 23, 5, 10);",
                                  "retained_examples_batch!(order, 2, 23, 4, 10);"))
+        self.assertTrue(problems("retained_examples_batch!(vault, 4, 26, 25, 26);",
+                                 "retained_examples_batch!(vault, 4, 26, 24, 26);"))
+        self.assertTrue(problems("retained_genesis!(vault, 4);", "retained_genesis!(stock, 4);"))
         self.assertTrue(problems("retained_genesis!(treasury, 5);", "retained_genesis!(order, 5);"))
         self.assertTrue(problems("        .skip(start)\n", "        .skip(start + 1)\n"))
         self.assertTrue(problems("        .take(end - start)\n", "        .take(end - start - 1)\n"))

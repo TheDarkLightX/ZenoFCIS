@@ -1011,6 +1011,7 @@ def main() -> int:
                 path, line, title = found[scenario_id]
                 print(f"{scenario_id}\t{path}:{line}\t{title}")
             return 0
+        run_command(("python3", "tools/test_atdd_registry.py"))
         run_command(("python3", "tools/check_authority_v2.py", "--check-sources"))
         run_command(("cargo", "+1.97.1", "test", "--locked", "--offline", "-p",
                      "zeno-fcis-synthesis", "--test", "v2_evaluator_identity"))
