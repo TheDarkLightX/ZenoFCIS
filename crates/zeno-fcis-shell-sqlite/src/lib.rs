@@ -1328,6 +1328,10 @@ mod tests {
     impl CatalogTransitionProgram<RustCryptoSha256> for SqliteProgram {
         type Error = TransitionError;
 
+        fn transition_build_hash(&self) -> Hash32 {
+            hash(50)
+        }
+
         fn execute(
             &self,
             input: ReviewedTransitionInput<'_>,

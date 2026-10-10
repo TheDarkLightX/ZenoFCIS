@@ -1173,6 +1173,7 @@ dependencies = [
  "zeno-fcis-codegen",
  "zeno-fcis-collections",
  "zeno-fcis-compose",
+ "zeno-fcis-composed-program",
  "zeno-fcis-core",
  "zeno-fcis-crypto",
  "zeno-fcis-domain",
@@ -1339,6 +1340,25 @@ name = "zeno-fcis-compose"
 version = "0.1.0"
 dependencies = [
  "zeno-fcis-codec",
+]
+
+[[package]]
+name = "zeno-fcis-composed-program"
+version = "0.1.0"
+dependencies = [
+ "zeno-fcis-authority",
+ "zeno-fcis-catalog",
+ "zeno-fcis-codec",
+ "zeno-fcis-compose",
+ "zeno-fcis-core",
+ "zeno-fcis-crypto",
+ "zeno-fcis-domain",
+ "zeno-fcis-patch",
+ "zeno-fcis-plan",
+ "zeno-fcis-project",
+ "zeno-fcis-schema",
+ "zeno-fcis-transition",
+ "zeno-fcis-value",
 ]
 
 [[package]]
