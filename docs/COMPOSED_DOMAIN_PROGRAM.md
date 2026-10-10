@@ -38,25 +38,31 @@ invocation, authorization, and shell types.
 
 1. Local state ownership maps to pairwise nonoverlapping root paths.
 2. Every interface envelope uses the exact catalog schema.
-3. Every owned machine identifies the exact canonical component row.
-4. An inactive interface port must use `Inactive`.
-5. A routed port must use `Internal` and cannot also stage an external effect.
-6. Every active unrouted port maps to exactly one catalogued effect or channel.
-7. Effect and outbox payload types equal the interface output type.
-8. Fixed outbox destinations satisfy the catalogued destination schema.
-9. Outbox output paths are declared in both the executable effect boundary and
+3. Every aggregate-root state projection path equals the exact wildcard-free
+   state path declared by its machine interface.
+4. Every owned machine identifies the exact canonical component row.
+5. An inactive interface port must use `Inactive`.
+6. A routed port must use `Internal` and cannot also stage an external effect.
+7. Every active unrouted port maps to exactly one catalogued effect or channel.
+8. Effect and outbox payload types equal the interface output type.
+9. Fixed outbox destinations satisfy the catalogued destination schema.
+10. Outbox output paths are declared in both the executable effect boundary and
    the component's explicit outbox footprint.
-10. Every executed machine's external output is present exactly once, while an
+11. Every executed machine's external output is present exactly once, while an
     unexecuted suffix after committed failure has no outputs.
-11. Per-machine reason domains are closed and their global precedence is
+12. Per-machine reason domains are closed and their global precedence is
     monotone in the explicit merge order.
-12. The derived composition/projection/machine/budget hash equals both the
+13. The derived composition/projection/machine/budget hash equals both the
     project algorithm binding and authority transition-build binding.
-13. Machine budgets and projection budgets are independently enforced.
-14. Aggregate resource use is checked by addition without overflow.
-15. Reject produces no patch, effect, outbox entry, or candidate.
-16. Accept and committed failure project every changed state cell and every
+14. Machine budgets and projection budgets are independently enforced.
+15. Aggregate resource use is checked by addition without overflow.
+16. Reject produces no patch, effect, outbox entry, or candidate.
+17. Accept and committed failure project every changed state cell and every
     emitted external output before catalog sealing.
+
+The exact path-equality law and its transitive write-coverage argument are
+specified in
+[`COMPOSED_ROOT_PROJECTION_CONFORMANCE.md`](COMPOSED_ROOT_PROJECTION_CONFORMANCE.md).
 
 ## Deterministic resource bounds
 
@@ -65,16 +71,20 @@ positions. Construction requires projection capacity for all reads, every
 possible changed state cell, and every possible external output. Canonical byte
 work is charged at runtime against an explicit projection byte limit. Each
 machine receives its own immutable `BudgetLimits`; reported use is aggregated
-with projection use only after all independent bounds pass.
+with projection use only after all independent bounds pass. Direct state,
+command, and context paths are rejected before conversion when they exceed the
+composition access-path depth bound.
 
 ## Negative cases
 
 Construction or execution fails closed for overlapping root state paths,
-machine substitution, catalog substitution, schema substitution, wrong output
-or reason treatment, unknown effect/channel/reason IDs, payload-type mismatch,
-fixed effect authority/subject mismatch, invalid outbox destinations, output
-from an unexecuted machine, logical-limit overflow, budget exhaustion, malformed root paths,
-or any downstream catalog/transition failure.
+ancestor, descendant, sibling, or namespace substitution between an interface
+state path and its root projection, machine substitution, catalog substitution,
+schema substitution, wrong output or reason treatment, unknown
+effect/channel/reason IDs, payload-type mismatch, fixed effect
+authority/subject mismatch, invalid outbox destinations, output from an
+unexecuted machine, logical-limit overflow, budget exhaustion, malformed root
+paths, excessive projection depth, or any downstream catalog/transition failure.
 
 ## Trusted dependencies
 
@@ -98,6 +108,8 @@ those commitments name the deployed code.
 - Production parallel promotion additionally requires complete static footprint
   witnesses for every component and full equality with the canonical sequential
   result.
+- Exact root-projection/interface equality does not establish that a component's
+  declared footprint is a complete all-input over-approximation.
 - V1 projections are direct replacement-only subtrees and exclude map-key paths.
 - This is not a mechanized end-to-end correctness proof.
 - It does not make an incorrect catalog, machine, context map, law definition,
