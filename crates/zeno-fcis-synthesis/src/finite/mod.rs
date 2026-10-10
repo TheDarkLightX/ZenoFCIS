@@ -262,6 +262,11 @@ impl Sketch {
 }
 
 /// Independent reviewed relation over input followed by output fields.
+///
+/// [`Self::try_new`] admits synthesis shapes. A system
+/// [`Property`](crate::system::Property) may expose a contract with more input
+/// fields, within the combined relation [`Program`] bound. Consumers must use
+/// the complete declared domains rather than assume the synthesis input limit.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Contract {
     inputs: Vec<Domain>,
@@ -270,14 +275,30 @@ pub struct Contract {
 }
 impl Contract {
     /// Requires a closed Boolean relation with exactly the declared environment.
+    /// Synthesis accepts at most [`MAX_FIELDS`] fields on each side.
     pub fn try_new(
         inputs: Vec<Domain>,
         outputs: Vec<Domain>,
         relation: Program,
     ) -> Result<Self, Error> {
-        if inputs.len() > MAX_FIELDS
-            || outputs.len() > MAX_FIELDS
+        if inputs.len() > MAX_FIELDS {
+            return Err(Error::Invalid("contract-shape"));
+        }
+        Self::try_new_system_property(inputs, outputs, relation)
+    }
+
+    /// System properties may describe any transition whose inputs and outputs
+    /// fit in one relation Program. This does not widen the synthesis grammar:
+    /// a Sketch still admits at most MAX_FIELDS inputs, and synthesize checks
+    /// the complete contract/sketch schema before doing any work.
+    pub(crate) fn try_new_system_property(
+        inputs: Vec<Domain>,
+        outputs: Vec<Domain>,
+        relation: Program,
+    ) -> Result<Self, Error> {
+        if outputs.len() > MAX_FIELDS
             || outputs.is_empty()
+            || inputs.len().saturating_add(outputs.len()) > 2 * MAX_FIELDS
             || relation.inputs() != [inputs.as_slice(), outputs.as_slice()].concat()
             || relation.outputs() != [Domain::Bool]
         {

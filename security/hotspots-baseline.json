@@ -413,73 +413,73 @@
       "path_roles": [
         "sqlite-production-port"
       ],
-      "production_lines": 1536,
+      "production_lines": 1546,
       "rank": 2,
       "score": 98,
       "signals": [
         {
           "id": "authority-construction",
           "lines": [
-            60,
-            76,
-            84,
-            98,
-            212,
-            562,
-            676,
-            1017
+            63,
+            79,
+            87,
+            101,
+            215,
+            565,
+            679,
+            1025
           ]
         },
         {
           "id": "canonical-commitment",
           "lines": [
-            357,
-            362,
-            564,
-            569,
-            642,
-            672,
-            1020,
-            1193
+            360,
+            365,
+            567,
+            572,
+            645,
+            675,
+            1028,
+            1201
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
-            78,
-            87,
-            157,
-            435,
-            567,
-            573,
-            588,
-            703
+            81,
+            90,
+            160,
+            438,
+            570,
+            576,
+            591,
+            706
           ]
         },
         {
           "id": "sql-boundary",
           "lines": [
-            438,
-            448,
-            458,
-            473,
-            491,
-            611,
-            652,
-            675
+            441,
+            451,
+            461,
+            476,
+            494,
+            614,
+            655,
+            678
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            503,
-            636,
-            798,
-            799,
-            1008,
-            1513,
-            1514,
-            1586
+            506,
+            639,
+            801,
+            802,
+            1016,
+            1521,
+            1522,
+            1594
           ]
         }
       ],
@@ -955,7 +955,7 @@
       "path_roles": [
         "nominal-authority"
       ],
-      "production_lines": 2140,
+      "production_lines": 2161,
       "rank": 6,
       "score": 92,
       "signals": [
@@ -964,12 +964,12 @@
           "lines": [
             79,
             799,
-            918,
-            1527,
-            1704,
-            1716,
-            1792,
-            1917
+            949,
+            1558,
+            1735,
+            1747,
+            1823,
+            1948
           ]
         },
         {
@@ -978,45 +978,45 @@
             724,
             725,
             726,
-            964,
-            978,
-            1372,
-            1373,
-            1374
+            995,
+            1009,
+            1403,
+            1404,
+            1405
           ]
         },
         {
           "id": "panic-or-unchecked-result",
           "lines": [
-            936,
-            1057
+            967,
+            1088
           ]
         },
         {
           "id": "potential-amplification",
           "lines": [
-            2418
+            2447
           ]
         },
         {
           "id": "replay-outbox-commit",
           "lines": [
             212,
-            1325,
-            1551,
-            1552,
-            1698,
-            1808,
-            1986,
-            1996
+            1356,
+            1582,
+            1583,
+            1729,
+            1839,
+            2017,
+            2027
           ]
         },
         {
           "id": "strict-decoder",
           "lines": [
-            1062,
-            1064,
-            1066
+            1093,
+            1095,
+            1097
           ]
         }
       ],
@@ -1958,29 +1958,29 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 130,
+      "production_lines": 131,
       "rank": 17,
       "score": 81,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            44
+            45
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
-            48
+            49
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
             15,
-            60,
-            132,
-            142
+            61,
+            133,
+            143
           ]
         }
       ],
@@ -4071,6 +4071,61 @@
       "categories": [
         "authority-access",
         "effects-injection",
+        "state-replay"
+      ],
+      "components": {
+        "authority": 5,
+        "chain_adjacency": 3,
+        "complexity": 0,
+        "hazardous_mechanisms": 4,
+        "reachability": 4,
+        "state_coupling": 5
+      },
+      "confidence": "medium",
+      "cwes": [
+        "CWE-22",
+        "CWE-73",
+        "CWE-78",
+        "CWE-89",
+        "CWE-94",
+        "CWE-269",
+        "CWE-284",
+        "CWE-285",
+        "CWE-362",
+        "CWE-367",
+        "CWE-664",
+        "CWE-667",
+        "CWE-841",
+        "CWE-862",
+        "CWE-863"
+      ],
+      "path": "crates/zeno-fcis-shell-sqlite/src/history.rs",
+      "path_roles": [
+        "sqlite-production-port"
+      ],
+      "production_lines": 135,
+      "rank": 41,
+      "score": 78,
+      "signals": [
+        {
+          "id": "authority-construction",
+          "lines": [
+            41
+          ]
+        },
+        {
+          "id": "replay-outbox-commit",
+          "lines": [
+            53
+          ]
+        }
+      ],
+      "tier": "priority-2"
+    },
+    {
+      "categories": [
+        "authority-access",
+        "effects-injection",
         "input-canonicalization",
         "resource-exhaustion",
         "secrets-crypto",
@@ -4128,7 +4183,7 @@
         "host-tool"
       ],
       "production_lines": 207,
-      "rank": 41,
+      "rank": 42,
       "score": 77,
       "signals": [
         {
@@ -4225,7 +4280,7 @@
         "host-tool"
       ],
       "production_lines": 221,
-      "rank": 42,
+      "rank": 43,
       "score": 77,
       "signals": [
         {
@@ -4316,7 +4371,7 @@
         "workflow"
       ],
       "production_lines": 65,
-      "rank": 43,
+      "rank": 44,
       "score": 76,
       "signals": [
         {
@@ -4384,7 +4439,7 @@
         "external-tool-boundary"
       ],
       "production_lines": 207,
-      "rank": 44,
+      "rank": 45,
       "score": 73,
       "signals": [
         {
@@ -4452,7 +4507,7 @@
         "semantic-authority"
       ],
       "production_lines": 2446,
-      "rank": 45,
+      "rank": 46,
       "score": 73,
       "signals": [
         {
@@ -4520,7 +4575,7 @@
         "workflow"
       ],
       "production_lines": 36,
-      "rank": 46,
+      "rank": 47,
       "score": 71,
       "signals": [
         {
@@ -4587,7 +4642,7 @@
         "semantic-authority"
       ],
       "production_lines": 1455,
-      "rank": 47,
+      "rank": 48,
       "score": 71,
       "signals": [
         {
@@ -4656,7 +4711,7 @@
         "generator-boundary"
       ],
       "production_lines": 283,
-      "rank": 48,
+      "rank": 49,
       "score": 71,
       "signals": [
         {
@@ -4718,7 +4773,7 @@
         "semantic-authority"
       ],
       "production_lines": 1136,
-      "rank": 49,
+      "rank": 50,
       "score": 71,
       "signals": [
         {
@@ -4746,66 +4801,6 @@
           "id": "replay-outbox-commit",
           "lines": [
             871
-          ]
-        }
-      ],
-      "tier": "priority-2"
-    },
-    {
-      "categories": [
-        "codegen-build",
-        "input-canonicalization",
-        "resource-exhaustion",
-        "state-replay"
-      ],
-      "components": {
-        "authority": 4,
-        "chain_adjacency": 4,
-        "complexity": 1,
-        "hazardous_mechanisms": 4,
-        "reachability": 4,
-        "state_coupling": 3
-      },
-      "confidence": "medium",
-      "cwes": [
-        "CWE-20",
-        "CWE-73",
-        "CWE-94",
-        "CWE-174",
-        "CWE-353",
-        "CWE-362",
-        "CWE-367",
-        "CWE-400",
-        "CWE-494",
-        "CWE-502",
-        "CWE-664",
-        "CWE-667",
-        "CWE-674",
-        "CWE-770",
-        "CWE-789",
-        "CWE-829",
-        "CWE-834",
-        "CWE-841",
-        "CWE-1287"
-      ],
-      "path": "crates/zeno-fcis-spec/src/views.rs",
-      "path_roles": [
-        "strict-admission"
-      ],
-      "production_lines": 319,
-      "rank": 50,
-      "score": 71,
-      "signals": [
-        {
-          "id": "canonical-commitment",
-          "lines": [
-            94
-          ]
-        },
-        {
-          "id": "generated-source",
-          "lines": [
-            196
           ]
         }
       ],
@@ -5147,15 +5142,15 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3416253,
-    "admitted_files": 194,
-    "inventory_sha256": "38b2ee5bfba497e71e27ccc855d94cd17f85dbabb3b6bbf3f73fbacaa4cf6862",
-    "ranked_above_minimum": 156,
+    "admitted_bytes": 3435535,
+    "admitted_files": 195,
+    "inventory_sha256": "4c8e2fff2088b964a5874efc3a93afefeea39e4b07b8f4029db2c01576a9395d",
+    "ranked_above_minimum": 157,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 13,
-      "priority-2": 44,
+      "priority-2": 45,
       "priority-3": 99,
       "priority-4": 15,
       "priority-5": 23

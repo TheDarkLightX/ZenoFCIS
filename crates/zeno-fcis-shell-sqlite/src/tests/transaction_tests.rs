@@ -491,7 +491,7 @@ fn repeated_reads_survive_schema_change_corruption_and_reopen() {
     );
 }
 
-fn authorized_from_state(
+pub(super) fn authorized_from_state(
     authority: &TestAuthority,
     catalog: &ProjectCatalog,
     pre_state: Value,

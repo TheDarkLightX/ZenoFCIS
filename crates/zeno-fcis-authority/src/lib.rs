@@ -836,6 +836,39 @@ where
         Ok(genesis)
     }
 
+    /// Derives exact command and complete-context bindings without a pre-state.
+    ///
+    /// This pure operation checks schema/type bindings and nonzero identities.
+    /// It does not authenticate the caller, refresh evidence, execute the
+    /// program, or mint an invocation or commit capability. Historical lookup
+    /// requires the original context, principal, evidence commitment and replay
+    /// ID; current permission to read that history is an application concern.
+    pub fn request_bindings(
+        &self,
+        command: &SchemaAdmittedTypeEnvelope,
+        context: &SchemaAdmittedTypeEnvelope,
+        principal_hash: Hash32,
+        authentication_evidence_hash: Hash32,
+        replay_id: Hash32,
+    ) -> Result<ExpectedInvocationBindings, AuthorityError> {
+        validate_request_envelopes(&self.policy, command, context)?;
+        let principal_hash = NonZeroHash::try_new(principal_hash)?;
+        let authentication_evidence_hash = NonZeroHash::try_new(authentication_evidence_hash)?;
+        let replay_id = NonZeroHash::try_new(replay_id)?;
+        let command_hash = command_commitment::<H, P, L, I>(&self.policy, command)?;
+        let context_hash = context_commitment::<H, P, L, I>(
+            &self.policy,
+            context,
+            principal_hash,
+            authentication_evidence_hash,
+            replay_id,
+        )?;
+        Ok(ExpectedInvocationBindings::try_new(
+            command_hash,
+            context_hash,
+        )?)
+    }
+
     /// Admits one exact externally supplied invocation.
     #[allow(clippy::too_many_arguments)]
     pub fn admit_invocation(
@@ -847,19 +880,17 @@ where
         authentication_evidence_hash: Hash32,
         replay_id: Hash32,
     ) -> Result<InvocationWitness<H, P, L, I>, AuthorityError> {
-        validate_envelope_bindings(&self.policy, &pre_state, &command, &context)?;
-        let principal_hash = NonZeroHash::try_new(principal_hash)?;
-        let authentication_evidence_hash = NonZeroHash::try_new(authentication_evidence_hash)?;
-        let replay_id = NonZeroHash::try_new(replay_id)?;
-        let command_hash = command_commitment::<H, P, L, I>(&self.policy, &command)?;
-        let context_hash = context_commitment::<H, P, L, I>(
-            &self.policy,
+        validate_root_envelope(&self.policy, &pre_state)?;
+        let expected = self.request_bindings(
+            &command,
             &context,
             principal_hash,
             authentication_evidence_hash,
             replay_id,
         )?;
-        let expected = ExpectedInvocationBindings::try_new(command_hash, context_hash)?;
+        let principal_hash = NonZeroHash::try_new(principal_hash)?;
+        let authentication_evidence_hash = NonZeroHash::try_new(authentication_evidence_hash)?;
+        let replay_id = NonZeroHash::try_new(replay_id)?;
         let pre_root = hash_value::<H>(
             self.policy.state_domain.domain()?,
             pre_state.value().value(),
@@ -2060,9 +2091,8 @@ where
     Ok(())
 }
 
-fn validate_envelope_bindings<H, P, L, I>(
+fn validate_request_envelopes<H, P, L, I>(
     policy: &AuthorizationPolicy<H, P, L, I>,
-    pre_state: &SchemaAdmittedEnvelope,
     command: &SchemaAdmittedTypeEnvelope,
     context: &SchemaAdmittedTypeEnvelope,
 ) -> Result<(), AuthorityError>
@@ -2071,7 +2101,6 @@ where
     P: CatalogTransitionProgram<H>,
     L: ProjectLawEngine,
 {
-    validate_root_envelope(policy, pre_state)?;
     for actual in [command.schema_hash(), context.schema_hash()] {
         if actual != policy.catalog.schema_hash() {
             return Err(AuthorityError::Mismatch(AuthorityField::Schema));
@@ -3266,6 +3295,97 @@ mod tests {
                 panic!("fixture program must accept")
             }
         }
+    }
+
+    #[test]
+    fn request_bindings_preserve_pre_refactor_identities() {
+        // Captured from the unmodified authority at 5f6acb01d59edf95f49ccc67bdbdc078793ab9f9.
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        for line in include_str!("tests/request-binding-vectors.txt").lines() {
+            let fields: Vec<_> = line.split_whitespace().collect();
+            let principal = fields[0]
+                .parse::<u8>()
+                .unwrap_or_else(|e| panic!("principal: {e}"));
+            let replay = fields[1]
+                .parse::<u8>()
+                .unwrap_or_else(|e| panic!("replay: {e}"));
+            let expected = authority
+                .request_bindings(
+                    &command(&catalog),
+                    &context(&catalog),
+                    hash(principal),
+                    hash(61),
+                    hash(replay),
+                )
+                .unwrap_or_else(|e| panic!("bindings: {e}"));
+            let value = accept(&authority, &catalog, principal, replay);
+            assert_eq!(expected, value.invocation().expected_bindings());
+            assert_eq!(expected.command_hash().to_string(), fields[2]);
+            assert_eq!(expected.context_hash().to_string(), fields[3]);
+            assert_eq!(value.authorization_id().hash().to_string(), fields[4]);
+            assert_eq!(value.body().candidate_id().hash().to_string(), fields[5]);
+            let later_state = SchemaAdmittedEnvelope::try_new::<RustCryptoSha256>(
+                catalog.schema(),
+                Value::Bool(true),
+                ValidationLimits::default(),
+            )
+            .unwrap_or_else(|e| panic!("later state: {e}"));
+            let later = authority
+                .admit_invocation(
+                    later_state,
+                    command(&catalog),
+                    context(&catalog),
+                    hash(principal),
+                    hash(61),
+                    hash(replay),
+                )
+                .unwrap_or_else(|e| panic!("later invocation: {e}"));
+            assert_eq!(expected, later.expected_bindings());
+        }
+    }
+
+    #[test]
+    fn request_bindings_reject_invalid_identity_and_type_before_hashing() {
+        let catalog = fixture_catalog();
+        let authority = accept_authority(&catalog, 53);
+        for (principal, evidence, replay) in [
+            (Hash32::ZERO, hash(61), hash(62)),
+            (hash(60), Hash32::ZERO, hash(62)),
+            (hash(60), hash(61), Hash32::ZERO),
+        ] {
+            assert!(
+                authority
+                    .request_bindings(
+                        &command(&catalog),
+                        &context(&catalog),
+                        principal,
+                        evidence,
+                        replay
+                    )
+                    .is_err()
+            );
+        }
+        assert!(matches!(
+            authority.request_bindings(
+                &context(&catalog),
+                &command(&catalog),
+                Hash32::ZERO,
+                hash(61),
+                hash(62)
+            ),
+            Err(AuthorityError::Mismatch(AuthorityField::CommandType))
+        ));
+        assert!(matches!(
+            authority.request_bindings(
+                &command(&catalog),
+                &command(&catalog),
+                hash(60),
+                hash(61),
+                hash(62)
+            ),
+            Err(AuthorityError::Mismatch(AuthorityField::ContextType))
+        ));
     }
 
     #[test]

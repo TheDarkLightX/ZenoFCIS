@@ -591,6 +591,105 @@ mod tests {
         assert_eq!(SystemObligationKind::DomainOnly.code(), "domain-only");
     }
 
+    /// Preserve the last input in the last output, unless a mutant forces it.
+    /// Singleton padding keeps all field positions visible without an enormous
+    /// Cartesian space. The relation reads the highest input and output fields.
+    fn wide_identity(inputs: usize, outputs: usize, forced: Option<i64>) -> (Program, Property) {
+        let zero = Domain::Int { min: 0, max: 0 };
+        let mut input_domains = vec![zero; inputs];
+        input_domains[inputs - 1] = BIT;
+        let mut output_domains = vec![zero; outputs];
+        output_domains[outputs - 1] = BIT;
+        let mut roots = vec![0; outputs];
+        roots[outputs - 1] = 1;
+        let last_input = u16::try_from(inputs - 1).unwrap_or_else(|_| unreachable!());
+        let last_output = u16::try_from(inputs + outputs - 1).unwrap_or_else(|_| unreachable!());
+        let transition = Program::try_new(
+            input_domains.clone(),
+            output_domains.clone(),
+            vec![Op::Int(0), forced.map_or(Op::Input(last_input), Op::Int)],
+            roots,
+        )
+        .unwrap_or_else(|error| panic!("wide transition: {error:?}"));
+        let relation = Program::try_new(
+            [input_domains.as_slice(), output_domains.as_slice()].concat(),
+            vec![Domain::Bool],
+            vec![Op::Input(last_input), Op::Input(last_output), Op::Eq(0, 1)],
+            vec![2],
+        )
+        .unwrap_or_else(|error| panic!("wide relation: {error:?}"));
+        let property = Property::try_new(input_domains, output_domains, relation)
+            .unwrap_or_else(|error| panic!("wide property: {error:?}"));
+        (transition, property)
+    }
+
+    #[test]
+    fn wide_system_exports_and_models_preserve_every_field() {
+        for (inputs, outputs) in [(17, 9), (31, 1), (16, 16)] {
+            let (transition, property) = wide_identity(inputs, outputs, None);
+            let obligations = export_system_smt(&transition, &property)
+                .unwrap_or_else(|error| panic!("wide export: {error:?}"));
+            assert_eq!(
+                (obligations.inputs(), obligations.outputs()),
+                (inputs, outputs)
+            );
+            assert_eq!(
+                export_system_smt(&transition, &property),
+                Ok(obligations.clone())
+            );
+            let control = text(&obligations, SystemObligationKind::DomainOnly);
+            assert!(control.contains(&format!("(declare-const in_{} Int)", inputs - 1)));
+            assert!(control.contains(&format!("(declare-const free_out_{} Int)", outputs - 1)));
+            let mut model = String::from("sat\n(");
+            for i in 0..inputs {
+                let _ = write!(model, "(in_{i} 0) ");
+            }
+            for i in 0..outputs {
+                let _ = write!(model, "(free_out_{i} {}) ", usize::from(i == outputs - 1));
+            }
+            model.push_str(")\n");
+            let answer = parse_system_answer(
+                SystemObligationKind::DomainOnly,
+                model.as_bytes(),
+                inputs,
+                outputs,
+            )
+            .unwrap_or_else(|error| panic!("wide model: {error:?}"));
+            assert_eq!(
+                system_verdict(&transition, &property, |kind, _| {
+                    Ok(if kind == SystemObligationKind::DomainOnly {
+                        answer.clone()
+                    } else {
+                        SystemAnswer::Unsat
+                    })
+                }),
+                Ok(SystemVerdict::SystemProperty)
+            );
+            for (input, output) in [
+                (vec![0; inputs - 1], vec![0; outputs]),
+                (vec![0; inputs], vec![0; outputs - 1]),
+                (vec![0; inputs], vec![0; outputs]),
+            ] {
+                assert!(matches!(
+                    system_verdict(&transition, &property, |kind, _| {
+                        Ok(if kind == SystemObligationKind::DomainOnly {
+                            SystemAnswer::Sat {
+                                input: input.clone(),
+                                output: output.clone(),
+                            }
+                        } else {
+                            SystemAnswer::Unsat
+                        })
+                    }),
+                    Err(SystemSolveError::UnreplayableModel {
+                        kind: SystemObligationKind::DomainOnly,
+                        ..
+                    })
+                ));
+            }
+        }
+    }
+
     /// Runs one script through a solver binary for the pinned differentials.
     fn run_solver(
         solver: &Path,
@@ -1040,23 +1139,41 @@ mod tests {
         let cvc5 = std::path::PathBuf::from(
             std::env::var_os("ZENO_FCIS_CVC5").unwrap_or_else(|| unreachable!()),
         );
-        let cases = [
+        let mut cases = vec![
             (counter(3), monotone(), "system-property"),
             (counter(3), bounded(), "domain-implied"),
             (counter(3), unchanged(), "violated"),
             (counter(4), monotone(), "not-total"),
         ];
+        for (inputs, outputs) in [(17, 9), (31, 1), (16, 16)] {
+            for (forced, expected) in [
+                (None, "system-property"),
+                (Some(1), "violated"),
+                (Some(2), "not-total"),
+            ] {
+                let (transition, property) = wide_identity(inputs, outputs, forced);
+                cases.push((transition, property, expected));
+            }
+        }
         for (transition, property, expected) in &cases {
             let exhaustive =
                 check_system_property(transition, property.contract(), SystemLimits::default())
                     .unwrap_or_else(|error| panic!("exhaustive: {error:?}"));
             assert_eq!(exhaustive.code(), *expected);
             let verdict = system_verdict(transition, property, |kind, script| {
-                run_solver(&cvc5, kind, script, 1, 1)
+                run_solver(
+                    &cvc5,
+                    kind,
+                    script,
+                    transition.inputs().len(),
+                    transition.outputs().len(),
+                )
             })
             .unwrap_or_else(|error| panic!("solver verdict: {error:?}"));
             assert_eq!(verdict.code(), exhaustive.code());
-            if let SystemCheck::NotTotal { input } = exhaustive {
+            if let SystemCheck::NotTotal { input } = exhaustive
+                && transition.inputs().len() == 1
+            {
                 assert_eq!(verdict, SystemVerdict::NotTotal { input });
             }
         }
