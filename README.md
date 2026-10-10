@@ -21,7 +21,7 @@ path and import the curated prelude:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=0.1.0", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -41,8 +41,12 @@ ProjectProfile + ProjectCatalog
     -> authorized shell publication
 ```
 
-Read the [quickstart](docs/QUICKSTART.md), [crate map](docs/CRATE_MAP.md),
-[feature matrix](docs/FEATURE_MATRIX.md), and [LLM integration guide](docs/LLM_USAGE.md).
+Read the [installation guide](docs/INSTALLATION.md),
+[quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
+[crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
+[LLM integration guide](docs/LLM_USAGE.md). The
+[RC1 release notes](docs/RC1_RELEASE_NOTES.md) describe the exact candidate
+surface and remaining final-release blockers.
 Runnable examples are checked permanently:
 
 ```bash
@@ -58,7 +62,10 @@ Reusable libraries should select only the features needed at their boundary.
 The workspace now includes the complete package ladder:
 
 - semantic values with default-bounded text and byte helper admission, immutable value and envelope witnesses for repeat canonical encoding, decisions with explicit immutable budget reports, ZCVE/1 canonical encoding, exact commitments, preconditioned patches and closed commit/outbox plans with strict bounded canonical decoding, receipts, and complete candidate bundles;
-- assume-guarantee composition, deterministic-parallel conflict checking, runtime refinement reports, promotion policy, canonical evidence envelopes, and the first ZenoDEX profile;
+- assume-guarantee composition, deterministic-parallel conflict checking,
+  backend-neutral complete static footprint claims, nominal footprint witnesses,
+  witness-gated parallel authorization, runtime refinement reports, promotion
+  policy, canonical evidence envelopes, and the first ZenoDEX profile;
 - fixed-size executable domain machines with schema-admitted state, command,
   context, and port matrices; narrow per-machine interfaces; routes derived
   exactly from global composition wiring; deterministic merge-order execution;
@@ -122,7 +129,7 @@ code should enable the smallest explicit feature set, for example:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=0.1.0", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["composed-program"] }
 ```
 
 The umbrella crate's default and `no_std` feature sets are project-neutral.
@@ -179,9 +186,31 @@ cargo +1.97.1 test --workspace --all-features --locked
 
 See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`, Miri, fuzz, supply-chain, and source-manifest gates. Package-specific boundaries are documented in `docs/`.
 
+RC packaging is fail closed and reviewable:
+
+```bash
+python3 tools/rc1_package.py self-test
+python3 tools/rc1_package.py check
+python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
+```
+
+The build retains all public `.crate` packages, rustdoc, source and diagnostic
+binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
+[packaging reference](docs/PACKAGING.md).
+
 ## Assurance posture
 
-This repository is pre-release high-assurance research software. It provides concrete reference implementations, runnable cross-boundary tests, fail-closed promotion rules, mandatory tool-neutral relational-law evaluation, and a nominal commit-authorization boundary. The pinned ZenoDEX single-vault zUSD mount is bounded executable refinement evidence. Production value-moving promotion still requires each promoted profile to supply independently reviewed conservation/invariant definitions and checkers; it is also blocked by strict decoded SQLite bundle/outbox set reconstruction, the open composition/refinement/authenticated-state findings, chain-specific deployment qualification, and independent exact-head audit. It does not claim audit completion, economic correctness, side-channel resistance, full ZenoDEX coverage, or that an external JMT, ESSO, solver, prover, compiler, or LLM runtime is bundled and approved.
+Version `1.0.0-rc.1` is the first public API and packaging candidate for the
+reusable core library. It is ready for downstream API evaluation and
+integration testing, while remaining a pre-release candidate until the
+independent exact-head review and final release gates pass. The pinned ZenoDEX
+single-vault zUSD mount is bounded executable refinement evidence. Production
+value-moving promotion still requires each profile's independently reviewed
+laws and evidence, strict decoded SQLite bundle/outbox set reconstruction,
+deployment qualification, and an exact-head audit. This RC does not claim
+audit completion, project-specific economic correctness, side-channel
+resistance, full ZenoDEX coverage, or approval of an external JMT, ESSO,
+solver, prover, compiler, or LLM runtime.
 
 ## License
 

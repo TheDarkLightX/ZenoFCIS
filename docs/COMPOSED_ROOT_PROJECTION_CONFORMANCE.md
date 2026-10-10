@@ -89,8 +89,8 @@ Wildcard interface bindings are rejected by `MachineInterface` before this check
 ## Explicit nonclaims
 
 - This check does not prove that a declared component footprint is a complete
-  all-input over-approximation. Production parallel authorization still requires
-  the static completeness witness tracked by issue #67.
+  all-input over-approximation. Production parallel authorization additionally
+  requires an accepted `CompleteFootprintWitness` for every component.
 - It does not prove commutativity, parallel parity, project business laws, value
   conservation, machine implementation correctness, or deployment identity.
 - It does not add a concurrent scheduler or threaded shell.

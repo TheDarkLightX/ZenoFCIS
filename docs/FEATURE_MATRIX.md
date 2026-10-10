@@ -1,8 +1,8 @@
 # ZenoFCIS feature matrix
 
 This matrix covers features on the `zeno-fcis` umbrella crate. The current
-workspace version is `0.1.0`; “core” means project-neutral architecture, not a
-stable Cargo V1 API.
+workspace version is `1.0.0-rc.1`; “core” means the implemented
+project-neutral RC surface. Final Cargo V1 API stability begins at `1.0.0`.
 
 ## Environment labels
 
@@ -104,22 +104,22 @@ surface small.
 
 ```toml
 # Project-neutral semantic values and reference semantics
-zeno-fcis = { version = "=0.1.0", default-features = false }
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false }
 
 # Single-domain, law-aware authorized transitions
-zeno-fcis = { version = "=0.1.0", default-features = false, features = ["authority"] }
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["authority"] }
 
 # Multi-domain deterministic composition
-zeno-fcis = { version = "=0.1.0", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["composed-program"] }
 
 # Host-side starter generation
-zeno-fcis = { version = "=0.1.0", features = ["bootstrap"] }
+zeno-fcis = { version = "=1.0.0-rc.1", features = ["bootstrap"] }
 
 # Concrete local authorized persistence
-zeno-fcis = { version = "=0.1.0", features = ["sqlite-shell"] }
+zeno-fcis = { version = "=1.0.0-rc.1", features = ["sqlite-shell"] }
 
 # Tool-neutral checked backend protocol
-zeno-fcis = { version = "=0.1.0", default-features = false, features = ["backend"] }
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["backend"] }
 ```
 
 ## Deterministic-parallel status
@@ -138,6 +138,7 @@ Current nonclaim:
 > ZenoFCIS does not ship a concurrent scheduler, threaded shell, or production
 > parallel runtime.
 
-Production parallel promotion additionally needs a complete static footprint
-witness for every component and independently checked equality with the
-canonical sequential result.
+Production parallel promotion uses `CompleteFootprintWitness` for every
+component and independently checked equality with the canonical sequential
+result. Projects must still supply and qualify the concrete proof artifacts and
+verifier used to mint those witnesses.

@@ -117,6 +117,13 @@ composition.
 Do not infer parallel safety from disjoint-looking code. Require complete static
 read/write/context/effect/outbox footprints, conflict checks, any exact
 commutativity evidence, and equality with the canonical sequential result.
+For production integration, the authority selects one
+`FootprintAuthorityBinding` per component and one
+`FootprintEvidenceVerifier`, then passes untrusted
+`FootprintCompletenessEvidence` through
+`authorize_deterministic_parallel`. Do not treat raw
+`verify_deterministic_parallel` success or caller-supplied witness-like data as
+production authorization.
 ZenoFCIS currently supplies the planning/evidence surfaces and a sequential
 executor, not a production concurrent runtime.
 

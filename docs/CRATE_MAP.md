@@ -2,7 +2,7 @@
 
 ZenoFCIS is a workspace of small crates arranged around a pure semantic core.
 The classes below describe architectural role, not current Cargo stability.
-All workspace crates are version `0.1.0`; the project has not published a
+All workspace crates are version `1.0.0-rc.1`; the project has not published a
 stable V1 API.
 
 ## Dependency direction
@@ -49,7 +49,7 @@ These crates turn the foundational values into a safe application path.
 
 | Crate | Responsibility |
 |---|---|
-| `zeno-fcis-compose` | Component contracts, footprints, frames, wiring, conflicts, and proof-carrying composition evidence |
+| `zeno-fcis-compose` | Component contracts, footprints, complete-footprint witnesses, frames, wiring, conflicts, and proof-carrying parallel authorization |
 | `zeno-fcis-domain` | Fixed-size typed domain machines and canonical sequential execution |
 | `zeno-fcis-composed-program` | Root projection, nominal machine ownership, catalogued plan projection, and transition-program identity |
 | `zeno-fcis-laws` | Complete relational-law manifests, executable checks, retained evidence, and verified law sets |

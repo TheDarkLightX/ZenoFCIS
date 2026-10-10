@@ -105,11 +105,11 @@ those commitments name the deployed code.
   domain machines commute.
 - Proof-carrying deterministic-parallel coordination remains a static promotion
   layer. V1 does not ship a concurrent scheduler or threaded shell.
-- Production parallel promotion additionally requires complete static footprint
-  witnesses for every component and full equality with the canonical sequential
-  result.
-- Exact root-projection/interface equality does not establish that a component's
-  declared footprint is a complete all-input over-approximation.
+- Production parallel promotion additionally requires one authority-bound
+  `CompleteFootprintWitness` for every component and full equality with the
+  canonical sequential result.
+- Exact root-projection/interface equality does not by itself establish that a
+  component's declared footprint is a complete all-input over-approximation.
 - V1 projections are direct replacement-only subtrees and exclude map-key paths.
 - This is not a mechanized end-to-end correctness proof.
 - It does not make an incorrect catalog, machine, context map, law definition,

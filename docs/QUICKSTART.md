@@ -12,9 +12,10 @@ ProjectProfile + ProjectCatalog
     -> authorized shell publication
 ```
 
-The workspace is currently version `0.1.0` and remains pre-release. The APIs
-below are implemented, but no Cargo API stability or general production
-qualification is claimed yet.
+The workspace is version `1.0.0-rc.1`, the first public API and packaging
+candidate. The APIs below are implemented and ready for downstream evaluation.
+Final Cargo API stability and general deployment qualification are not claimed
+until their separate `1.0.0` gates pass.
 
 ## 1. Choose the smallest feature set
 
@@ -22,7 +23,7 @@ Use the umbrella crate when starting a project:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=0.1.0", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -48,13 +49,13 @@ Add features only at the boundary that needs them:
 
 ```toml
 # Host-side starter generation
-zeno-fcis = { version = "=0.1.0", features = ["bootstrap"] }
+zeno-fcis = { version = "=1.0.0-rc.1", features = ["bootstrap"] }
 
 # Crash-atomic SQLite publication
-zeno-fcis = { version = "=0.1.0", features = ["sqlite-shell"] }
+zeno-fcis = { version = "=1.0.0-rc.1", features = ["sqlite-shell"] }
 
 # Checked external engines such as an SMT, Lean, CVC5, or private ESSO adapter
-zeno-fcis = { version = "=0.1.0", default-features = false, features = ["backend"] }
+zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["backend"] }
 ```
 
 Avoid `full` in reusable libraries. It includes project-specific and reference
@@ -192,6 +193,8 @@ committed outbox entry idempotently and under the authority-owned interpreter.
 - [ ] Every effect and channel has schema, authority, and deterministic limits.
 - [ ] Commands and context are admitted under exact role-separated bindings.
 - [ ] Domain machines expose narrow typed interfaces and complete footprints.
+- [ ] Every component has an authority-bound `CompleteFootprintWitness` from a
+      release-selected verifier.
 - [ ] The canonical sequential composition is deterministic and budgeted.
 - [ ] Required invariants, conservation, authority, and failure laws are complete.
 - [ ] Formal evidence is checked by the release-selected verifier.
@@ -206,7 +209,7 @@ ZenoFCIS does not currently provide:
 
 - Cargo API stability or a completed official V1 release;
 - a concurrent scheduler, threaded shell, or production parallel runtime;
-- proof that handwritten footprints are complete;
+- a bundled proof that project-specific handwritten footprints are complete;
 - automatic invention of project schemas, identifiers, laws, or policies;
 - a bundled universal solver, theorem prover, ESSO installation, or proof of a
   checker implementation;
