@@ -134,8 +134,10 @@ An LLM may help write implementations at each step. It may not skip a step by
 constructing a lower-level artifact directly.
 
 When Probity is installed, follow the deterministic repository configuration.
-Run `python3 tools/atdd.py run --all` immediately before committing. Probity is
-a workflow guardrail and supplies no proof or production authority.
+Use checks appropriate to ordinary changes, following [AGENTS.md](../AGENTS.md).
+The full `python3 tools/atdd.py run --all` is required when preparing a new
+version for release, including release candidates, on the exact release source.
+Probity is a workflow guardrail and supplies no proof or production authority.
 
 ## What a model may propose
 
