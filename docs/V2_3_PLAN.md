@@ -1,9 +1,18 @@
 # ZenoFCIS V2.3: reusable formally checked cores
 
-Status: owner-requested roadmap, updated 2026-10-09. The component catalogue has
-passed the local qualification described below; integration and release gates
-remain pending. Other sections retain their stated completion obligations.
-V2.2 retains its existing requirements; this roadmap does not silently defer them.
+Status: owner-requested roadmap, updated 2026-10-10. The public signed
+[2.3.0-rc.1 candidate](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-rc.1)
+is published at `dd04cbcb3f7d8694de5f79bc1280b9252fdd147b` with a Linux x86_64 GNU
+CLI and matching source/evidence assets. The ten-family finite catalogue is in
+that source. [Candidate qualification](RELEASE_CANDIDATES.md) records inherited
+64/64 acceptance, the packaging-only repair and the focused publication exception.
+
+This is the qualified candidate subset. Full stable V2.3 acceptance remains
+unfinished: the six coupled applications, restricted symbolic proof chain,
+ZAL UX, additional language qualification and carried V2.2 obligations still
+need their stated evidence. V2.2 retains its existing requirements; this roadmap
+does not silently defer them. Follow the [installation guide](INSTALLATION.md)
+to use the candidate rather than the differently versioned `main` checkout.
 
 ## Intended result
 
@@ -146,6 +155,23 @@ emitting source does not prove the emitter or target compiler.
 Completion for each added profile: a reproducible toolchain, conformance and
 negative cases, an installation journey, clear trust assumptions, and one worked
 component application. Advertise only the guarantee its evidence supports.
+
+## Separate Crucible and follow-on research
+
+Crucible development proceeds in a separate experimental repository. The public
+increment and private Library results are recorded in
+[research status](RESEARCH_STATUS.md). They provide starting points for finite
+composition checking, signed receipts, bounded resource models, law diagnostics,
+shadow evaluation and completion optimization. The private packets were not
+independently replayed for this documentation update, and these experiments are
+not included in the published candidates.
+
+Native FCIS authority integration, multi-profile search and a reusable proof
+registry remain planned. A checked counter improvement and an actual scratch
+application/store upgrade are useful bounded results; they do not close the
+six coupled applications or general integration. Each adoption needs independent
+contract checks and exact-source qualification. Search output and proof references
+grant no publication authority and do not change this plan's stable criteria.
 
 ## Order and release gate
 

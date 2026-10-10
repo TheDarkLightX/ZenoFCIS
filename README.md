@@ -12,6 +12,27 @@ ZenoFCIS intends to become a **state of the art high assurance software factory*
 turning reviewed requirements into applications built around a **formally
 verified functional core**, with durable effects and evidence agents can maintain.
 
+## Available release candidates
+
+As of 10 October 2026, signed **[2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)**
+and **[2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-rc.1)**
+are public. Each supplies a Linux x86_64 GNU CLI, matching source, crate archives,
+Rustdoc and qualification manifests. Follow the [installation guide](docs/INSTALLATION.md)
+for direct downloads and the [candidate record](docs/RELEASE_CANDIDATES.md) for
+exact source pins, signed checksums and qualification limits.
+
+These prereleases deliver the current supported subset. Full stable V2.2/V2.3
+scope remains unfinished. The V2.3 catalogue contains ten reusable core families,
+77 declared instances and 107,518 raw inputs with explicitly finite evidence;
+the six coupled applications and stronger symbolic proof path remain work in the
+[V2.3 plan](docs/V2_3_PLAN.md). Use the matching candidate tag for its binaries
+and APIs: `main` still declares Cargo version `1.1.0` and is a different source.
+
+The [research status](docs/RESEARCH_STATUS.md) records separate Crucible experiments
+and private Library follow-on results. Those experiments are not included in
+these binaries, and the private packets were not independently replayed for
+this documentation update. Native Crucible integration remains pending.
+
 **V2's central assurance goal is a formally verified functional core.**
 
 Its primary design rule is:
@@ -43,7 +64,7 @@ CommittedFailure; its reason, successor state, patch and ordered effect plan;
 and its law, genesis, resource and refusal rules. The proof must cover the
 executable decision path and the connections between its stages.
 
-V2 is being built around this boundary:
+The supported V2 route uses this boundary:
 
 ```text
 reviewed decision contract + immutable original inputs
@@ -52,8 +73,8 @@ reviewed decision contract + immutable original inputs
     -> imperative-shell persistence and delivery
 ```
 
-The completed V2 API must require this path, refuse unsupported contracts and
-prevent application callbacks from substituting authoritative decisions.
+The supported V2 API requires this path, refuses unsupported contracts and
+prevents application callbacks from substituting authoritative decisions.
 Synthesis and LLMs can propose contracts and programs; admission and execution
 must preserve the same assurance regardless of who produced them.
 
@@ -63,20 +84,21 @@ rules capture the intended product behavior remains essential. External fact
 authentication, storage atomicity and effect delivery have their own assurance
 obligations in the imperative shell.
 
-**Current status:** V2 is under construction. Executable interpreter, admission,
-meter, decision, law/genesis and raw-domain units have bounded verification
-evidence; the combined mandatory authority route and release gates remain
-unfinished. The [V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md)
-records the checked scope and open obligations. The full-core guarantee becomes
-a release claim only after that complete route is qualified.
+**Current status:** the public candidates include the supported checked program
+and mandatory authority route, with source-bound implementation and finite
+application evidence. The [V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md)
+and [candidate record](docs/RELEASE_CANDIDATES.md) identify the checked scope and
+trusted assumptions. Broader stable-release obligations remain open. These
+results do not establish a formal guarantee for arbitrary functional cores or
+an application's complete shell and external environment.
 
-The [2.1 factory roadmap](docs/V2_1_FACTORY_PLAN.md) plans additional
-specification review, reusable verified components, generated integration,
-verified upgrades, a bounded neurosymbolic proposal/check/feedback loop, and
-agent-maintenance benchmarks after V2's required gates close. The integrated
-loop is planned; the completed e-graph study evaluated symbolic optimization.
-The factory description states our intended destination; comparative leadership
-remains a claim to demonstrate.
+The [factory feature plan](docs/V2_1_V2_2_PLAN.md) records contracts and acceptance
+for generation, specification review, optimization, checked adoption and upgrades,
+the bounded neurosymbolic proposal/check/feedback loop, and agent-maintenance
+benchmarks. The [earlier factory roadmap](docs/V2_1_FACTORY_PLAN.md) retains its
+design notes. Available tools and remaining stable work are distinguished in
+the candidate record. The factory description states our intended destination;
+comparative leadership remains a claim to demonstrate.
 
 The [ZAL addon for coding harnesses](docs/zal/HARNESS_INTEGRATION.md) is an
 additive 2.3 track: Codex and Claude Code can inspect, compare and propose precise
@@ -254,9 +276,11 @@ published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
 ## Start here
 
 The normal V2 library route declares a complete checked program. It is available
-in this development checkout with default features and with
-`default-features = false`. Use the reviewed checkout; the published `1.1.0`
-package does not supply this breaking V2 API:
+in the candidate source and this development checkout with default features and
+with `default-features = false`. For the published V2.3 candidate, first check out
+`v2.3.0-rc.1` as the [installation guide](docs/INSTALLATION.md) describes, then bind
+the dependency to that source. The historical `1.1.0` package does not supply
+this breaking V2 API:
 
 ```toml
 [dependencies]
@@ -520,9 +544,9 @@ The guarantee depends on four things:
   faithfully wrong. This is the largest risk, so the durable-counter template
   also checks decision examples that were reviewed against its README.
 - **The checker must be correct.** The V1 end-to-end synthesis path trusts its
-  interpreter and enumeration. V2 has executable interpreter proofs and is
-  closing the remaining admission, decision and authority bridges described
-  in the [full-core plan](docs/V2_VERIFIED_CORE_PLAN.md).
+  interpreter and enumeration. The V2 route has source-bound executable
+  interpreter, admission, decision and authority evidence with the scope and
+  trusted assumptions recorded in the [full-core plan](docs/V2_VERIFIED_CORE_PLAN.md).
 - **The code around the program needs its own check.** In the durable-counter
   template, `tests/conformance.rs` runs all 64 admitted inputs through the real
   application: admission, the authority, the adapter that turns outputs into
@@ -565,9 +589,9 @@ subjects but reconstructs the complete authority subject for replay; compact
 bytes alone are not publication authority. See the
 [API migration guide](docs/V2_PROGRAM_API_MIGRATION.md).
 
-The [V2.1 roadmap](docs/V2_1_FACTORY_PLAN.md) adds a separately qualified
-compound-value profile and full-width U128 zUSD, then specification review,
-reusable verified components and upgrade support. The earlier 17-case ZenoDEX
+The [factory feature plan](docs/V2_1_V2_2_PLAN.md) retains the separately qualified
+compound-value profile and full-width U128 zUSD obligations alongside specification
+review, reusable components and upgrade support. The earlier 17-case ZenoDEX
 mount is historical bounded parity evidence. It does not qualify that future
 profile; the removed native mount runner is not the current application route.
 
@@ -609,7 +633,7 @@ binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 
 ## Assurance posture
 
-V2 remains under construction. Its intended claim is executable conformance to
+The candidates' assurance is scoped to executable conformance to
 a reviewed contract across the supported domain, under named trusted
 assumptions. It is not a proof that the requirements match human intent, that
 external observations are true, or that a destination performs an effect
@@ -618,7 +642,9 @@ correctly. A passing stage check is not a release receipt.
 The existing `1.1.0` release and its [release notes](docs/V1_1_RELEASE_NOTES.md)
 have their own historical scope. This development branch changes the public
 execution API. Source qualification, exact-head CI, packaging, owner signing
-and publication remain distinct steps; this README announces no V2 release.
+and publication remain distinct steps. The public V2.2/V2.3 prereleases have the
+qualification limits recorded in [release candidates](docs/RELEASE_CANDIDATES.md);
+they do not complete the original stable-release scope.
 
 ## License
 
