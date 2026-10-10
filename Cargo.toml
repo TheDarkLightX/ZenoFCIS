@@ -15,6 +15,7 @@ members = [
     "crates/zeno-fcis-compose",
     "crates/zeno-fcis-refine",
     "crates/zeno-fcis-profile-zenodex",
+    "crates/zeno-fcis-collections",
 ]
 
 [workspace.package]
