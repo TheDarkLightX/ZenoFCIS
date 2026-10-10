@@ -338,7 +338,7 @@ pub enum ConflictKind {
     LeftWriteRightRead = 1,
     /// The right component may write a value read by the left component.
     RightWriteLeftRead = 2,
-    /// Both components stage authoritative effects; conflict is conservative.
+    /// Both components stage commit evidence; conflict is conservative.
     EffectEffect = 3,
     /// Both components stage outbox obligations; conflict is conservative.
     OutboxOutbox = 4,
@@ -377,7 +377,7 @@ impl CanonicalEncode for Conflict {
 
 /// Computes default state and effect conflicts between two footprints.
 ///
-/// Effects conflict whenever both components stage any authoritative effect.
+/// Commit-evidence records conflict whenever both components stage any record.
 /// A verified [`ParallelConflictLaw`] is required to waive that conservative
 /// default in a complete composition specification.
 #[must_use]

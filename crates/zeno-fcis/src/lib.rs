@@ -27,8 +27,9 @@ pub mod prelude {
 
     #[cfg(feature = "catalog")]
     pub use crate::{
-        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, OperationSemantics,
-        ProjectCatalog, ReasonDefinition, ReasonDisposition, ValueFlow, ValueFlowKind,
+        CatalogLimits, CatalogManifest, ChannelDefinition, CommitEffectSemantics, EffectDefinition,
+        OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition, ValueFlow,
+        ValueFlowKind,
     };
 
     #[cfg(feature = "transition")]
@@ -44,8 +45,8 @@ pub mod prelude {
 
     #[cfg(feature = "authority")]
     pub use crate::{
-        AuthorizedShellState, BoundInterpreter, CatalogCommitAuthority, CatalogTransitionProgram,
-        ExecutionBinding, InvocationWitness, StateDomainBinding,
+        AuthorizedShellState, BoundDeliveryInterpreter, CatalogCommitAuthority,
+        CatalogTransitionProgram, ExecutionBinding, InvocationWitness, StateDomainBinding,
     };
 
     #[cfg(feature = "authenticated-authority")]
@@ -99,7 +100,7 @@ pub use zeno_fcis_authenticated as authenticated;
 /// Candidate-bound projector qualification and authenticated-state publication.
 pub use zeno_fcis_authenticated_authority as authenticated_authority;
 #[cfg(feature = "authority")]
-/// Nominal catalog, invocation, provider, interpreter, and deployment commit authority.
+/// Nominal catalog, invocation, provider, delivery-interpreter, and deployment authority.
 pub use zeno_fcis_authority as authority;
 #[cfg(feature = "backend")]
 /// Checked project-neutral backend protocol for private and external engines.
@@ -140,7 +141,7 @@ pub use zeno_fcis_evidence as evidence;
 pub use zeno_fcis_laws as laws;
 /// Preconditioned canonical state patches.
 pub use zeno_fcis_patch as patch;
-/// Closed authoritative and outbox plans.
+/// Closed non-executable commit evidence and durable outbox plans.
 pub use zeno_fcis_plan as plan;
 #[cfg(feature = "zenodex-profile")]
 /// Optional ZenoDEX profile values and the first zUSD schema registry.
@@ -163,7 +164,7 @@ pub use zeno_fcis_security as security;
 /// Pure reference semantics for atomic commit, replay, and outbox acknowledgement.
 pub use zeno_fcis_shell as shell;
 #[cfg(feature = "sqlite-shell")]
-/// Crash-atomic SQLite interpretation and idempotent outbox delivery.
+/// Crash-atomic SQLite publication and idempotent outbox delivery.
 pub use zeno_fcis_shell_sqlite as shell_sqlite;
 #[cfg(feature = "synthesis")]
 /// Deterministic verifier-gated bounded synthesis.
@@ -207,7 +208,7 @@ pub use zeno_fcis_authenticated_authority::{
 pub use zeno_fcis_authority::{
     AUTHORIZATION_FORMAT_VERSION, AuthorizationBody, AuthorizationId, AuthorizationPolicy,
     AuthorizationRecord, AuthorizedCommitResult, AuthorizedShellError, AuthorizedShellState,
-    BoundInterpreter, CatalogAuthorizationDecision, CatalogAuthorizedGenesis,
+    BoundDeliveryInterpreter, CatalogAuthorizationDecision, CatalogAuthorizedGenesis,
     CatalogAuthorizedReject, CatalogAuthorizedTransition, CatalogCommitAuthority,
     CatalogExecutionError, CatalogTransitionProgram, ExecutionBinding, GenesisAuthorizationBody,
     GenesisId, GenesisPolicyBinding, INVOCATION_INPUT_FORMAT_VERSION, InvocationWitness,
@@ -230,9 +231,9 @@ pub use zeno_fcis_bootstrap::{
 #[cfg(feature = "catalog")]
 pub use zeno_fcis_catalog::{
     CatalogError, CatalogLimits, CatalogManifest, CatalogMetrics, ChannelDefinition,
-    EffectDefinition, EffectHashField, HashRequirement, MAX_VALUE_FLOWS, NonZeroHash,
-    OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition, ValueFlow,
-    ValueFlowKind, ValueRole,
+    CommitEffectSemantics, EffectDefinition, EffectHashField, HashRequirement, MAX_VALUE_FLOWS,
+    NonZeroHash, OperationSemantics, ProjectCatalog, ReasonDefinition, ReasonDisposition,
+    ValueFlow, ValueFlowKind, ValueRole,
 };
 pub use zeno_fcis_codec::{
     AdmittedEnvelope, CanonicalEncode, CommitmentHasher, DecodeError, DecodeLimits, Domain,

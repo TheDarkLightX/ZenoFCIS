@@ -8,11 +8,17 @@ embedded in ZenoFCIS values.
 
 ### Changed
 
-- Catalog format 2 requires every effect and channel to bind explicit reviewed
+- Catalog format 3 requires every effect and channel to bind explicit reviewed
   `OperationSemantics`, including canonical asset-scoped value-flow sets.
 - Verified project laws now derive non-waivable economic families and
   committing-decision coverage from the exact catalog. Custom value relations
   require one exact registered claim with independently retained evidence.
+- `CommitPlan` is explicitly non-executable committed evidence. Every effect
+  definition is constructor-fixed to `CommitEffectSemantics::EvidenceOnly`,
+  project catalogs reject value-moving effects, and external value movement
+  must use a durable value-classified outbox channel.
+- Production authority now names and binds the concrete outbox-delivery
+  interpreter through `BoundDeliveryInterpreter`.
 
 ## 1.0.0-rc.1 - 2026-07-29
 

@@ -3,7 +3,7 @@
 ## Purpose
 
 A project may not classify an operation as value-moving while marking the
-relational laws that govern that value as inapplicable. Catalog format 2 binds
+relational laws that govern that value as inapplicable. Catalog format 3 binds
 closed economic semantics into every effect and channel definition. The laws
 crate derives the minimum non-waivable law families from the exact catalog
 before it constructs `VerifiedProjectLaws`.
@@ -52,6 +52,10 @@ The classification commitment records reviewed evidence. A hash alone does
 not prove that a `NonValue` classification is true. Catalog ownership and
 independent release review remain trusted authority boundaries.
 
+V1 additionally rejects every value-moving `EffectDefinition` during
+`ProjectCatalog` construction. Commit effects are non-executable evidence;
+value-moving semantics must be attached to durable `ChannelDefinition` values.
+
 ## Derived laws
 
 Every value flow requires:
@@ -78,7 +82,8 @@ evidence.
 
 ## Deterministic bounds
 
-- At most 64 distinct value flows per effect or channel.
+- At most 64 distinct value flows per definition; production catalogs admit
+  value flows only on channels.
 - Flow sets are sorted and duplicate-free.
 - Asset domains, classification commitments, and custom claim commitments are
   nonzero.
@@ -93,7 +98,8 @@ The implementation rejects:
 - empty, duplicate, or oversized value-flow sets;
 - `Custom` without an exact registered law ID and claim;
 - zero asset, classification, or claim commitments;
-- value-moving catalogs that mark a derived family inapplicable;
+- value-moving commit evidence;
+- value-moving channels that mark a derived family inapplicable;
 - economic definitions that cover only one committing decision;
 - missing or mismatched custom laws;
 - custom laws that do not require retained independent evidence.
@@ -120,7 +126,8 @@ verifier for proof-required claims.
   names or source code.
 - Derived law families do not prove that a project law engine implements them
   correctly.
-- This change does not define how `CommitPlan` effects are executed. That
-  separate V1 blocker is specified by issue #76.
+- `CommitPlan` records are not executed. The generic external-work boundary is
+  the durable, replay-safe outbox described in
+  [Commit evidence and durable outbox model](COMMIT_EVIDENCE_AND_OUTBOX_MODEL.md).
 - No downstream project or deployment becomes production-qualified solely by
   constructing these values.

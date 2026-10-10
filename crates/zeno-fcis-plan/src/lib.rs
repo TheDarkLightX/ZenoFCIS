@@ -1,7 +1,9 @@
-//! Closed data-only plans for authoritative commit and external delivery.
+//! Closed data-only plans for committed evidence and external delivery.
 //!
 //! Plans contain no closures, function pointers, trait objects, endpoints, or
-//! ambient runtime handles. The shell interprets a closed operation registry.
+//! ambient runtime handles. In V1, [`CommitPlan`] is non-executable evidence
+//! published atomically with state, while [`OutboxPlan`] is the only durable
+//! external-work boundary.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
@@ -23,7 +25,7 @@ use zeno_fcis_value::Value;
 pub struct PlanDecodeLimits {
     /// Maximum bytes in one complete encoded plan.
     pub max_input_bytes: u64,
-    /// Maximum authoritative effects in one commit plan.
+    /// Maximum evidence records in one commit plan.
     pub max_effects: u32,
     /// Maximum delivery obligations in one outbox plan.
     pub max_outbox_entries: u32,
@@ -48,7 +50,11 @@ impl Default for PlanDecodeLimits {
     }
 }
 
-/// One authoritative operation planned by the semantic core.
+/// One non-executable evidence record planned by the semantic core.
+///
+/// A shell publishes this record atomically with the candidate but never
+/// executes it. Work that must happen outside semantic state belongs in an
+/// [`OutboxEntry`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Effect {
     ordinal: u32,
@@ -59,7 +65,7 @@ pub struct Effect {
 }
 
 impl Effect {
-    /// Creates a closed authoritative operation.
+    /// Creates one closed non-executable evidence record.
     #[must_use]
     pub const fn new(
         ordinal: u32,
@@ -118,7 +124,7 @@ impl CanonicalEncode for Effect {
     }
 }
 
-/// Canonically ordered authoritative operations.
+/// Canonically ordered non-executable commit evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitPlan {
     effects: Box<[Effect]>,
@@ -531,7 +537,7 @@ fn put_blob(output: &mut Vec<u8>, bytes: &[u8]) -> Result<(), EncodeError> {
 /// Closed-plan construction failure.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlanError {
-    /// Two authoritative effects share one ordinal.
+    /// Two commit-evidence records share one ordinal.
     DuplicateEffectOrdinal(u32),
     /// Two outbox entries share one ordinal.
     DuplicateOutboxOrdinal(u32),

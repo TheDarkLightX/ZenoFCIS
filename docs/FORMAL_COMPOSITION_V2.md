@@ -49,7 +49,7 @@ A component contract declares:
 - state reads;
 - state writes;
 - authenticated-context reads;
-- authoritative effects;
+- non-executable commit evidence and durable outbox obligations;
 - outbox channel/destination paths.
 
 The declaration is intended to be a static complete over-approximation. A transition's execution-observed footprint is useful evidence but is not, by itself, a complete static footprint. Production parallel authorization additionally requires one of:

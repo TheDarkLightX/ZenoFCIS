@@ -50,7 +50,7 @@ pub enum LawKind {
     AssetConservation = 1,
     /// Minting and burning authority and supply relations.
     MintBurnAuthorization = 2,
-    /// Equality between semantic debits/credits and authoritative effects.
+    /// Equality between semantic debits/credits and committed external obligations.
     DebitCreditEffectEquality = 3,
     /// Fee, scale, dust, and rounding-remainder relations.
     FeeAndRounding = 4,
@@ -805,13 +805,13 @@ impl CanonicalEncode for LawLimits {
 
 /// Full decision surface presented to relational checkers.
 pub enum LawDecisionView<'a> {
-    /// An accepted successor and its exact authority-bearing plans.
+    /// An accepted successor with exact evidence and delivery obligations.
     Accept {
         /// Admitted successor state.
         post_state: &'a Value,
         /// Exact state patch.
         patch: &'a CanonicalPatch,
-        /// Exact authoritative effects.
+        /// Exact non-executable commit evidence.
         commit_plan: &'a CommitPlan,
         /// Exact external obligations.
         outbox_plan: &'a OutboxPlan,
@@ -829,7 +829,7 @@ pub enum LawDecisionView<'a> {
         post_state: &'a Value,
         /// Exact state patch.
         patch: &'a CanonicalPatch,
-        /// Exact authoritative effects.
+        /// Exact non-executable commit evidence.
         commit_plan: &'a CommitPlan,
         /// Exact external obligations.
         outbox_plan: &'a OutboxPlan,
@@ -2071,8 +2071,8 @@ impl core::error::Error for LawError {}
 mod tests {
     use super::*;
     use zeno_fcis_catalog::{
-        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, HashRequirement,
-        OperationSemantics, ValueFlow, ValueFlowKind,
+        CatalogLimits, CatalogManifest, ChannelDefinition, EffectDefinition, OperationSemantics,
+        ValueFlow, ValueFlowKind,
     };
     use zeno_fcis_evidence::{Assumption, EvidenceResult, ToolIdentity};
     use zeno_fcis_project::{DomainPrefix, ProfileBindings, ProjectProfile};
@@ -2338,20 +2338,19 @@ mod tests {
             .unwrap_or_else(|error| panic!("complete manifest: {error}"))
     }
 
-    fn value_effect(kind: ValueFlowKind) -> EffectDefinition {
+    fn value_channel(kind: ValueFlowKind) -> ChannelDefinition {
         let flow = ValueFlow::standard(kind, hash(b"asset-domain"))
             .unwrap_or_else(|error| panic!("flow: {error}"));
-        EffectDefinition::try_new(
-            id(20),
-            name("value-effect"),
+        ChannelDefinition::try_new(
+            id(30),
+            name("value-delivery"),
             TypeId::new(1),
-            HashRequirement::Present,
-            HashRequirement::Present,
+            TypeId::new(1),
             OperationSemantics::value(vec![flow], hash(b"classification"))
                 .unwrap_or_else(|error| panic!("semantics: {error}")),
-            hash(b"value-policy"),
+            hash(b"delivery-policy"),
         )
-        .unwrap_or_else(|error| panic!("effect: {error}"))
+        .unwrap_or_else(|error| panic!("channel: {error}"))
     }
 
     #[test]
@@ -2368,7 +2367,7 @@ mod tests {
         ];
         for (flow, missing) in cases {
             let manifest = complete_manifest(Some(missing), None);
-            let catalog = catalog_with_effects(&manifest, vec![value_effect(flow)]);
+            let catalog = catalog_with_operations(&manifest, Vec::new(), vec![value_channel(flow)]);
             assert_eq!(
                 validate_catalog_law_requirements(&catalog, &manifest),
                 Err(LawError::CatalogRequiredFamilyNotApplicable(missing))
@@ -2386,8 +2385,11 @@ mod tests {
             LawKind::AuthoritySubjectRecipient,
         ] {
             let manifest = complete_manifest(Some(missing), None);
-            let catalog =
-                catalog_with_effects(&manifest, vec![value_effect(ValueFlowKind::Settlement)]);
+            let catalog = catalog_with_operations(
+                &manifest,
+                Vec::new(),
+                vec![value_channel(ValueFlowKind::Settlement)],
+            );
             assert_eq!(
                 validate_catalog_law_requirements(&catalog, &manifest),
                 Err(LawError::CatalogRequiredFamilyNotApplicable(missing))
@@ -2405,8 +2407,11 @@ mod tests {
             LawKind::AuthoritySubjectRecipient,
         ] {
             let manifest = complete_manifest(None, Some(narrowed));
-            let catalog =
-                catalog_with_effects(&manifest, vec![value_effect(ValueFlowKind::Settlement)]);
+            let catalog = catalog_with_operations(
+                &manifest,
+                Vec::new(),
+                vec![value_channel(ValueFlowKind::Settlement)],
+            );
             assert_eq!(
                 validate_catalog_law_requirements(&catalog, &manifest),
                 Err(LawError::MissingCommittingCoverage(narrowed))
@@ -2435,8 +2440,11 @@ mod tests {
         ));
         let manifest = LawManifest::try_new(base.families().to_vec(), definitions)
             .unwrap_or_else(|error| panic!("split manifest: {error}"));
-        let catalog =
-            catalog_with_effects(&manifest, vec![value_effect(ValueFlowKind::Settlement)]);
+        let catalog = catalog_with_operations(
+            &manifest,
+            Vec::new(),
+            vec![value_channel(ValueFlowKind::Settlement)],
+        );
         assert_eq!(
             validate_catalog_law_requirements(&catalog, &manifest),
             Ok(())
@@ -2452,18 +2460,17 @@ mod tests {
             hash(b"complete-conservation"),
         )
         .unwrap_or_else(|error| panic!("flow: {error}"));
-        let effect = EffectDefinition::try_new(
-            id(20),
-            name("custom-value-effect"),
+        let channel = ChannelDefinition::try_new(
+            id(30),
+            name("custom-value-delivery"),
             TypeId::new(1),
-            HashRequirement::Present,
-            HashRequirement::Present,
+            TypeId::new(1),
             OperationSemantics::value(vec![flow], hash(b"custom-classification"))
                 .unwrap_or_else(|error| panic!("semantics: {error}")),
-            hash(b"custom-policy"),
+            hash(b"custom-delivery-policy"),
         )
-        .unwrap_or_else(|error| panic!("effect: {error}"));
-        let catalog = catalog_with_effects(&manifest, vec![effect]);
+        .unwrap_or_else(|error| panic!("channel: {error}"));
+        let catalog = catalog_with_operations(&manifest, Vec::new(), vec![channel]);
         assert_eq!(
             validate_catalog_law_requirements(&catalog, &manifest),
             Err(LawError::CustomValueLawRequiresEvidence(id(301)))

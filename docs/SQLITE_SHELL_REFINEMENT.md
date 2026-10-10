@@ -17,7 +17,7 @@ also equal that authorized genesis exactly.
 
 The shell type carries the exact reviewed transition-program type `P` and owns
 one concrete delivery-interpreter instance `I`. That instance must arrive in a
-private-construction `BoundInterpreter` minted by the same commit authority.
+private-construction `BoundDeliveryInterpreter` minted by the same commit authority.
 Its persisted identity pins the complete authorization policy and state-domain
 name/version. Opening under another policy, substituting a token from another
 policy, or mutating the stored identity fails closed.

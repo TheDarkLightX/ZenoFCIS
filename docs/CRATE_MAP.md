@@ -34,7 +34,7 @@ surface.
 | `zeno-fcis-value` | Transitively owned closed values and bounded admission |
 | `zeno-fcis-codec` | ZCVE/1 canonical encoding, domain separation, commitments, strict value decoding |
 | `zeno-fcis-patch` | Expected-root, preconditioned, canonical nonoverlapping state patches |
-| `zeno-fcis-plan` | Closed authoritative effects and outbox obligations |
+| `zeno-fcis-plan` | Closed non-executable commit evidence and durable outbox obligations |
 | `zeno-fcis-receipt` | Candidate sealing, receipts, reject receipts, and complete bundles |
 | `zeno-fcis-project` | Project profiles, stable registries, compatibility, and migration bindings |
 | `zeno-fcis-schema` | Closed schemas, type IDs, and schema-bound value admission |
@@ -53,7 +53,7 @@ These crates turn the foundational values into a safe application path.
 | `zeno-fcis-domain` | Fixed-size typed domain machines and canonical sequential execution |
 | `zeno-fcis-composed-program` | Root projection, nominal machine ownership, catalogued plan projection, and transition-program identity |
 | `zeno-fcis-laws` | Complete relational-law manifests, executable checks, retained evidence, and verified law sets |
-| `zeno-fcis-authority` | Exact invocation, provider, program, law, interpreter, deployment, replay, and commit authorization |
+| `zeno-fcis-authority` | Exact invocation, provider, program, law, outbox-delivery interpreter, deployment, replay, and commit authorization |
 | `zeno-fcis-authenticated-authority` | Retained-evidence projector qualification, per-transition projection laws, candidate-bound authenticated commits, and nominal authenticated publication |
 
 The recommended production path ends in a privately constructed
