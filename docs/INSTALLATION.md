@@ -1,13 +1,12 @@
 # Installation
 
 Public `2.2.0-rc.1` and `2.3.0-rc.1` candidates are available for the
-**Linux x86_64 GNU CLI**. They are prereleases with unchanged binaries, Rustdoc and manifests.
-Internal source bundles have been withdrawn. Curated Git tags retain the
-runtime code but have new commit IDs and no original tag signature. See [release candidates](RELEASE_CANDIDATES.md)
-for the exact source pins, original signed checksum assets and qualification limits.
-Stable V2.2/V2.3 scope remains unfinished; macOS/Windows binaries and candidate
-crates.io publication are not claimed. Rust `1.97.1` is the supported toolchain
-for building the matching source and generated applications.
+**Linux x86_64 GNU CLI**, with offline Rustdoc. See
+[release candidates](RELEASE_CANDIDATES.md) for the exact source pins, signed
+checksum assets and qualification limits. Stable V2.2/V2.3 scope remains
+unfinished; macOS/Windows binaries and candidate crates.io publication are not
+claimed. Rust `1.97.1` is the supported toolchain for building the matching
+source and generated applications.
 
 ## Install the V2.3 candidate CLI
 
@@ -29,9 +28,10 @@ licenses. Retain that directory and add it to your shell's PATH to use it in
 later sessions. `--ignore-missing` checks the downloaded assets listed in the
 flat `DOWNLOADS.sha256`; it does not check assets you have not downloaded.
 Verify the [detached checksum signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.3.0-rc.1/DOWNLOADS.sha256.sig)
-separately using your trusted signing-key policy. The release also provides the
-[owner public key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.3.0-rc.1/OWNER-SIGNING-KEY.pub);
-downloading it beside the artifacts does not independently establish trust.
+separately under your trusted signing-key policy. The release also provides the
+[signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.3.0-rc.1/RELEASE-SIGNING-KEY.pub).
+Downloading it beside the artifacts does not independently establish trust;
+confirm its fingerprint through a trusted channel.
 
 ## Install the V2.2 candidate CLI
 
@@ -49,7 +49,7 @@ zeno-fcis describe
 ```
 
 Its [signature](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.2.0-rc.1/DOWNLOADS.sha256.sig)
-and [public key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.2.0-rc.1/OWNER-SIGNING-KEY.pub)
+and [signing key](https://github.com/TheDarkLightX/ZenoFCIS/releases/download/v2.2.0-rc.1/RELEASE-SIGNING-KEY.pub)
 have the same separate trust requirement.
 
 ## Matching source and current library API
@@ -71,8 +71,9 @@ The installed CLI records no build-directory location, so `new` needs an
 explicit `--source`. Its generated application binds dependencies and the
 lockfile to that tree; retain the source and follow the generated README.
 For V2.2, use tag `v2.2.0-rc.1` and expected source
-`66e8e05180e0883e570e5459a5dc94f99d8e0d9b` instead. These are the curated Git revisions, not the historical binary build
-revisions in the retained manifests. Runtime files are unchanged.
+`66e8e05180e0883e570e5459a5dc94f99d8e0d9b` instead. These source checkout
+revisions differ from the original binary build revisions, with matching
+runtime files.
 
 An application beside that V2.3 source checkout can use:
 
@@ -129,7 +130,7 @@ cargo +1.97.1 test --workspace --all-features --locked
 ```
 
 Original artifact manifests identify the source used to build the published
-packages; documentation-curated tags have new Git identities. See the [release notes](V1_RELEASE_NOTES.md) for compatibility and
+packages. See the [release notes](V1_RELEASE_NOTES.md) for compatibility and
 assurance boundaries.
 
 ## Optional coding-agent guardrails
@@ -156,20 +157,14 @@ cargo +1.97.1 install zeno-fcis-cli --version 1.1.0 --locked
 zeno-fcis check project.zeno
 ```
 
-V1's `mount-zenodex-zusd` diagnostic parity tool is not shipped in V2. Its
-pinned assertions remain in the private kernel-law oracle. The checked
-full-width zUSD profile is not qualified by the supported scalar route.
+V1's `mount-zenodex-zusd` diagnostic parity tool is not shipped in V2. The
+checked full-width zUSD profile is not qualified by the supported scalar route.
 
-## Bundle verification
+## Verifying downloads
 
-The retained bundle contains `SHA256SUMS`, `RC-MANIFEST.json`,
-`SOURCE-MANIFEST.json`, `SBOM.cdx.json`, and `PROVENANCE-INPUTS.json`. Its
-`SHA256SUMS` names paths inside the extracted bundle; run this there:
-
-```bash
-sha256sum --check SHA256SUMS
-```
-
-GitHub-hosted provenance or signatures must be verified separately against the
-exact release tag. `PROVENANCE-INPUTS.json` records inputs for attestation; it
-is not itself a signature or SLSA attestation.
+`DOWNLOADS.sha256` lists the flat release assets; the install commands check
+only the files you downloaded. The detached signature signs the entire
+`DOWNLOADS.sha256` file: verify that signature with `RELEASE-SIGNING-KEY.pub`,
+then compare the binary's hash against its entry in that signed file. Confirm
+the key's fingerprint through a trusted channel; downloading it from the same
+release does not independently establish trust.

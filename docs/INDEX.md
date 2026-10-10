@@ -12,25 +12,23 @@
 8. [V1 product contract](V1_PRODUCT_CONTRACT.md)
 9. [BDD and acceptance testing](ACCEPTANCE_TESTING.md)
 10. [Deterministic developer guardrails](DEVELOPER_GUARDRAILS.md)
-11. [V1 release notes](V1_RELEASE_NOTES.md)
-12. [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md)
-13. [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
-14. [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
-15. [Formal tools](FORMAL_TOOLS_RC3.md); [symbolic per-case checks](SYMBOLIC_CHECKS.md)
-16. [Mini Determinator](MINI_DETERMINATOR.md)
-17. [Mini Determinator QEMU kernel demo](QEMU_MINI_DETERMINATOR.md)
-18. [CLI reference](CLI_REFERENCE.md)
-19. [CLI and QEMU marketing captures](assets/marketing/README.md)
-20. [Historical RC2 release notes](RC2_RELEASE_NOTES.md)
-21. [Historical RC1 release notes](RC1_RELEASE_NOTES.md)
-22. [V1 release checklist](V1_RELEASE_CHECKLIST.md)
-23. [Packaging](PACKAGING.md)
-24. [Release assurance](RELEASE_ASSURANCE.md)
-25. [RC3 readiness review](RC3_READINESS_REVIEW.md)
-27. [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
-28. [Security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
-29. [Security hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
-30. [Security standards snapshot](SECURITY_STANDARDS_SNAPSHOT.md)
+11. [Release candidates](RELEASE_CANDIDATES.md)
+12. [Historical V1.1 release notes](V1_1_RELEASE_NOTES.md)
+13. [Historical V1 release notes](V1_RELEASE_NOTES.md)
+14. [RC3 authoring contract](RC3_AUTHORING_CONTRACT.md)
+15. [`.zeno` language v1](ZENO_LANGUAGE_V1.md)
+16. [Temporal logic v1](TEMPORAL_LOGIC_V1.md)
+17. [Formal tools](FORMAL_TOOLS_RC3.md); [symbolic per-case checks](SYMBOLIC_CHECKS.md)
+18. [Mini Determinator](MINI_DETERMINATOR.md)
+19. [Mini Determinator QEMU kernel demo](QEMU_MINI_DETERMINATOR.md)
+20. [CLI reference](CLI_REFERENCE.md)
+21. [CLI and QEMU marketing captures](assets/marketing/README.md)
+22. [Packaging](PACKAGING.md)
+23. [Release assurance](RELEASE_ASSURANCE.md)
+24. [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
+25. [Security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
+26. [Security hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
+27. [Security standards snapshot](SECURITY_STANDARDS_SNAPSHOT.md)
 
 ## Project definition and typed construction
 
@@ -129,13 +127,14 @@ and other tools can use the same public boundaries.
 
 ## Status
 
-The workspace is version `1.0.0`, the stable Cargo API release. The
-documentation describes implemented APIs and explicit boundaries. It does not
-claim general deployment qualification, a bundled concurrent runtime, or an
-end-to-end proof for arbitrary downstream projects. Historical
-[RC3 notes](RC3_RELEASE_NOTES.md) describe the earlier published candidate.
+The workspace is version `1.1.0`. The crates.io `1.1.0` API is the historical
+stable line; the current supported V2 source API ships in the pinned public
+candidates `v2.2.0-rc.1` and `v2.3.0-rc.1` and differs from `1.1.0`. See
+[release candidates](RELEASE_CANDIDATES.md) and
+[installation](INSTALLATION.md). Neither candidate is a stable V2 release.
 
+The documentation describes implemented APIs and explicit boundaries. It does
+not claim general deployment qualification, a bundled concurrent runtime, or
+an end-to-end proof for arbitrary downstream projects.
 
-- [V1.1 release notes](V1_1_RELEASE_NOTES.md)
-- [V1.1 release checklist](V1_1_RELEASE_CHECKLIST.md)
 - [Bounded completion and preparation](BOUNDED_COMPLETION.md)

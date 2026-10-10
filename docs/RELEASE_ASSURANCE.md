@@ -2,10 +2,11 @@
 
 This document defines the release gate for the complete ZenoFCIS library family. A passing build is necessary evidence. It is not an audit, a deployment authorization, or proof that a downstream profile is economically correct.
 
-The [V1 release checklist](V1_RELEASE_CHECKLIST.md) gives the ordered owner
-procedure for freezing one exact commit, rerunning this gate, creating the
-signed tag, publishing crates, retaining evidence, and responding to a partial
-or failed release.
+Each release freezes one exact commit, reruns this gate from a clean
+checkout, creates the signed tag, publishes crates in dependency order, and
+retains the evidence listed below. [Release
+candidates](RELEASE_CANDIDATES.md) lists the pinned public candidates and the
+assets each download page carries.
 
 ## Authority boundary
 
@@ -306,6 +307,14 @@ The repository currently supplies reviewed reference implementations and strict 
 - that equality between untrusted `NormalizedDecision` values grants
   production promotion authority;
 - that SQLite durability settings replace deployment-specific storage validation;
-- audit completion, project-specific economic correctness, side-channel resistance, or production qualification of a value-moving profile.
+- audit completion, project-specific economic correctness, side-channel resistance, or production qualification of a value-moving profile;
+- that a stored certificate, signature, or key identity proves where an
+  artifact originated;
+- that the signing key published with a release's checksums establishes an
+  independent trust root for that release;
+- that a release tag proves its artifacts were originally built and signed on
+  that tag;
+- that finite exhaustive replay over a complete declared domain transfers to
+  arbitrary cores, undeclared inputs, or an untrusted base.
 
 Those claims require separately bound evidence and an explicit deployment decision.

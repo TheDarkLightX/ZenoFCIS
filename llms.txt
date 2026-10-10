@@ -4,8 +4,9 @@ ZenoFCIS is a Rust library family for high-assurance functional-core /
 imperative-shell systems.
 
 Current workspace version: 1.1.0
-Current status: stable Cargo API 1.1.0; downstream deployment qualification
-remains project specific
+Current status: crates.io 1.1.0 is the historical stable Cargo API; the
+supported V2 source line ships in the pinned public candidates
+v2.2.0-rc.1 and v2.3.0-rc.1 and is not yet stable
 Rust toolchain: 1.97.1 for repository validation
 
 ## Start here
@@ -20,7 +21,7 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/SECURITY_REVIEW_PLAYBOOK.md: evidence-first review, chain, mitigation, and re-review stages
 - docs/SECURITY_HOTSPOT_MODEL.md: deterministic EPI ranking and chain proof obligations
 - docs/SECURITY_STANDARDS_SNAPSHOT.md: dated primary-source practices and tool cautions
-- docs/V1_PRODUCT_CONTRACT.md: stable V1 features and supported adopter journeys
+- docs/V1_PRODUCT_CONTRACT.md: historical stable V1 features and supported adopter journeys
 - docs/RC3_AUTHORING_CONTRACT.md: authoring pipeline, capability boundary, and nonclaims
 - docs/ZENO_LANGUAGE_V1.md: exact grammar, canonicalization, and diagnostics
 - docs/TEMPORAL_LOGIC_V1.md: finite and unbounded temporal semantics
@@ -32,17 +33,30 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/DEVELOPER_GUARDRAILS.md: optional deterministic Probity rules and setup
 - docs/ARCHITECTURE.md: dependency rings
 - docs/BOUNDED_COMPLETION.md: finite exits, bounded plan import and ordered preparation
-- docs/V1_1_RELEASE_NOTES.md: new workflows and compatibility
-- docs/V1_1_RELEASE_CHECKLIST.md: current release runbook
-- docs/V1_RELEASE_NOTES.md: original stable API scope and compatibility limits
-- docs/RC3_RELEASE_NOTES.md: historical third-candidate notes
-- docs/RC2_RELEASE_NOTES.md: historical second-candidate notes
-- docs/RC1_RELEASE_NOTES.md: historical first-candidate notes
-- docs/V1_RELEASE_CHECKLIST.md: historical V1.0 publication runbook
+- docs/RELEASE_CANDIDATES.md: pinned public candidates, download assets, and the current V2 source line
+- docs/V1_1_RELEASE_NOTES.md: historical 1.1.0 workflows and compatibility
+- docs/V1_RELEASE_NOTES.md: historical 1.0.0 stable API scope and compatibility limits
 - docs/PACKAGING.md: package authority and retained artifacts
 - docs/RELEASE_ASSURANCE.md: repository gates and nonclaims
 
-## Safe golden path
+## Current V2 source path
+
+The supported API lives in the pinned public source candidates, not in
+crates.io 1.1.0. docs/RELEASE_CANDIDATES.md and docs/INSTALLATION.md give the
+pinned sources and assets. The library-owned entry point is
+zeno_fcis_synthesis::finite::v2_authority::Authority:
+
+Authority owns complete declarative decisions and laws
+-> Authority.publish(Raw) produces a genuine Publication
+-> V2SqliteShell.commit consumes that Publication
+
+Observed time and authorization values enter as data; clock access itself
+stays in the shell. The library does not authenticate callers.
+
+## Historical V1 golden path (crates.io 1.1.0)
+
+Retained for adopters of the published 1.1.0 API. For current work use the V2
+source path above.
 
 ProjectProfile + ProjectCatalog
 -> generated typed transition or typed DomainMachine implementations
@@ -56,7 +70,7 @@ The authority owns the catalog, program, law engine, provider, interpreter,
 deployment, replay policy, and limits. Request callers supply admitted
 invocation values, not prebuilt decisions or bundles.
 
-## Important public APIs
+## Historical V1 public APIs (crates.io 1.1.0)
 
 - project: ProjectProfile, RegistryEntry, ProfileEvolution
 - schema/catalog: Schema, ProjectCatalog, CatalogLimits
@@ -76,6 +90,9 @@ invocation values, not prebuilt decisions or bundles.
 - shells: AuthorizedShellState; zeno-fcis-shell-sqlite when enabled
 
 ## Production integration rules
+
+Type names below are the historical 1.1.0 surface; the underlying boundary
+rules still apply.
 
 - Do not use CommitBundle, TransitionDecision, or NormalizedDecision as commit
   authority.

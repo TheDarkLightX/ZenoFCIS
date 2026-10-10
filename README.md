@@ -16,17 +16,15 @@ verified functional core**, with durable effects and evidence agents can maintai
 
 As of 10 October 2026, **[2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)**
 and **[2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-rc.1)**
-are public. Each supplies a Linux x86_64 GNU CLI, Rustdoc and qualification manifests.
-Source bundles containing internal documents have been withdrawn; GitHub
-provides a curated source tree with unchanged runtime code. Follow the
-[installation guide](docs/INSTALLATION.md)
-for direct downloads and the [candidate record](docs/RELEASE_CANDIDATES.md) for
-exact source pins, signed checksums and qualification limits.
+are public. Each supplies a Linux x86_64 GNU CLI and offline Rustdoc. Follow the
+[installation guide](docs/INSTALLATION.md) for direct downloads and the
+[candidate record](docs/RELEASE_CANDIDATES.md) for exact source pins, signed
+checksums and qualification limits.
 
-These prereleases deliver the current supported subset. Full stable V2.2/V2.3
+These prereleases deliver the current supported subset; full stable V2.2/V2.3
 scope remains unfinished. The V2.3 catalogue contains ten reusable core families,
 77 declared instances and 107,518 raw inputs with explicitly finite evidence;
-broader application composition and symbolic proof work remain unfinished.
+broader application composition and symbolic proof work are also unfinished.
 See the [candidate assurance scope](docs/RELEASE_CANDIDATES.md). Use the matching
 candidate tag for its binaries
 and APIs: `main` still declares Cargo version `1.1.0` and is a different source.
@@ -277,8 +275,7 @@ See the [normal program migration](docs/V2_PROGRAM_API_MIGRATION.md) and run
 The root/prelude cutover is intentionally breaking on this V2 development branch.
 Native transition callbacks, public candidate sealing and caller-supplied
 usage have been retired. `zeno_fcis::legacy` retains inert compatibility data
-and standalone evidence utilities; historical authoring algorithms are in a
-private verification oracle. See the [API migration guide](docs/V2_PROGRAM_API_MIGRATION.md)
+and standalone evidence utilities. See the [API migration guide](docs/V2_PROGRAM_API_MIGRATION.md)
 for the supported invocation and publication boundaries.
 
 Read the [installation guide](docs/INSTALLATION.md),
@@ -300,12 +297,7 @@ report contract. Run `python3 tools/security_hotspots.py check` to reject
 unreviewed ranking or model drift. The
 [V1.1 release notes](docs/V1_1_RELEASE_NOTES.md) describe the new workflows and
 compatibility boundaries. The [V1 release notes](docs/V1_RELEASE_NOTES.md) retain
-the original stable API scope. The
-[RC3 release notes](docs/RC3_RELEASE_NOTES.md) retain the historical candidate
-scope. The owner-facing
-[V1.1 release checklist](docs/V1_1_RELEASE_CHECKLIST.md) separates exact-source
-repository evidence from signing, publication, and external review actions;
-the [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) remains historical.
+the original stable API scope.
 Runnable examples are checked permanently:
 
 ```bash
@@ -409,8 +401,7 @@ adapters, and the `zeno-fcis` CLI. Start with the
 [formal-tools contract](docs/FORMAL_TOOLS_RC3.md),
 [Mini Determinator reference](docs/MINI_DETERMINATOR.md),
 [Mini Determinator QEMU kernel demo](docs/QEMU_MINI_DETERMINATOR.md), and
-[CLI reference](docs/CLI_REFERENCE.md), and
-[RC3 readiness review](docs/RC3_READINESS_REVIEW.md).
+[CLI reference](docs/CLI_REFERENCE.md).
 
 ```bash
 cargo +1.97.1 run -p zeno-fcis-cli --locked -- new /tmp/zeno-demo --template minimal
@@ -543,7 +534,7 @@ Properties of a finite transition are checked the same way.
 [System properties](docs/SYSTEM_PROPERTIES.md) are checked on every admitted
 input, with a control that flags a property the declared domains already imply.
 
-## Supported architecture and roadmap
+## Supported architecture
 
 ```text
 reviewed schema + decision/law declarations + exact policy
@@ -591,11 +582,12 @@ python3 tools/rc_package.py check
 python3 tools/rc_package.py build --output /tmp/zeno-fcis-v1
 ```
 
-The build retains all public `.crate` packages, rustdoc, source and diagnostic
-binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
-[packaging reference](docs/PACKAGING.md),
-[RC3 readiness review](docs/RC3_READINESS_REVIEW.md), and
-[V1.1 release checklist](docs/V1_1_RELEASE_CHECKLIST.md).
+`rc_package.py build` writes a full local release package: all public `.crate`
+packages, rustdoc, source and diagnostic binary archives, checksums, a
+CycloneDX SBOM, and provenance inputs. This is the packaging tool's output, not
+the candidate release pages, which carry only the Linux CLI, offline Rustdoc,
+signed checksum lists, the signing key, and an SBOM. See the
+[packaging reference](docs/PACKAGING.md).
 
 ## Assurance posture
 
@@ -607,7 +599,7 @@ correctly. A passing stage check is not a release receipt.
 
 The existing `1.1.0` release and its [release notes](docs/V1_1_RELEASE_NOTES.md)
 have their own historical scope. This development branch changes the public
-execution API. Source qualification, exact-head CI, packaging, owner signing
+execution API. Source qualification, exact-head CI, packaging, signing
 and publication remain distinct steps. The public V2.2/V2.3 prereleases have the
 qualification limits recorded in [release candidates](docs/RELEASE_CANDIDATES.md);
 they do not complete the original stable-release scope.

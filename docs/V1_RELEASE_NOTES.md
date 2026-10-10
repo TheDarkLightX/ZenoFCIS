@@ -1,11 +1,16 @@
 # ZenoFCIS 1.0.0
 
+Historical notes for the crates.io `1.0.0` release. The supported V2 source
+line ships in pinned public candidates; see
+[release candidates](RELEASE_CANDIDATES.md) and
+[installation](INSTALLATION.md).
+
 ZenoFCIS 1.0.0 establishes the stable Cargo API for the 36-crate library family.
 It keeps the functional core pure and requires nominal authorization before
 the production-facing shell can publish a transition. The release continues
 to use Rust 1.97.1, Node 22.23.1, and the existing Lean 4.30.0 integration.
 
-## What developers gain over the published RC3
+## What developers gain
 
 - Describe a finite contract, search a bounded instruction language, and
   independently check the selected implementation. The CLI can emit Rust,
@@ -15,12 +20,13 @@ to use Rust 1.97.1, Node 22.23.1, and the existing Lean 4.30.0 integration.
 - Generate a runnable Rust application with the `durable-counter` template.
   Its consumer checks exercise project laws, nominal authorization, SQLite
   persistence, restart, replay, and idempotent notification delivery.
-- Let a coding agent discover commands with `zeno-fcis describe`, consume
-  versioned JSON diagnostics, and check generated-file drift without writing
-  files. Input reads and artifact comparisons have explicit bounds.
+- Discover commands with `zeno-fcis describe`, consume versioned JSON
+  diagnostics, and check generated-file drift without writing files. Input
+  reads and artifact comparisons have explicit bounds.
 - Qualify the generated application using the CLI and dependencies extracted
-  from actual `.crate` archives. The release retains
-  `PACKAGED-APPLICATION.json` alongside source, package and checker identities.
+  from actual `.crate` archives. The packaging tooling emits
+  `PACKAGED-APPLICATION.json` with the run's source, package and checker
+  identities as a local build artifact.
 - Use the standard error trait on foundational error types and select a
   smaller dependency surface for `no_std + alloc` consumers.
 
@@ -102,5 +108,5 @@ Determinator are reference integrations, with their documented limits.
 Stable Cargo APIs do not establish a mechanized end-to-end theorem for every
 project, production deployment qualification, or an independent security
 audit. See the [product contract](V1_PRODUCT_CONTRACT.md),
-[security policy](../SECURITY.md), [release assurance](RELEASE_ASSURANCE.md),
-and [release checklist](V1_RELEASE_CHECKLIST.md).
+[security policy](../SECURITY.md), and
+[release assurance](RELEASE_ASSURANCE.md).

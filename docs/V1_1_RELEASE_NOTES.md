@@ -1,5 +1,10 @@
 # ZenoFCIS 1.1.0
 
+Historical notes for the crates.io `1.1.0` release. The supported V2 source
+line ships in pinned public candidates; see
+[release candidates](RELEASE_CANDIDATES.md) and
+[installation](INSTALLATION.md).
+
 V1.1 adds checked finite exit plans and bounded preparation of ordered work. An
 application can prove that every state in its declared finite model has a path
 to a terminal state, prepare a command in small chunks, and authorize its complete
@@ -15,8 +20,9 @@ result through the existing state and outbox publication boundary.
   It accepts only the next ordered chunk, rolls back a failed chunk, and exposes
   a result only after completion and an exact root/version/invocation match.
 - `zeno-fcis synth completion discover|find|verify|replay` provides closed JSON
-  models, deterministic diagnostics, canonical plans and inert reproduction files
-  for agents. Reproducing a failed claim retains its failure exit code.
+  models, deterministic diagnostics, canonical plans and inert reproduction
+  files for programmatic consumers. Reproducing a failed claim retains its
+  failure exit code.
 - `zeno-fcis new counter --template prepared-counter` generates an application
   with typed commands, independent transition and law checks, capacity admission,
   nominal authorization, SQLite publication, exact replay and notification retry.
@@ -63,6 +69,5 @@ The profile's byte limit does not bound OS memory, execution time or database si
 No serialized partial accumulator, new proof backend, hash chain, paged storage
 protocol or automatic settlement authority is introduced.
 
-See [bounded completion](BOUNDED_COMPLETION.md), the
-[prepared application](../crates/zeno-fcis-cli/templates/prepared-counter/README.md)
-and the [V1.1 release checklist](V1_1_RELEASE_CHECKLIST.md).
+See [bounded completion](BOUNDED_COMPLETION.md) and the
+[prepared application](../crates/zeno-fcis-cli/templates/prepared-counter/README.md).

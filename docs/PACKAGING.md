@@ -1,6 +1,7 @@
 # Release packaging
 
-This document describes the ZenoFCIS `1.1.0` artifact set.
+This document describes the release packaging tooling and the `1.1.0`
+artifact set it produces.
 
 ## Package set
 
@@ -35,6 +36,13 @@ RC-MANIFEST.json
 SHA256SUMS
 zeno-fcis-<version>-rc-bundle.zip
 ```
+
+The full list above is what the tooling builds locally. The current public
+candidate download pages carry a smaller set: the Linux x86-64 GNU CLI
+archive, the offline rustdoc archive, signed checksums, and a commentless
+`RELEASE-SIGNING-KEY.pub`. Source for a candidate is its matching public Git
+tag. The source archive, full bundle, and `.crate` archives are local build
+outputs, not published downloads.
 
 The command requires a clean exact commit. It uses pinned Rust `1.97.1`, fetches
 the locked external graph, packages every public crate with `--locked`, then
@@ -158,17 +166,15 @@ release.
 ## Publication
 
 Crates are published in the exact order in `release/package-set.toml`. The
-generated-code test crate has `publish = false`. Publishing, signing, creating a Git tag,
-or creating a GitHub release remains an owner action after review.
+generated-code test crate has `publish = false`. Publishing, signing, Git
+tagging, and GitHub release creation happen only after review and outside the
+repository's permanent workflows, which remain read-only. This package does
+not add a write-enabled release workflow or weaken that policy.
 
-The repository's permanent workflows are read-only. This package does not add
-a write-enabled release workflow or weaken that policy.
-
-The complete owner procedure for exact-head review, signed tagging,
-dependency-ordered crates.io publication, release evidence, and failure
-recovery is the [V1.1 release checklist](V1_1_RELEASE_CHECKLIST.md). The permanent
-release-candidate workflow also runs on `v1.0.0-rc.*`, `v1.0.0` and `v1.1.0` tags so the immutable tag
-is packaged through the same read-only gate used during review.
+The read-only release-candidate workflow also runs on release tags, so each
+published tag passes through the same packaging gate used during review.
+[Release candidates](RELEASE_CANDIDATES.md) lists the pinned public
+candidates and the assets each download page carries.
 
 ## Nonclaims
 
@@ -178,4 +184,7 @@ Reproducibility requires matching retained checksums from independent clean
 builders. It does not claim byte reproducibility for Rustdoc's excluded global
 search index, and it does not constitute an independent audit, proof of
 downstream project laws, deployment qualification, signature, or SLSA
-attestation.
+attestation. A stored certificate or key identity records which key produced
+a signature; it is not proof of an artifact's origin. The signing key
+published with a release's checksums shares that release's distribution
+channel and does not establish an independent trust root.
