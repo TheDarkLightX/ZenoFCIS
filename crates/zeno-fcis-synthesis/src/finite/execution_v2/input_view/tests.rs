@@ -11,7 +11,7 @@ fn variants_valid(variants: &[Variant], min: i64, max: i64) -> bool {
         && codes.len() == variants.len()
         && codes.iter().all(|code| min <= *code && *code <= max)
 }
-fn schema_valid(fields: &[Field]) -> bool {
+pub(in super::super) fn schema_valid(fields: &[Field]) -> bool {
     fields.windows(2).all(|pair| pair[0].id < pair[1].id)
         && fields.iter().all(|field| match &field.leaf {
             Leaf::I128 { min, max } => min <= max,
@@ -88,7 +88,7 @@ fn charge(
     used[index] = total as u64;
     Ok(())
 }
-fn oracle(
+pub(in super::super) fn oracle(
     bytes: &[u8],
     fields: &[Field],
     limits: [u64; 8],

@@ -19,11 +19,15 @@ pub mod preparation;
 mod choice_tests;
 
 pub use execution_v2::{
-    AccessAttempt as V2ReadAttempt, Failure as V2ExecutionFailure, InputField as V2InputField,
-    InputLeaf as V2InputLeaf, InputVariant as V2InputVariant, Limits as V2Limits,
-    MeterFailure as V2MeterFailure, Outcome as V2ExecutionOutcome,
-    RecordFailure as V2RecordFailure, RecordProjection as V2RecordProjection,
-    Resource as V2Resource, Usage as V2Usage, execute as execute_v2,
+    AccessAttempt as V2ReadAttempt, Failure as V2ExecutionFailure, InputBinding as V2InputBinding,
+    InputField as V2InputField, InputLeaf as V2InputLeaf, InputVariant as V2InputVariant,
+    Limits as V2Limits, MeterFailure as V2MeterFailure, Outcome as V2ExecutionOutcome,
+    RawRecord as V2RawRecord, RecordAttempts as V2RecordAttempts,
+    RecordExecutionFailure as V2RecordExecutionFailure,
+    RecordExecutionOutcome as V2RecordExecutionOutcome, RecordFailure as V2RecordFailure,
+    RecordInvocation as V2RecordInvocation, RecordProjection as V2RecordProjection,
+    RecordSource as V2RecordSource, Resource as V2Resource, ScalarProgram as V2ScalarProgram,
+    Usage as V2Usage, execute as execute_v2, execute_records as execute_records_v2,
     project_record as project_record_v2, zero_limits as v2_zero_limits,
 };
 pub use ir::{Domain, MAX_FIELDS, MAX_NODES, Op, PROFILE, Program};
@@ -33,6 +37,9 @@ pub const V2_EXECUTION_PROFILE: &str = "zeno-fcis/finite-instruction-meter/2";
 
 /// V2 ingress bytes and protected flat-record field attempts.
 pub const V2_RECORD_PROFILE: &str = "zeno-fcis/finite-protected-record/2";
+
+/// Complete raw State/Command/Context projection and eager scalar execution.
+pub const V2_RECORD_EXECUTION_PROFILE: &str = "zeno-fcis/finite-record-execution/2";
 
 use crate::{
     Assignment, CandidateChecker, CheckResult, Hole, HoleId, SearchBudget, SearchResult,
@@ -699,6 +706,24 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
                 hash_bytes(
                     "zeno-fcis/finite-v2-input-specification",
                     include_bytes!("execution_v2/input_view/spec.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-v2-record-execution-source",
+                    include_bytes!("execution_v2/record_execution.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-v2-record-execution-specification",
+                    include_bytes!("execution_v2/record_execution/spec.rs"),
                 )?
                 .as_bytes()
                 .to_vec()

@@ -243,12 +243,13 @@ python3 tools/atdd.py run --all
 
 The [Verus verification units](verification/verus/README.md) check shared
 finite-domain arithmetic, structural program admission, and eager scalar
-execution against mathematical contracts. The owned V2 instruction meter
-also checks exact outcomes and retained usage: its combined unit covers 38
-executable functions, including generated clones, with 57 obligations.
-Operational charge ordering has a separate reviewed body guard. Canonical
-import, protected state views, complete decisions, laws, genesis and
-authority composition remain separate proof obligations. See the
+execution against mathematical contracts. The V2 raw-record pipeline derives
+the exact typed scalar tuple in source/field ABI order and executes it with one
+owned Read/Byte/Step meter. Its shared dependency closure has 81 executable
+functions, including generated clones, and 145 proof obligations. Operational
+charge ordering has a separate reviewed body guard. Catalog extraction,
+original envelope/hash admission, complete decisions, laws, genesis and the
+mandatory authority/replay route remain separate proof obligations. See the
 [V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md) and
 [lessons from Verus and the V2 plan](docs/VERUS_LESSONS_AND_V2_PLAN.md) for the
 integration design and remaining proof obligations.

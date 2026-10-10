@@ -28,7 +28,7 @@ SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view.rs
 SPEC = SUBJECT.parent / "input_view/spec.rs"
 UNIT_SOURCES = (HARNESS, *METER_SOURCES[1:])
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
-           SUBJECT.parent / "input_view/tests.rs",
+           SUBJECT.parent / "input_view/tests.rs", SUBJECT.parent / "record_execution/tests.rs",
            Path("tools/check_protected_input.py"), Path("tools/test_check_protected_input.py"),
            Path("tools/check_metered_execution.py"), Path("tools/check_finite_execution.py"),
            Path("tools/check_verus.py"), Path("tools/verus_coverage.py"),
@@ -228,8 +228,8 @@ def check(cache: Path, install: bool) -> dict:
             "scope": "complete canonical flat-record projection, exact retained logical counters and descriptor-based attempts",
             "trusted_base": ["reviewed specifications and operational body manifest", "Verus translation/erasure and bundled vstd/Z3",
                              "Rust compilers", "standard library/allocation", "host platform"],
-            "unproved": ["catalog descriptor extraction and binding permutation", "original-envelope framing/hash admission",
-                         "multi-record composition", "atomic grouped operations", "complete decisions",
+            "unproved": ["catalog descriptor extraction/admission", "original-envelope framing/hash admission",
+                         "atomic grouped operations", "complete decisions",
                          "mandatory V2 authority and replay", "laws/genesis", "compiler/erasure correspondence", "shell"]}
 
 

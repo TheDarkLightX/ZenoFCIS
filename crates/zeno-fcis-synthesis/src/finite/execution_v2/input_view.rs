@@ -134,9 +134,11 @@ fn validate_leaf(leaf: &Leaf) -> bool {
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
-    ensures result == spec::schema_valid(fields@),
+    ensures result == schema_valid(fields@),
 ))]
-fn validate_schema(fields: &[Field]) -> bool {
+pub(super) fn validate_schema(fields: &[Field]) -> bool {
+    #[cfg(verus_keep_ghost)]
+    proof! { reveal(schema_valid); }
     let mut index = 0usize;
     #[cfg_attr(verus_keep_ghost, verus_spec(
         invariant index <= fields.len(), spec::schema_prefix(fields@, index as nat),
@@ -356,6 +358,49 @@ pub closed spec fn projection(bytes: Seq<u8>, fields: Seq<Field>,
     -> (Result<Seq<i64>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
     spec::projection(bytes, fields, limits, used)
 }
+pub closed spec fn schema_valid(fields: Seq<Field>) -> bool {
+    spec::schema_valid(fields)
+}
+pub closed spec fn leaf_domain(leaf: Leaf) -> super::super::evaluation::Domain {
+    match leaf {
+        Leaf::Bool => super::super::evaluation::Domain::Bool,
+        Leaf::I128 { min, max } | Leaf::Enum { min, max, .. }
+        | Leaf::Sum { min, max, .. } => super::super::evaluation::Domain::Int { min, max },
+    }
+}
+pub(super) proof fn projected_is_typed(bytes: Seq<u8>, fields: Seq<Field>,
+    limits: Seq<u64>, used: Seq<u64>, values: Seq<i64>)
+    requires limits.len() == 8, used.len() == 8,
+        projection(bytes, fields, limits, used).0 == Ok(values),
+    ensures values.len() == fields.len(),
+        forall|i: int| 0 <= i < fields.len() ==>
+            super::super::evaluation::spec::contains(leaf_domain(fields[i].leaf), values[i]),
+{
+    reveal(projection);
+    spec::projection_is_typed(bytes, fields, limits, used, values);
+    assert forall|i: int| 0 <= i < fields.len() implies
+        super::super::evaluation::spec::contains(leaf_domain(fields[i].leaf), values[i]) by {
+        reveal(leaf_domain);
+        assert(spec::leaf_contains(fields[i].leaf, values[i]));
+    }
+}
+}
+
+#[cfg_attr(verus_keep_ghost, verus_spec(result =>
+    ensures result == leaf_domain(*leaf),
+))]
+pub(super) fn scalar_domain(leaf: &Leaf) -> super::super::evaluation::Domain {
+    #[cfg(verus_keep_ghost)]
+    proof! { reveal(leaf_domain); }
+    match leaf {
+        Leaf::Bool => super::super::evaluation::Domain::Bool,
+        Leaf::I128 { min, max } | Leaf::Enum { min, max, .. } | Leaf::Sum { min, max, .. } => {
+            super::super::evaluation::Domain::Int {
+                min: *min,
+                max: *max,
+            }
+        }
+    }
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result =>
@@ -476,7 +521,7 @@ pub(super) fn project_into(
     attempts: &mut Vec<AccessAttempt>,
 ) -> Result<(), Failure> {
     #[cfg(verus_keep_ghost)]
-    proof! { reveal(projection); }
+    proof! { reveal(projection); reveal(schema_valid); }
     output.clear();
     if !validate_schema(fields) {
         return Err(Failure::Schema);
@@ -533,4 +578,4 @@ pub fn project(bytes: &[u8], fields: &[Field], limits: super::Limits) -> Project
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

@@ -38,8 +38,8 @@ class MeteredCoverage(unittest.TestCase):
     def test_reviewed_inventory_and_mutation_anchors_are_complete(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         runtime = {name for name, record in profile["functions"].items() if record["mode"] == "Exec"}
-        self.assertEqual(len(profile["functions"]), 122)
-        self.assertEqual(len(runtime), 59)
+        self.assertEqual(len(profile["functions"]), 182)
+        self.assertEqual(len(runtime), 81)
         self.assertEqual(set(profile["body_covered_functions"]), runtime)
         self.assertTrue(all(record["requires"] == 0 and record["ensures"] > 0
                             for record in profile["functions"].values() if record["mode"] == "Exec"))
@@ -57,7 +57,7 @@ class MeteredCoverage(unittest.TestCase):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
         pin.update({key: profile[key] for key in ("expected_verified", "target_functions")})
         report = {"verus": {"commit": pin["commit"], "version": pin["version"]},
-                  "verification-results": {"success": True, "errors": 0, "verified": 98,
+                  "verification-results": {"success": True, "errors": 0, "verified": 145,
                     "encountered-error": False, "encountered-vir-error": False, "is-verifying-entire-crate": True},
                   "func-details": dict.fromkeys(pin["target_functions"], {})}
         self.assertTrue(verifier.accepted(report, pin))
@@ -72,7 +72,7 @@ class NativeMeteredExecution(unittest.TestCase):
             # The full gate already owns this name for its positive VIR logs.
             (Path(temporary) / "positive").mkdir()
             evidence = gate.native_checks(Path(temporary), pin, dict(os.environ))
-        self.assertIn("8 passed", evidence["test_output"])
+        self.assertIn("14 passed", evidence["test_output"])
         self.assertEqual(evidence["api_consumers"]["positive"]["exit_code"], 0)
         self.assertEqual(len(evidence["api_consumers"]), 5)
         self.assertTrue(all(record["exit_code"] != 0 for name, record in evidence["api_consumers"].items()
