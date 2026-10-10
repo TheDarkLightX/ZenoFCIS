@@ -1,6 +1,6 @@
 # V2 normal program API migration
 
-The [smaller V2 plan](V2_VERIFIED_CORE_PLAN.md) defines the supported scope.
+The [candidate record](RELEASE_CANDIDATES.md) defines the supported scope.
 Simplification is in progress; the current implementation and intermediate
 checks do not constitute final combined qualification or a released API.
 
@@ -122,7 +122,7 @@ The original `bounded_completion` main and every original check run as `oracle::
 
 Native Rust hosts execute the same checked closed scalar/record bodies exposed by `Program`. A Wasm library compilation uses those same bodies; it does not establish native/Wasm execution parity or a universal Rust/code-generation theorem. Arbitrary native code, legacy synthesis/compiler outputs, and newly generated application callbacks have no automatic bridge into authority. These direct reexports do not extend the supported scalar/record execution profile or shrink legal template domains.
 
-This umbrella adds no protocol enums. Handle existing `#[non_exhaustive]` enums, including `Resource`, with an unsupported/refused fallback for unfamiliar outcomes; never grant commit authority from that fallback. The [smaller V2 ledger](V2_LEDGER_SCOPE.md) withdraws the blanket protocol-enum migration. Final supported-route proof and release checks remain mandatory. Any additional optimized native/Wasm execution path needs its own qualification before becoming authoritative.
+This umbrella adds no protocol enums. Handle existing `#[non_exhaustive]` enums, including `Resource`, with an unsupported/refused fallback for unfamiliar outcomes; never grant commit authority from that fallback. The smaller V2 ledger withdraws the blanket protocol-enum migration. Final supported-route proof and release checks remain mandatory. Any additional optimized native/Wasm execution path needs its own qualification before becoming authoritative.
 
 Bootstrap generates `GeneratedProgramProposal` and pure `GeneratedDeclarations` helpers. Supply the complete original schema description/bytes, reviewed policy, execution descriptor and original frame/channel roots. `GeneratedProject::bind_program` checks exact generated catalog correspondence, then calls the same actual `v2_catalog::bind_original`/`v2_authority::bind` implementation selected by the root `Program` API. It cannot infer policy adequacy from catalog metadata. Typed adapters retain complete original envelopes; declaration and inert effect/channel helpers grant no publication capability.
 

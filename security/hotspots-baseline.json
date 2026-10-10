@@ -5175,16 +5175,16 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 7317017,
-    "admitted_files": 488,
-    "inventory_sha256": "8b2032fcb45d78e5275dc85ea929045829fff34d947e3d32b51705cd2f32d4cf",
-    "ranked_above_minimum": 417,
+    "admitted_bytes": 7322063,
+    "admitted_files": 490,
+    "inventory_sha256": "af910daaf891d4385cf35348ec0594e4abc1ddcb60e3d323515404f0fb41d9c9",
+    "ranked_above_minimum": 419,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 34,
-      "priority-2": 138,
-      "priority-3": 177,
+      "priority-2": 139,
+      "priority-3": 178,
       "priority-4": 40,
       "priority-5": 99
     }

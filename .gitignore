@@ -24,3 +24,12 @@ crates/zeno-fcis-generated-code-tests/python/
 
 # Local run records written by zeno-fcis inside a project; never source.
 .zeno-fcis/
+
+# Private working documents are kept outside public source.
+.private/
+/private-notes/
+/docs/research/
+/docs/evidence/
+/docs/neurosymbolic-loop/
+/docs/RESEARCH_STATUS.md
+/docs/zal/RESEARCH.md

@@ -2,7 +2,7 @@
 
 Assessment date: 2026-09-12. The source reviewed here is
 `dfdcc04c5f6d944f9c4395b6ec119ee3a5765e49`, together with the accompanying
-[parallel authorization change](PARALLEL_AUTHORIZATION_SORTING.md).
+parallel authorization change.
 The release identity remains `1.0.0-rc.3`. This is a dated assessment, not
 release approval or evidence that a later commit passed.
 

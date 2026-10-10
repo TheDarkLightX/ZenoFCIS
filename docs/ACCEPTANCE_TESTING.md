@@ -87,5 +87,4 @@ portfolio from the exact source revision.
 
 The benchmark smoke gate uses the development profile and Criterion's `--test`
 mode. It checks commitment parity and persistent-map test inputs across enabled
-backends; it does not qualify performance. See the
-[commitment optimization record](COMMITMENT_OPTIMIZATION.md) for timed runs.
+backends; it does not qualify performance.

@@ -55,7 +55,7 @@ V2.3 expands the [catalogue](../core-components/README.md) to ten families,
 77 declared instances and 107,518 raw inputs. Stored references are Identified;
 successful exhaustive replay supports Proved for the closed finite scope under
 the [named trusted base](../core-components/FINITE_PROOFS.md). Coupled applications
-and composition obligations remain work in the [V2.3 plan](V2_3_PLAN.md).
+and composition obligations remain work in the V2.3 plan.
 The retired crates do not supply a composed runtime or discharge those obligations.
 
 ## Tooling and mounted runtimes
@@ -84,12 +84,8 @@ The backend protocol can be implemented by public Lean, SMT/Z3, CVC5, Kani,
 Flux, or other adapters. Users with private ESSO access can implement it in a
 private crate. No backend decides release or commit authority by itself.
 
-Crucible is a separate experimental repository. Native FCIS integration,
-multi-profile search and a reusable proof registry remain planned. The
-[research status](RESEARCH_STATUS.md) distinguishes its public increment from
-private Library composition, receipt, resource and diagnostic experiments.
-Those follow-on results are not included in the candidate binaries; the private
-packets were not independently replayed for this documentation update.
+Checked transform and optimization commands operate within their declared finite
+domains. Search proposals do not grant publication authority.
 
 ## Reference data structures and shells
 

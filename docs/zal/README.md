@@ -7,7 +7,7 @@ the browser is optional. Built-in help, translation and input-specific
 explanations work locally without an LLM. This is not a released ZenoFCIS API.
 
 Read the [specification](SPECIFICATION.md), [exact grammar](GRAMMAR.md),
-[research and provenance](RESEARCH.md), and [factory source map](../ZAL_SOURCE_MAP.md).
+and [factory source map](../ZAL_SOURCE_MAP.md).
 Commands below run from the repository root. Python 3.11+ and a POSIX system
 are required for the terminal/shared-file path (`fcntl` advisory locking).
 The Python runtime uses only the standard library. Factory qualification also
@@ -323,7 +323,7 @@ events into your stock Codex CLI session. It uses stdio, an ephemeral read-only
 thread, structured final output and exact turn IDs, and refuses execution
 approval requests. Actual permitted read-only tools must still be observed;
 an instruction to avoid tools is not a physical isolation guarantee.
-Live use is separate from default offline checks. See [evidence distinctions](RESEARCH.md#integration-evidence-and-open-work).
+Live use is separate from default offline checks. See evidence distinctions.
 
 ## File-level export and actual factory qualification
 

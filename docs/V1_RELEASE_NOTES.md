@@ -72,8 +72,7 @@ Canonical decoding, commitment hashing, finite evaluation, outbox encoding,
 and parallel-authorization ordering avoid redundant traversal or allocation.
 Retained differential and mutation checks cover the changed behavior.
 Measurements are workload-specific; the release makes no universal speedup,
-constant-time, SIMD, or hardware qualification claim. See
-[design improvements](DESIGN_IMPROVEMENTS.md) for the evidence and limits.
+constant-time, SIMD, or hardware qualification claim.
 
 ## Compatibility
 
@@ -104,5 +103,4 @@ Stable Cargo APIs do not establish a mechanized end-to-end theorem for every
 project, production deployment qualification, or an independent security
 audit. See the [product contract](V1_PRODUCT_CONTRACT.md),
 [security policy](../SECURITY.md), [release assurance](RELEASE_ASSURANCE.md),
-and [release checklist](V1_RELEASE_CHECKLIST.md), and
-[implementation review](V1_REVIEW.md).
+and [release checklist](V1_RELEASE_CHECKLIST.md).

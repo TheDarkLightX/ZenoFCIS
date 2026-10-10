@@ -4,8 +4,8 @@ ZenoFCIS separates protocol meaning from runtime mechanism.
 
 It intends to become a **state of the art high assurance software factory**.
 A formally verified functional core is the architectural foundation; the
-[2.1 roadmap](V2_1_FACTORY_PLAN.md) adds tooling for reviewing meaning, reusing
-verified components and maintaining applications through change.
+public CLI provides tooling for reviewing declared meaning, checking finite
+transformations and maintaining applications through checked upgrades.
 
 ## Formally verified functional core
 
@@ -44,9 +44,8 @@ Each claim binds an implementation, specification, domain and named trusted
 base. Specification adequacy, external fact authentication, persistence and
 delivery retain their own review and qualification obligations.
 
-V2 remains under construction. The
-[implementation and proof plan](V2_VERIFIED_CORE_PLAN.md) tracks the bounded
-verified units, open bridges and release gates. The dependency rings below
+The [candidate assurance scope](RELEASE_CANDIDATES.md) identifies the supported
+verified units and remaining qualification limits. The dependency rings below
 describe the existing library; their presence alone does not establish the
 completed V2 guarantee.
 

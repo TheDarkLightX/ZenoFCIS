@@ -27,7 +27,6 @@
 23. [Packaging](PACKAGING.md)
 24. [Release assurance](RELEASE_ASSURANCE.md)
 25. [RC3 readiness review](RC3_READINESS_REVIEW.md)
-26. [V1 polish review and remaining gates](V1_POLISH_REVIEW.md)
 27. [LLM cybersecurity review orchestrator](LLM_CYBERSECURITY_REVIEW.md)
 28. [Security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
 29. [Security hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
@@ -64,7 +63,6 @@
 - [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md)
 - [Policy-bound genesis authorization](GENESIS_AUTHORIZATION.md)
 - [Candidate and commit boundary](CANDIDATE_COMMIT_BOUNDARY.md)
-- [Commitment allocation optimization](COMMITMENT_OPTIMIZATION.md)
 - [Owned footprint sealing](OWNED_FOOTPRINT_SEALING.md)
 
 ## Formal tools and runtime refinement
@@ -77,12 +75,6 @@
 - [Law path resolution](LAW_PATH_RESOLUTION.md)
 - [Kernel law harnesses](KERNEL_LAW_HARNESSES.md)
 - [Shared-source Verus verification](../verification/verus/README.md)
-- [Lessons from Verus](VERUS_LESSONS_AND_V2_PLAN.md)
-- [V2 implementation and core verification plan](V2_VERIFIED_CORE_PLAN.md)
-- [2.1 and 2.2 plan](V2_1_V2_2_PLAN.md), the plan of record; the
-  [earlier 2.1 roadmap](V2_1_FACTORY_PLAN.md) keeps its design notes
-- [V2.3 roadmap and Zeno Core Standard Library](V2_3_PLAN.md), a proposed
-  follow-on scope with explicit evidence and composition obligations
 - [System properties of finite transitions](SYSTEM_PROPERTIES.md)
 - [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md)
 - [Deterministic synthesis](DETERMINISTIC_SYNTHESIS.md)
@@ -125,6 +117,8 @@ and other tools can use the same public boundaries.
 - [Strict canonical plan decoders](STRICT_CANONICAL_PLAN_DECODERS.md)
 - [Correct-by-construction map entries](CORRECT_BY_CONSTRUCTION_MAP_ENTRIES.md)
 
+- [Public documentation policy](PUBLICATION_POLICY.md)
+
 ## Design records
 
 - [Design record index](adr/README.md)
@@ -132,7 +126,6 @@ and other tools can use the same public boundaries.
 - [0002: Principles for the V2 assurance program](adr/0002-principles.md)
 - [0003: Epistemic status of evidence and witnesses](adr/0003-epistemic-status.md)
 - [0004: V2 ledger of deferred breaking changes](adr/0004-v2-ledger.md)
-- [zUSD lane expressiveness with V1 representations](ZUSD_LANE_EXPRESSIVENESS.md)
 
 ## Status
 
@@ -142,7 +135,6 @@ claim general deployment qualification, a bundled concurrent runtime, or an
 end-to-end proof for arbitrary downstream projects. Historical
 [RC3 notes](RC3_RELEASE_NOTES.md) describe the earlier published candidate.
 
-- [V1 implementation and release review](V1_REVIEW.md)
 
 - [V1.1 release notes](V1_1_RELEASE_NOTES.md)
 - [V1.1 release checklist](V1_1_RELEASE_CHECKLIST.md)

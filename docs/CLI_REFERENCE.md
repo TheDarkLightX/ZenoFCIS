@@ -300,8 +300,8 @@ Formal commands apply the exit classes to each backend result:
 | Tool crashes, times out, exceeds a bound, or encounters a filesystem failure | 3 | 3 | The bounded execution failed. |
 
 The retained `KernelChecked` evidence type does not provide a public Lean
-exporter. Restoring a checked symbolic route is explicit planned work; see the
-[V2.3 roadmap](V2_3_PLAN.md). The existing solver path remains attested unless
+exporter. A checked public symbolic route remains unfinished; see the
+[candidate assurance scope](RELEASE_CANDIDATES.md). The existing solver path remains attested unless
 the required independent proof checking and translation obligations are met.
 
 ## Finite synthesis
@@ -602,7 +602,7 @@ recorded hand candidate has 60) and an 88-node current decision graph (from
 Over the 32 seeds of `docs/benchmarks/cases.json` the outputs total 58
 instructions on the Boolean seeds and 45 on the integer seeds (an unimproved
 seed counts at its own size), and over the
-[published 100-case corpus](benchmarks/published-corpus/README.md)
+published 100-case corpus
 (calibration only) 508 instructions; under `functional-bool-v1` every Boolean
 seed and corpus output passes the profile's gate with the same totals.
 [`docs/benchmarks/measure_optimizer.py`](benchmarks/measure_optimizer.py)
@@ -621,8 +621,7 @@ does not perform.
 
 ## Bounded optimization loop
 
-`zeno-fcis loop` runs the bounded adaptive loop specified in
-[docs/neurosymbolic-loop](neurosymbolic-loop/README.md): a proposer suggests
+`zeno-fcis loop` runs a bounded adaptive loop: a proposer suggests
 complete candidate programs and `transform check` judges every one against the
 admitted original on its whole declared input domain. The loop keeps an
 incumbent that is either the original, with no receipt, or a checked

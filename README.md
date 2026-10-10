@@ -14,24 +14,22 @@ verified functional core**, with durable effects and evidence agents can maintai
 
 ## Available release candidates
 
-As of 10 October 2026, signed **[2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)**
+As of 10 October 2026, **[2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)**
 and **[2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-rc.1)**
-are public. Each supplies a Linux x86_64 GNU CLI, matching source, crate archives,
-Rustdoc and qualification manifests. Follow the [installation guide](docs/INSTALLATION.md)
+are public. Each supplies a Linux x86_64 GNU CLI, Rustdoc and qualification manifests.
+Source bundles containing internal documents have been withdrawn; GitHub
+provides a curated source tree with unchanged runtime code. Follow the
+[installation guide](docs/INSTALLATION.md)
 for direct downloads and the [candidate record](docs/RELEASE_CANDIDATES.md) for
 exact source pins, signed checksums and qualification limits.
 
 These prereleases deliver the current supported subset. Full stable V2.2/V2.3
 scope remains unfinished. The V2.3 catalogue contains ten reusable core families,
 77 declared instances and 107,518 raw inputs with explicitly finite evidence;
-the six coupled applications and stronger symbolic proof path remain work in the
-[V2.3 plan](docs/V2_3_PLAN.md). Use the matching candidate tag for its binaries
+broader application composition and symbolic proof work remain unfinished.
+See the [candidate assurance scope](docs/RELEASE_CANDIDATES.md). Use the matching
+candidate tag for its binaries
 and APIs: `main` still declares Cargo version `1.1.0` and is a different source.
-
-The [research status](docs/RESEARCH_STATUS.md) records separate Crucible experiments
-and private Library follow-on results. Those experiments are not included in
-these binaries, and the private packets were not independently replayed for
-this documentation update. Native Crucible integration remains pending.
 
 **V2's central assurance goal is a formally verified functional core.**
 
@@ -86,42 +84,16 @@ obligations in the imperative shell.
 
 **Current status:** the public candidates include the supported checked program
 and mandatory authority route, with source-bound implementation and finite
-application evidence. The [V2 implementation and proof plan](docs/V2_VERIFIED_CORE_PLAN.md)
-and [candidate record](docs/RELEASE_CANDIDATES.md) identify the checked scope and
+application evidence. The [candidate record](docs/RELEASE_CANDIDATES.md)
+identifies the checked scope and
 trusted assumptions. Broader stable-release obligations remain open. These
 results do not establish a formal guarantee for arbitrary functional cores or
 an application's complete shell and external environment.
 
-The [factory feature plan](docs/V2_1_V2_2_PLAN.md) records contracts and acceptance
-for generation, specification review, optimization, checked adoption and upgrades,
-the bounded neurosymbolic proposal/check/feedback loop, and agent-maintenance
-benchmarks. The [earlier factory roadmap](docs/V2_1_FACTORY_PLAN.md) retains its
-design notes. Available tools and remaining stable work are distinguished in
-the candidate record. The factory description states our intended destination;
-comparative leadership remains a claim to demonstrate.
-
-The [ZAL addon for coding harnesses](docs/zal/HARNESS_INTEGRATION.md) is an
-additive 2.3 track: Codex and Claude Code can inspect, compare and propose precise
-finite application behavior through MCP and a shared skill. Separate human review
-and revision-bound exports connect authoring to the existing factory route.
-ZAL's Python checks and cooperative review remain distinct from verified Rust
-execution and authenticated approval.
-
-Two reusable [proof and specification review skills](docs/LLM_SYNTHESIS.md#proof-and-specification-review)
-help agents keep formal obligations fixed and challenge guarantees that could
-hold without useful behavior. The [frozen proof pilot](experiments/proof-challenge/README.md)
-demonstrates these checks on a small Lean model; it is separate from Rust
-execution qualification.
-
-The [neurosymbolic loop design](docs/neurosymbolic-loop/DESIGN.md) and
-[implementation specifications](docs/neurosymbolic-loop/specs/INDEX.md) describe
-how proposals, checker feedback and revisions form a bounded process under a
-fixed contract. Human review governs changes to the intended behavior.
-
-The [draft paper](docs/neurosymbolic-loop/paper.md), authored by Dana Edwards,
-explains the factory architecture and the proposed loop. The
-[implementation handoff](docs/neurosymbolic-loop/CLAUDE_HANDOFF.md) gives
-continuation agents the contracts, delivery order and qualification gates.
+Supported generation, specification review, finite optimization, checked
+adoption and upgrade commands are described in the [CLI reference](docs/CLI_REFERENCE.md).
+The factory description states our intended destination; comparative leadership
+remains a claim to demonstrate.
 
 ## Why functional core, imperative shell
 
@@ -306,8 +278,8 @@ The root/prelude cutover is intentionally breaking on this V2 development branch
 Native transition callbacks, public candidate sealing and caller-supplied
 usage have been retired. `zeno_fcis::legacy` retains inert compatibility data
 and standalone evidence utilities; historical authoring algorithms are in a
-private verification oracle. See the [scope ledger](docs/V2_LEDGER_SCOPE.md)
-for retained obligations and the separate release track.
+private verification oracle. See the [API migration guide](docs/V2_PROGRAM_API_MIGRATION.md)
+for the supported invocation and publication boundaries.
 
 Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
@@ -347,8 +319,8 @@ executable code against mathematical contracts. The smaller V2 qualification
 covers admission, original-byte interpretation, scalar execution, complete
 decisions, laws/genesis and mandatory authority/replay. Per-stage proof runs
 are provisional; final source-bound profiles, controls and integration checks
-must pass together. See the [V2 plan](docs/V2_VERIFIED_CORE_PLAN.md) for the exact
-scope and [Verus lessons](docs/VERUS_LESSONS_AND_V2_PLAN.md) for its background.
+must pass together. See [release assurance](docs/RELEASE_ASSURANCE.md) and the
+[candidate record](docs/RELEASE_CANDIDATES.md) for scope and qualification limits.
 
 ## Example applications
 
@@ -546,7 +518,7 @@ The guarantee depends on four things:
 - **The checker must be correct.** The V1 end-to-end synthesis path trusts its
   interpreter and enumeration. The V2 route has source-bound executable
   interpreter, admission, decision and authority evidence with the scope and
-  trusted assumptions recorded in the [full-core plan](docs/V2_VERIFIED_CORE_PLAN.md).
+  trusted assumptions recorded in the [candidate assurance scope](docs/RELEASE_CANDIDATES.md).
 - **The code around the program needs its own check.** In the durable-counter
   template, `tests/conformance.rs` runs all 64 admitted inputs through the real
   application: admission, the authority, the adapter that turns outputs into
@@ -589,17 +561,11 @@ subjects but reconstructs the complete authority subject for replay; compact
 bytes alone are not publication authority. See the
 [API migration guide](docs/V2_PROGRAM_API_MIGRATION.md).
 
-The [factory feature plan](docs/V2_1_V2_2_PLAN.md) retains the separately qualified
-compound-value profile and full-width U128 zUSD obligations alongside specification
-review, reusable components and upgrade support. The earlier 17-case ZenoDEX
-mount is historical bounded parity evidence. It does not qualify that future
-profile; the removed native mount runner is not the current application route.
-
 Existing package names and optional compatibility data do not enlarge the
-supported V2 execution scope. The [32-entry ledger](docs/V2_LEDGER_SCOPE.md)
-records which obligations remain required and which broader requirements were
-withdrawn. QEMU, packaging, private historical-oracle transport and version
-cutover have a separate release track.
+supported V2 execution scope. Historical mounted comparisons do not qualify
+wider compound-value execution. Consult the
+[candidate assurance scope](docs/RELEASE_CANDIDATES.md) and the API migration guide
+before choosing an execution profile.
 
 ## Verification
 

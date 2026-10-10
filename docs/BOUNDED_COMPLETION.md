@@ -22,8 +22,8 @@ invalid-item diagnostics identify the input position without printing its conten
 
 The original example is kept as a private regression test in
 [`bounded_completion.rs`](../verification/kernel-laws/src/oracle/tests/bounded_completion.rs).
-The V2 checked replacement is described in
-[V2_CHECKED_CONTINUATION_STAGE.md](V2_CHECKED_CONTINUATION_STAGE.md).
+The V2 checked replacement is exposed through `finite::v2_continuation`; see
+the [API migration guide](V2_PROGRAM_API_MIGRATION.md).
 No new plugin, language-specific callback, solver installation, or Lean upgrade
 is needed. Existing finite-IR language emitters remain applicable to the step
 programs; a native application still needs its normal target-conformance gate.

@@ -51,8 +51,8 @@ private library publication.
 
 Historical guides below describe earlier protocols and assurance work. They
 are not instructions to restore removed callback authority or authenticated
-commit constructors. The [scope ledger](V2_LEDGER_SCOPE.md) and
-[migration guide](V2_PROGRAM_API_MIGRATION.md) govern the smaller V2 route.
+commit constructors. The [migration guide](V2_PROGRAM_API_MIGRATION.md)
+describes the supported V2 route.
 
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
 the [crate map](CRATE_MAP.md) and generated rustdoc for exact signatures.
@@ -84,5 +84,5 @@ strict plan reauthorization, and nominal authenticated publication.
 This development branch intentionally changes the 1.1.0 execution API. It has
 not been released as V2. Protocol identifiers remain versioned; SQLite schema
 9 refuses older stores rather than silently migrating them. Final application,
-proof, CI and release checks remain open as recorded in the
-[V2 plan](V2_VERIFIED_CORE_PLAN.md).
+proof, CI and release checks have the limits stated in the
+[candidate record](RELEASE_CANDIDATES.md).

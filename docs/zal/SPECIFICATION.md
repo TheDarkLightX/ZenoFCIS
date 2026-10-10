@@ -19,8 +19,7 @@ parsing defines the candidate meaning. An LLM cannot resolve ambiguity silently.
 
 The design follows controlled-language work on explicit interpretation and
 canonical paraphrase, atomic transition-system modeling, finite counterexample
-search and human review. [RESEARCH.md](RESEARCH.md) records primary sources,
-design inferences, limits and the two provided prototype packages. No study has
+search and human review. No study has
 established that ZAL improves comprehension or synthesis quality.
 
 ## One model, two surfaces
@@ -352,11 +351,8 @@ review. Hierarchical/concurrent state machines need an independently defined
 step/event scheduling semantics. Integer arithmetic must preserve actual widths,
 eager evaluation, traps and inactive-expression behavior before any lowering.
 
-The two provided broader reference packages remain distinct designs (checked
-i64 state/command inputs, failure/effect data and a RetryGate example). Their
-syntax, evaluation strategy and captured check reports are not silently merged
-with this Boolean control-FSM profile. Their visual patterns are reused with
-provenance in [RESEARCH.md](RESEARCH.md).
+This specification covers the Boolean control-FSM profile; it does not qualify
+a wider checked-integer application language.
 
 A future 2.3 gate should qualify profiles and lowering on actual source, add
 revision-bound evidence replay and test human comprehension against canonical

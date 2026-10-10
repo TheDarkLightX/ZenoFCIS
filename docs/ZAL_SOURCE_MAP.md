@@ -86,8 +86,8 @@ passes consistency while the semantic diff exposes unauthorized approval under
 the supplied false authorization observation. Effects,
 fairness/liveness, arithmetic and concurrency can be retained as unsupported
 obligations; wider executable semantics are refused. The
-[grammar](zal/GRAMMAR.md), [specification](zal/SPECIFICATION.md) and
-[research/provenance](zal/RESEARCH.md) now describe this implemented cut.
+[grammar](zal/GRAMMAR.md) and [specification](zal/SPECIFICATION.md)
+describe this implemented scope.
 
 `factory.py` lowers to `project.zeno`, `v2/policy.json`, a feasible
 `tests/decision-examples.txt` journey, a whole-domain reference table, source

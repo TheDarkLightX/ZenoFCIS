@@ -37,8 +37,8 @@ claim as unprovable would confuse those two quantifiers.
 Likewise, a theorem about all possible future reinterpretations does not stop
 us proving an integer reader or a complete declared decision relation. It does
 not justify leaving application-owned functions or composition bridges
-unchecked. V2 retains the full-core completion requirements in
-[the implementation plan](V2_VERIFIED_CORE_PLAN.md).
+unchecked. See the [candidate assurance scope](RELEASE_CANDIDATES.md) for the
+currently supported decision path and its limits.
 
 ## Changes to our assurance practice
 

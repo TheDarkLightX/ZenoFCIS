@@ -63,3 +63,9 @@ when preparing a new version for release, including release candidates. Bind
 that result to the exact release source and retain the other applicable release
 gates. This policy supersedes older per-commit full-suite instructions in plans
 and handoffs; it does not waive proof obligations for changed semantics.
+
+Before publishing documentation, follow `docs/PUBLICATION_POLICY.md`. Curate
+for library users and check the full contents and attachments. Private research,
+project details, Library records and agent coordination stay outside GitHub.
+Run `python3 tools/check_public_docs.py` and the relevant link/privacy checks;
+adding a file to the public document list requires a content review.

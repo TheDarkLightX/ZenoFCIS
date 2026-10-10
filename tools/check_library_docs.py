@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import tomllib
@@ -269,6 +270,8 @@ def main() -> int:
     check_release_markers(failures)
     check_security_json(failures)
     check_markdown_links(failures)
+    if subprocess.run(["python3", str(ROOT / "tools/check_public_docs.py")], cwd=ROOT).returncode:
+        failures.append("public documentation curation check failed")
     if failures:
         for failure in failures:
             print(f"library-docs: FAIL: {failure}")

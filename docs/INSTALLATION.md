@@ -1,9 +1,10 @@
 # Installation
 
-Public signed `2.2.0-rc.1` and `2.3.0-rc.1` candidates are available for the
-**Linux x86_64 GNU CLI**. They are prereleases with matching source, crate
-archives, Rustdoc and manifests. See [release candidates](RELEASE_CANDIDATES.md)
-for the exact source pins, signed checksum assets and qualification limits.
+Public `2.2.0-rc.1` and `2.3.0-rc.1` candidates are available for the
+**Linux x86_64 GNU CLI**. They are prereleases with unchanged binaries, Rustdoc and manifests.
+Internal source bundles have been withdrawn. Curated Git tags retain the
+runtime code but have new commit IDs and no original tag signature. See [release candidates](RELEASE_CANDIDATES.md)
+for the exact source pins, original signed checksum assets and qualification limits.
 Stable V2.2/V2.3 scope remains unfinished; macOS/Windows binaries and candidate
 crates.io publication are not claimed. Rust `1.97.1` is the supported toolchain
 for building the matching source and generated applications.
@@ -62,7 +63,7 @@ For V2.3, clone into a fresh directory:
 ```bash
 git clone --branch v2.3.0-rc.1 --depth 1 https://github.com/TheDarkLightX/ZenoFCIS.git ZenoFCIS
 git -C ZenoFCIS rev-parse HEAD
-# Expected: dd04cbcb3f7d8694de5f79bc1280b9252fdd147b
+# Expected: cb813cca3ddc4a4129c26f09f0d53e4052893c06
 zeno-fcis new my-counter --template durable-counter --source "$PWD/ZenoFCIS"
 ```
 
@@ -70,8 +71,8 @@ The installed CLI records no build-directory location, so `new` needs an
 explicit `--source`. Its generated application binds dependencies and the
 lockfile to that tree; retain the source and follow the generated README.
 For V2.2, use tag `v2.2.0-rc.1` and expected source
-`c94c962f4d223f76dbc9ba9cb332cffd4b25436b` instead. Matching source tarballs are
-also linked from the candidate record.
+`66e8e05180e0883e570e5459a5dc94f99d8e0d9b` instead. These are the curated Git revisions, not the historical binary build
+revisions in the retained manifests. Runtime files are unchanged.
 
 An application beside that V2.3 source checkout can use:
 
@@ -127,8 +128,8 @@ git checkout v1.1.0
 cargo +1.97.1 test --workspace --all-features --locked
 ```
 
-The signed release tag identifies the source used to build the published
-packages. See the [release notes](V1_RELEASE_NOTES.md) for compatibility and
+Original artifact manifests identify the source used to build the published
+packages; documentation-curated tags have new Git identities. See the [release notes](V1_RELEASE_NOTES.md) for compatibility and
 assurance boundaries.
 
 ## Optional coding-agent guardrails
@@ -157,8 +158,7 @@ zeno-fcis check project.zeno
 
 V1's `mount-zenodex-zusd` diagnostic parity tool is not shipped in V2. Its
 pinned assertions remain in the private kernel-law oracle. The checked
-full-width zUSD profile retains its qualification obligations in the
-[factory feature plan](V2_1_V2_2_PLAN.md).
+full-width zUSD profile is not qualified by the supported scalar route.
 
 ## Bundle verification
 
