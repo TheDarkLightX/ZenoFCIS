@@ -61,6 +61,7 @@ bounded refinement evidence.
 | Feature | Environment | Class | Enables |
 |---|---|---|---|
 | `evidence` | Host `std` through umbrella | Formal evidence | Canonical evidence import and promotion gates |
+| `diagnostics` | `no_std + alloc` | Diagnostic evidence | Canonical trace partitions, exact recovery words, and globally minimal divergence or bad-prefix witnesses |
 | `synthesis` | `no_std + alloc` | Formal/search kernel | Complete-within-bounds canonical candidate enumeration |
 | `backend` | `no_std + alloc` protocol | Formal adapter | Synthesis plus checked engine/verifier requests, responses, and certificates |
 
