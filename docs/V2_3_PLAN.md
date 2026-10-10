@@ -186,9 +186,11 @@ depth, the agent maintenance study, macOS packaging, and minor authoring fixes.
 Any actual deferral must be recorded explicitly rather than implied by this draft.
 
 Every implementation stage uses the current acceptance, proof, native, package,
-source-identity, independent-review, and hosted-CI gates. Run the full acceptance
-suite immediately before committing. No catalog size or marketing phrase replaces
-these gates.
+source-identity, independent-review, and hosted-CI gates as applicable to the
+change. Follow [AGENTS.md](../AGENTS.md) for focused validation of ordinary
+commits. The full acceptance suite is required on the exact source when preparing
+a new version for release, including release candidates. No catalog size or
+marketing phrase replaces these gates.
 
 Companion design inputs, completed without implementation or fresh formal runs:
 

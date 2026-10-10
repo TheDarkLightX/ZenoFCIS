@@ -21,8 +21,9 @@ current checker evidence and a supported profile. Export verification binds
    every generated declaration and detects changes or stale review. The actual
    factory remains the execution/qualification route.
 
-Run focused Python, MCP, UI and oracle checks first. Run the complete registered
-ATDD suite immediately before a commit, on the final source. Independent review
+Run focused Python, MCP, UI and oracle checks for affected changes. Run the
+complete registered ATDD suite when preparing a new version for release,
+including release candidates, on the exact source (see [AGENTS.md](../../AGENTS.md)). Independent review
 and hosted checks qualify publication separately. Current Codex/Claude sessions
 must reload their configuration before the new tool catalog is visible.
 
