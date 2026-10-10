@@ -2,6 +2,11 @@
 
 **A neurosymbolic software factory for high assurance FCIS applications.**
 
+This source packages **2.3.0-rc.1**, a release candidate for the current checked
+application path. See [release notes](docs/RELEASE_NOTES.md) and
+[installation](docs/INSTALLATION.md). The original stable V2.2/V2.3 scope
+remains open; the candidate does not mark those milestones complete.
+
 ZenoFCIS combines LLM-assisted authoring with symbolic checking in a Rust
 library family for functional-core / imperative-shell systems. LLMs propose
 specifications and programs; deterministic checkers decide whether supported
@@ -254,8 +259,8 @@ published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
 ## Start here
 
 The normal V2 library route declares a complete checked program. It is available
-in this development checkout with default features and with
-`default-features = false`. Use the reviewed checkout; the published `1.1.0`
+in this candidate with default features and with
+`default-features = false`. Use the pinned candidate source; the published `1.1.0`
 package does not supply this breaking V2 API:
 
 ```toml
@@ -609,7 +614,7 @@ binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 
 ## Assurance posture
 
-V2 remains under construction. Its intended claim is executable conformance to
+The original stable V2 milestones remain under construction. The intended claim is executable conformance to
 a reviewed contract across the supported domain, under named trusted
 assumptions. It is not a proof that the requirements match human intent, that
 external observations are true, or that a destination performs an effect
@@ -618,7 +623,8 @@ correctly. A passing stage check is not a release receipt.
 The existing `1.1.0` release and its [release notes](docs/V1_1_RELEASE_NOTES.md)
 have their own historical scope. This development branch changes the public
 execution API. Source qualification, exact-head CI, packaging, owner signing
-and publication remain distinct steps; this README announces no V2 release.
+and publication remain distinct steps. This source packages a release candidate,
+whose exact-source checks and available assets are recorded by its prerelease.
 
 ## License
 

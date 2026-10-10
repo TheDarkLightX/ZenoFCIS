@@ -4,7 +4,16 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
-## Unreleased
+## 2.3.0-rc.1
+
+This candidate packages the available checked application path and the ten
+closed finite component families. It does not complete the original stable
+V2.2/V2.3 scope. Cargo/internal dependency versions and npm root metadata are
+coherent; external dependency identities are unchanged. Evaluator identities
+and finite runtime bindings are refreshed for the candidate source. See
+[release notes](docs/RELEASE_NOTES.md) for installation and assurance limits.
+
+## Changes included in the candidate
 
 - Migration admission now checks freshly compiled target claims on the mapped
   current state and rechecks them during history replay. Records with claims

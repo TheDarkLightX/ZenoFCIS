@@ -1,5 +1,9 @@
 # `.zeno` language version 1
 
+This guide is included in the `2.3.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 This is the implemented language contract for ZenoFCIS `1.1.0`.
 `ZENO_DSL_VERSION`, `PROJECT_SPEC_FORMAT_VERSION`, and
 `TEMPORAL_SPEC_FORMAT_VERSION` are all `1`.

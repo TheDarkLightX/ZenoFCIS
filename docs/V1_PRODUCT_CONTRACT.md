@@ -1,5 +1,9 @@
 # ZenoFCIS V1 product contract
 
+This guide is included in the `2.3.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 This document defines the stable reusable core-library scope for the V1 family, currently `1.1.0`. It
 is the product-level complement to the protocol and authority documents. Each
 feature supports an adopter journey below with an explicit assurance boundary.

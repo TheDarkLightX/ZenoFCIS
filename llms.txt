@@ -3,8 +3,8 @@
 ZenoFCIS is a Rust library family for high-assurance functional-core /
 imperative-shell systems.
 
-Current workspace version: 1.1.0
-Current status: stable Cargo API 1.1.0; downstream deployment qualification
+Current workspace version: 2.3.0-rc.1
+Current status: release candidate; original stable V2.2/V2.3 scope is unfinished; downstream deployment qualification
 remains project specific
 Rust toolchain: 1.97.1 for repository validation
 

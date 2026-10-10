@@ -1,14 +1,14 @@
 {
   "authority": "none",
-  "cli_sha256": "e2e569f5c8f2affe82360280f47ee26a67984291df7f7b895d42a611e6ce3366",
+  "cli_sha256": "8d0b9d99d39b0b29c7e6070f5243d1a7615eb2a01124e0ace2b3f4a310b83f62",
   "evidence": "complete-finite-execution",
   "family_theorem": null,
   "independent_reference_sha256": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868",
   "instances": [
     {
-      "app_tests_sha256": "ddca8d091f67ca1d78bb42258b779252834968245aeed7430455a16c70e8cdfa",
+      "app_tests_sha256": "a133f9819f909f82011fff280aa22819db10bc1a8d95faf8a6658b4f5029b033",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -32,7 +32,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "8f9cdbae6892347c9982e7a4737f1f555077a9bc4955152c3e46800ff8f22bc5",
+      "consumer_lock_sha256": "5ddb61bb26b8a520ce8d4ec44c6619e1dff4d081e8c2bbb8b31a62209f433843",
       "generated_sha256": {
         "src/v2_contract.rs": "72d0dc626cea70c7ee4ba03b7d78b061c66ac7dae80086a46f5d5a9e721a4ee8",
         "v2/policy.zcve": "71d424db3e20fc724c3013a0a5ff627021979a177e8afa7befe3f29418f039f1",
@@ -109,12 +109,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "778949f6cac061197f135263042cd753b2dcb90807e4f5cfc77ea25e6519521c"
+      "review_sha256": "a23a27a04ba5c3db9f76fa0c966e4ed60afe43b04145b3593c29965b3e68f5f5"
     },
     {
-      "app_tests_sha256": "a2213fc8a1684d09b98a337a2fc96e6bbb4845563cfdf9581c565a5d068d9171",
+      "app_tests_sha256": "81d6295a1bab88d3dd37ac71a63e274ad0148750afe7605ce1da2c27934612a2",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -138,7 +138,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "37b02e5af4fb4a7b1d3f3c2b6e56cf83380fd9031163b24ca6fb9b43f94c576f",
+      "consumer_lock_sha256": "f05319bccacb06cf26fa8c55be9d686babb295c5b406b02266121214bf21d5d7",
       "generated_sha256": {
         "src/v2_contract.rs": "e9d9c6230b98dcb5072febe9b787106cccd9ce6c728d67f36be012bae5c573ad",
         "v2/policy.zcve": "1915ccea87c451b0dbdae544453e0a52299ac4a7623c1d8637ef6ad990c2573f",
@@ -217,12 +217,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "c1d9cbd94ca8fe0aa17819000e54bf6b9b9e692d3aa5de7685f00534f50fa173"
+      "review_sha256": "399ff14c7eca2d6e5916d3747b933825871a289c1e90d14d8b917a3451382b58"
     },
     {
-      "app_tests_sha256": "274a4d636306782622cd9eaa9287a1e2746299505b9c3d41364efd534a5b8915",
+      "app_tests_sha256": "739f4149b89afe86eaee555c8f266f7ae7ed2a5003a8dfd19b9132fd51245dc1",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -246,7 +246,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "f3e11cb1211bbf45a9ee1b0a88f64bcc34c8176cd0fce3ea0dfe8406c6328e86",
+      "consumer_lock_sha256": "647301cdef6864042af99ef9b1242deebd714e1e00ab3f0125e0567e69079120",
       "generated_sha256": {
         "src/v2_contract.rs": "e863c5381b8ec6d07afd9a3ff0bd1d9918f7d05fd75f68cb357680bce93f27fe",
         "v2/policy.zcve": "9577fcc3bb3a81ef909c7dc6b758234051653fe3f64435854754214ef87470eb",
@@ -326,12 +326,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "67cc71116479ec592cbacedd350cb121d88dc2c2c3c6e70637d8c5f32183eecf"
+      "review_sha256": "b381a67a234c82253976462cd15f181afb459a8178073550983d6bacbb51867c"
     },
     {
-      "app_tests_sha256": "2de3cd55dcca947efe3c63b41a7d11f4d230bc09edb4cf40758734067f19e32e",
+      "app_tests_sha256": "605178efb85c03ffe10c9680e7df86d5c71655033cb6909d84e292c6d49eebad",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -355,7 +355,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "769656d651f388b3efea361684da2721e8b2d693d37089361632cf4251ecabe6",
+      "consumer_lock_sha256": "06568a5720d772cd7e99d0b497f32f49c272c7874d6f048869d1f1a66a5485e2",
       "generated_sha256": {
         "src/v2_contract.rs": "269dee2d1419a49f5fe5d8361c4b50c9e8e1e35e832c83b8a2fc44800d450984",
         "v2/policy.zcve": "b5601a8f5981d61fbf7543b19c5605ed89b250feead4f03046b3e6f7d88b5738",
@@ -436,12 +436,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "fe44a24c1eb8401a4e461c591b4f3ee64c834c88fd3d9e1ac727fdd99ed52c00"
+      "review_sha256": "28add34b4292218a75fdcfc60d7e0abea04f8a2d8b72887bf21ab22fc0777ef7"
     },
     {
-      "app_tests_sha256": "4df53cbc89f80bfa0dd4450d464a5b21389faa190000623c6bde730c569b338d",
+      "app_tests_sha256": "d58c0bb2b834e30d9983211efc33a2e3e1de729e4ab24d2c357cff5455211053",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -465,7 +465,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "d8eddc8d5549c31c021008cc0512bfb772d2cec8b343940311c86c6fadd3b678",
+      "consumer_lock_sha256": "7e92509ed5bc1c25200b9f89d08ae5d189f38c089001e26c593aed00497da759",
       "generated_sha256": {
         "src/v2_contract.rs": "262e1973269cfd4e8d579c861b066f5ec67d6e1f64ff79d820d19af44d3b2a65",
         "v2/policy.zcve": "9e8c3f04e8873534fe304a9746fb74da36511bf08af2d7905bdd025e33bd03cf",
@@ -547,12 +547,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "b7eba721244a8f6c7e6ba43f8fa8af5a52244e730a25990fea3bc158132f765a"
+      "review_sha256": "79de2d1e0b042527cadee5fda32905306071aa1fa21f83a6c2ba3c05ad1fee31"
     },
     {
-      "app_tests_sha256": "5b5e24528da1e63753c6a4d3e439f8ddd32808e86218501a7093315c5e9cf742",
+      "app_tests_sha256": "1d8102c8dee3d14350a09e55ed2364d0e86a02296f01c081edecada57cab5b41",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -576,7 +576,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "3552e0824c623c3365b0269eb759d670e93a8498d9916c602a4028fd47f0c8df",
+      "consumer_lock_sha256": "c3e831088d38dc11d3aabe526256fab822441d19e75214667c943af3a618e814",
       "generated_sha256": {
         "src/v2_contract.rs": "f88d83017fb65f23817aef1d9d468f7e015a591946609fcd46b36dc7fde438d1",
         "v2/policy.zcve": "3b589f6c9114d9387c4537e302913a5c8510e67f9e9e9526912d2c8c4eda5131",
@@ -659,12 +659,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "28d6c873470f13ea0092db6d9fc8c6b18fef27410ab69fa3bbdc7da3eda26a81"
+      "review_sha256": "71c9f667640f5ddbf93876a19ed5c108fc6cd18de95336bff27bfa0121a244f6"
     },
     {
-      "app_tests_sha256": "c4914418b99f9cb22991808897bbdc595968c996c179ed952637e9a420e217bb",
+      "app_tests_sha256": "e082dc894ce6b11f02062d26243098ddf62f81dcd30a0256ab30994f4444286a",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -688,7 +688,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "87dc16504104d8ca04f49287d378f59162c9becc7ec7f488084a26b3735392b5",
+      "consumer_lock_sha256": "a5b7fd85cd7ff08218ebb5e1c2ec5cbed62214c1f4c0468e2ee2df7fa9c17ecb",
       "generated_sha256": {
         "src/v2_contract.rs": "32884ddfdfdbb333845036eac1c80bd7e50d867a330132e20241962a6ffb0f7c",
         "v2/policy.zcve": "e266b017dbca59e838f40dd7bc4d7a9ca24e468a8af5baa8f202b9314e421c73",
@@ -771,12 +771,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "7bf2c1cbd30d66197519c9593afe4932f78e842d6bee83fe88c8c930ab0f8d30"
+      "review_sha256": "97210a798da888a9384e99e7899d89361fe9c3df3831d1329b15cb1f1b34a2e6"
     },
     {
-      "app_tests_sha256": "71c58dca4f56b199f7f7709e5a9cb09f7edf4931a28af06a1c2a6984494fd907",
+      "app_tests_sha256": "bc789d4eca770204b61a26dd5d5dcc6815d22a619e37e0d1b1ec269b596ccc77",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -800,7 +800,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "b13416bc8df1d0f520524ddfbbea449a68fa6bbb116756f821525d113f95f355",
+      "consumer_lock_sha256": "b4ecbef7f470a712280d4c6a018bc96f0a1206ec13ea04ad76453059c5f784b3",
       "generated_sha256": {
         "src/v2_contract.rs": "03ec230821de291cecd04666162942728cc80ed1a7d7ac57e6232989a562069b",
         "v2/policy.zcve": "3bec52f55703c8d67a50f16175d16cf9e31f058eed96628f9ffce04742a1f730",
@@ -884,12 +884,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "53c3b5fcb9f991cce313ac25e1071dbd05dd83338a50e8ffff3e5dac7b03962f"
+      "review_sha256": "066a2cf1a0ee689e89c5e3d6cf709d1d485b040363fab732b090fe18933faad8"
     },
     {
-      "app_tests_sha256": "51a3a6edb9bb0780b17f25abb607cce5aa05b5ddb32e2a70f2b494821a5b812d",
+      "app_tests_sha256": "125203944f26ec4f7efd8bbcfbb3dd762734802072846237971dd01cc74dc80a",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -913,7 +913,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "ebf60531f9cfe97fe2537f5b45ccc9fbfadd6a7df7172343dc7879cc3a0205de",
+      "consumer_lock_sha256": "146b3519be5d539c136d32aaa59cb98d02d9d82916de141ae1ea4bdbaccf9660",
       "generated_sha256": {
         "src/v2_contract.rs": "9a12f4f0cd31b7171cc5f94ff329538f7717fe48eab8caf0ff05c09bd7f4e0b1",
         "v2/policy.zcve": "faaae8508618f33c7bb444b18e0f0f89e0f9d6521072fa39e95b804e3bfee8a8",
@@ -998,12 +998,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "a71f11a5838851c048c2743e906f46c379dccd3bdd7817c5b782c35b12397799"
+      "review_sha256": "e6159a7f090cdff6249cf6df2ddb57cea852c700625f65df3399a1fec4963afa"
     },
     {
-      "app_tests_sha256": "a6c9e03d36a2df165e394d9427503afba52ba7b37e055a3da554a2884b025a73",
+      "app_tests_sha256": "1dc8ea62b5c6971d425519cc7e64f7319bb742967cefe7c637e829628f471919",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1027,7 +1027,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "379e0c0a311c80d7e75cc2dd7c3f135fee69f0bcd018e2a13cf06a33b5474784",
+      "consumer_lock_sha256": "b3b581c55aa7314ed1d3397eae8d89d81f40715d4f3889a7969161a6349d19fb",
       "generated_sha256": {
         "src/v2_contract.rs": "cc857dfda22b30e9ad6de1e73779b802c98037d2d09c4658965d4d97543ba6e4",
         "v2/policy.zcve": "5b416d9147bacc852f13f2508de378c0cc49300d241913ee89d14236011f9c1b",
@@ -1111,12 +1111,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "88729b5c7b3abad0128405316c9b488428a444e3219e4575c2e568b2f0674cbf"
+      "review_sha256": "ddf129f39c9228a3e6c60ceab73b3b4155669345cfb10be17466fae57323d3ba"
     },
     {
-      "app_tests_sha256": "0cdb10885f8ce3f0c18ce9195af7a6fd66c615d211acce83fecef3380587f5de",
+      "app_tests_sha256": "23b48d5c690304cb358de47032d156e3da3ee8871943864dfe187eb7001063e3",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1140,7 +1140,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "9bc772b5e7dbc6e8788a0ed951eb5e5106c743ec04173f32c2ce8505c22d893c",
+      "consumer_lock_sha256": "b65de502a4b65cd11be599cca1521003f97a30e6c7762523317fd9c28ca4dae2",
       "generated_sha256": {
         "src/v2_contract.rs": "4fee53c5502c140b7353fc993670f867a206e571908333825c386631d27cdc35",
         "v2/policy.zcve": "7b5ca6c609e133da7debe84c48fa40caf1abb73332a602be9014d2fbaaffa86f",
@@ -1225,12 +1225,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "ba79ade46aeee214ffbce18217c5e63865a9e0eef1cea35c5fae5c64f1acbc85"
+      "review_sha256": "a2d7861b78177d0a0407a5fbc6b7187f7c82c7542ba14248cc40d42f02c5db12"
     },
     {
-      "app_tests_sha256": "c9320c02dcfccac08f19791209a8c4fe9309602d6bd61b44e7bb851b3a0f2b9d",
+      "app_tests_sha256": "5199c39d004b49c451d20a27168cc20a0d59ad1606f26d3efaeaeae283b1ac20",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1254,7 +1254,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "dbe5140b8c5a61e77f6ba3d62dff72825191cb0fdfd8e1b8a6553bc208de8a1e",
+      "consumer_lock_sha256": "47164408d182ee537f05547b533ddb84b8af4e58dd1535653cf6e839cfe74d34",
       "generated_sha256": {
         "src/v2_contract.rs": "353c9c62b7c0b715aef0df3b683a9e60fd4b0616d9eb5f6e928b15ecdcfa4415",
         "v2/policy.zcve": "16bf77540fbb008bcd73d84b4cd7300b37302cbb19654f9ec3fc793b40eb5601",
@@ -1340,12 +1340,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "1dfe8cda6b75a4c1bb417a018f7d9eb3a513994fecb66ab3f1ffe579bcde78d0"
+      "review_sha256": "dd728041de601dc3099ac57f33b429bd617e51138368844a5ab654545328718e"
     },
     {
-      "app_tests_sha256": "94f48dad80c9628e009c4704a7d4e2788cf297e5ba578a84fcd110efc81e15cd",
+      "app_tests_sha256": "ad3dce3270df9fca9a29e751874c3876ca2641a3cbe93f070f59c135151125c0",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1369,7 +1369,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "1edb4f6eac0c5491efa2feaaa1dc138b7fd21ad17c4ad4b4cbd0a5814e68be14",
+      "consumer_lock_sha256": "dc75b6aa6acbe5307d77dcc864bb42bf543d7d649ba070bdeec63859f984b150",
       "generated_sha256": {
         "src/v2_contract.rs": "1dea7cbb51a3bb910f8796dc9a5c75ac4284bf51863b9b2a775daf37ba9e765c",
         "v2/policy.zcve": "030fd1009110a15d68c02213c248c91a60402dc1b3391f73b9b654adf1f95fe3",
@@ -1453,12 +1453,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "9daf9ddbf21a663b8b167a45ed42654616199b2253df22f7c764cb0a85835db3"
+      "review_sha256": "b123cae8f63ae075c626e6fab8585d773fae0b814ff7257c6999cbafc5d0399b"
     },
     {
-      "app_tests_sha256": "1af86f34a21789a30f80119ac9ba7c12046f5746cffcf6d77699bd723641e020",
+      "app_tests_sha256": "e9216dd6e35834efcd25ace7370d19d55603f2caab568bb4c1e7bcae7a3e768a",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1482,7 +1482,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "eb80df2a068098afb462969d467c916ee2768b5d087728a3736befb5b4848953",
+      "consumer_lock_sha256": "92d4698bebacd4002f7dfcf3535220d4ec996a4e878a39687b09e73dd42365c5",
       "generated_sha256": {
         "src/v2_contract.rs": "45053783a32505ab69fdf91260d89e7fe9dc730ed02f67247101c8864e486ec9",
         "v2/policy.zcve": "cefb615cbb7e845b774bb8d810b404a00554e212af415d6589b3e12614193e9f",
@@ -1567,12 +1567,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "e5f8c4ece408e4c119fdeadc31684debdd556d9d9e02e3db7dddaaca6667ff65"
+      "review_sha256": "47e7ef5dd9672a7329216ca99fbce6d1a05cda6d223a59b1f756277c7e4b80a0"
     },
     {
-      "app_tests_sha256": "cdd8293465b0c1b31a26da5d0ba68b3e51ec0825cae27f60a8b4f3a074a6c455",
+      "app_tests_sha256": "45d3c06ba0727e86be9d01672d05d079c274db523f47cc4792dd89e703fc2483",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1596,7 +1596,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "966a1bbecf17bf2c8e246cd8821698529a0b5892e876f91b4492b9a252a810b3",
+      "consumer_lock_sha256": "c498992de18c18a9accd24400f1fffc73db78eac65bde256374f165252a66eec",
       "generated_sha256": {
         "src/v2_contract.rs": "c9b322f26f094863deb805d0efa7383361fd580fee87920d9602272c1c8b532f",
         "v2/policy.zcve": "168ab0ece5b449fc7cdffa291f546a21e49cb5ae3de8c0f734fc25100555c175",
@@ -1682,12 +1682,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "62e547060eb28df1628d4aa649100aa2adeb735325cb20b9b5a974d9350874a2"
+      "review_sha256": "fbdd7788f2d839d551da2df29f37bb81a7c7accfcc892816a69460f08bfcf9b0"
     },
     {
-      "app_tests_sha256": "5de3c439530771216e9f757430ff2e950ed08f3f8efbe6bd9a0307626e99e6e9",
+      "app_tests_sha256": "2c7f23bf59097490478e558e7adb7d6e90340e9c1bf91fe9cdaf935bad8491c0",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1711,7 +1711,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "d55c8d3142d0ff50f7e430fed922d7fd081c1b258b2a0d5b1a71967071a7cab8",
+      "consumer_lock_sha256": "38a7949610fe3b6bc9c6d7df720e4b467ac74595cd5855c06144d6d07e66b913",
       "generated_sha256": {
         "src/v2_contract.rs": "ef9dbccc7d26b65a0ff8167d92c63ab07a7492996bbd5bae063788e9c00e48bd",
         "v2/policy.zcve": "f014cde71be82d7c8232c2fc68909e44298dbb88e28631f5c276f65619533793",
@@ -1795,12 +1795,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "06201e67566f334bd854415a190fb2a4f2e9a013ce6881fd6125fe9911ee4132"
+      "review_sha256": "20033a657d3593ac182ebba55b07d223bddc97ec567828685257c2ddf6d4130f"
     },
     {
-      "app_tests_sha256": "ed7e510cc3fa3f052fdba7fc6e39b6b459da83d3702e1f30176a03e46e598edd",
+      "app_tests_sha256": "2d1e03416b8e8d615c5734d5f40f5d949b1c26be0dabaedb4bebd402eb4c3c94",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1824,7 +1824,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "2488bed11339f7fe8838b3be4d13235d1190db03cd26e554c6044f2a6facc742",
+      "consumer_lock_sha256": "448b59ebd48378211894191f6dd894b59bf926c124c4737117bcdb863a6b0fdc",
       "generated_sha256": {
         "src/v2_contract.rs": "79d8bb54ad33ffa9056e0676146240c93159c62a40d6b40f04665f5f586d7109",
         "v2/policy.zcve": "d32f530a1b85bfcd6703bcb8b10ee6f4ce9d5b404e20a9226774007e1ad58c38",
@@ -1909,12 +1909,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "93e284d320799f2527820d61ca5e4ba22566235287a98758a23d8f240bff8e64"
+      "review_sha256": "a95913b101861ed38116a4caeeba6b7ddac360415848f598dcac26991466773c"
     },
     {
-      "app_tests_sha256": "034c2ab6a949eb7fbe9b3f9cbde821256e14a3caeb3657592116210f8cc741d4",
+      "app_tests_sha256": "24e0b4fdd6667c7c19480fd62199883de94329a0ae00bf4c658a7db99a5337e7",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -1938,7 +1938,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "076effe8504ba0476849df828dddb8899ae2c13390c1eea80f352579309dfaf6",
+      "consumer_lock_sha256": "c837736ebb9739e77d2c1bc41a117d2fbd5ec51cac255c900c0cea2ce42e973c",
       "generated_sha256": {
         "src/v2_contract.rs": "5be39a148cc3a245b9c2637a4232ea008f99f1cadba9614e02b429852f1a8da1",
         "v2/policy.zcve": "fe7cd3e8aff2e110101759c4625db532dc1c4b5663a64650413da733353cd326",
@@ -2024,12 +2024,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "837c3a3514a54e941a19e58e037b9d8a84a65f659c5cbafb2ba8a7be59dd3e9e"
+      "review_sha256": "c26496cacdee96cdc89051567d709cb1cece59d4bb87d098d9083b022079aa0a"
     },
     {
-      "app_tests_sha256": "60a518d64b25c96ff0238ace18bff683cc48addd4cdbab523678ff7382de10d4",
+      "app_tests_sha256": "deb095ca3ff3f3a9f867697ae784ff43d8237120b746298e9f55988ec6c38b11",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2053,7 +2053,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "36346900099878b3948bf19f1fd151a01d924398351a628559a60ad0c880ebc3",
+      "consumer_lock_sha256": "8ba81246cc845965cd195e597cea373542811b432f69c08ffcf7d1ba1b8e1652",
       "generated_sha256": {
         "src/v2_contract.rs": "f48d5b3bc39430d9485c6b4db3e3603488b43c8f06ee47f6f0a7996e67570cfa",
         "v2/policy.zcve": "d85f2d32cef4b3768cb381787d8f5ca0fd9fff161ea02e8102e1a1a67ae5c9ed",
@@ -2139,12 +2139,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "8031b58cdb32bf272afe133e72d213a0d426db077b29e6a8c9614d6491a7c229"
+      "review_sha256": "df324ca2f3ec97432f70ab197b7ff3478c023df9fdffa61ebd5493b5f2ff844e"
     },
     {
-      "app_tests_sha256": "75a5a62db1cb2f5dca285190201c65f1b94e69d941574d7c16e953caf693f019",
+      "app_tests_sha256": "a5bbb6da828e2cf92e61ce68ff95f4326a8900f4af35c0ea72c04cebe07c9583",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2168,7 +2168,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "d4a7b9b62e1df14665a4addeb62929e58dd5dcbd4338440bc525335bbf36a7a2",
+      "consumer_lock_sha256": "4d932cf7e64eea374e3a0a8989e05a8ce730d958eb7aecd8f16d6fbc6354578d",
       "generated_sha256": {
         "src/v2_contract.rs": "61c6eb5de717311f9ed38187bdae4ad9a62ea7935fb665f813868137d5cdff02",
         "v2/policy.zcve": "039055660c20588c2f25cd84e5dd806f0a35327dec0096e04ca6946075989384",
@@ -2254,12 +2254,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "23658fd1424c7df0788a7f60244808e4fedbacf744a2e660fffafac3c63ed465"
+      "review_sha256": "d6bb6a41e9d53004eb423219911f6f005968faa6465303dbf429c63f7ab6bf15"
     },
     {
-      "app_tests_sha256": "39f84109d2344484bdc0fddcc40fef269e05e9b4c50035c25208ea1cbbc658c1",
+      "app_tests_sha256": "c1b6d622d6a05909abc9e8e1ceb82f36ebe1c135fd43a525e7693aa9770bc3ea",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2283,7 +2283,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "defee2a58df1d18d3d1cf2843a07a3ee87e72635152e2ab9fd94b6dd58890fd8",
+      "consumer_lock_sha256": "3c5300dd9ea6b9118d3103974359498aeb06ce7882ab855318a2409c668dc76c",
       "generated_sha256": {
         "src/v2_contract.rs": "07058b774b83f3ffa685ab218d6bdbf2e7024bbc3851cd6b0d554f467db861fd",
         "v2/policy.zcve": "b4e97484ebb341a63391359cd18361ea9e63958b7e01333db10c2552b37864d9",
@@ -2369,12 +2369,12 @@
         "schema_types": 7,
         "version": 1
       },
-      "review_sha256": "4edf37c36840041ce29eb5bad3dda96d7803c67f6f7a45a554cb81b64e24b268"
+      "review_sha256": "0fd53f61c2a2366facee2d27dcc1b8df3c0beacc996b8d5f8d7eb7286f5585ae"
     },
     {
-      "app_tests_sha256": "f696352c4421d0dcf13553e44efce1bc88dbfb8c0bbc4276a171fd72963e1a4f",
+      "app_tests_sha256": "9243fb44197bbbbf97ca829f6afead468b9746a9988fc97852ce94b5e038c9c5",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2398,7 +2398,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "889036cd15f977a5bd789a277a8814b8f51f041c2eafee9bf2e2d993fbe6a534",
+      "consumer_lock_sha256": "a20d1b86318992517016fd333083d22d97bd91a37bd86e07f29727a50ed10d77",
       "generated_sha256": {
         "src/v2_contract.rs": "79a0c9a8fe398054bd012f1ef3d5758c5f1fc2a1860b6c0dd8327dc9bf4353a4",
         "v2/policy.zcve": "3777d7c0e3e05526d5445a5db7441317173ee5a42bcb79cf2e53202bf9680df0",
@@ -2465,12 +2465,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "308387ac24e53f2681ebdaddd8357ec99660a762e9f4bbe847cc63f319285d87"
+      "review_sha256": "e89aa52fcb29bf1ffda35e8cd987d5c8cb2df1cef1552af752d0bed934c1a4f0"
     },
     {
-      "app_tests_sha256": "cf59bce29607c045d3c6de11c4b058c28ff3ce129f0b465ab99646b2af084af6",
+      "app_tests_sha256": "e91b48c07a6ffddbd950b85a213b66778d8fff175a8c992507cab4e76f544232",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2494,7 +2494,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "6ede97a54169b9d68e922d7be7930abe11e6677ddf04d76e295d289b086a58e2",
+      "consumer_lock_sha256": "b1af9d75dde309594b5bbace4205f5625efbc47075dd6e8895e43efadae7e8c9",
       "generated_sha256": {
         "src/v2_contract.rs": "6a6005196e8692308e57d154441715a8072c40902da60408ab2e215d6f5cbe83",
         "v2/policy.zcve": "9b6768564af4bc48af64f6d470f91ce36790da7dcbe91dc07e92576d1533e2e2",
@@ -2562,12 +2562,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "72a91423c045a87d0bd7e99ef6012ae3254848ffb7749feb464b90f04a83913c"
+      "review_sha256": "74b261f4ef5bbe5ef3aef93873e797acaef76e42df7a2e65111861f8d1b71c90"
     },
     {
-      "app_tests_sha256": "25f06c2f1dc64073856018bae3d5e941f8cad85db97d52b9be5cebc529a4a967",
+      "app_tests_sha256": "67f342052c6c2dd451a50ddeeff538ce930c6c35cdc6d2ff4b759ce4eb058fa4",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2591,7 +2591,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "c1150519301c3d071d565f66d94565a072f4c2f5caa8c925127a898d7df4c52a",
+      "consumer_lock_sha256": "51ab5ad45734e2dc9df39f59073f9427e08f4e76e03b10b4adea1d7edbdb5472",
       "generated_sha256": {
         "src/v2_contract.rs": "b915971c61066bd9ea1330ce20ca3be58d9c2373ca16ee7a0b75fcf760563e39",
         "v2/policy.zcve": "00c64a52e75b50b25867988dac33a5a3ca64ae99415feb7e687b6afe01ff6c30",
@@ -2660,12 +2660,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "b3ce89af177f79675580cd828c5a3f0d0db9718ba491ea822abf88d1792c6327"
+      "review_sha256": "fa8125233323a488a9af34c835fdaf4fd6e721e906c00c73c395ba5b53f3769e"
     },
     {
-      "app_tests_sha256": "b1f4f0ec9bc603c5469f9e5c8179fc908003bce97957651dd4a9703f1a1b84a3",
+      "app_tests_sha256": "c5eb4bd596aa35241775816152c7c92127c4e18bae9cc6bb66b0eacecb7a5f94",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2689,7 +2689,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "cafe50e65d951e1877cf605aef4a7a86c06881e9e393b53c19e4079c135838c5",
+      "consumer_lock_sha256": "4bbf076c646f5d8ae4fcdba262b08de5fa6d6ef500932f7b7459d595cbcf98aa",
       "generated_sha256": {
         "src/v2_contract.rs": "5fd271da8c38e828069c06efb490366d321d587abaa9f4b8cbffb73260564743",
         "v2/policy.zcve": "552d75bffc5f2782c8d1b6d068c40f9f1b6b52c43e633e2d371b4f5477b0c14e",
@@ -2759,12 +2759,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "132cb7d0a5d39a7b0536c27d3c547cb5d06da334c00b56f6813e4b9529887987"
+      "review_sha256": "1e449de5ad04ae65c99a9cf65380da5828d5275d4afdcdff154101b546de45b5"
     },
     {
-      "app_tests_sha256": "7588ce387a366cf1fc074697ac106339ed4b7efb4af15fde0feb8455ae169146",
+      "app_tests_sha256": "04ca617059d39c4229cd06d7a6f4d1e7d8f22fbe2ae80977ae47af707f8e8245",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2788,7 +2788,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "744552fc792028b757831e8100e450f40b8e11d96fa059fafc934d24e5a181df",
+      "consumer_lock_sha256": "42643ca3ca14df9738424a04192aab368034cd6623feedb9349490f4f3e300ae",
       "generated_sha256": {
         "src/v2_contract.rs": "bbcb1a05a6903c6c00373e0e2d7a32435ff0377dcc84ef055d675e52fb322b42",
         "v2/policy.zcve": "dcddf12946f4dad1785acfe9e17840f59b83894dca29fa2a1a51b972e5331b81",
@@ -2859,12 +2859,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "25722cb7becad48f24444fa13e2e3a036a6c2c5478aee3b1d0c453d8216f536e"
+      "review_sha256": "a8702511a70ecb2534eac4fd61d2b3c1324d4090bbdd9bd03958128230c60537"
     },
     {
-      "app_tests_sha256": "3a24d200282450471f9d3a1e1195fdcf22402ed876a129a24cd9ebff5814d4a6",
+      "app_tests_sha256": "c82839e465074f9b0b36d703f4db349f1217a93b8a40162f758cd4261b42b928",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2888,7 +2888,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "a26389da32515760ab05388ee72641d65495db0e82ea2b25bab4872dfd916592",
+      "consumer_lock_sha256": "df67b27df080f1e1d5cc438d94c0fb22df3412b46bf694744e017b96be686ea8",
       "generated_sha256": {
         "src/v2_contract.rs": "e48674cba8cf1cbc948a9eaba8741535dffa7d82cc5bbd6d99e116ae7fbc9f36",
         "v2/policy.zcve": "a42ff9f38f4c172fc8eb9a64a456394ce20d9a42fb0a9c438001a7dc17418203",
@@ -2960,12 +2960,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "58fc1e1458351b137bf308ef79322ac06266b73733290d258137945a756520a6"
+      "review_sha256": "feefaac6e7f61be1b3dedecbdd93bb616c908370ff74ca20efb7730602baefc9"
     },
     {
-      "app_tests_sha256": "2179ffc5709d608adff6701cec296b6bae619a8356b6e67c7b85343375189f8d",
+      "app_tests_sha256": "b3698f97698fdf05601ae7553d5bfbac0364c865acf5e8c4c04c705cfb402de0",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -2989,7 +2989,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "74f368c6f5c9f75f89203919d62cd9078aa38714a8b3cfee4f2b4ef86c0c1d5c",
+      "consumer_lock_sha256": "582b5ee4fc25947cafa48467fc5eeb470d64cb4dada289777076fb82130bdd98",
       "generated_sha256": {
         "src/v2_contract.rs": "6bd81df75508183ce74958322c196356348f454c02cf2b586d9c123f682c8c5d",
         "v2/policy.zcve": "47a04aef43c115e530e3bd29313432bb795d8a59fffd817307963182e87f44ce",
@@ -3062,12 +3062,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "43491ee1b05ff2c340a88e7355de6bff5b7e048a88e8ff29bfca9434943d8cf2"
+      "review_sha256": "f866ab149ec7d6a9cae3380b39e669ef2471dadeb9f4829042f7a633cecdb529"
     },
     {
-      "app_tests_sha256": "e0ace93b18c31b28aea748013f0c7e3528043492566c9579030953ef6312b2bd",
+      "app_tests_sha256": "a2b947a6a30e222a8b6953949a55b4ae53b987769dd3711d02284c2e8e35930a",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3091,7 +3091,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "4abecc0fa5dbca05469485875d1b4e90f8f3c47a5f745f846344175a400345ea",
+      "consumer_lock_sha256": "4c1d28be2006c95ed0bf6ffb1a5b57d297ee03d5de9077a8ef3e149fd3bd7f91",
       "generated_sha256": {
         "src/v2_contract.rs": "8ef2b5af0bea005e6b3ba001485a3591f6700d401a78fed091536eb30d176b24",
         "v2/policy.zcve": "2707ddfdd371124b5b5fbaae1d6c18779cd4908b727bdab31a25c1a8b8238452",
@@ -3165,12 +3165,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "197a4b26743ec15cadf82a4cee1964905d515582beba210be13c14cfed7cf336"
+      "review_sha256": "706119a0b841b94207ccc1b0ed70707ac2173cddf72a8925ec5686d517642b3a"
     },
     {
-      "app_tests_sha256": "c6851d557de06abe78facb09b93d46349524303c84edc2dd6be3e63f65a99a37",
+      "app_tests_sha256": "4b8fadec6f8001b00f2024e9ddfb2a00b4daa5361eda24e23508eb0c01865969",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3194,7 +3194,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "5e989b5129d67e85592c32083bd7216dea1bc1c3f14d9df130b2626c9eb6cf12",
+      "consumer_lock_sha256": "f53d9e92ef23c6f73124a976274fa15c187d4d6bb3fb0c0223a1ea982ced3128",
       "generated_sha256": {
         "src/v2_contract.rs": "c7b8ed8f549773ca10661cc77cfbeb1506efe11b4c80bba035f9bd0670358cb0",
         "v2/policy.zcve": "e55044474e4a05daee4fe864f0ba27b28661335933805bfb489909591018b4b2",
@@ -3261,12 +3261,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "ccbd5ce77346772191f41f19027b4e970e945dde65f6e3f842792be779ef7dfa"
+      "review_sha256": "c1dca0b6fb29019b91ba758f2076b41192d4a0802adea5395177f7ed2d996247"
     },
     {
-      "app_tests_sha256": "ca9bafb545aab3a3eee9304fdf57cc6fb3a0d466fa4c1479bf74081c99f1ef21",
+      "app_tests_sha256": "9ea58ff21df6df0765aa29dea3c163c1a2d2a6577608021af07075284ecaadc4",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3290,7 +3290,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "c178ffaac2d6a4b75f23c775383b2638f71e322886cd4c6ae750afd27423a713",
+      "consumer_lock_sha256": "347a0f960465502e94108fb560448a6fc3f549d530b2d968729a6ae903b1c4b4",
       "generated_sha256": {
         "src/v2_contract.rs": "c38e1c36cdcaadcef5b5ff2eeca512e7332631d768a3d7eca68c570b90fce6b3",
         "v2/policy.zcve": "42cce11bed892106177aa5994cd5251954b96dab1a6110032d038360ef1fcea1",
@@ -3359,12 +3359,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "dd13e2899b5a6ebb419c2a1ecbb018329ba3b5f7bc0bfe0480a5df0dbb66ff1d"
+      "review_sha256": "771727753656ab725431bd7108a2ccddf01f5fc8c83c3aff438ccb4b57cf80b7"
     },
     {
-      "app_tests_sha256": "af6e0f77ce0096dc2c06179d4191d3d6d03743dd5904c8c6d48b8c837108e53b",
+      "app_tests_sha256": "1bd1d0a6e806459ec4a4aa08fefeb7860d3316998d54d9049e74a494c4995abc",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3388,7 +3388,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "acc1733f3a39b5b381463ecb2291633fb19270808e0125b622058f977bb50dad",
+      "consumer_lock_sha256": "d656978a7ea934488c9e0328dc18ce86da6f060c27dc9abf7b0d66e75f46364c",
       "generated_sha256": {
         "src/v2_contract.rs": "37bd82c90e19e8edc5474d6b3f56f0c52c914d6ff7889a082c7445420b5b032d",
         "v2/policy.zcve": "57dfd4eb9c8c3bc6af32e6fb91b74de9a858e49eda253057b892e507dffb3aa0",
@@ -3459,12 +3459,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "81032099f1be2eb084606f73d06490c5a33dac0d3cd953f13554fb5a1848b688"
+      "review_sha256": "7d073fa5bf1dfae6ec55db40290d6ca658b7beb74f37aa78348ecb6a761f1bbf"
     },
     {
-      "app_tests_sha256": "7cd34b69e17971d2478bd4d8a3c1dea7ea8068f8a6068d78fd81b9583b683f79",
+      "app_tests_sha256": "0792a8f265e5617bb20ab8349a1c3ae7a487ffb81cfb4d03729b539077e92fd9",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3488,7 +3488,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "3be26d6b160cb5e35cfd914db9a29272c27372e239ea890e77e9454566038c31",
+      "consumer_lock_sha256": "185910569045b3438d121dcd9034399a76fac0f8a4244441e5fc76be5940304d",
       "generated_sha256": {
         "src/v2_contract.rs": "8f8beebd47bd635e87a9be3cf96864ba0e4246a40bdcf6d2bd08c49e3ed3d788",
         "v2/policy.zcve": "aefb440b4a5c59fe0cae59df9cf33f651e20f7f271c426dbf7cedae480a3426c",
@@ -3561,12 +3561,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "b48da65ba20628eb85b47a69a9ec256fc9337952fe276336df474291fbd83285"
+      "review_sha256": "3253609503a3c3d20b54d4eadcffcf599050455943ccbead29fa37f4ec2c0f53"
     },
     {
-      "app_tests_sha256": "6aa8a8816db1956524de5d043cc63d74a516808e85b9e45198320657d0b1cf4b",
+      "app_tests_sha256": "16b8ccc95e2a4b98c090dc37d841b018393ac6e742b2d363cf23719149803f51",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3590,7 +3590,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "c0615db8633beddaae4fbf1383bffecb9320a05e195e56cdc4b3b64b3f37feb5",
+      "consumer_lock_sha256": "707a9e9c66ba287ab4dba2f7f1736c342a37e12c0f51d36bc7913746ab780cfd",
       "generated_sha256": {
         "src/v2_contract.rs": "90352cb0c61789fb24d38e8889daf54a499789fa579cc72bae6112c12f4e7858",
         "v2/policy.zcve": "4001a55296746f34bc7404e9514dba5fcf267b30df473e6147ae49fb79376da7",
@@ -3665,12 +3665,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "216977e0c3e9f9de2e0b2e454a681e136ced7dd19e88a71198a2c27c87b78bcf"
+      "review_sha256": "6c6fa6d78494fbe417188195ab435b76ecc5f8b91055b5f0afa98ea0600b7458"
     },
     {
-      "app_tests_sha256": "c66b4ca707ee560fe4cbea608e949414c0cd90f6fe5cb2ff1987a50563eab4e1",
+      "app_tests_sha256": "0a869ccd6c3ca6ee27de529107967eb891b2159c074a0c470b5fcf9dd76fb0d4",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3694,7 +3694,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "b1027e7478ab7f48a0d38fced10b4c0a11021640728c7f8308c969cb2526125a",
+      "consumer_lock_sha256": "514766322f9d05a34577dbec8a09c47acc1fcba5aabe40ea528baa84bcddd65c",
       "generated_sha256": {
         "src/v2_contract.rs": "6908426a42fbc2c7accf77923a59df213a120d93768ee84b6d7bc4768fb642ad",
         "v2/policy.zcve": "5ac0cad05f6b2d8ac8e8e223ed8b245d6560cbf485c525c28657f105c9274190",
@@ -3771,12 +3771,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "20add48e6b7a4db2201854603279f516773f515ae4983d58a9980277ff7a490d"
+      "review_sha256": "85e61fb33da5ea75e884b7a408124331ced516baa848aa6f691acda7785fad8d"
     },
     {
-      "app_tests_sha256": "4585e03f5b5bf5cc4823303a4bbb3d0512c2f088ca11598ccfb6135aad82dcf2",
+      "app_tests_sha256": "ff7e033f366ff7a3da92b4d1edb3810d156bebcb403f9935a53f8231312f6297",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3800,7 +3800,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "f3bac7eac4afe58baa8e2b00118f4c7622de9d827d6b2a4f9f7e5af2162077fc",
+      "consumer_lock_sha256": "3b0f7ac9b2c33d7809b4acf69e17457b753633bb7c21e397d19d320b1fc6578f",
       "generated_sha256": {
         "src/v2_contract.rs": "1ec2f8984e8c2c234d32f86184be64d195900f3c27ca6db7cb9d473540e8a1ba",
         "v2/policy.zcve": "48cc8ab3635a9fdcc8581c465d51391b59d1f586c5be7175e03cfa7482443b3d",
@@ -3879,12 +3879,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "7811f48c3c745cb5a5639ca4ddbc5924573925329a9897c5ba173b4a7bb73c24"
+      "review_sha256": "4260e9afd25967e177e073de33c074a9c6a3492928f8746562c3be4499aa0e68"
     },
     {
-      "app_tests_sha256": "56da766a4b0aa683266d808062114e0199c1b826d58e4c7e14da8c0c9125a4c7",
+      "app_tests_sha256": "cf049031d232e991eafd6377f77055ea9ad4435b94330797df1cd0ac3912ab92",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -3908,7 +3908,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "60acd4187bdcc754e5374f1796d207a1f14cdcd6ef1d3382db6c7926bbe3013c",
+      "consumer_lock_sha256": "5ce46a0bbce9f0c6ef500106d2a27bb833f5670eb67298055c7c8d4088a1c909",
       "generated_sha256": {
         "src/v2_contract.rs": "2e403a97767ffdcabf0241cd6476ba02ea7f27e59d87fbb0d97a9b5ed93a3a06",
         "v2/policy.zcve": "f068b59be7fecdbd79f2cc2ee6de0b3e5ec20526975283cce88427d6dcc6f812",
@@ -3989,12 +3989,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "5a206d6699e1b5abed7365e0c5a99191f3a44154743d9440b348f0e13d7d68e9"
+      "review_sha256": "0f99c7f0899798caaae3d3325f7b3c7db6557dcb4ee6e33c4c8a89dfb6368686"
     },
     {
-      "app_tests_sha256": "37bc2cb27e4821ca9f67825b232acf01540a7ebfcd7634dc67db264eddf30f47",
+      "app_tests_sha256": "cacb5bcf52023765b985a3dc6e8271f47fd62d641c7f87b4a94144c0bda695f6",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4018,7 +4018,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "8af05adb410c554c7589949df1feae03184afd8081f0d36e7fd4c04352e13769",
+      "consumer_lock_sha256": "99e5d4a067bfac842e0b1a02b33f1ea6ccc8b6eeef1d9b70f68880ea01a47715",
       "generated_sha256": {
         "src/v2_contract.rs": "21cbd3d5940496cf5df6dc30c594888e4eaea52bc2bc207b82f280a791c4aa5f",
         "v2/policy.zcve": "9662c35313e873de32c084f18fa0677261ca493e1ccc4c36ce169331efd05bb9",
@@ -4093,12 +4093,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "c9493bb1f62be8807b3171eea235b83726ec670bd200c8d932c2a629be2bcfa5"
+      "review_sha256": "e1a4268c83d6195713401f7490ba35c4600bdd410164711e214147a55cbb9ed9"
     },
     {
-      "app_tests_sha256": "1d3626e8b9b878252b10daa699190533e98e930366552750445db3a1260fa657",
+      "app_tests_sha256": "8c6d4a410ca6208fd3ee29862e3ff98961c60a0a4a5faeeb3edb21fbf67c0628",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4122,7 +4122,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "64e84fcbb86e8a849ebe37b5d4a697a81386a2f65d27baee39ac9bde8da13f52",
+      "consumer_lock_sha256": "eb52ee5b3c0bf8138e1bbba33bc0b708850631739471ce229b3106e82f669dfa",
       "generated_sha256": {
         "src/v2_contract.rs": "d855e0ba951582a50271e6fc3a73a4b4f2d78500c0946bf7df6ca285de06517b",
         "v2/policy.zcve": "452abae1a317e15b1cc09e0de6485c7476932c6958a07fd4f1def30d3fff8043",
@@ -4201,12 +4201,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "76273b53b61b317c6dab45374533e1d5adde0e0a82db2930e46f64f461e6c40d"
+      "review_sha256": "9315a07ca173f16ce4627798d137509e6638f415f672f28c747e4e1c902098dc"
     },
     {
-      "app_tests_sha256": "f4617c6ea019f7eb16cd2769ca50466304dec0390f3a9efbe4e935a6be7e0486",
+      "app_tests_sha256": "ab1a7e89168fe285c42a9d3ebe9ffc5892335ec8b6ca257a98757dacc26933a1",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4230,7 +4230,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "8af64806aa601011c92579b43f6f677d6ab632c57ef6743c10f9f5bf49109348",
+      "consumer_lock_sha256": "70e7c09e82a92bf790a42f058f26a5dc87a43deccf1ca74e16b8d72332433955",
       "generated_sha256": {
         "src/v2_contract.rs": "ca54fed46620edb4a74bf4f1ab99d287a0adcb3f37fb4f3ebd4a4a2fb48f9481",
         "v2/policy.zcve": "c071284bc1f9d57a84ffc0e0f5abf47b91072de9d37b390739f878c422b65041",
@@ -4313,12 +4313,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "7f0e55b8d573076bebe5a0fd6d4aff48e6a80da4f006fd87b2871e803bd325cd"
+      "review_sha256": "cb2096d110fea332cc8a24d9385273cdaa0754727d65f783744e5692b412389e"
     },
     {
-      "app_tests_sha256": "780e444cadfd961663f9e9df5aa3a1ddf93f91de25fd80ad700889a228afebe5",
+      "app_tests_sha256": "9f78df86aa3a53856e44c7641db3ca894fb07ef41faf758a67155dc2bce5e3fb",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4342,7 +4342,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "47a322c7303b3df5c708e86a6d33d3559a54f7cac90948b24b7f63153ffb7135",
+      "consumer_lock_sha256": "cc2c48b902130a822a83a2b1b52b53c07d9d51c468ce7ff2b35aa6d139f8ad3c",
       "generated_sha256": {
         "src/v2_contract.rs": "ceaa0a10395ca1c23792a908d63220f717194c3fa9ece8acd73c20c7a2c6e977",
         "v2/policy.zcve": "64beb3111b3b8ef77c3553ebf99ba977b961896a9b8dd72aab74ea9ef075f256",
@@ -4429,12 +4429,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "ff9dc314417bf48659e356f521a3e6a25842cab2d7940787d209a0903b26ed0f"
+      "review_sha256": "1128b4044a0ad9d846292ae45c3cf1e6b46579302b4d151360fcdd6737f2a0ec"
     },
     {
-      "app_tests_sha256": "574ccea22d917a1b90c55f1a376b651ab43e2291536dd6222dd10ef958905d74",
+      "app_tests_sha256": "7373cbb410d61d0072f2ffc14fbacc8513ec4c084eb60cefa8d4f770d46796ab",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4458,7 +4458,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "f39a7b765ab1db787bb3606b24d79766157da43b6adce310280516a91d7b68c2",
+      "consumer_lock_sha256": "25806ff097c9699d1724880f92caad41cf2dc7a0775fc055671271c53e5385d8",
       "generated_sha256": {
         "src/v2_contract.rs": "6d7e3a7c365a4352d2c2066ba9ccae3dfb95e9e081660eb80f00c42cfc2b7353",
         "v2/policy.zcve": "08ef3c3d2efd12ef6fa0c8baba0fa688eef3aca6ec6c94c1806722d67b51c643",
@@ -4549,12 +4549,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "60d75fa26f14cd73218d950e134c98232168770673311d6fb99fa99e18e355e7"
+      "review_sha256": "04bd892a03615740e52dd11ef1eae0c340b474d17de16f999db0b9423549d401"
     },
     {
-      "app_tests_sha256": "2ad5f350d9b512421bcd0fd4b1b02edec38795b9f04f9d6e88a8d36e4d37c28a",
+      "app_tests_sha256": "620a0ac6b06eb16bdc590cca1404f9527f02d6f8b5751579a6bcebc8bd50e4e3",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4578,7 +4578,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "26d5d868cd47db7891a403aad633c9d5083a7ae253cc85b6c22b8e7af2d3ce78",
+      "consumer_lock_sha256": "975836ac0e5688f676861ea6eaddda470559913c0a7d818c4d6a54efddff754f",
       "generated_sha256": {
         "src/v2_contract.rs": "53eef85f02a240c0d15711bcfa9b1d8cc6631116f5a051793d570a986640f7a1",
         "v2/policy.zcve": "1726a2d76720730d92add30545be756a3861f9fe2a5f0c6ae109b1e2801c3a22",
@@ -4673,12 +4673,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "b543dc15f1a382a68e51e912dd7cb11f867e58c15dbb634449fbd6de9cdd6641"
+      "review_sha256": "336fa7f076bc0954fe50598da42b73be549458b3281edea548e24a9fb3df4fdf"
     },
     {
-      "app_tests_sha256": "6b1bed008490df714c97ca5d43ea97f8541ae9d9a5cad2e9650746ef6ce3c1cb",
+      "app_tests_sha256": "0a2f1c4ca359728c5d993dfca2399fada2217bcabad36e38e07fe7a7a05e3166",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4702,7 +4702,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "c27ccb030dd78e56f3eeddd9d29bae424e87db972e8fde409cce1ff690048d06",
+      "consumer_lock_sha256": "56c996e5953b1b470659ba8d10f6744af305a20f933fa0034e0c47c4c72e07ed",
       "generated_sha256": {
         "src/v2_contract.rs": "8853622c0516488a4d2fcbbd8aefd942e8ac82aad9b711bc810dc71305f0c86c",
         "v2/policy.zcve": "7139126f81e877c80adca626d4d4440f6ff6401c1702dadc62cfe10120d72253",
@@ -4801,12 +4801,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "2a2765a6a46b9e105ae18e79fa9cd7115450e7f68cc4f484e00e21ed57ff521a"
+      "review_sha256": "a2873964316d15e0a3f60655f78c1f96b129ce9c7b1ac8b87c6dea94935ddbd3"
     },
     {
-      "app_tests_sha256": "71af4be06c78ec56b5566c11aaf63210393fe8e0e64937259028d36ac78d233e",
+      "app_tests_sha256": "059a3ca4575b0f90590d366baaf9d3259a48d8e3a0eab1c61c997937464b7eeb",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4830,7 +4830,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "b72093b21f09b852fcd51ae7ebadf055fd7e992f7565bda9785208e8e2b8a3f1",
+      "consumer_lock_sha256": "898d21745a9f31d7303c54eca78abc00482c8ec808775bd357527aa28b7869bc",
       "generated_sha256": {
         "src/v2_contract.rs": "944121bc0a81467375a5ac27d45e7ccf7243c94c24a38f81ae053d8d4a21d8ac",
         "v2/policy.zcve": "e4bd2db521aa806299fbe6c4dc42a697f3f53a0046aeb5f3b22efd9839d0010e",
@@ -4933,12 +4933,12 @@
         "schema_types": 5,
         "version": 1
       },
-      "review_sha256": "c7fcf44c98b324cd5e46fa5f3276da85134c21b64f0e17185e9312e6063039df"
+      "review_sha256": "5dff7a5b6f788b9d7172164444f94a4e79692fa50cf37089501769bd9c078fb7"
     },
     {
-      "app_tests_sha256": "0adc750c20078d448667d10971bbe10d1f06109af30066cc5531524a2948c4b1",
+      "app_tests_sha256": "32cd3a807e08afdb5bef934b146c8c6197713589b2385adcdff70d9cc0f32a10",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -4962,7 +4962,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "f4caa60e9c94d21b6e7055659725d676a350851e81adc3f59e5e9e5041818fb2",
+      "consumer_lock_sha256": "0b6a9bbd0498880f72e01c6595aa138a5058a48825b8990cebdaaaed2983dfb5",
       "generated_sha256": {
         "src/v2_contract.rs": "0fa186debe6091cda19db05a58b8384ddbb1533fd0ce6b5d24c3231da741a613",
         "v2/policy.zcve": "d48f0dc6638cadfb70f8c48915f5c13359825b9bfd69ae05f7344ed98c1832a2",
@@ -5041,12 +5041,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "41ab699afcca2e441a6b519dbffa5438f3e7010c4a461499bd963c9372082b96"
+      "review_sha256": "54c37e10307e9c81452566aae1e30c38d94eaf01dfa0df61dfca76dd0def928a"
     },
     {
-      "app_tests_sha256": "13b1506541b22b298779f3c6093f1ffb1b83f7f98dc3a30ce0559285e07b004e",
+      "app_tests_sha256": "c60199cf1ad1f05a2ef4187549fab75eeedd10f69b3edc8b1d442c769af34469",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5070,7 +5070,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "978fb7e29efe24650bda2621d4e3c9c916b9cac630a80c8fbd20b08b5b26acc5",
+      "consumer_lock_sha256": "96410a31a326d78107b04c5243dd9c5db48eccd3eaddb526187a7c210e51e8f5",
       "generated_sha256": {
         "src/v2_contract.rs": "4c44d88c7492f6f8c00f84bd32b11e8baa89f39caa481e22174826e57587c668",
         "v2/policy.zcve": "0b5980c3418ec73ff7d3a824c7527d793cd6a9d7da9f4830a67a9b87e489016b",
@@ -5153,12 +5153,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "49cfb983305f351198dc7b349327e128df94c636195bf0b578c7e19c4cfab935"
+      "review_sha256": "b11731bf405528f97e6d9cd26703db4e2e04cddef6f8a0efac1a723a25e39bfe"
     },
     {
-      "app_tests_sha256": "14c59b6fc61dc7a4c6ceed806ae8d42cc1d9a1ea3f1579a266d2890c579cdf03",
+      "app_tests_sha256": "727863cb2be7317464350bbf2e3c462c86f17d4fee01cd8bddd6263a93d2430a",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5182,7 +5182,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "6490c3d0c40dd882635603f8edce4d88fddede02ccdc381150fb243c7a8c6425",
+      "consumer_lock_sha256": "613a473bbc5d02cec665dce716304e13741d2f002076b80737deb47c9441816a",
       "generated_sha256": {
         "src/v2_contract.rs": "675b3e80ffd789e6406a12e644774fac01aca51c6db245375b729cc3928b16be",
         "v2/policy.zcve": "203daf5761aff885c099d6caed43a0156e6a253696aa10ee854d05dceefe1c58",
@@ -5269,12 +5269,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "ae245d5a162ac11a24fae1e17bc2e3d24464496fa9f80163e1cf3dc1f94133cf"
+      "review_sha256": "bc2011a4c1f72a05d919f891a9c08ab95553e42b9362c180a76116664580fd9d"
     },
     {
-      "app_tests_sha256": "a5be781e2eede31acdb2efaa1df4a8d8f170cf2ec50d845d500f02864b0e6cde",
+      "app_tests_sha256": "46cfd56c834b3c6644c8ff4334a1a06abc9f2899f1b7b1418dda618144d5918c",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5298,7 +5298,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "86c50bd90a7d59b5a23a9f8eeb2a7086b6b58d537e037b6f07951436bdcb0ad9",
+      "consumer_lock_sha256": "545139d7c527dad569c2f41bfee8d42543fdb82154baab25bbc662543f8baa0a",
       "generated_sha256": {
         "src/v2_contract.rs": "f07586982f781660051aced0a88bd376c92110d7ae67cbd14e6b2e055c00ab7e",
         "v2/policy.zcve": "5c8ae3f3bfe74411d1b3eb1ecbd3b17c0adf97b678b96082152ecf88662fabb2",
@@ -5389,12 +5389,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "8074b6e3ab0ba3b4ed5363401660d86c7e0e3e8b7b433cd6a61045328408f347"
+      "review_sha256": "4f637247a246cfad32847d737d726927e4c7e2c58202fbf8943b867825f4b82e"
     },
     {
-      "app_tests_sha256": "b369ad517219127e48e1ddb4fc8c5c0a4b9d4892ba0d9e80394e183b6daed241",
+      "app_tests_sha256": "266b853fc8dc8aaebaba9dd738bcc98f6c75a7b341493163b3aa99d5f948eed0",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5418,7 +5418,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "45120214b560db6867dc6123a58504a4899088d0fc92c7655375bb9c3beacdf2",
+      "consumer_lock_sha256": "0e1c1be6964721495466899defb5c083b19e26c67a14d50f4ec60057fa07e897",
       "generated_sha256": {
         "src/v2_contract.rs": "681e423a6da736632de3e2adcb722952f468b2a194f22ca0b888311b5884ec88",
         "v2/policy.zcve": "d46157a28b034f7330333c33afad8a48cff88cc4f90f7e050c6b333e5f9cde92",
@@ -5513,12 +5513,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "9c2fea864eeb6e1bc6155df50976bfdaf2bb8b03d921b31117883a2eed702b44"
+      "review_sha256": "800f31f5f66b115ec2671d4dcfe3e318ab1a0aaca97a36f4681200e4712597cd"
     },
     {
-      "app_tests_sha256": "d02755551063501a93ded6376a5268e732e27950321e5284b08f7e6ea67bed80",
+      "app_tests_sha256": "10f809add6e3e85207d7a6b9d9dfb08b7d69007dfcf31cbb78eef6b59b542d2a",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5542,7 +5542,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "efaa8549c77d376de6f0b3fb2d237ae1b4242fcc54623e3a8de588154025f6d0",
+      "consumer_lock_sha256": "a0dc66d71062a8c406fee8f260e1f9703d3d5a209282782783f8ebcf6d52499f",
       "generated_sha256": {
         "src/v2_contract.rs": "31e7cc2acee51f1feac5300326bd56ab8a45d66f857efbef6c31e345c337a1c9",
         "v2/policy.zcve": "4605e858ddfe9b22e99cc3e3aa57ea79bf632d6ad9eaf4e253cf584e4034ff39",
@@ -5641,12 +5641,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "acdd819dd1692f86e7fed80266eec1a9215a10a3ba51fec45a1324319b9a0d5b"
+      "review_sha256": "3c2007b065e301487f8e1212a2ec21c3f5e9a40a7729c9a184cb94894b150779"
     },
     {
-      "app_tests_sha256": "5b1ad300cfe7e35caa16ef984cb6ec132ca5ea868122a7274cc0fbfdef398ff9",
+      "app_tests_sha256": "601665c7db8af73da6daf4ea441b64a2bf4c3f708f86ed74ccb18bf0519bdf8e",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5670,7 +5670,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "e930d1bf0e0a7c61fd3afa1c39452829e1b5ca29356b859b2776597416359e40",
+      "consumer_lock_sha256": "69fd56b7b299d907c3a0bfaf637ef9a04a05d51a5c97e5ed41833afdd9f506d5",
       "generated_sha256": {
         "src/v2_contract.rs": "1bdc6a67dd7e4182322530dd77ec5c167cac21849461b1a39b02617af46d3cbb",
         "v2/policy.zcve": "dc04d7075c9a4309af2ce92d4f26b4d1480b15e3d6276e327a0420cd5cb83f9e",
@@ -5773,12 +5773,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "1e1201ed08511d38bab1d5c3ab457fce3f98e0bf1ee81b8b75be54bf51272728"
+      "review_sha256": "c5e081e5f31ddb3498b059e4f05534568f1c56174d3977846ffae704e097c6b6"
     },
     {
-      "app_tests_sha256": "cdf7fe32da1f3aa5714eef52a9cc2549304d896b843d13269140ee9d245594cb",
+      "app_tests_sha256": "b5b2d71b6713a7b3c9ca4c45b46cb9c12f201bfe612beff61f2cf582482aa11e",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5802,7 +5802,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "d8dea64601ad80bef15cc6fff5cb025af494a20ccf3cd98b727eb199b374e026",
+      "consumer_lock_sha256": "1ed8ae1e063b7b88891e7b7b5b8f397e883449e125479a90541c1434ec0abbdc",
       "generated_sha256": {
         "src/v2_contract.rs": "ab7d652b0033da3b894a53fddad3e9b671dabc87173d566facb0d0098e25f42b",
         "v2/policy.zcve": "d47f0ea28a5ce89cc303bf32641d4487ffc8b394f2e4105e80c3f60ade824021",
@@ -5909,12 +5909,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "f0abb387785192dbd4988921b31884e8d8d970d06f9d9a179e5a563d6c013e4b"
+      "review_sha256": "d28bb54fb28a688fb1da4460f9e049f765dcab20428c5f461ac2d043546e3ba3"
     },
     {
-      "app_tests_sha256": "e69fb05caae7482f1a7a8e4dc767526bdf1a2f98ac5bb1b7556e78256177dc6b",
+      "app_tests_sha256": "e81f92d1763ad155efedada48b8bcaa6672e02594088f4ed6883a5c8a301759e",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -5938,7 +5938,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "c677aaefa095e9a3cf74489d4551ea99f2144dc58e5fa0393f4ddc79f2dffaa5",
+      "consumer_lock_sha256": "6e484ffa8ff4e132ad0614d373188422b389d22b8754a9671645f32bd80a7046",
       "generated_sha256": {
         "src/v2_contract.rs": "1a99d98aa8c131fe0545775573e3abfa728b050155f496ca0bed2ddeb9d6e0b6",
         "v2/policy.zcve": "4d4befa23d39cb7de58c441137ff1ed36cc2543b3beffc113cca953c80742108",
@@ -6010,12 +6010,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "11c1e6a60b9c0dd57626b856a54c32c4405a07a1fcea1ab90ec62f28d345ba5a"
+      "review_sha256": "226ab8d488b64c2138d20c22b68091192147d6b86b8dc06da022497675cacf4f"
     },
     {
-      "app_tests_sha256": "c49363550732c974d0cc45c1ea11330ce03d93a1b71da59e2ae77625d8b1122f",
+      "app_tests_sha256": "8b1e15ded1662848349c0197b90724f7c6b1ca40ccc9868620d49a8d1feb2ba3",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6039,7 +6039,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "6c48e299c849de38bc227480372ff83a3defb6145223d21e8a46d505b2e80da1",
+      "consumer_lock_sha256": "025b5978fe96679d86f9befed119a58d86ec2e2e3ddc73140cb49a8de54bce9f",
       "generated_sha256": {
         "src/v2_contract.rs": "4437e08d017b80e445019fc142b07516f6450a4b2dea0b4baa50beb61d11806c",
         "v2/policy.zcve": "449b25f7cfb42421c96bed43cbc6dd56254d02f7d92610ffd1431213b8bb2d68",
@@ -6112,12 +6112,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "a17da3811f30405292ec586a3b09cce977062972b30d90f996146516c686afbc"
+      "review_sha256": "f9cb16c4bb5f4357f5739d3e5755df43226301c5b77b295f2df720be4c9ff9bb"
     },
     {
-      "app_tests_sha256": "fc3ac33ef922708ea211d10ffc560bb0665358dadd16adbacc49b33d640f7b20",
+      "app_tests_sha256": "91834d97b54cbd6205d212dc5ba6c246caa52aeff058f795769970b998c9f3a2",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6141,7 +6141,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "64226863a37faa3bfb9ddf6d1191fd645b2639e198ded3948863e735e449a8c1",
+      "consumer_lock_sha256": "ee18e3ee89f9e6a69d8df2ea36c43a9478784133e2d41db8b3c4eeb13ec17a35",
       "generated_sha256": {
         "src/v2_contract.rs": "8136da14d8738e169227d61d277556db62c485215243a677971288a892c97653",
         "v2/policy.zcve": "9099235fd927de95c8f15d23fdc728020b5ec4a60061d839c37c3a5137785a87",
@@ -6215,12 +6215,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "d20d434df7bc583064fed8f6624de457a3012c8f8a728103af435dc183c4ff2a"
+      "review_sha256": "2b07566989155de4ad7448fec2870efaa2b1af2cde0b4190b6a10b75faabb5c0"
     },
     {
-      "app_tests_sha256": "8f59e9752579494c6d9775ea3ce49207c47b93add6e717896c6de80e41b6e63e",
+      "app_tests_sha256": "00ce9007056f9561fbe3870e69f5f0b61de72f5054a8d53f9cb84e7e1b6828b8",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6244,7 +6244,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "5f15e8139f138a59b5d4ad30dc7ff3f3f1baea85fb339b228148ed02bb8729ea",
+      "consumer_lock_sha256": "f3bc0073994e8699288cfdeb4fb218a2c6dd74e162f677e7d8cd4b59b89acb00",
       "generated_sha256": {
         "src/v2_contract.rs": "d7f01b7c97b491d632aa7f42fb604de1a4a8a4d1b797a37349cc971b4bfc9065",
         "v2/policy.zcve": "11fc19e9a8248808ba84179b8472570b3955790a1494b42b2872ee5c6ec56897",
@@ -6319,12 +6319,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "88d32685ab8cc0a9cfb86d56a4cbba9fdca206c5c74f24deb5660a650d37e077"
+      "review_sha256": "1f7f8f4169baa8fc835b85e8d0a30b633f613c1a53c6da6b0bad416cca0f9ecc"
     },
     {
-      "app_tests_sha256": "65870f0ddaf67985649a11414e0c8eb1a056e9766fd02feb8fc1fe634ff93086",
+      "app_tests_sha256": "8e2d910123475be12a9ae291cba7d70d429613535e30d08d70d44ad7a2c40912",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6348,7 +6348,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "30a2e0b5d4626f18b298aa090c3df9f6e82d27b696acf490df4485dcfb31ae87",
+      "consumer_lock_sha256": "668c7f2eb7a8d732ac733a5ed3e4ba4769ba53e8eb09b3fc27810459e6c1ff00",
       "generated_sha256": {
         "src/v2_contract.rs": "747a89acb95a1c8b070da05fa340272715271f84050602485e836c0f2a2b18e9",
         "v2/policy.zcve": "9e7411f3fa30dc74c04238582fa55320dd165f614c3ca9c6cd9eef6183e32f3b",
@@ -6424,12 +6424,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "7f3fb0cec5da5a9ad74e3815fa8dcbf3ef5b92d7f30751f1d97b870481cea515"
+      "review_sha256": "c377d6045170b86d26883159fb139f66b239097237c642eabd8675762ef1f355"
     },
     {
-      "app_tests_sha256": "48a53ceabd28a757cf8d751311daab39f7da2e6f87386b1bbf59a145d867dc4f",
+      "app_tests_sha256": "a3174cc636765dfa690d28383bbdb9aecce57f1671752a8928a281092de7edb2",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6453,7 +6453,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "700de6e8929cc06690a1dfc763d494727cc1bcf62441017408a66a5c31179df5",
+      "consumer_lock_sha256": "02cadb1ee38b70ac5f0f70d6c1a4151da1924bbec3d012aaa20c8ee58defb476",
       "generated_sha256": {
         "src/v2_contract.rs": "8f90a289773b923a54e178a686d79fc1d334f3c8fd7c9f8022a8aca88ff915da",
         "v2/policy.zcve": "7a0e61d8b31daea7f1366fde9a79b2d7ac02e1ce8f4fdbc59745f0584cd2d1f3",
@@ -6530,12 +6530,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "9b67cba4280abed3e5e918ace7ec10b22facd2afb95eb77dd0553e9c74b46cc0"
+      "review_sha256": "9f65560150adbc67bf9a1a1c54219f47e11f2a2b4f5bb97d8de7f1b19dea36a9"
     },
     {
-      "app_tests_sha256": "dd07bd9e4fe2bcd54e6dda08543373f577096c4c5189436c1356be8319a91781",
+      "app_tests_sha256": "93beb4542a4d36819a3cd5ef77131554db7c1b5a4343bb37cd87229451dd8817",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6559,7 +6559,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "64b7c76f5e13d54b1ea243b9407793dca24e05dfac31107299983f3ca2c881bd",
+      "consumer_lock_sha256": "225783442b183e4212f5dd4c57f8ee0e2eb62e95a8abff93e6e6fdef73be88f4",
       "generated_sha256": {
         "src/v2_contract.rs": "24968f5ffcdee23101f2981ea0f478eb67c5bb7d595caea025e1767f57e5a38f",
         "v2/policy.zcve": "ed4123c5d85935e6a96579c3080fbf87bae5cd72e8bc5a401d99748aa770260e",
@@ -6637,12 +6637,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "8bef96079c6039eb842810c4cd1f230907bf7fce53284d0dff2edb1464e30d93"
+      "review_sha256": "56c05f8f049c812e3b503dc990bfefa1a44f139a97a623b3820169a1c9d1543d"
     },
     {
-      "app_tests_sha256": "ff5f6492067c800858b6ee3e8f676e207759a0c31068bc52a814d2870147dd82",
+      "app_tests_sha256": "81a82dfac6f5efdda10bdce2c48e6a7f268fe1f7a9eea753fd0adb32a37d2a18",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6666,7 +6666,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "518a1351270137b868619102222065f6fe67661e5628dbc2231f67bb92ba6f6f",
+      "consumer_lock_sha256": "fccfed604062ee5adea162a438548af26e99068ef2d12490afc397076bdf8121",
       "generated_sha256": {
         "src/v2_contract.rs": "64b9335d9366f8b422e2a1f1db8c7b261d1526894cbfe75a94ffe98943b978bd",
         "v2/policy.zcve": "030d3482193bab008da8d9623b88c8358e9c98619ab3316ee8ece0adcc75452a",
@@ -6745,12 +6745,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "0fe51eb5a297d35ac5f3089c77b6424db0a673fd609437ddb2e695730164bfbb"
+      "review_sha256": "482c53a63c000a04a5c76f661a7f67bdbc5fe6f90136ddc25779f6cba1cefeb3"
     },
     {
-      "app_tests_sha256": "0a6e6cd503a96157853d6211a51b7b449dd3ca89ce70b3b0eccc29d30ce366d3",
+      "app_tests_sha256": "91edcdede7342d2688b01fe9f362e92b25bc1b507cca06265d9ccbdf0779b837",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6774,7 +6774,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "942b3bb4625573d3ce80923f6ef5018a31745a898f8ce24b6c696b46f1253c6d",
+      "consumer_lock_sha256": "da4e2e3eacaf4050905e923904463cd0ac5dc48818f91038e83dbe015894ce95",
       "generated_sha256": {
         "src/v2_contract.rs": "740968ecfaa6d5802c5a190b533f1bf2b3c52daa86f2c25d9b0f4771dc766fa1",
         "v2/policy.zcve": "6a0091ca00ae7cc8cd6f6ba14b082af773f9a3df09048e0b6160c80043962be9",
@@ -6841,12 +6841,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "80760ff545f88b2cf7e9b53f4f6dee81d1b51446ee31fd4eae0d646dcd0e7534"
+      "review_sha256": "ff82cae637efe4bd2c66998d537e48dbc8528315919bd9ac507526feadd70fb5"
     },
     {
-      "app_tests_sha256": "839811fe0c0bc3764b4f6d335b9fabbad9881676a3f4ee74d0bfb1e4503193e0",
+      "app_tests_sha256": "35cdd4cfeff7be18c64ea79d19639d378fdff2b2535652bac5167fdbe6e5fe98",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6870,7 +6870,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "3452f18ca906295ff8def721e444d9aad3d635adc5428764f06e4b2a2ba68c9c",
+      "consumer_lock_sha256": "0cb7ab68978ec0e9a6d2b864145c4575d80b3801448947c1ef5dbf1bff881aba",
       "generated_sha256": {
         "src/v2_contract.rs": "d26561e2f2c277d6a9845ff897698e39f6e29472ec0e0a5e78ed1364c6ce2c1e",
         "v2/policy.zcve": "e450a15f326ce024f684265d79622954b049e5233b8254f160ec2b9fc94cfec6",
@@ -6938,12 +6938,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "84be854ce1a010384c43e3ddc0dada5edd7d0a35d32c4d1f176c933e4f713853"
+      "review_sha256": "c9cc96e7cd84a2e9efce7935fd09d3cc35c049175668c86ab52487d8fa6a2dfb"
     },
     {
-      "app_tests_sha256": "6fb443ef570b5be4b21ea0aef32d9f7687686be9e80a650af5e1364447916c2f",
+      "app_tests_sha256": "986d97aa59aa556d13dec9c26e932e98a2195bb57fcaf82ed08b5a129dc202f0",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -6967,7 +6967,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "74b3616614655e3241ef9f7f472f890c46d40e78610e12eae31f7db0b513db1c",
+      "consumer_lock_sha256": "d43c4688d7297f2904e8a2aec204221c18f7358e4db9468738afb99ba8842590",
       "generated_sha256": {
         "src/v2_contract.rs": "5c22b9fb6fa412684f6696cda2587a96ca916715f2b4ff55832b24ce9b6b8480",
         "v2/policy.zcve": "a070955ef87e13678341cc8000a9c53a53fd629cdc0de4d4cf1c609fc5d464a7",
@@ -7036,12 +7036,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "c0ce70bf84460c09e0761df1e6d3d1e1eae36c717f317fe05a11eadfd4372614"
+      "review_sha256": "6f41d508c1f7d16ff95969c3d4180435d438ad8d9a0a256972e8de956575a86d"
     },
     {
-      "app_tests_sha256": "d785861a8aaa268bd57c928e559264bb55c6afef269688acae3294e047633d13",
+      "app_tests_sha256": "587a23971862f64d983b041469f96ef8896101daa4723c30c87932f6751b7ab6",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7065,7 +7065,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "b0c438fb9b42e36d5b0675a0ab22f1c25e6a4623aa3cbe4cafef344736d168e9",
+      "consumer_lock_sha256": "1bad852d689ed5fa0329177597924779eac500d9583832edf2d12cf6ff905bc5",
       "generated_sha256": {
         "src/v2_contract.rs": "b8cfb5bb02c8c5b81ba6d30e8467725717c214b964ae415ffedc1275f18874b4",
         "v2/policy.zcve": "f8bdd15d9fe2552536022e90c93ec84c8b5c6c9f1bf206a23e614b7a14b646c6",
@@ -7135,12 +7135,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "d8bd0ebedb107b261074fffa43f347f08471ab0af2aa930c9e64d36cb45ab657"
+      "review_sha256": "634342d1b5eb548dfa4c194f049ec2a9d917eb0b4645103d3a68b49b265635ec"
     },
     {
-      "app_tests_sha256": "6693b6a904e8f6f9673833a25086025cdbb835618408d96c4f42cd857fa49298",
+      "app_tests_sha256": "b6df094b1dfc8e7b845b4420d00629dc3783d53328e5e1f8e6e9a6b19e12e5a1",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7164,7 +7164,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "424a0add9b07bff4a69833df07a3cc27f7217b18fa89a0e9e77e8e801d5d932f",
+      "consumer_lock_sha256": "92001518eb7b1bbdbcb5f5928bc57d40abcf4002b9886d447276ae7defc61747",
       "generated_sha256": {
         "src/v2_contract.rs": "2704b4d352d95879499009668a450f2e644cefb03fcd39ae7cbfd9f0d7b7a663",
         "v2/policy.zcve": "1581532744b335cbaa25efbf3bc9c6afd7dbd52ffea945f790507701e62694b4",
@@ -7235,12 +7235,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "095c6eac3730848d4e4f403f4ca4664b644b1efbd68291e316fba15f56a63c37"
+      "review_sha256": "7c675efc38b52f9f6bf9e0bee5427db8e20c5a30cd8c4751d1b56fb79d0b120d"
     },
     {
-      "app_tests_sha256": "c6a887085c71ca667780beb3383ffd3c1e2d3e42280d1483d50a2792a1448b13",
+      "app_tests_sha256": "70f3c947e7f2bce1afcf6ece26d7ebce970fd1ec5e50869f53911360d962ef52",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7264,7 +7264,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "b1c386ec85bf5f6300d482ade3c80fffb70715cb03a2e3ac909fb8f7a2236dea",
+      "consumer_lock_sha256": "a2820df7e1ec8d9ef8ef060fb046f52c1630b0a973d82a25aec0ce8fbd3b8266",
       "generated_sha256": {
         "src/v2_contract.rs": "25016b6d05af29c361727ea87b23bcf9909bbf6d33d0fe79883874ac9c9cb90c",
         "v2/policy.zcve": "720c40a720e9a02dccec90df9c34a6e0029589056995a8fc0136693004f5cfd1",
@@ -7336,12 +7336,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "9ec22b2b667d13f5d999671e15a17e9903a4ac70ee320580e50d4307abd08fa7"
+      "review_sha256": "901d2a42c6a38a10bfffc08179f827709d628de4d84f11f4a8dc8a116884a701"
     },
     {
-      "app_tests_sha256": "b574be7a47211470d0cbc896b4691c131d434d10ebcd5575e571399f41ac7e53",
+      "app_tests_sha256": "bcac464fff5a5dc6ce02d880f1228c17801be90b7b8e0274c91e533170e4f198",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7365,7 +7365,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "4ca357716070574e73553faf836a0d4425bec2e7326531309ca38233a05c7531",
+      "consumer_lock_sha256": "b61b1cee64093dc62f7fd58b6f10ebc5798c6c2b9972915079cf4b11ba602e44",
       "generated_sha256": {
         "src/v2_contract.rs": "1f066b5524e9543edd5837703cb65d41fe585507c951556a125454aeec15be28",
         "v2/policy.zcve": "d0458ecba18425c622367ae67b6446d5a4e0e47e6f440b25a527a3137f4158bc",
@@ -7438,12 +7438,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "95f864d6f8e91f31a02dcdc44aa19eea526f588a046a741a78d35046b943940c"
+      "review_sha256": "609cb454fd603fe05b0e07943d2f052e55c238910ad468cd1b8186f9e24a31a1"
     },
     {
-      "app_tests_sha256": "27870ceafeaec4a0733394877a77b8cba2945bccd34da3155263d15b2505eb41",
+      "app_tests_sha256": "1b92427cb2160827f3f5433ab0e53ef6c4b17a8a508241ecfae5463c32d10cd4",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7467,7 +7467,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "f9ee2439e4cc3a8e23d9127acb6736c3577bc37e49eaca293424410759bd6a5c",
+      "consumer_lock_sha256": "9121157a95c01bced0c6795a8fc21267b50f99e38d02688305b6a8192b4db2b1",
       "generated_sha256": {
         "src/v2_contract.rs": "5a23a7f0f6aeda0a6a98a33df9596b56d768a00c9d7105e0f348c186490038d0",
         "v2/policy.zcve": "46c072028ba25274d94f287a5aed4d7c57f149b48fceb5ee4578143c137224ed",
@@ -7541,12 +7541,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "1b9584e8c8081b63bbed878e61f9622b4ceaf979692cc71b1d6ba0443ae5a4c0"
+      "review_sha256": "c754110f01d15d1e5992cd7c307346310487f29c5bd59d36ea2e0fc6a0f54834"
     },
     {
-      "app_tests_sha256": "1cba5844af3e86630678eae703d7a4e12332c3c7769037437a8aa6ea237cf514",
+      "app_tests_sha256": "cd42745441cb8e2f5d58f3498285e234e2aee504d9a7a43f3cff338d867a40d2",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7570,7 +7570,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "330f4aeb757eca76ceb81983daa190ccb6c62a5ab08247c8366cc4dd9e16102d",
+      "consumer_lock_sha256": "7d3e7eb8046c628f0c54f866e6fd00bbb8831822d48f5180a01cd8c2dde7280a",
       "generated_sha256": {
         "src/v2_contract.rs": "ac90e27df388b9519f69fbb2c4ee9baca8137ab5e6f4263f757f5259afa4fcdb",
         "v2/policy.zcve": "a988991b74574755e065d829f8568645bd96681e5e2b8d58afb2022a6bd4c23c",
@@ -7645,12 +7645,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "e0dbe1107b18dd714d170c199278fec37a6d1dfb998ee4109be64c54ab3f1da1"
+      "review_sha256": "f70900d365e6a722510fe5361fc707cb1aa63a07b534c646521095ee1d563090"
     },
     {
-      "app_tests_sha256": "d0f6f1a5f14e6ee9f4aaa16c439a7e8a9482d8dd8ef5c5e868bab9a3a8c7d4ca",
+      "app_tests_sha256": "1b123103006520c5c2e5d4cbf12cbf143ddaaba85025cf9f4743d3949f2fae62",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7674,7 +7674,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "66732d9b94254d0629ca1f0ae38c4bd97a45ca44f9ad1619fcf9891faf424787",
+      "consumer_lock_sha256": "50074c7a45fac2d9fbdabc8ae251e98dd3e33847cab1130b12c24656f43aee0b",
       "generated_sha256": {
         "src/v2_contract.rs": "452f83ddf50e5be488288ced7742f92936660a3cf2448766006b660107e33346",
         "v2/policy.zcve": "451005e877260b8718185ccf3c0b27a7e86ee6e45c78cc914b2adacd1c1d70e0",
@@ -7752,12 +7752,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "e7bc83327f44108c915d04d61f248be52235c9c890b79695eadc40431ba704e2"
+      "review_sha256": "b9226de943aac9718ca6337f7b1186ef806b6806ed9dc2ae5dcf8d6b19844b4c"
     },
     {
-      "app_tests_sha256": "8e111df2254f7a44b47b7a7968844202c6e192d5b6753c1fa13aa85161cf81b0",
+      "app_tests_sha256": "4c5152a7f2e6b54de873dc006d0cf56b00453b8bfdb6cfa96e8db71a1432b159",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7781,7 +7781,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "2bf52d6fb38b8e5674633964a8b7d75e4b9ca88907a0ffd7af225fadcec0ab8a",
+      "consumer_lock_sha256": "f6e70c2d01d07fa4f3176ac51b620ec8f1c283e009c1101694ddae46befc13e7",
       "generated_sha256": {
         "src/v2_contract.rs": "0ab800733d12be044d5ae03301878441a9140aebd1ef6c6c82628cc2cc2e70a5",
         "v2/policy.zcve": "5452ffa3a69a94a0cdc5c12ccab81b9bdeea4254ab46e612d6fa1d2cd1072438",
@@ -7862,12 +7862,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "55f5e9d5b2e3a902ac27c9385505275723453ecb2f06547059b350d053c40139"
+      "review_sha256": "c6ba9049599391b5fd596f9f3e2923066560d728435198a22b38f5d7e12f9e06"
     },
     {
-      "app_tests_sha256": "a30dc4feda9c93992454738a68e4275c1980b1fd2251d8513b5c5ddf7c4bccf1",
+      "app_tests_sha256": "af9f8471990196f5943d2ced6081af959086b0880ee2b021cf167c75d0d26204",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -7891,7 +7891,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "db5d53fcd1add0b5dbd577033d3f843cd72a4dc455d1ed50fb0ede1a517aacc6",
+      "consumer_lock_sha256": "58cba5fe813db108398a2564e857182b028017057259abec277d9337ccaadb08",
       "generated_sha256": {
         "src/v2_contract.rs": "4b363a66ba146a889bc810e162f72661b7bdf27eecdf442cfa8e92470a5bad7e",
         "v2/policy.zcve": "800ceea252edc8dc0b866464144b20a24414eed75f678dffbcd988f85149179f",
@@ -7975,12 +7975,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "f6d3cfe77c35b7d8788298a5421e7ed40462b303b00709f022d472a9e6bafb41"
+      "review_sha256": "03746f5fb0fe5ccb587f3764d72f3ee0a7d19588926b8673b7ccb5513a077136"
     },
     {
-      "app_tests_sha256": "9075d4714194642a806a07f005af58ebf75b3601beb8b4ef634e58b5716b1867",
+      "app_tests_sha256": "1b5e1a3a57825c1987ebfcc89206c7d9bc9daec37e56b0bc5510f2d87da156a2",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -8004,7 +8004,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "f9303c79f03b49bea08149bf98ca00a5aef1ae77dd69b68767fa21703a95d9e2",
+      "consumer_lock_sha256": "f97e5100900308f044d5ef4c9774a133afdd6154685ef189e263fcdf9638bb68",
       "generated_sha256": {
         "src/v2_contract.rs": "ad7c9af1f70e14e3ef833a7fe47f12684002fbd565fe1e1e4755607075a749c6",
         "v2/policy.zcve": "5c9f1ae80d6903a253c5665b36f860bf94c81b516757e357cbeb1985c1ff8882",
@@ -8091,12 +8091,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "0412f0c5748553d2af0eae8c632e4b8b3f1ae298d2004b251ae8cb48b000b1e8"
+      "review_sha256": "e2d3951f995e8c678be9f86ead1ee2a13c4969e7e34766fc57e526813fef23a9"
     },
     {
-      "app_tests_sha256": "20a811676a10d44815669ac632693c19c5d0de1d2d5773465f59f63425d8fc91",
+      "app_tests_sha256": "5648baf8dfb1dad68d97e8c08fdd4323091ea96199e80abab2ea051e1320ac3d",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -8120,7 +8120,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "557a13c6cacf7b2ddb95482c761c654713eb49c4e21ba345dc63b37d444c8eb5",
+      "consumer_lock_sha256": "f741501d9e4e877f29c05039f509acbddc61e8368c682f9b098f3079b2cd0c17",
       "generated_sha256": {
         "src/v2_contract.rs": "7560b28e559ccf11b5cf4137eb8308ab84f6293da13cef3ade78dcd8ecba421e",
         "v2/policy.zcve": "4323408eb0aa5c6b2555cddd02e1fc8b7a29a9aed207ac9ce8c58f9f72771747",
@@ -8210,12 +8210,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "3853bcf2f5a3db9e646f599808398f6df8728de68c80f1ef2c9bcf74b9ba6c21"
+      "review_sha256": "34d686ac1b83cc0ec3e67bebb471f420e7621656b8ee897ea98978a4cc6641fe"
     },
     {
-      "app_tests_sha256": "51645a2fb5713ee2f401f9f39288055d6ef4938d86f6cc9692781e2cf7d428be",
+      "app_tests_sha256": "93c5375046ba51b5e4554bc0b4b0e1c02a2a83dd3362adab2b4eba276acf5cbc",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -8239,7 +8239,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "90ac406c0c9d024e1c5c46f5da9d75ec7c8d09e4c11d747594bb4740d9b4faae",
+      "consumer_lock_sha256": "3482d5aa1d48e4323dd7e13efc6b2e75f135f6eb420176fd87380b6f662a5ea0",
       "generated_sha256": {
         "src/v2_contract.rs": "ed30193a25faa223bd46f8ca4b4a13f84ff2ed02ab0cb84800999300eabab0b0",
         "v2/policy.zcve": "1c19cd638b9ba70781bb8e17639406fc482ea99a57129264f860a7fd6f01c64a",
@@ -8332,12 +8332,12 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "53d2be3dc8f55603ab52ebb547d2e90233d77485ed0d74295ecd52c1a7c3f4d0"
+      "review_sha256": "d7d1dd674b93a04fe188422bc0fad89ceeb3f8729df2697e9dee11f2b1826d44"
     },
     {
-      "app_tests_sha256": "bd79c25cf7ba5a84ccc10ac3c8710c90434423ecc93a63f461a61d01dd03b9f3",
+      "app_tests_sha256": "1f7f06314d9e088e8e2c2fdc44ac6b8fe0a71cdc664cdb5db64a1ceb82b1f97c",
       "binding": {
-        "lock_sha256": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
+        "lock_sha256": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
         "packages": [
           "zeno-fcis-authority",
           "zeno-fcis-catalog",
@@ -8361,7 +8361,7 @@
           "zeno-fcis-value"
         ]
       },
-      "consumer_lock_sha256": "ac7b0739d437fa3d4dea210549dff71afae1c77f81a64cbdffbe7fe5ca62afdd",
+      "consumer_lock_sha256": "11c6c7dce4a1abf7f949293c01787e85983df2184705fb55dd2b1cb2aacaf829",
       "generated_sha256": {
         "src/v2_contract.rs": "5b20fa655499c92334d93eae24951e83df155bb332b5183816b5e10a5dd60ba6",
         "v2/policy.zcve": "81dc6fea36979b9403684173ed4da4228afb7914778c475ee80a2e04368c58a2",
@@ -8457,7 +8457,7 @@
         "schema_types": 6,
         "version": 1
       },
-      "review_sha256": "d3295de8428fecbcfd0288e02461c81d9a51a10a81f879949aa52c1a45404300"
+      "review_sha256": "17d149efeeb22951d234842db6219991a7f8a6e3917a53b35db161ff8cebf689"
     }
   ],
   "law_violating_mutants": [
@@ -8465,111 +8465,111 @@
       "family": "reservation-pool",
       "law_refusal_findings": 1,
       "mutation": "lost-reservation",
-      "review_sha256": "d85ff77a133328599e351e7cfcbfca38bb0a10dd1ff75f6d8015b5ce32d1202c"
+      "review_sha256": "45e3ee056dd72c5134f18659b94a80e9ff7cfd55cc251d44be135bcdbf303d74"
     },
     {
       "family": "rate-limiter",
       "law_refusal_findings": 1,
       "mutation": "free-request",
-      "review_sha256": "c1a166e282603bac0638336809396d2b837ca68bc67e58d78aa8ee628072160b"
+      "review_sha256": "49ec0347660235d34e0c56af7e418031c9df935e60c77a8b5a33c6a68694807b"
     },
     {
       "family": "approval-queue",
       "law_refusal_findings": 1,
       "mutation": "lost-vote",
-      "review_sha256": "69d31fbecea8f39fa347db7427264f20e32eda98dc9ab5fc8cab94df09939b4c"
+      "review_sha256": "535a7f94982f1fb5e7f43f187225de2a1974bab1a4156fc8aeb7e02d7246cbdf"
     },
     {
       "family": "bounded-counter",
       "law_refusal_findings": 1,
       "mutation": "lost-increment",
-      "review_sha256": "6eaaef23f0452c9fdef1a1a250501dd391da75ceab6ce28656a5d18b2811c4c9"
+      "review_sha256": "4897987489cc8c6c382a9f668cc4cd324599aff0878d208b9bceec587cda9e0c"
     },
     {
       "family": "bounded-counter",
       "law_refusal_findings": 1,
       "mutation": "authorization",
-      "review_sha256": "23598c307be81aec3e404ce9d53b42fc9e516cd06736ad0534b0a41bfa2b2d4f"
+      "review_sha256": "9d4d070bb01ae9b8f1fc84a75cac465d77be3941bf3f97de4cab3d7a41e14008"
     },
     {
       "family": "consumable-budget",
       "law_refusal_findings": 1,
       "mutation": "free-spend",
-      "review_sha256": "b51e08dbcbc9f7840282c14c9e12cb5a7f4d7acc26d5f2603b73f1ec5b19a525"
+      "review_sha256": "57603c9f39a37b360f2fdcd908af21127def7614f13816b4fd693644c09da787"
     },
     {
       "family": "consumable-budget",
       "law_refusal_findings": 1,
       "mutation": "authorization",
-      "review_sha256": "6743fbaebebf01b15e373dee1989b6345659007bf4642a72b424edc420a0210c"
+      "review_sha256": "4298189ed233c8dc35ef391e3a6b66599f8823db775e819d95d792ade89c64bf"
     },
     {
       "family": "versioned-register",
       "law_refusal_findings": 1,
       "mutation": "lost-version",
-      "review_sha256": "e32f10c0232501301f2b603a6a7a08fafb312407f92188ecb1ea5f1170a07a0f"
+      "review_sha256": "350f9ed39a85421436c881d288cfeb3344c4cdde8b561ace6cf7cf8dffc28f7f"
     },
     {
       "family": "versioned-register",
       "law_refusal_findings": 1,
       "mutation": "authorization",
-      "review_sha256": "0b179cb55a93e5a36f4b34a1d397dd0bc981d8ca058557b85966851223ca0183"
+      "review_sha256": "9933c71f4da8a700404f9c48df3e99e2cbc1f00f6578f2b38b49fe468046b4aa"
     },
     {
       "family": "idempotency-slot",
       "law_refusal_findings": 1,
       "mutation": "lost-record",
-      "review_sha256": "af11e42d328c1bf680ae7a095069e055fe9d41591f456dd4f30a71bbf469cb47"
+      "review_sha256": "e88b8f5625422b222dc5c78f0eddec5cdcb36b466e6401327d6fb2127f944a2e"
     },
     {
       "family": "idempotency-slot",
       "law_refusal_findings": 1,
       "mutation": "authorization",
-      "review_sha256": "706e2a3ce3b830c982a784513d156504a382285e08cd3d750bc1c074fb44079f"
+      "review_sha256": "715ad81ef6b7fa5fca8fa0db33608310b458279a807eabaa0c08ccc87f0d2ea5"
     },
     {
       "family": "retry-budget",
       "law_refusal_findings": 1,
       "mutation": "free-attempt",
-      "review_sha256": "7e727f3d39608796d82d43f0ddc3109af520fc622a89684b8be7b074125c70f3"
+      "review_sha256": "6cd9f2c5335840de7c1c18eb5c944a0f477c009278b71392711c2b96fbdcfb7e"
     },
     {
       "family": "retry-budget",
       "law_refusal_findings": 1,
       "mutation": "authorization",
-      "review_sha256": "30c0b20097e38ee05b8d7e597c78f5ce28d8f7cbbcc7a83f8be9f552b962ab25"
+      "review_sha256": "c4e8ad23a49bdd40b41df8c22472c2007428fd1357301a7ecdd62314ed506092"
     },
     {
       "family": "finite-phase-machine",
       "law_refusal_findings": 1,
       "mutation": "lost-advance",
-      "review_sha256": "806f75161de221d7f7b357c03219f4167107e2f3a459d148fe302a9cba0a09b1"
+      "review_sha256": "06ee8f12e4e216329f1a6a09720a05504143d976583eb20aad05aba589201af4"
     },
     {
       "family": "finite-phase-machine",
       "law_refusal_findings": 1,
       "mutation": "authorization",
-      "review_sha256": "a0963378a738e33a74a2e593921dbcdb891cca47177c3ebf620b5bb534378c8a"
+      "review_sha256": "233ac22025a738f5e614f3e745030b22753eeffd6eb9f799fe8fcfe645647f1f"
     },
     {
       "family": "logical-deadline",
       "law_refusal_findings": 1,
       "mutation": "lost-deadline",
-      "review_sha256": "4befe4dea7e9b145f13605ac0dc9c91bfe2ce36542d6652b6b520298ccac7dae"
+      "review_sha256": "025eb165076e41757c53742d74fa0d0ee35e26fbbf8d8857efd7263030fb4905"
     },
     {
       "family": "logical-deadline",
       "law_refusal_findings": 1,
       "mutation": "authorization",
-      "review_sha256": "628d0aa686698d4d784c45dbadf8ecc0a3f7dc72b72a31ada3c4b9d8b1e665a7"
+      "review_sha256": "35b3e9ca4e6e4fc6e9b4d318cc9ce78050b7c65b7b2045694d876e8cd61b34aa"
     }
   ],
   "owner_adoption": false,
   "raw_tuples": 107518,
-  "runtime_source_sha256": "a6ea8d3c4fe8883b94520efc6c7b23cc8dd42cf5015d77ec8e6a5c4ec1558878",
+  "runtime_source_sha256": "088f47033684dc1bf2d8c3152e6a6e4f83b9a9fb992a010b5bc0547528e2e79b",
   "schema": "zeno-fcis/core-seed-check/1",
   "source_binding": {
-    "cli_sha256": "e2e569f5c8f2affe82360280f47ee26a67984291df7f7b895d42a611e6ce3366",
+    "cli_sha256": "8d0b9d99d39b0b29c7e6070f5243d1a7615eb2a01124e0ace2b3f4a310b83f62",
     "families": {
       "approval-queue": {
         "core-components/approval-queue/examples/k1.txt": "a597b3b6dff08d8a8bf36b2aad7310fa77361fced3ade89c13c8306dfcd73a9f",
@@ -8580,7 +8580,7 @@
         "core-components/approval-queue/project.zeno.in": "17f776c9aaa2fb8c3c2c4dd514822fa12e6a04ce51636679568333bfc5e2c32e",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "bounded-counter": {
@@ -8598,7 +8598,7 @@
         "core-components/bounded-counter/project.zeno.in": "78b267f2dc73c85d456dab06a61ad0452826c5297a8e1fd55b97bfd06077c518",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "consumable-budget": {
@@ -8616,7 +8616,7 @@
         "core-components/consumable-budget/project.zeno.in": "cac0d4516067d5b392075572b18124ef00052f648015483c9bb7f55174fba587",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "finite-phase-machine": {
@@ -8634,7 +8634,7 @@
         "core-components/finite-phase-machine/project.zeno.in": "b03637ae0e549a07ce7c81ef229b0c93ee033bf1ddb879c197b6295a0cf3cdd5",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "idempotency-slot": {
@@ -8652,7 +8652,7 @@
         "core-components/idempotency-slot/project.zeno.in": "1a99f7ff9a44f4a6f143263c7d8a1f056ccaaa526db296bfa0d83b714aaeab8b",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "logical-deadline": {
@@ -8670,7 +8670,7 @@
         "core-components/logical-deadline/project.zeno.in": "62d7a8952f3d57fe40c7e16d77c36446db9525213a9e79d0672a4d2a12bf0b51",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "rate-limiter": {
@@ -8688,7 +8688,7 @@
         "core-components/rate-limiter/project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "reservation-pool": {
@@ -8706,7 +8706,7 @@
         "core-components/reservation-pool/project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "retry-budget": {
@@ -8724,7 +8724,7 @@
         "core-components/retry-budget/project.zeno.in": "f8670cc9d2ce67f62dcf1dae82254b5dc99292501a93abe0ab235c52e30c904b",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       },
       "versioned-register": {
@@ -8742,38 +8742,38 @@
         "core-components/versioned-register/project.zeno.in": "606eed09c7cd8d6eb34775bf53b25e012c03e075ca39c342e6b9af7fe6a497ef",
         "tools/check_core_components.py": "a5c7d789eb80423d016f689ca725814d39a073c3bf3bc40b48321812f4493c88",
         "tools/instantiate_core.py": "5553e17a5a43d377fff85c08a3c122224cbc66042e1075481b296dcbbc67c1be",
-        "tools/prove_core_families.py": "f5fc869006defb5391607ee22a7cb85922483e137b0cc9efc2f93f19a1d3359b",
+        "tools/prove_core_families.py": "37666d18be8e01a295b873ffdce959b6c6697b1ad856132f6879ca7ddfe787d4",
         "tools/test_data/core_components/reference.py": "c5c74f405e4c55cee85e15231e384cb029fa939a7eab9432dc83295c03bc0868"
       }
     },
     "runtime": {
       "files": {
         ".cargo/config.toml": "617c13aecf5b5eb08def4c002a76c19312b4b5bb1d5651cedd27f8db624e75cc",
-        "Cargo.lock": "bc6ad6daeefe6426176def576c06b92788eb52ed9ecfd3f6d80798f53d8fbdd1",
-        "Cargo.toml": "9fb0a5a5e0430e15b543c4aac87aa93d2faa62a1e511765e7cd39a61aca86b50",
-        "crates/zeno-fcis-adapter-zenodex/Cargo.toml": "c752d7f4cce3a403935ee9388c37eb1a2446b1a99b0162b9fbf6327b27ffd192",
+        "Cargo.lock": "1b4696776fb32f94b752e566fd95d4302763b460903265ff22b8e1e05c6d1935",
+        "Cargo.toml": "aa8c4ea3de3a6a5693920ccdb97f3cb4403b72cc4e468dcb0f0c5f429e0b181c",
+        "crates/zeno-fcis-adapter-zenodex/Cargo.toml": "ea138988e0f065e1f2eb56aae640a428936edc4d8cd476974d7d6a475d5d97bb",
         "crates/zeno-fcis-adapter-zenodex/src/lib.rs": "a3e03c4ff866d138d430ac4be054c5485d4f2798819efb8af849d962025dcb91",
-        "crates/zeno-fcis-adapter/Cargo.toml": "487d8cbf96af5dfe96a7a4ec4b5e024e966ec68c160c3d01885bb07a2823c54f",
+        "crates/zeno-fcis-adapter/Cargo.toml": "f31a5e82f903d2ca389db7fe315a68d90ec900dccc134b229d9c16c66c802146",
         "crates/zeno-fcis-adapter/src/lib.rs": "7e02f9eb384a233f31dbb08eb4a5b55b8fd9f40b30c9217cb0901ef9073532be",
-        "crates/zeno-fcis-authenticated-authority/Cargo.toml": "bb8effa79fbfd0ff3672bfe76dcbe324118659ff852367198728078b2eb7eb09",
+        "crates/zeno-fcis-authenticated-authority/Cargo.toml": "0dd77c826ffbe96aaeeff039beca62ddc6f6e3fb3bad1b7ed20fa096d73ddc99",
         "crates/zeno-fcis-authenticated-authority/src/lib.rs": "b20d96849d9ea33111ac5d6e1b144ecd97405807e383c55497dabad454c5d1c2",
-        "crates/zeno-fcis-authenticated/Cargo.toml": "58d14e912fa438718ad699200ed06bbbc4cb960cd2ff10403048c926946e1e24",
+        "crates/zeno-fcis-authenticated/Cargo.toml": "63b47ed11dbb2116795180972204185b9aabbca3245184c0b4a30727b1584eb4",
         "crates/zeno-fcis-authenticated/src/lib.rs": "41e1dc9779bc825a103fdfd6e691c7996416c8edcfa794a3d34553e099ad8f49",
-        "crates/zeno-fcis-authority/Cargo.toml": "15391b1a34888518c2498ca81fc634a3fdcb0b033cb3743a108243190563a4e9",
+        "crates/zeno-fcis-authority/Cargo.toml": "7b6759f7a7c21c26f55f1691a3948bf18be7aa36d03658cda56498206e3e64e0",
         "crates/zeno-fcis-authority/src/lib.rs": "51f505b8e73f4c49c43f70aec01c1f196d8bad7ed2b6dae42628b0427413a372",
         "crates/zeno-fcis-authority/tests/v2_schema_binding.rs": "a31b7fcb58f72576f8f3406214d2f2df584bee7cac8d307e7ddcdeaf2f537f2b",
-        "crates/zeno-fcis-backend/Cargo.toml": "caa085e6febfab969e123d04756b5f2c7ce6da024e2c840bd8e445041c25a7ed",
+        "crates/zeno-fcis-backend/Cargo.toml": "1922905b4081cda2d6201e8c302f2ebd92df7e2018966a23e43aebc1fd08fbff",
         "crates/zeno-fcis-backend/src/lib.rs": "72f1fd51db3addb11a24650665757d3e50bdf446ba02dd46f4204812b9029e7b",
-        "crates/zeno-fcis-bootstrap/Cargo.toml": "c4f347568425472cf930fc4c3a15934b44552fda38a1ac28cd0f03de26135f68",
+        "crates/zeno-fcis-bootstrap/Cargo.toml": "8cbec0374160325c95288a72a1b0bf2a251dc94822bcb3f6f9055da143783392",
         "crates/zeno-fcis-bootstrap/src/lib.rs": "9c558a2fc79d3b5c480f4326be1f7a6a07823898f55150192207103fb15cc19f",
         "crates/zeno-fcis-bootstrap/src/model.rs": "f544002b04a4db53dc47b309ffd4b6d54a95ad9a0b9f5ef5ff060925b78e5a1e",
         "crates/zeno-fcis-bootstrap/src/render.rs": "16b81337dce0c23c5b5d8a0b0851042ef18fb30876555293f71ce8817b21eca6",
         "crates/zeno-fcis-bootstrap/src/schema_lowering.rs": "78e20813c70d8757d336e3829eb8686bc5e5e8cb1b126a8581425b4f254c6395",
         "crates/zeno-fcis-bootstrap/src/templates.rs": "07219bbe9f9b73300666e785e0b99ee092235ec2c5916ba0abc3294e51316bd5",
         "crates/zeno-fcis-bootstrap/tests/schema_lowering.rs": "28a49fb723281074272f7a760a02f1d0b1bdecf6ea86e4137f082babf9abc50e",
-        "crates/zeno-fcis-catalog/Cargo.toml": "e2c40fa8149c6cf9454be10a69ecca81e54afc607c03564f59fdcd9bd5e9b062",
+        "crates/zeno-fcis-catalog/Cargo.toml": "6ca47858c098c4af0f873a65cadec5ee9df0336679f0b356715848e1da6a3d3b",
         "crates/zeno-fcis-catalog/src/lib.rs": "1f69cb8b998b7dc53bcd9322d788f950b49adf80f3f0f00a33b7f331b022e89f",
-        "crates/zeno-fcis-cli/Cargo.toml": "98114fcd79019435948fa4a1c9b58bb23822b9915bbdfa6cc5cc6796ff312f54",
+        "crates/zeno-fcis-cli/Cargo.toml": "63e544caa90aa8c6f2ef46e939bc4c460fece8767bd5f952ab5214d567969ba8",
         "crates/zeno-fcis-cli/contract-app/Cargo.toml.in": "3e55c3dde21705acffb515ca1cdf9eec2a5dc089023695b243d99451b90358b0",
         "crates/zeno-fcis-cli/contract-app/README.md.in": "d290a7f303ce1466a3e3d1be5c8341db24ce4eb89c63d7b1324649f871b65db2",
         "crates/zeno-fcis-cli/contract-app/decision-examples.txt": "932d2d0a78e21c4037912fd53303ac794ddeb951e762e0f9d88fbed3f27ef5d5",
@@ -8830,7 +8830,7 @@
         "crates/zeno-fcis-cli/src/durable_counter.rs": "e1418162ad6b47fac07d75125c3c71a94617fd5af405aaaf805f378fc7f8aeea",
         "crates/zeno-fcis-cli/src/inventory_reservation.rs": "71f86125e9bcc636dbab74b6e52378fc231a09173278bf14e443fe3256af345e",
         "crates/zeno-fcis-cli/src/loop_command.rs": "db53fb9c70f9434d3392da64fadcac9645dc2c068f927267f1dca4c9d3041a18",
-        "crates/zeno-fcis-cli/src/loop_command_resume_tests.rs": "d1181d19e6169f5b3cd3621faec104d2e646044fb06e32f9959794893a074dfb",
+        "crates/zeno-fcis-cli/src/loop_command_resume_tests.rs": "186b2f547c2d47076a45e1bd4aa7b8379a171cee1bf92c02fabb947db528559a",
         "crates/zeno-fcis-cli/src/loop_command_tests.rs": "673371825bc3d0b248d7a89ee7c732ef4e0144f2812ea93f17537e829ce7ccb8",
         "crates/zeno-fcis-cli/src/loop_proposers.rs": "a813ec947db44b713ef0399f8f775dbf87e75bcd23d275a495140508642abb06",
         "crates/zeno-fcis-cli/src/main.rs": "c76487442bf5cdca559c498a4014f8aab6289f56d835f5a738e1ef22598fc62e",
@@ -8881,7 +8881,7 @@
         "crates/zeno-fcis-cli/src/transform_command.rs": "b290be810674ee1a045c874faa148c51ac7015ad3689bf9f88f6c683136bf591",
         "crates/zeno-fcis-cli/src/transform_tests.rs": "f6e54b9fdbfd96268a8098789edd13810eacb4402567e71c46862a490d3519ad",
         "crates/zeno-fcis-cli/src/withdrawal_queue.rs": "c8c7e828ecc8a3922b978c34dbde4e4c3b9783c726abb864a70e4f1ce47f0610",
-        "crates/zeno-fcis-cli/templates/account-lockout/Cargo.toml.in": "691a69e568e6cc428453b150a0f43fe00f9405612077a455923c244fa5cedae6",
+        "crates/zeno-fcis-cli/templates/account-lockout/Cargo.toml.in": "17b4cd8ca1175e6faad44ac5d38fb8d0c158e6c08690aeb13ac6ec18ef52bea7",
         "crates/zeno-fcis-cli/templates/account-lockout/README.md": "5e3ca76f186fb9529eb1bd2719ecd11b901f1bb5764d405200d0d53139fc7a8b",
         "crates/zeno-fcis-cli/templates/account-lockout/build.rs": "535d59b71dc8fc23fda7dcc00dca0630e3447261704683a6579027a6114b24c2",
         "crates/zeno-fcis-cli/templates/account-lockout/profile.rs": "9219ae72dd47da52a5800f5169e4316ccf1c77c99c4b944022d675ddd6ffba28",
@@ -8903,7 +8903,7 @@
         "crates/zeno-fcis-cli/templates/account-lockout/v2/policy.zcve": "6b9a86bbb740e7fe157204b0bfd851a1251679ff2db9f7ab00b809313d744565",
         "crates/zeno-fcis-cli/templates/account-lockout/v2/schema-origin.json": "f63e5b9a8fb94b10481bebc45b8b88aaf84f52b5fe74145bd4ca9be9f20c9272",
         "crates/zeno-fcis-cli/templates/account-lockout/v2/schema.zcve": "b08d78b453e0aadf775da9c1dd95e50edd4056b1908d6705e870f044d1aba894",
-        "crates/zeno-fcis-cli/templates/agent-treasury-guard/Cargo.toml.in": "70abc33f7007b086d87a8e52a4b1d4bc1ded26f15029e763a29172da6d16361a",
+        "crates/zeno-fcis-cli/templates/agent-treasury-guard/Cargo.toml.in": "1798fd041274c5014206a9b0d107871c806024db215e4a692540f1f0d1571d3d",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/README.md": "09e503436f19c070ebcbb29cd7d31a24f9725c52982a85184ed84949ba2d2159",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/build.rs": "62751a7227ee33496bddb92aa280b6c121a915c58e2a7bfefe21385b054ccd35",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/profile.rs": "3b553eb46ac4b2c4b2302f47af6cc3de042463cee7e78b5bd4680581342e6ae1",
@@ -8916,7 +8916,7 @@
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/src/program.rs": "4da3ffd5e6023de7734859099bdbcd9652486090827d7bd2656ed7706c79f8be",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/src/v2_contract.rs": "4a7e64a5f61461e6ec5e52ded20c74987e4a7e1341ae51e41cadc3f15be6b84f",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesis.json": "9eafb5c42f33c1b5d37edcc42898c9712d17d258feab849503c1e28de41cc180",
-        "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/manifest.json": "1bfc22bbc784112cb4adf6bbe45eae2140f2a9fb06d75cf63036e40bb66a9c9a",
+        "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/manifest.json": "751d92cfda6ee03ddd4ba78125fb7bdeaaa828b6ec69cf0a06b07f3e930662e6",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/problem.json": "9eafb5c42f33c1b5d37edcc42898c9712d17d258feab849503c1e28de41cc180",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/program.zcve": "e2d8a9d8058500a5a2c168921c0b8d2ade3bc8487954a6d1deafa8b37c9e2c6f",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/synthesized/transition.rs": "ad0135bc03f1d7b8c01599769e0980f7f8706a91f786cc775d6739a6c54e1773",
@@ -8931,7 +8931,7 @@
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/v2/policy.zcve": "a62a7d426d90e633e79e2d5e9f744bbc228acb7a346afef8ca61300e2062b1cc",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/v2/schema-origin.json": "6a5cc3b0a18ce1bfb71990cc2bf1a2713ef945039e7e376a03840ef9a8520a69",
         "crates/zeno-fcis-cli/templates/agent-treasury-guard/v2/schema.zcve": "1666ce1610f943d7029a225dbe7314f7bbea0cf154a1b6bfbb465e29be834fd9",
-        "crates/zeno-fcis-cli/templates/compliance-gateway/Cargo.toml.in": "e9f2d1e865f7e1cfff27bc5c63e624c4c8acc210a0f6ad76a0d2bb1a1e33cc14",
+        "crates/zeno-fcis-cli/templates/compliance-gateway/Cargo.toml.in": "02c41a3f77402f749cf1700c798cb5b4dd1b9bead20b557691666c318d606e8b",
         "crates/zeno-fcis-cli/templates/compliance-gateway/README.md": "4ff472d7a9266eedee7adba2ac95b318693f3f5d0c2e20495acf87341d431c6a",
         "crates/zeno-fcis-cli/templates/compliance-gateway/build.rs": "cb3b46aa34f70a16c67c6517d6dfcde13af7934f55c4c409c93e01047d461288",
         "crates/zeno-fcis-cli/templates/compliance-gateway/profile.rs": "594a55698479196597c2689b9f7031462e65d983bae96fb587441d9ef384c140",
@@ -8946,7 +8946,7 @@
         "crates/zeno-fcis-cli/templates/compliance-gateway/src/rules.rs": "9da294a71e0feb12b8502c4c0cf2a5081cde06f134b4cf8242201ddceba17347",
         "crates/zeno-fcis-cli/templates/compliance-gateway/src/v2_contract.rs": "ef093423f104f21ce611dc1c9343a99cb4d230c3f624d42850cad13e0e7f02d1",
         "crates/zeno-fcis-cli/templates/compliance-gateway/synthesis.json": "d855ee8c955c441e0394837958184b840be2bbb5d940c33abc545c71dd1eaf04",
-        "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/manifest.json": "ac31e6aaddc1a9b4f3e32126a551a309c8b4a9a16b5b9d6b957d41688f89f46d",
+        "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/manifest.json": "508a52f4906833ae08e6202ac5f58f77e4833f22fa6570763c3545d81ab0a04d",
         "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/problem.json": "d855ee8c955c441e0394837958184b840be2bbb5d940c33abc545c71dd1eaf04",
         "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/program.zcve": "9a6814de4ade7ee25cdd8e9f125647851c0afb994fb38d8ba8d928375c40c95b",
         "crates/zeno-fcis-cli/templates/compliance-gateway/synthesized/transition.rs": "f5cd4c0d86f471f139a5dc2d33b738a7e8350e4ce690b818c30da0b109b222ed",
@@ -8964,7 +8964,7 @@
         "crates/zeno-fcis-cli/templates/compliance-gateway/v2/policy.zcve": "6c71ca1fec9f344d0c3c7ffa1b9c45c4329da9755e913695ae2ea7d3b94b4f87",
         "crates/zeno-fcis-cli/templates/compliance-gateway/v2/schema-origin.json": "44291ca17fd033fcf9111280deef0423065b19473defe2bf7c7fbbddcb536cdf",
         "crates/zeno-fcis-cli/templates/compliance-gateway/v2/schema.zcve": "9bbc41e9d5a6607a1da1cf6603b77f1dfafe8fa89dc244df3049ee8274255536",
-        "crates/zeno-fcis-cli/templates/durable-counter/Cargo.toml.in": "0ce15a498de8d00d048b837f9a28925cce5f74f60a4504f9ad6940ebce30d325",
+        "crates/zeno-fcis-cli/templates/durable-counter/Cargo.toml.in": "e773d440faa824a3cdb376fe57087bb6b39f65bc55f6b846827d7217291a09a8",
         "crates/zeno-fcis-cli/templates/durable-counter/README.md": "63dc6ef39622f2c01f6f06d2e5cabbf8021bc4051444b37dc53133731149fa2a",
         "crates/zeno-fcis-cli/templates/durable-counter/build.rs": "3ea29c8293d7a51e4c949b3f08212b58ff12239185793c8e23d16ec359ab8183",
         "crates/zeno-fcis-cli/templates/durable-counter/profile.rs": "5b08fd50e8d63bb2cf192e242c230808b7b293309a828b3b3c3d4018d3094d81",
@@ -8977,7 +8977,7 @@
         "crates/zeno-fcis-cli/templates/durable-counter/src/program.rs": "d550243ce59e5b42a77fffafc8531def40fe67fbb1a4b052f5fd391e320cbcc8",
         "crates/zeno-fcis-cli/templates/durable-counter/src/v2_contract.rs": "7af55d332a11d871bd2715d5aeb77e6c8c5d79b9cbbe44f90855b17c0781e1c6",
         "crates/zeno-fcis-cli/templates/durable-counter/synthesis.json": "86f4bf4f3361cf3fec0a657c9eb63e4ee37b4e0cb860584a91dbe6f5034b5aca",
-        "crates/zeno-fcis-cli/templates/durable-counter/synthesized/manifest.json": "796003e7ebda66d4314748b032a1645b37c6b4105ba02c2499f77587fccc4214",
+        "crates/zeno-fcis-cli/templates/durable-counter/synthesized/manifest.json": "ae8dd7483e29e58060334245f3f798b398cb4fab1c9658cb10a13f947b34b725",
         "crates/zeno-fcis-cli/templates/durable-counter/synthesized/problem.json": "86f4bf4f3361cf3fec0a657c9eb63e4ee37b4e0cb860584a91dbe6f5034b5aca",
         "crates/zeno-fcis-cli/templates/durable-counter/synthesized/program.zcve": "b01007b058bf8f270dff2cd39ab97e43b8f09f96aae71d34d34d33b2c4498e28",
         "crates/zeno-fcis-cli/templates/durable-counter/synthesized/transition.rs": "fb9d80ce47ced60c134925812175cc9dd8241e2f66fe2ce446be4837eb07a10b",
@@ -8993,7 +8993,7 @@
         "crates/zeno-fcis-cli/templates/durable-counter/v2/policy.zcve": "3169d8ffe59338cce7b4c0ce1701042ed671bcaf104cd6fba764007285cf6ade",
         "crates/zeno-fcis-cli/templates/durable-counter/v2/schema-origin.json": "d07b97e6fa609f346e840c065279e5313a8088cb54111eee9a79be4fbb38aba0",
         "crates/zeno-fcis-cli/templates/durable-counter/v2/schema.zcve": "3579f1978d8b6fb85b5b35cb87ce02bbd8e6cf5e843bec86edb24556584257e8",
-        "crates/zeno-fcis-cli/templates/inventory-reservation/Cargo.toml.in": "82734b00a238c5b95475b1a14989c51e4272e33cb7cd6dbab80feeca4680c0b9",
+        "crates/zeno-fcis-cli/templates/inventory-reservation/Cargo.toml.in": "94214dedf308fca13963f1733353545bd5bd9d998c0a7e08f435daa64d0b68dc",
         "crates/zeno-fcis-cli/templates/inventory-reservation/README.md": "9b7f59dfdc2d673b2819c2f614946ba8fa05a19896ca0ac4c70b5aaf3320fe4e",
         "crates/zeno-fcis-cli/templates/inventory-reservation/build.rs": "af33568aa0f6f9e9f7e65fa9900de4124f39d84bac7b1180427768913b3cbcfb",
         "crates/zeno-fcis-cli/templates/inventory-reservation/profile.rs": "ed0948e2b21a600e201b2ed5e67cbc71ae2a29bb066367523dc7c68f805fa480",
@@ -9006,7 +9006,7 @@
         "crates/zeno-fcis-cli/templates/inventory-reservation/src/program.rs": "9fbfe23cf0f74934c51d16391b229ded7a7cc80b11e4d152f6337d542abcc6d6",
         "crates/zeno-fcis-cli/templates/inventory-reservation/src/v2_contract.rs": "458a7d48363fd7d2b5271ccef09d10147592f7e799b143ce941c64018699b5b0",
         "crates/zeno-fcis-cli/templates/inventory-reservation/synthesis.json": "5274130e0199896685fcd67604692a4988203e126a39ecd81a397943ab1df0c1",
-        "crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/manifest.json": "332da1c19a39fabb49e09bc94d5fdaeeaf77bbb19dc2fc49764c2c572aa39fd2",
+        "crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/manifest.json": "2dd37ac1ea1338da882c26c20f5620c1e9b87b3664865b6b1ca3d6f4a1249cef",
         "crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/problem.json": "5274130e0199896685fcd67604692a4988203e126a39ecd81a397943ab1df0c1",
         "crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/program.zcve": "39ff0dd57ef27b452cb7351c3ea0de3133526833283bf44728b6bf52410360f3",
         "crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/transition.rs": "bb0c141647ee7a55d8b156d9a48e238a548a54f7bbe27c2da3436bd3384d6356",
@@ -9020,7 +9020,7 @@
         "crates/zeno-fcis-cli/templates/inventory-reservation/v2/policy.zcve": "d94b49850eb31da4e97056c53bb6a797319a14ccf8cc61708fa12757cd2b8ece",
         "crates/zeno-fcis-cli/templates/inventory-reservation/v2/schema-origin.json": "f00edd10d505dc0ddfaf30551dd277bca454d382600abe92713f5299fa1050be",
         "crates/zeno-fcis-cli/templates/inventory-reservation/v2/schema.zcve": "d740f8e2da4110f9e302da68fb6e00b717591f81d57daf492002539fb419d2c7",
-        "crates/zeno-fcis-cli/templates/order-fulfillment/Cargo.toml.in": "94c5fc76999b55abea1ba88994c93b2e06a2adf2243e762a59e0058f3157314b",
+        "crates/zeno-fcis-cli/templates/order-fulfillment/Cargo.toml.in": "55f29926c96fc123c17bb866fc51fc234a01e4f96c515377cfa670f3dbeb947b",
         "crates/zeno-fcis-cli/templates/order-fulfillment/README.md": "073ecc7dc76f8e26daaf3a9848344bfc2fd7425d3bcacbea96562f797973c1a6",
         "crates/zeno-fcis-cli/templates/order-fulfillment/build.rs": "cf8a7be5df2ca77bba77f2b23903b23b2cb6c695dd54bc49adf7590d911f3471",
         "crates/zeno-fcis-cli/templates/order-fulfillment/decision_to_synthesis.py": "9f0e7191b87915d8e2dce63b5326dc877b528d58e31b3552c8249d1fc8033b15",
@@ -9034,7 +9034,7 @@
         "crates/zeno-fcis-cli/templates/order-fulfillment/src/program.rs": "6f7616315aa79ca5a33d29092e1fbdb3aabc20439c9b2d5ab368e9d0a65688b3",
         "crates/zeno-fcis-cli/templates/order-fulfillment/src/v2_contract.rs": "bd514208b4cdfc831b0d5432c8a43deecbcc980c947ae5ec4a8fc2f718403f1d",
         "crates/zeno-fcis-cli/templates/order-fulfillment/synthesis.json": "4738e0729edd28940118b3c44d9255201d9b37111a6ed2b9aaeda0423e31ac61",
-        "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/manifest.json": "f11220cf2f50df2752b03a9124a000566f839448f757a14c8800690a213cd487",
+        "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/manifest.json": "034bc915d20d169130bf7c6232b067aa8ecd60e32b74544eca7882663e717db1",
         "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/problem.json": "4738e0729edd28940118b3c44d9255201d9b37111a6ed2b9aaeda0423e31ac61",
         "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/program.zcve": "d851d6505725ad19177ddafae4562a78b962b47932d1a4ba41f46681acd11f8b",
         "crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs": "55265761ef63be43bc775ea714fa36e623c1a1d59c03f0f6c8db8bfdf867fdc5",
@@ -9048,7 +9048,7 @@
         "crates/zeno-fcis-cli/templates/order-fulfillment/v2/policy.zcve": "be1d016de0af96670665739b89089ef6a9a65db9a2b263081c4a8182bc674044",
         "crates/zeno-fcis-cli/templates/order-fulfillment/v2/schema-origin.json": "0da3e264ee88bb0b09d3f35f937a19c38ef6a09783518c78c0b3ce2de0698c0b",
         "crates/zeno-fcis-cli/templates/order-fulfillment/v2/schema.zcve": "e6def12190ec27f487026c49e6a1f68b40f3a216fb56e87ce7fe4c6fe859d0af",
-        "crates/zeno-fcis-cli/templates/prepared-counter/Cargo.toml.in": "2f7eb8b1afe48fdbd323d87edac62fae538c6ff7ef5f96eef96dc1447520e34e",
+        "crates/zeno-fcis-cli/templates/prepared-counter/Cargo.toml.in": "1ef297ff46e66c82c0bfb6ecd5ca23559ca2bc1e5f73d8f818899086bf29c826",
         "crates/zeno-fcis-cli/templates/prepared-counter/README.md": "81fbe738559887f6997ede031468ad25337bf09ccd666d144590aedc5da843cd",
         "crates/zeno-fcis-cli/templates/prepared-counter/build.rs": "e39cd696ec08bdeabe9c5790358f12b4f2ed82d916783b7758b8306d24fee617",
         "crates/zeno-fcis-cli/templates/prepared-counter/completion.json": "6b0bfe702007d500f1aa339303baeda22eb82c3cc133814dd112834a8fc2d9b2",
@@ -9067,7 +9067,7 @@
         "crates/zeno-fcis-cli/templates/prepared-counter/v2/policy.zcve": "2ba74408fccca07764ee93b06a3370702f50ac4b30e2c7bea77a01711116625b",
         "crates/zeno-fcis-cli/templates/prepared-counter/v2/schema-origin.json": "8e7e69c5145df23771845971e35f02e32baf9afc692f862addb8fef087d3eee9",
         "crates/zeno-fcis-cli/templates/prepared-counter/v2/schema.zcve": "dadba1576ec67a0cd578f8bcb2bff2c2ac103c0a19da3224bab53b630c077212",
-        "crates/zeno-fcis-cli/templates/withdrawal-queue/Cargo.toml.in": "23aa8c542dad0c2cbe6add3240a17990769a5ad715430747798fba890e6f2460",
+        "crates/zeno-fcis-cli/templates/withdrawal-queue/Cargo.toml.in": "22ece08170f4e95435828aa5794d242755f9e983d8c95e36b065624f1ada1660",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/README.md": "dae4cd6e5c59d411440e5e9fb4bd95767b87817955e160c8e8f9567a8f9c4a78",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/build.rs": "e463cade4f1758f2e2266fb1064e72f7da3fac0a9ee5e081339c0489a0dbe34b",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/controller/contract.json": "751f31be67d38076c15d42a1807e80dc92f51799e85a613af5152eb351a2575f",
@@ -9087,7 +9087,7 @@
         "crates/zeno-fcis-cli/templates/withdrawal-queue/src/program.rs": "68d2116edb07285cbcce8a9fc700e1072406d4bd7935ed75c1f2a6b325da30a3",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/src/v2_contract.rs": "a58a0f283e5c6519df2de811b8e8bc69503840ce5ebd0665035c992d42cde7bc",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesis.json": "aceae074a989d6b18b4b52b449dfe8a069da92e38711080c6d76b6cafe890489",
-        "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/manifest.json": "ed0257f73f27889a4089af4daa556bfe74c67e456655a01b75c58df462fb0f59",
+        "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/manifest.json": "c439b567189849837b514d504f207e9a57af722656a78185d7cbc38c4b529b9c",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/problem.json": "aceae074a989d6b18b4b52b449dfe8a069da92e38711080c6d76b6cafe890489",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/program.zcve": "7a0c0f94b26a7a682468fdce0294570806372192ab11631b1eecce79e4f89afc",
         "crates/zeno-fcis-cli/templates/withdrawal-queue/synthesized/transition.rs": "9fb879a94ae798d76043258dc87d13cc4c04d424a1c335ef09a5273d855cab98",
@@ -9155,16 +9155,16 @@
         "crates/zeno-fcis-cli/tests/fixtures/spend-approval/project.zeno": "12ffbb4e9eabcaf76e53cf20b04e53e48813cbae0220708b5f4f74d7ea0cc5b8",
         "crates/zeno-fcis-cli/tests/fixtures/spend-approval/tests/decision-examples.txt": "2392f4834afb8c9a94b941895e226be525dff271f2c2b29e4a00c3ae1935e772",
         "crates/zeno-fcis-cli/tests/fixtures/spend-approval/v2/policy.json": "76fee1f2ebe2c85c9172ab70c5b5204a115d29cb547801b4a7c4b328b9fafb79",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/budget-boundary.expected.json": "b49a58746d079a5880c80c05b7f8b268f6e4a07ef4f4a5b1fb3e7b687e2acda9",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/counterexample.expected.json": "b05ecee1d192b35be2b9291c1d59c98521f546c07f2843887d0815fa15c29564",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/domain-too-large.expected.json": "7255acdb478686022c433340137c3085304b9277c20e5dcf03398ae742cb9a66",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-identical-failures.expected.json": "7043b56de123a12d4f6f2b59707d2706d141ecb57941767c4a0dacb33dcb4147",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-identical-failures.receipt.json": "95a874b270aa83f15aa340ccece1f47b55e7acabd019a9bc66d0442500328fb2",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-differs.expected.json": "e5235c8db20f99a2bec29c02281679f1a785191a276e328a6ba5fa95c7939277",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-differs.receipt.json": "0df2ecad4d6581480f3e39e426810976995241efcdefb3bd85c19e411bc7d0a4",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-preserved.expected.json": "e1868a6411609d94be7607d0c9288c87bbba3689e03645f71315dd6c0003f713",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-preserved.receipt.json": "ab92d868534a154054bf7c3f9e2ff622f2e36a5982d76015785420f574de0c63",
-        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/output-abi-refused.expected.json": "64c0f17190e5ef7f0c1bcbf29fdd0aa4cecca7ab51c61a801c91b2b41bc23711",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/budget-boundary.expected.json": "b970b4a25bdc93e24753e2b36f40ce27adc19715434c901ad1e251aa363e8a7a",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/counterexample.expected.json": "5f14876bafdd5222bd654c81ad5c4f51a7490b1614605619501f08772d03c4cd",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/domain-too-large.expected.json": "5b4ad0a5b68420be33bb6f271283e80acd5a88c951a46bbdf1d27c2ec788f371",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-identical-failures.expected.json": "913a12652218789b6cdce3586a66d8e572213d121d4c0756d3a1eb360970529d",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-identical-failures.receipt.json": "7b019bc3888844de5a31b10e857ab0f2854134bd5859d52d6c3ebcdd4b87489e",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-differs.expected.json": "6d96a8b0d80a74f6bc264d9066c7a10511cd18c21e635e3c827df1d20b631c62",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-differs.receipt.json": "88ad57e25bb2407ccf9f1f33f30c59d0eee30a7a3ec32b48d567db1af802c183",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-preserved.expected.json": "8a0c24ba61db20db70bc3e7183ac692bed768d1945b1448f3422edbc183d907b",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/equivalent-usage-preserved.receipt.json": "9b90cb38aa53a73dc7f523dc1b8a9d5ebaa927843c4d6211a692c5ac5a17d83f",
+        "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/output-abi-refused.expected.json": "ba6720abb315e73c5ba4980e5e0ecae9713abf997ba7958f263f40a78c24a45b",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/program-1.json": "b43e30abaf0175fae5338eb6180fea13610a095e20ec57fabc6f114a1c09ab25",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/program-1.zcve": "6e5d73446417168fd634e0d57d598bcba82eb1c12a9106e799e5b1c2d9948d84",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/program-2.json": "120f8aca7dcf6ba0b4230b2189deec41a20022cf8e669fd81117a6ac43e9a2d5",
@@ -9184,12 +9184,12 @@
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/1/vectors.json": "a5682ff7905990459c025ab67dfd1684534f9e41ad185f4bb48d93811032a5d1",
         "crates/zeno-fcis-cli/tests/fixtures/transform-check/README.md": "8534148f54094d62a0112269b168b48356aba1d7314a1e7d00f7d589649ef87d",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/project.zeno": "ac326379295929abe19ebaffef0002acacdbb2184e1de3af44de1e52dbfddf79",
-        "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs": "47345177951ad6299d3cda05c5d5cdbbcd044931d5ee5ff4119a0ca3abc2c108",
+        "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs": "8d74bca25a7457b3b39a3ac3fe3a594372f7b1c7a5d523cbb71461ae33726861",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract_v1.rs": "b74ca1ee3259bc175d1a39c31d739a989dc5f9d9403c8fa894092af85ab87062",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/tests/decision-examples.txt": "1ce2c6d0273d51dcb049d41076c86252b60b0e483c8abac0693b7a7da7bec31c",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/adoptions/1/program.zcve": "5df45c56b2f9d2e304bad481ccdbc2f5f3ede5f4327ab99a29efbfb3e8714e89",
-        "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/adoptions/1/receipt.json": "e11e4e07ee3e4fbc9b763f21ed3c9e854da6ae7e051152e01fc68c3f2dfdf03e",
-        "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/policy.json": "d9e19599043692f84d049c31613349f13a5eaf612558f1ed65b55c4d7769849a",
+        "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/adoptions/1/receipt.json": "5735e972d85bb1166514533d8d1bca0a8f9f662e81a27a4feb9daf6b77002433",
+        "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/policy.json": "3d88ed337b372e6cbfea69f8f9ec40f232f0ec70c6e74c7b10aec60c36dbc412",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/policy.zcve": "a080dab62b09d1bdc99d4626b70b36387a333a02ddbdc1d89e40b9a56278bd6f",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/policy_v1.zcve": "be3f9e42ea9e2e41f069f81a99db1e98050a3ea3761b7a08f23949909682fb61",
         "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/v2/schema-origin.json": "b1ae1cdee1afdf951c0bbf1077f2a2e1133ef22d535361f3f00e99ba770f097d",
@@ -9200,13 +9200,13 @@
         "crates/zeno-fcis-cli/tests/synthesis_completion.rs": "bebcda3b67c894a6aaaa8b63f3d0583bbe1939d8e2055868c1c3b53617d469f2",
         "crates/zeno-fcis-cli/tests/synthesis_javascript.rs": "3e04d57025e4d8dafb08c4922d5a917ca76c57b83f35873def6263e13ae68ecc",
         "crates/zeno-fcis-cli/tests/transform_cli.rs": "d7b014533b3864d770682c7d1be4634ce4646783089df8a28e501497569911ad",
-        "crates/zeno-fcis-codec/Cargo.toml": "fcb68e7bc158d9f328b21f7f6499e4b596580061a647fefdd29c204ac1367cfc",
+        "crates/zeno-fcis-codec/Cargo.toml": "6629f1e0c4eb239375cbb89baa0c8ec1dbd1618b4d3663538562753bb1e80ffd",
         "crates/zeno-fcis-codec/src/artifact.rs": "3bd613e822e8fa6ef54a15c6d53fa528824b20bfc2ddd681327955e8511cdf41",
         "crates/zeno-fcis-codec/src/domains.rs": "f4e006cc6ec0294e9af982f909a7a001f73448b70891d3ea423524b2476f71f5",
         "crates/zeno-fcis-codec/src/lib.rs": "ec35b1b4eb20bc0932ca64de9311563afe476e3b90ce17d3835cf8577e6448af",
         "crates/zeno-fcis-codec/src/providers.rs": "412e23fc2847f9b186e02547a1d466ab474db219e78810eeaf49e3eb12f0f926",
         "crates/zeno-fcis-codec/tests/limits.rs": "504496dafe6d4f52db9429fe120e1a5001b1fc0edad03035bc1e78f1bc578d38",
-        "crates/zeno-fcis-codegen/Cargo.toml": "c7e8ec5696965f66a21b14cdcfa1a384d260541292b506612f5e9a40d639135d",
+        "crates/zeno-fcis-codegen/Cargo.toml": "9322d94d3580a1af25c530709e433be6e01a7fe75cacceed4a7ca837093b88d1",
         "crates/zeno-fcis-codegen/src/adapters.rs": "cd0362e6dbba012f10c9cc7953ee432c5fd344f8907e9460c05a86c8ee9edc1a",
         "crates/zeno-fcis-codegen/src/fixture.rs": "26a303b583eb5af0b76d034aed57cf1ae4aae122b23691edaf8a7c462bbc9b20",
         "crates/zeno-fcis-codegen/src/lib.rs": "8328aeeadf1a8dcf5f1c115ccee2e0bdc7181a5249c345f3181fe592ee6253ca",
@@ -9215,7 +9215,7 @@
         "crates/zeno-fcis-codegen/src/render.rs": "0f43d355dfdc129dad6f472b1c3ba9608406a7c99b7db93cccc8003f1295ba02",
         "crates/zeno-fcis-codegen/src/root_envelope.rs": "72a989fd3a80c46515af313eb6a5d7cfafc3b1851b712ef60605285c471e2120",
         "crates/zeno-fcis-codegen/src/vectors.rs": "b19288dbc34c99802e5c802d6ff442cd1db55aec3cace89b8aa1b87a01c8b916",
-        "crates/zeno-fcis-collections/Cargo.toml": "8deff58311dccb6286622fd715960a05be811aad2ce328760a0b67c1ae2ca522",
+        "crates/zeno-fcis-collections/Cargo.toml": "a5b3a0edc10ec5e2dead732ee352851080aebdc0699469cfb4e24ea86971b732",
         "crates/zeno-fcis-collections/benches/persistent_map.rs": "97523c03f815dfe715a9f75448e045322c8f58268f6130e4a61061c4c062dc09",
         "crates/zeno-fcis-collections/src/bounded.rs": "1693ab2ecdd655a09b11227bc81493e936643efbc2485cffa19ca4bc1426ae90",
         "crates/zeno-fcis-collections/src/lib.rs": "3442944353bb17b3b76d3a33dbd144b7276c1c92a024d5f16460661ccbda2646",
@@ -9226,31 +9226,31 @@
         "crates/zeno-fcis-collections/src/tests.rs": "34af6e4b4347ac0a00b88c368d7cd9f2efb01046733c0734059bc821904e8196",
         "crates/zeno-fcis-collections/tests/bounded_contract.rs": "e136344d9dbd92d0fba4df576dca3d936190dd5dbdcb6660fa67e734083395c7",
         "crates/zeno-fcis-collections/tests/review_bounded.rs": "4de6f9e5ffece1bebe6aea2511e76494945d5c6e7c23b0b91779936ee85beef8",
-        "crates/zeno-fcis-compose/Cargo.toml": "41bac888cc54a2c1b6f5a68ddcd4203c219632b079734af4df6b7cef24062977",
+        "crates/zeno-fcis-compose/Cargo.toml": "8c8fa72eb62829a72b8f82d29bc01a5f63aaf2b9e44820dc019e619dd1d4c328",
         "crates/zeno-fcis-compose/src/composition_identity_tests.rs": "6bca5efb479e477adb53deddfb17b1ff482e1f3302b22cbc6b30b7930ae2a9ab",
         "crates/zeno-fcis-compose/src/lib.rs": "d7c311173679a7db67db7564629d79b19db1f1593110f8940e0a8fc4bb780346",
         "crates/zeno-fcis-compose/tests/complete_footprint.rs": "63e34a7e51518b3e5fd1b5e01aba155d59621f264090094f2c946f0852d6d8d9",
         "crates/zeno-fcis-compose/tests/frame_authorization.rs": "7ffc32b885878a9f17e9eadeef4531e27fb77e03a610ad473acceb2409c6ec96",
-        "crates/zeno-fcis-composed-program/Cargo.toml": "52ffd116372dba42b37e473372859ecc4f0937a010ced64dc040ebd498fdb821",
+        "crates/zeno-fcis-composed-program/Cargo.toml": "760c48dd3044e183a2b1c308ed688c621a8dc2545343af893e789c2c4295765c",
         "crates/zeno-fcis-composed-program/src/lib.rs": "a5915f4568b026149327c2696eb5244b40419c709096065f35c81378bcf905a9",
         "crates/zeno-fcis-core/Cargo.toml": "f1e7ffc4547de7a070e57e3c91d8d3d42a5e1770fcb9daa585a09e34509b5ef9",
         "crates/zeno-fcis-core/src/lib.rs": "66e3ccb5de30045da7ca7e40212e8d533b2cda2dc6bcc82f09bbdc3d16b16b58",
         "crates/zeno-fcis-core/src/resource.rs": "60d8a21aa556a26ecf499933b1932e9e892e91e6067d1d0ff848176c97784134",
-        "crates/zeno-fcis-crypto/Cargo.toml": "b33f84a7704222501de22fd3bd7e12feedea649597c076f50455214954193558",
+        "crates/zeno-fcis-crypto/Cargo.toml": "40561ad66fa78eed4827603899cb92eaa307173f18cc391d508292337e26cfe1",
         "crates/zeno-fcis-crypto/benches/commitment.rs": "cc889ca06b1d043e176c90030f347fddcac83e27ae41e6d1703a6130be5aff22",
         "crates/zeno-fcis-crypto/src/lib.rs": "453c024c0a348dfb9b74c1841efa6b980c6574079f032cf5dfd76d0ef7a015b6",
-        "crates/zeno-fcis-domain/Cargo.toml": "0b0ab63256767352da3889a67712fe21f9c70f3107abd154d20bf8d3f5bd211d",
+        "crates/zeno-fcis-domain/Cargo.toml": "e12d1fcc3c9f741868afa96dbf804785681beea91b5628fd8e04f750706da62d",
         "crates/zeno-fcis-domain/src/lib.rs": "5a185ee1bc3a33f7a194a00c426aa52e3ad86b15cbd4d845cfb7684b9607f730",
-        "crates/zeno-fcis-evidence/Cargo.toml": "4d58379769f969ec830878a050130f26a85ecab860236f99beb30d577b70cb77",
+        "crates/zeno-fcis-evidence/Cargo.toml": "24335d882e335c5cf4b85ac21e0c7e5adf7361b1d3be93695574faf920e96762",
         "crates/zeno-fcis-evidence/src/lib.rs": "58e540dfe540955167cb8304d77d969056c78cb9c9ce928232970dda523d846f",
         "crates/zeno-fcis-evidence/src/tests.rs": "8ee97cd6daa62a7c505489d3b6f98eec053e1805acadc1a0d6b09a23882b3c88",
-        "crates/zeno-fcis-formal-tools/Cargo.toml": "9a9e27c64e401fbd74177848aa29cf9b458755e8f67d24f4fdf7ae56957b034d",
+        "crates/zeno-fcis-formal-tools/Cargo.toml": "9fa5e3ceb584ce8fc4f8265daa39c0d13952e45dff1464f0c4689b3f41af9348",
         "crates/zeno-fcis-formal-tools/src/lib.rs": "c0543513caf654d76455de0ac761d2b57399e589f759e0b3cc5808a90048f35c",
         "crates/zeno-fcis-formal-tools/src/model_diagnostics.rs": "955f8fcec626f5b7ff8368f6713462ab3f2a5cbb89ab6b1cf15c711cb49f5fcc",
         "crates/zeno-fcis-formal-tools/src/system.rs": "227b20f9a5a177c82dbcd3731c9bc749819074ee73199c0eae5512bfc36e1c9f",
         "crates/zeno-fcis-formal-tools/src/translation_tests.rs": "1e008669ee9e23ea999c2b3e9e0639023690150427bcec76f08b419d2730595a",
         "crates/zeno-fcis-formal-tools/tests/system_contract.rs": "8d9ef3d60cd224d80e1c24e0a1bf5b1a65761d25ed80f191cf6ac373020225a8",
-        "crates/zeno-fcis-generated-code-tests/Cargo.toml": "b04f9715b572075d3e545ff57cab685bd7a3e31417db1292fb74b45f14e5bc55",
+        "crates/zeno-fcis-generated-code-tests/Cargo.toml": "68425fd44c50046d0dc6a5cd0419687655515dbb4ecec342a17006208a5ef23e",
         "crates/zeno-fcis-generated-code-tests/build.rs": "f3be893ece28806e5e1e1281097f0a51cc614b31a41ed434c09e69a8eb215e89",
         "crates/zeno-fcis-generated-code-tests/checked_catalog.rs": "66b818a23716de0ca8f68cdbc44566432fa88e5ee3adca0698261deb8f55f3d5",
         "crates/zeno-fcis-generated-code-tests/src/lib.rs": "4aff7a6cd9f34afd973d4f1c1f8457082e131baff8651cbf904b943e411053bd",
@@ -9258,21 +9258,21 @@
         "crates/zeno-fcis-generated-code-tests/tests/checked_workflow.rs": "d8e48970359ab67a6e6429a9eee648cf56e3d319cfbd594d568232bc71481350",
         "crates/zeno-fcis-generated-code-tests/tests/generated_declarations.rs": "170a68a3960e3837604763c068510ab42f0b18d6021d59eebd983b36e5f2a387",
         "crates/zeno-fcis-generated-code-tests/tests/python_replay.rs": "dbb1d7e530cbd48529bdf7303408400ff7cc30e7a2aed4736ac323f71e2e07f6",
-        "crates/zeno-fcis-laws/Cargo.toml": "be8e8b14256f33f0cb8d07e2f2634d62c600f94dc3a9fbaec7698395434ee73e",
+        "crates/zeno-fcis-laws/Cargo.toml": "5229ee66f6c6a78060ba6d0b8ceab0fe6b32e1c122bc7e6767e68703a5524676",
         "crates/zeno-fcis-laws/src/lib.rs": "fbc9fde1132d62883ab0cfe691bf2f78042fe0c6715ab4d8851df5e6ad728e96",
-        "crates/zeno-fcis-patch/Cargo.toml": "cdfe4548d927525dd38cf153d31adf4ad95b1a14897f2107b14fe4ce187b3495",
+        "crates/zeno-fcis-patch/Cargo.toml": "c7f480c31e0e014cf063ca347c3c286da9ffc919d04b80e856532de94bb5d2b6",
         "crates/zeno-fcis-patch/src/lib.rs": "815925a8e647e61c5cc49907374f7626e971f06befdfe39684e5138bca768ce5",
-        "crates/zeno-fcis-plan/Cargo.toml": "d3fdc66cd03ddcf85908920908a590c14e92e1f6305a93edfebc7700e0688e74",
+        "crates/zeno-fcis-plan/Cargo.toml": "bfd68fe1a8320f7dd15aebad9d651d64f29ae6212835e5568b867e67640821e6",
         "crates/zeno-fcis-plan/src/lib.rs": "d6bd9a9c4fc06848d19a03c64c5afe8b704a3ced051d72b0ae0928cbf78f7880",
-        "crates/zeno-fcis-profile-zenodex/Cargo.toml": "fe7f79b604dbc314be07b84342889cf40ba187285f127edfd1d1683b36a44b0b",
+        "crates/zeno-fcis-profile-zenodex/Cargo.toml": "d8780b16d0259e2368797ebd37c21eb6f47e216b2b98516ab5a069da16822732",
         "crates/zeno-fcis-profile-zenodex/src/lib.rs": "35095b690bb30accbe5a76edb556a9673fb897da4b9fee010c452033241567b4",
-        "crates/zeno-fcis-project/Cargo.toml": "96e9d6671c6a32b2a06e021755427718255086bbd18b44020849c640e810081d",
+        "crates/zeno-fcis-project/Cargo.toml": "b9d12c0ff671387880040bdb330d62119188445d1dcd9f443b34700e4983858d",
         "crates/zeno-fcis-project/src/lib.rs": "c02b06e263694d8d94b2d666f13e7e7dcc767f80c196924f84cee57cc53fca9e",
-        "crates/zeno-fcis-receipt/Cargo.toml": "ef5a1b8b780acd8138fcf3517a8e1ec7c849976d6ccde0436ecd0bad5288a715",
+        "crates/zeno-fcis-receipt/Cargo.toml": "207233843a1ada7922279b8f1b6d2c770bf63fd0d9ae1b755d86e901af7a2e66",
         "crates/zeno-fcis-receipt/src/lib.rs": "aa4082a0b6a2bb627138e77d61921cab21f02f8ab89303ee37ac9a059cf178e1",
-        "crates/zeno-fcis-refine/Cargo.toml": "1bb60acbcf1afabfc1ad6d93ea92f7cd990d6c537b91ae423e7fcf2bee152f11",
+        "crates/zeno-fcis-refine/Cargo.toml": "30e5659cfa608bbf8e306fb272ca7d9be79b65f97e35f4d4b13e74eeb61cadd6",
         "crates/zeno-fcis-refine/src/lib.rs": "a79739791d1ec0944e22034fd1c35e9ef23ba98455fb2b948b9922f9b1a78bd4",
-        "crates/zeno-fcis-schema/Cargo.toml": "e9cb33e788ba3d3ba61bac5d6ce58c9cb230704c45e5b5e60fda9b3e14daef66",
+        "crates/zeno-fcis-schema/Cargo.toml": "d3ab7175752b23c17758076c8d3d978be6d5c935b17a7ea649c41261e8db55b0",
         "crates/zeno-fcis-schema/src/encoding.rs": "b945d5d8c8c10efe049dffd24bdf07be7d64c2d6242a7514143da2b42977d29e",
         "crates/zeno-fcis-schema/src/envelope.rs": "4e652a12d7901601bcf8396c02a0d886960e240e4f2e281785d25994c8b96324",
         "crates/zeno-fcis-schema/src/error.rs": "425642bebb82365d4830c11a0017757803940e78026ab93148cfd12395b24a61",
@@ -9280,11 +9280,11 @@
         "crates/zeno-fcis-schema/src/lib.rs": "b410732e33c0438dd287cbe588e88ff70e9d62f5006aae796ecc5983bfbdf059",
         "crates/zeno-fcis-schema/src/model.rs": "57c12dd409cd806557489da0709922aa0b97c1c3953ed5ef80711daab3b61c18",
         "crates/zeno-fcis-schema/src/validate.rs": "c40c9ee715624c7ce92b4335e7de1f0d02d6814b05ae4e8218e86e7c5f7ae2f3",
-        "crates/zeno-fcis-secret/Cargo.toml": "a5f6be3edf3319a4a681c725212dd1fcff0939408eec20c1f960128a10b61da6",
+        "crates/zeno-fcis-secret/Cargo.toml": "41234d5b0996d80aad96c85454f6b75d3ffbacf28412e593d0572c759a60641a",
         "crates/zeno-fcis-secret/src/lib.rs": "47c474a0895484958374225bb1dec75d31c43558e0efa364f81239374c6ebc9f",
-        "crates/zeno-fcis-security/Cargo.toml": "1fbe384781eb343f1dbee12d58e4921ea06a93ec2b72be109439482aeb8bbd7e",
+        "crates/zeno-fcis-security/Cargo.toml": "c0e8492fe5fca517e15dbb33636a982cd86bacbbb6d92b6cd7a8797d30da3486",
         "crates/zeno-fcis-security/src/lib.rs": "63586ec6ad3d88c5078757c50582b15a49af29927b9ade74f2ced5acc435291f",
-        "crates/zeno-fcis-shell-sqlite/Cargo.toml": "30ce64adece69c678c9cf9bf53face791574d05973a2882f1db4f5495892741c",
+        "crates/zeno-fcis-shell-sqlite/Cargo.toml": "f4f5f77364d8ed60c16e7c34cdf8afef317468e65392c567b9a8612927385635",
         "crates/zeno-fcis-shell-sqlite/src/lib.rs": "d809c7ad00d16fd8609a4d2c247f9d3cfcbe770241fd5c4ac2bd7a5e29b82c58",
         "crates/zeno-fcis-shell-sqlite/src/v2.rs": "f76916e683102c513845916712b316a81a383718f518f9840dc357056c1815c8",
         "crates/zeno-fcis-shell-sqlite/src/v2/behaviour.rs": "8d1b3de6f98fc71197beee2ae966eff8e716747d35c86883009b4181642d5db4",
@@ -9307,10 +9307,10 @@
         "crates/zeno-fcis-shell-sqlite/tests/relay.rs": "5c6d712c318a7077df1b0005c1fd519cf21831fd9a25921c3406c4b9e44899f2",
         "crates/zeno-fcis-shell-sqlite/tests/upgrade.rs": "349f8030e0a0146d6eb9eabedc66640b8f44055ccf20f8ddf9790ceedec63bd9",
         "crates/zeno-fcis-shell-sqlite/tests/v2.rs": "05271f292605cbd884ba8d7e26c13715b4443806d8b9b0414b2d302e29a95b69",
-        "crates/zeno-fcis-shell/Cargo.toml": "db7d5099e3a398983bcc2371180b812d854608c365e9c3ca075c81e662658f05",
+        "crates/zeno-fcis-shell/Cargo.toml": "d83ab65a208780a66c917963122075eceb8fd0267f472436d44d8750b7dd0393",
         "crates/zeno-fcis-shell/src/delivery.rs": "ec1aeb3b5c40563d2318eabc1eaa8e0698928df850c1d94dfc116cf7e5cdcbc0",
         "crates/zeno-fcis-shell/src/lib.rs": "ffcfedf84700b22e29ca2af67fd252dfd640d3ed0079c18ce9d79f24f5c692b9",
-        "crates/zeno-fcis-spec/Cargo.toml": "4e9b80677753ef27ddfecb205ea301c29a760503644855d7f5863fe97cd890e5",
+        "crates/zeno-fcis-spec/Cargo.toml": "09b87b90da2bb591a1213ced6badcee357ced47e7a98c53d871773b5bf5972bc",
         "crates/zeno-fcis-spec/examples/mini_determinator.rs": "e17a0ad78fe9f66289187e45ee3f1463ab74f5cf58a66793ffeb1f4996fdb2d2",
         "crates/zeno-fcis-spec/examples/temporal_walkthrough.rs": "07b5d5b1f00154111347813adaf7684afdd5cb259af0129b5ea928967a222411",
         "crates/zeno-fcis-spec/src/ast.rs": "5e96c1e457bf4e64210dc3accc64bf5cce5c9963715c749e0441409753f7f77c",
@@ -9328,7 +9328,7 @@
         "crates/zeno-fcis-spec/tests/data/zusd_lane_v1.zeno": "204c8f1f2c1e7efd63b3ba7a304926d2be77a39573c01c5487fcb8b4f3d88ef9",
         "crates/zeno-fcis-spec/tests/rc3_acceptance.rs": "c6874beac4679ddde6ac95476385d4685a8bd16991e6fbd395be5b7be350baff",
         "crates/zeno-fcis-spec/tests/zusd_lane_gaps.rs": "b19f53481208144d5f2f605e9f87c3b225809dd1755471c46f97879327cfe7ad",
-        "crates/zeno-fcis-synthesis/Cargo.toml": "2c6b0d30cb6aefd8f6e0352f6ee6fc40232e14eb48050c3a875774d7d55874d4",
+        "crates/zeno-fcis-synthesis/Cargo.toml": "dd60c8b96f6efdc2217a567828819d8c5a27c4dcc7379f38ae353abd44cdcde6",
         "crates/zeno-fcis-synthesis/examples/checked_continuation.rs": "7f3af190716703b6ab95da970f6fd11cbe9b32e9aee6c226423fdca91aa2e1e4",
         "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope.rs": "c0141f70f67c0aab98709fbfcf5bf432a333fe14264d63a357756262c54e24b8",
         "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope/spec.rs": "7e4b35d9addb658dca2ae3bbc206366d34bee4e3a5381e018779813e21760eeb",
@@ -9358,7 +9358,7 @@
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/canonical.rs": "adb6868a16b19c48d068ca14ab8046d2b9cb603a4562a20ab1c5c7ce6ce62a7a",
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/descriptor.rs": "9165b8279f0753a4a87015d6a0964ce9a8dabb14d7fc684d0d9d0b0713644d97",
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/descriptor_spec.rs": "162f54080ccb3915f189224582ad6cdda8cd3e3b5e97b483f2f7ea598a3390ea",
-        "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs": "5aea5c56a7f39e16a20be8ee73007b822b960cc38e0a65779f1380a175fbbc7a",
+        "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/evaluator.rs": "e049443945095f613029efc8400de84c1b7c2babaf251eddbc51adfc8e89a606",
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/framing.rs": "96c79c38f65abb84447c7b37866d5535363035f7feb57999a7b2e148d4038dc9",
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/invocation_tests.rs": "0959a90754ea0d7a17cc618f08aff8948325e004c83141daf6767319a016ec7b",
         "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/metadata.rs": "634c753d00dde03fa1928e867932bd454698f2903bd2236c36ea44612a0a6654",
@@ -9438,12 +9438,12 @@
         "crates/zeno-fcis-synthesis/tests/v2_publication.rs": "8072059d16d21d39bdce9490e8dd066e118b05cbd0ec7ed77cdba2061a043760",
         "crates/zeno-fcis-synthesis/tests/v2_record_execution.rs": "9de0d5b781226f657544a0f8d2d26c1bfc5b63b6dd7aab2f13299e838a5a4ee9",
         "crates/zeno-fcis-synthesis/tests/v2_template_contracts.rs": "70ff0a0cbbd133e3d505b090a2b764c4943c32101d071cd1d361d040edb59061",
-        "crates/zeno-fcis-transition/Cargo.toml": "7f4ebdf67866fc4c7ef8ea48789e4ee24938688e2be74696833b88a903d405f4",
+        "crates/zeno-fcis-transition/Cargo.toml": "8502f34ee99c13907e7d9d9f8b34306f11872727d6a367515c756d773375ae0d",
         "crates/zeno-fcis-transition/src/lib.rs": "023ea1e20133dfbce72d41549bcc8a33a1d59947b0dc5c68e79370ed62ac720d",
         "crates/zeno-fcis-value/Cargo.toml": "216653044e5c69a81f39692282ab40de52dd3baf4d6a6c66a44ec31e6e4d1701",
         "crates/zeno-fcis-value/src/lib.rs": "5b2801acecb3abdf971a75855fa2742049ba590f15fad6e0b13bd02f883c7232",
         "crates/zeno-fcis-value/tests/construction.rs": "70a629f79ff9edb0ba7b8c45a2f2eb9d5984b0279515aa524487b65aed3015ba",
-        "crates/zeno-fcis/Cargo.toml": "79bd178d6d631991d7efefb1366251f259ac87dd47523b3344bb2dbd6882338e",
+        "crates/zeno-fcis/Cargo.toml": "1c17c928f80e5f538b6b4585a5bde978d75a8e8507eba9c77ba02756a9f621ff",
         "crates/zeno-fcis/examples/checked_backend.rs": "3487dfc88428a92ea6447a1d4188dfe7db483a5b4b6314b52a823522b307805a",
         "crates/zeno-fcis/examples/completion_scaling.rs": "e4b2c7af2daeb4eeef3310a169e0d780515fac6895c449d1eb5c9f41937be2e0",
         "crates/zeno-fcis/examples/minimal_core.rs": "52b282d5d5eaa6e50d4f4f5a122dfd69cbed9da0cdc142efed93ad4d4f1a8d01",

@@ -1,5 +1,9 @@
 # API reference
 
+This guide is included in the `2.3.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 The V2 development branch uses the checked program family by default. `zeno_fcis::Program` is the existing private Authority; `bind_catalog` and `bind_program` perform actual admission. Original envelopes enter `Program::publish`/`publish_genesis`; only successful library evaluation returns a private publication capability. See [migration](V2_PROGRAM_API_MIGRATION.md) for declaration modules, refusal/replay behavior and remaining lower-level obligations.
 
 | Normal goal | Entry point |

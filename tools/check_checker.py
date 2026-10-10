@@ -34,7 +34,7 @@ SHELL = SUBJECT.parent.parent / 'equivalence.rs'
 ROUTE_INPUTS = (CLI, SHELL, API, HARNESS, Path('crates/zeno-fcis-cli/src/main.rs'),
                 Path('crates/zeno-fcis-cli/src/shell_v2.rs'),
                 Path('crates/zeno-fcis-cli/Cargo.toml'), Path('Cargo.lock'),
-                Path('release/package-set.toml'))
+                Path('release/package-set.toml'), Path('Cargo.toml'))
 
 # Each planted operational fault owns one declared proof region. A failure in
 # another function is a broken qualification run, not evidence against it.
@@ -120,7 +120,8 @@ def check_routes(root: Path = ROOT) -> None:
     harness = (root / HARNESS).read_text()
     manifest = tomllib.loads((root / 'crates/zeno-fcis-cli/Cargo.toml').read_text())
     dependency = manifest['dependencies'].get('zeno-fcis-shell-sqlite', {})
-    if dependency != {'version': '=1.1.0', 'path': '../zeno-fcis-shell-sqlite'}:
+    version = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']['version']
+    if dependency != {'version': '=' + version, 'path': '../zeno-fcis-shell-sqlite'}:
         raise ValueError('CLI lacks the exact published shell library dependency')
     if 'pub(crate) use zeno_fcis_shell_sqlite::v2::equivalence::finite_checker;' not in main:
         raise ValueError('CLI no longer uses the shared library checker API')

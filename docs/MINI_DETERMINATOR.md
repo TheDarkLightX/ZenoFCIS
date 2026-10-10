@@ -1,5 +1,9 @@
 # Mini Determinator semantic reference
 
+This guide is included in the `2.3.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 The Mini Determinator in ZenoFCIS `1.1.0` is an original, public,
 self-contained model of shared-nothing deterministic coordination. Its design
 is informed by Determinator's public model of private spaces and deterministic

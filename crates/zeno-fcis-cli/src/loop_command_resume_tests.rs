@@ -308,13 +308,13 @@ fn a_resume_that_cannot_afford_a_new_replay_refuses_and_writes_nothing() {
 /// shared checker changes its identity and derived request, receipt and ledger
 /// hashes; all other fields in these hashed records, including reservations,
 /// are unchanged. The separate elapsed-time transcript is not hashed here.
-const JOURNEY_CHECKER_ID: &str = "06625439ca5fd003036a7da9149219a108cd91393dfc51eed36a22337cdcaed4";
+const JOURNEY_CHECKER_ID: &str = "4d125b68482558c0c9fb14bf90c0d641c9ccffb027cbd2c77c822130b7ef1d74";
 const JOURNEY_LEDGER_SHA256: &str =
-    "7aa19215f385a61f68acaefc0e736b3ffaf93084173f6be180f9489376c7ce60";
+    "2d2007160b6d2dd6bda6266ac7c2c00fe6f98380621426946341f53211cdeb6f";
 const JOURNEY_HEAD_SHA256: &str =
-    "699338fdba4ee9840691ca8c07d0b8a31a1f5ec34d04b7ac9ecab64eb6b4d7ee";
+    "634475b3ec81920ab787783028971fe8023e11c05009bacf4a1e3eb1264a348a";
 const JOURNEY_OUTPUTS_SHA256: &str =
-    "a6083b058cb59a66180e8d07dff363f7117652602e9c660f956da18ffa8b8bb7";
+    "98bbbfc32d759a985eac0954d6455b442bd87f8cbf6cf882462afbe069369823";
 
 #[test]
 fn an_uninterrupted_resume_matches_the_source_bound_journey() {

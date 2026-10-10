@@ -1,5 +1,9 @@
 # Mini Determinator QEMU kernel demo
 
+This guide is included in the `2.3.0-rc.1` candidate. Its retained V1
+protocol guidance does not define the normal V2 authority route; see
+[the candidate release notes](RELEASE_NOTES.md).
+
 ZenoFCIS `1.1.0` includes an isolated, executable `no_std` x86_64 kernel
 demo under `demos/mini-determinator-qemu/`. It boots through OVMF in QEMU,
 calls the public `zeno-fcis-spec` Mini Determinator implementation, writes a
