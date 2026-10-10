@@ -19,6 +19,9 @@ std = [
     "zeno-fcis-plan/std",
     "zeno-fcis-receipt/std",
     "zeno-fcis-shell/std",
+    "zeno-fcis-compose/std",
+    "zeno-fcis-refine/std",
+    "zeno-fcis-profile-zenodex/std",
 ]
 
 [dependencies]
@@ -29,6 +32,9 @@ zeno-fcis-patch = { path = "../zeno-fcis-patch", default-features = false }
 zeno-fcis-plan = { path = "../zeno-fcis-plan", default-features = false }
 zeno-fcis-receipt = { path = "../zeno-fcis-receipt", default-features = false }
 zeno-fcis-shell = { path = "../zeno-fcis-shell", default-features = false }
+zeno-fcis-compose = { path = "../zeno-fcis-compose", default-features = false }
+zeno-fcis-refine = { path = "../zeno-fcis-refine", default-features = false }
+zeno-fcis-profile-zenodex = { path = "../zeno-fcis-profile-zenodex", default-features = false }
 
 [lints]
 workspace = true
