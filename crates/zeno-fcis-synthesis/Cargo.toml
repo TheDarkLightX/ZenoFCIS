@@ -19,9 +19,9 @@ std = [
 ]
 
 [dependencies]
-zeno-fcis-codec = { version = "=1.0.0-rc.1", path = "../zeno-fcis-codec", default-features = false }
-zeno-fcis-crypto = { version = "=1.0.0-rc.1", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
-zeno-fcis-value = { version = "=1.0.0-rc.1", path = "../zeno-fcis-value", default-features = false }
+zeno-fcis-codec = { version = "=1.0.0-rc.2", path = "../zeno-fcis-codec", default-features = false }
+zeno-fcis-crypto = { version = "=1.0.0-rc.2", path = "../zeno-fcis-crypto", default-features = false, features = ["rustcrypto"] }
+zeno-fcis-value = { version = "=1.0.0-rc.2", path = "../zeno-fcis-value", default-features = false }
 
 [lints]
 workspace = true

@@ -6,6 +6,12 @@ embedded in ZenoFCIS values.
 
 ## Unreleased
 
+No changes yet.
+
+## 1.0.0-rc.2 - 2026-07-29
+
+Second public release candidate for the reusable ZenoFCIS core library family.
+
 ### Changed
 
 - Catalog format 3 requires every effect and channel to bind explicit reviewed
@@ -19,6 +25,24 @@ embedded in ZenoFCIS values.
   must use a durable value-classified outbox channel.
 - Production authority now names and binds the concrete outbox-delivery
   interpreter through `BoundDeliveryInterpreter`.
+- Release-candidate packaging now uses the version-neutral
+  `tools/rc_package.py` entry point and current-version-derived artifact names.
+- RC2 now freezes its reusable product surface explicitly and binds nine
+  human-readable BDD scenarios to a closed executable ATDD registry.
+- Optional deterministic coding-agent guardrails pin Node `22.23.1` and
+  Probity `1.10.0`; hostile command and transcript mutations are permanent
+  acceptance evidence and AI-judged TDD is not enabled.
+
+### Release-candidate limits
+
+- no arbitrary downstream project receives production authorization merely by
+  using the library;
+- the authenticated sparse tree and included SQLite deployment remain bounded
+  reference surfaces unless separately qualified;
+- concrete formal-tool adapters and project proof artifacts remain
+  project-owned;
+- signing, hosted provenance, crates.io publication, and independent exact-head
+  review remain owner or external actions.
 
 ## 1.0.0-rc.1 - 2026-07-29
 

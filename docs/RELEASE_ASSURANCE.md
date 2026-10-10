@@ -53,8 +53,13 @@ Run from a clean checkout of the exact release commit:
 ```bash
 python3 tools/check_assurance.py --self-test
 python3 tools/check_assurance.py
-python3 tools/rc1_package.py self-test
-python3 tools/rc1_package.py check
+python3 tools/rc_package.py self-test
+python3 tools/rc_package.py check
+python3 tools/atdd.py self-test
+python3 tools/atdd.py check
+npm ci --ignore-scripts
+npm audit --audit-level=high
+NODE_BIN=<exact-node-22.23.1> python3 tools/check_probity.py
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
@@ -63,7 +68,8 @@ RUSTDOCFLAGS='-D warnings' cargo +1.97.1 doc --workspace --all-features --locked
 cargo +1.97.1 deny check
 cargo +1.97.1 audit --ignore RUSTSEC-2026-0173 --deny warnings
 python3 tools/release_manifest.py --require-clean > SOURCE-MANIFEST.json
-python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
+python3 tools/atdd.py run --all
 ```
 
 The CI workflows add:
@@ -77,6 +83,8 @@ The CI workflows add:
 - strict sparse-proof and authenticated-plan decoding, projector qualification,
   candidate-bound projection-relation, and nominal publication tests;
 - two independently generated source manifests compared byte-for-byte.
+- exact BDD-to-ATDD registry equality, the complete adopter portfolio, and a
+  hostile/permitted Probity command corpus under Node `22.23.1`.
 
 ## Static policy
 
@@ -96,6 +104,12 @@ The check has hostile witnesses for every forbidden-pattern rule. `--self-test` 
 ## Supply-chain policy
 
 `Cargo.lock` is committed and every external direct dependency is exactly pinned. `deny.toml` makes unknown registries, unknown Git sources, wildcard dependencies, disallowed licenses, and RustSec findings release blockers. CI installs exact versions of `cargo-deny`, `cargo-audit`, and `cargo-fuzz`.
+
+Optional developer guardrails use a private npm package with exact Probity
+`1.10.0`, exact Node `22.23.1`, lockfile version 3, and a retained npm integrity
+digest for the complete canonical lock graph. CI installs that graph with
+lifecycle scripts disabled and runs `npm audit`. It is excluded from Rust
+runtime and protocol authority.
 
 The source manifest binds the full commit, clean-tree status, pinned Rust toolchain file, every tracked path, file kind, byte length, and SHA-256 digest. It is deterministic and contains no timestamps or host-specific paths.
 

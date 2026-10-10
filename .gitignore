@@ -1,4 +1,8 @@
 /target/
+node_modules/
+npm-debug.log*
+__pycache__/
+*.pyc
 Cargo.lock
 *.profraw
 *.profdata

@@ -5,7 +5,7 @@
 After publication, rustdoc for the umbrella crate is available at:
 
 ```text
-https://docs.rs/zeno-fcis/1.0.0-rc.1/zeno_fcis/
+https://docs.rs/zeno-fcis/1.0.0-rc.2/zeno_fcis/
 ```
 
 Every public subcrate is published at the same exact version and receives its
@@ -45,6 +45,12 @@ release commit.
 
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
 the [crate map](CRATE_MAP.md) and generated rustdoc for exact signatures.
+The [canonical-bytes guide](CANONICAL_BYTES.md) explains ZCVE/1 admission,
+decode/re-encode enforcement, commitments, and the boundary between byte
+identity and semantic authority.
+The [V1 product contract](V1_PRODUCT_CONTRACT.md) identifies the supported
+adopter journeys, and the [acceptance guide](ACCEPTANCE_TESTING.md) maps each
+journey to fixed executable commands.
 The [genesis authorization guide](GENESIS_AUTHORIZATION.md) documents the
 required one-time initial-state ceremony and SQLite reopen contract. The
 [strict artifact and SQLite history guide](STRICT_ARTIFACT_AND_SQLITE_HISTORY.md)
@@ -59,6 +65,6 @@ strict plan reauthorization, and nominal authenticated publication.
 
 ## Stability
 
-`1.0.0-rc.1` freezes a candidate Rust API for review. Corrections may change
+`1.0.0-rc.2` freezes a candidate Rust API for review. Corrections may change
 that API in a later release candidate. Stable protocol identifiers remain
 independent of Cargo versions and may not be silently reinterpreted.

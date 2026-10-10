@@ -1,5 +1,5 @@
 format = "zeno-fcis/package-set/1"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 rust_toolchain = "1.97.1"
 
 # Dependency-first order for crates.io publication. The checker rejects a

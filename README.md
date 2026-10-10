@@ -14,6 +14,31 @@ immutable state + command + policy + authenticated context
 
 The semantic kernel treats values, decisions, resource budgets, canonical bytes, and commitments as explicit protocol data. It forbids unsafe Rust and is designed for `no_std + alloc` use without clocks, randomness, networking, filesystems, databases, or executable effect closures.
 
+## Canonical bytes and byte-level enforcement
+
+Canonical bytes are the one permitted byte representation of an admitted
+semantic value. ZCVE/1 fixes type tags, integer and length encodings, field and
+map-key order, collection shape, and optional/sum representation. Its bounded
+decoder rejects malformed structure, duplicate or reordered entries, trailing
+bytes, and every input that does not equal a canonical re-encoding of the
+decoded value:
+
+```text
+untrusted bytes
+    -> bounded structural decode
+    -> typed immutable value
+    -> canonical re-encode
+    -> require original bytes == re-encoded bytes
+    -> schema and authority admission
+```
+
+This makes state roots, candidate IDs, receipts, replay bindings, and evidence
+commitments deterministic across supported implementations. Canonical bytes
+are not encryption and do not establish business correctness by themselves.
+Schemas establish shape; catalogs, invocation witnesses, project laws, and
+nominal authority establish what the bytes mean and whether they may be
+published. See the [canonical-bytes guide](docs/CANONICAL_BYTES.md).
+
 ## Start here
 
 For a project-neutral multi-domain application, enable the composed-program
@@ -21,7 +46,7 @@ path and import the curated prelude:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -45,7 +70,12 @@ Read the [installation guide](docs/INSTALLATION.md),
 [quickstart](docs/QUICKSTART.md), [API reference](docs/API_REFERENCE.md),
 [crate map](docs/CRATE_MAP.md), [feature matrix](docs/FEATURE_MATRIX.md), and
 [LLM integration guide](docs/LLM_USAGE.md). The
-[RC1 release notes](docs/RC1_RELEASE_NOTES.md) describe the exact candidate
+[V1 product contract](docs/V1_PRODUCT_CONTRACT.md) defines the RC2 feature
+freeze and supported adopter journeys. [BDD and ATDD](docs/ACCEPTANCE_TESTING.md)
+bind those journeys to fixed executable commands, while the optional
+[developer guardrails](docs/DEVELOPER_GUARDRAILS.md) reject selected unsafe
+coding-agent actions before execution. The
+[RC2 release notes](docs/RC2_RELEASE_NOTES.md) describe the exact candidate
 surface and remaining final-release blockers. The owner-facing
 [V1 release checklist](docs/V1_RELEASE_CHECKLIST.md) separates exact-source
 repository evidence from signing, publication, and external review actions.
@@ -54,6 +84,7 @@ Runnable examples are checked permanently:
 ```bash
 cargo +1.97.1 run -p zeno-fcis --example minimal_core --locked
 cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
+python3 tools/atdd.py run --all
 ```
 
 The `full` feature is intended for workspace integration and exploration.
@@ -92,6 +123,9 @@ The workspace now includes the complete package ladder:
 - crash-atomic policy-pinned SQLite schema v5 publication that creates a store only from nominal `CatalogAuthorizedGenesis`, reopens without caller-supplied initial state, strictly decodes and reauthorizes the complete persisted transition history, reconstructs exact authorization/bundle/receipt/replay/outbox row-set equality and current state, validates pending delivery against exact bundle membership, rejects schema v4 and earlier stores pending explicit migration, owns a policy-bound delivery-interpreter instance, never executes `CommitPlan` evidence, and retains crash-point and adversarial-corruption tests;
 - backend-independent persistent collections with reference, `rpds`, and `imbl` implementations, structural sharing, logical-entry equality, property tests, and benchmarks;
 - release assurance with static effect-boundary checks, exact dependency and CI-action pins, RustSec/license/source policy, deterministic source manifests, Miri, and fuzz harnesses.
+- a frozen V1 product contract, nine human-readable BDD scenarios, a closed
+  fail-closed ATDD registry, and optional deterministic Probity guardrails with
+  a pinned Node/npm graph and hostile command corpus.
 
 ## Demonstrated ZenoDEX runtime mount
 
@@ -142,7 +176,7 @@ code should enable the smallest explicit feature set, for example:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["composed-program"] }
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["composed-program"] }
 ```
 
 The umbrella crate's default and `no_std` feature sets are project-neutral.
@@ -205,9 +239,12 @@ The main local gate is:
 
 ```bash
 python3 tools/check_assurance.py --self-test
+python3 tools/atdd.py self-test
+python3 tools/atdd.py check
 cargo +1.97.1 fmt --all -- --check
 cargo +1.97.1 clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo +1.97.1 test --workspace --all-features --locked
+python3 tools/atdd.py run --all
 ```
 
 See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`, Miri, fuzz, supply-chain, and source-manifest gates. Package-specific boundaries are documented in `docs/`.
@@ -215,9 +252,9 @@ See [release assurance](docs/RELEASE_ASSURANCE.md) for the full stable, `no_std`
 RC packaging is fail closed and reviewable:
 
 ```bash
-python3 tools/rc1_package.py self-test
-python3 tools/rc1_package.py check
-python3 tools/rc1_package.py build --output /tmp/zeno-fcis-rc1
+python3 tools/rc_package.py self-test
+python3 tools/rc_package.py check
+python3 tools/rc_package.py build --output /tmp/zeno-fcis-rc2
 ```
 
 The build retains all public `.crate` packages, rustdoc, source and diagnostic
@@ -227,7 +264,7 @@ binary archives, checksums, a CycloneDX SBOM, and provenance inputs. See the
 
 ## Assurance posture
 
-Version `1.0.0-rc.1` is the first public API and packaging candidate for the
+Version `1.0.0-rc.2` is the current public API and packaging candidate for the
 reusable core library. It is ready for downstream API evaluation and
 integration testing, while remaining a pre-release candidate until the
 independent exact-head review and final release gates pass. The pinned ZenoDEX

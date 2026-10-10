@@ -12,7 +12,7 @@ ProjectProfile + ProjectCatalog
     -> authorized shell publication
 ```
 
-The workspace is version `1.0.0-rc.1`, the first public API and packaging
+The workspace is version `1.0.0-rc.2`, the current public API and packaging
 candidate. The APIs below are implemented and ready for downstream evaluation.
 Final Cargo API stability and general deployment qualification are not claimed
 until their separate `1.0.0` gates pass.
@@ -23,7 +23,7 @@ Use the umbrella crate when starting a project:
 
 ```toml
 [dependencies]
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = [
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = [
     "composed-program",
 ] }
 ```
@@ -41,6 +41,17 @@ cargo +1.97.1 run -p zeno-fcis --example minimal_core --locked
 cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --locked
 ```
 
+Run the complete adopter journey through the reviewable BDD/ATDD contract:
+
+```bash
+python3 tools/atdd.py list
+python3 tools/atdd.py run --all
+```
+
+The scenario registry is closed and executes fixed argument arrays. Feature
+prose cannot inject commands. See [V1 product contract](V1_PRODUCT_CONTRACT.md)
+and [BDD and acceptance testing](ACCEPTANCE_TESTING.md).
+
 `composed-program` enables the schema, catalog, transition, laws, authority,
 fixed-domain-machine, and composed-program layers. The semantic path supports
 `no_std + alloc`.
@@ -49,19 +60,51 @@ Add features only at the boundary that needs them:
 
 ```toml
 # Host-side starter generation
-zeno-fcis = { version = "=1.0.0-rc.1", features = ["bootstrap"] }
+zeno-fcis = { version = "=1.0.0-rc.2", features = ["bootstrap"] }
 
 # Crash-atomic SQLite publication
-zeno-fcis = { version = "=1.0.0-rc.1", features = ["sqlite-shell"] }
+zeno-fcis = { version = "=1.0.0-rc.2", features = ["sqlite-shell"] }
 
 # Checked external engines such as an SMT, Lean, CVC5, or private ESSO adapter
-zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["backend"] }
+zeno-fcis = { version = "=1.0.0-rc.2", default-features = false, features = ["backend"] }
 ```
 
 Avoid `full` in reusable libraries. It includes project-specific and reference
 surfaces that most consumers do not need. See [Feature matrix](FEATURE_MATRIX.md).
 
-## 2. Define reviewed project meaning
+## 2. Establish canonical byte identity
+
+ZenoFCIS does not use Rust layout, Serde, JSON field order, or a collection's
+internal shape as protocol identity. ZCVE/1 defines one encoding for every
+admitted semantic value.
+
+Treat external bytes as untrusted. Decode them with explicit limits, require
+complete input consumption, and let the codec re-encode and byte-compare the
+result before admission:
+
+```text
+bytes
+    -> bounded ZCVE/1 decode
+    -> structural canonicality checks
+    -> canonical re-encode
+    -> exact byte equality
+    -> admitted immutable value or rejection
+```
+
+Use generated schema-bound envelopes at application boundaries. Use
+`AdmittedValue` and `AdmittedEnvelope` only for lower-level integration.
+Compute roots, candidate identities, receipts, and evidence commitments from
+canonical admitted data, never from JSON, debug output, Serde layout, or
+database-native bytes.
+
+Byte-level canonicality provides deterministic identity and malleability
+resistance. It does not prove that a transfer is authorized, conserved, or
+correct. Those claims require the remaining schema, catalog, law, authority,
+and shell steps in this guide.
+
+Read [Canonical bytes and admission](CANONICAL_BYTES.md).
+
+## 3. Define reviewed project meaning
 
 Start with closed values and identifiers:
 
@@ -90,7 +133,7 @@ Read:
 - [Schema-bound catalog](SCHEMA_BOUND_CATALOG.md)
 - [Project bootstrap generator](PROJECT_BOOTSTRAP_GENERATOR.md)
 
-## 3. Implement the transition
+## 4. Implement the transition
 
 For one bounded domain, use the generated private-inner transition API or
 `CataloguedTransitionBuilder`. The generated API is preferred because it fixes
@@ -117,7 +160,7 @@ Read:
 - [Composed domain program](COMPOSED_DOMAIN_PROGRAM.md)
 - [Formal composition](FORMAL_COMPOSITION_V2.md)
 
-## 4. Define and verify project laws
+## 5. Define and verify project laws
 
 Schemas establish shape. Project laws establish relationships across the
 complete transition, such as:
@@ -151,7 +194,7 @@ Formal tools are optional adapters:
 Read [Project relational laws](PROJECT_RELATIONAL_LAWS.md) and
 [Generic backend protocol](GENERIC_BACKEND_PROTOCOL.md).
 
-## 5. Own production authority
+## 6. Own production authority
 
 Construct one `CatalogCommitAuthority` at application startup. The authority,
 not the request caller, owns:
@@ -184,7 +227,7 @@ Do not accept a caller-created `CommitBundle`, `TransitionDecision`,
 
 Read [Catalog authorization boundary](CATALOG_AUTHORIZATION_BOUNDARY.md).
 
-## 6. Publish through an authorized shell
+## 7. Publish through an authorized shell
 
 Use `AuthorizedShellState` for the pure authorized publication model or enable
 `sqlite-shell` for the crash-atomic SQLite adapter. The shell publishes the
