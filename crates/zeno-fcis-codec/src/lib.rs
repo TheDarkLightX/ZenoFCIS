@@ -536,8 +536,8 @@ fn decode_value_inner(
         TAG_TUPLE | TAG_VECTOR => {
             let count = cursor.take_u32()?;
             state.collection(count)?;
-            let capacity = usize::try_from(count).map_err(|_| DecodeError::LengthOverflow)?;
-            let mut items = Vec::with_capacity(capacity);
+            let mut items =
+                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 1)?);
             for _ in 0..count {
                 items.push(decode_value_inner(cursor, state, depth + 1)?);
             }
@@ -550,8 +550,9 @@ fn decode_value_inner(
         TAG_RECORD => {
             let count = cursor.take_u32()?;
             state.collection(count)?;
-            let capacity = usize::try_from(count).map_err(|_| DecodeError::LengthOverflow)?;
-            let mut fields = Vec::with_capacity(capacity);
+            // One field requires its u16 identifier and at least one value tag.
+            let mut fields =
+                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 3)?);
             let mut previous = None;
             for _ in 0..count {
                 let id = cursor.take_u16()?;
@@ -583,8 +584,10 @@ fn decode_value_inner(
         TAG_MAP => {
             let count = cursor.take_u32()?;
             state.collection(count)?;
-            let capacity = usize::try_from(count).map_err(|_| DecodeError::LengthOverflow)?;
-            let mut entries = Vec::with_capacity(capacity);
+            // One entry requires two u32 blob lengths plus at least one value
+            // tag in each encoded key and value.
+            let mut entries =
+                Vec::with_capacity(initial_collection_capacity(count, cursor.remaining(), 10)?);
             let mut previous: Option<Vec<u8>> = None;
             for _ in 0..count {
                 let encoded_key = cursor.take_blob(state.limits.max_payload_bytes)?.to_vec();
@@ -631,6 +634,18 @@ fn decode_value_inner(
         }
         other => Err(DecodeError::UnknownTag(other)),
     }
+}
+
+fn initial_collection_capacity(
+    count: u32,
+    remaining_wire_bytes: usize,
+    minimum_wire_bytes_per_item: usize,
+) -> Result<usize, DecodeError> {
+    let count = usize::try_from(count).map_err(|_| DecodeError::LengthOverflow)?;
+    let wire_bound = remaining_wire_bytes
+        .checked_div(minimum_wire_bytes_per_item)
+        .ok_or(DecodeError::LengthOverflow)?;
+    Ok(count.min(wire_bound))
 }
 
 struct Cursor<'a> {
@@ -986,6 +1001,31 @@ mod tests {
             decode_value(&bytes, DecodeLimits::default()),
             Err(DecodeError::TrailingBytes { .. })
         ));
+    }
+
+    #[test]
+    fn collection_reservation_is_bounded_by_remaining_wire_bytes() {
+        assert_eq!(initial_collection_capacity(1_000_000, 0, 1), Ok(0));
+        assert_eq!(initial_collection_capacity(1_000_000, 7, 1), Ok(7));
+        assert_eq!(initial_collection_capacity(1_000_000, 11, 3), Ok(3));
+        assert_eq!(initial_collection_capacity(1_000_000, 29, 10), Ok(2));
+        assert_eq!(initial_collection_capacity(2, 100, 1), Ok(2));
+        assert_eq!(
+            initial_collection_capacity(1, 1, 0),
+            Err(DecodeError::LengthOverflow)
+        );
+    }
+
+    #[test]
+    fn truncated_large_collection_declarations_are_rejected() {
+        for tag in [TAG_TUPLE, TAG_VECTOR, TAG_RECORD, TAG_MAP] {
+            let mut bytes = vec![tag];
+            bytes.extend_from_slice(&1_000_000_u32.to_be_bytes());
+            assert!(matches!(
+                decode_value(&bytes, DecodeLimits::default()),
+                Err(DecodeError::UnexpectedEnd { .. })
+            ));
+        }
     }
 
     #[test]
