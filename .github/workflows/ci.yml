@@ -42,10 +42,18 @@ jobs:
 
       - name: no_std checks
         run: |
-          cargo +1.97.1 check -p zeno-fcis-core --no-default-features --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis-value --no-default-features --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis-codec --no-default-features --target wasm32-unknown-unknown
-          cargo +1.97.1 check -p zeno-fcis --no-default-features --target wasm32-unknown-unknown
+          for crate in \
+            zeno-fcis-core \
+            zeno-fcis-value \
+            zeno-fcis-codec \
+            zeno-fcis-patch \
+            zeno-fcis-plan \
+            zeno-fcis-receipt \
+            zeno-fcis-shell \
+            zeno-fcis
+          do
+            cargo +1.97.1 check -p "${crate}" --no-default-features --target wasm32-unknown-unknown
+          done
 
       - name: Documentation
         env:
