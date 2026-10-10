@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["crates/treasury_machine-core", "programs/treasury_machine"]
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1

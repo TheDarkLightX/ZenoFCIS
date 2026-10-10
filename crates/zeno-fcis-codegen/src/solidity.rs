@@ -12,7 +12,7 @@ use std::fmt::{self, Write as _};
 pub const SOLIDITY_GENERATOR_ID: &str = "zeno-fcis-solidity/1";
 
 /// Solidity compiler range emitted by v1.
-pub const SOLIDITY_PRAGMA: &str = "0.8.35";
+pub const SOLIDITY_PRAGMA: &str = "0.8.36";
 
 /// Maximum state or command fields accepted by one scaffold.
 pub const MAX_SOLIDITY_FIELDS: usize = 64;

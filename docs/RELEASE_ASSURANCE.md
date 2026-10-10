@@ -17,6 +17,8 @@ candidate generator or mounted runtime proposes data
 
 Persistent collection backends are sealed implementations of one logical map interface. Equality and canonical materialization are defined by logical entries, not by backend nodes, allocation identity, or mutation history. Old versions remain usable because updates return a structurally shared successor.
 
+These rules constrain semantic authority; they do not provide process containment. Build tools, mounted runtimes, backend engines, and effect interpreters require deployment-specific isolation. See the [execution and sandbox boundary](EXECUTION_SANDBOX_BOUNDARY.md).
+
 ## Version policy
 
 Cargo package versions follow semantic versioning for the Rust API. Protocol compatibility is governed separately by explicit identifiers embedded in canonical data:
@@ -110,6 +112,7 @@ The repository currently supplies reviewed reference implementations and strict 
 - that a concrete ESSO, SMT solver, theorem prover, compiler, or LLM is bundled as a synthesis backend;
 - that generated or imported evidence is true without its independent checker;
 - that SQLite durability settings replace deployment-specific storage validation;
+- that semantic purity, strict adapters, dedicated `/tmp` paths, or ephemeral CI runners provide hostile-process containment;
 - audit completion, economic correctness, side-channel resistance, or production authorization.
 
 Those claims require separately bound evidence and an explicit deployment decision.

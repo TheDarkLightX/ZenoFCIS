@@ -18,7 +18,7 @@ use crate::solidity::inspect_solidity_source;
 /// Stable semantic identity for the advanced Solidity backend.
 pub const SOLIDITY_ADVANCED_GENERATOR_ID: &str = "zeno-fcis-solidity/2";
 /// Exact Solidity compiler version required by generated v2 source.
-pub const SOLIDITY_PINNED_VERSION: &str = "0.8.35";
+pub const SOLIDITY_PINNED_VERSION: &str = "0.8.36";
 /// Reviewed OpenZeppelin Contracts release expected by generated imports.
 pub const OPENZEPPELIN_CONTRACTS_VERSION: &str = "5.6.1";
 

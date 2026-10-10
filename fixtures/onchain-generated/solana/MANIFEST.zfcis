@@ -1,0 +1,15 @@
+generator=zeno-fcis-solana-anchor/3
+machine_hash=bd5c612ad6484fa025e8f2b6dee9a868a9a54bd7beb8c2904760011b854039de
+anchor=1.0.2
+solana=3.1.10
+solana-sha256-hasher=3.1.0
+program_id=cGfHiC6Kgg3FpFZvgwGcswsCRtp4aBP2fzuXRQPizuN
+state_seed=treasury_state
+core_dependencies=0
+core_no_std=true
+overflow_checks=true
+verified_build=required
+upgrade_authority_review=required
+capability.7.mint=8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR
+capability.7.token_program=TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
+capability.7.vault=GgBaCs3NCBuZN12kCJgAW63ydqohFkHEdfdEXBPzLHq

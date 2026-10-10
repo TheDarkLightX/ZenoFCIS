@@ -13,9 +13,9 @@ ZenoFCIS separates protocol meaning from runtime mechanism.
 A lower ring never imports a higher ring. The semantic kernel is `no_std +
 alloc`, forbids unsafe Rust, and has no ambient I/O.
 
-## Initial nonclaims
+## Isolation boundary
 
-The first workspace does not yet provide cryptographic hash implementations,
-state patches, effect plans, atomic commit bundles, persistent data-structure
-backends, runtime refinement, or production authority. Those are deliberately
-split into reviewable follow-up pull requests.
+The semantic kernel restricts protocol-authoritative observations and outputs.
+It does not sandbox the process running a compiler, generator, mounted runtime,
+backend engine, database shell, or effect interpreter. See the
+[execution and sandbox boundary](EXECUTION_SANDBOX_BOUNDARY.md).
