@@ -71,7 +71,7 @@ private crate. No backend decides release or commit authority by itself.
 
 | Feature | Environment | Class | Enables |
 |---|---|---|---|
-| `authenticated-state` | Host `std` through umbrella | Reference | Bounded sparse authenticated-state planning and proofs |
+| `authenticated-state` | Host `std` through umbrella | Reference | Configured projector-bound planning and context-verified sparse-proof witnesses |
 | `collections` | Host `std` through umbrella | Reference/optimization | Backend-neutral persistent collections |
 | `persistent-collections` | Host `std` | Reference/optimization | `collections` plus `rpds` and `imbl` backends |
 | `sqlite-shell` | Host `std` | Concrete shell | Authorized crash-atomic SQLite publication and delivery |
