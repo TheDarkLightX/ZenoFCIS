@@ -8,15 +8,15 @@ publish.workspace = true
 
 [dependencies]
 serde_json = "=1.0.151"
-zeno-fcis-authority = "=1.1.0"
-zeno-fcis-codec = "=1.1.0"
-zeno-fcis-core = "=1.1.0"
-zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
-zeno-fcis-laws = "=1.1.0"
-zeno-fcis-schema = "=1.1.0"
-zeno-fcis-shell = "=1.1.0"
-zeno-fcis-spec = "=1.1.0"
-zeno-fcis-value = "=1.1.0"
+zeno-fcis-authority = "=2.2.0-rc.1"
+zeno-fcis-codec = "=2.2.0-rc.1"
+zeno-fcis-core = "=2.2.0-rc.1"
+zeno-fcis-crypto = { version = "=2.2.0-rc.1", features = ["rustcrypto"] }
+zeno-fcis-laws = "=2.2.0-rc.1"
+zeno-fcis-schema = "=2.2.0-rc.1"
+zeno-fcis-shell = "=2.2.0-rc.1"
+zeno-fcis-spec = "=2.2.0-rc.1"
+zeno-fcis-value = "=2.2.0-rc.1"
 
 [lints]
 workspace = true

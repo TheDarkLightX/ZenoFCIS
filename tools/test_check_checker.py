@@ -4,6 +4,7 @@ import copy
 from pathlib import Path
 import subprocess
 import tempfile
+import tomllib
 import unittest
 from unittest import mock
 
@@ -37,9 +38,10 @@ class SharedCheckerGate(unittest.TestCase):
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((gate.ROOT / relative).read_bytes())
+            version = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']['version']
             for relative, before, after, reason in (
                 (gate.HARNESS, 'pub mod checker_api;', '', 'outside the proof unit'),
-                (Path('crates/zeno-fcis-cli/Cargo.toml'), '=1.1.0', '=1.2.0', 'exact published'),
+                (Path('crates/zeno-fcis-cli/Cargo.toml'), '=' + version, '=0.0.0-invalid', 'exact published'),
                 (Path('crates/zeno-fcis-cli/src/shell_v2.rs'), '//! The actual', '#[path = "sibling.rs"]\n//! The actual', 'sibling shell source'),
                 (Path('release/package-set.toml'), '    "zeno-fcis-shell-sqlite",\n    "zeno-fcis-cli",', '    "zeno-fcis-cli",\n    "zeno-fcis-shell-sqlite",', 'publication order'),
             ):
@@ -50,6 +52,22 @@ class SharedCheckerGate(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, reason):
                         gate.check_routes(root)
                 target.write_text(original)
+
+    def test_release_version_changes_keep_the_exact_dependency_check(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for relative in gate.ROUTE_INPUTS:
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((gate.ROOT / relative).read_bytes())
+            workspace = root / 'Cargo.toml'
+            old = tomllib.loads(workspace.read_text())['workspace']['package']['version']
+            workspace.write_text(workspace.read_text().replace('version = "' + old + '"', 'version = "2.9.0-rc.1"', 1))
+            with self.assertRaisesRegex(ValueError, 'exact published'):
+                gate.check_routes(root)
+            cli = root / 'crates/zeno-fcis-cli/Cargo.toml'
+            cli.write_text(cli.read_text().replace('=' + old, '=2.9.0-rc.1'))
+            gate.check_routes(root)
 
     def test_source_inventory_covers_shared_core_and_both_consumers(self):
         paths = set(gate.source_paths(profile=False))

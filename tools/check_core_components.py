@@ -53,7 +53,9 @@ def static_check():
     for family in core.FAMILIES:
         spec = core.definition(family)
         for parameters in spec["instances"]:
-            files = core.source(family, parameters)
+            # Qualification constructs untrusted source before fresh certificates
+            # exist. Ordinary installation still requires the stored reference.
+            files = core.source(family, parameters, include_proof=False)
             manifest = core.read_json(files["core-instance.json"].decode())
             expected = [row for row in rows if row["family"] == family.replace("-", "_")
                         and row["parameters"] == parameters]
@@ -124,7 +126,7 @@ def execute(cli, work, target, instances):
         directory = work / name
         directory.mkdir()
         contract, app = directory / "contract", directory / "app"
-        core.instantiate(family, parameters, contract)
+        core.instantiate(family, parameters, contract, include_proof=False)
         print(f"checking {name}: {manifest['input_tuples']} raw tuples", flush=True)
         run([cli, "generate", "contract", contract, "--format", "json"], core.ROOT,
             directory / "generate.log", environment)
@@ -160,7 +162,7 @@ def execute(cli, work, target, instances):
     mutants = []
     for family in core.FAMILIES:
         directory = work / (family + "-mutant")
-        core.instantiate(family, core.definition(family)["instances"][0], directory)
+        core.instantiate(family, core.definition(family)["instances"][0], directory, include_proof=False)
         policy_path = directory / "v2/policy.json"
         policy = core.read_json(policy_path.read_text())
         if family == "reservation-pool":

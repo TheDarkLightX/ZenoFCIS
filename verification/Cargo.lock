@@ -1054,7 +1054,7 @@ checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
 name = "zeno-fcis-authenticated"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
@@ -1064,7 +1064,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-authority"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-catalog",
  "zeno-fcis-codec",
@@ -1085,7 +1085,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-catalog"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-core",
@@ -1097,7 +1097,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-codec"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "libcrux-sha2",
  "sha2",
@@ -1106,7 +1106,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-codegen"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-crypto",
@@ -1116,25 +1116,25 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-compose"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
 ]
 
 [[package]]
 name = "zeno-fcis-core"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 
 [[package]]
 name = "zeno-fcis-crypto"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
 ]
 
 [[package]]
 name = "zeno-fcis-evidence"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-refine",
@@ -1173,7 +1173,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-laws"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-catalog",
  "zeno-fcis-codec",
@@ -1188,7 +1188,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-patch"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-value",
@@ -1196,7 +1196,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-plan"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-value",
@@ -1204,14 +1204,14 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-project"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
 ]
 
 [[package]]
 name = "zeno-fcis-receipt"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-core",
@@ -1222,7 +1222,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-refine"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-core",
@@ -1234,7 +1234,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-schema"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-value",
@@ -1242,7 +1242,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-secret"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "subtle",
  "zeno-fcis-codec",
@@ -1251,14 +1251,14 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-security"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
 ]
 
 [[package]]
 name = "zeno-fcis-shell"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-patch",
@@ -1269,7 +1269,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-shell-sqlite"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "rusqlite",
  "zeno-fcis-authority",
@@ -1287,14 +1287,14 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-spec"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
 ]
 
 [[package]]
 name = "zeno-fcis-synthesis"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-codec",
  "zeno-fcis-core",
@@ -1304,7 +1304,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-transition"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 dependencies = [
  "zeno-fcis-catalog",
  "zeno-fcis-codec",
@@ -1320,7 +1320,7 @@ dependencies = [
 
 [[package]]
 name = "zeno-fcis-value"
-version = "1.1.0"
+version = "2.2.0-rc.1"
 
 [[package]]
 name = "zerocopy"
