@@ -17,6 +17,7 @@ mod onchain;
 mod python;
 mod render;
 mod root_envelope;
+mod solana_anchor;
 mod solidity;
 mod solidity_advanced;
 mod vectors;
@@ -33,6 +34,13 @@ pub use onchain::{
     OnchainModelError, OnchainReason, OnchainScalar, RecipientPolicy,
 };
 pub use render::{GENERATOR_ID, generate};
+pub use solana_anchor::{
+    ANCHOR_VERSION, MAX_SOLANA_GENERATED_FILE_BYTES, SOLANA_ANCHOR_GENERATOR_ID,
+    SOLANA_SHA256_HASHER_VERSION, SOLANA_TOOLCHAIN_VERSION, SolanaAnchorSpec,
+    SolanaCoreSafetyFindingKind, SolanaFungibleBinding, SolanaSafetyFinding, SolanaSafetyReport,
+    SolanaShellSafetyFindingKind, SolanaTokenProgram, generate_solana_anchor,
+    inspect_solana_core_source, inspect_solana_shell_source,
+};
 pub use solidity::{
     GeneratedSolidity, MAX_SOLIDITY_FIELDS, MAX_SOLIDITY_REASONS, MAX_SOLIDITY_SOURCE_BYTES,
     SOLIDITY_GENERATOR_ID, SOLIDITY_PRAGMA, SolidityContractSpec, SolidityField,
