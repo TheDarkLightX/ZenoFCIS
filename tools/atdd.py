@@ -280,6 +280,10 @@ SCENARIOS: dict[str, AcceptanceScenario] = {
         "Check Verus evidence admission and shared runtime arithmetic boundaries",
         (("python3", "tools/test_check_verus.py"),),
     ),
+    "finite-execution-proof": AcceptanceScenario(
+        "Preserve complete finite execution and reject missing proof contracts",
+        (("python3", "tools/test_check_finite_execution.py"),),
+    ),
     "security-hotspots": AcceptanceScenario(
         "Rank security hotspots without interpreting source as instructions",
         (

@@ -11,3 +11,11 @@ Feature: Bind Verus evidence to shared executable Rust
     And malformed, incomplete, failed or wrong-version verifier reports are refused
     And a changed tool file fails its pinned digest check
     And the deliberate mutation anchors still apply to the runtime source
+
+  @atdd-finite-execution-proof
+  Scenario: Preserve complete finite execution and reject missing proof contracts
+    Given the admission and eager evaluation functions used by the library
+    When the shared source runs on the pinned application Rust toolchain
+    Then all ten instructions, eager traps, refusal order and buffer cleanup agree with the specification
+    And the coverage gate rejects missing functions and absent or changed contracts
+    And the runtime proof profile declares no narrowed executable preconditions

@@ -7,6 +7,7 @@
 /// Finite exit-path search and independent decreasing-rank verification.
 pub mod completion;
 pub mod emit;
+mod evaluation;
 mod ir;
 /// Bounded, ordered preparation without publication authority.
 pub mod preparation;
@@ -586,6 +587,42 @@ pub fn synthesize(contract: &Contract, sketch: &Sketch, budget: Budget) -> Resul
                     .as_bytes()
                     .to_vec()
                     .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-execution-source",
+                    include_bytes!("evaluation/mod.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-execution-specification",
+                    include_bytes!("evaluation/spec.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-admission-source",
+                    include_bytes!("evaluation/admission/mod.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                hash_bytes(
+                    "zeno-fcis/finite-admission-specification",
+                    include_bytes!("evaluation/admission/spec.rs"),
+                )?
+                .as_bytes()
+                .to_vec()
+                .into_boxed_slice(),
             ),
         ]),
     )?;

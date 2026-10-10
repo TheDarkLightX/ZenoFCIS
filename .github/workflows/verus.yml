@@ -4,9 +4,13 @@ on:
   pull_request:
     paths:
       - "crates/zeno-fcis-authority/**"
+      - "crates/zeno-fcis-synthesis/**"
       - "verification/verus/**"
       - "tools/check_verus.py"
       - "tools/test_check_verus.py"
+      - "tools/check_finite_execution.py"
+      - "tools/test_check_finite_execution.py"
+      - "tools/verus_coverage.py"
       - "Cargo.toml"
       - "rust-toolchain.toml"
       - ".github/workflows/verus.yml"
@@ -32,15 +36,21 @@ jobs:
           rustup toolchain install 1.97.1 --profile minimal
           rustup toolchain install 1.98.1 --profile minimal
       - name: Check receipt admission and native runtime boundaries
-        run: python3 tools/test_check_verus.py
+        run: |
+          python3 tools/test_check_verus.py
+          python3 tools/test_check_finite_execution.py
       - name: Verify shared Rust and require mutation failures
         run: python3 tools/check_verus.py --install --out "${{ runner.temp }}/verus-evidence.json"
+      - name: Verify finite admission and execution with contract coverage
+        run: python3 tools/check_finite_execution.py --out "${{ runner.temp }}/finite-execution-evidence.json"
       - name: Check no-std authority compatibility
-        run: cargo +1.97.1 check -p zeno-fcis-authority --no-default-features --locked
+        run: cargo +1.97.1 check -p zeno-fcis-authority -p zeno-fcis-synthesis --no-default-features --locked
       - name: Retain scoped evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: verus-evidence
-          path: ${{ runner.temp }}/verus-evidence.json
+          path: |
+            ${{ runner.temp }}/verus-evidence.json
+            ${{ runner.temp }}/finite-execution-evidence.json
           if-no-files-found: warn
