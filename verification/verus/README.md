@@ -212,3 +212,37 @@ this instruction profile. A protected raw-state view, grouped operations,
 complete decisions, laws/genesis and the mandatory V2 authority/replay route
 remain open. A verified private meter is not a proof that every authority
 operation uses it, nor a whole-core or V2 completion claim.
+
+## V2 integer byte interpretation
+
+[canonical_bytes.rs](canonical_bytes.rs) directly includes the production
+[byte readers](../../crates/zeno-fcis-synthesis/src/finite/canonical_v2/mod.rs).
+`read_big_endian` interprets zero through 16 bytes as a base-256 unsigned integer;
+`read_signed_128` interprets exactly 16 bytes as a signed two's-complement value.
+Success returns the exact integer and next offset. Invalid offsets, truncation
+and excessive width return `None`. Both functions cover their entire Rust input
+domain, including zero-width reads and both signed extremes.
+
+The reviewed [coverage manifest](canonical-bytes.json) fixes 11 translated
+records: two executable functions, five mathematical specifications and four
+induction lemmas, with nine verification obligations. Native tests compare
+against independent `from_be_bytes` conversions, exhaust all 65,536 two-byte
+values and cover byte order, widths, truncation, offset overflow and signed
+boundaries. Nine behavior mutants must fail proof; five mutants must verify
+and then fail the contract/specification coverage guard. Both actual source
+files are included in the finite evaluator identity.
+
+```sh
+python3 tools/test_check_canonical_bytes.py
+python3 tools/check_canonical_bytes.py --install --out /tmp/zeno-fcis-byte-evidence.json
+cargo +1.97.1 test -p zeno-fcis-synthesis --test v2_execution --locked
+```
+
+These functions are integer primitives, and do not establish canonical record,
+schema or envelope admission. They do not charge a meter. The protected view
+must use them after its specified ingress/access charge and preserve the
+original admitted bytes; that integration remains open. Complete decisions,
+laws/genesis and mandatory authority/replay also remain open. The receipt is
+scoped Verus/Z3 evidence with the named compiler, verifier, standard-library
+and hardware assumptions; it does not become Lean `KernelChecked` evidence or
+establish source-to-binary correspondence.
