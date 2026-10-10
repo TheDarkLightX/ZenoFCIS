@@ -1962,29 +1962,29 @@
         "release-control",
         "workflow"
       ],
-      "production_lines": 131,
+      "production_lines": 132,
       "rank": 17,
       "score": 81,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            45
+            46
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
-            49
+            50
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
             15,
-            61,
-            133,
-            143
+            62,
+            134,
+            144
           ]
         }
       ],
@@ -4854,34 +4854,34 @@
       "path_roles": [
         "workflow"
       ],
-      "production_lines": 65,
+      "production_lines": 71,
       "rank": 49,
       "score": 76,
       "signals": [
         {
           "id": "release-or-publish",
           "lines": [
-            60
+            65
           ]
         },
         {
           "id": "workflow-action",
           "lines": [
-            34,
-            60
+            36,
+            65
           ]
         },
         {
           "id": "workflow-expression",
           "lines": [
-            36,
-            49,
-            51,
-            53,
-            55,
-            64,
-            65,
-            66
+            38,
+            52,
+            54,
+            56,
+            58,
+            60,
+            69,
+            70
           ]
         }
       ],
@@ -5305,18 +5305,18 @@
     }
   ],
   "scope": {
-    "admitted_bytes": 3973611,
-    "admitted_files": 244,
-    "inventory_sha256": "33bee9078a36b3abaebd793f3c45d8ce342757b845d8eaf3194aced21da6bc30",
-    "ranked_above_minimum": 216,
+    "admitted_bytes": 4025000,
+    "admitted_files": 248,
+    "inventory_sha256": "d4ba4ca303b2dca0fd83cf82c26ecf2d6573f59dcccf7802a5869e7a330f0364",
+    "ranked_above_minimum": 219,
     "reported_hotspots": 50,
     "selection": "production crate source, host tools, GitHub workflows, and security-relevant root configuration; tests and fixtures are evidence, not runtime hotspots",
     "tier_counts": {
       "priority-1": 13,
-      "priority-2": 56,
-      "priority-3": 118,
-      "priority-4": 18,
-      "priority-5": 39
+      "priority-2": 57,
+      "priority-3": 119,
+      "priority-4": 19,
+      "priority-5": 40
     }
   }
 }

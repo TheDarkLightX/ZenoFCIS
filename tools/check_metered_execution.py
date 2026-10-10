@@ -25,8 +25,14 @@ PROFILE = Path("verification/verus/metered-execution.json")
 HARNESS = Path("verification/verus/metered_execution.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs")
 METER, SPEC = SUBJECT.parent / "meter.rs", SUBJECT.parent / "spec.rs"
-UNIT_SOURCES = (HARNESS, *SCALAR_SOURCES[1:], SUBJECT, METER, SPEC)
+INPUT = SUBJECT.parent / "input_view.rs"
+INPUT_SPEC = SUBJECT.parent / "input_view/spec.rs"
+CANONICAL = SUBJECT.parent.parent / "canonical_v2/mod.rs"
+CANONICAL_SPEC = CANONICAL.parent / "spec.rs"
+UNIT_SOURCES = (HARNESS, *SCALAR_SOURCES[1:], SUBJECT, METER, SPEC,
+                INPUT, INPUT_SPEC, CANONICAL, CANONICAL_SPEC)
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
+           SUBJECT.parent / "input_view/tests.rs",
            Path("tools/check_metered_execution.py"), Path("tools/test_check_metered_execution.py"),
            Path("tools/check_finite_execution.py"), Path("tools/check_verus.py"),
            Path("tools/verus_coverage.py"), Path("Cargo.toml"), Path("rust-toolchain.toml"),
@@ -190,7 +196,7 @@ def check(cache: Path, install: bool) -> dict:
             "verus_report": report, "translated_function_coverage": coverage,
             "operational_order_evidence": "reviewed executable-body inventory; execute-before-charge mutation verifies but is refused",
             "native": native, "mutations": mutations,
-            "scope": "owned V2 charge counters and eager scalar outcomes with exact retained usage",
+            "scope": "owned V2 counters, eager scalar outcomes and shared protected-record dependency closure",
             "trusted_base": ["reviewed specifications and operational body manifest", "Verus translation/erasure and bundled vstd/Z3",
                              "Rust compilers", "standard library/allocation", "host platform"],
             "unproved": ["Program convenience adapter", "canonical/schema/raw-state bridge", "protected state view",
@@ -213,7 +219,7 @@ def main() -> int:
     if receipt["status"] != "passed":
         print(receipt["error"])
         return 1
-    print(f"57 obligations; {len(receipt['mutations'])} mutations caught")
+    print(f"{receipt['verus_report']['verification-results']['verified']} obligations; {len(receipt['mutations'])} mutations caught")
     return 0
 
 
