@@ -10,9 +10,11 @@ and restocking brings units in. It shows three patterns:
   exactly right;
 - commands with parameters: each command carries an action and a quantity.
 
-`src/program.rs` calls the synthesized step in
-`synthesized/transition.rs` for the complete decision, including authorization,
-then maps its output into typed staging. The law
+The authority imports `synthesized/program.zcve` and the closed plan in
+`profile.rs`. Library code interprets both: it maps finite outputs to catalogued
+rejections, state updates, and the shipment outbox. `src/program.rs` names
+that library-owned interpreter; `synthesized/transition.rs` is retained as a
+cross-language evidence artifact and is not compiled into this application. The law
 checker in `src/laws.rs` evaluates the formulas in `project.zeno` against every
 decision, and refuses any decision that breaks them.
 
@@ -21,6 +23,13 @@ types, and relational formulas. `build.rs` supplies explicit scalar bounds and
 catalog meanings, then checks and generates the schema and project bindings.
 `profile.rs` binds the exact source, including the synthesis files, and the
 runtime-only law manifest.
+
+The closed plan is authored in `profile.rs`; the library checks its complete
+field projection against the schema, binds it to the catalog identity, and
+interprets it without application staging code. The independent application
+model checks all 864 admitted inputs. These checks establish this bounded
+example's behavior against its stated rules; they do not certify the rules
+themselves or make the current optional path the mandatory V2 gate.
 
 ## The rules
 
@@ -64,7 +73,7 @@ warehouse to send them.
 
 `zeno-fcis synth run` evaluates hole assignments over all 864 inputs and
 selects the first that satisfies the contract on every one: capacity 5 and
-code 1, which the adapter maps to `insufficient_reserved`. The selected
+code 1, which the closed plan maps to `insufficient_reserved`. The selected
 program, its complete input and output vectors, and the emitted Rust are
 checked in under `synthesized/`. Authorization has first precedence: an
 unauthorized command always returns `not_authorized`, the unchanged state,
@@ -120,7 +129,7 @@ commit, or to the genesis, reported as a mismatch.
 
 The tests check the running application:
 - `tests/conformance.rs` runs all 864 admitted inputs through admission, the
-  authority, the adapter, the law checker, the committed patch, and the
+  authority, the library decision interpreter, the law checker, the committed patch, and the
   outbox. It compares each outcome with a separate model of the README's
   complete decision rules and checks that units are conserved. It also checks
   that schema admission matches the finite domain in both directions, that
@@ -137,7 +146,7 @@ The tests check the running application:
   environment, and requires every decision digest to match.
 
 ```sh
-zeno-fcis purity src/program.rs src/laws.rs synthesized/transition.rs
+zeno-fcis purity src/program.rs src/laws.rs
 ```
 
 All of these are detectors: agreement shows that these runs matched and that
@@ -168,8 +177,8 @@ cargo +1.97.1 run --locked -- new-stock.sqlite
 
 The SQLite shell is the `sqlite` feature, on by default. Without it,
 `cargo +1.97.1 build --no-default-features` builds the core alone: the
-generated bindings, the program, the law checker, the profile, the delivery
-adapter, and `authority()`, with no database; the gate checks that it also
+generated bindings, the library decision interpreter, the law checker, the
+profile, the delivery adapter, and `authority()`, with no database; the gate checks that it also
 compiles for `wasm32-unknown-unknown`. `create`, `invoke`, `journey`, and the demonstration
 binary need the feature.
 

@@ -35,15 +35,18 @@ zeno-fcis-transition = "=1.1.0"
 zeno-fcis-value = "=1.1.0"
 
 [build-dependencies]
+zeno-fcis-authority = "=1.1.0"
 zeno-fcis-bootstrap = "=1.1.0"
 zeno-fcis-catalog = "=1.1.0"
 zeno-fcis-codec = "=1.1.0"
 zeno-fcis-crypto = { version = "=1.1.0", features = ["rustcrypto"] }
+zeno-fcis-core = "=1.1.0"
 zeno-fcis-laws = "=1.1.0"
 zeno-fcis-project = "=1.1.0"
 zeno-fcis-schema = "=1.1.0"
 zeno-fcis-spec = "=1.1.0"
 zeno-fcis-synthesis = "=1.1.0"
+zeno-fcis-value = "=1.1.0"
 
 # The demonstration needs the shell; the library alone builds without it.
 [[bin]]
