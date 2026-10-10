@@ -241,6 +241,12 @@ cargo +1.97.1 run -p zeno-fcis --example checked_backend --features backend --lo
 python3 tools/atdd.py run --all
 ```
 
+The [Verus pilot](verification/verus/README.md) checks two arithmetic functions
+used by the optional finite decision interpreter against mathematical
+contracts. It does not verify the complete interpreter. See
+[lessons from Verus and the V2 plan](docs/VERUS_LESSONS_AND_V2_PLAN.md) for the
+integration design and remaining proof obligations.
+
 ## Example applications
 
 `zeno-fcis new DIR --template NAME` creates a complete application: an

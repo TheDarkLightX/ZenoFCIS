@@ -24,6 +24,7 @@ use zeno_fcis_synthesis::finite_runtime::{evaluator_hash, import_program};
 use zeno_fcis_transition::{CataloguedTransitionBuilder, TransitionDecision, TransitionError};
 use zeno_fcis_value::{Field, Value, ValueError};
 
+use crate::finite_bounds::{bounded_product, interval_width};
 use crate::{CatalogTransitionProgram, ReviewedTransitionInput};
 
 const MAX_ROWS: u64 = 1_000_000;
@@ -208,10 +209,24 @@ impl FiniteDecisionContract {
     pub fn identity<H: ApprovedCommitmentProvider>(&self) -> Result<Hash32, FiniteDecisionError> {
         let finite_evaluator =
             evaluator_hash().map_err(|_| FiniteDecisionError::Invalid("evaluator-identity"))?;
+        let evaluator_sources = Value::tuple(vec![
+            Value::Bytes(
+                include_bytes!("finite_decision.rs")
+                    .to_vec()
+                    .into_boxed_slice(),
+            ),
+            Value::Bytes(
+                include_bytes!("finite_bounds.rs")
+                    .to_vec()
+                    .into_boxed_slice(),
+            ),
+        ])
+        .canonical_bytes()
+        .map_err(FiniteDecisionError::Encode)?;
         let gate_evaluator = commitment::<H>(
-            Domain::new("zeno-fcis/finite-decision-evaluator", 1)
+            Domain::new("zeno-fcis/finite-decision-evaluator", 2)
                 .map_err(FiniteDecisionError::Encode)?,
-            include_bytes!("finite_decision.rs"),
+            &evaluator_sources,
         )
         .map_err(FiniteDecisionError::Encode)?;
         let value = Value::tuple(vec![
@@ -462,14 +477,10 @@ fn verify_total(program: &Program, branches: &[DecisionBranch]) -> Result<(), Fi
     let mut rows = 1_u64;
     for domain in program.inputs() {
         let (min, max) = domain.bounds();
-        let width = u64::try_from(i128::from(max) - i128::from(min) + 1)
-            .map_err(|_| FiniteDecisionError::Invalid("input-domain-width"))?;
-        rows = rows
-            .checked_mul(width)
+        let width =
+            interval_width(min, max).ok_or(FiniteDecisionError::Invalid("input-domain-width"))?;
+        rows = bounded_product(rows, width, MAX_ROWS)
             .ok_or(FiniteDecisionError::Invalid("input-product"))?;
-        if rows > MAX_ROWS {
-            return Err(FiniteDecisionError::Invalid("input-product"));
-        }
     }
     let mut row: Vec<i64> = program
         .inputs()
