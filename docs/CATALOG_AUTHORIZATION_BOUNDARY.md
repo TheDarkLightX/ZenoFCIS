@@ -229,8 +229,9 @@ authorization records, partial transaction, or corrupted stored identity.
   implementation matches its manifest. Each promoted profile still needs
   independently reviewed definitions, checkers, and retained proof evidence
   at the coverage level it claims.
-- This boundary does not reconstruct exact decoded SQLite bundle/outbox set
-  equality; issue #55 remains required before delivery qualification.
+- SQLite schema v5 reconstructs exact decoded authorization, bundle, receipt,
+  replay, and outbox set equality before replay or delivery. This does not
+  qualify the host filesystem or a production destination.
 - [Flux: Liquid Types for Rust](https://doi.org/10.1145/3591283) is relevant
   to future refinement checking inside reviewed Rust implementations. A Flux
   proof would not by itself establish ingress authentication, runtime

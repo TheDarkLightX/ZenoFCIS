@@ -31,6 +31,8 @@ release commit.
 | Pure transition construction | `zeno_fcis::transition` |
 | Project invariants and conservation | `zeno_fcis::laws` |
 | Nominal genesis and commit authorization | `zeno_fcis::authority` |
+| Strict receipt and bundle decoding | `zeno_fcis::receipt::{ReceiptDecodeLimits, BundleDecodeLimits, decode_receipt, decode_reject_receipt, decode_commit_bundle}` |
+| Persisted authorization re-entry | `zeno_fcis::authority::{AuthorizationDecodeLimits, CatalogCommitAuthority::reauthorize_canonical_transition}` |
 | Fixed domain machines | `zeno_fcis::domain` |
 | Global composed program | `zeno_fcis::composed_program` |
 | Composition proof obligations | `zeno_fcis::compose` |
@@ -40,7 +42,9 @@ release commit.
 Prefer the [quickstart](QUICKSTART.md) for the first implementation, then use
 the [crate map](CRATE_MAP.md) and generated rustdoc for exact signatures.
 The [genesis authorization guide](GENESIS_AUTHORIZATION.md) documents the
-required one-time initial-state ceremony and SQLite reopen contract.
+required one-time initial-state ceremony and SQLite reopen contract. The
+[strict artifact and SQLite history guide](STRICT_ARTIFACT_AND_SQLITE_HISTORY.md)
+documents persisted-artifact reauthorization and complete row-set validation.
 
 ## Stability
 
