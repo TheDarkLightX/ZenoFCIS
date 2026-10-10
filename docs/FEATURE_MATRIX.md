@@ -72,6 +72,7 @@ private crate. No backend decides release or commit authority by itself.
 | Feature | Environment | Class | Enables |
 |---|---|---|---|
 | `authenticated-state` | Host `std` through umbrella | Reference | Configured projector-bound planning and context-verified sparse-proof witnesses |
+| `authenticated-authority` | Host `std` | Core authority adapter | Authenticated state + semantic authority + retained projector qualification + nominal candidate-bound publication |
 | `collections` | Host `std` through umbrella | Reference/optimization | Backend-neutral persistent collections |
 | `persistent-collections` | Host `std` | Reference/optimization | `collections` plus `rpds` and `imbl` backends |
 | `sqlite-shell` | Host `std` | Concrete shell | Authorized crash-atomic SQLite publication and delivery |
@@ -117,6 +118,9 @@ zeno-fcis = { version = "=1.0.0-rc.1", features = ["bootstrap"] }
 
 # Concrete local authorized persistence
 zeno-fcis = { version = "=1.0.0-rc.1", features = ["sqlite-shell"] }
+
+# Candidate-bound authenticated index publication
+zeno-fcis = { version = "=1.0.0-rc.1", features = ["authenticated-authority"] }
 
 # Tool-neutral checked backend protocol
 zeno-fcis = { version = "=1.0.0-rc.1", default-features = false, features = ["backend"] }

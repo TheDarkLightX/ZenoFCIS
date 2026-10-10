@@ -16,7 +16,10 @@ ZenoFCIS separates protocol meaning from runtime mechanism.
    invocation to one approved provider, reviewed transition type, exact project
    law-engine type and verified law set, interpreter type, deployment profile,
    state domain, catalog, and resource envelope.
-5. Imperative adapters: mounted runtimes, code generation, SQLite, and other
+5. Authenticated authority: `zeno-fcis-authenticated-authority` binds one
+   qualified projector, exact authorized candidate, strict persisted plan,
+   per-transition projection relation, and nominal authenticated publication.
+6. Imperative adapters: mounted runtimes, code generation, SQLite, and other
    external tools interpret or persist already bounded values. The SQLite
    production port accepts only `CatalogAuthorizedTransition`.
 
@@ -29,11 +32,13 @@ The workspace implements all layers above as bounded Rust libraries and
 reference adapters. It now makes a complete profile-bound relational-law set
 and fresh per-invocation evaluation mandatory before production authorization.
 Each promoted project still has to supply and independently qualify its exact
-conservation/invariant definitions and checker implementation. Strict decoded
-SQLite bundle/outbox set equality, concrete qualified complete-footprint proofs
-for each production component, exhaustive-domain refinement manifests,
-production authenticated storage, and chain deployment qualification also
-remain open. The generic complete-footprint witness and parallel-authorization
-API is implemented; concrete Lean, Flux, Kani, SMT, private ESSO, and Morph
-checkers still require separately mounted adapters and exact evidence. These
-gaps block an official production value-moving profile.
+conservation/invariant definitions and checker implementation. The library now
+implements strict SQLite history reconstruction, manifest-backed exhaustive
+refinement, complete-footprint witnesses, strict authenticated transport
+decoding, and candidate-bound authenticated publication authority. A concrete
+production authenticated datastore, qualified project-specific projectors and
+relations, cross-store atomicity, and chain deployment qualification remain
+project work. Concrete Lean, Flux, Kani, SMT, private ESSO, and Morph checkers
+still require separately mounted adapters and exact evidence. These gaps block
+an official production value-moving profile, but not publication of the
+reusable core library.

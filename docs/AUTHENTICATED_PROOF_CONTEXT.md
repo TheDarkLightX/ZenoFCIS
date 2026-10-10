@@ -34,6 +34,12 @@ consumer can compare it with authority-owned state.
 diagnostics and reference testing. The ambiguous pre-V1 `verify` method is
 removed.
 
+Persisted proof bytes enter through `decode_sparse_proof` under explicit
+`AuthenticatedDecodeLimits`. The decoder requires the exact format version,
+complete input consumption, fixed 256-sibling length, strict nested ZCVE
+admission, and byte-for-byte canonical reconstruction before
+`verify_against` can create the nominal context witness.
+
 ## Authority boundary
 
 The proof producer controls the untrusted `SparseProof`. The proof consumer or
@@ -79,11 +85,12 @@ test protects the private witness fields.
 
 ## Canonical format change
 
-`AuthenticatedProfile` now commits the projector identity.
+`AuthenticatedProfile` commits the projector identity.
 `PlannedAuthenticatedCommit` canonical encoding is explicitly version 2 and
-includes that projector commitment. This is an intentional pre-V1 incompatible
-hardening change from the legacy unversioned pre-release encoding. No strict
-plan decoder exists yet, so wire admission and migration remain separate work.
+includes that projector commitment. `SparseProof` canonical encoding is
+version 1. Both values now have strict bounded decoders with complete canonical
+round-trip admission. These are intentional pre-V1 incompatible hardening
+formats; migration from earlier experimental bytes remains project-owned.
 
 ## Trusted dependencies and assumptions
 
@@ -105,8 +112,10 @@ immutable, and free of ambient or interior mutable state.
   immutability, or freedom from ambient and interior mutable state;
 - no proof that a supplied verification context has production provenance;
 - no production JMT, persistence, pruning, or crash-recovery implementation;
-- no strict sparse-proof decoder;
-- no binding between an authenticated plan and a catalog-authorized candidate;
+- no production JMT, migration, pruning, or crash-recovery claim;
 - no unbounded cryptographic or parser proof;
 - no protocol meaning or precedence assigned to `AuthError` branch order;
 - no production-readiness or V1 qualification claim.
+
+Candidate-bound authenticated updates are implemented separately in
+[`zeno-fcis-authenticated-authority`](AUTHENTICATED_AUTHORITY_BOUNDARY.md).

@@ -6,7 +6,7 @@ This document describes the ZenoFCIS `1.0.0-rc.1` artifact set.
 
 `release/package-set.toml` is the reviewed package authority. It contains:
 
-- 32 public crates in dependency-first publication order;
+- 33 public crates in dependency-first publication order;
 - one private compiled code-generation fixture;
 - one supported diagnostic binary target;
 - the exact Cargo version and Rust toolchain.

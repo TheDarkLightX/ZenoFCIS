@@ -6,7 +6,7 @@ development, and release-process validation.
 
 ## What users receive
 
-- 32 version-aligned Rust crates and the `zeno-fcis` umbrella crate;
+- 33 version-aligned publishable Rust crates and the `zeno-fcis` umbrella crate;
 - `no_std + alloc` foundational and semantic surfaces;
 - typed project construction, relational laws, nominal commit authority,
   fixed-size domain machines, and explicit global composition;
@@ -18,6 +18,9 @@ development, and release-process validation.
   independently verified exact enumeration claims, and content-addressed
   promotion reports;
 - deterministic-parallel planning with complete static footprint evidence;
+- strict sparse-proof/authenticated-plan decoding and a nominal
+  catalog-candidate-bound authenticated publication path with retained projector
+  qualification evidence and required per-transition projection laws;
 - human quickstarts, LLM guidance, crate and feature maps, complete public API
   rustdoc pages, and checked external-consumer examples;
 - `.crate`, source, rustdoc, and Linux diagnostic-binary archives;
@@ -46,8 +49,9 @@ complete authorization/bundle/receipt/replay/outbox relation and current state.
 1. Merge the exact reviewed stacked PR series onto `main` without semantic
    drift.
 2. Complete independent exact-head API and authority review of this RC.
-3. Qualify the selected authenticated-state and persistence deployment rather
-   than promoting the bounded reference backends implicitly.
+3. Qualify the selected production authenticated-state and persistence backends,
+   crash recovery, pruning, and cross-store atomicity rather than promoting the
+   bounded reference backends implicitly.
 4. Retain concrete evidence for every verifier and target advertised by a
    production profile.
 5. Produce signed release artifacts and hosted provenance from the protected

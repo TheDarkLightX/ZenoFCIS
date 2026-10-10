@@ -241,8 +241,10 @@ authorization records, partial transaction, or corrupted stored identity.
   provenance, interpreter identity, deployment binding, or SQLite row-set
   completeness.
 - The composition and exhaustive-refinement structural findings are closed by
-  proof-carrying composition and validated manifest-backed promotion. The
-  authenticated-projector and concrete Solidity/Solana deployment findings
-  remain open under issue #62 and the chain-specific reviews.
+  proof-carrying composition and validated manifest-backed promotion. Strict
+  authenticated transport, projector qualification, context-bound proofs, and
+  candidate-bound authenticated publication are implemented by the
+  authenticated authority layer. Production datastore qualification and the
+  concrete Solidity/Solana deployment findings remain project-specific work.
 - Passing bounded tests is not an unbounded proof, independent audit, or a
   production-readiness claim.
