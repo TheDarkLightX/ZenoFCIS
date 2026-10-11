@@ -2,9 +2,9 @@
 
 ZenoFCIS separates protocol meaning from runtime mechanism.
 
-It intends to become a **state of the art high assurance software factory**.
-A formally verified functional core is the architectural foundation; the
-public CLI provides tooling for reviewing declared meaning, checking finite
+It aims to become a **state-of-the-art, high-assurance software factory**.
+A formally verified functional core is the architectural foundation. The
+public CLI provides tools for reviewing declared meaning, checking finite
 transformations and maintaining applications through checked upgrades.
 
 ## Formally verified functional core
@@ -14,25 +14,25 @@ a pure, total decision boundary whose executable implementation has a
 machine-checked proof of conformance to its versioned decision contract over
 the full admitted input domain.
 
-Purity is reviewed at the complete authoritative invocation boundary. Immutable
-input bytes and bound policy determine the result; checked results expose no
-mutable aliases to admitted state. Private, exclusively owned invocation
-scratch may change while computing that result. The compound parser's meter
-and read log account for actual parsing work and refusals within this boundary;
-they do not make it an imperative-shell component. The shell acquires inputs,
-persists authorized results and delivers effects.
+Purity is reviewed at the complete authoritative invocation boundary.
+Immutable input bytes and bound policy determine the result, and checked
+results expose no mutable aliases to admitted state. Private, exclusively owned
+invocation scratch space may change while the result is computed. The compound
+parser's meter and read log account for actual parsing work and refusals
+within this boundary; they do not make it an imperative-shell component. The
+shell acquires inputs, persists authorized results and delivers effects.
 
 Stateful preparation handles and utilities that append to caller buffers are
-not individually pure decision functions. Their contracts must identify that
-state explicitly. Preparation does not confer decision, resource-usage or
-publication authority; the authoritative invocation evaluates and accounts for
-its own work. Ownership review alone does not establish semantic correctness
-or complete the machine-checked proof obligations.
+not pure decision functions in their own right, so their contracts must
+identify that state explicitly. Preparation confers no decision, resource-usage
+or publication authority: the authoritative invocation evaluates and accounts
+for its own work. Ownership review alone neither establishes semantic
+correctness nor completes the machine-checked proof obligations.
 
 The contract covers complete decisions, successor state, ordered effect plans,
 laws, genesis, logical resources and refusal behavior. Verification must also
-establish the connections from original-byte admission through decision
-construction to authorization and replay. An open connection remains a
+establish each connection from original-byte admission, through decision
+construction, to authorization and replay. An open connection remains a
 completion obligation.
 
 V2's supported authority route must require library-owned verified execution,
@@ -45,9 +45,9 @@ base. Specification adequacy, external fact authentication, persistence and
 delivery retain their own review and qualification obligations.
 
 The [candidate assurance scope](RELEASE_CANDIDATES.md) identifies the supported
-verified units and remaining qualification limits. The dependency rings below
-describe the existing library; their presence alone does not establish the
-completed V2 guarantee.
+verified units and the remaining qualification limits. The dependency rings
+below describe the existing library; their presence alone does not establish
+the completed V2 guarantee.
 
 ## Dependency rings
 
@@ -61,8 +61,8 @@ completed V2 guarantee.
    backend protocols validate and compose those values.
 4. Nominal authority: `zeno-fcis-authority` binds an externally admitted
    invocation to one approved provider, reviewed transition type, exact project
-   law-engine type and verified law set, outbox-delivery-interpreter type, deployment profile,
-   state domain, catalog, and resource envelope.
+   law-engine type and verified law set, outbox-delivery-interpreter type,
+   deployment profile, state domain, catalog, and resource envelope.
 5. Authenticated authority: `zeno-fcis-authenticated-authority` binds one
    qualified projector, exact authorized candidate, strict persisted plan,
    per-transition projection relation, and nominal authenticated publication.
@@ -86,8 +86,7 @@ on a convention.
 
 Proposers, whose output is checked before anything relies on it:
 
-- project transitions, whether written by hand, generated, or written by an
-  LLM;
+- project transitions, whether generated or written by a person or an LLM;
 - the synthesis search, when it selects a program;
 - solver models, which are replayed through the interpreter;
 - proof search, meaning the tactics that build a Lean proof, which the Lean
@@ -137,24 +136,30 @@ Effects happen only in the shell, only on authorized values:
 
 `CommitPlan` records evidence and is never executed.
 
-What each judgment establishes differs: some recompute a result, and some only
-record a trusted component's report.
+Judgments differ in what they establish: some recompute a result, and some
+only record a trusted component's report.
 [Design record 0003](adr/0003-epistemic-status.md) classifies each by level,
 scope, assumptions, and trusted base.
 
 ## Current nonclaims
 
-The workspace implements all layers above as bounded Rust libraries and
-reference adapters. It now makes a complete profile-bound relational-law set
-and fresh per-invocation evaluation mandatory before production authorization.
+The workspace implements all the layers above as bounded Rust libraries and
+reference adapters. It makes a complete profile-bound relational-law set and a
+fresh per-invocation evaluation mandatory before production authorization.
 Each promoted project still has to supply and independently qualify its exact
-conservation/invariant definitions and checker implementation. The library now
-implements strict SQLite history reconstruction, manifest-backed exhaustive
-refinement, complete-footprint witnesses, strict authenticated transport
-decoding, and candidate-bound authenticated publication authority. A concrete
-production authenticated datastore, qualified project-specific projectors and
-relations, cross-store atomicity, and chain deployment qualification remain
-project work. Concrete Lean, Flux, Kani, SMT, private ESSO, and Morph checkers
-still require separately mounted adapters and exact evidence. These gaps block
-an official production value-moving profile, but not publication of the
-reusable core library.
+conservation and invariant definitions and its checker implementation.
+
+The library implements strict SQLite history reconstruction, manifest-backed
+exhaustive refinement, complete-footprint witnesses, strict authenticated
+transport decoding, and candidate-bound authenticated publication authority.
+These remain project work:
+
+- a concrete production authenticated datastore;
+- qualified project-specific projectors and relations;
+- cross-store atomicity;
+- chain deployment qualification.
+
+Concrete Lean, Flux, Kani, SMT, private ESSO, and Morph checkers still require
+separately mounted adapters and exact evidence. These gaps block an official
+production value-moving profile, but not publication of the reusable core
+library.

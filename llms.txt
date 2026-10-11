@@ -11,6 +11,7 @@ Rust toolchain: 1.97.1 for repository validation
 
 ## Start here
 
+- docs/INDEX.md: every guide, grouped by task
 - docs/INSTALLATION.md: exact dependency and source installation
 - docs/QUICKSTART.md: supported project adoption path
 - docs/API_REFERENCE.md: public API entry points and rustdoc
@@ -55,8 +56,8 @@ stays in the shell. The library does not authenticate callers.
 
 ## Historical V1 golden path (crates.io 1.1.0)
 
-Retained for adopters of the published 1.1.0 API. For current work use the V2
-source path above.
+Retained for adopters of the published 1.1.0 API. For current work, use the
+V2 source path above.
 
 ProjectProfile + ProjectCatalog
 -> generated typed transition or typed DomainMachine implementations
@@ -108,16 +109,17 @@ rules still apply.
 
 ## Formal tools
 
-The backend and evidence protocols are tool neutral. Public users may mount
+The backend and evidence protocols are tool-neutral. Public users may mount
 Lean, SMT/Z3, CVC5, Kani, Flux, or another checker. Private ESSO users may
 implement the same traits in a private crate. Missing tools, timeouts, crashes,
 unknown results, and checker disagreement grant no authority.
 
 ## Deterministic parallelism
 
-The library contains proof-carrying composition, footprint/conflict analysis,
-commutativity evidence, and sequential-versus-composed parity surfaces.
-Canonical sequential execution is the normative runtime oracle.
+The library contains surfaces for proof-carrying composition,
+footprint/conflict analysis, commutativity evidence, and
+sequential-versus-composed parity. Canonical sequential execution is the
+normative runtime oracle.
 
 Nonclaim: no concurrent scheduler, threaded shell, or production parallel
 runtime is currently shipped. Production parallel promotion also requires

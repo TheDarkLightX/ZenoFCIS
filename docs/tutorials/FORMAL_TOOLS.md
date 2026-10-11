@@ -30,14 +30,14 @@ lean claim 501: generated theorem kernel checked with the qualified RC3 toolchai
 lean claim 501 scope: no transition relation was exported, so this result holds for every bounded observation assignment and says nothing specific about this system
 ```
 
-This result covers the exact generated theorem, qualified Lean tree, and axiom
-report. It leaves production authority unchanged. The `scope:` line matters:
-claim 501 is `always atom(pre.100 == pre.100)`, which is true for every
-observation assignment. The exported obligation contains no transition
-relation, so a proof says nothing specific about the Mini Determinator.
+This result covers the exact generated theorem, the qualified Lean tree, and
+the axiom report. It leaves production authority unchanged. The `scope:` line
+matters: claim 501 is `always atom(pre.100 == pre.100)`, which is true for
+every observation assignment. The exported obligation contains no transition
+relation, so a proof says nothing specific about the Mini Determinator, and
 `zeno-fcis check` reports this claim as `constant-true`. See
 [law and claim substance](../CLAIM_SUBSTANCE.md). The next sections show how
-to prepare the tool identity and how blocked solver results appear.
+to prepare the tool identity and what blocked solver results look like.
 
 ## Ask CVC5 about one finite claim
 
@@ -104,7 +104,7 @@ examples/minimal/.zeno-fcis/evidence/<content-hash>/
   transcript-02-evidence-stdout
 ```
 
-Exit code `2` tells automation that the requested proof remains blocked. The
+Exit code `2` tells automation that the requested proof is still blocked. The
 retained source and solver output let a reviewer inspect exactly what ran.
 
 ## Ask Lean to check one generated theorem
@@ -206,15 +206,15 @@ examples/mini-determinator/.zeno-fcis/evidence/<content-hash>/
   transcript-01-kernel-stdout
 ```
 
-Before each run, ZenoFCIS checks the file type, hash, and exact reported
-version. It starts the tool with a fixed argument list and an empty environment.
-Lean runs from a checked private copy of its distribution. Commands go directly
-to the selected executable.
+Before each run, ZenoFCIS checks the file type, the hash, and the exact
+reported version. It starts the tool with a fixed argument list and an empty
+environment. Lean runs from a checked private copy of its distribution.
+Commands go directly to the selected executable.
 
 `backend inventory-lean` can also describe a custom Lean tree. That hash gives
 repeatable local consistency and lets `doctor` detect later changes. A custom
-tree is outside the qualified RC3 identity, so its successful kernel output
-remains blocked and `prove` returns exit code `2`.
+tree is outside the qualified RC3 identity, so even a successful kernel check
+on it stays blocked and `prove` returns exit code `2`.
 
 ## See missing configuration fail closed
 
@@ -229,8 +229,8 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
 tools manifest blocked: Io("No such file or directory (os error 2)")
 ```
 
-No proof, certificate, or production permission is created. Missing
-configuration is a visible blocked result.
+No proof, certificate, or production permission is created; missing
+configuration shows up as a blocked result.
 
 ## Move a tools/1 manifest to tools/2
 
@@ -267,8 +267,8 @@ A missing tool, wrong hash, wrong version, timeout, crash, oversized output,
 `unknown`, mismatched claim, failed model replay, or rejected Lean axiom report
 stays blocked or fails with a nonzero exit.
 
-These runs supply reviewable evidence for the translated claim. A separate
-backend verifier is responsible for creating any ZenoFCIS certificate types.
+These runs supply reviewable evidence for the translated claim. Creating any
+ZenoFCIS certificate type is the job of a separate backend verifier.
 
 The [formal-tools reference](../FORMAL_TOOLS_RC3.md) gives the full JSON
 schema, fixed arguments, output rules, retained-file layout, and exact scope of

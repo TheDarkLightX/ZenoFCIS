@@ -18,7 +18,7 @@ Report suspected vulnerabilities through GitHub's private security-advisory
 interface for `TheDarkLightX/ZenoFCIS`. Do not disclose a suspected issue in a
 public issue, pull request, discussion, or chat transcript before coordinated
 disclosure. Do not include private keys, production secrets, personal data, or
-live-system exploit data.
+exploit data from live systems.
 
 Include, when available:
 
@@ -30,14 +30,14 @@ Include, when available:
 - a proposed test or invariant that would prevent recurrence.
 
 The deterministic [hotspot model](docs/SECURITY_HOTSPOT_MODEL.md) and
-[review playbook](docs/SECURITY_REVIEW_PLAYBOOK.md) may help identify and
-describe the affected boundary. An EPI score or scanner match alone is not a
+[review playbook](docs/SECURITY_REVIEW_PLAYBOOK.md) can help you identify and
+describe the affected boundary. An EPI score or a scanner match alone is not a
 vulnerability report; include reachability, impact, and evidence.
 
 Maintainers aim to acknowledge a complete report within three business days,
 then coordinate validation, remediation, release, and disclosure timing with
-the reporter. This target is not a guarantee of a particular fix date. Please
-allow the private process to complete before public disclosure.
+the reporter. This target does not guarantee a particular fix date. Please let
+the private process finish before public disclosure.
 
 ## Security-relevant boundaries
 
@@ -51,16 +51,17 @@ Reports are especially relevant when they demonstrate:
 - undeclared ambient effects or unsafe code in semantic crates;
 - forged promotion, proof, provider, projector, interpreter, or deployment
   evidence;
-- secret exposure or a concrete side/covert-channel claim violation.
+- secret exposure or a concrete side/covert-channel claim violation;
 - an LLM, scanner, generated artifact, workflow, dependency, or compromised
   evidence producer obtaining authority or composing with another weakness;
-- a reproducible multi-stage chain from untrusted input or supply-chain control
-  to publication, persistence, release, secret access, or external effects.
+- a reproducible multi-stage chain from untrusted input or supply-chain
+  control to publication, persistence, release, secret access, or external
+  effects.
 
-The semantic kernel forbids unsafe Rust and is designed to remain independent
+The semantic kernel forbids unsafe Rust and is designed to stay independent
 of clocks, randomness, networking, filesystems, databases, threads, async
 runtimes, and ambient process state. A violation of those boundaries is
-security relevant even when no memory-safety defect exists.
+security-relevant even when no memory-safety defect exists.
 
 ## Scope and nonclaims
 
@@ -71,7 +72,8 @@ project's laws, selected verifier, storage backend, effect interpreter,
 hardware, operational controls, or deployment.
 
 A report about an application-specific policy may belong to that downstream
-project. A reusable-library bypass, unsafe default, misleading production
-claim, or failure to enforce a documented ZenoFCIS boundary belongs here.
-This policy does not establish audit completion, value-custody approval,
-physical side-channel resistance, or general production qualification.
+project. A bypass of the reusable library, an unsafe default, a misleading
+production claim, or a failure to enforce a documented ZenoFCIS boundary
+belongs here. This policy does not establish audit completion, value-custody
+approval, physical side-channel resistance, or general production
+qualification.
