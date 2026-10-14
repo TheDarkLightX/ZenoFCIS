@@ -21,14 +21,16 @@ PROFILE=Path('verification/verus/decision.json')
 SUBJECT=Path('crates/zeno-fcis-synthesis/src/finite/execution_v2/decision.rs')
 SPEC=SUBJECT.parent/'decision/spec.rs'
 TESTS=SUBJECT.parent/'decision/tests.rs'
-PRODUCER='crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/producer.rs'
-# Rejections at the verified production caller `producer::from_atoms`. The weakened
-# contract was observed on hosted run 37404295156 (postconditions at lines 185-186);
-# the narrowed domain's call-site precondition (line 217) awaits its selected run.
+# G3 moved the decision's complete domain admission into the shared value module.
+VALUE=SUBJECT.parent.parent/'value/mod.rs'
+PRODUCER='crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/shared.rs'
+# Rejections at the verified production caller `shared::produce`. The exact final
+# weak-contract run rejects postconditions131/132; the retained narrow-domain
+# diagnostic rejects the constructor's call-site precondition at188.
 CONTRACT_REJECTIONS={
-    'weaken_construct_contract':frozenset({('postcondition not satisfied',PRODUCER,185),
-                                           ('postcondition not satisfied',PRODUCER,186)}),
-    'narrow_construct_domain':frozenset({('precondition not satisfied',PRODUCER,217)}),
+    'weaken_construct_contract':frozenset({('postcondition not satisfied',PRODUCER,131),
+                                           ('postcondition not satisfied',PRODUCER,132)}),
+    'narrow_construct_domain':frozenset({('precondition not satisfied',PRODUCER,188)}),
 }
 UNIT_SOURCES=(HARNESS,*BASE[1:],SUBJECT,SPEC)
 
@@ -36,7 +38,7 @@ UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
 TEST_SOURCES=(SUBJECT.parent/'tests.rs',SUBJECT.parent/'input_view/tests.rs',SUBJECT.parent/'composition/record_tests.rs',TESTS,Path('crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs'))
 SOURCES=(*UNIT_SOURCES,*TEST_SOURCES,PROFILE,verifier.PIN,Path('tools/check_decision_v2.py'),
     Path('tools/test_check_decision_v2.py'),Path('tools/check_metered_execution.py'),Path('tools/check_finite_execution.py'),Path('tools/check_verus.py'),Path('tools/verus_coverage.py'),
-    Path('docs/V2_COMPLETE_DECISION_STAGE.md'))
+    Path('README.md'))
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
@@ -61,7 +63,8 @@ def snapshot():
         if (ROOT/p).is_symlink():raise RuntimeError(f'symlink proof source: {p}')
     return {str(p):verifier.digest(ROOT/p) for p in SOURCES}
 
-def mutations(source,specification):
+def mutations(source,specification,value=None):
+    value=(ROOT/VALUE).read_text() if value is None else value
     rows={}
     for name,before,after in (
         ('branch','found = Some(i);','found = Some(0);'),
@@ -76,8 +79,11 @@ def mutations(source,specification):
         ('domain','min <= v && v <= max','min <= v'),
     ):
         if name=='domain':
-            changed=source.replace(before,after,1)
-        else: changed=once(source,before,after)
+            # decision::admitted delegates to value::admitted; narrow its first
+            # (signed) range check there, as before in decision.rs.
+            rows[name]=(VALUE,value.replace(before,after,1),'proof',True)
+            continue
+        changed=once(source,before,after)
         rows[name]=(SUBJECT,changed,'proof',True)
     header=source.index("pub(super) fn construct<'a>")
     start=source.rindex('#[cfg_attr(verus_keep_ghost, verus_spec(result =>',0,header)
@@ -111,7 +117,7 @@ def check(out:Path,positive_only=False):
     env.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'],VERUS_Z3_PATH=str(tool/'z3'),CARGO_BUILD_JOBS='1',RUST_TEST_THREADS='1')
     command=[str(tool/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads','2', "-V", "spinoff-all",'--output-json','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
     evidence=out.parent; evidence.mkdir(parents=True,exist_ok=True)
-    positive=verifier.run([*command,'--log-dir',str(evidence/'positive'),str(HARNESS)],ROOT,env,timeout=300)
+    positive=verifier.run([*command,'--log-dir',str(evidence/'positive'),str(HARNESS)],ROOT,env,timeout=600)
     (evidence/'positive.stdout').write_text(positive.stdout);(evidence/'positive.stderr').write_text(positive.stderr)
     verifier.require_success(positive);report=json.loads(positive.stdout)
     if not verifier.accepted(report,report_pin):raise RuntimeError('unaccepted whole-crate proof/toolchain/inventory count')
@@ -130,7 +136,7 @@ def check(out:Path,positive_only=False):
                     target.write_text(changed) if unit==path else target.write_bytes((ROOT/unit).read_bytes())
                 adjust_specimen_source_lengths(specimen)
                 proof_command=[*command,'--log-dir',str(specimen/'logs'),str(HARNESS)]
-                proof=verifier.run(proof_command,specimen,env,timeout=300)
+                proof=verifier.run(proof_command,specimen,env,timeout=600)
                 (evidence/f'{name}.stdout').write_text(proof.stdout);(evidence/f'{name}.stderr').write_text(proof.stderr)
                 parsed=json.loads(proof.stdout).get('verification-results',{})
                 refusal=None

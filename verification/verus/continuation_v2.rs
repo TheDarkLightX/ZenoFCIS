@@ -12,6 +12,8 @@ pub use resource::Resource;
 extern crate std;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/canonical_v2/mod.rs"]
 pub mod canonical_v2;
+#[path = "../../crates/zeno-fcis-synthesis/src/finite/value/mod.rs"]
+mod value;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/evaluation/mod.rs"]
 pub mod evaluation;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs"]

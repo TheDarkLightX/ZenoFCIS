@@ -18,6 +18,7 @@ mod lexer;
 mod mini_determinator;
 mod parser;
 mod paths;
+mod source;
 mod substance;
 mod views;
 
@@ -36,6 +37,7 @@ pub use parser::parse_project;
 pub use paths::{
     DeclaredDomain, PathResolution, claim_paths, declared_domain, law_paths, resolve_path,
 };
+pub use source::{SOURCE_FILES, source_digest};
 pub use substance::{
     Substance, claim_substance, invariant_substance, law_substance, relation_substance,
     temporal_substance,

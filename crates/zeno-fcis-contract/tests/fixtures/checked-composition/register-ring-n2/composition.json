@@ -1,0 +1,139 @@
+{
+  "checker": "zeno-fcis/checked-composition-checker/1",
+  "edges": [
+    {
+      "consumer": 1,
+      "facts": [
+        1
+      ],
+      "interface": 202,
+      "provider": 2,
+      "view": 1
+    },
+    {
+      "consumer": 2,
+      "facts": [
+        1
+      ],
+      "interface": 202,
+      "provider": 1,
+      "view": 1
+    }
+  ],
+  "leaves": [
+    {
+      "assumption": "command.101.201 == 4 -> context.102.202 <= 3",
+      "footprint": {
+        "reads": [
+          "pre.100.110",
+          "command.101.201",
+          "context.102.202"
+        ],
+        "writes": [
+          "post.100.110"
+        ]
+      },
+      "guarantees": [
+        {
+          "formula": "post.100.110 <= 3",
+          "id": 1,
+          "kind": "StateFact",
+          "scope": null
+        },
+        {
+          "formula": "post.100.110 != pre.100.110",
+          "id": 2,
+          "kind": "TransitionRelation",
+          "scope": "accept"
+        },
+        {
+          "formula": "new_value == pre.100.110",
+          "id": 3,
+          "kind": "TransitionRelation",
+          "scope": "reject"
+        }
+      ],
+      "id": 1,
+      "invariant": "post.100.110 <= 3",
+      "name": "register-0",
+      "owns": [
+        {
+          "field": 110,
+          "slot": 0
+        }
+      ],
+      "path": "register-0",
+      "policy_sha256": "c4295fd46fdd879e27343c6c390d400f0f8e77752d1494f7939821b750e169e6",
+      "program_sha256": "60af081fc7fd75403f5642787a8aa85882ecd30f0080c023d03377f9fc9a0ec5",
+      "project_sha256": "5c420f01ab4ab5513bb5c8c566f0fd95c384491a7d78c0ca0f600c3b284aa196",
+      "views": [
+        {
+          "field": 110,
+          "id": 1
+        }
+      ],
+      "witnesses": [
+        "accept",
+        "reject"
+      ]
+    },
+    {
+      "assumption": "command.101.201 == 4 -> context.102.202 <= 3",
+      "footprint": {
+        "reads": [
+          "pre.100.110",
+          "command.101.201",
+          "context.102.202"
+        ],
+        "writes": [
+          "post.100.110"
+        ]
+      },
+      "guarantees": [
+        {
+          "formula": "post.100.110 <= 3",
+          "id": 1,
+          "kind": "StateFact",
+          "scope": null
+        },
+        {
+          "formula": "post.100.110 != pre.100.110",
+          "id": 2,
+          "kind": "TransitionRelation",
+          "scope": "accept"
+        },
+        {
+          "formula": "new_value == pre.100.110",
+          "id": 3,
+          "kind": "TransitionRelation",
+          "scope": "reject"
+        }
+      ],
+      "id": 2,
+      "invariant": "post.100.110 <= 3",
+      "name": "register-1",
+      "owns": [
+        {
+          "field": 110,
+          "slot": 1
+        }
+      ],
+      "path": "register-1",
+      "policy_sha256": "78140dd08deede108d8aa4eebe0ee54884d4c447fe65e23cefb59fa2f2447596",
+      "program_sha256": "38e6e4287e5e5a2265c5e65d1008c5c98d5a5def41c2dbfc611d591ccb5a67dc",
+      "project_sha256": "0a9ab891c2d020c7d60f896583b9c258119c2a5d519caf3a2bffa66cab08efdd",
+      "views": [
+        {
+          "field": 110,
+          "id": 1
+        }
+      ],
+      "witnesses": [
+        "accept",
+        "reject"
+      ]
+    }
+  ],
+  "name": "register-ring-n2",
+  "schema": "zeno-fcis/checked-composition/1"
+}

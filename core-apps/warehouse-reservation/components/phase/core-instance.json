@@ -1,0 +1,46 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "finite-phase-machine",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/finite-phase-machine.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "4a05f73b661163d65b80201f624935e896b4eff7a277f6c4261063d36b83c7b6"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 12,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 2
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "920a526465fd382df456e42086b7250020d85b9d8a96f7bb32aba60d9a2bad7c",
+  "source_sha256": {
+    "examples/c2.txt": "9a240aa6d9811c70879b6a7d9c5bdb90d0ebd0cf5582945b047764da7214466f",
+    "family.json": "4649c6a2399e7ddbfe29748f2e5af78f6e7d7a426467f847ea7ac26ba527febb",
+    "policy.json.in": "471d6ac6af1f931ff565162c20fe393f1b4a756c12fa34595e87545ede744a4a",
+    "project.zeno.in": "b03637ae0e549a07ce7c81ef229b0c93ee033bf1ddb879c197b6295a0cf3cdd5"
+  },
+  "state_tuples": 3,
+  "version": 1
+}

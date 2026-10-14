@@ -1,5 +1,8 @@
 {
   "paths": [
+    "crates/zeno-fcis-shell-sqlite/tests/v2_original_compound.rs",
+    "crates/zeno-fcis-shell-sqlite/tests/v2_original_zusd.rs",
+    "crates/zeno-fcis-shell-sqlite/tests/v2_original_zusd_authority.rs",
     "crates/zeno-fcis-synthesis/src/finite/canonical_v2/envelope/tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/canonical_v2/output/tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/canonical_v2/schema/tests.rs",
@@ -13,11 +16,30 @@
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/account_tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/record_tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/compound/tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/continuation/tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/decision/tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view/tests.rs",
     "crates/zeno-fcis-synthesis/src/finite/execution_v2/laws/tests.rs",
-    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tests.rs"
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/numeric/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/execution_v2/tests.rs",
+    "crates/zeno-fcis-synthesis/src/finite/value/tests.rs",
+    "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-compound/fixture.rs",
+    "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-compound/schema.zcve",
+    "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/SOURCE.json",
+    "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/data.rs",
+    "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/fixture.rs",
+    "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/native-cases.txt",
+    "crates/zeno-fcis-synthesis/tests/v2_numeric_capacity.rs",
+    "crates/zeno-fcis-synthesis/tests/v2_numeric_execution.rs",
+    "crates/zeno-fcis-synthesis/tests/v2_numeric_wide_arithmetic.rs",
+    "crates/zeno-fcis-synthesis/tests/v2_original_compound.rs",
+    "tools/test_data/g3_original_zusd/README.md",
+    "tools/test_data/g3_original_zusd/check_fixture.py",
+    "tools/test_data/g3_original_zusd/check_original.py",
+    "tools/test_data/g3_original_zusd/compile_zusd.py",
+    "tools/test_data/g3_original_zusd/emit_rust.py",
+    "tools/test_data/g3_original_zusd/original_zusd.py"
   ],
   "schema": "zeno-fcis/authority-test-sources/1"
 }

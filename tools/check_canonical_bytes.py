@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -21,7 +22,8 @@ from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import once
-from verus_coverage import require_coverage
+from verus_coverage import parse_vir, profile_inventory, require_coverage
+from verus_contract_controls import contract_rejected
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = Path("verification/verus/canonical-bytes.json")
@@ -29,6 +31,36 @@ HARNESS = Path("verification/verus/canonical_bytes.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/canonical_v2/mod.rs")
 SPEC = SUBJECT.parent / "spec.rs"
 ENVELOPE = SUBJECT.parent / "envelope.rs"
+SCHEMA = SUBJECT.parent / "schema.rs"
+SEMANTIC_TARGETS = {
+    **dict.fromkeys(("reverse_byte_order", "wrong_radix", "wrong_byte_offset",
+                    "refuse_empty_width", "refuse_full_width", "permit_excessive_width",
+                    "wrong_next_offset"), (SUBJECT, "read_big_endian")),
+    **dict.fromkeys(("wrong_negative_sign", "wrong_signed_boundary"),
+                   (SUBJECT, "read_signed_128")),
+}
+# Exact production callers demonstrated by the pinned selected narrow-domain run.
+CONTRACT_REJECTIONS = {
+    **dict.fromkeys(("omit_signed_contract", "weaken_signed_contract"), frozenset({
+        ("postcondition not satisfied", str(SCHEMA), 150),
+        ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/compound.rs"), 107),
+        ("postcondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 206),
+    })),
+    "narrow_signed_input": frozenset({
+        ("precondition not satisfied", str(SCHEMA), 153),
+        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/compound.rs"), 109),
+        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 228),
+        ("precondition not satisfied", str(SUBJECT.parent.parent / "execution_v2/input_view/typed.rs"), 266),
+    }),
+}
+
+COVERAGE_TARGETS = {
+    "omit_unused_getter_contract": ("canonical_v2::envelope::impl&%0::original", "ensures_sha256"),
+    "weaken_unused_getter_contract": ("canonical_v2::envelope::impl&%0::original", "ensures_sha256"),
+    "narrow_unused_getter_domain": ("canonical_v2::envelope::impl&%0::original", "requires_sha256"),
+    "change_signed_specification": ("canonical_v2::spec::signed", "body_sha256"),
+    "add_uncontracted_function": ("canonical_v2::uncontracted_width", "inventory"),
+}
 UNIT_SOURCES = (HARNESS, Path("verification/verus/canonical_bytes_tests.rs"),
                 *sorted(path.relative_to(ROOT) for path in (ROOT / SUBJECT.parent).rglob("*.rs")))
 
@@ -44,7 +76,8 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
 
-SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
+SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"),
+                                Path("tools/verus_contract_controls.py"))))
 
 
 def snapshot() -> dict[str, str]:
@@ -106,6 +139,179 @@ def mutation_sources(source: str, spec: str) -> dict[str, tuple[Path, str, str]]
     return mutations
 
 
+def same_read_identity_structure(left, right, forward, reverse, return_identity=None):
+    """Compare exact VIR trees with a bijection of pinned read-place identities."""
+    if return_identity is not None and (left == return_identity[0] or right == return_identity[1]):
+        return left == return_identity[0] and right == return_identity[1]
+    if isinstance(left, list) and isinstance(right, list):
+        if (len(left) == len(right) == 5 and left[:2] == right[:2]
+                == ["UnfinalizedReadKind", ":preliminary_kind"]
+                and left[3] == right[3] == ":id"):
+            a, b = left[4], right[4]
+            if (not isinstance(a, str) or not isinstance(b, str)
+                    or not a.isascii() or not b.isascii()
+                    or not a.isdecimal() or not b.isdecimal()
+                    or left[2] != right[2]):
+                return False
+            if a in forward or b in reverse:
+                return forward.get(a) == b and reverse.get(b) == a
+            forward[a], reverse[b] = b, a
+            return True
+        return len(left) == len(right) and all(
+            same_read_identity_structure(a, b, forward, reverse, return_identity)
+            for a, b in zip(left, right))
+    return type(left) is type(right) and left == right
+
+
+def coverage_structure(vir, reference_vir, profile, name):
+    """Retain exact positive fingerprints; compare only the owned mutation."""
+    require_coverage(reference_vir, profile)
+    def records(text):
+        return {node[1][2]: dict(zip(node[2::2], node[3::2]))
+                for node in parse_vir(text)
+                if node and node[0] == "Function"
+                and node[1][2].startswith(profile["namespace"])}
+    before, after = records(reference_vir), records(vir)
+    suffix, field = COVERAGE_TARGETS[name]
+    target = "canonical_bytes::" + suffix
+    if field == "inventory":
+        if set(after) != set(before) | {target}:
+            return False
+        if (after[target][":mode"] != "Exec" or after[target][":require"]
+                or after[target][":ensure"]):
+            return False
+    elif set(before) != set(after):
+        return False
+    changed_field = {"ensures_sha256": ":ensure", "requires_sha256": ":require",
+                     "body_sha256": ":body"}.get(field)
+    return_identity = None
+    if name == "narrow_unused_getter_domain":
+        # Adding a requires clause renumbers the getter's named ghost result.
+        # Compare its binder and references together, within this function only.
+        returns = (before[target][":ret"], after[target][":ret"])
+        for ret in returns:
+            if ret[:2] != ["Param", ":name"]:
+                return False
+            ident = ret[2]
+            if (len(ident) != 3 or ident[:2] != ["VarIdent", '"result"']
+                    or len(ident[2]) != 3
+                    or ident[2][:2] != ["VarIdentDisambiguate", "RustcId"]
+                    or not isinstance(ident[2][2], str)
+                    or not ident[2][2].isascii() or not ident[2][2].isdecimal()):
+                return False
+        return_identity = tuple(ret[2] for ret in returns)
+    forward, reverse = {}, {}
+    for function in sorted(before):
+        if set(before[function]) != set(after[function]):
+            return False
+        for key in before[function]:
+            if function == target and key == changed_field:
+                continue
+            left, right = before[function][key], after[function][key]
+            if function == target and key == ":ret" and name == "omit_unused_getter_contract":
+                # Contract removal replaces the unused named ghost result.
+                if (left[:2] != ["Param", ":name"] or right[:2] != ["Param", ":name"]
+                        or left[2][:2] != ["VarIdent", '"result"']
+                        or right[2] != ["VarIdent", '"%return"', ["VarIdentDisambiguate", "AirLocal"]]):
+                    return False
+                left, right = left[3:], right[3:]
+            identity = return_identity if function == target and key in (":ret", ":ensure") else None
+            if not same_read_identity_structure(left, right, forward, reverse, identity):
+                return False
+    if field == "inventory":
+        return True
+    return not same_read_identity_structure(before[target][changed_field],
+        after[target][changed_field], dict(forward), dict(reverse))
+
+
+def coverage_control(vir: str, profile: dict, name: str,
+                     reference_vir: str | None = None) -> tuple[bool, str | None]:
+    """Only the declared function, contract field or added probe may differ."""
+    try:
+        require_coverage(vir, profile)
+    except ValueError as error:
+        refusal = str(error)
+    else:
+        return False, None
+    try:
+        actual = profile_inventory(vir, profile)
+    except ValueError:
+        return False, refusal
+    suffix, field = COVERAGE_TARGETS[name]
+    target = "canonical_bytes::" + suffix
+    expected = profile["functions"]
+    if field == "inventory":
+        matched = (set(actual) == set(expected) | {target} and target not in expected
+                   and all(actual[key] == expected[key] for key in expected)
+                   and actual[target]["mode"] == "Exec" and actual[target]["requires"] == 0
+                   and actual[target]["ensures"] == 0)
+    else:
+        changed = {key for key in expected if key in actual and actual[key] != expected[key]}
+        matched = (set(actual) == set(expected) and changed == {target}
+                   and actual[target][field] != expected[target][field]
+                   and all(actual[target][key] == expected[target][key]
+                           for key in ("mode", "signature_sha256")
+                           + (("requires_sha256", "ensures_sha256") if field == "body_sha256"
+                              else ("body_sha256", "requires_sha256" if field == "ensures_sha256"
+                                    else "ensures_sha256"))))
+    if not matched and reference_vir is not None:
+        try:
+            matched = coverage_structure(vir, reference_vir, profile, name)
+        except (ValueError, KeyError, TypeError, IndexError, RecursionError):
+            matched = False
+    return bool(matched and target in refusal), refusal
+
+
+def classify_mutation(proc, report: dict, name: str, changed: str, specimen: Path,
+                      pin: dict, profile: dict, *, vir: str | None = None,
+                      reference_vir: str | None = None,
+                      timed_out: bool = False) -> tuple[bool, str, str | None]:
+    """Operational failures are inconclusive, even beside an intended error."""
+    if timed_out or verifier.NON_SEMANTIC.search(proc.stderr) or proc.returncode not in (0, 1):
+        return False, "inconclusive", None
+    refusal = None
+    if name in SEMANTIC_TARGETS:
+        path, function = SEMANTIC_TARGETS[name]
+        source = changed if path == SUBJECT else (specimen / path).read_text()
+        region = verifier.function_lines(source, function)
+        if name == "permit_excessive_width":
+            # Exact pinned loop-entry spelling; raw diagnostic evidence stays unchanged.
+            stderr = re.sub(r'^error: invariant not satisfied before loop$',
+                            'error: invariant not satisfied', proc.stderr, flags=re.M)
+            proc = subprocess.CompletedProcess(proc.args, proc.returncode, proc.stdout, stderr)
+        elif name == "wrong_byte_offset":
+            # Exact pinned bounds spelling; raw diagnostic evidence stays unchanged.
+            stderr = re.sub(r'^error: precondition not met: index in bounds for this access$',
+                            'error: precondition not satisfied', proc.stderr, flags=re.M)
+            proc = subprocess.CompletedProcess(proc.args, proc.returncode, proc.stdout, stderr)
+        killed = verifier.semantic_refusal(proc, report, pin, path, specimen,
+            region=region, target_functions=profile["target_functions"])
+    elif name in CONTRACT_REJECTIONS:
+        if not isinstance(report, dict):
+            return False, "survived-or-unrelated-failure", None
+        outcome = contract_rejected(proc.returncode, proc.stdout, proc.stderr, pin,
+                                    CONTRACT_REJECTIONS[name])
+        result, tool, functions = (report.get(k, {}) for k in
+                                  ("verification-results", "verus", "func-details"))
+        count = len(outcome["observed"])
+        headers = list(verifier.ERROR_HEADER.finditer(proc.stderr))
+        killed = (outcome["accepted"]
+            and all(isinstance(v, dict) for v in (result, tool, functions))
+            and str(tool.get("toolchain", "")).split(" ")[0] == pin["rust_toolchain"]
+            and result.get("encountered-error") is True
+            and type(result.get("verified")) is int and result["verified"] > 0
+            and result["errors"] <= count
+            and set(profile["target_functions"]).issubset(functions)
+            and len(headers) == count + 1
+            and headers[-1][1] == f"aborting due to {count} previous errors")
+    else:
+        killed = False
+        if (proc.returncode == 0 and verifier.proof_succeeded(report, pin)
+                and not verifier.ERROR_HEADER.search(proc.stderr) and vir is not None):
+            killed, refusal = coverage_control(vir, profile, name, reference_vir)
+    return bool(killed), "killed" if killed else "survived-or-unrelated-failure", refusal
+
+
 def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     executable = directory / "canonical-byte-tests"
     command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
@@ -147,9 +353,12 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
         (directory / "positive.stderr").write_text(positive.stderr)
         verifier.require_success(positive)
         report = json.loads(positive.stdout)
-        if not verifier.accepted(report, report_pin):
+        if (not verifier.accepted(report, report_pin) or not verifier.proof_succeeded(report, pin)
+                or verifier.ERROR_HEADER.search(positive.stderr)
+                or verifier.NON_SEMANTIC.search(positive.stderr)):
             raise RuntimeError("byte proof report lacks pinned tools or complete obligation coverage")
-        coverage = require_coverage((directory / "positive/crate.vir").read_text(), profile)
+        reference_vir = (directory / "positive/crate.vir").read_text()
+        coverage = require_coverage(reference_vir, profile)
         native = native_checks(directory, pin, environment)
         print("V2 bytes: exact proof coverage and independent native comparisons passed", flush=True)
         for name, (path, changed, expected) in mutation_sources(
@@ -158,35 +367,43 @@ def check(cache: Path, install: bool, retained_directory: Path | None = None) ->
             for unit in UNIT_SOURCES:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(changed if unit == path else (ROOT / unit).read_text())
+                target.write_bytes(changed.encode("utf-8") if unit == path else (ROOT / unit).read_bytes())
             adjust_specimen_source_lengths(specimen)
-            mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"),
-                                   str(specimen / HARNESS)], ROOT, environment)
+            mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(specimen / HARNESS)]
+            timed_out = False
+            try:
+                mutant = verifier.run(mutant_command, ROOT, environment, timeout=900)
+            except subprocess.TimeoutExpired as error:
+                stdout, stderr = error.stdout or "", error.stderr or ""
+                if isinstance(stdout, bytes):
+                    stdout = stdout.decode(errors="replace")
+                if isinstance(stderr, bytes):
+                    stderr = stderr.decode(errors="replace")
+                mutant = subprocess.CompletedProcess(mutant_command, None, stdout, stderr)
+                timed_out = True
             (specimen / "verus.json").write_text(mutant.stdout)
             (specimen / "verus.stderr").write_text(mutant.stderr)
+            (specimen / "verus-process.json").write_text(json.dumps({
+                "command": mutant_command, "cwd": str(ROOT), "returncode": mutant.returncode,
+                "timeout_seconds": 900, "timed_out": timed_out}, indent=2) + "\n")
             try:
-                result = json.loads(mutant.stdout).get("verification-results", {})
+                parsed = json.loads(mutant.stdout)
             except ValueError:
-                result = {}
-            refusal = None
-            if expected in ("proof", "proof_contract"):
-                killed = (mutant.returncode != 0 and result.get("errors", 0) > 0
-                          and result.get("encountered-vir-error") is False)
-            else:
-                if mutant.returncode == 0:
-                    try:
-                        require_coverage((specimen / "logs/crate.vir").read_text(), profile)
-                    except ValueError as error:
-                        refusal = str(error)
-                killed = (mutant.returncode == 0 and result.get("success") is True
-                          and result.get("errors") == 0 and refusal is not None)
+                parsed = {}
+            result = parsed.get("verification-results", {}) if isinstance(parsed, dict) else {}
+            vir_path = specimen / "logs/crate.vir"
+            vir = vir_path.read_text() if expected == "coverage" and vir_path.is_file() else None
+            killed, classification, refusal = classify_mutation(
+                mutant, parsed, name, changed, specimen, pin, profile, vir=vir,
+                reference_vir=reference_vir, timed_out=timed_out)
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
+                              "classification": classification, "timed_out": timed_out,
                               "changed_source": str(path), "changed_sha256": verifier.digest(specimen / path),
                               "exit_code": mutant.returncode, "verification_results": result,
                               "coverage_refusal": refusal, "logs": str(specimen)})
             (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
             if not killed:
-                raise RuntimeError(f"byte mutation {name} survived or failed for an unrelated reason")
+                raise RuntimeError(f"byte mutation {name}: {classification}; inspect retained diagnostics")
             print(f"V2 bytes: caught {name} ({expected})", flush=True)
     verifier.verify_tool_files(tools, pin)
     if before != snapshot():

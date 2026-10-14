@@ -17,7 +17,12 @@ on:
       - "verification/verus/**"
       - "tools/check_*.py"
       - "tools/test_check_*.py"
+      - "tools/test_negative_retention.py"
+      - "tools/test_verus_contract_controls.py"
       - "tools/verus_coverage.py"
+      - "tools/v2_proof_sources.py"
+      - "crates/zeno-fcis-cli/tests/fixtures/escrow/**"
+      - "crates/zeno-fcis-cli/tests/fixtures/spend-approval/**"
       - "docs/V2_*_STAGE.md"
       - "Cargo.toml"
       - "Cargo.lock"
@@ -25,6 +30,7 @@ on:
       - ".cargo/**"
       - ".github/workflows/verus.yml"
       - ".github/actions/fetch-locked-crates/**"
+      - ".github/actions/checker-containment/**"
   push:
     branches: [main]
   workflow_dispatch:
@@ -36,13 +42,14 @@ jobs:
   qualification:
     name: qualification (${{ matrix.gate }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 240
+    timeout-minutes: ${{ matrix.gate == 'shared-finite-checker' && 360 || 240 }}
     strategy:
       fail-fast: false
       max-parallel: 3
       matrix:
         include:
           - {gate: shared-runtime, script: check_verus.py, output: receipt.json}
+          - {gate: scalar-query, script: check_scalar_query_refinement.py, output: receipt.json}
           - {gate: finite-execution, script: check_finite_execution.py, output: receipt.json}
           - {gate: metered-execution, script: check_metered_execution.py, output: receipt.json}
           - {gate: shared-finite-checker, script: check_checker.py, output: run}
@@ -59,6 +66,7 @@ jobs:
           - {gate: original-output, script: check_original_output_v2.py, output: run}
           - {gate: publication, script: check_publication_v2.py, output: run}
           - {gate: guarded-laws, script: check_guarded_laws_v2.py, output: run}
+          - {gate: checked-assembly, script: check_checked_assembly.py, output: receipt.json}
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CARGO_BUILD_JOBS: "1"
@@ -73,6 +81,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Establish contained checker runtime
+        uses: ./.github/actions/checker-containment
+
       - name: Install application and verifier toolchains
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component clippy --component rustfmt

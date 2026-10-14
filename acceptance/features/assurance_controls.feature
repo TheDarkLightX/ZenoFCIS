@@ -110,3 +110,10 @@ Feature: Report evidence that cannot distinguish system behavior
     When tracked source or the commit changes at any point before the record is written
     Then no record is written and the recorder fails
     And a clean run records its exact revision and tree
+    Given a clean source manifest and additional evidence artifacts
+    When an artifact collides with the built-in source label or archive path
+    Then the bundle builder refuses without creating or replacing output
+    And duplicate requested labels and invalid archive labels remain refused
+    When noncolliding evidence is bundled in either argument order
+    Then the archives are byte-identical and every unique member matches its manifest hash
+    And the bundled source is the exact clean manifest bound by the bundle source commit

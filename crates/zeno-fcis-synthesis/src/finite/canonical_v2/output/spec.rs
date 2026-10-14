@@ -12,6 +12,7 @@ pub open spec fn ascii(bytes: Seq<u8>) -> bool {
 pub open spec fn atom_size(value: Atom) -> Result<usize, Failure> {
     match value {
 
+        Atom::Canonical(v) => Ok(v.view().2.len() as usize),
         Atom::Bool(_) => Ok(1),
         Atom::I128(_) | Atom::U128(_) => Ok(17),
         Atom::Enum { .. } => Ok(7),
@@ -27,6 +28,7 @@ pub open spec fn atom_size(value: Atom) -> Result<usize, Failure> {
 pub open spec fn atom_wire(value: Atom) -> Seq<u8> {
     match value {
 
+        Atom::Canonical(v) => v.view().2,
         Atom::Bool(v) => seq![if v { 0x02u8 } else { 0x01u8 }],
         Atom::I128(v) => seq![0x04u8] + be16(v as u128),
         Atom::U128(v) => seq![0x03u8] + be16(v),

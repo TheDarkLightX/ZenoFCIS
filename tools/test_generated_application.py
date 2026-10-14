@@ -17,6 +17,67 @@ import check_v1_compatibility
 import rc_package
 
 
+class PublicConformanceEvidenceTests(unittest.TestCase):
+    def test_local_tool_paths_are_not_exported_but_verification_identity_is_preserved(self):
+        synthesis = application.check_synthesis
+        private_path = str(Path("/") / "home" / "private-user" / ".rustup" / "compiler")
+        original = {
+            "status": "passed", "inputs_checked": 64, "certificate": "a" * 64,
+            "stdout_sha256": "b" * 64, "source_sha256": "c" * 64,
+            "tool": {"path": private_path, "working_directory": private_path,
+                     "binary_sha256": "d" * 64,
+                     "version": "rustc pinned", "identity_scope": "executable-and-version"},
+        }
+        baseline = copy.deepcopy(original)
+        with mock.patch.object(synthesis, "invoke", side_effect=lambda *args, **kwargs:
+                               {"status": "current"} if "--check" in args[1]
+                               else copy.deepcopy(original)), \
+                mock.patch.object(synthesis, "check_vectors"):
+            receipt = synthesis.exercise_synthesized(
+                ["cli"], Path("app"), Path("work"), {}, "counter", 64)
+        self.assertEqual(original, baseline)
+        self.assertEqual(len(receipt["targets"]), len(synthesis.TARGETS))
+        expected = copy.deepcopy(baseline)
+        del expected["tool"]["path"]
+        del expected["tool"]["working_directory"]
+        for record in receipt["targets"]:
+            self.assertEqual(record, expected)
+        import check_release_privacy
+        before = check_release_privacy.Scan()
+        before.inspect("receipt.json", json.dumps(baseline).encode())
+        self.assertEqual(before.report()["status"], "failed")
+        after = check_release_privacy.Scan()
+        after.inspect("receipt.json", json.dumps(receipt).encode())
+        self.assertEqual(after.report()["status"], "passed")
+
+    def test_failed_target_cannot_become_a_public_pass(self):
+        synthesis = application.check_synthesis
+        for change in ({"status": "failed"}, {"inputs_checked": 63}):
+            record = {"status": "passed", "inputs_checked": 64, "certificate": "a" * 64,
+                      "stdout_sha256": "b" * 64, "tool": {"path": "local-compiler"}, **change}
+            with self.subTest(change=change), \
+                    mock.patch.object(synthesis, "invoke", side_effect=lambda *args, **kwargs:
+                                      {"status": "current"} if "--check" in args[1]
+                                      else copy.deepcopy(record)), \
+                    mock.patch.object(synthesis, "check_vectors"), \
+                    self.assertRaisesRegex(RuntimeError, "complete finite conformance"):
+                synthesis.exercise_synthesized(
+                    ["cli"], Path("app"), Path("work"), {}, "counter", 64)
+
+    def test_unreviewed_documents_stop_release_before_output_is_created(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "release-output"
+            with mock.patch.object(rc_package, "validate_package_set", return_value=({"version": "2.3.0"}, {})), \
+                    mock.patch.object(rc_package, "require_clean_commit", return_value="a" * 40), \
+                    mock.patch.object(rc_package, "require_source_state"), \
+                    mock.patch.object(rc_package, "run", side_effect=subprocess.CalledProcessError(
+                        1, ["python", "tools/check_public_docs.py"])) as run, \
+                    self.assertRaises(subprocess.CalledProcessError):
+                rc_package.build(output)
+            run.assert_called_once_with([rc_package.sys.executable, "tools/check_public_docs.py"])
+            self.assertFalse(output.exists())
+
+
 class ReproducibleApplicationReceiptTests(unittest.TestCase):
     def test_completion_identity_survives_the_single_threaded_test_prefix(self):
         digest = "a" * 64
@@ -451,6 +512,30 @@ class GeneratedBindingTests(unittest.TestCase):
                 change(app)
                 with self.assertRaisesRegex(RuntimeError, message):
                     application.check_generated_binding(app, packages, "1.1.0")
+
+    def test_resolved_contract_lock_binds_root_and_keeps_external_identities(self):
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-resolved-binding-") as directory:
+            root = Path(directory)
+            packages = self.tree(root)
+            app = self.bound(root, packages)
+            manifest = app / "Cargo.toml"
+            manifest.write_text(manifest.read_text().replace('[dependencies]', '[lib]\nname = "application"\n[dependencies]'))
+            external = ('[[package]]\nname = "external"\nversion = "1.0.0"\n'
+                        'source = "registry+https://example.invalid"\nchecksum = "reviewed"\n')
+            (root / "Cargo.lock").write_text("version = 4\n" + external)
+            lock = ("version = 4\n[[package]]\nname = \"app\"\nversion = \"0.0.0\"\n" + external)
+            (app / "Cargo.lock").write_text(lock)
+            application.check_generated_binding(app, packages, "1.1.0")
+            for field in ('version = "1.0.0"', 'checksum = "reviewed"', 'example.invalid'):
+                changed = lock.replace(field, field + "-changed")
+                if field != 'example.invalid':
+                    changed = lock.replace(field, field[:-1] + '-changed"')
+                (app / "Cargo.lock").write_text(changed)
+                with self.assertRaisesRegex(RuntimeError, "external identity"):
+                    application.check_generated_binding(app, packages, "1.1.0")
+            (app / "Cargo.lock").write_text("version = 4\n" + external)
+            with self.assertRaisesRegex(RuntimeError, "omits the application"):
+                application.check_generated_binding(app, packages, "1.1.0")
 
 
 class PackagedStagingTests(unittest.TestCase):

@@ -1,0 +1,51 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "retry-budget",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/retry-budget.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "f395abfc3eb068ad4456c17f040110ace42612337741b16778d00d5d8b0db307"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 32,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 3
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "e730ad96ea84380b6cf3c9dec3479ab4a4e95b694bd53724217f28c0549cf99f",
+  "source_sha256": {
+    "examples/c3.txt": "ba766cae6506666c08b6456b1d067a11e780e42704d9e79b356beaddecef32f6",
+    "family.json": "ef8190342d76fad3bb3850a9c52e18a61755c2073fc3f887bc667929d79e3876",
+    "policy.json.in": "a785a750a6697d26ffa48308053e417312a8bb22d9b9f968ebfae7f965331be5",
+    "project.zeno.in": "f8670cc9d2ce67f62dcf1dae82254b5dc99292501a93abe0ab235c52e30c904b"
+  },
+  "state_tuples": 8,
+  "version": 1
+}

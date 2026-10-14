@@ -103,13 +103,8 @@ pub fn journey(path: &Path) -> AppResult<String> {
         return Err("partial work published data".into());
     }
     batch.advance(1, 2)?;
-    let publication = batch.publish(
-        &mut shell,
-        &authority,
-        true,
-        prepare::MAX_PUBLICATION_BYTES,
-        None,
-    )?;
+    let publication =
+        batch.publish(&mut shell, &authority, true, prepare::MAX_PUBLICATION_BYTES)?;
     if publication.status != zeno_fcis_shell::CommitStatus::Committed {
         return Err("first publication was not committed".into());
     }
@@ -135,13 +130,7 @@ pub fn journey(path: &Path) -> AppResult<String> {
         "exit-1",
     )?;
     exit.advance(0, 3)?;
-    exit.publish(
-        &mut shell,
-        &authority,
-        true,
-        prepare::MAX_PUBLICATION_BYTES,
-        None,
-    )?;
+    exit.publish(&mut shell, &authority, true, prepare::MAX_PUBLICATION_BYTES)?;
     while let Some(pending) = checked(shell.next_pending())? {
         let delivered = checked(pending.deliver(&mut destination.memory()))?;
         checked(delivered.acknowledge())?;

@@ -12,6 +12,11 @@ use vstd::prelude::*;
 #[cfg_attr(verus_keep_ghost,verus_spec(ensures final(parts)@==old(parts)@+model::schema(value),))]
 pub(super) fn schema<'a>(parts: &mut Vec<Part<'a>>, value: Schema<'a>) {
     match value {
+        Schema::Original {
+            checked,
+            root,
+            projection,
+        } => super::numeric_metadata::original(parts, checked, root, projection),
         Schema::Leaf(leaf) => {
             parts.push(Part::Word(0));
             metadata::leaf(parts, leaf);
@@ -28,6 +33,10 @@ pub(super) fn schema<'a>(parts: &mut Vec<Part<'a>>, value: Schema<'a>) {
 pub(super) fn selector<'a>(parts: &mut Vec<Part<'a>>, value: Selector) {
     match value {
         Selector::Root => parts.push(Part::Word(0)),
+        Selector::PayloadField(id) => {
+            parts.push(Part::Word(2));
+            parts.push(Part::Word(id as u128));
+        }
         Selector::Field(id) => {
             parts.push(Part::Word(1));
             parts.push(Part::Word(id as u128));

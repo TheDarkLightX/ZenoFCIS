@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import check_verus as verifier
 import evaluator_identity as evaluator
-from verus_coverage import inventory, require_coverage
+from verus_coverage import descriptor_inventory, inventory, require_coverage
 ROOT=Path(__file__).resolve().parents[1]
 HARNESS=Path('verification/verus/authority_v2.rs')
 PROFILE=Path('verification/verus/authority_v2.json')
@@ -30,10 +30,32 @@ DESCRIPTOR=SUBJECT.parent/'authority/descriptor.rs'
 EVALUATOR=SUBJECT.parent/'authority/evaluator.rs'
 SOURCE_MANIFEST=Path('verification/verus/authority_v2_sources.json')
 PUBLIC_TEST=Path('crates/zeno-fcis-synthesis/tests/v2_authority.rs')
-APPROVED_SOURCE_CLOSURE_SHA256='2120fdb44abf017910f29cb6b34a74fb27ca67a636f4f38c58f124c6696cf10f'
+APPROVED_SOURCE_CLOSURE_SHA256='19439fa8152997769ccef59f4b2e81b91d92292cb6507fecf4216b46f1bf1e22'
 # This unchanged command-substitution control needs more than the default
 # solver budget. Exhaustion still refuses qualification; it is not a kill.
-CONTROL_RLIMITS={'sealed_command':40}
+CONTROL_RLIMITS={'sealed_command':80,'stage_usage':80}
+
+SEMANTIC_TARGETS = {
+    'word_byte_order': 'word', 'length_header': 'encoded_size',
+    'byte_mismatch': 'bytes_equal', 'signed_value': 'atom',
+    'decision_class': 'class_tag', 'reason': 'candidate_parts',
+    'pre_state': 'candidate_parts', 'patch_before': 'patches',
+    'effect_outbox_order': 'candidate_parts', 'usage_counter': 'append_usage',
+    'law_observation': 'append_observation', 'invocation_state': 'subject_bytes',
+    'genesis_tag': 'subject_bytes', 'metadata_variant_code': 'variants',
+    'metadata_branch_reason': 'branches', 'metadata_delivery_idempotency': 'deliveries',
+    'metadata_law_scope': 'law_list', 'metadata_law_rounding': 'division',
+    'metadata_graph_roots': 'program', 'metadata_limits': 'limits',
+    'replay_comparison': 'compare', 'candidate_after_refusal': 'result',
+    'sealed_command': 'seal', 'sealed_initial': 'genesis',
+    'stage_usage': 'seal', 'root_read_selector': 'append_reads',
+    'policy_channel_destination': 'policy_bytes', 'policy_channel_count': 'policy_bytes',
+    'frame_limit': 'framing_bytes', 'unframed_evaluation': 'evaluate',
+    'replay_original': 'replay', 'replay_genesis_original': 'replay_genesis',
+    'sealed_law_reports': 'seal', 'core_refusal_order': 'seal',
+    'constructor_policy_substitution': 'bind', 'constructor_source_omission': 'bind',
+    'constructor_framing_substitution': 'bind',
+}
 
 def source_manifest(path):
     if verifier.digest(path)!=APPROVED_SOURCE_CLOSURE_SHA256:
@@ -59,10 +81,18 @@ def adjust_specimen_source_lengths(specimen):
 def sources():
     closure=sorted(p.relative_to(ROOT) for d in ('evaluation','canonical_v2','execution_v2') for p in (ROOT/BASE/d).rglob('*.rs'))
     paths=[HARNESS,PUBLIC_TEST,Path("crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs"),Path("verification/verus/evaluator_encoding_vector.txt"),*closure,Path('crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs'),PROFILE,verifier.PIN,
-        Path('tools/check_authority_v2.py'),Path('tools/test_check_authority_v2.py'),Path('tools/evaluator_identity.py'),Path('tools/test_evaluator_identity.py'),Path('tools/check_evaluator_replay.py'),Path('tools/check_verus.py'),Path('tools/verus_coverage.py'),Path('tools/check_decision_v2.py'),Path('tools/check_metered_execution.py'),Path('tools/check_finite_execution.py'),Path('docs/V2_AUTHORITY_REPLAY_STAGE.md')]
+        Path('tools/check_authority_v2.py'),Path('tools/test_check_authority_v2.py'),Path('tools/evaluator_identity.py'),Path('tools/test_evaluator_identity.py'),Path('tools/check_evaluator_replay.py'),Path('tools/check_verus.py'),Path('tools/verus_coverage.py'),Path('tools/check_decision_v2.py'),Path('tools/check_metered_execution.py'),Path('tools/check_finite_execution.py'),Path('README.md')]
     if (ROOT/SOURCE_MANIFEST).exists():
         names=source_manifest(ROOT/SOURCE_MANIFEST)['paths']
-        paths.extend([SOURCE_MANIFEST,EVALUATOR,Path('verification/verus/authority_v2_test_sources.json'),*map(Path,names)])
+        test_manifest=Path('verification/verus/authority_v2_test_sources.json')
+        tests=json.loads(evaluator.read_regular(ROOT/test_manifest))
+        if (set(tests)!={'schema','paths'} or tests['schema']!='zeno-fcis/authority-test-sources/1'
+                or not isinstance(tests['paths'],list) or not tests['paths']
+                or not all(evaluator.safe_name(n) for n in tests['paths'])
+                or tests['paths']!=sorted(set(tests['paths']))):
+            raise ValueError('invalid native authority test source closure')
+        for name in tests['paths']:evaluator.read_regular(ROOT/name)
+        paths.extend([SOURCE_MANIFEST,EVALUATOR,test_manifest,*map(Path,names),*map(Path,tests['paths'])])
     return list(dict.fromkeys(paths))
 
 def snapshot(skip_profile=False):
@@ -98,19 +128,27 @@ def mutations():
         ('candidate_after_refusal',OUTCOME,'match self.subject{Err(e)=>Err(e),Ok(_)=>match self.outcome.result(){Ok(c)=>Ok(c),Err(e)=>Err(Refusal::Core(e))}}','match self.outcome.result(){Ok(c)=>Ok(c),Err(e)=>Err(Refusal::Core(e))}',True),
         # genesis_after_refusal retired in S5: genesis and transition share Evaluation::result, covered by candidate_after_refusal.
         ('sealed_command',OUTCOME,'seal_bytes(kind,identity,raw.state,raw.command,raw.context,&artifact,)','seal_bytes(kind,identity,raw.state,raw.state,raw.context,&artifact,)',True),
-        ('sealed_initial',BOUND,'Raw{state:original,command:&[],context:&[]}','Raw{state:&[],command:&[],context:original}',True),
+        ('sealed_initial',BOUND,'Kind::Genesis,Raw{state:original,command:&[],context:&[]},&self.framing','Kind::Genesis,Raw{state:&[],command:&[],context:original},&self.framing',True),
         ('stage_usage',OUTCOME,'observations::append_optional_usage(&mut parts,outcome.decision_usage());','observations::append_optional_usage(&mut parts,outcome.ingress_usage());',True),
         ('root_read_selector',OUTCOME,'Selector::Root=>parts.push(Part::Word(0))','Selector::Root=>parts.push(Part::Word(1))',True),
         ('policy_channel_destination',POLICY,'parts.push(Part::Word(v.1 as u128));','parts.push(Part::Word(v.2 as u128));',True),
         ('policy_channel_count',POLICY,'Part::Word(channel_roots.len() as u128)];','Part::Word(0)];',True),
         ('frame_limit',BOUND,'Part::Word(config.state.max_bytes as u128),','Part::Word(config.context.max_bytes as u128),',True),
-        ('unframed_evaluation',BOUND,'self.core.frame(Kind::Transition,original,&self.framing)','self.core.execute(original)',True),
+        ('unframed_evaluation',BOUND,'self.core.frame_family(Kind::Transition,original,&self.framing)','self.core.execute_family(Kind::Transition,original)',True),
         ('replay_original',BOUND,'let evaluated=self.evaluate(original);\n        let subject=compare(evaluated.subject,expected);','let evaluated=self.evaluate(Raw{state:original.state,command:original.state,context:original.context});\n        let subject=compare(evaluated.subject,expected);',True),
         ('replay_genesis_original',BOUND,'let evaluated=self.genesis(original);\n        let subject=compare(evaluated.subject,expected);','let evaluated=self.genesis(&[]);\n        let subject=compare(evaluated.subject,expected);',True),
         ('sealed_law_reports',OUTCOME,'observations::append_decision_attempts(&mut parts,outcome.decision_attempts());\n    observations::append_diagnostics(&mut parts,outcome.diagnostics());observations::append_law_reads(&mut parts,outcome.law_reads());','observations::append_decision_attempts(&mut parts,outcome.decision_attempts());\n    observations::append_diagnostics(&mut parts,&[]);observations::append_law_reads(&mut parts,&[]);',True),
         ('core_refusal_order',OUTCOME,'let candidate=match outcome.result(){Ok(c)=>c,Err(e)=>return Err(Refusal::Core(e))};','let candidate=match outcome.result(){Ok(c)=>c,Err(_e)=>return Err(Refusal::ReplayMismatch)};',True),
     ]:
-        controls[name]=(path,once((ROOT/path).read_text(),before,after),'proof',native)
+        source=(ROOT/path).read_text()
+        if path==POLICY:
+            # The legacy and numeric policy encoders both contain these fields.
+            # Preserve the legacy control's exact subject.
+            numeric_start=source.rfind('#[cfg_attr',0,source.index('pub fn numeric_policy_bytes('))
+            changed=once(source[:numeric_start],before,after)+source[numeric_start:]
+        else:
+            changed=once(source,before,after)
+        controls[name]=(path,changed,'proof',native)
     source=(ROOT/CANONICAL).read_text()
     # A public replay method is not a callee of the proof harness. Weakening its
     # exact contract must verify and then fail that function's coverage record.
@@ -118,9 +156,10 @@ def mutations():
         'ensures model::transition(self.view(),original,result.view(),Some(expected@)),\n        result.view().1.is_ok() ==> result.view().1.unwrap()==expected@,',
         'ensures true,'),'coverage',False)
     controls['uncontracted_helper']=(CANONICAL,source+'\npub fn unchecked_authority_probe()->u64 {7}\n','coverage',False)
-    changed=once(source,'encoded_size(parts)?;','')
+    changed=once(source,'let size = encoded_size(parts)?;\n    let mut out = Vec::with_capacity(size);',
+        'let mut out = Vec::new();')
     changed=once(changed,'model::length(parts@,parts@.len())<=usize::MAX,','')
-    changed=once(changed,'    Some(out)','    encoded_size(parts)?;\n    Some(out)')
+    changed=once(changed,'Some(out)','encoded_size(parts)?;\n    Some(out)')
     controls['serialize_before_size_check']=(CANONICAL,changed,'coverage',False)
     bound=(ROOT/BOUND).read_text()
     for name,before,after in [
@@ -129,9 +168,9 @@ def mutations():
         ('constructor_framing_substitution','let framing=*catalog.framing();','let framing=Framing{state:catalog.framing().command,command:catalog.framing().state,context:catalog.framing().context};'),
     ]:controls[name]=(BOUND,once(bound,before,after),'proof',True)
     controls['weak_constructor_contract']=(BOUND,once(bound,
-        '(match result{Ok(a)=>Ok(a.view()),Err(e)=>Err(e)}) ==\n        super::bind_value(catalog),','true,'),'coverage',False)
-    constructor_start=bound.rfind('#[cfg_attr',0,bound.index("pub fn bind<'p>"))
-    constructor_end=bound.index("\n\nimpl<'p> Authority<'p>",constructor_start)
+        '(match result{Ok(a)=>Ok(a.view()),Err(e)=>Err(e)}) ==\n        model::bind_value(catalog),','true,'),'coverage',False)
+    constructor_start=bound.rfind('#[cfg_attr',0,bound.index("pub fn bind<'p, D:"))
+    constructor_end=bound.index("\n\nimpl<'p, D:",constructor_start)
     # The synthetic bypass keeps its signature, contract and empty roots. Its checked
     # extensional assertion only lets the bypass prove its own contract; no assumption.
     raw_constructor="""#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures
@@ -155,12 +194,21 @@ def coverage_control(vir,profile,name):
     try:require_coverage(vir,profile)
     except ValueError as e:refusal=str(e)
     if refusal is None:return False,None,None
-    actual=inventory(vir,profile['namespace'],tuple(profile['body_covered_functions']))
+    if 'abstract_declarations' in profile:
+        actual,_declarations=descriptor_inventory(vir,profile['namespace'],
+            profile['namespace']+'execution_v2::composition::descriptor::',tuple(profile['body_covered_functions']))
+    else:
+        actual=inventory(vir,profile['namespace'],tuple(profile['body_covered_functions']))
     expected=profile['functions']
+    # require_coverage reports its first mismatch. Removing contract reads can
+    # shift compiler read IDs in an earlier descriptor record, so establish the
+    # intended refusal from the exact inventory and target field, not that text.
     prefix='authority_v2::execution_v2::authority::'
     if name=='uncontracted_helper':
         target=prefix+'canonical::unchecked_authority_probe'
-        intended=target in actual and target not in expected and target in refusal
+        intended=(set(actual)==set(expected)|{target} and target not in expected
+            and actual[target]['mode']=='Exec'
+            and actual[target]['requires']==0 and actual[target]['ensures']==0)
         field='inventory'
     else:
         relative,field={
@@ -170,18 +218,22 @@ def coverage_control(vir,profile,name):
             'unchecked_constructor_bypass':('bound::bind','signature_sha256'),
         }[name]
         target=prefix+relative
-        intended=target in actual and target in expected and target in refusal and actual[target][field]!=expected[target][field]
+        intended=(set(actual)==set(expected) and target in actual and target in expected
+            and actual[target][field]!=expected[target][field])
         if name=='serialize_before_size_check':
             intended=intended and all(actual[target][f]==expected[target][f] for f in ('signature_sha256','requires_sha256','ensures_sha256'))
 
     return intended,refusal,{'function':target,'field':field,'intended_refusal':intended}
 
-def semantic_refusal(proc,report,path):
+def semantic_refusal(proc,report,path,specimen=ROOT,*,region=None,target_functions=()):
     """A timeout, type error or unrelated solver failure is not a killed control."""
-    r=report['verification-results']
-    return (proc.returncode!=0 and r.get('success') is False and r.get('errors',0)>0
-        and r.get('encountered-vir-error') is False and path.name in proc.stderr
-        and re.search(r'resource limit|timed out|out of memory',proc.stderr,re.IGNORECASE) is None)
+    pin=json.loads((ROOT/verifier.PIN).read_text())
+    # This pin also names entry invariants this way; raw logs remain unchanged.
+    stderr=re.sub(r'^error: invariant not satisfied before loop$',
+        'error: invariant not satisfied',proc.stderr,flags=re.M)
+    proc=subprocess.CompletedProcess(proc.args,proc.returncode,proc.stdout,stderr)
+    return verifier.semantic_refusal(proc,report,pin,path,specimen,
+        region=region,target_functions=target_functions)
 
 def custody_controls(out,rust,env):
     """Compile a usable external client, then reject attempts to forge private authority."""
@@ -235,8 +287,10 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
     if not vr.get('is-verifying-entire-crate') or not vr.get('success') or vr.get('errors')!=0:raise RuntimeError('whole closure proof failed')
     vir=(out/'positive/crate.vir').read_text()
     if refresh:
-        raw=inventory(vir,'authority_v2::');body=[n for n,v in raw.items() if v['mode']=='Exec']
-        profile={'namespace':'authority_v2::','functions':inventory(vir,'authority_v2::',tuple(body)),'body_covered_functions':body,'expected_verified':vr['verified'],'target_functions':sorted(n for n in report['func-details'] if n.startswith('authority_v2::'))}
+        prefix='authority_v2::execution_v2::composition::descriptor::'
+        raw,_declarations=descriptor_inventory(vir,'authority_v2::',prefix);body=[n for n,v in raw.items() if v['mode']=='Exec']
+        functions,declarations=descriptor_inventory(vir,'authority_v2::',prefix,tuple(body))
+        profile={'namespace':'authority_v2::','functions':functions,'abstract_declarations':declarations,'body_covered_functions':body,'expected_verified':vr['verified'],'target_functions':sorted(n for n in report['func-details'] if n.startswith('authority_v2::'))}
         (ROOT/PROFILE).write_text(json.dumps(profile,indent=2,sort_keys=True)+'\n')
     profile=json.loads((ROOT/PROFILE).read_text());coverage=require_coverage(vir,profile)
     if not verifier.accepted(report,{**pin,'expected_verified':profile['expected_verified'],'target_functions':profile['target_functions']}):raise RuntimeError('toolchain or exact function count mismatch')
@@ -289,10 +343,15 @@ def check(out:Path,refresh=False,positive_only=False,selected=None):
                 else:shutil.copyfile(ROOT/unit,target)
             adjustments=adjust_specimen_source_lengths(specimen)
             proc,parsed=proof(specimen,name);r=parsed['verification-results'];refusal=None;intended=None
-            if expected=='proof':killed=semantic_refusal(proc,parsed,path)
+            if expected=='proof':
+                region=verifier.function_lines(changed,SEMANTIC_TARGETS[name])
+                killed=semantic_refusal(proc,parsed,path,specimen,region=region,
+                    target_functions=profile['target_functions'])
             else:
                 matched,refusal,intended=coverage_control((out/name/'crate.vir').read_text(),profile,name)
-                killed=proc.returncode==0 and r.get('success') is True and matched
+                killed=(proc.returncode==0 and verifier.proof_succeeded(parsed,pin) and matched
+                    and not verifier.ERROR_HEADER.search(proc.stderr)
+                    and not verifier.NON_SEMANTIC.search(proc.stderr))
             n=native(specimen,name,True) if native_control else None
             failed_tests=[] if n is None else re.findall(r'^test (\S+) \.\.\. FAILED$',n.stdout,re.MULTILINE)
             if n is not None:killed=killed and n.returncode!=0 and 'test result: FAILED' in n.stdout and bool(failed_tests)

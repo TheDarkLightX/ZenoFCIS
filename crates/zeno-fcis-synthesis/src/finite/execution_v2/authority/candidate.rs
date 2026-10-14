@@ -19,6 +19,12 @@ fn class_tag(class: Class) -> u128 {
 #[cfg_attr(verus_keep_ghost, verus_spec(ensures final(parts)@ == old(parts)@+model::atom(value),))]
 pub(super) fn atom<'a>(parts: &mut Vec<Part<'a>>, value: Atom<'a>) {
     match value {
+        Atom::Canonical(v) => {
+            parts.push(Part::Word(7));
+            parts.push(Part::Bytes(v.schema()));
+            parts.push(Part::Word(v.type_id() as u128));
+            parts.push(Part::Bytes(v.wire()));
+        }
         Atom::Bool(v) => {
             parts.push(Part::Word(0));
             parts.push(Part::Word(v as u128));

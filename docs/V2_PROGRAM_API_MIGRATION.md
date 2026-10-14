@@ -18,14 +18,16 @@ Pass exact original state, command and context envelopes as `Invocation`. `Progr
 
 The publication poststate is an original envelope. Its ordered delivery destination, payload and idempotency values are bare original ZCVE; checked destination/payload roots accompany them. The idempotency atom is a policy marker, not a globally unique delivery identity. A shell must accept the genuine capability, bind exact authority/prestate/subject/wires and handle actual durable state comparison. Feature `sqlite-shell` exposes the V2 adapter as `zeno_fcis::sqlite`; the shell has its own qualification and trust boundary.
 
-## S1 storage migration
+## Storage migration
 
-The unreleased schema-9 `V2SqliteShell` replaces the separate schema-7 V2 and
-schema-8 History adapters. `HistorySqliteShell`, `admit_history` and the core
-History publication wrappers are removed. Use the bound Authority directly for
+The schema-9 `V2SqliteShell` replaced the separate schema-7 V2 and schema-8
+History adapters; it is at schema 10 since store upgrades were added.
+`HistorySqliteShell`, `admit_history` and the core History publication
+wrappers are removed. Use the bound Authority directly for
 `publish_genesis`, `publish` and exact publication replay, then pass the genuine
-publication to the surviving shell. Old database versions are refused; there
-is no implicit migration or permission to relabel an old store as schema 9.
+publication to the surviving shell. Older database versions are refused;
+there is no implicit migration or permission to relabel an old store. A
+schema-9 store migrates to schema 10 only explicitly, after a complete audit.
 
 The shell stores the complete policy/evaluator identity once. It compacts each
 publication by removing that identity from its nested audited subject, and
@@ -51,7 +53,7 @@ copying and hashing remain outside that logical transition bound. The storage
 encoding change does not remove root/version/CAS, crash, replay or delivery
 obligations. Final-source qualification remains required.
 
-## S5 invocation kinds
+## Invocation kinds
 
 Genesis and ordinary transitions share `Outcome`, `Evaluation`, `Publication`
 and `PublicationOutcome`; the separate `Genesis*` wrappers are retired.
@@ -64,8 +66,8 @@ ordinary commits and publication bundles. A genuine publication of the wrong
 kind returns `Error::InvocationKind` before a history refresh or checkpoint
 write; a foreign identity still returns `Error::Identity` first. Wrong-kind
 bundle refusal also precedes the version check. Correct-kind bundles retain
-their existing refresh, version, identity and pre-state checks. These are
-unreleased API changes; final combined qualification remains required.
+their existing refresh, version, identity and pre-state checks. These API
+changes are not in a stable release; final combined qualification remains required.
 
 ## V1 consumer migration
 

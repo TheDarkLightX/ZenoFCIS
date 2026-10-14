@@ -1,0 +1,187 @@
+{
+  "application": "expense-approval",
+  "assumptions": [
+    "authorization and principal identity are supplied, not authenticated",
+    "one fixed subject, no reset or historical requests",
+    "payment is an intent, not bank settlement",
+    "contract compiler, finite enumeration, Rust compiler and SQLite shell remain named trusted boundaries"
+  ],
+  "authority": "none",
+  "components": [
+    {
+      "family": "consumable-budget",
+      "instance": "components/budget/core-instance.json",
+      "instance_sha256": "a1ad1dec2e74d180e42fe3b52114ff4a0b38abcdd49c2884348f033b471f3d8f",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "budget",
+      "owns_fields": [
+        110
+      ],
+      "parameters": {
+        "C": 7
+      },
+      "source_set_sha256": "1ec32ec25ca42c4afdf4a766a522de7697263a4bdb3f0e31bf309ea277c59029",
+      "views": {
+        "command": [
+          "3"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "remaining"
+        ]
+      }
+    },
+    {
+      "family": "approval-queue",
+      "instance": "components/queue/core-instance.json",
+      "instance_sha256": "6d52e774e7e36af94a32e5af4018708b7b59e95d68d1aec95c55e690a60b046f",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "queue",
+      "owns_fields": [
+        111,
+        112,
+        113,
+        114
+      ],
+      "parameters": {
+        "K": 2
+      },
+      "source_set_sha256": "a2b329091913bbb427c9fff92c2fc9f9fa718103ec63e00a7f2836eb910f0dc7",
+      "views": {
+        "command": [
+          "action"
+        ],
+        "context": [
+          "principal",
+          "authorized"
+        ],
+        "state": [
+          "phase + 150",
+          "v0",
+          "v1",
+          "v2"
+        ]
+      }
+    },
+    {
+      "family": "idempotency-slot",
+      "instance": "components/memo/core-instance.json",
+      "instance_sha256": "f1d66a671f3cab8caab337d16b2a39abd08142691a92e32de0d442572ef93f1f",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "memo",
+      "owns_fields": [],
+      "parameters": {
+        "C": 7
+      },
+      "source_set_sha256": "ecf2167bf84c13c05a1042b34ff33be379ae4d15e1326df8ea940e0eede6fc1c",
+      "views": {
+        "command": [
+          "key",
+          "requested"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "phase != 0",
+          "1",
+          "3"
+        ]
+      }
+    }
+  ],
+  "effects": {
+    "channel": 300,
+    "destination": "bank",
+    "max_per_transition": 1,
+    "occurrence": "execute",
+    "owner": "budget",
+    "payload": {
+      "140": "3",
+      "141": "1"
+    }
+  },
+  "evidence_status": "pending complete actual Authority replay, durable journey, controls and review",
+  "frames": "Budget changes only on the first Execute. Queue fields frame on exact retry. The memo owns no state: its view reads the queue's phase and the fixed key 1 and amount 3, so its Record step only checks the request subject and can change nothing.",
+  "input_tuples": 55296,
+  "occurrences": [
+    {
+      "name": "enqueue",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Enqueue",
+          "component": "queue"
+        }
+      ],
+      "when": "phase == 0 && action == 160"
+    },
+    {
+      "name": "vote",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Vote",
+          "component": "queue"
+        }
+      ],
+      "when": "phase == 1 && action == 161"
+    },
+    {
+      "name": "execute",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Execute",
+          "component": "queue"
+        },
+        {
+          "command": "Spend",
+          "component": "budget"
+        }
+      ],
+      "when": "phase == 1 && action == 162"
+    },
+    {
+      "name": "retry",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        }
+      ],
+      "when": "phase == 2 && action == 162"
+    }
+  ],
+  "owner_adoption": false,
+  "preconditions": [
+    "complete coupled-state invariant",
+    "supplied authorization and principal",
+    "exact amount 3 and key 1",
+    "two distinct votes on first Execute"
+  ],
+  "profile": "single-expense-budget-seven-quorum-two/1",
+  "publication": "one ordinary complete Authority publication and one SQLite transaction; abort-all on technical refusal",
+  "schema": "zeno-fcis/core-application-composition/1",
+  "state_fields": [
+    110,
+    111,
+    112,
+    113,
+    114
+  ],
+  "stateless_components": [
+    "memo"
+  ]
+}

@@ -25,6 +25,8 @@ use spec_authoring::{
     MAX_FINITE_HORIZON, MAX_FORMULA_DEPTH, ProjectSpec, ProjectionPath, ProjectionRoot, RelExpr,
     StableId, TemporalFormula, ValueExpr, declared_domain, invariant_at,
 };
+/// Pinned independent certificate checking with immutable input custody.
+pub mod certificate;
 mod model_diagnostics;
 use model_diagnostics::{
     DiagnosticLimits, DiagnosticOutcome, ModelContext, ModelObservation, ModelReason, ModelStep,
@@ -855,10 +857,13 @@ struct PrivateExecutable {
 }
 impl PrivateExecutable {
     fn create(backend: ToolBackend, bytes: &[u8]) -> Result<Self, ToolFailure> {
+        Self::create_named(&format!("{backend:?}"), bytes)
+    }
+    fn create_named(name: &str, bytes: &[u8]) -> Result<Self, ToolFailure> {
         let sequence = TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         let extension = if cfg!(windows) { ".exe" } else { "" };
         let path = std::env::temp_dir().join(format!(
-            "zeno-fcis-checked-{}-{backend:?}-{sequence}{extension}",
+            "zeno-fcis-checked-{}-{name}-{sequence}{extension}",
             std::process::id()
         ));
         let mut file = OpenOptions::new()

@@ -1,5 +1,5 @@
 //! Language-neutral synthesis authoring; no commit or publication authority.
-mod completion;
+pub(super) mod completion;
 mod problem;
 mod runner;
 

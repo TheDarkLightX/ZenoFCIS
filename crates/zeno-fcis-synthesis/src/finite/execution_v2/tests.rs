@@ -340,3 +340,63 @@ fn buffer_refusal_clears_both_buffers_without_rolling_back_consumption() {
     assert_eq!(output, [1]);
     assert_eq!(meter.used.used(Resource::Step), 2);
 }
+
+#[test]
+fn shared_arithmetic_preserves_budget_before_unused_overflow() {
+    let graph = [
+        Op::Bool(false),
+        Op::Int(i64::MAX),
+        Op::Int(1),
+        Op::Add(1, 2),
+        Op::Select(0, 3, 2),
+    ];
+    let domain = [Domain::Int {
+        min: i64::MIN,
+        max: i64::MAX,
+    }];
+    for cap in [0, 3, 4, 5] {
+        let (result, usage) = execute(
+            &[],
+            &domain,
+            &graph,
+            &[4],
+            &[],
+            zero_limits().with_limit(Resource::Step, cap),
+        )
+        .into_parts();
+        if cap < 4 {
+            assert_eq!(
+                result,
+                Err(Failure::Budget(MeterFailure {
+                    resource: Resource::Step,
+                    limit: cap,
+                    attempted: cap + 1,
+                    overflow: false,
+                }))
+            );
+            assert_eq!(usage.used(Resource::Step), cap);
+        } else {
+            assert_eq!(result, Err(Failure::Arithmetic));
+            assert_eq!(usage.used(Resource::Step), 4);
+        }
+        for resource in RESOURCES {
+            if resource != Resource::Step {
+                assert_eq!(usage.used(resource), 0);
+            }
+        }
+    }
+    let (result, usage) = execute(&domain, &domain, &graph, &[4], &[], zero_limits()).into_parts();
+    assert_eq!(result, Err(Failure::InputDomain));
+    assert_eq!(usage.used(Resource::Step), 0);
+    let (result, usage) = execute(
+        &[],
+        &domain,
+        &[Op::Int(7)],
+        &[1],
+        &[],
+        zero_limits().with_limit(Resource::Step, 1),
+    )
+    .into_parts();
+    assert_eq!(result, Err(Failure::Reference));
+    assert_eq!(usage.used(Resource::Step), 1);
+}

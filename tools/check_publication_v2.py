@@ -21,7 +21,7 @@ import check_original_output_v2 as output
 from v2_proof_sources import execution_sources, adjust_specimen_source_lengths
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
-from verus_coverage import inventory, require_coverage
+from verus_coverage import inventory, profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path('verification/verus/publication_v2.rs')
@@ -29,7 +29,7 @@ PROFILE = Path('verification/verus/publication-v2.json')
 SUBJECT = authority.BOUND.parent / 'publication.rs'
 SPEC = SUBJECT.parent / 'publication/spec.rs'
 PUBLIC_TEST = Path('crates/zeno-fcis-synthesis/tests/v2_publication.rs')
-STAGE = Path('docs/V2_PUBLICATION_STAGE.md')
+STAGE = Path('README.md')
 TARGET = output.TARGET
 UNIT_SOURCES = tuple(sorted({HARNESS, PUBLIC_TEST, *map(Path,
     json.loads((ROOT / authority.SOURCE_MANIFEST).read_text())['paths']),
@@ -107,13 +107,18 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
         require_coverage(vir, profile)
     except ValueError as error:
         refusal = str(error)
-    actual = inventory(vir, profile['namespace'], tuple(profile['body_covered_functions']))
+    actual = profile_inventory(vir, profile)
     expected = profile['functions']
+    # Coverage reports its first mismatch; compiler read-ID shifts can make
+    # descriptor declarations appear before the intended target. Require the
+    # exact inventory and target record rather than that diagnostic's wording.
     prefix = 'publication_v2::execution_v2::authority::publication::'
     if name == 'uncontracted_inventory':
         target = prefix + 'uncontracted_publication_probe'
         field = 'inventory'
-        intended = target in actual and target not in expected and target in (refusal or '')
+        intended = (set(actual) == set(expected) | {target} and target not in expected
+                    and actual[target]['mode'] == 'Exec'
+                    and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
     else:
         suffix,field = {'weak_getter_contract':('::ordinal','ensures_sha256'),
                         'equivalent_link_spec':('spec::link','body_sha256')}[name]
@@ -121,7 +126,8 @@ def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | No
         if len(names) != 1:
             raise ValueError('ambiguous intended coverage target: ' + name)
         target = names[0]
-        intended = target in actual and target in (refusal or '') and actual[target][field] != expected[target][field]
+        intended = (set(actual) == set(expected) and target in actual
+                    and actual[target][field] != expected[target][field])
     return bool(intended and refusal),refusal,{'function':target,'field':field,'intended_refusal':bool(intended)}
 
 

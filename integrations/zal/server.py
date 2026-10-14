@@ -11,11 +11,11 @@ import secrets
 import threading
 from urllib.parse import urlsplit
 
-from behavior import Refusal, canonical, explain, help_topic, legend, parse, replay
+from behavior import Refusal, assumption_groups, canonical, explain, help_topic, legend, parse, replay
 from codex_transport import AppServer, TransportError
-from factory import lower
 from shared import SharedWorkspace
-from workflow import PROPOSAL_SCHEMA, Session, checker_identity
+from workflow import PROPOSAL_SCHEMA, Session, checker_identity, examples_digest
+from workspace import declarations
 
 
 class Workspace:
@@ -278,19 +278,22 @@ class Workspace:
             elif route == "accept":
                 if self.running:
                     raise Refusal("Interrupt the live turn before accepting a revision")
-                self.session.accept_human(data["base_revision"], data["candidate_revision"])
+                self.session.accept_human(data["base_revision"], data["candidate_revision"], data.get("examples_digest"))
             elif route == "reject":
                 self.session.reject_human(data["base_revision"], data["candidate_revision"])
             elif route == "trace":
                 if data["revision"] != self.session.model.revision:
                     raise Refusal("Trace uses a stale revision")
-                return {"revision": self.session.model.revision, "trace": replay(self.session.model, data["inputs"])}
+                trace = replay(self.session.model, data["inputs"])
+                return {"revision": self.session.model.revision, "trace": trace,
+                        "supplied_assumptions": {"steps": [row["supplied_assumptions"] for row in trace]},
+                        "authenticated_facts": []}
             elif route == "decision":
                 if data["revision"] != self.session.model.revision:
                     raise Refusal("Decision uses a stale revision")
                 model = self.session.model
                 result = model.decide(data["state"], data["event"], data["context"])
-                return {"revision": model.revision, "outcome": result,
+                return {"revision": model.revision, "outcome": result, **assumption_groups(data["context"]),
                         "guards": [{"rule": r.id, "state_event_match": r.source == data["state"] and r.event == data["event"],
                                     "predicate": r.guard.render(True), "value": r.guard.value(data["state"], data["context"])} for r in model.rules]}
             elif route == "explain":
@@ -302,9 +305,13 @@ class Workspace:
                     raise Refusal("Help uses a stale revision")
                 return help_topic(self.session.model, data["topic"], checker_identity())
             elif route == "export":
-                if self.session.agreement != "human-accepted":
-                    raise Refusal("Explicitly accept a reviewed candidate before factory export")
-                return {"revision": self.session.model.revision, "files": lower(self.session.model), "authority": "none"}
+                if data.get("revision") != self.session.model.revision:
+                    raise Refusal("Export uses a stale or missing displayed revision; refresh first")
+                if data.get("examples_digest") != examples_digest(self.session.owner_examples):
+                    raise Refusal("Export uses a stale or missing displayed example corpus; refresh first")
+                files, receipt = declarations(self.session, data["revision"])
+                return {"revision": self.session.model.revision, "files": files,
+                        "review": receipt, "authority": "none"}
             else:
                 raise Refusal("Unknown workspace action")
             self.error = None

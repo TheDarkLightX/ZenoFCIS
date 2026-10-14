@@ -2,7 +2,8 @@
 //! summary reports the review, a planted wrong constant contradicts an owner
 //! example, a law refusal on a pre-state that satisfies every state law is a
 //! finding, an application compiles the examples grammar the review
-//! compiles, and the command is described with its effects.
+//! compiles, the equivalent mutants' programs are written as seeds, and the
+//! command is described with its effects.
 #![forbid(unsafe_code)]
 
 use std::fs;
@@ -74,6 +75,15 @@ fn review(dir: &Path, extra: &[&str]) -> Output {
         .args(extra)
         .output()
         .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"))
+}
+
+fn sha256(bytes: &[u8]) -> String {
+    use zeno_fcis_codec::CommitmentHasher;
+    zeno_fcis_crypto::RustCryptoSha256::hash(bytes)
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn json(bytes: &[u8]) -> Value {
@@ -357,6 +367,84 @@ fn failures_use_the_exit_classes() {
 }
 
 #[test]
+fn equivalent_mutants_are_written_as_seed_programs_with_their_program_verdict() {
+    let root = TempRoot::new("seeds");
+    let seeds = root.path().join("nested/seeds");
+    let packet = root.path().join("packet.json");
+    let output = review(
+        &dual_approval(),
+        &[
+            "--out",
+            packet.to_str().unwrap_or_default(),
+            "--format",
+            "json",
+            "--mutant-programs",
+            seeds.to_str().unwrap_or_default(),
+        ],
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report = json(&output.stdout);
+    let packet = json(&fs::read(&packet).unwrap_or_else(|error| panic!("{error}")));
+    let equivalent: Vec<&Value> = packet["mutants"]["list"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|mutant| mutant["classification"] == "equivalent-over-full-domain")
+        .map(|mutant| &mutant["id"])
+        .collect();
+    let programs = report["mutant_programs"]["programs"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{report}"));
+    assert_eq!(
+        programs.iter().map(|seed| &seed["id"]).collect::<Vec<_>>(),
+        equivalent
+    );
+    // Dual approval's one decision-equivalent mutant swaps two disjoint
+    // cases: the same decisions, but a different case index in output 0.
+    assert_eq!(equivalent, [&Value::from("m0027")]);
+    assert_eq!(programs[0]["program_equivalent"], false);
+    let mut written = fs::read_dir(&seeds)
+        .unwrap_or_else(|error| panic!("{error}"))
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|error| panic!("{error}"));
+    written.sort();
+    assert_eq!(written, ["m0027.zcve"]);
+    let bytes = fs::read(seeds.join("m0027.zcve")).unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(programs[0]["bytes"], bytes.len());
+    assert_eq!(programs[0]["sha256"], sha256(&bytes));
+    // Seeds go to a new directory only; nothing is written over one.
+    let output = review(
+        &dual_approval(),
+        &[
+            "--format",
+            "json",
+            "--mutant-programs",
+            seeds.to_str().unwrap_or_default(),
+        ],
+    );
+    assert_eq!(output.status.code(), Some(3));
+    assert_eq!(json(&output.stdout)["error"]["code"], "review-read-failed");
+    // Without --out the seed lines follow the summary on stderr.
+    let fresh = root.path().join("fresh");
+    let output = review(
+        &dual_approval(),
+        &["--mutant-programs", fresh.to_str().unwrap_or_default()],
+    );
+    assert_eq!(output.status.code(), Some(0));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("m0027.zcve (not program-equivalent)"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 fn the_command_is_described_with_its_effects() {
     let output = zeno(&["describe", "contract", "review"]);
     assert_eq!(output.status.code(), Some(0));
@@ -371,7 +459,7 @@ fn the_command_is_described_with_its_effects() {
     );
     assert_eq!(
         description["effects"]["writes"],
-        serde_json::json!(["optional-review-packet"])
+        serde_json::json!(["optional-review-packet", "optional-seed-programs"])
     );
     assert_eq!(description["effects"]["executes_tools"], false);
     let output = zeno(&["describe", "contract"]);

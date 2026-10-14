@@ -59,7 +59,7 @@ further plumbing. The program follows the principles in
 
 ## Consequences
 
-Delivered so far on `agent/v2-assurance-20260923`:
+Delivered so far:
 
 - Vacuity is reported. `zeno-fcis check` classifies every law and claim, and
   `prove` states that current obligations contain no system model. See

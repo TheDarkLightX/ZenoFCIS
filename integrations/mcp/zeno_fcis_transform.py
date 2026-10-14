@@ -75,7 +75,7 @@ def _loop(arguments: list[str]) -> dict[str, Any]:
             "authority": "none", "note": NOTE}
 
 
-def transform_request(original_path: str, session_path: str, profile: str = "functional-bool-v1",
+def transform_request(original_path: str, session_path: str, profile: str = "checked-i64-v1",
                       attempts: int = 8, checks: int = 8, deadline_ms: int = 20_000) -> dict[str, Any]:
     """Admit an original program and open a loop session; hosted providers stay disabled."""
     if profile not in PROFILES:

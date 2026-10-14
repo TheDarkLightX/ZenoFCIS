@@ -32,15 +32,9 @@ The repository configuration is deliberately deterministic. It:
 - rejects direct `cargo publish`, Git tagging, GitHub release creation, and PR
   merging from an ordinary coding-agent session;
 - requires pinned Rust `+1.97.1` and `--locked` for build, check, Clippy,
-  documentation, run, and test commands.
-
-Ordinary commits and pushes use checks appropriate to the change; the hook
-does not require a full acceptance run before every commit. Documentation
-changes need documentation and link checks; code and tooling need relevant
-tests. The full `python3 tools/atdd.py run --all` remains required when preparing
-a new version for release, including release candidates, on its exact source.
-See [agent guidance](../AGENTS.md) and [release assurance](RELEASE_ASSURANCE.md).
-Passing tests does not authorize tagging, publication or merging.
+  documentation, run, and test commands;
+- requires `python3 tools/atdd.py run --all` as the immediately preceding
+  canonical session event before `git commit`.
 
 Probity's AI-judged `enforceTdd` rule is not enabled. Its decision would depend
 on an external model and its deterministic fast path does not currently support

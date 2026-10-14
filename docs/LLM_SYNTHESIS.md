@@ -64,8 +64,9 @@ code-generation theorem or automatic authority for generated native code.
 
 Three transform-loop tools drive the bounded optimization loop
 (`zeno-fcis loop`, see the [CLI reference](CLI_REFERENCE.md)):
-`transform_request(original_path, session_path, profile, attempts, checks,
-deadline_ms)` admits an original and opens a session; `transform_candidate
+`transform_request(original_path, session_path, profile="checked-i64-v1",
+attempts, checks, deadline_ms)` admits an original and opens a session with
+work ceilings scaled to it; `transform_candidate
 (session_path, candidate_path | candidate_json_path)` spends one attempt on a
 candidate the agent supplies, as canonical bytes or in the fixture vocabulary,
 and returns checker-derived feedback (a replayed counterexample, an admission
@@ -91,7 +92,7 @@ provenance, examples_path="", rounds=4, max_tuples=4096)`,
 `contract_draft_label(session_path, revision, examples_path, provenance)`,
 `contract_draft_check(session_path)`, and
 `contract_draft_finalize(session_path, revision, out_path)`. Start from an intent
-file and fixed declarations, supply a complete rules proposal, present F2's
+file and fixed declarations, supply a complete rules proposal, present the review
 questions to the owner, then submit explicitly supplied expected decisions.
 Repeat with the returned exact revision. Hosted models stay off; an MCP agent
 is the external proposer. Do not convert a suggested answer into an owner label.
@@ -104,8 +105,9 @@ See the [CLI workflow, bounds and concurrency contract](CLI_REFERENCE.md#example
 `DraftToolsTest` in `test_draft_tools.py` checks wrapper routing/refusals with
 mocked processes; those controls do not establish native CLI behavior. Its
 `NativeDraftPathTest` requires a built CLI and checks existing-path preservation
-through the wrappers. The G7 acceptance scenario also exercises native drafting
-and generated apps. None of these fixtures establishes a real owner conversation.
+through the wrappers. The `contract-draft` acceptance scenario also exercises
+native drafting and generated apps. None of these fixtures establishes a real
+owner conversation.
 
 Install the skill in Codex from this checkout:
 

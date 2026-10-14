@@ -13,6 +13,8 @@ Cargo.lock
 !verification/Cargo.lock
 !site/Cargo.lock
 !tools/resolved-purity/Cargo.lock
+# tools/symbolic_certificate_checker/build.py copies this lock into its build.
+!tools/symbolic_certificate_checker/Cargo.lock
 # rustc writes over-long type names to <crate>.long-type-<hash>.txt in the CWD.
 *.long-type-*.txt
 *.profraw

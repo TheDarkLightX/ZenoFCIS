@@ -3,7 +3,7 @@ use super::*;
 use vstd::prelude::*;
 verus! {
 pub(in super::super) open spec fn schema_valid(schema:Schema)->bool {
-    match schema {Schema::Leaf(leaf)=>input_view::spec::leaf_valid(*leaf),Schema::Record(fields)=>input_view::schema_valid(fields@),}
+    match schema {Schema::Original{..}=>false,Schema::Leaf(leaf)=>input_view::spec::leaf_valid(*leaf),Schema::Record(fields)=>input_view::schema_valid(fields@),}
 }
 
 pub(in super::super) open spec fn inverse(variants:Seq<super::super::super::InputVariant>,code:i64,n:nat)->Option<u16>
@@ -92,6 +92,7 @@ pub(in super::super) open spec fn decoded<'a>(d:Decoded<'a>)->(ValueView<'a>,Seq
 pub(in super::super) open spec fn project<'a>(bytes:Seq<u8>,schema:Schema<'a>,source:u8,limits:Seq<u64>,used:Seq<u64>)->(Result<(ValueView<'a>,Seq<i64>),Failure>,Seq<u64>,Seq<Read>) {
     if !schema_valid(schema) {(Err(Failure::Schema),used,Seq::empty())} else {
         match schema {
+            Schema::Original{..}=>(Err(Failure::Schema),used,Seq::empty()),
 
             Schema::Record(descriptor)=>{
                 let r=input_view::projection(bytes,descriptor@,limits,used);

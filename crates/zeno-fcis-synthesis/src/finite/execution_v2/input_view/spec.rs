@@ -209,6 +209,16 @@ pub(super) proof fn prefix_failure(bytes: Seq<u8>, fields: Seq<Field>, failed: n
         prefix_failure(bytes, fields, failed, (count - 1) as nat, offset, limits, used, error);
     }
 }
+pub(super) proof fn prefix_usage(bytes: Seq<u8>, fields: Seq<Field>, count: nat,
+    offset: usize, limits: Seq<u64>, used: Seq<u64>)
+    requires count <= fields.len(), limits.len() == 8, used.len() == 8,
+    ensures prefix(bytes, fields, count, offset, limits, used).1.len() == 8,
+    decreases count,
+{
+    if count > 0 {
+        prefix_usage(bytes, fields, (count - 1) as nat, offset, limits, used);
+    }
+}
 pub(super) open spec fn projection(bytes: Seq<u8>, fields: Seq<Field>, limits: Seq<u64>, used: Seq<u64>)
     -> (Result<Seq<i64>, Failure>, Seq<u64>, Seq<AccessAttempt>) {
     if !schema_valid(fields) { (Err(Failure::Schema), used, Seq::empty()) }

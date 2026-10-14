@@ -4,14 +4,8 @@
     {
       "package": "zeno-fcis-cli",
       "target": "bin:zeno-fcis",
-      "path": "crates/zeno-fcis-shell-sqlite/src/v2/upgrade.rs",
-      "sha256": "7f97164ad1d7ceb0cb7d720d9033f90dfc095c81aacb5caa0499f3ec416f4947"
-    },
-    {
-      "package": "zeno-fcis-cli",
-      "target": "bin:zeno-fcis",
       "path": "docs/benchmarks/cases.json",
-      "sha256": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55"
+      "sha256": "52f2af85e465dd69cb2baa13edb7875ff00d3133c673a261f23b75317e23afe0"
     },
     {
       "package": "zeno-fcis-cli",
@@ -77,7 +71,7 @@
       "package": "zeno-fcis-cli",
       "target": "test:loop_cli",
       "path": "docs/benchmarks/cases.json",
-      "sha256": "65ad66a61de3bbd8d0133cdf30c451f6344a3077c5eef989f39682890c6a1f55"
+      "sha256": "52f2af85e465dd69cb2baa13edb7875ff00d3133c673a261f23b75317e23afe0"
     },
     {
       "package": "zeno-fcis-formal-tools",
@@ -137,7 +131,7 @@
       "package": "zeno-fcis-shell-sqlite",
       "target": "test:behaviour_change",
       "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs",
-      "sha256": "47345177951ad6299d3cda05c5d5cdbbcd044931d5ee5ff4119a0ca3abc2c108"
+      "sha256": "384f91a443e2f5c5bc16210799853f3273c0849eba043c14298608671c1b9380"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -281,7 +275,7 @@
       "package": "zeno-fcis-shell-sqlite",
       "target": "test:upgrade",
       "path": "crates/zeno-fcis-cli/tests/fixtures/withdrawal-queue-adopted/src/v2_contract.rs",
-      "sha256": "47345177951ad6299d3cda05c5d5cdbbcd044931d5ee5ff4119a0ca3abc2c108"
+      "sha256": "384f91a443e2f5c5bc16210799853f3273c0849eba043c14298608671c1b9380"
     },
     {
       "package": "zeno-fcis-shell-sqlite",
@@ -330,6 +324,54 @@
       "target": "test:v2",
       "path": "crates/zeno-fcis-shell/src/delivery.rs",
       "sha256": "ec1aeb3b5c40563d2318eabc1eaa8e0698928df850c1d94dfc116cf7e5cdcbc0"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_compound",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-compound/fixture.rs",
+      "sha256": "c3f05f4db9ba108ee3ed0df2c470a7d90641f68cef950d4885e2ab5b28aec85b"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_compound",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-compound/schema.zcve",
+      "sha256": "830a17ee25b7b06a3b3332d3e0e7205cea78b05702b4fae16c96a4cd377815c9"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_zusd",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/data.rs",
+      "sha256": "509bad206f8930ee873911a015f286125f9f434c30a4d1b1add0a3ff335f7b6d"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_zusd",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/fixture.rs",
+      "sha256": "3bb6d4d4eefe69b247071dcd4179e2eb4bb5966862994a8dad9f2705a12ec8cc"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_zusd",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/native-cases.txt",
+      "sha256": "2e2056afbeae5a588885fc2b6947a0303cb90248fc0f838a0500e6854074e2ab"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_zusd_authority",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/data.rs",
+      "sha256": "509bad206f8930ee873911a015f286125f9f434c30a4d1b1add0a3ff335f7b6d"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_zusd_authority",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/fixture.rs",
+      "sha256": "3bb6d4d4eefe69b247071dcd4179e2eb4bb5966862994a8dad9f2705a12ec8cc"
+    },
+    {
+      "package": "zeno-fcis-shell-sqlite",
+      "target": "test:v2_original_zusd_authority",
+      "path": "crates/zeno-fcis-synthesis/tests/fixtures/g3-original-zusd/native-cases.txt",
+      "sha256": "2e2056afbeae5a588885fc2b6947a0303cb90248fc0f838a0500e6854074e2ab"
     },
     {
       "package": "zeno-fcis-synthesis",
@@ -413,7 +455,7 @@
       "package": "zeno-fcis-synthesis",
       "target": "test:v2_evaluator_identity",
       "path": "verification/verus/authority_v2_sources.json",
-      "sha256": "2120fdb44abf017910f29cb6b34a74fb27ca67a636f4f38c58f124c6696cf10f"
+      "sha256": "19439fa8152997769ccef59f4b2e81b91d92292cb6507fecf4216b46f1bf1e22"
     },
     {
       "package": "zeno-fcis-synthesis",

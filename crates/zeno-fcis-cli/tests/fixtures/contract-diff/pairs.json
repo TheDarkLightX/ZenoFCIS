@@ -319,7 +319,7 @@
           }
         ]
       },
-      "kind": "unrelated",
+      "kind": "layout-change",
       "changes": [
         "channel:301:changed",
         "case:15:changed",

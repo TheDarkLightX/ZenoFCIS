@@ -152,8 +152,9 @@ fn failed_first_project_file_can_be_retried() {
     let out = root.0.join("project");
     let output = limited_write(Command::new(CLI).arg("new").arg(&out));
     assert_eq!(output.status.code(), Some(3));
+    assert!(!out.exists(), "failed first write left its new directory");
     assert_eq!(
-        fs::read_dir(&out)
+        fs::read_dir(&root.0)
             .unwrap_or_else(|error| panic!("{error}"))
             .count(),
         0

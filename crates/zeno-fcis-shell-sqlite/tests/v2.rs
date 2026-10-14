@@ -8,10 +8,9 @@ use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Envelope, Hash32, commitmen
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_shell::{CommitStatus, IdempotentDestination, MemoryDestination};
-use zeno_fcis_shell_sqlite::{
-    CrashPoint,
-    v2::{CommitReceipt, Error, V2SqliteShell},
-};
+#[cfg(feature = "crash-injection")]
+use zeno_fcis_shell_sqlite::CrashPoint;
+use zeno_fcis_shell_sqlite::v2::{CommitReceipt, Error, V2SqliteShell};
 use zeno_fcis_synthesis::finite::{
     V2Resource as Resource,
     canonical_v2::schema,
@@ -169,6 +168,7 @@ fn actual_contract_commits_and_replays_without_duplicating_deliveries() {
 }
 
 #[test]
+#[cfg(feature = "crash-injection")]
 fn every_injected_commit_interruption_is_atomic() {
     with_authority(None, |a| {
         let initial = state(0, 0);
@@ -767,14 +767,24 @@ fn commit_through(
     db: &mut V2SqliteShell<'_, '_>,
     key: Hash32,
     p: Publication<'_>,
-    crash: Option<CrashPoint>,
+    before_transaction: bool,
 ) -> Result<CommitReceipt, Error> {
+    #[cfg(feature = "crash-injection")]
+    let crash = before_transaction.then_some(CrashPoint::BeforeTransaction);
+    #[cfg(not(feature = "crash-injection"))]
+    let _ = before_transaction;
     match entry {
         "commit" => db.commit(key, p),
         "commit_at" => db.commit_at(0, key, p),
+        "commit_bounded_at" => db.commit_bounded_at(0, key, p, usize::MAX),
+        #[cfg(feature = "crash-injection")]
         "commit_with_crash" => db.commit_with_crash(key, p, crash),
+        #[cfg(feature = "crash-injection")]
         "commit_with_crash_at" => db.commit_with_crash_at(0, key, p, crash),
-        "commit_bounded_at" => db.commit_bounded_at(0, key, p, usize::MAX, crash),
+        #[cfg(feature = "crash-injection")]
+        "commit_bounded_with_crash_at" => {
+            db.commit_bounded_with_crash_at(0, key, p, usize::MAX, crash)
+        }
         other => panic!("unknown commit entry point {other}"),
     }
 }
@@ -820,13 +830,16 @@ fn genesis_publication_cannot_commit_through_any_ordinary_entry_point() {
         let initial = state(0, 0);
         let cmd = command(120);
         let ctx = context(true);
-        let boundary = Some(CrashPoint::BeforeTransaction);
         let entries = [
             "commit",
             "commit_at",
-            "commit_with_crash",
-            "commit_with_crash_at",
             "commit_bounded_at",
+            #[cfg(feature = "crash-injection")]
+            "commit_with_crash",
+            #[cfg(feature = "crash-injection")]
+            "commit_with_crash_at",
+            #[cfg(feature = "crash-injection")]
+            "commit_bounded_with_crash_at",
         ];
         let mut observed = Vec::new();
         for entry in entries {
@@ -836,13 +849,13 @@ fn genesis_publication_cannot_commit_through_any_ordinary_entry_point() {
             let rows = stored_rows(&file.0);
             // A wrong kind never reaches the requested first commit crash boundary.
             let wrong = genesis(a, &initial);
-            let refused = commit_through(entry, &mut db, Hash32::new([19; 32]), wrong, boundary);
+            let refused = commit_through(entry, &mut db, Hash32::new([19; 32]), wrong, true);
             let unchanged =
                 matches!(db.snapshot(), Ok(now) if now == head) && stored_rows(&file.0) == rows;
             // The same entry point still commits a genuine transition and its delivery.
             let valid = publication(a, &initial, &cmd, &ctx);
             let committed = matches!(
-                commit_through(entry, &mut db, Hash32::new([20; 32]), valid, None),
+                commit_through(entry, &mut db, Hash32::new([20; 32]), valid, false),
                 Ok(receipt) if receipt.status() == CommitStatus::Committed
             ) && matches!(
                 db.snapshot(),
@@ -861,8 +874,7 @@ fn genesis_publication_cannot_commit_through_any_ordinary_entry_point() {
         with_authority(Some(9999), |other| {
             for entry in entries {
                 let foreign = genesis(other, &initial);
-                let refused =
-                    commit_through(entry, &mut db, Hash32::new([19; 32]), foreign, boundary);
+                let refused = commit_through(entry, &mut db, Hash32::new([19; 32]), foreign, true);
                 assert!(
                     matches!(refused, Err(Error::Identity)),
                     "{entry}: {refused:?}"

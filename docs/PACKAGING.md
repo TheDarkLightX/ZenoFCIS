@@ -1,13 +1,13 @@
 # Release packaging
 
-This document describes the release packaging tooling and the `1.1.0`
+This document describes the release packaging tooling and the `2.3.0`
 artifact set it produces.
 
 ## Package set
 
 `release/package-set.toml` is the reviewed package authority. It contains:
 
-- 36 public crates in dependency-first publication order;
+- 37 public crates in dependency-first publication order;
 - one private crate for compiled generated-code tests;
 - the `zeno-fcis` authoring CLI;
 - the exact Cargo version and Rust toolchain.
@@ -26,6 +26,8 @@ crate.
 ```text
 packages/*.crate
 binaries/zeno-fcis-<version>-<target>.tar.gz
+hosts/<target>/HOST-BINARY.json
+hosts/<target>/COMPILED-INPUTS-<target>.json
 docs/zeno-fcis-rustdoc-<version>.tar.gz
 source/zeno-fcis-<version>-source.tar.gz
 SOURCE-MANIFEST.json
@@ -39,14 +41,31 @@ zeno-fcis-<version>-rc-bundle.zip
 
 The full list above is what the tooling builds locally. The current public
 candidate download pages carry a smaller set: the Linux x86-64 GNU CLI
-archive, the offline rustdoc archive, signed checksums, and a commentless
-`RELEASE-SIGNING-KEY.pub`. Source for a candidate is its matching public Git
-tag. The source archive, full bundle, and `.crate` archives are local build
-outputs, not published downloads.
+archive, the offline rustdoc archive, `SBOM.cdx.json`, signed checksums, and a
+commentless `RELEASE-SIGNING-KEY.pub`. Source for a candidate is its matching
+public Git tag. The source archive, full bundle, and `.crate` archives are
+local build outputs, not published downloads.
 
-The command requires a clean exact commit. It uses pinned Rust `1.97.1`, fetches
-the locked external graph, packages every public crate with `--locked`, then
-unpacks the complete crate set into a temporary resolver-3 workspace. It
+`tools/rc_package.py downloads-list --release <directory>
+[--signing-key RELEASE-SIGNING-KEY.pub] --out DOWNLOADS.sha256` writes the flat
+list users check, sorted by name: one `<sha256>  <name>` line for each host
+archive, the rustdoc archive and `SBOM.cdx.json`, each with its `SHA256SUMS`
+hash, and, with `--signing-key`, one for the key file with its own hash. Two
+assets may not share a name, and the key file must be named
+`RELEASE-SIGNING-KEY.pub`. The repository does not hold the key, so the
+release-set job writes the list without it. The owner writes the list to sign
+with `--signing-key`, and the custody check given the same key checks that
+list. The installed-binary journeys check archives against a list made by the
+same function.
+
+The command requires a clean exact commit. Run it, `build-host-binary`,
+`merge-hosts` and the custody check from a fresh clone of that commit: they
+refuse untracked files and any ignored file outside `target/`, `node_modules/`
+and `__pycache__/` folders, which a working checkout usually holds (a workspace
+test run, for example, writes `crates/zeno-fcis-generated-code-tests/python/`).
+The build uses pinned Rust `1.97.1`, fetches the locked external graph,
+packages every public crate with `--locked`, then unpacks the complete crate
+set into a temporary resolver-3 workspace. It
 reconciles a copy of the reviewed lock against only the unpacked internal
 packages, rejects external identity/checksum drift and internal source fallback, then
 runs two compilations with all features, `--locked --offline`:
@@ -79,8 +98,8 @@ references force this allowance:
 - `crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs`, which includes
   two files from `verification/verus/`.
 
-Open item: restore standalone packaged tests when the verified sources next
-change. That change is the identity regeneration planned for the 2.1.0 release.
+Open item: restore standalone packaged tests at the next identity
+regeneration, when the verified sources next change.
 The same run builds both declared binaries in release mode,
 generates warning-denied rustdoc, records the Cargo dependency graph as
 CycloneDX 1.6, and content-addresses every retained artifact. The binaries
@@ -144,7 +163,7 @@ It retains the isolated Mini Determinator QEMU kernel source, its locked nested
 workspace, the fixed-argument capture runner, and the validated marketing
 capture, serial transcript, and metadata. These demo artifacts are source and
 integration evidence; they are not additional publishable crates or binaries
-in the 36-package release set.
+in the 37-package release set.
 The release packager validates their exact Node/Probity identities and binds
 the complete canonical npm lock graph, including every transitive package
 entry. `SBOM.cdx.json` describes the shipped Rust crate graph; the
@@ -159,9 +178,95 @@ The generated help and settings pages are normalized to the `zeno_fcis`
 umbrella crate because Rustdoc otherwise records the crate that finishes last.
 Use docs.rs or locally generated documentation when global search is required.
 
-Each generated binary archive is host-target-specific. The archive name, top-level directory, executable member, and provenance command are derived from the declared target. The read-only release candidate workflow currently qualifies the Linux x86-64 archive. Additional
-targets require their own exact-head workflow evidence before attachment to a
-release.
+Each generated binary archive is host-target-specific. The archive name,
+top-level directory, executable member, and provenance command are derived
+from the host target that `rustc -vV` reports, so a machine builds only its own
+executable. Beside the archive, the build records:
+
+- `hosts/<target>/HOST-BINARY.json`: version, source commit, the full
+  `rustc -vV` text, macOS deployment target, archive name, hash, size and
+  members, executable hash, compiler flags and commands;
+- `hosts/<target>/COMPILED-INPUTS-<target>.json`: every file the release
+  build's rustc dep-info names, each classified as a workspace source, a member
+  of a locked registry package or a build-script output, and the environment
+  variables the build's crates read, with the target, source and home folders
+  shown as `<target>`, `<source>` and `<home>`. Any other input fails the
+  build, and so does a variable naming the checkout, the target folder or the
+  home folder, except that Cargo's `CARGO_MANIFEST_DIR` and `OUT_DIR` may name
+  a folder inside the checkout or the target folder. rustc records such a
+  variable even when the code that reads it is not compiled in, so reading a
+  path is not embedding it: the build refuses an executable that holds the
+  checkout's path, and `merge-hosts` and the custody check refuse one that
+  holds a build or home path. The record is written before the build directory
+  is deleted.
+
+`tools/rc_package.py build-host-binary --output <directory>` builds, archives
+and records only this host's executable, with the same remapped compiler
+environment and an empty `ZENO_FCIS_BUILD_TREE`, then runs the privacy scan.
+
+### Two-host release set
+
+The read-only release-candidate workflow builds two host executables:
+`x86_64-unknown-linux-gnu` in the complete Linux set on `ubuntu-24.04`, and
+`aarch64-apple-darwin` on GitHub's `macos-15` arm64 image with
+`MACOSX_DEPLOYMENT_TARGET=11.0`. There is no Intel macOS executable and no
+universal binary. Its jobs:
+
+1. **`assemble`** builds the complete Linux set and reports the hashes of its
+   `SHA256SUMS`, archive, host record and compiled-inputs record as job outputs.
+2. **`macos-host-binary`** runs `build-host-binary`, then installs and uses the
+   executable with `tools/check_installed_cli.py` (below), and reports the
+   hashes of its archive, records and journey report.
+3. **`release-set`** downloads both artifacts and checks each file against the
+   hash its producing job reported. It runs the Linux installed-binary journey,
+   merges the macOS host into the set, writes `DOWNLOADS.sha256` and runs the
+   custody check.
+
+`tools/rc_package.py merge-hosts --release <directory> --host <host folder>...
+--journey <target>=<report>` checks the set's index first and changes nothing
+when it is stale. It refuses a host record from another commit, version or
+`rustc` commit-hash, a duplicate host or one the set already holds, an archive
+other than the recorded one, an extra or missing archive member, a document
+member that differs from the committed file, and an executable other than the
+recorded one. Every host needs an installed-binary journey report that passed
+on that host's archive, and the release privacy scan must find nothing in the
+journeys and records joining the set. Only after every check passes does it
+copy the archive, the host's records and the journeys into the set, add the
+host to `PROVENANCE-INPUTS.json`, and rewrite `RC-MANIFEST.json`, `SHA256SUMS`
+and the bundle with the code `build` uses.
+
+`tools/check_installed_cli.py --release <directory> [--source <tree>]
+--work-dir <new directory> --report <file>` runs the marked install block of
+the [installation guide](INSTALLATION.md) for this host as written, with only
+the release URL replaced by a local folder. It then checks the installed
+executable's platform facts (glibc 2.39 floor on Linux; arm64, macOS 11.0 and
+an ad-hoc signature on macOS), creates and builds generated applications with
+`--source`, runs a store journey and the serial checks, and checks that the
+Linux-only routes fail closed on macOS. Each step records its arguments, exit
+code and output hashes. The store journey runs the SQLite shell with its
+shipped settings: `synchronous=EXTRA` on both hosts, so each commit also syncs
+its rollback-journal deletion, and `fullfsync` on macOS, so SQLite's file syncs
+use `F_FULLFSYNC`. The journey checks the store's results, not durability
+under power loss.
+
+`tools/check_release_custody.py --release <directory> --report <file>
+[--bindings <job outputs>] [--downloads DOWNLOADS.sha256
+[--signing-key RELEASE-SIGNING-KEY.pub]] [--tag v<version>]` binds the merged
+set to its source commit by content. Its eleven checks cover the working tree,
+index and ignored files (without hashing `.git/index`), the tag and versions,
+the source manifest and source archive, every `.crate` member, every binary
+archive member, executable header and journey report, each executable's
+compiled inputs, the packaged-application record, the release index, the
+producing jobs' hashes and the download list. A missing input fails its check,
+and the bindings must name every host of the set with its archive and all four
+hashes. The tag check confirms that the tag names the commit; it does not
+authenticate the tag, which on a tag run the checkout itself creates at the
+run's commit. The release-set artifact keeps the job outputs as
+`JOB-OUTPUTS.json` beside `DOWNLOADS.sha256` and `CUSTODY.json`, so on a fresh
+clone at the commit, after `cargo fetch --locked`, the same check repeats
+offline against the downloaded set. It rebuilds nothing, so it is not a
+reproducible-build proof, and it does not authenticate the runner, compiler or
+linker.
 
 ## Publication
 

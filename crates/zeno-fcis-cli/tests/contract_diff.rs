@@ -365,12 +365,14 @@ fn a_refusal_names_the_side_and_writes_nothing() {
     let report = json(&invalid);
     assert_eq!(report["side"], "new");
     assert_eq!(report["error"]["code"], "contract-invalid");
-    assert_eq!(report["error"]["place"], "v2/policy.json cases[0].post");
+    // The accept may omit its unchanged state fields, so the reason it keeps
+    // is the entry at fault.
+    assert_eq!(report["error"]["place"], "v2/policy.json cases[0].reason");
     let human = diff(&good, &bad, "human");
     assert_eq!(human.status.code(), Some(1));
     assert!(
         String::from_utf8_lossy(&human.stderr)
-            .starts_with("new contract: v2/policy.json cases[0].post: "),
+            .starts_with("new contract: v2/policy.json cases[0].reason: "),
         "{human:?}"
     );
     let usage = zeno(&["contract".as_ref(), "diff".as_ref(), good.as_os_str()]);

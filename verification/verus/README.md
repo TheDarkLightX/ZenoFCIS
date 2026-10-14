@@ -1,31 +1,71 @@
 # Shared-source Verus verification
 
-The V2.2 shared finite checker is being qualified separately in
-[the G11 proof plan](../../docs/G11_SHARED_CHECKER_PROOF_PLAN.md). Its
-[direct-source harness](checker.rs) includes the shipped CLI/SQLite checker,
-the public library data projection API and the unchanged real metered evaluator
-source closure. The public API requires fresh whole-unit proof and executable
-inventory qualification; the earlier frozen-core result does not cover it. `tools/check_checker.py` requires
-a successful pinned whole-unit proof, independently reviewed translated
-contracts and executable bodies, native checks through both consumers, stable
-source hashes, and the CI negative controls. An emitted candidate inventory or
-the cheap `v2-shared-finite-checker` ATDD scenario does not establish that gate.
+The [Verus workflow](../../.github/workflows/verus.yml) runs 19 qualification
+gates. Each gate first runs its script's own tests, then the script itself;
+for the `shared-runtime` gate these are `python3 tools/test_check_verus.py` and
+`python3 tools/check_verus.py --out` with an evidence path. The script requires
+the complete exact-source proof and the gate's control suite. A separate job
+checks the authority and synthesis crates without default features.
 
-Six harnesses check actual shared source with the pinned verifier. Arithmetic
-has three obligations and four mutation controls; scalar admission/execution
-has 34 and 16; integer byte interpretation has nine and 14. The record-execution, protected-record
-and metered harnesses include the same complete dependency closure: 81
-executable bodies and 145 obligations. Their gates run 24, 30 and 16 mutation
-controls respectively. The overlapping harnesses must not be added as independent
-function or obligation counts.
-Local results, independent review and
-exact-head GitHub CI remain distinct evidence.
+| Gate | Script | Subject |
+| --- | --- | --- |
+| `shared-runtime` | `check_verus.py` | [Finite-domain arithmetic](#arithmetic-unit) in the shared runtime source |
+| `scalar-query` | `check_scalar_query_refinement.py` | Scalar runtime/query correspondence |
+| `finite-execution` | `check_finite_execution.py` | [Finite admission and eager evaluation](#v2-finite-admission-and-eager-execution) |
+| `metered-execution` | `check_metered_execution.py` | [Owned V2 instruction metering](#owned-v2-instruction-metering); not transition authorization |
+| `shared-finite-checker` | `check_checker.py` | The [shared finite checker](#shared-finite-checker) against its real metered evaluator |
+| `canonical-bytes` | `check_canonical_bytes.py` | [Production V2 integer byte readers](#v2-integer-byte-interpretation); not schema admission |
+| `protected-input` | `check_protected_input.py` | [Owned V2 protected record projection](#v2-protected-flat-record-projection) |
+| `envelope-frame` | `check_envelope_frame_v2.py` | Original-envelope framing and exact payload custody |
+| `schema-binding` | `check_schema_binding_v2.py` | Complete original schema bytes, closed metadata and private custody |
+| `decision` | `check_decision_v2.py` | Complete typed decisions; byte/authority composition is separate |
+| `account-data` | `check_account_graph_v2.py` | Native account rule-data controls only; the specialized proof was removed |
+| `laws` | `check_laws_v2.py` | Laws and genesis, with custody tests |
+| `composition` | `check_composition_v2.py` | The production composition module; no catalog or shell authority |
+| `catalog` | `check_catalog_v2.py` | Catalog correspondence |
+| `authority` | `check_authority_v2.py` | Canonical artifacts on the complete registered source closure |
+| `original-output` | `check_original_output_v2.py` | Exact original-wire output from typed values |
+| `publication` | `check_publication_v2.py` | Publication, with original-wire oracles and custody controls |
+| `guarded-laws` | `check_guarded_laws_v2.py` | Guarded laws, with raw coverage and independent oracles |
+| `checked-assembly` | `check_checked_assembly.py` | [Checked assembly](#checked-assembly): tables, assembly and route specialization over the evaluator specification |
 
-The units verify finite-domain arithmetic, scalar execution and V2 original
-record projection/composition. The complete byte-based decision/authority route remains
-under construction. They keep the Rust 1.97.1 build
-and run the pinned Verus release with its separate Rust 1.98.1 toolchain.
-Specifications are enabled only while Verus checks the shared Rust source.
+Every V2 harness includes the complete production source closure, so fourteen
+of the installed profiles expect the same whole-crate count, 1,161 obligations.
+The `shared-finite-checker` and `scalar-query` harnesses include further sources
+and expect 1,282 and 1,325; `checked-assembly` expects 1,188 whole-crate and
+27 restricted obligations, with zero selected Exec bodies; the arithmetic unit
+expects three. These are reviewed positive inventory snapshots; complete
+qualification also requires each gate's controls and final source binding.
+The gates differ
+in the source their reviewed coverage manifests and controls examine, so their
+counts must not be added. The unit sections below give each unit's subject and
+controls as introduced; their record and obligation counts predate the shared
+whole-unit profiles. Each gate's manifest and receipt record its current
+inventory and results.
+
+Together these gates make up the smaller V2 qualification: admission,
+original-byte interpretation, scalar execution, complete decisions,
+laws/genesis and mandatory authority/replay. Per-stage proof runs are
+provisional; final source-bound profiles, controls and integration checks must
+pass together. Local results, independent review and exact-head GitHub CI
+remain distinct evidence. See the
+[candidate record](../../docs/RELEASE_CANDIDATES.md) for qualification limits.
+
+The gates keep the Rust 1.97.1 build and run the pinned Verus release with its
+separate Rust 1.98.1 toolchain. Specifications are enabled only while Verus
+checks the shared Rust source.
+
+## Shared finite checker
+
+The `shared-finite-checker` gate's [direct-source harness](checker.rs) includes
+the shipped CLI/SQLite checker, the public library data projection API and the
+unchanged real metered evaluator source closure. The public API requires fresh
+whole-unit proof and executable inventory qualification; the earlier
+frozen-core result does not cover it. `tools/check_checker.py` requires a
+successful pinned whole-unit proof, independently reviewed translated contracts
+and executable bodies, native checks through both consumers, stable source
+hashes, and the CI negative controls. An emitted candidate inventory or the
+cheap `v2-shared-finite-checker` ATDD scenario does not establish that gate.
 
 ## Arithmetic unit
 
@@ -37,7 +77,6 @@ Specifications are enabled only while Verus checks the shared Rust source.
   verification result, trusted dependencies, and uncovered obligations.
 - Compile the shared code with Rust 1.97.1, including the no-std crate path.
 - Preserve the existing finite-input limit and admitted-input behavior.
-- Document lessons, compatibility, follow-up work, and the fork policy.
 
 ## Proof sketch
 
@@ -100,11 +139,8 @@ the host remain trusted.
 The regular acceptance suite runs the native and evidence-admission tests.
 The separate [Verus workflow](../../.github/workflows/verus.yml) runs the pinned
 solver and all mutations. Passing ordinary ATDD alone does not imply a Verus
-proof passed. The owner fork is an extension workspace; this integration uses
-the pinned upstream release and makes no claim about a fork-built verifier.
-
-See [lessons and V2 plan](../../docs/VERUS_LESSONS_AND_V2_PLAN.md) for the
-complete follow-up scope and evidence policy.
+proof passed. This integration uses the pinned upstream release and makes no
+claim about a fork-built verifier.
 
 ## V2 finite admission and eager execution
 
@@ -127,7 +163,7 @@ This does not narrow the actual inputs to make verification succeed. The
 allocation operations use the bundled standard-library specifications;
 allocation cost, failure and platform behavior remain part of the trusted base.
 Loop measures establish the local progress obligations. They do not establish
-the unfinished V2 resource accounting contract.
+V2 resource accounting; see the metering unit below.
 
 ```sh
 python3 tools/test_check_finite_execution.py
@@ -170,7 +206,7 @@ decision construction, meter/state-view enforcement, laws/genesis and authority
 composition remain outside this unit. Rust compilation/erasure, Verus/Z3 and
 the standard library are named assumptions; a source receipt is not a
 source-to-binary proof. See the
-[V2 implementation plan](../../docs/V2_VERIFIED_CORE_PLAN.md) for release closure.
+[candidate record](../../docs/RELEASE_CANDIDATES.md) for release scope.
 
 ## Owned V2 instruction metering
 
@@ -208,9 +244,9 @@ python3 tools/check_metered_execution.py --install --out /tmp/zeno-fcis-metered-
 cargo +1.97.1 test -p zeno-fcis-synthesis --test v2_execution --locked
 ```
 
-The original meter subject had 73 translated records and 57 obligations. Its
-current shared dependency closure also includes the integer readers, record
-projection and multi-record execution below: 182 translated records, comprising
+The original meter subject had 73 translated records and 57 obligations. With
+the integer readers, record projection and the since-retired multi-record
+execution in its dependency closure, it had 182 translated records, comprising
 81 executable functions including clones, 75 mathematical functions/constants
 and 26 ghost proof helpers; 145 verification groups. These are overlapping
 counts. The 14 native tests use
@@ -226,10 +262,10 @@ and all new executable/specification sources join the evaluator identity.
 Finite scalar wire semantics remain unchanged. Allocation, scalar admission,
 root projection, hashing and schema navigation are not charged by this
 instruction profile. The separate protected-record profile below charges Byte
-and Read for its bounded record language. The record-execution profile below
-composes all three records with scalar execution. Grouped operations, complete
+and Read for its bounded record language. The `composition` gate covers their
+composition with scalar execution. Grouped operations, complete
 decisions, laws/genesis and the mandatory V2 authority/
-replay route remain open. A verified private meter is not a proof that every
+replay route are outside this unit. A verified private meter is not a proof that every
 authority operation uses it, nor a whole-core or V2 completion claim.
 
 ## V2 integer byte interpretation
@@ -261,7 +297,7 @@ These functions are integer primitives and do not alone establish canonical
 record, schema or envelope admission. They do not charge a meter. The protected
 record implementation below calls them after its specified charges. Original
 envelope admission, complete decisions, laws/genesis and mandatory authority/
-replay remain open. The receipt is
+replay are outside this unit. The receipt is
 scoped Verus/Z3 evidence with the named compiler, verifier, standard-library
 and hardware assumptions; it does not become Lean `KernelChecked` evidence or
 establish source-to-binary correspondence.
@@ -313,70 +349,103 @@ compares actual canonical `Value` encoding with this implementation.
 
 The `zeno-fcis/finite-protected-record/2` profile and all shared source/specification
 files join the finite evaluator identity. Source-bound template certificates
-must be regenerated rather than relabeled. This unit does not yet prove catalog
+must be regenerated rather than relabeled. This unit does not prove catalog
 descriptor extraction, original envelope/hash admission, full decisions,
 laws/genesis or the mandatory
-V2 authority and replay route. See the
-[stage contract](../../docs/V2_PROTECTED_RECORD_STAGE.md) for the complete bounded
-definition of done. Proof receipts retain the named Verus/Z3, compiler,
+V2 authority and replay route. Proof receipts retain the named Verus/Z3, compiler,
 standard-library, allocator and platform assumptions.
 
 
-## V2 original-record execution
+## Retired record-execution harness
 
-[record_execution.rs](record_execution.rs) imports the actual production
-[composable pipeline](../../crates/zeno-fcis-synthesis/src/finite/execution_v2/record_execution.rs).
-`execute_records_v2` borrows original State/Command/Context canonical record
-bytes, complete closed descriptors and the scalar graph. Bindings associate
-each ABI position with an exact (source, field-ID) pair; IDs may repeat across
-sources. Admission requires a bijection onto all declared fields and structural
-equality of each complete scalar domain. Bool remains distinct from Int(0,1).
-No new domain, field-count, dense-ID or variant-order limit is introduced.
-
-The exact transition checks all three schemas before any raw work, then complete
-bindings. It projects State, Command and Context in that fixed order, constructs
-the exact bound scalar tuple, and calls the private eager evaluator with the
-same owned meter. Ghost induction derives tuple domain membership from actual
-wire decoding and complete bindings. The executable helpers remain total for
-malformed metadata, bytes and graphs; their contracts have zero `requires`.
-Every failure returns no partial output while retaining all eight counters and
-source-attempt prefixes. Source labels identify Byte/Header refusals even when
-no Read request was appended. Public outcomes, attempts and meter custody stay
-opaque; compile negatives challenge external forgery and replacement.
+The separate original-record execution harness and its gate were retired. Its
+mutation controls now target the production composition boundary in the
+`composition` gate. [record-stage-migration.json](record-stage-migration.json)
+maps each retired control: 20 moved to a composition control, three were
+retired with the interface or proof step they targeted, and one was removed
+because the type of the surviving boundary now excludes its fault. The final
+replay of the migrated controls is pending. The native tests of original-record
+composition remain:
 
 ```sh
-python3 tools/test_check_record_execution.py
-python3 tools/check_record_execution.py --install --out /tmp/zeno-fcis-record-execution-evidence.json
 cargo +1.97.1 test -p zeno-fcis-synthesis --test v2_record_execution --locked
 ```
 
-The reviewed [manifest](record-execution.json) fixes 182 translated records:
-81 executable functions, 75 specifications/constants and 26 ghost proof helpers,
-with 145 obligations. These counts overlap the other two complete harnesses.
-Eighteen mutations must fail the actual proof, including same-typed source
-substitution, wrong scalar positions, incomplete bindings, weakened domains,
-skipped records, meter reset, source mislabeling, dropped prefixes and rollback.
-Six controls must verify and then be refused by the separate inventory,
-including cached record work before metadata. Removing the applied typing
-bridge must fail the proof of scalar admission itself. The inherited protected/instruction gates retain their Byte/Read/Step
-operational-order controls. Logical accounting excludes metadata work,
-allocation and physical CPU/I/O cost; the body guard is not a physical trace.
-
-The direct native closure has 14 tests, including six new composition tests.
-Their independent wire, set-based metadata and wide-arithmetic instruction
-oracles challenge all four leaf shapes over six complete-record source
-permutations and 24 ABI permutations (144 combinations), plus same-typed source
-confusion, malformed metadata/raw records/graphs, quotas, arbitrary initial
-counters and source prefixes, and empty/32/100-field records. A separate public
-test consumes actual canonical Value bytes. Both new source/specification files
-and `zeno-fcis/finite-record-execution/2` join evaluator identity; affected
-certificates are refreshed by synthesis and independent/native replay.
-
-This API does not authenticate context, extract a catalog descriptor or bind
-an envelope hash. It constructs scalar outputs rather than complete decisions.
-Catalog/envelope correspondence, complete successor/patch/reason/effect/outbox
-artifacts, library law/genesis evaluation and mandatory V2 authority/replay
-remain open. See the [stage contract](../../docs/V2_RECORD_EXECUTION_STAGE.md).
 Verus/vstd/Z3, erasure/compiler correspondence, allocation and the platform
-remain named trusted premises; this proof does not become Lean KernelChecked
-or confer release authority.
+remain named trusted premises; these proofs do not become Lean KernelChecked
+evidence or confer release authority.
+
+## Checked assembly
+
+[checked_assembly.rs](checked_assembly.rs) verifies three proof modules together
+with the evaluator specification and its production source closure:
+
+- [checked_assembly_joint.rs](checked_assembly_joint.rs): for disjoint
+  components, initialization, a local preservation check, each route's command
+  assumption, the selected transition and the framing of every unselected
+  position give the conjunction of every component's invariant at every state
+  of a finite history (`joint_induction`).
+- [checked_assembly_tables.rs](checked_assembly_tables.rs): the composition
+  checker's local, StateFact and interface tables imply that local check
+  (`tables_imply_local_check`). From a genesis satisfying every leaf's initial
+  condition, every history of an aggregate satisfying the assembly step
+  equation keeps the joint invariant at every state
+  (`aggregate_histories_keep_the_joint_invariant`). A register ring of any size
+  of at least two instantiates every premise.
+- [checked_assembly_route.rs](checked_assembly_route.rs): route specialization
+  preserves evaluation. The assembly validator compares an aggregate's decision
+  program with each leaf's through canonical terms: on route `k` the target
+  input is the constant `k`, a leaf's inputs are renamed to the aggregate's,
+  and the constructors fold constants and apply identities. A term's value is
+  defined by the evaluator specification's `node`. On every input the
+  specification executes without failure, each output is its canonical term's
+  value, so outputs with equal terms are equal and selection chains with the
+  same conditions choose the cases the validator pairs
+  (`validated_routes_agree`).
+
+The tables, the step equation and genesis are premises of these lemmas, and
+the theorem's decision functions are abstract. The composition checker
+establishes the tables by exhaustive enumeration with the leaves' bound
+Authorities, and the assembly validator establishes the step equation
+structurally. A differential test compares the validator's canonical terms,
+route specialization and case pairing with the library evaluator: every
+aggregate input for two leaves and, for 4 to 32 leaves, every input of each
+route's leaf with the remaining slots drawn from a fixed seeded sample, on the
+register ring and chain; unit tests check each constructor. The trusted base,
+tested and not proved, is the same list the composition result states:
+
+- The checker's exhaustive enumeration of each leaf's local, StateFact and
+  interface tables with the leaf's bound Authority.
+- The group checks of equation 2.8: their tables and the discharge and rise
+  of each child's assumption.
+- The assembly validator's canonical terms, route specialization and case
+  pairing, compared with the library evaluator on the register ring and chain
+  and constructor by constructor in unit tests.
+- The assembly validator's comparison of classes, reasons, assignments and
+  frames, its field, genesis and routing checks, and its law-implication
+  tables.
+- The interval analysis showing that no eager node can trap, and the meter
+  check with its cost model of one Step per program or law node.
+- The link from the bound Authorities' actual decisions (case selection,
+  assignments, law and meter refusals) to the abstract decision functions of
+  the Verus theorem.
+
+The application-level safety statement is therefore machine-checked over the
+evaluator specification, with the validator implementation tested, not
+proved.
+
+```sh
+python3 tools/test_check_checked_assembly.py
+python3 tools/check_checked_assembly.py --install --out /tmp/zeno-fcis-checked-assembly.json
+```
+
+The positive run is unfiltered and verifies the proof modules with the
+evaluator closure under `--no-cheating`. The reviewed
+[profile](checked-assembly.json) fixes the obligation count, the target lemmas
+and the translated inventory of the proof modules: 76 specification functions,
+23 proof functions and no executable function. Three planted controls must
+each fail one intended obligation in a run restricted to the proof modules: a
+leaf providing its own interface, an aggregate allowed to write unselected
+slots, and the identity `true && x = x` applied to a non-Boolean `x`. The proof
+makes no claim about liveness, fairness, traces, continuous dynamics, or
+asynchronous or shared-write coupling.

@@ -1,0 +1,195 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "order-fulfillment",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "106": [
+      "I128",
+      0,
+      3
+    ],
+    "109": [
+      "Text",
+      1,
+      32
+    ],
+    "112": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "attempts": "pre.100.121",
+    "action": "command.101.125",
+    "callback": "command.101.126",
+    "caller": "context.102.130",
+    "payment": "action == 151 || action == 152",
+    "sender": "choose(action == 150 || action == 155, 170, choose(payment, 171, 172))",
+    "legal": "(action == 150 && (!paid && progress == 0)) || (payment && (!paid && progress == 1)) || (action == 153 && (paid && progress == 0)) || (action == 154 && (paid && progress == 1)) || (action == 155 && ((!paid && progress == 0) || (!paid && progress == 1)))",
+    "paid": "pre.100.122",
+    "progress": "pre.100.123"
+  },
+  "cases": [
+    {
+      "when": "caller != sender",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!legal",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "payment && callback != attempts",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && attempts == 3",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "121": "attempts + 1",
+        "122": false,
+        "123": 1
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payment-provider",
+          "payload": {
+            "140": "attempts + 1",
+            "142": true
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "121": "attempts",
+        "122": true,
+        "123": 0
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 301,
+          "destination": "carrier",
+          "payload": {
+            "145": "attempts"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 152",
+      "class": "CommittedFailure",
+      "reason": 204,
+      "post": {
+        "121": "attempts",
+        "122": false,
+        "123": 0
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 153",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "121": "attempts",
+        "122": true,
+        "123": 1
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 154",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "121": "attempts",
+        "122": true,
+        "123": 2
+      },
+      "outbox": []
+    },
+    {
+      "when": "(!paid && progress == 0)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "121": "attempts",
+        "122": false,
+        "123": 2
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "121": "attempts",
+        "122": false,
+        "123": 2
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "payment-provider",
+          "payload": {
+            "140": "attempts",
+            "142": false
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "121": 0,
+    "122": false,
+    "123": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AuthoritySubjectRecipient",
+    "503": "AuthoritySubjectRecipient",
+    "504": "AuthoritySubjectRecipient",
+    "505": "AuthoritySubjectRecipient",
+    "506": "CommittedFailureEffects"
+  },
+  "idempotency": "The explicit U128 ordinal marker is not the derived delivery ID. Publication derives that ID from the complete library candidate subject and exact original OutboxEntry bytes.",
+  "framework_reject_law": 509
+}

@@ -1,0 +1,31 @@
+zeno 1;
+project 1 versioned_register;
+namespace 2 core;
+type 100 state Register;
+type 101 command Write;
+type 102 context Operator;
+type 105 int Units in 0..=3;
+type 108 bool Authorized;
+field 110 100 value 105;
+field 111 100 version 105;
+field 120 101 expected_version 105;
+field 121 101 new_value 105;
+field 130 102 authorized 108;
+reason 200 not_authorized precedence 0;
+reason 201 version_mismatch precedence 1;
+reason 202 at_max_version precedence 2;
+component 400 register {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 128;
+}
+merge [400];
+law 500 bounded on commit, genesis = 0 <= post.100.110 && post.100.110 <= 3 && 0 <= post.100.111 && post.100.111 <= 3;
+law 501 authorized_bounded_result on accept = context.102.130 == 1 && 0 <= post.100.110 && post.100.110 <= 3 && 0 <= post.100.111 && post.100.111 <= 3;
+law 502 exact_write on accept = command.101.120 == pre.100.111 && post.100.110 == command.101.121 && post.100.111 == pre.100.111 + 1;
+// Core seed versioned-register/1; parameters {"C": 3}.
+// Instance source-set SHA256 c290dfd68bb81df3585bfe128e3ffbb13186350c54b67eb08134c1ba099fc773.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/versioned-register.json SHA256 af02d6f67c19330a211f6d1322e71617c9747d04dd69b53c1a9d84eab1023420; replay required; no KernelChecked claim.
+// Qualification procedure: tools/check_core_components.py in the source tree.

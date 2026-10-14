@@ -20,11 +20,11 @@ cases=[]
 def add(id,family,role,domains,outputs,p,q,why):
     profile='FunctionalBoolV1' if id.startswith('B') else 'CheckedI64V1-proposed'
     cases.append(dict(id=id,family=family,profile=profile,role=role,
-      provenance={'kind':'handwritten-development-seed','source':'Astra design 2026-10-04','independence_group':family,'application_extraction':False},
+      provenance={'kind':'development-seed','source':'benchmark design 2026-10-04','independence_group':family,'application_extraction':False},
       input_domains=domains,output_domains=outputs,
       abi={'inputs':['x'+str(i) for i in range(len(domains))],'outputs':['y'+str(i) for i in range(len(outputs))]},
       original=p,candidate=q,expected_relation='Different' if role=='incorrect-attractive' else 'Equivalent',
-      rationale=why,witness=None,target_status='invalid-target' if role=='incorrect-attractive' else ('feasible-handwritten-baseline-not-optimal' if role=='positive' else 'control-not-an-optimality-claim'),
+      rationale=why,witness=None,target_status='invalid-target' if role=='incorrect-attractive' else ('feasible-baseline-not-optimal' if role=='positive' else 'control-not-an-optimality-claim'),
       eligibility={'structural':'expected-admitted','transform_profile':'proposed-not-qualified' if id.startswith('I') else 'designed-not-qualified','optimization_denominator':role!='incorrect-attractive'}))
 # Boolean fixtures, all OR uses lower to Not/And.
 add('B01','boolean-involution','positive',[B],[B],P([inp(0),['Not',0],['Not',1]],[2]),P([inp(0)],[0]),'Double negation; functional equality changes Step usage.')

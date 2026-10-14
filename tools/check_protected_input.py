@@ -8,10 +8,12 @@ cannot prove. Neither result closes the raw-state or mandatory-authority bridge.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -28,6 +30,7 @@ PROFILE = Path("verification/verus/protected-input.json")
 HARNESS = Path("verification/verus/protected_input.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/execution_v2/input_view.rs")
 SPEC = SUBJECT.parent / "input_view/spec.rs"
+TYPED = SUBJECT.parent / "input_view/typed.rs"
 UNIT_SOURCES = (HARNESS, *METER_SOURCES[1:])
 
 UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
@@ -38,6 +41,7 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, SUBJECT.parent / "tests.rs",
            Path("tools/check_verus.py"), Path("tools/verus_coverage.py"),
            Path("Cargo.toml"), Path("rust-toolchain.toml"),
            Path("crates/zeno-fcis-synthesis/src/finite/ir.rs"),
+           Path("crates/zeno-fcis-synthesis/src/finite/ir/program.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
            Path("crates/zeno-fcis-synthesis/tests/v2_protected_input.rs"))
@@ -46,6 +50,46 @@ SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_native_dependencies.py"))))
+
+
+PROOF_FUNCTIONS = {
+    "wrong_interval_cardinality": "validate_variants",
+    "ignore_negative_code_bound": "validate_variants",
+    "allow_duplicate_variant_ids": "validate_variants",
+    "allow_duplicate_variant_codes": "validate_variants",
+    "ignore_field_order": "validate_schema",
+    "allow_sum_payload": "decode_variant",
+    "wrong_type_width": "decode_variant",
+    "wrong_variant_width": "decode_variant",
+    "wrong_closed_variant_mapping": "lookup",
+    "ignore_record_count": "decode_header",
+    "wrong_record_tag": "decode_header",
+    "wrong_enum_tag": "decode_value",
+    "wrong_integer_value": "decode_value",
+    "wrong_unsigned_value": "decode_value",
+    "wrong_boolean_value": "decode_value",
+    "ignore_field_identity": "decode_field",
+    "omit_ingress_charge": "project_into",
+    "omit_protected_read_charge": "project_fields",
+    "charge_wrong_read_resource": "project_fields",
+    "wrong_permission_observation": "project_fields",
+    "allow_trailing_bytes": "project_into",
+    "leak_partial_scalars": "project_into",
+    "rollback_prior_usage": "project_into",
+    "drop_refused_attempts": "project_into",
+}
+
+
+def semantic_refusal(name: str, proc, report: dict, pin: dict, path: Path,
+                     changed: str, specimen: Path, target_functions=()) -> bool:
+    region = verifier.function_lines(changed, PROOF_FUNCTIONS[name])
+    # The pinned Verus emits this exact pre-loop invariant header. Preserve
+    # raw stderr and delegate all pin/completeness/source/error checks unchanged.
+    normalized = re.sub(r'^error: invariant not satisfied before loop$',
+                        'error: invariant not satisfied', proc.stderr, flags=re.M)
+    diagnostic = subprocess.CompletedProcess(proc.args, proc.returncode, proc.stdout, normalized)
+    return verifier.semantic_refusal(diagnostic, report, pin, path, specimen,
+                                     region=region, target_functions=target_functions)
 
 
 def snapshot() -> dict[str, str]:
@@ -61,7 +105,7 @@ def entry_contract(source: str, replacement: str) -> str:
     return source[:start] + replacement + source[end:]
 
 
-def mutation_sources(source: str, specification: str) -> dict[str, tuple[Path, str, str]]:
+def mutation_sources(source: str, specification: str, typed: str) -> dict[str, tuple[Path, str, str]]:
     mutations = {}
     for name, before, after in (
         ("wrong_interval_cardinality", "max as i128 - min as i128 + 1", "max as i128 - min as i128 + 2"),
@@ -71,52 +115,57 @@ def mutation_sources(source: str, specification: str) -> dict[str, tuple[Path, s
         ("allow_duplicate_variant_codes", "variants[prior].id == variant.id || variants[prior].code == variant.code",
          "variants[prior].id == variant.id"),
         ("ignore_field_order", "index > 0 && fields[index - 1].id >= fields[index].id", "false"),
-        ("wrong_enum_tag", "if tag != 0x07 {", "if tag != 0x0a {"),
         ("allow_sum_payload", "if payload != 0 {", "if false {"),
         ("wrong_type_width", "read_big_endian(bytes, offset, 4)", "read_big_endian(bytes, offset, 3)"),
         ("wrong_variant_width", "read_big_endian(bytes, after_type, 2)", "read_big_endian(bytes, after_type, 1)"),
-        ("wrong_integer_value", "value > *max as i128 { return None; } Some((value as i64, end))",
-         "value > *max as i128 { return None; } Some((0, end))"),
-        ("wrong_unsigned_value", "value > i64::MAX as u128 { return None; } Some((value as i64, end))",
-         "value > i64::MAX as u128 { return None; } Some((0, end))"),
-        ("wrong_boolean_value", "Some((1, payload_offset))", "Some((0, payload_offset))"),
         ("wrong_closed_variant_mapping", "return Some(code);", "return Some(0);"),
-        ("ignore_field_identity", "if id != field.id as u128 {", "if false {"),
         ("ignore_record_count", "if count != field_count as u128 {", "if false {"),
         ("wrong_record_tag", "if tag != 0x09 {", "if tag != 0x08 {"),
-        ("omit_ingress_charge", "meter.charge(super::Resource::Byte, bytes.len() as u64)",
-         "meter.charge(super::Resource::Byte, 0)"),
-        ("omit_protected_read_charge", "meter.charge(super::Resource::Read, 1)",
-         "meter.charge(super::Resource::Read, 0)"),
-        ("charge_wrong_read_resource", "meter.charge(super::Resource::Read, 1)",
-         "meter.charge(super::Resource::Step, 1)"),
-        ("wrong_permission_observation", "permitted: charged.is_ok()", "permitted: charged.is_err()"),
-        ("allow_trailing_bytes", "if end != bytes.len() {", "if false {"),
-        ("leak_partial_scalars", "Err(error) => {\n            output.clear();\n            Err(error)",
-         "Err(error) => {\n            Err(error)"),
-        ("rollback_prior_usage", "Err(error) => {\n            output.clear();\n            Err(error)",
-         "Err(error) => {\n            output.clear();\n            meter.used.counters = [0; 8];\n            Err(error)"),
-        ("drop_refused_attempts", "Err(error) => {\n            output.clear();\n            Err(error)",
-         "Err(error) => {\n            output.clear();\n            attempts.clear();\n            Err(error)"),
     ):
         mutations[name] = (SUBJECT, once(source, before, after), "proof")
-
+    # G3 moved the record projection's scalar decoding, Read/Byte charges and
+    # refusal cleanup into input_view/typed.rs, which the legacy entry calls
+    # with FieldsView::Legacy. These controls change the legacy cases there.
+    for name, before, after in (
+        ("wrong_enum_tag", "if tag != 0x07 {", "if tag != 0x0a {"),
+        ("wrong_integer_value", "value > *max as i128 { return None; } Some((Atom::I128(value), end))",
+         "value > *max as i128 { return None; } Some((Atom::I128(0), end))"),
+        ("wrong_unsigned_value", "value > i64::MAX as u128 { return None; } Some((Atom::I128(value as i128), end))",
+         "value > i64::MAX as u128 { return None; } Some((Atom::I128(0), end))"),
+        ("wrong_boolean_value", "Some((Atom::I128(1), payload_offset))", "Some((Atom::I128(0), payload_offset))"),
+        ("ignore_field_identity", "if actual != id as u128 {", "if false {"),
+        ("omit_ingress_charge", "meter.charge(Resource::Byte, bytes.len() as u64)",
+         "meter.charge(Resource::Byte, 0)"),
+        ("omit_protected_read_charge", "meter.charge(Resource::Read, 1)",
+         "meter.charge(Resource::Read, 0)"),
+        ("charge_wrong_read_resource", "meter.charge(Resource::Read, 1)",
+         "meter.charge(Resource::Step, 1)"),
+        ("wrong_permission_observation", "permitted: charged.is_ok()", "permitted: charged.is_err()"),
+        ("allow_trailing_bytes", "if end == bytes.len() {", "if true {"),
+        ("leak_partial_scalars", "Err(e) => {\n            output.clear();\n            Err(e)",
+         "Err(e) => {\n            Err(e)"),
+        ("rollback_prior_usage", "Err(e) => {\n            output.clear();\n            Err(e)",
+         "Err(e) => {\n            output.clear();\n            meter.used.counters = [0; 8];\n            Err(e)"),
+        ("drop_refused_attempts", "Err(e) => {\n            output.clear();\n            Err(e)",
+         "Err(e) => {\n            output.clear();\n            attempts.clear();\n            Err(e)"),
+    ):
+        mutations[name] = (TYPED, once(typed, before, after), "proof")
     # These cached parses preserve exact results, usage and attempt records.
     # They genuinely verify; the separately reviewed body inventory refuses them.
-    cached_header = once(source,
-        "if let Err(error) = meter.charge(super::Resource::Byte, bytes.len() as u64) {",
-        "let cached_header = decode_header(bytes, fields.len());\n"
-        "    if let Err(error) = meter.charge(super::Resource::Byte, bytes.len() as u64) {")
+    cached_header = once(typed,
+        "if let Err(e) = meter.charge(Resource::Byte, bytes.len() as u64) {",
+        "let cached_header = super::decode_header(bytes, fields.len());\n"
+        "    if let Err(e) = meter.charge(Resource::Byte, bytes.len() as u64) {")
     cached_header = once(cached_header,
-        "let Some(offset) = decode_header(bytes, fields.len()) else {",
+        "let Some(offset) = super::decode_header(bytes, fields.len()) else {",
         "let Some(offset) = cached_header else {")
-    mutations["parse_header_before_ingress"] = (SUBJECT, cached_header, "coverage")
-    cached_field = once(source, "let charged = meter.charge(super::Resource::Read, 1);",
-        "let cached_field = decode_field(bytes, position, &fields[index]);\n"
-        "        let charged = meter.charge(super::Resource::Read, 1);")
-    cached_field = once(cached_field, "match decode_field(bytes, position, &fields[index]) {",
-        "match cached_field {")
-    mutations["parse_field_before_read"] = (SUBJECT, cached_field, "coverage")
+    mutations["parse_header_before_ingress"] = (TYPED, cached_header, "coverage")
+    cached_field = once(typed, "let charged = meter.charge(Resource::Read, 1);",
+        "let cached_field = decode_field(bytes, position, id, leaf);\n"
+        "        let charged = meter.charge(Resource::Read, 1);")
+    cached_field = once(cached_field, "let Some((value, end)) = decode_field(bytes, position, id, leaf) else {",
+        "let Some((value, end)) = cached_field else {")
+    mutations["parse_field_before_read"] = (TYPED, cached_field, "coverage")
     mutations["weaken_projection_contract"] = (SUBJECT,
         entry_contract(source, "#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n"),
         "coverage")
@@ -175,7 +224,7 @@ def native_checks(directory: Path, pin: dict, environment: dict) -> dict:
     return {"test_output": native.stdout.strip(), "api_consumers": outcomes}
 
 
-def check(cache: Path, install: bool) -> dict:
+def check(cache: Path, install: bool, retained_directory: Path | None = None) -> dict:
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("this proof profile requires qualified Linux x86-64 tools")
     pin = json.loads((ROOT / verifier.PIN).read_text())
@@ -190,10 +239,18 @@ def check(cache: Path, install: bool) -> dict:
                "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json", "--log", "vir",
                "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
-    with tempfile.TemporaryDirectory(prefix="zeno-fcis-input-proof-") as temporary:
+    context = (nullcontext(str(retained_directory)) if retained_directory is not None
+               else tempfile.TemporaryDirectory(prefix="zeno-fcis-input-proof-"))
+    with context as temporary:
         directory = Path(temporary)
+        (directory / "source_sha256.json").write_text(json.dumps(before, indent=2, sort_keys=True) + "\n")
         positive_command = [*command, "--log-dir", str(directory / "positive"), str(HARNESS)]
         positive = verifier.run(positive_command, ROOT, environment)
+        (directory / "positive.json").write_text(positive.stdout)
+        (directory / "positive.stderr").write_text(positive.stderr)
+        (directory / "positive-process.json").write_text(json.dumps({
+            "command": positive_command, "cwd": str(ROOT), "returncode": positive.returncode,
+        }, indent=2, sort_keys=True) + "\n")
         verifier.require_success(positive)
         report = json.loads(positive.stdout)
         if not verifier.accepted(report, report_pin):
@@ -201,20 +258,31 @@ def check(cache: Path, install: bool) -> dict:
         coverage = require_coverage((directory / "positive/crate.vir").read_text(), profile)
         native = native_checks(directory, pin, environment)
         print("V2 input: exact proof coverage and native/API boundaries passed", flush=True)
-        for name, (path, changed, expected) in mutation_sources((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text()).items():
+        for name, (path, changed, expected) in mutation_sources((ROOT / SUBJECT).read_text(), (ROOT / SPEC).read_text(),
+                                                                 (ROOT / TYPED).read_text()).items():
             specimen = directory / name
             for unit in UNIT_SOURCES:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
             adjust_specimen_source_lengths(specimen)
-            mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"), str(HARNESS)], specimen, environment)
-            result = json.loads(mutant.stdout).get("verification-results", {})
+            mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(HARNESS)]
+            if name == "omit_protected_read_charge":
+                # The pinned full-crate diagnostic validates this budget and
+                # stops extra error searches after the first semantic refusal.
+                mutant_command[1:1] = ["--multiple-errors", "0", "--rlimit", "160"]
+            mutant = verifier.run(mutant_command, specimen, environment)
+            (specimen / "verus.json").write_text(mutant.stdout)
+            (specimen / "verus.stderr").write_text(mutant.stderr)
+            (specimen / "verus-process.json").write_text(json.dumps({
+                "command": mutant_command, "cwd": str(specimen), "returncode": mutant.returncode,
+            }, indent=2, sort_keys=True) + "\n")
+            mutant_report = json.loads(mutant.stdout)
+            result = mutant_report.get("verification-results", {})
             coverage_error = None
             if expected == "proof":
-                killed = (mutant.returncode != 0 and result.get("success") is False
-                          and type(result.get("errors")) is int and result["errors"] > 0
-                          and result.get("encountered-vir-error") is False)
+                killed = semantic_refusal(name, mutant, mutant_report, pin, path, changed,
+                                          specimen, profile["target_functions"])
             else:
                 try:
                     require_coverage((specimen / "logs/crate.vir").read_text(), profile)
@@ -224,7 +292,8 @@ def check(cache: Path, install: bool) -> dict:
                           and result.get("errors") == 0 and coverage_error is not None)
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
                               "exit_code": mutant.returncode, "verification_results": result,
-                              "coverage_refusal": coverage_error})
+                              "coverage_refusal": coverage_error, "logs": str(specimen)})
+            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
             if not killed:
                 raise RuntimeError(f"mutation {name} survived or failed for an unrelated reason")
             print(f"V2 input: caught {name} ({expected})", flush=True)
@@ -253,10 +322,13 @@ def main() -> int:
     parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    directory = Path(tempfile.mkdtemp(prefix="protected-input-run-", dir=args.out.parent))
     try:
-        receipt = check(args.cache.resolve(), args.install)
+        receipt = check(args.cache.resolve(), args.install, directory)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
         receipt = {"schema": "zeno-fcis/protected-input-evidence/1", "status": "failed", "error": str(error)}
+    receipt["logs"] = str(directory)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     print(f"V2 input: {receipt['status']}; receipt: {args.out}")

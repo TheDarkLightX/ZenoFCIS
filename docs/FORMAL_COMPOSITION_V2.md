@@ -190,9 +190,14 @@ Composition v2 is one layer of correctness by construction:
 5. structured evidence must discharge every declared theorem;
 6. authorization must refuse transitions lacking required project invariants and law evidence.
 
-Layer 6 is not implemented by this composition package. The current integrated
-stack supplies it through `zeno-fcis-laws`, `zeno-fcis-authority`, and an
-authority-owned `ComposedDomainProgram`. Each project must still define and
+Layer 6 is not implemented by this composition package. The current runtime
+route uses `zeno_fcis::program`: `bind_catalog` checks complete
+`ProgramDefinition` descriptors against the original schema, policy and
+frame/channel links; `bind_program` derives the program identity and
+capability; and `Program::publish` produces genuine `Publication` values for
+committing decisions after library evaluation. Composition verification still
+relies on the supplied `EvidenceVerifier` and does not automatically bind every
+external claim to the actual program laws. Each project must still define and
 independently qualify its exact invariants, conservation laws, evidence
 checkers, interpreter, and deployment bindings.
 

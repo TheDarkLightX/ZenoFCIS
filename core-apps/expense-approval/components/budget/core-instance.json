@@ -1,0 +1,57 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "consumable-budget",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/consumable-budget.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "2e97f57d45d835dc7093a30edc0be714c2ac7ced1db5222d0d67998197381be0"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 128,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 7
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "1ec32ec25ca42c4afdf4a766a522de7697263a4bdb3f0e31bf309ea277c59029",
+  "source_sha256": {
+    "examples/c7.txt": "08c91c5216309e1f8faa04171ee632b9462f119b7515a5c76f294ffb7d0508c5",
+    "family.json": "877e986d01d7f6740469740ee4a5a7d0ef50817ab96771b208355d5e5942783e",
+    "policy.json.in": "9e2e9839b9456688f9ebaab2a22495f7506fea3489a2493609567b0ebaef49ec",
+    "project.zeno.in": "cac0d4516067d5b392075572b18124ef00052f648015483c9bb7f55174fba587"
+  },
+  "state_tuples": 8,
+  "version": 1
+}

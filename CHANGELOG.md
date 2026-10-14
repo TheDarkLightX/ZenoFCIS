@@ -4,7 +4,146 @@ All notable Rust API and packaging changes are recorded here. Canonical
 protocol compatibility is governed separately by the identifiers and versions
 embedded in ZenoFCIS values.
 
-## Unreleased
+## 2.3.0 - 2026-10-13
+
+V2.2 and V2.3 development is consolidated into one source version for the
+stable 2.3.0 release. This section records source changes; final acceptance,
+platform qualification and publication are not claimed. See the
+[release notes](docs/RELEASE_NOTES.md) for the supported scopes and boundaries.
+
+### Breaking changes since 1.1.0
+
+- The crate root and prelude use the checked program API. V1 data and evidence
+  tools move to `zeno_fcis::legacy`; value variants become constructors such
+  as `Value::boolean(true)`. `PublicationOutcome` replaces
+  `TransitionDecision`.
+- The library owns decision and law evaluation, metering and publication.
+  Native transition callbacks, application law engines, caller-built meters
+  and public candidate sealing leave the normal API. The SQLite shell
+  accepts library publications and does not migrate older databases implicitly.
+- Generated Cargo applications bind to the matching ZenoFCIS source tree;
+  an installed CLI needs `new --source`. Evaluator/source identities are
+  refreshed, so earlier source-bound artifacts are not interchangeable.
+- `prove --backend lean` returns `UnsupportedMode`. Solver and Verus evidence
+  does not become Lean kernel-checked evidence.
+- `loop` and `transform check --offline-parallel` need Linux cgroup v2,
+  memory/pids controllers and a systemd user manager. Unavailable containment
+  gives an inconclusive result. Serial checks and ordinary library use do
+  not require that runtime.
+
+### Library, contracts and stores
+
+- `bind_catalog`, `bind_program`, `Program::publish`, genesis and replay use
+  the mandatory checked route over original state, command and supplied
+  context. The library checks every applicable declared law before issuing
+  a private, non-`Clone` committing publication.
+- Signed/unsigned 128-bit library values and whole declared compound values
+  use checked numeric evaluation. Nested field selection and numeric CLI
+  authoring/lineage upgrades remain unsupported. CLI contracts support 4,096
+  nodes, 64 inputs and 64 outputs with checked i64 expressions; transform,
+  optimizer and loop receipts retain the 256-node/16-output bound.
+- `zeno-fcis-contract` holds the compiler's functional core and the
+  checked-composition API. `contract diff` uses the store's comparisons for
+  successors and renames. `contract adopt` preserves JSON layout, escaped
+  key spellings, compact files and CRLF files.
+- `migration/2` adds checked expression splits, total injective payload maps
+  and explicit drops of unread state fields. Forward simulation and later
+  generation/upgrade/audit replay recheck admission. Existing migration/1
+  carry, rename, default and table splits remain available.
+- Schema-10 lineages replay history and retain chained upgrades and original
+  delivery identities. Delivery uses consuming tokens; transport is at
+  least once and needs receiver idempotency for one effect.
+- The store uses `synchronous=EXTRA` everywhere and `fullfsync` for SQLite
+  file syncs on Apple. Hardware must honour requested syncs. Crash-injection
+  hooks are disabled by default behind a dedicated test feature.
+
+### Checking and search
+
+- Contained checker children have a 64 MiB memory cap, zero swap, 64 tasks
+  and bounded inherited CPU policy. Offline failures publish no receipt.
+- Loop sessions use `checked-i64-v1` by default, scaled work ceilings and
+  `zeno-fcis/checker-work/4`; earlier policy sessions must be reopened.
+  Repeatable `--seed` proposals are ordinary checked attempts without a
+  model call. Equivalent review mutants can be exported as programs.
+- Canonical encoding uses fixed 16-byte words, preallocated output and bulk
+  byte append; legacy numeric projection reserves output space. No
+  release-wide performance improvement is asserted.
+- `transform check-certificates` and `replay-certificates` require a complete
+  pinned Carcara-checked Alethe certificate for every difference query in
+  the supported eager checked-i64 Boolean/linear-integer fragment. The
+  runtime/query refinement covers ordered outputs and failures with a
+  nonbinding Step limit. These receipts grant no adoption or publication
+  authority.
+- `contract check-composition MANIFEST [--aggregate DIR | --write-aggregate DIR]
+  [--receipt FILE | --replay FILE]` checks finite leaves, StateFacts,
+  interface implications and a generated aggregate without enumerating the
+  joint product. Its safety proof is over the abstract evaluator specification;
+  the enumeration, validator, interval/meter checks and actual-decision link
+  remain a tested trusted base. Conditional histories require checked
+  genesis and stated outer assumptions. There is no runtime capability or
+  liveness, fairness, trace, delivery, asynchronous/shared-write coupling theorem.
+
+### Templates and integrations
+
+- Six added templates cover account lockout, orders, inventory, compliance,
+  withdrawal queues and treasury controls. Ten finite component families
+  have 77 closed parameter instances checked over 107,518 raw transition
+  inputs; 17 planted law mutants each produced one law-refusal finding.
+  Certificate issuance/replay and accompanying tamper qualification passed.
+  Six coupled applications checked 373,056 finite input tuples and passed
+  180 native tests, including 53 named fault controls; separate warehouse
+  reviews found five law refusals and a distinct destination/outbox mismatch.
+  Replay supports only the declared finite scope; overlapping counts are
+  not additive and establish no formal family theorem.
+- The finite Tau import/export kit requires query-by-query SMT agreement.
+  Local native checks covered 262,144 allowance inputs and 20,480 spend inputs.
+  Separate Tau/SMT runs corroborated 150 allowance and 373 spend positive
+  queries, and rejected 10 and six planted controls respectively, with no
+  disagreement or incomplete verdict. Results are attested per query, with
+  no whole-domain Tau, authentication or publication-authority claim.
+  The OCaml consumer drives generated Rust applications;
+  Rust retains decisions, laws and storage. ZAL remains an optional finite-model
+  authoring prototype outside the released API.
+- Local Linux preparation passed 148 SQLite tests with zero ignored tests
+  and an OCaml run with 24 native negative cases and two overflow controls.
+  Compliance-gateway synthesis conformance checked 2,880 inputs for each of
+  Rust, Python and JavaScript; conformance is bound to the exact source/target.
+
+### Assurance and release scope
+
+- Installed positive Verus inventories record 1,161 whole-crate obligations
+  for the shared execution closure, 1,282 for checker, 1,325 for scalar query,
+  and 1,188 for checked assembly (27 restricted obligations, zero selected
+  Exec bodies). Shared dependencies overlap; these counts do not add up to
+  independent proofs or completed qualification gates.
+- Scalar query qualification passed 43 native tests and two targeted fault
+  controls, with no whole-negative qualification claim. Full acceptance and
+  hosted results remain separate from the local observations above.
+- The release plan targets Linux x86_64 GNU with glibc 2.39 and Apple-silicon
+  macOS (`aarch64-apple-darwin`, minimum-version metadata 11.0). Support depends
+  on completed matching host/install/custody qualification; configured jobs
+  do not establish qualified hosts or published binaries. No Windows or
+  Intel macOS binary is planned, and Linux-only features remain limited.
+- Stable publication, download/signature verification and active 2.3.x
+  security support are not claimed here. The post-publication policy targets
+  2.3.x; `SECURITY.md` states the current policy.
+- Supplied principals, authorization, time and context are unauthenticated
+  application inputs. Verus relies on specifications, translation/erasure,
+  vstd/Z3, compiler, allocation and platform assumptions. SQLite, the OS,
+  hardware and external receivers remain trusted; crash/parity tests do not
+  establish a whole-shell or end-to-end theorem.
+
+## 2.3.0-rc.1 - 2026-10-10
+
+Published Linux x86-64 release candidate. It packages the available checked
+application path and the ten closed finite component families. It does not
+complete the original stable V2.2/V2.3 scope. Cargo/internal dependency
+versions and npm root metadata are coherent; external dependency identities are
+unchanged. Evaluator identities and finite runtime bindings are refreshed for
+the candidate source. See [candidate scope and source
+provenance](docs/RELEASE_CANDIDATES.md) for installation and assurance limits.
+
+### Changes included in the candidate
 
 - Migration admission now checks freshly compiled target claims on the mapped
   current state and rechecks them during history replay. Records with claims
@@ -1435,6 +1574,13 @@ embedded in ZenoFCIS values.
   now states that current obligations contain no system model: accepted
   results hold for every bounded observation assignment, and counterexamples
   may be unreachable.
+
+## 2.2.0-rc.1 - 2026-10-10
+
+Published Linux x86-64 release candidate, built from a separate V2.2 source
+revision with three closed finite component families. It does not complete
+the original stable V2.2/V2.3 scope. Its changes are not itemized separately
+here; see [candidate scope and source provenance](docs/RELEASE_CANDIDATES.md).
 
 ## 1.1.0 - 2026-09-13
 

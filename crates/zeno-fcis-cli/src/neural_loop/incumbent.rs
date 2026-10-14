@@ -11,16 +11,7 @@ use crate::transform::{Equivalence, sha256_hex};
 use serde_json::{Value, json};
 use zeno_fcis_synthesis::finite::Program;
 
-/// Objective V1: the lexicographic pair (stored instructions, canonical
-/// artifact bytes). `Ord` on this struct is that order because `nodes` comes
-/// first.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub(crate) struct Cost {
-    /// Every stored instruction counted once, unused nodes included.
-    pub(crate) nodes: u64,
-    /// The actual canonical artifact length.
-    pub(crate) bytes: u64,
-}
+pub(crate) use super::value_types::Cost;
 
 impl Cost {
     /// Measures an admitted program and the exact bytes it was decoded from.

@@ -66,6 +66,9 @@ V1 retains qualification of the official Lean `4.30.0` Linux x86-64 archive reco
 recorded in `release/lean-4.30.0-tree.sha256` and exposed as
 `LEAN_LINUX_X86_64_TREE_SHA256`. A different inventory can support repeatable
 local checks, while its proof outcome remains blocked as unqualified evidence.
+The pinned CVC5, Z3 and Lean archives are all Linux x86-64. On macOS, Lean
+evidence is therefore blocked, and solver commands run only binaries that an
+exact-hash manifest names, which is not qualified.
 
 ### Moving from tools/1
 

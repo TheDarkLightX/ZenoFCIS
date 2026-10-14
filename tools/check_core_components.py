@@ -185,7 +185,8 @@ def execute(cli, work, target, instances):
         require(applications.decision_example_counts(test_log) == [str(manifest["input_tuples"])],
                 f"{name}: generated tests did not check every independent example")
         required_tests = ("every_example_is_the_authority_decision", "genesis_publishes_only_the_contract_genesis",
-                          "examples_run_as_one_persistent_session", "every_written_form_of_an_example_reads_alike")
+                          "examples_run_as_one_persistent_session", "every_written_form_of_an_example_reads_alike",
+                          "the_journey_checks_every_example_in_any_file_order")
         for test in required_tests:
             require(f"test {test} ... ok" in test_log, f"{name}: generated test {test} did not pass")
         reports.append({"instance": manifest, "review_sha256": core.digest((directory / "review.json").read_bytes()),

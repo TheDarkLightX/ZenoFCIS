@@ -7,10 +7,14 @@ cargo +1.97.1 run --quiet -p zeno-fcis-cli --locked -- \
   check examples/minimal/project.zeno
 ```
 
-The command prints one stable summary:
+The command prints a stable summary line, then what each obligation it
+counts still asks for; they are not errors:
 
 ```text
 checked examples/minimal/project.zeno: project=1 components=1 claims=1 unresolved_obligations=2 semantic_program_hash=57385a54387db8ad3e2da9a46a9ae22d2e72502b336120f570791d79e736b365
+unresolved obligations: evidence this check does not establish and generated code cannot discharge; they are not errors:
+  complete-footprint: component 300 needs evidence that it reads and writes only what its footprint declares
+  sequential-parity: the merge needs evidence that the merged components decide as they would one after another
 ```
 
 The source is small enough to read in one view:

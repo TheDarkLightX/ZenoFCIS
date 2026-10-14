@@ -61,7 +61,7 @@ context may be records or single values.
 
 The decision program reads one input per field of each record root, or the
 root itself when it is a single value, in this order: the state fields, the
-command, the context. A contract has at most 32 inputs.
+command, the context. A contract has at most 64 inputs.
 
 ## Leaf bindings
 
@@ -142,8 +142,11 @@ them. A variant is its ID: `status == 151`.
 A boolean used as a number is 0 or 1, and a number used as a boolean holds
 when it equals 1. Decision arithmetic is 64-bit, and the program evaluates
 every node, both branches of `choose` included, so an overflow anywhere
-refuses the decision. A contract has at most 256 program nodes and 16
-program outputs: the case selection and each distinct computed value.
+refuses the decision. A contract has at most 4,096 program nodes and 64
+program outputs: the case selection and each distinct computed value. A
+program past 256 nodes, 16 outputs or 32 inputs uses a larger profile that
+the program-file commands do not read; see
+[Contract program export](CLI_REFERENCE.md#contract-program-export).
 
 ## Cases
 
@@ -157,25 +160,30 @@ decides.
 | `when` | yes | A boolean expression. |
 | `class` | yes | `Accept`, `Reject` or `CommittedFailure`; see below. |
 | `reason` | yes | `null` for `Accept`; for `Reject` and `CommittedFailure`, a reason `project.zeno` declares. |
-| `post` | yes | State field ID to its value after the decision. |
+| `post` | yes | State field ID to its value after the decision; a committing case may omit a field it leaves unchanged. |
 | `outbox` | yes | The deliveries the decision makes; see [Deliveries](#deliveries). |
 | `rule` | no | The rule's name for reviewers, text. Generation ignores it. |
 
 <!-- policy-keys: classes -->
 | Class | Commits | `post` and `outbox` |
 |---|---|---|
-| `Accept` | yes | `post` sets every state field. |
+| `Accept` | yes | `post` sets the state fields the decision changes; each omitted field keeps its value. |
 | `Reject` | no | `post` is `{}` and `outbox` is `[]`: a reject changes nothing and delivers nothing. |
-| `CommittedFailure` | yes | `post` sets every state field. The contract needs a [`CommittedFailureEffects`](#law-kinds) law. |
+| `CommittedFailure` | yes | `post` sets the state fields the decision changes; each omitted field keeps its value. The contract needs a [`CommittedFailureEffects`](#law-kinds) law. |
 
-A committing case states every state field, including the ones it keeps:
-`"111": "pre.100.111"`, or a variable bound to it. A constant must fit its
-field: a declared range, or a variant ID for a sum. A computed value outside
-its field's range makes the library refuse that decision when it is made.
+A committing case that omits a state field keeps that field's value: an
+omitted `"111"` reads as `"111": "pre.100.111"`, and generates the same
+contract as writing it. A key that is not a state field is refused. A
+constant must fit its field: a declared range, or a variant ID for a sum. A
+computed value outside its field's range makes the library refuse that
+decision when it is made.
 
 Reasons: every reason `project.zeno` declares must be used by at least one
-case, and every case that uses a reason has the same class. A reason's
-`precedence` in `project.zeno` does not change the case order.
+case, and every case that uses a reason has the same class, because a
+reason's class comes from its cases. So removing the last case that uses a
+reason also means deleting that `reason` from `project.zeno`; the refusal
+names the reason and says so. A reason's `precedence` in `project.zeno` does
+not change the case order.
 
 ## Deliveries
 
@@ -339,9 +347,15 @@ IDs.
 ## Adoptions
 
 `zeno-fcis contract adopt` appends one entry per adopted decision program
-and renders the whole file again in the templates' layout (two-space
-indentation, one entry per line), keeping its keys in order. Edit
-`adoptions` only through that command.
+in the file's own layout: every existing byte is kept, and the new entry
+goes after the last adoption, or under a new last key `adoptions`, one
+entry per line and indented with the whitespace that starts the line of the
+file's first key. Compact files use two spaces for the added entry; existing
+bytes and line endings are preserved. Escaped JSON key spellings keep their
+meaning and spelling. Edit `adoptions` only through that command. Only
+`contract adopt` keeps the file's layout: `contract refresh-receipts`, when it
+rebinds a receipt, and `contract evolve` write the whole file again in the
+templates' layout, two-space indentation and one entry per line.
 
 <!-- policy-keys: adoption -->
 | Key | Value |
@@ -393,11 +407,13 @@ new one, field by field. `contract evolve --migration FILE` reads it, and
 <!-- policy-keys: migration -->
 | Key | Value |
 |---|---|
-| `schema` | `"zeno-fcis/migration/1"`. |
+| `schema` | `"zeno-fcis/migration/1"`, or `"zeno-fcis/migration/2"` for closed expressions and payload maps. |
 | `from_version` | Only in a shortcut: the version it migrates from. A migration between consecutive versions has none. |
 | `state` | An object with one entry per field of the new state record, keyed by its decimal field ID. |
+| `drop` | Version 2 only: unique old state field IDs intentionally removed without being used by any new field. Admission still requires complete forward simulation. |
+| `payloads` | Version 2 only: channel ID to a complete mapping of that channel's new payload fields. Every changed payload requires an explicit map. |
 
-Each entry of `state` is one of three forms, by its keys:
+Each entry of `state` uses one source form, by its keys:
 
 <!-- policy-keys: migration-field -->
 | Key | Value |
@@ -405,11 +421,32 @@ Each entry of `state` is one of three forms, by its keys:
 | `from` | The decimal ID of an old state field. Alone, it carries that field's value over, under its own name or a new one; the field's kind (Boolean, integer, variant) must not change. |
 | `default` | Alone, the value of an added field: `true`, `false`, an integer in the field's range, or a variant's ID. |
 | `map` | With `from`, a table from every value of the old field to the new field's value: keys are decimal integers, `false` or `true`. It splits an old field into several new ones. |
+| `expr` | Version 2 only, alone: a closed expression over `old.<field ID>` in the source record. Booleans, checked i64 integers, addition, subtraction, comparisons, Boolean operators and `choose` use the library finite evaluator; multiplication, division, text and external inputs are refused. |
 
-Every new field needs exactly one entry, and every old field must be carried
-into at least one new field: a migration renames, adds and splits fields,
-and drops none. Text fields cannot be migrated. Payloads and destinations
-have no mapping: every change a migration can take keeps their types.
+Every new field needs exactly one entry. Every old state field must be carried
+or read by a split expression, or explicitly listed in version 2's `drop`.
+A dropped field cannot also be used by a new field, and the complete forward
+simulation must show that its removal preserves the declared observations.
+Its value leaves the current state; historical segments retain and replay it
+under their original contracts. Text fields cannot be migrated. The same source forms apply to a
+version 2 payload map, with `old` referring to that channel's payload. Every
+payload map must be total and injective over the complete old payload domain:
+no payload meaning may be erased or collapsed. The domain cap is 65,536
+records; retained mapped bytes are capped at 64 MiB. A cap, partial map,
+arithmetic trap or out-of-domain result refuses admission. Expression totality
+also covers source valuations excluded by state laws. No missing map is inferred
+for a changed payload. Destinations and channel IDs cannot change.
+
+Forward simulation compares the actual old and new Authority publications:
+ordered delivery lanes, ordinals, channels, destinations and idempotency are
+exact, while new payload bytes equal the explicit map of old payload bytes.
+A shortcut must match the composed state and payload maps on their complete
+supported domains. Historical pending rows retain their original bytes,
+owning Authority, entry hashes and delivery IDs; delivery and acknowledgment
+still use that historical contract after an upgrade. The map declares how
+future publications represent the same meaning. Units and interpretation
+remain an explicit owner review obligation; bounded commutation alone does
+not establish arbitrary business semantics.
 
 ## Changing a contract
 
@@ -425,12 +462,12 @@ defines each kind exactly. In terms of the files:
   canonical policy, and so the contract identity, stays the same; `contract
   diff` lists these differences as notes.
 - **Program successor:** `contract adopt` replaced the decision program with a
-  checked candidate. The F6.1 upgrade admits it at any state.
+  checked candidate. The program-successor upgrade admits it at any state.
 - **Rename:** only the project's name or a type, field or variant name in
   `project.zeno` changes, with the same IDs. Rule variables may be renamed
   with it, since they are not part of the contract. `contract evolve`
   records it, and a store upgrades at any state.
-- **Layout change:** a state field is added, removed or given another type,
+- **Layout change:** a state or payload field is added, removed or given another type,
   or a type that only state fields have changes, such as a variant added to
   the state's status type. The genesis state and every committing case's
   `post` change with it. `contract evolve --migration` records it with a
@@ -444,8 +481,8 @@ defines each kind exactly. In terms of the files:
   `contract evolve` records it, and a store upgrades when the new contract's
   state laws and inductive claims hold on its state.
 - **Unrelated:** the command or context changes, including a variant added to
-  the command's action type; a payload or destination type changes; a channel
-  is added, removed or given another type; or a rename comes together with any
+  the command's action type; a destination type changes; a channel
+  is added, removed or given another destination; or a rename comes together with any
   other change. No path admits it. Make a renaming its own version.
 
 `contract adopt` refuses any adoption that is not a program successor of the

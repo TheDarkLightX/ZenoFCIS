@@ -1,0 +1,65 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "rate-limiter",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/rate-limiter.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "1e6e254577fa03120d8ac48434b2c7cd6e203c9d6f8e978ac1d816e2924d6294"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    [
+      0,
+      1,
+      2,
+      3
+    ],
+    [
+      150
+    ],
+    [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 392,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "N": 3,
+    "W": 1
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "a5120ce5e55fb3cdb18f9d89739eb671a7905af2109bc63f9fd257bd1a12a794",
+  "source_sha256": {
+    "examples/n3-w1.txt": "e7472499656668f3abdb08d252e5cd5a09c39fa3b43e7b8e0725ad82b0c16773",
+    "family.json": "ae1e6e60da1942a0245a24757d22a07f0c4bf96305e321fa34f9a7dd235d76ca",
+    "policy.json.in": "2ef2c3c67dd3790a129f88e93a05918708a69c6e316cbdb39974850dce1ab999",
+    "project.zeno.in": "c1aa83e16b0a286387bbff71afc061ff51644468c8c5bc12da2ffd70b0d70c36"
+  },
+  "state_tuples": 28,
+  "version": 1
+}

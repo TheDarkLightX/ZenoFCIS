@@ -1,0 +1,174 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "api-quota",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "window_start": "pre.100.110",
+    "used": "pre.100.111",
+    "seen": "pre.100.112",
+    "last_key": "pre.100.113",
+    "last_payload": "pre.100.114",
+    "request_key": "command.101.120",
+    "request_payload": "command.101.121",
+    "epoch": "context.102.130",
+    "authorized": "context.102.131",
+    "same_key": "seen && last_key == request_key"
+  },
+  "cases": [
+    {
+      "rule": "1 invalid prestate",
+      "when": "!((!seen && window_start == 0 && used == 0 && last_key == 0 && last_payload == 0) || (seen && used >= 1 && used <= 3))",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "2 not authorized",
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "3 same key, different payload",
+      "when": "same_key && last_payload != request_payload",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "4 exact retry, any epoch: memo Record only",
+      "when": "same_key",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "window_start",
+        "111": "used",
+        "112": "seen",
+        "113": "last_key",
+        "114": "last_payload"
+      },
+      "outbox": []
+    },
+    {
+      "rule": "5 stale epoch",
+      "when": "epoch < window_start",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "6 quota exhausted in the current epoch",
+      "when": "epoch == window_start && used == 3",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "rule": "7 new request in a later epoch: memo Record, then quota Acquire resets the window",
+      "when": "epoch > window_start",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "epoch",
+        "111": 1,
+        "112": true,
+        "113": "request_key",
+        "114": "request_payload"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "service",
+          "payload": {
+            "140": "epoch",
+            "141": "request_key",
+            "142": "request_payload"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "rule": "7 new request in the current epoch: memo Record, then quota Acquire charges one unit",
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "window_start",
+        "111": "used + 1",
+        "112": true,
+        "113": "request_key",
+        "114": "request_payload"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "service",
+          "payload": {
+            "140": "epoch",
+            "141": "request_key",
+            "142": "request_payload"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    }
+  ],
+  "genesis": {
+    "110": 0,
+    "111": 0,
+    "112": false,
+    "113": 0,
+    "114": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation",
+    "503": "DebitCreditEffectEquality"
+  },
+  "delivery_laws": {
+    "503": {
+      "max_deliveries": 2,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        },
+        "outbox.104.141": {
+          "channel": 300,
+          "field": 141
+        },
+        "outbox.104.142": {
+          "channel": 300,
+          "field": 142
+        }
+      }
+    }
+  }
+}

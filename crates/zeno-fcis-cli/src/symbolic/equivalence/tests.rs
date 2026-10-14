@@ -176,6 +176,111 @@ fn a_trap_only_one_program_has_is_a_counterexample_in_its_piece() {
 }
 
 #[test]
+fn an_output_domain_failure_is_a_replayed_difference() {
+    let output = Domain::Int { min: 0, max: 2 };
+    let original = bytes(vec![SMALL], vec![output], vec![Op::Input(0)], vec![0]);
+    let candidate = bytes(vec![SMALL], vec![output], vec![Op::Int(0)], vec![0]);
+    let Outcome::Counterexample(found) = check(&original, &candidate, SYMBOLIC, &mut reference)
+    else {
+        panic!("different success and refusal must be detected")
+    };
+    let piece = found
+        .compared
+        .pieces
+        .iter()
+        .find(|piece| piece.label == "output-domain-failure")
+        .unwrap_or_else(|| panic!("output-domain difference piece is required"));
+    let Judgment::Refuted { witness, .. } = &piece.judgment else {
+        panic!("output-domain failure must have a replayed witness")
+    };
+    assert_eq!(witness.input, [3]);
+    assert_eq!(witness.original, Err(V2ExecutionFailure::OutputDomain));
+    assert_eq!(witness.candidate, Ok(vec![0]));
+}
+
+#[test]
+fn later_outputs_and_duplicate_roots_are_compared_in_order() {
+    let original = bytes(
+        vec![SMALL, SMALL],
+        vec![SMALL; 3],
+        vec![Op::Input(0), Op::Input(1)],
+        vec![0, 1, 0],
+    );
+    let candidate = bytes(
+        vec![SMALL, SMALL],
+        vec![SMALL; 3],
+        vec![Op::Input(0), Op::Input(1)],
+        vec![0, 0, 1],
+    );
+    let Outcome::Counterexample(found) = check(&original, &candidate, SYMBOLIC, &mut reference)
+    else {
+        panic!("equal first outputs must not hide different later outputs")
+    };
+    let Judgment::Refuted { witness, .. } = &found.compared.pieces[found.piece].judgment else {
+        panic!("ordered outputs must have a replayed witness")
+    };
+    assert_eq!(witness.input, [0, 1]);
+    assert_eq!(witness.original, Ok(vec![0, 1, 0]));
+    assert_eq!(witness.candidate, Ok(vec![0, 0, 1]));
+}
+
+#[test]
+fn inclusive_split_boundary_is_256_values_not_width_256() {
+    for (max, count) in [(127, 258), (128, 3)] {
+        let domain = Domain::Int { min: -128, max };
+        let program = Program::try_new(vec![domain], vec![domain], vec![Op::Input(0)], vec![0])
+            .unwrap_or_else(|error| panic!("boundary program: {error}"));
+        let view = crate::symbolic::program::Program::of(&program);
+        let queries = super::Queries::build(view, view)
+            .unwrap_or_else(|error| panic!("boundary queries: {error:?}"));
+        assert_eq!(queries.pieces.len(), count);
+        if max == 127 {
+            assert_eq!(queries.pieces[0].label, "case--128");
+            assert_eq!(queries.pieces[255].label, "case-127");
+            assert!(
+                queries.pieces[0]
+                    .source
+                    .contains("(assert (= p0 (- 128)))\n")
+            );
+            assert!(queries.pieces[255].source.contains("(assert (= p0 127))\n"));
+        } else {
+            assert_eq!(queries.pieces[0].label, "outputs");
+        }
+        assert_eq!(queries.pieces[count - 2].label, "arithmetic-failure");
+        assert_eq!(queries.pieces[count - 1].label, "output-domain-failure");
+    }
+}
+
+#[test]
+fn exactly_nonbinding_step_limit_checks_results_without_equal_usage() {
+    let original = smaller();
+    let candidate = smaller_rewritten();
+    let limits = Limits {
+        steps: 7,
+        input_tuples: 0,
+    };
+    let Outcome::Equivalent(equal) = check(&original, &candidate, limits, &mut reference) else {
+        panic!("seven Steps admits both complete eager executions")
+    };
+    let receipt: serde_json::Value =
+        serde_json::from_slice(&equal.receipt(&serde_json::json!({"cvc5": null, "z3": null})))
+            .unwrap_or_else(|error| panic!("receipt: {error}"));
+    assert_eq!(receipt["evidence"], "attested");
+    let Outcome::Inconclusive(stop) = check(
+        &original,
+        &candidate,
+        Limits {
+            steps: 6,
+            input_tuples: 0,
+        },
+        &mut reference,
+    ) else {
+        panic!("one fewer Step must be inconclusive")
+    };
+    assert!(stop.cause.starts_with("budget-boundary"));
+}
+
+#[test]
 fn a_domain_within_the_cap_is_left_to_the_exhaustive_check() {
     let limits = Limits {
         steps: transform::DEFAULT_STEP_LIMIT,

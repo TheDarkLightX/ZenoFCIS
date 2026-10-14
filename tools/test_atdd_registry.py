@@ -1,5 +1,6 @@
 """Guard the repaired gate bindings and refusal of successful empty test runs."""
 
+import ast
 import collections
 import contextlib
 import json
@@ -205,6 +206,28 @@ def template_profile_problems(source):
 
 
 class RepairedRegistryTests(unittest.TestCase):
+    def test_crash_refinement_suites_enable_crash_injection(self):
+        # Default store builds hide the interruption APIs. Both acceptance
+        # routes must opt in so their atomicity controls cannot silently skip.
+        for scenario, target in (("checked-upgrade", "upgrade"), ("sqlite-authority", None)):
+            commands = [
+                command for command in atdd.SCENARIOS[scenario].commands
+                if command[:3] == ("cargo", "+1.97.1", "test")
+                and "-p" in command
+                and command[command.index("-p") + 1] == "zeno-fcis-shell-sqlite"
+                and (target is None or "--test" in command
+                     and command[command.index("--test") + 1] == target)
+            ]
+            with self.subTest(scenario=scenario):
+                self.assertEqual(len(commands), 1)
+                command = commands[0]
+                self.assertIn("--features", command)
+                features = command[command.index("--features") + 1].split(",")
+                self.assertIn("crash-injection", features)
+                if target is None:
+                    self.assertNotIn("--lib", command)
+                    self.assertNotIn("--test", command)
+
     def test_registry_failure_stops_run_before_expensive_checks(self):
         command = ("python3", "tools/test_atdd_registry.py")
         with mock.patch.object(atdd, "parse_args", return_value=mock.Mock(command="run", all=True)), \
@@ -372,6 +395,35 @@ class RepairedRegistryTests(unittest.TestCase):
             run_miri_coverage_check(source.replace(json.dumps(completion), json.dumps(invented), 1), invented,
                                     inventories, test_args=miri_exclusions.miri_test_arguments(invented))
 
+    def test_miri_original_compound_runs_each_test_in_its_own_group(self):
+        # Interpreted alone, two of the three tests each take about an hour,
+        # so each runs in its own group under the hosted per-group limit.
+        source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
+        target = "--test v2_original_compound"
+        rows = [row for row in miri_rows(source) if row.get("target") == target]
+        remainder = [row for row in rows if "test" not in row]
+        exact = [row for row in rows if "test" in row]
+        self.assertEqual(len(remainder), 1)
+        self.assertTrue(all("miri_skip" not in row for row in rows))
+        rust = (atdd.ROOT / "crates/zeno-fcis-synthesis/tests/v2_original_compound.rs").read_text()
+        inventory = sorted(re.findall(r"#\[test\]\s*fn (\w+)\(", rust))
+        self.assertEqual(len(inventory), 3)
+        isolated = [row["test"] for row in exact]
+        self.assertEqual(sorted(isolated), [
+            "original_compounds_patch_carry_forward_and_replay_without_reencoding_loss",
+            "original_parser_denied_reads_and_steps_remain_refusals",
+        ])
+        inventories = {target: inventory}
+        self.assertEqual(run_miri_coverage_check(source, remainder[0], inventories),
+                         "-- " + shlex.join(["--exact"] + [a for name in isolated for a in ("--skip", name)]))
+        for row in exact:
+            self.assertEqual(run_miri_coverage_check(source, row, inventories),
+                             "-- " + shlex.join(["--exact", row["test"]]))
+        # Planted control: a remainder that ignored its skips would run the
+        # isolated tests twice, which the workflow's own check refuses.
+        with self.assertRaisesRegex(AssertionError, "split selector coverage differs"):
+            run_miri_coverage_check(source, remainder[0], inventories, honour_skip=False)
+
     def test_miri_template_partitions_run_bounded_profile_and_skip_only_native_corpora(self):
         source = (atdd.ROOT / ".github/workflows/miri.yml").read_text()
         rows = miri_rows(source)
@@ -525,6 +577,523 @@ class RepairedRegistryTests(unittest.TestCase):
             if command[0] == "python3":
                 self.assertTrue((atdd.ROOT / command[1]).is_file(), command)
         self.assertTrue((atdd.ROOT / "crates/zeno-fcis-shell-sqlite/tests/relay.rs").is_file())
+
+
+# Every test_*.py in the repository that git does not ignore must be named by a
+# whole-file command in an ATDD scenario or a workflow `run:` step; triggers and
+# step conditions are not checked. A file run only inside another command is
+# listed with that host: `runs` means some command invokes the host with the
+# listed leading arguments and the host runs the file; `imports` that the host
+# test file imports every TestCase the file defines, so the host's
+# unittest.main() runs them.
+RUN_INSIDE = {
+    "tools/test_atdd_registry.py": ("tools/atdd.py", "runs", ("run",),
+                                    "`atdd.py run` and `atdd.py self-test` run it first"),
+    "tools/test_scaffold_versions.py": ("tools/atdd.py", "runs", ("run",),
+                                        "`atdd.py run` runs it before any scenario"),
+    "tools/test_release_privacy.py": ("tools/rc_package.py", "runs", ("self-test",),
+                                      "`rc_package.py self-test` runs it"),
+    "tools/test_check_installed_cli.py": ("tools/rc_package.py", "runs", ("self-test",),
+                                         "`rc_package.py self-test` runs it"),
+    "tools/test_check_release_custody.py": ("tools/rc_package.py", "runs", ("self-test",),
+                                           "`rc_package.py self-test` runs it"),
+    "tools/test_release_hosts.py": ("tools/rc_package.py", "runs", ("self-test",),
+                                   "`rc_package.py self-test` runs it"),
+    "tools/test_core_components.py": ("tools/check_core_components.py", "runs", ("--finite-proof",),
+                                      "`--finite-proof` runs it on the staged qualification source"),
+    "tools/test_core_family_proofs.py": ("tools/check_core_components.py", "runs", ("--finite-proof",),
+                                         "`--finite-proof` runs it on the staged qualification source"),
+    "tools/test_negative_retention.py": ("tools/test_check_finite_execution.py", "imports", (),
+                                         "NegativeRetentionTests"),
+    "tools/test_verus_contract_controls.py": ("tools/test_check_envelope_frame_v2.py", "imports", (),
+                                              "ContractClassifier"),
+    "site/tests/test_wasm.py": ("site/build.py", "runs", (), "its `check` stage runs it; pages.yml runs every stage"),
+    "site/tests/test_browser.py": ("site/build.py", "runs", (),
+                                   "its `browser` stage runs it; pages.yml runs every stage"),
+}
+# Test files that no scenario or workflow runs, each with its reviewed reason.
+NOT_RUN = {
+    "integrations/mcp/test_server.py":
+        "manual: needs the pinned MCP SDK and ZENO_FCIS_CLI, as docs/LLM_SYNTHESIS.md shows",
+    "integrations/elite_archive/tests/test_archive.py":
+        "manual, as integrations/elite_archive/README.md shows; wiring it into CI is separate pending work",
+}
+# A workflow must run every scenario, or scenario commands are not CI runs.
+ATDD_RUN_ALL = ["python3", "tools/atdd.py", "run", "--all"]
+
+
+def python_runs(tokens):
+    """(script, arguments) for each `python3 [options] FILE ...` in one token
+    list, and ("discover", arguments) for each `python3 -m unittest discover`."""
+    runs, segment = [], []
+    for token in [*tokens, ";"]:
+        if token not in ("&&", "||", ";", "|"):
+            segment.append(token)
+            continue
+        starts = [index for index, part in enumerate(segment) if os.path.basename(part) in ("python", "python3")]
+        rest = segment[starts[0] + 1:] if starts else []
+        while rest and rest[0].startswith("-") and rest[0] not in ("-m", "-c", "-"):
+            rest = rest[2:] if rest[0] in ("-W", "-X") else rest[1:]
+        if rest[:3] == ["-m", "unittest", "discover"]:
+            runs.append(("discover", rest[3:]))
+        elif rest and rest[0].endswith(".py"):
+            runs.append((rest[0].removeprefix("$GITHUB_WORKSPACE/").removeprefix("./"), rest[1:]))
+        segment = []
+    return runs
+
+
+def discovered(root, arguments):
+    """The files `python3 -m unittest discover ARGUMENTS` loads from its start directory."""
+    named, positional, index = {}, [], 0
+    while index < len(arguments):
+        if arguments[index] in ("-s", "--start-directory", "-p", "--pattern", "-t", "--top-level-directory"):
+            named[arguments[index].lstrip("-")[0]] = arguments[index + 1]
+            index += 2
+            continue
+        if not arguments[index].startswith("-"):
+            positional.append(arguments[index])
+        index += 1
+    start = named.get("s", positional[0] if positional else ".")
+    pattern = named.get("p", positional[1] if len(positional) > 1 else "test*.py")
+    return {str(path.relative_to(root)) for path in (root / start).glob(pattern) if path.is_file()}
+
+
+def uncommented(line):
+    """A YAML line without its comment: `#` at the start or after a space, outside quotes."""
+    quote = None
+    for index, character in enumerate(line):
+        if quote:
+            quote = None if character == quote else quote
+        elif character in "'\"":
+            quote = character
+        elif character == "#" and (index == 0 or line[index - 1] in " \t"):
+            return line[:index].rstrip()
+    return line.rstrip()
+
+
+SCALAR_PAIR = re.compile(r"\s*([A-Za-z_][\w-]*):\s+(?:([^\s'\"{}\[\]&*!|>%@`][^'\"{}\[\]]*?)"
+                         r"|\"([^\"\\]*)\"|'([^']*)')\s*")
+
+
+def flow_mapping(body):
+    """The `key: value, ...` of a one-line flow mapping of plain or quoted scalars."""
+    mapping = {}
+    for item in body.split(","):
+        pair = SCALAR_PAIR.fullmatch(item)
+        if not pair or pair[1] in mapping:
+            raise ValueError(f"unsupported matrix row: {{{body}}}")
+        mapping[pair[1]] = next(value for value in pair.groups()[1:] if value is not None)
+    return mapping
+
+
+def matrix_rows(text):
+    """The rows of a workflow's one `matrix:` block, read without a YAML parser:
+    one-line `- {key: value, ...}` rows under `include:`, minus every row an
+    `exclude:` row matches. Comments are ignored and any other shape is refused,
+    not guessed. GitHub applies `exclude` before `include`, so subtracting can
+    only report a file that still runs, never count one that does not."""
+    lines = [uncommented(line) for line in text.splitlines()]
+    starts = [index for index, line in enumerate(lines) if re.match(r"\s*matrix:", line)]
+    if len(starts) != 1 or lines[starts[0]].strip() != "matrix:":
+        raise ValueError("expected exactly one `matrix:` block whose rows follow on their own lines")
+    indent = len(lines[starts[0]]) - len(lines[starts[0]].lstrip())
+    rows, section, depth_of_section = {"include": [], "exclude": []}, None, 0
+    for line in lines[starts[0] + 1:]:
+        if not line.strip():
+            continue
+        depth = len(line) - len(line.lstrip())
+        if depth <= indent:
+            break
+        key, row = re.fullmatch(r"\s*(include|exclude):", line), re.fullmatch(r"\s*-\s+\{(.*)\}", line)
+        if key:
+            section, depth_of_section = key[1], depth
+        elif row and section and depth >= depth_of_section:
+            rows[section].append(flow_mapping(row[1]))
+        else:
+            raise ValueError(f"unsupported matrix line: {line.strip()}")
+    return [row for row in rows["include"] if not any(excluded.items() <= row.items() for excluded in rows["exclude"])]
+
+
+def workflow_commands(text):
+    """Token lists of every shell line in a workflow's `run:` steps. `${NAME}`
+    expands over the matrix rows when an uncommented `NAME: ${{ matrix.KEY }}`
+    line binds it."""
+    bound = dict(re.findall(r"^[ \t]*(\w+):[ \t]*\$\{\{\s*matrix\.(\w+)\s*\}\}[ \t]*(?:#.*)?$", text, re.M))
+    rows = None
+    lines, commands, index = text.splitlines(), [], 0
+    while index < len(lines):
+        line, index = lines[index], index + 1
+        match = re.match(r"\s*(?:-\s+)?run:\s*(.*)$", line)
+        if not match:
+            continue
+        column, body = line.index("run:"), [match[1].strip()]
+        if body[0][:1] in ("|", ">"):
+            folded, body = body[0][:1] == ">", []
+            while index < len(lines) and (not lines[index].strip()
+                                          or len(lines[index]) - len(lines[index].lstrip()) > column):
+                body.append(lines[index].strip())
+                index += 1
+            body = [" ".join(body)] if folded else body
+        for shell in re.sub(r"\\\n", " ", "\n".join(body)).splitlines():
+            try:
+                tokens = shlex.split(shell, comments=True)
+            except ValueError:
+                continue  # here-document data, not a command
+            expanded = [tokens]
+            for name, key in bound.items():
+                if any(f"${{{name}}}" in token for token in tokens):
+                    rows = matrix_rows(text) if rows is None else rows
+                    values = [row[key] for row in rows if key in row]
+                    expanded = [[token.replace(f"${{{name}}}", value) for token in each]
+                                for each in expanded for value in values]
+            commands += expanded
+    return commands
+
+
+def workflow_lines(root):
+    commands = []
+    for path in sorted([*(root / ".github/workflows").glob("*.yml"), *(root / ".github/actions").glob("*/action.yml")]):
+        commands += workflow_commands(path.read_text(encoding="utf-8"))
+    return commands
+
+
+def every_command(root):
+    commands = [list(command) for scenario in atdd.SCENARIOS.values() for command in scenario.commands]
+    return commands + workflow_lines(root)
+
+
+def k_filter(argument):
+    """unittest's `-k` filter: separate (`-k NAME`), attached (`-kNAME`) or
+    grouped with other short options (`-vk NAME`)."""
+    return argument.startswith("-") and not argument.startswith("--") and "k" in argument[1:]
+
+
+def selects_all(arguments):
+    """No later positional argument or `-k` filter selects only some of a file's tests."""
+    return all(argument.startswith("-") and not k_filter(argument) for argument in arguments)
+
+
+# unittest.main() options that neither select tests nor let failures pass.
+MAIN_OPTIONS = {"verbosity", "failfast", "buffer", "catchbreak", "warnings", "tb_locals", "durations"}
+
+
+def runs_all_tests(path):
+    """Whether `python3 PATH` runs every test case: its `if __name__ == "__main__":`
+    block calls unittest.main() with no positional argument and no option that
+    selects tests or hides failures (defaultTest, argv, module, testLoader,
+    testRunner, exit)."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, SyntaxError):
+        return False
+    return any(isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call)
+               and ast.unparse(statement.value.func) == "unittest.main" and not statement.value.args
+               and all(keyword.arg in MAIN_OPTIONS for keyword in statement.value.keywords)
+               for node in tree.body
+               if isinstance(node, ast.If) and ast.unparse(node.test) == "__name__ == '__main__'"
+               for statement in node.body)
+
+
+def runs_of(root, commands):
+    """Test files some command runs whole, and every (script, arguments) any command runs."""
+    whole, invoked = set(), set()
+    for tokens in commands:
+        for script, arguments in python_runs(tokens):
+            if script == "discover":
+                if not any(map(k_filter, arguments)):
+                    whole |= discovered(root, arguments)
+                continue
+            invoked.add((script, tuple(arguments)))
+            # A later positional argument or a `-k` filter selects only some of a test
+            # file's tests, and only an unrestricted unittest.main() runs them all.
+            if selects_all(arguments) and runs_all_tests(root / script):
+                whole.add(script)
+    return whole, invoked
+
+
+def case_classes(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {node.name for node in tree.body if isinstance(node, ast.ClassDef) and any(
+        (base.attr if isinstance(base, ast.Attribute) else getattr(base, "id", None)) == "TestCase"
+        for base in node.bases)}
+
+
+def imported(path, module):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {alias.name for node in tree.body if isinstance(node, ast.ImportFrom) and node.module == module
+            for alias in node.names}
+
+
+def repository_tests(root):
+    """Every test_*.py git tracks or would track: the index plus untracked files it does not ignore."""
+    listed = subprocess.run(["git", "--no-optional-locks", "ls-files", "--cached", "--others", "--exclude-standard",
+                             "-z"], cwd=root, check=True, capture_output=True).stdout.decode().split("\0")
+    return sorted({name for name in listed
+                   if Path(name).name.startswith("test_") and name.endswith(".py") and (root / name).is_file()})
+
+
+def registry_problems(root, commands, inside=RUN_INSIDE, not_run=NOT_RUN, workflows=None):
+    """Why a test file may silently not run; an empty list means none can.
+    `workflows`, when given, are the workflow command lines."""
+    tests = repository_tests(root)
+    whole, invoked = runs_of(root, commands)
+    problems = [f"{name}: listed, but there is no such test file"
+                for name in sorted((set(inside) | set(not_run)) - set(tests))]
+    problems += [f"{name}: listed both as run inside a host and as not run" for name in sorted(set(inside) & set(not_run))]
+    if workflows is not None and ATDD_RUN_ALL not in workflows:
+        problems.append(f"no workflow runs `{shlex.join(ATDD_RUN_ALL)}`, so no scenario command is a CI run")
+    for name in tests:
+        if name in whole:
+            if name in inside or name in not_run:
+                problems.append(f"{name}: runs whole in a scenario or workflow; remove its registry entry")
+        elif name in inside:
+            host, kind, prefix, _ = inside[name]
+            if kind == "runs":
+                listed = (any(script == host and arguments[:len(prefix)] == prefix for script, arguments in invoked)
+                          and Path(name).name in (root / host).read_text(encoding="utf-8"))
+            else:
+                cases = case_classes(root / name)
+                listed = host in whole and bool(cases) and cases <= imported(root / host, Path(name).stem)
+            if not listed:
+                problems.append(f"{name}: {host} does not {kind.removesuffix('s')} it as listed")
+        elif name not in not_run:
+            if any(script == name and selects_all(arguments) for script, arguments in invoked):
+                problems.append(f"{name}: a command runs it directly, but its `__main__` block does not call an "
+                                "unrestricted unittest.main()")
+            else:
+                problems.append(f"{name}: no ATDD scenario or workflow runs it; wire it, or list it in NOT_RUN "
+                                "with a reviewed reason")
+    return problems
+
+
+PLANTED_TEST = ("import unittest\n\n\nclass Cases(unittest.TestCase):\n    def test_case(self):\n        pass\n\n\n"
+                "if __name__ == '__main__':\n    unittest.main()\n")
+RUNS_EVERY_SCENARIO = "jobs:\n  acceptance:\n    steps:\n      - run: python3 tools/atdd.py run --all\n"
+
+
+def plant(root, files):
+    for name, text in files.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text)
+
+
+# Planted gaps, one per reviewed hole, each in a fresh git work tree: the files a
+# case writes, its commands and workflows, the problems the registry must report,
+# and the files no problem may name.
+def planted_disabled_matrix_rows(root):
+    """A commented-out matrix row and an excluded one are not runs."""
+    plant(root, {f"tools/test_{name}.py": PLANTED_TEST for name in ("alpha", "beta", "gamma")})
+    workflow = textwrap.dedent("""\
+        jobs:
+          check:
+            strategy:
+              matrix:
+                include:
+                  - {gate: one, script: alpha.py}  # the only row that runs
+                  # - {gate: two, script: beta.py}
+                  - {gate: three, script: gamma.py}
+                exclude:
+                  - {gate: three}
+            env:
+              SCRIPT: ${{ matrix.script }}
+            steps:
+              - run: python3 "tools/test_${SCRIPT}"
+        """)
+    return {"commands": [], "workflows": [workflow, RUNS_EVERY_SCENARIO], "inside": {}, "not_run": {},
+            "refused": ["tools/test_beta.py: no ATDD scenario", "tools/test_gamma.py: no ATDD scenario"],
+            "kept": ["tools/test_alpha.py"]}
+
+
+def planted_host_without_its_arguments(root):
+    """A host run without the entry's leading arguments does not run the file."""
+    plant(root, {"tools/test_beta.py": PLANTED_TEST, "tools/test_delta.py": PLANTED_TEST,
+                 "tools/host.py": "SUITES = {'self-test': 'test_beta.py', 'check': 'test_delta.py'}\n"})
+    return {"commands": [["python3", "tools/host.py", "check", "--all"]], "workflows": [RUNS_EVERY_SCENARIO],
+            "inside": {"tools/test_beta.py": ("tools/host.py", "runs", ("self-test",), ""),
+                       "tools/test_delta.py": ("tools/host.py", "runs", ("check",), "")},
+            "not_run": {}, "refused": ["tools/test_beta.py: tools/host.py does not run it as listed"],
+            "kept": ["tools/test_delta.py"]}
+
+
+def planted_k_filters(root):
+    """A `-k` filter, attached, grouped or given to discover, runs only part of a file."""
+    plant(root, {**{f"tools/test_{name}.py": PLANTED_TEST for name in ("alpha", "beta", "gamma")},
+                 "tools/test_data/apps/test_delta.py": PLANTED_TEST})
+    return {"commands": [["python3", "tools/test_alpha.py", "-kfast"],
+                         ["python3", "tools/test_beta.py", "-v", "-bkfast"],
+                         ["python3", "-m", "unittest", "discover", "-s", "tools/test_data/apps", "-p", "test_*.py",
+                          "-k", "fast"],
+                         ["python3", "tools/test_gamma.py", "-v"]],
+            "workflows": [RUNS_EVERY_SCENARIO], "inside": {}, "not_run": {},
+            "refused": ["tools/test_alpha.py: no ATDD scenario", "tools/test_beta.py: no ATDD scenario",
+                        "tools/test_data/apps/test_delta.py: no ATDD scenario"],
+            "kept": ["tools/test_gamma.py"]}
+
+
+def planted_restricted_mains(root):
+    """A file run directly runs all its tests only through an unrestricted unittest.main()."""
+    cases = PLANTED_TEST.split("\n\n\nif __name__", 1)[0] + "\n"
+    mains = {"alpha": "", "beta": "unittest.main(defaultTest='Cases')", "gamma": "unittest.main(argv=['x', 'Cases'])",
+             "epsilon": "unittest.main(exit=False)"}
+    plant(root, {f"tools/test_{name}.py": cases + (f"\n\nif __name__ == '__main__':\n    {main}\n" if main else "")
+                 for name, main in mains.items()})
+    plant(root, {"tools/test_delta.py": PLANTED_TEST})
+    return {"commands": [["python3", f"tools/test_{name}.py"] for name in [*mains, "delta"]],
+            "workflows": [RUNS_EVERY_SCENARIO], "inside": {}, "not_run": {},
+            "refused": [f"tools/test_{name}.py: a command runs it directly, but its `__main__` block"
+                        for name in mains],
+            "kept": ["tools/test_delta.py"]}
+
+
+def planted_no_full_scenario_run(root):
+    """Scenario commands are CI runs only while a workflow runs every scenario."""
+    plant(root, {"tools/test_alpha.py": PLANTED_TEST})
+    workflow = textwrap.dedent("""\
+        jobs:
+          acceptance:
+            steps:
+              - run: python3 tools/atdd.py self-test
+              - run: python3 tools/atdd.py run --scenario smoke
+        """)
+    return {"commands": [["python3", "tools/test_alpha.py"]], "workflows": [workflow], "inside": {}, "not_run": {},
+            "refused": ["no workflow runs `python3 tools/atdd.py run --all`"], "kept": ["tools/test_alpha.py"]}
+
+
+def planted_tests_outside_tools(root):
+    """Every test file git would track is in scope, not only those under tools/; ignored ones are not."""
+    plant(root, {"tools/test_alpha.py": PLANTED_TEST, "integrations/demo/test_orphan.py": PLANTED_TEST,
+                 "site/tests/test_page.py": PLANTED_TEST, ".gitignore": "generated/\n",
+                 "generated/test_output.py": PLANTED_TEST})
+    return {"commands": [["python3", "tools/test_alpha.py"]], "workflows": [RUNS_EVERY_SCENARIO], "inside": {},
+            "not_run": {}, "refused": ["integrations/demo/test_orphan.py: no ATDD scenario",
+                                       "site/tests/test_page.py: no ATDD scenario"],
+            "kept": ["tools/test_alpha.py", "generated/test_output.py"]}
+
+
+PLANTED = (planted_disabled_matrix_rows, planted_host_without_its_arguments, planted_k_filters,
+           planted_restricted_mains, planted_no_full_scenario_run, planted_tests_outside_tools)
+
+
+def planted_problems(root, case):
+    """The registry's report for one planted case."""
+    lines = [line for text in case["workflows"] for line in workflow_commands(text)]
+    return "\n".join(registry_problems(root, [*case["commands"], *lines], case["inside"], case["not_run"],
+                                       workflows=lines))
+
+
+class TestFileRegistryTests(unittest.TestCase):
+    def test_every_tool_test_runs_in_a_scenario_or_workflow(self):
+        commands, workflows = every_command(atdd.ROOT), workflow_lines(atdd.ROOT)
+        self.assertEqual(registry_problems(atdd.ROOT, commands, workflows=workflows), [])
+        whole, _ = runs_of(atdd.ROOT, commands)
+        # One run of each kind: an ATDD argv, a workflow discover, and a matrix-expanded verus.yml step.
+        self.assertTrue({"tools/test_check_core_app.py", "tools/test_evaluator_identity.py",
+                         "tools/test_check_account_graph_v2.py"} <= whole)
+
+    def test_the_test_registry_refuses_planted_gaps(self):
+        workflow = textwrap.dedent("""\
+            on:
+              pull_request:
+                paths: ["tools/test_beta.py"]
+            jobs:
+              check:
+                strategy:
+                  matrix:
+                    include:
+                      - {gate: one, script: alpha.py}
+                env:
+                  SCRIPT: ${{ matrix.script }}
+                steps:
+                  - run: |
+                      python3 -B "$GITHUB_WORKSPACE/tools/host.py" --mode x \\
+                        --flag
+                    env:
+                      UNRELATED: python3 tools/test_beta.py
+                  - run: python3 "tools/test_${SCRIPT}"
+            """)
+        main = "\nif __name__ == '__main__':\n    unittest.main()\n"
+        with tempfile.TemporaryDirectory(prefix="zeno-fcis-test-registry-") as raw:
+            root = Path(raw)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            for name in ("tools/test_alpha.py", "tools/test_beta.py", "tools/test_gamma.py",
+                         "tools/test_data/apps/test_delta.py"):
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_text("import unittest\nclass Cases(unittest.TestCase):\n    pass\n" + main)
+            (root / "tools/host.py").write_text("SUITE = 'test_beta.py'\n")
+            (root / "tools/test_gamma.py").write_text("import unittest\nfrom test_alpha import Cases\n" + main)
+            inside = {"tools/test_beta.py": ("tools/host.py", "runs", ("--mode", "x"), "")}
+            host_run, alpha_run = workflow_commands(workflow)
+            discover = ["python3", "-m", "unittest", "discover", "-s", "tools/test_data/apps", "-p", "test_*.py"]
+            gamma_run = ["python3", "tools/test_gamma.py"]
+            commands = [host_run, alpha_run, discover, gamma_run]
+            self.assertEqual(registry_problems(root, commands, inside, {}), [])
+
+            def problems(commands=commands, inside=inside, not_run=None):
+                return "\n".join(registry_problems(root, commands, inside, not_run or {}))
+
+            # A path filter or an environment value is not a run, so without the
+            # matrix step the file it expands to is reported.
+            self.assertIn("tools/test_alpha.py: no ATDD scenario or workflow runs it",
+                          problems([host_run, discover, gamma_run]))
+            self.assertIn("tools/test_beta.py: tools/host.py does not run it", problems([alpha_run, discover, gamma_run]))
+            # A filter after the file runs only part of it.
+            self.assertIn("tools/test_gamma.py: no ATDD",
+                          problems([host_run, alpha_run, discover, [*gamma_run, "Cases"]]))
+            self.assertIn("tools/test_data/apps/test_delta.py: no ATDD", problems([host_run, alpha_run, gamma_run]))
+            # Entries stay exact: stale and unknown entries are reported.
+            self.assertIn("tools/test_gamma.py: runs whole", problems(not_run={"tools/test_gamma.py": "stale"}))
+            self.assertIn("tools/test_missing.py: listed, but there is no such test file",
+                          problems(not_run={"tools/test_missing.py": "gone"}))
+            # Run inside a host only while the host still runs or imports it.
+            imports = {**inside, "tools/test_alpha.py": ("tools/test_gamma.py", "imports", (), "Cases")}
+            self.assertEqual(problems([host_run, discover, gamma_run], imports), "")
+            (root / "tools/host.py").write_text("SUITE = 'other.py'\n")
+            self.assertIn("tools/test_beta.py: tools/host.py does not run it", problems())
+            (root / "tools/test_gamma.py").write_text("import unittest\nfrom test_alpha import helper\n" + main)
+            self.assertIn("tools/test_alpha.py: tools/test_gamma.py does not import it",
+                          problems([host_run, discover, gamma_run], imports))
+
+    def test_the_test_registry_refuses_each_reviewed_gap(self):
+        for planted in PLANTED:
+            with self.subTest(planted.__name__), \
+                    tempfile.TemporaryDirectory(prefix="zeno-fcis-test-registry-") as raw:
+                root = Path(raw)
+                subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+                case = planted(root)
+                problems = planted_problems(root, case)
+                for refused in case["refused"]:
+                    self.assertIn(refused, problems)
+                for kept in case["kept"]:
+                    self.assertNotIn(kept, problems)
+                # Wiring the reported gap the honest way leaves nothing to report.
+                if planted is planted_no_full_scenario_run:
+                    case["workflows"].append(RUNS_EVERY_SCENARIO)
+                    self.assertEqual(planted_problems(root, case), "")
+
+    def test_the_matrix_reader_refuses_shapes_it_does_not_read(self):
+        def workflow(matrix):
+            return ("jobs:\n  check:\n    strategy:\n      matrix:\n" + textwrap.indent(matrix, " " * 8)
+                    + "    env:\n      SCRIPT: ${{ matrix.script }}\n    steps:\n"
+                    "      - run: python3 \"tools/test_${SCRIPT}\"\n")
+
+        self.assertEqual(workflow_commands(workflow("include:\n  - {gate: one, script: 'a.py'}  # quoted\n")),
+                         [["python3", "tools/test_a.py"]])
+        for unread in ("include:\n  - gate: one\n    script: a.py\n",       # a block mapping row
+                       "script: [a.py, b.py]\n",                            # a matrix variable
+                       'include: [{"gate": "one", "script": "a.py"}]\n',   # a flow sequence
+                       "include:\n  - {gate: one, script: {nested: a.py}}\n",
+                       "include:\n  - {gate: one, script: a.py, script: b.py}\n"):
+            with self.subTest(unread):
+                with self.assertRaises(ValueError):
+                    workflow_commands(workflow(unread))
+        two = workflow("include:\n  - {script: a.py}\n").replace("jobs:\n", "jobs:\n  other:\n    strategy:\n"
+                                                                 "      matrix:\n        include: []\n", 1)
+        with self.assertRaises(ValueError):
+            workflow_commands(two)
+        # The matrix is read only when a bound name is used, so other shapes elsewhere stay unread.
+        self.assertEqual(workflow_commands("jobs:\n  check:\n    strategy:\n      matrix:\n        include: [\n"
+                                           "          {\"group\": \"one\"}]\n    steps:\n      - run: python3 x.py\n"),
+                         [["python3", "x.py"]])
 
 
 if __name__ == "__main__":

@@ -69,11 +69,13 @@ def validate_resolved_graph(reference: dict, locked: dict, metadata: dict,
 
 
 def resolve_reviewed_graph(directory: Path, local_manifests: dict[tuple[str, str], Path],
-                           environment: dict[str, str]) -> dict:
+                           environment: dict[str, str], *, resolved_lock: bool = False) -> dict:
     # Only this newly created workspace's lock may change. Cargo retains the
     # reviewed external versions while reconciling the different local roots.
-    shutil.copyfile(ROOT / "Cargo.lock", directory / "Cargo.lock")
+    if not resolved_lock:
+        shutil.copyfile(ROOT / "Cargo.lock", directory / "Cargo.lock")
     metadata = json.loads(run(["cargo", "+1.97.1", "metadata", "--offline",
+                               *(["--locked"] if resolved_lock else []),
                                "--format-version", "1"], directory, capture=True,
                               environment=environment))
     reference = tomllib.loads((ROOT / "Cargo.lock").read_text())
@@ -163,9 +165,10 @@ def check_generated_binding(app: Path, package_roots: dict[str, Path], version: 
 
     The manifest must end with a `[patch.crates-io]` section that points
     exactly the packages the application needs at these package roots, in
-    sorted order, with no other resolver override; `Cargo.lock` must be the
-    source tree's lock and `rust-toolchain.toml` its toolchain file, byte for
-    byte. Each check runs before any Cargo command can change a file.
+    sorted order, with no other resolver override. Contract apps carry their
+    own resolved lock, restricted to the source lock's external identities;
+    legacy templates copy the source lock. The toolchain file is byte identical.
+    Each check runs before any Cargo command can change a file.
     """
     manifest = app / "Cargo.toml"
     text = manifest.read_text()
@@ -182,7 +185,28 @@ def check_generated_binding(app: Path, package_roots: dict[str, Path], version: 
     if section != expected:
         raise RuntimeError("generated binding differs from the needed packages and their source paths")
     tree = binding_tree(package_roots)
-    if (app / "Cargo.lock").read_bytes() != (tree / "Cargo.lock").read_bytes():
+    if emitted.get("lib", {}).get("name") == "application":
+        reference = tomllib.loads((tree / "Cargo.lock").read_text())
+        locked = tomllib.loads((app / "Cargo.lock").read_text())
+        def identity(package):
+            return tuple(package.get(field) for field in
+                         ("name", "version", "source", "checksum"))
+        admitted = {identity(package) for package in reference.get("package", []) if package.get("source")}
+        root_package = (emitted["package"]["name"], emitted["package"]["version"])
+        local = {(name, version) for name in selected} | {root_package}
+        found = False
+        for package in locked.get("package", []):
+            if package.get("source"):
+                if identity(package) not in admitted:
+                    raise RuntimeError("generated Cargo.lock selects an external identity outside the source lock")
+            else:
+                key = (package["name"], package["version"])
+                if key not in local:
+                    raise RuntimeError("generated Cargo.lock selects an unbound local package")
+                found |= key == root_package
+        if not found:
+            raise RuntimeError("generated Cargo.lock omits the application package")
+    elif (app / "Cargo.lock").read_bytes() != (tree / "Cargo.lock").read_bytes():
         raise RuntimeError("generated Cargo.lock differs from the source tree's lock")
     toolchain = tree / "rust-toolchain.toml"
     copied = app / "rust-toolchain.toml"
@@ -200,7 +224,8 @@ def exercise_rust_application(app: Path, directory: Path, package_roots: dict[st
     binding = check_generated_binding(app, package_roots, version)
     allowed = {(name, version): path / "Cargo.toml" for name, path in package_roots.items()}
     allowed[(consumer["name"], consumer["version"])] = manifest
-    graph = resolve_reviewed_graph(app, allowed, environment)
+    graph = resolve_reviewed_graph(app, allowed, environment,
+        resolved_lock=tomllib.loads(manifest.read_text()).get("lib", {}).get("name") == "application")
     commands = [
         ["cargo", "+1.97.1", "fmt", "--all", "--", "--check"],
         ["cargo", "+1.97.1", "clippy", "--all-targets", "--locked", "--offline", "--", "-D", "warnings"],

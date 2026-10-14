@@ -39,6 +39,7 @@
 //! it emits enter the same admission and `transform::check` path as a whole
 //! candidate. No model-supplied code, path or callback is executed anywhere.
 
+pub(crate) mod acquisition;
 pub(crate) mod feedback;
 pub(crate) mod incumbent;
 pub(crate) mod ledger;
@@ -49,6 +50,7 @@ pub(crate) mod program_json;
 pub(crate) mod request;
 pub(crate) mod session;
 pub(crate) mod strategy;
+mod value_types;
 
 use serde_json::Value;
 

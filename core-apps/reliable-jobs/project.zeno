@@ -1,0 +1,51 @@
+zeno 1;
+project 1 reliable_jobs;
+namespace 2 core_apps;
+type 100 state Job;
+type 101 command JobCommand;
+type 102 context LogicalTime;
+type 103 destination Worker;
+type 104 payload Attempt;
+type 105 int Attempts in 0..=3;
+type 106 int Phase in 0..=3;
+type 107 int Clock in 0..=4;
+type 108 bool Flag;
+type 109 data Action;
+field 110 100 remaining 105;
+field 111 100 phase 106;
+field 112 100 deadline_last 107;
+field 113 100 reached 108;
+field 114 100 clock 107;
+field 120 101 action 109;
+field 121 101 attempt 105;
+field 130 102 now 107;
+field 131 102 authorized 108;
+field 140 104 active_attempt 105;
+field 141 104 unit 105;
+variant 150 109 Start none;
+variant 151 109 Fail none;
+variant 152 109 Succeed none;
+reason 204 invalid_coupled_state precedence 0;
+reason 200 not_authorized precedence 1;
+reason 206 regressing_clock precedence 2;
+reason 201 attempts_exhausted precedence 3;
+reason 205 stale_attempt precedence 4;
+reason 203 before_backoff precedence 5;
+reason 202 wrong_phase precedence 6;
+channel 300 execute destination 103 payload 104;
+// Logical owners and their projections are pinned in composition.json.
+// The complete application is one physical Authority and atomic publication.
+component 400 job {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+law 500 coherent_job_state on commit, genesis = ((post.100.112 == 0 && post.100.113 == 0) || (post.100.112 == 4 && post.100.113 == 1)) && post.100.114 >= post.100.112 && (post.100.111 == 0 -> post.100.110 == 3 && post.100.112 == 0 && post.100.113 == 0 && post.100.114 == 0) && (post.100.111 != 0 -> post.100.110 <= 2);
+law 501 authorized_current_attempt on accept = context.102.131 == 1 && context.102.130 >= pre.100.114 && (command.101.120 == 150 && (pre.100.111 == 0 || pre.100.111 == 2) -> command.101.121 == 4 - pre.100.110) && (!(command.101.120 == 150 && (pre.100.111 == 0 || pre.100.111 == 2)) -> command.101.121 == 3 - pre.100.110);
+law 502 charge_once_and_exact_lifecycle on accept = (command.101.120 == 150 -> (pre.100.111 == 1 -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111 && post.100.114 == pre.100.114) && (pre.100.111 != 1 -> (pre.100.111 == 0 || pre.100.111 == 2) && pre.100.110 > 0 && post.100.110 + 1 == pre.100.110 && post.100.111 == 1 && post.100.114 == context.102.130)) && (command.101.120 == 151 -> pre.100.111 == 1 && post.100.111 == 2 && post.100.110 == pre.100.110 && post.100.114 == context.102.130) && (command.101.120 == 152 -> (pre.100.111 == 1 || pre.100.111 == 3) && post.100.111 == 3 && post.100.110 == pre.100.110 && (pre.100.111 == 1 -> post.100.114 == context.102.130) && (pre.100.111 == 3 -> post.100.114 == pre.100.114));
+law 503 intent_equals_new_charged_attempt on commit = outbox.104 <= 1 && (command.101.120 == 150 && pre.100.111 != 1 -> outbox.104 == 1 && outbox.104.140 == 3 - post.100.110 && outbox.104.141 == 1) && (!(command.101.120 == 150 && pre.100.111 != 1) -> outbox.104 == 0 && outbox.104.140 == 0 && outbox.104.141 == 0);
+law 504 logical_backoff_and_deadline_frame on accept = (command.101.120 == 150 && pre.100.111 == 2 && pre.100.113 == 0 -> context.102.130 >= 4 && post.100.112 == context.102.130 && post.100.113 == 1) && (!(command.101.120 == 150 && pre.100.111 == 2 && pre.100.113 == 0) -> post.100.112 == pre.100.112 && post.100.113 == pre.100.113);

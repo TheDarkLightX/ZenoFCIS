@@ -53,7 +53,7 @@ beyond them.
 The ordinary installer requires a fresh source-bound finite certificate and
 refuses missing or stale evidence. Its stored reference is **Identified**;
 actual exhaustive replay establishes **Proved for the closed finite scope**
-under the [named trusted base](../FINITE_PROOFS.md). The independent Root
+under the [named trusted base](../FINITE_PROOFS.md). The independent
 reference and the complete example corpus check every declared input tuple.
 `authority` remains none and `family_theorem` remains null: this is not an
 unbounded parameter theorem, Lean `KernelChecked`, authentication or release

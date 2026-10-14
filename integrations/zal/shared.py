@@ -13,7 +13,7 @@ import tempfile
 import time
 
 from behavior import Refusal, canonical, parse
-from workflow import Session
+from workflow import Session, owned_examples
 
 
 MAX_SNAPSHOT = 32 * 1024 * 1024
@@ -50,7 +50,7 @@ class SharedWorkspace:
         if not isinstance(saved, dict) or set(saved) != {"schema", "session"} or saved["schema"] != "zal/shared-workspace/1":
             raise Refusal("Unknown shared workspace format")
         data = saved["session"]
-        session = Session(parse(data["model"]["symbolic"]))
+        session = Session(parse(data["model"]["symbolic"]), evidence=data["evidence"])
         if session.model.revision != data["model"]["revision"] or data["agreement"] not in {"seed-example", "human-accepted"} or data["realization"] != "not-run":
             raise Refusal("Workspace identity/status mismatch")
         events = data["events"]
@@ -62,6 +62,7 @@ class SharedWorkspace:
         if session.selected not in session.objects():
             raise Refusal("Workspace selection has an unknown typed ID")
         session.agreement = data["agreement"]
+        session.owner_examples = owned_examples(data.get("owner_examples", []))
         # Preserve the proposal's original source-bound evidence. accept_human
         # reruns current checks and refuses a stale checker closure.
         proposal = data["proposal"]

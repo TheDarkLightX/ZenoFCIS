@@ -1,14 +1,8 @@
 # Generated application and translation milestone
 
-Base: `4025ccdcaaa455e3d7e5626153c92ecf6c997026`.
-Worktree: `<workdir>`.
-Branch: `agent/generated-app-translation-20260905`.
-
-This is the first implementation milestone from the architecture review. It
-adds a bounded adopter journey and strengthens existing translation evidence.
-It is a development candidate, not a new RC3 release or deployment approval.
-Lean stays pinned at 4.30.0. No Lean installation, update, or additional local
-runtime copy is authorized by this milestone.
+This milestone adds a bounded adopter journey and strengthens existing
+translation evidence. It is a development candidate, not a new RC3 release or
+deployment approval. Lean stays pinned at 4.30.0.
 
 ## Scope and contracts
 

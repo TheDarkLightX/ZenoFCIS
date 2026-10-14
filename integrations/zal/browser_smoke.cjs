@@ -4,6 +4,7 @@
 'use strict';
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const url = process.argv[2] || 'http://127.0.0.1:8765/';
@@ -51,6 +52,34 @@ if (!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)) throw Error('Use the fresh loopb
       (await page.locator('#explanation').textContent()).includes('authorized') && providerRequests.length === 0);
     check('check advisory does not imply an unstated application invariant',
       (await page.locator('#checkAdvisories').textContent()).includes('No application invariants declared'));
+    const traceBefore = await page.evaluate(() => view.model.revision);
+    await page.locator('#traceEvent').selectOption('submit'); await page.locator('#step').click();
+    await page.waitForFunction(() => trace.length === 1 && traceState() === 'pending');
+    await page.locator('#traceEvent').selectOption('approve'); await page.locator('#step').click();
+    await page.waitForFunction(() => trace.length === 2 && trace[1].outcome.class === 'Reject');
+    await page.locator('#whyRecorded').click();
+    await page.waitForFunction(() => document.querySelector('#explanation').textContent.includes('Recorded step 2'));
+    const refusedExplanation = await page.locator('#explanation').textContent();
+    check('actual trace refusal preserves state and explains the false supplied guard',
+      await page.evaluate(() => trace[1].pre === 'pending' && trace[1].outcome.state === 'pending') &&
+      refusedExplanation.includes('authorized observed false = false') &&
+      refusedExplanation.includes('Authenticated facts: none supplied by this profile.'));
+    await page.locator('#factInputs input[data-fact="authorized"]').setChecked(true);
+    await page.locator('#step').click();
+    await page.waitForFunction(() => trace.length === 3 && traceState() === 'approved');
+    await page.locator('#traceEvent').selectOption('cancel'); await page.locator('#step').click();
+    await page.waitForFunction(() => trace.length === 4 && trace[3].outcome.class === 'Reject');
+    check('supplied true observation allows approval; default cancellation keeps approved state',
+      await page.evaluate(base => trace[2].outcome.rule === 'approve_order' &&
+        trace[3].outcome.rule === 'default' && traceState() === 'approved' && view.model.revision === base, traceBefore));
+    const traceMetadata = await page.evaluate(() => api('trace', { revision: view.model.revision, inputs: traceInputs }));
+    check('actual HTTP trace distinguishes each supplied observation from authenticated facts',
+      traceMetadata.authenticated_facts.length === 0 &&
+      traceMetadata.supplied_assumptions.steps.length === 4 &&
+      traceMetadata.supplied_assumptions.steps[2].observations.authorized === true);
+    await page.locator('#restart').click();
+    check('trace restart recovers the initial state without changing the model',
+      await page.evaluate(base => trace.length === 0 && traceState() === 'draft' && view.model.revision === base, traceBefore));
     const helpTarget = page.locator('[data-object="rule:approve_order"]');
     await helpTarget.focus();
     await page.waitForFunction(() => document.querySelector('#helpPreview').textContent.includes('Meaning of rule:approve_order'));
@@ -123,7 +152,7 @@ if (!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)) throw Error('Use the fresh loopb
     }));
     await page.locator('#accept').click();
     await page.waitForFunction(() => view.agreement === 'human-accepted' && !view.proposal);
-    check('human acceptance changes exact revision only', await page.evaluate(revision => view.model.revision !== revision && view.realization === 'not-run', initial));
+    check('scripted acceptance changes exact revision only', await page.evaluate(revision => view.model.revision !== revision && view.realization === 'not-run', initial));
     await peer.waitForFunction(base => view.model.revision !== base, initial);
     check('other-tab acceptance preserves dirty editor text and exact old base',
       await peer.evaluate(({ base, draft }) => editorBase === base && editorDirty &&
@@ -186,8 +215,25 @@ if (!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)) throw Error('Use the fresh loopb
     await page.locator('#question').focus(); await page.locator('#question').fill('A draft survives polling.');
     await page.waitForTimeout(1100);
     check('polling does not steal focus or draft', await page.evaluate(() => document.activeElement.id === 'question' && document.querySelector('#question').value === 'A draft survives polling.' && scrub === 2));
-    const exported = await page.evaluate(async () => { const r = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-ZAL-Client': token }, body: '{}' }); return { status: r.status, data: await r.json() }; });
-    check('agreed finite profile exports factory declarations', exported.status === 200 && exported.data.files['v2/policy.json'] && exported.data.authority === 'none');
+    pendingRefusals.set(url + 'api/export', 'HTTP400 missing export display tokens');
+    const missingExport = await page.evaluate(async () => { const r = await fetch('/api/export', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-ZAL-Client': token }, body: '{}' }); return { status: r.status, data: await r.json() }; });
+    check('export independently refuses missing displayed revision before download',
+      missingExport.status === 400 && missingExport.data.error.includes('missing displayed revision'));
+    const downloading = page.waitForEvent('download');
+    await page.locator('#export').click();
+    const downloaded = await downloading;
+    const exported = JSON.parse(await fs.readFile(await downloaded.path(), 'utf8'));
+    await downloaded.saveAs(path.join(output, 'reviewed-declarations.json'));
+    check('actual browser export button downloads the exact reviewed declaration receipt',
+      !!exported.files['v2/policy.json'] && exported.authority === 'none' &&
+      exported.review.revision === await page.evaluate(() => view.model.revision) &&
+      exported.review.checker === await page.evaluate(() => view.evidence.checker) &&
+      exported.review.examples_digest === await page.evaluate(() => view.examples_digest) &&
+      exported.review.factory_qualification === 'not-run');
+    assert.deepEqual(JSON.parse(exported.files['zal-review.json']), exported.review);
+    check('downloaded declaration bytes match every reviewed receipt digest',
+      Object.entries(exported.review.files).every(([name, digest]) =>
+        createHash('sha256').update(exported.files[name], 'ascii').digest('hex') === digest));
     await page.locator('#editButton').click();
     const older = (await page.locator('#sourceEditor').inputValue()).replaceAll('not_enabled', 'older_reason');
     await page.locator('#sourceEditor').fill(older);
@@ -225,12 +271,14 @@ if (!/^http:\/\/127\.0\.0\.1:\d+\/$/.test(url)) throw Error('Use the fresh loopb
     check('mobile help fits viewport', await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.keyboard.press('Escape');
     check('dialog returns focus to trigger', await page.evaluate(() => document.activeElement.id === 'legendButton'));
-    check('all deliberate HTTP refusals were classified exactly once', pendingRefusals.size === 0 && expectedRefusals.length === 2);
+    check('all deliberate HTTP refusals were classified exactly once', pendingRefusals.size === 0 && expectedRefusals.length === 3);
     check('no live provider action during browser checks', providerRequests.length === 0);
     check('no unexpected browser or CSP errors', errors.length === 0);
     const report = { schema: 'zal/browser-check/1', network_path: 'native browser to loopback HTTP', checks,
       errors, expected_refusals: expectedRefusals, viewport: { width: 1440, height: 1000 }, measurements, live_model: 'not-run',
-      limitations: ['Not a complete WCAG audit', 'No production adoption or usage-equivalence check'] };
+      limitations: ['Not a complete WCAG audit', 'No production adoption or usage-equivalence check',
+        'Review gestures are browser automation, not a real person approving meaning',
+        'No independent owner-labelled examples or authenticated facts were supplied'] };
     await fs.writeFile(path.join(output, 'browser-report.json'), JSON.stringify(report, null, 2) + '\n');
     console.log(JSON.stringify(report, null, 2));
   } finally { await browser.close(); }

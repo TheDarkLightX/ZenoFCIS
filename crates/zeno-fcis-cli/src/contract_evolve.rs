@@ -422,6 +422,11 @@ fn report(dir: &Path, plan: &EvolutionPlan, artifacts: &[String], format: Output
                         })).collect::<Vec<_>>(),
                     }),
                 );
+                if !migration.dropped.is_empty()
+                    && let Some(serde_json::Value::Object(report)) = fields.get_mut("migration")
+                {
+                    report.insert("dropped".to_owned(), json!(migration.dropped));
+                }
             }
             print_json(&json!({
                 "schema": JSON_SCHEMA, "status": "evolved", "path": dir.display().to_string(),

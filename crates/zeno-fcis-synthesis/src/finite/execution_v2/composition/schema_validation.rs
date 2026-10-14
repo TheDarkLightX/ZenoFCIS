@@ -7,6 +7,9 @@ pub(super) mod spec;
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::atom(domain,value),))]
 pub(super) fn atom(domain: Domain<'_>, value: Atom<'_>) -> bool {
     match (domain, value) {
+        (Domain::Canonical { schema, type_id }, Atom::Canonical(v)) => {
+            type_id == v.type_id() && super::super::util::bytes_equal(schema, v.schema())
+        }
         (Domain::Bool, Atom::Bool(_)) | (Domain::Bytes, Atom::Bytes(_)) => true,
         (Domain::Text, Atom::Text(bytes)) => super::super::util::ascii(bytes),
         (Domain::I128 { min, max }, Atom::I128(v)) => min <= v && v <= max,
@@ -29,7 +32,7 @@ pub(super) fn atom(domain: Domain<'_>, value: Atom<'_>) -> bool {
     }
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::payload(fields@,schema@),))]
-fn payload(fields: &[Field<'_>], schema: &[TypedField<'_>]) -> bool {
+pub(super) fn payload(fields: &[Field<'_>], schema: &[TypedField<'_>]) -> bool {
     if fields.len() != schema.len() {
         return false;
     }
@@ -45,32 +48,15 @@ fn payload(fields: &[Field<'_>], schema: &[TypedField<'_>]) -> bool {
     }
     true
 }
-#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::deliveries(d,input@.map(|_:int,x:decision::Delivery|decision::spec::delivery_view(x))),))]
-fn deliveries(d: &Descriptor<'_>, input: &[decision::Delivery<'_>]) -> bool {
-    let mut i = 0usize;
-    #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=input.len(),forall|j:int|0<=j<i==>spec::delivery(d,decision::spec::delivery_view(input@[j])),decreases input.len()-i,))]
-    while i < input.len() {
-        let p = &input[i];
-        let Some(c) = admission::channel(d, p.channel) else {
-            #[cfg(verus_keep_ghost)]
-            proof! {let mapped=input@.map(|_:int,x:decision::Delivery|decision::spec::delivery_view(x));assert(mapped.len()==input@.len());assert(mapped[i as int]==decision::spec::delivery_view(input@[i as int]));assert(!spec::delivery(d,mapped[i as int]));assert(exists|j:int|0<=j<mapped.len()&&!spec::delivery(d,mapped[j]));}
-            return false;
-        };
-        if !atom(c.destination, p.destination)
-            || !atom(c.idempotency, p.idempotency)
-            || !payload(&p.payload, c.payload)
-        {
-            #[cfg(verus_keep_ghost)]
-            proof! {let mapped=input@.map(|_:int,x:decision::Delivery|decision::spec::delivery_view(x));assert(mapped.len()==input@.len());assert(mapped[i as int]==decision::spec::delivery_view(input@[i as int]));assert(!spec::delivery(d,mapped[i as int]));assert(exists|j:int|0<=j<mapped.len()&&!spec::delivery(d,mapped[j]));}
-            return false;
-        }
-        i += 1;
-    }
-    true
-}
+// Correspondence adapter for the legacy proof; execution uses shared::candidate.
+#[cfg(verus_keep_ghost)]
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::candidate(d,decision::spec::candidate_view(*input)),))]
 pub(super) fn candidate(d: &Descriptor<'_>, input: &Candidate<'_>) -> bool {
-    deliveries(d, input.effects()) && deliveries(d, input.outbox())
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        shared::spec::legacy_candidate(d, decision::spec::candidate_view(*input));
+    }
+    shared::candidate(&d.project(), input)
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::expression(domain,expr),))]
 pub(super) fn expression(domain: Domain<'_>, expr: Expr<'_>) -> bool {

@@ -14,6 +14,8 @@ extern crate std;
 
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/canonical_v2/mod.rs"]
 pub mod canonical_v2;
+#[path = "../../crates/zeno-fcis-synthesis/src/finite/value/mod.rs"]
+mod value;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/evaluation/mod.rs"]
 pub mod evaluation;
 #[path = "../../crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs"]
@@ -36,3 +38,18 @@ pub use execution_v2::execution as checker_execution;
 mod checker;
 #[path = "../../crates/zeno-fcis-shell-sqlite/src/v2/equivalence/checker_api.rs"]
 pub mod checker_api;
+
+// The same actual CLI helper body; no adapter or executable model.
+#[path = "../../crates/zeno-fcis-cli/src/neural_loop/ledger_membership.rs"]
+mod ledger_membership;
+
+// Include the actual owned types/accounting body at their production depth.
+// Only module aliases differ; there is no executable representation adapter.
+#[path = "../../crates/zeno-fcis-cli/src/neural_loop/value_types.rs"]
+mod value_types;
+#[path = "../../crates/zeno-fcis-cli/src/neural_loop"]
+mod ledger {
+    use crate::ledger_membership as membership;
+    #[path = "ledger_accounting.rs"]
+    mod accounting;
+}

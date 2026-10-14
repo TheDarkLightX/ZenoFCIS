@@ -1,0 +1,737 @@
+{
+  "arithmetic_negative": "Remove endpoint boundary guards: actual checked arithmetic MIN-1/MAX+1 must be refused by native contract checking, never published.",
+  "c3": [
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 0
+        }
+      },
+      "state": [
+        "0"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "value": 1
+        }
+      },
+      "state": [
+        "0"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 0
+        }
+      },
+      "state": [
+        "0"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 202,
+        "state": {
+          "value": 0
+        }
+      },
+      "state": [
+        "0"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 1
+        }
+      },
+      "state": [
+        "1"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "value": 2
+        }
+      },
+      "state": [
+        "1"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 1
+        }
+      },
+      "state": [
+        "1"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "value": 0
+        }
+      },
+      "state": [
+        "1"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 2
+        }
+      },
+      "state": [
+        "2"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "value": 3
+        }
+      },
+      "state": [
+        "2"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 2
+        }
+      },
+      "state": [
+        "2"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "value": 1
+        }
+      },
+      "state": [
+        "2"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 3
+        }
+      },
+      "state": [
+        "3"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Inc",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 201,
+        "state": {
+          "value": 3
+        }
+      },
+      "state": [
+        "3"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "value": 3
+        }
+      },
+      "state": [
+        "3"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Dec",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "value": 2
+        }
+      },
+      "state": [
+        "3"
+      ]
+    }
+  ],
+  "client_negatives": [
+    "uppercase-hex",
+    "odd-hex",
+    "nonhex",
+    "duplicate-frame-field",
+    "wrong-frame-schema",
+    "wrong-frame-profile",
+    "missing-newline",
+    "extra-newline",
+    "output-cap",
+    "timeout-unknown",
+    "binding-mismatch"
+  ],
+  "derivation": "C3 supplied public-semantics examples; endpoint truth table fixed before execution. Implementation collaboration, no independent review claim.",
+  "endpoints": [
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775806",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775807",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775806",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 201,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775807",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775806",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775807",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775806",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 201,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775807",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 201,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775808",
+        "9223372036854775806"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775806",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775807",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775806",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 201,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Up",
+        "command.probe=9223372036854775807",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 201,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775806",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775807",
+        "context.authorized=false"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 200,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775806",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Reject",
+        "deliveries": [],
+        "reason": 201,
+        "state": {
+          "high": 9223372036854775807,
+          "low": -9223372036854775807
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    },
+    {
+      "arguments": [
+        "command.action=Down",
+        "command.probe=9223372036854775807",
+        "context.authorized=true"
+      ],
+      "expected": {
+        "class": "Accept",
+        "deliveries": [],
+        "reason": null,
+        "state": {
+          "high": 9223372036854775806,
+          "low": -9223372036854775808
+        }
+      },
+      "state": [
+        "-9223372036854775807",
+        "9223372036854775807"
+      ]
+    }
+  ],
+  "native_negatives": [
+    {
+      "case": "bad-magic",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "truncated-header",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "truncated-envelope",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "trailing-frame-byte",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "oversized-frame",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "length-mismatch",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "wrong-command-root",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "wrong-command-schema",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "wrong-context-root",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "wrong-context-schema",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "uint-instead-of-bool",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "enum-instead-of-sum",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "sum-with-payload",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "unknown-variant",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "extra-field",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "duplicate-field",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "unknown-word",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "duplicate-word",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "missing-word",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "bool-domain",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "integer-outside-i64",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "frame-and-words",
+      "exit": 64,
+      "writes": false
+    },
+    {
+      "case": "unsupported-byte-profile",
+      "exit": 1,
+      "writes": false
+    },
+    {
+      "case": "unsupported-uint-profile",
+      "exit": 1,
+      "writes": false
+    }
+  ],
+  "profile": "zeno-fcis/native-scalar-consumer/1",
+  "schema": "zeno-fcis/ocaml-consumer-expected/1"
+}

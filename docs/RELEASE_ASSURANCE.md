@@ -188,6 +188,14 @@ Any failed gate blocks release. Repair occurs in a new commit, followed by a com
 
 SQLite schema v5 creates a store only from nominal `CatalogAuthorizedGenesis`, persists the exact initial state/root/policy/law-evaluation/authorization identity, and revalidates that record on reopen without caller-supplied state. It consumes nominal `CatalogAuthorizedTransition` values and stores the exact policy, invocation, replay, authorization, candidate, bundle, receipt, and outbox identities in one transaction. Reopen strictly decodes and reauthorizes the gap-free transition sequence, reconstructs exact row-set equality, and requires the resulting state/root/version to equal the current semantic row. Replay and pending delivery repeat exact persisted-candidate validation. Delivery identities are derived from the implementation-neutral candidate and canonical outbox entry in both reference and SQLite shells. A crash before commit leaves no publication. A crash after commit is recovered by exact idempotent replay and delivery acknowledgement. Schema v4 and earlier or populated unversioned stores fail closed pending explicit migration. Operators must never edit genesis, policy, authorization, replay, receipt, or outbox rows to force progress.
 
+Every connection that can write a V2 SQLite store uses `synchronous=EXTRA` on
+every platform: each commit also syncs the folder after deleting its rollback
+journal, the step that makes the commit final. On Apple platforms the shell
+also turns on `fullfsync`, so SQLite's file syncs, checkpoints included, use
+`F_FULLFSYNC`; its folder syncs stay a plain `fsync`. These settings request
+syncs; whether a commit survives power loss still depends on the drive
+honouring them.
+
 ## Deliberate narrowings
 
 ### Packaged tests compile only in the repository layout
@@ -210,8 +218,8 @@ Two frozen, pinned references force this allowance: the `#[cfg(test)]`
 `#[path]` include in `crates/zeno-fcis-synthesis/src/finite/execution_v2/mod.rs`
 and the two `verification/verus/` includes in
 `crates/zeno-fcis-synthesis/tests/v2_evaluator_identity.rs`. Open item: restore
-standalone packaged tests when the verified sources next change, which is the
-identity regeneration planned for the 2.1.0 release.
+standalone packaged tests at the next identity regeneration, when the verified
+sources next change.
 
 ### Five tests are not interpreted by Miri
 
@@ -315,6 +323,15 @@ The repository currently supplies reviewed reference implementations and strict 
 - that a release tag proves its artifacts were originally built and signed on
   that tag;
 - that finite exhaustive replay over a complete declared domain transfers to
-  arbitrary cores, undeclared inputs, or an untrusted base.
+  arbitrary cores, undeclared inputs, or an untrusted base;
+- that the macOS executable is signed with a Developer ID or notarized: it
+  carries only the linker's ad-hoc signature;
+- a contained checker runtime on macOS, where `loop` commands and
+  `transform check --offline-parallel` exit 2 without running;
+- that macOS qualification extends beyond its installed-binary journey on
+  GitHub's macOS 15 arm64 image, or that Linux evidence covers macOS;
+- that the release custody check rebuilds anything: it is not a
+  reproducible-build proof and does not authenticate the runner, compiler or
+  linker.
 
 Those claims require separately bound evidence and an explicit deployment decision.

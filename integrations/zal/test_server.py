@@ -4,11 +4,14 @@ import json
 from pathlib import Path
 import threading
 import time
+import tempfile
 import unittest
 
 from behavior import Refusal
 from server import Workspace
+from shared import SharedWorkspace
 from test_behavior import SOURCE
+from workflow import examples_digest
 
 
 class ControlledTransport:
@@ -93,13 +96,112 @@ class ServerTests(unittest.TestCase):
         with self.assertRaises(Refusal):
             self.work.action("accept", {"base_revision": self.revision, "candidate_revision": "invented"})
 
+    def test_http_decision_and_trace_disclose_supplied_inputs_without_authentication(self):
+        before = self.work.view()
+        decision = self.work.action("decision", {"revision": self.revision, "state": "pending",
+                                   "event": "approve", "context": {"authorized": False}})
+        self.assertEqual(decision["supplied_assumptions"], {"observations": {"authorized": False}})
+        self.assertEqual(decision["authenticated_facts"], [])
+        self.assertEqual(decision["outcome"]["class"], "Reject")
+        self.assertEqual(decision["outcome"]["state"], "pending")
+        trace = self.work.action("trace", {"revision": self.revision, "inputs": [
+            {"event": "submit", "context": {"authorized": False}},
+            {"event": "approve", "context": {"authorized": True}},
+        ]})
+        self.assertEqual(trace["supplied_assumptions"], {"steps": [
+            {"observations": {"authorized": False}}, {"observations": {"authorized": True}}]})
+        self.assertEqual(trace["authenticated_facts"], [])
+        self.assertEqual(trace["trace"][1]["outcome"]["state"], "approved")
+        self.assertEqual(self.work.view(), before)
+
     def test_agreed_future_requirement_still_cannot_export(self):
         self.work.action("propose", {"surface": SOURCE + "unresolved liveness: pending resolves;\n", "syntax": "symbolic", "revision": self.revision})
         candidate = self.work.session.proposal["revision"]
-        self.work.action("accept", {"base_revision": self.revision, "candidate_revision": candidate})
+        self.work.action("accept", {"base_revision": self.revision, "candidate_revision": candidate,
+                                  "examples_digest": self.work.view()["examples_digest"]})
         self.assertEqual(self.work.session.agreement, "human-accepted")
-        with self.assertRaises(Refusal):
-            self.work.action("export", {})
+        with self.assertRaisesRegex(Refusal, "completed supported-profile checks"):
+            self.work.action("export", {"revision": candidate,
+                                      "examples_digest": self.work.view()["examples_digest"]})
+
+
+class ExportFreshnessTests(unittest.TestCase):
+    """Simulated review gestures exercise real shared-client export checks."""
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.path = Path(self.temporary.name) / "workspace.json"
+        self.store = SharedWorkspace(self.path)
+        self.store.initialize(SOURCE)
+        self.work = Workspace(SOURCE, Path(self.temporary.name), self.path)
+        self.review_simulated_current()
+
+    def review_simulated_current(self):
+        self.store.use(lambda session: session.accept_current_human(
+            session.model.revision, examples_digest(session.owner_examples)))
+
+    def displayed_tokens(self):
+        view = self.work.view()
+        return {"revision": view["model"]["revision"], "examples_digest": view["examples_digest"]}
+
+    def test_current_export_contains_the_reviewed_receipt_and_preserves_workspace(self):
+        tokens = self.displayed_tokens()
+        before = self.path.read_bytes()
+        result = self.work.action("export", tokens)
+        receipt = json.loads(result["files"]["zal-review.json"])
+        self.assertEqual(receipt, result["review"])
+        self.assertEqual(receipt["revision"], tokens["revision"])
+        self.assertEqual(receipt["examples_digest"], tokens["examples_digest"])
+        self.assertEqual(receipt["factory_qualification"], "not-run")
+        self.assertEqual(result["authority"], "none")
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_other_clients_label_change_refuses_old_display_and_stale_review(self):
+        tokens = self.displayed_tokens()
+        self.store.use(lambda session: session.supply_owner_example({
+            "id": "simulated_allow", "input": {"state": "pending", "event": "approve", "context": {"authorized": True}},
+            "expected": {"class": "Accept", "state": "approved", "reason": None},
+            "provenance": "simulated independent input for an export race",
+        }, session.model.revision))
+        before = self.path.read_bytes()
+        self.assertEqual(self.work.view()["model"]["revision"], tokens["revision"])
+        with self.assertRaisesRegex(Refusal, "displayed example corpus"):
+            self.work.action("export", tokens)
+        with self.assertRaisesRegex(Refusal, "Approval lacks"):
+            self.work.action("export", self.displayed_tokens())
+        self.assertEqual(self.path.read_bytes(), before)
+        self.review_simulated_current()
+        receipt = self.work.action("export", self.displayed_tokens())["review"]
+        self.assertEqual(len(receipt["owner_examples"]["cases"]), 1)
+
+    def test_missing_or_stale_display_tokens_refuse_without_mutation(self):
+        tokens = self.displayed_tokens()
+        before = self.path.read_bytes()
+        for invalid in [{}, {"revision": tokens["revision"]},
+                        {**tokens, "revision": "simulated-old-revision"},
+                        {**tokens, "examples_digest": "simulated-old-corpus"}]:
+            with self.subTest(tokens=invalid), self.assertRaisesRegex(Refusal, "displayed"):
+                self.work.action("export", invalid)
+            self.assertEqual(self.path.read_bytes(), before)
+
+    def test_pending_candidate_and_stale_checker_review_refuse_export(self):
+        tokens = self.displayed_tokens()
+        self.work.action("propose", {"surface": SOURCE + "rule cancel_approved: approved + cancel [true] -> accept cancelled;\n",
+                                     "syntax": "symbolic", "revision": tokens["revision"]})
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(Refusal, "no pending candidate"):
+            self.work.action("export", tokens)
+        self.assertEqual(self.path.read_bytes(), before)
+        self.store.use(lambda session: session.reject_human(
+            session.model.revision, session.proposal["revision"]))
+        def stale_review(session):
+            agreement = next(event for event in reversed(session.events) if event["act"] == "agree")
+            agreement["data"]["checker"] = "simulated-older-checker"
+        self.store.use(stale_review)
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(Refusal, "Approval lacks"):
+            self.work.action("export", tokens)
+        self.assertEqual(self.path.read_bytes(), before)
 
 
 if __name__ == "__main__":

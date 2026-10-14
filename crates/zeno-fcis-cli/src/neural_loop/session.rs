@@ -10,8 +10,9 @@
 //! passes the selection rule changes the incumbent. A report for a stage that
 //! is no longer pending is late and changes nothing.
 //!
-//! Resume follows the same order in two steps. [`Session::prepare_resume`]
-//! verifies the persisted data and reserves the replay work without running
+//! Resume follows the same order in two steps. [`ResumeHeader::admit`] verifies
+//! persisted bindings; [`Session::prepare_resume`] consumes that exact admission
+//! and reserves the replay work without running
 //! any of it; [`PendingReplay::reserve`] hands that reservation to the
 //! shell's durable write; only the [`ReservedReplay`] it returns can run the
 //! replay. Every resume reserves and pays for its own replay: an earlier
@@ -20,7 +21,9 @@
 
 use super::feedback::{DuplicateOf, Feedback, Witness, WitnessFault, replay_witness};
 use super::incumbent::{Cost, Incumbent, Replacement, Selection, select};
-use super::ledger::{Head, Kind, Ledger, LedgerFault, Stage};
+use super::ledger::{
+    AccountedLedger, Accounting, Head, Kind, Ledger, LedgerFault, Stage, account_ledger,
+};
 use super::profiles::ProfileRefusal;
 use super::request::{ReadmitRefusal, Request};
 use super::strategy::{SearchReport, Strategy, StrategyRefusal};
@@ -206,8 +209,8 @@ impl WorkerFailure {
     }
 }
 
-/// A completed check. Fields are private: only [`CheckJob::run`] builds one,
-/// from `transform::check` on the job's exact bytes.
+/// A completed check. Private constructors bind admission/refusal and finished
+/// range evidence to the job's exact bytes; tests also retain the serial oracle.
 #[derive(Debug)]
 pub(crate) struct Completed {
     attempt: u8,
@@ -235,8 +238,24 @@ pub(crate) struct CheckJob {
 }
 
 impl CheckJob {
-    /// Runs F3's checker on exactly the admitted pair. This is the only
-    /// constructor of a completed report (NSL-004).
+    /// Pure admission for the shell's range scheduler; the job binding stays
+    /// private until the actual source-bound range is finalized.
+    pub(crate) fn prepare_ranges(&self) -> Result<PreparedRanges<'_>, Box<CheckReport>> {
+        match transform::prepare(&self.original, &self.candidate, self.limits) {
+            Ok(prepared) => Ok(PreparedRanges {
+                job: self,
+                prepared,
+            }),
+            Err(error) => Err(Box::new(CheckReport::Completed(Completed {
+                attempt: self.attempt,
+                candidate_sha256: self.candidate_sha256.clone(),
+                result: Err(error),
+            }))),
+        }
+    }
+    /// Serial reference for state-machine and range-parity controls. Production
+    /// uses prepare_ranges/finish so its complete work plan precedes dispatch.
+    #[cfg(test)]
     pub(crate) fn run(&self) -> CheckReport {
         CheckReport::Completed(Completed {
             attempt: self.attempt,
@@ -264,6 +283,42 @@ impl CheckJob {
     /// The deterministic work reserved for this check.
     pub(crate) fn work(&self) -> u64 {
         self.work
+    }
+}
+
+pub(crate) struct PreparedRanges<'a> {
+    job: &'a CheckJob,
+    prepared: transform::PreparedCheck<'a>,
+}
+
+impl PreparedRanges<'_> {
+    pub(crate) fn dimensions(&self) -> crate::transform_plan::Dimensions {
+        self.prepared.dimensions()
+    }
+    pub(crate) fn subjects(
+        &self,
+    ) -> (
+        zeno_fcis_synthesis::finite::V2ScalarProgram<'_>,
+        zeno_fcis_synthesis::finite::V2ScalarProgram<'_>,
+    ) {
+        self.prepared.subjects()
+    }
+    pub(crate) fn limits(&self) -> transform::Limits {
+        self.job.limits
+    }
+    pub(crate) fn finish(&self, report: crate::finite_checker::RangeReport<'_, '_>) -> CheckReport {
+        let result = match self.prepared.finish(report) {
+            Ok(equivalence) => Ok(equivalence),
+            Err(transform::RangeFinishError::Semantic(error)) => Err(error),
+            Err(transform::RangeFinishError::Coverage) => {
+                return CheckReport::Failed(WorkerFailure::Unavailable("range-coverage".into()));
+            }
+        };
+        CheckReport::Completed(Completed {
+            attempt: self.job.attempt,
+            candidate_sha256: self.job.candidate_sha256.clone(),
+            result,
+        })
     }
 }
 
@@ -504,6 +559,10 @@ impl Session {
             self.close(StopReason::AttemptsExhausted);
             return Err(StopReason::AttemptsExhausted);
         }
+        // Worst-case canonical candidate hash/import/profile/ABI/refusal work.
+        // The shell persists this with the attempt before invoking a proposer.
+        let bytes = u64::from(self.request.limits().artifact_bytes);
+        self.reserve_preparation(9 * bytes + 16 * 2048 + 16 * (32 + 16 + 256 + 16) + 8192)?;
         let attempt = self.next_attempt;
         self.ledger.append(Kind::Reserved {
             attempt: Some(attempt),
@@ -516,6 +575,27 @@ impl Session {
         });
         self.next_attempt = self.next_attempt.saturating_add(1);
         Ok(Ticket { attempt })
+    }
+
+    pub(crate) fn reserve_preparation(&mut self, work: u64) -> Result<(), StopReason> {
+        if let Status::Closed(reason) = &self.status {
+            return Err(reason.clone());
+        }
+        let remaining = self
+            .request
+            .limits()
+            .session_work
+            .saturating_sub(self.ledger.accounting().work_reserved);
+        if work > remaining {
+            let reason = StopReason::Unavailable("preparation-work-exhausted".into());
+            self.close(reason.clone());
+            return Err(reason);
+        }
+        self.ledger.append(Kind::Reserved {
+            attempt: None,
+            stage: Stage::Preparation { work },
+        });
+        Ok(())
     }
 
     /// Reserves one model call at its worst-case tokens before dispatch
@@ -918,47 +998,85 @@ impl Session {
         })
     }
 
-    /// NSR-007/NSR-008/NSR-009, the first of resume's two steps. Binding and
-    /// ledger faults precede any reuse. When the bindings hold, the replay
+    /// NSR-007/NSR-008/NSR-009, the first of resume's two steps. The owned
+    /// ResumeHeader contains the actual admission or its exact refusal; faults
+    /// precede any reuse without re-reading bytes. When bindings hold, the replay
     /// work for the retained replacement and the stored witnesses is computed
     /// and reserved in the returned plan's ledger. No checker or witness
     /// replay work runs here: the plan can replay only through
     /// [`PendingReplay::reserve`], after the shell made that reservation
     /// durable.
-    pub(crate) fn prepare_resume(stored: Stored<'_>, elapsed_ms: u64) -> ResumePlan {
-        let request = match Request::readmit(stored.request, stored.original) {
-            Ok(request) => request,
-            Err(refusal) => return ResumePlan::Refused(ResumeRefusal::Request(refusal)),
-        };
-        let entries = match Ledger::parse_lines(stored.ledger) {
-            Ok(entries) => entries,
-            Err(fault) => return ResumePlan::Refused(ResumeRefusal::Ledger(fault)),
-        };
-        let mut ledger = match Ledger::from_entries(entries) {
-            Ok(ledger) => ledger,
-            Err(fault) => return ResumePlan::Refused(ResumeRefusal::Ledger(fault)),
-        };
-        let Some(expected) = stored.head else {
-            return ResumePlan::Refused(ResumeRefusal::Unverifiable);
-        };
+    pub(crate) fn prepare_resume(
+        header: Result<ResumeHeader, ResumeRefusal>,
+        replacement: Option<(&[u8], &[u8])>,
+        witnesses: Vec<(u8, Value, Vec<u8>)>,
+        elapsed_ms: u64,
+    ) -> ResumePlan {
+        match header {
+            Ok(header) => header.prepare(replacement, witnesses, elapsed_ms),
+            Err(refusal) => ResumePlan::Refused(refusal),
+        }
+    }
+}
+
+/// Owned admitted request and authenticated-with-respect-to-the-supplied-head
+/// ledger. This is not a checked incumbent: replacement/witness replay remains
+/// mandatory after its durable reservation. Only actual admission builds it.
+#[derive(Debug)]
+pub(crate) struct ResumeHeader {
+    request: Request,
+    // Owns totals computed from this exact ledger, with immutable projections.
+    accounted: AccountedLedger,
+}
+impl ResumeHeader {
+    pub(crate) fn admit(
+        request: &[u8],
+        original: &[u8],
+        ledger: &[u8],
+        head: Option<Head>,
+    ) -> Result<Self, ResumeRefusal> {
+        let request = Request::readmit(request, original).map_err(ResumeRefusal::Request)?;
+        let entries = Ledger::parse_lines(ledger).map_err(ResumeRefusal::Ledger)?;
+        let ledger = Ledger::from_entries(entries).map_err(ResumeRefusal::Ledger)?;
+        let expected = head.ok_or(ResumeRefusal::Unverifiable)?;
         let found = ledger.head();
         if expected != found {
-            return ResumePlan::Refused(ResumeRefusal::RollbackSuspected { expected, found });
+            return Err(ResumeRefusal::RollbackSuspected { expected, found });
         }
         match ledger.entries().first().map(|entry| &entry.kind) {
             Some(Kind::Opened {
                 request_id,
                 checker,
             }) if request_id == request.id() && checker == request.checker() => {}
-            _ => return ResumePlan::Refused(ResumeRefusal::RequestMismatch),
+            _ => return Err(ResumeRefusal::RequestMismatch),
         }
-        let totals = ledger.accounting();
+        let accounted = account_ledger(ledger);
+        Ok(Self { request, accounted })
+    }
+    pub(crate) fn request(&self) -> &Request {
+        &self.request
+    }
+    pub(crate) fn ledger(&self) -> &Ledger {
+        self.accounted.ledger()
+    }
+    pub(crate) fn accounting(&self) -> &Accounting {
+        self.accounted.totals()
+    }
+
+    fn prepare(
+        self,
+        replacement: Option<(&[u8], &[u8])>,
+        stored_witnesses: Vec<(u8, Value, Vec<u8>)>,
+        elapsed_ms: u64,
+    ) -> ResumePlan {
+        let Self { request, accounted } = self;
+        let (mut ledger, totals) = accounted.into_parts();
         let limits = *request.limits();
         let mut replay_work = 0_u64;
         let mut witnesses = Vec::new();
         let mut dropped = Vec::new();
         if let Some((_, candidate_sha256, receipt_sha256, cost)) = &totals.replaced {
-            let Some((candidate, receipt)) = stored.replacement else {
+            let Some((candidate, receipt)) = replacement else {
                 return ResumePlan::Refused(ResumeRefusal::ReplacementMissing);
             };
             if sha256_hex(candidate) != *candidate_sha256 || sha256_hex(receipt) != *receipt_sha256
@@ -980,7 +1098,7 @@ impl Session {
                 }
             }
         }
-        for (attempt, value, candidate) in &stored.witnesses {
+        for (attempt, value, candidate) in &stored_witnesses {
             let inputs = request.program().inputs();
             let outputs = request.program().outputs();
             match Witness::from_json(value, inputs, outputs) {
@@ -1010,7 +1128,7 @@ impl Session {
                 stage: Stage::Replay { work: replay_work },
             });
         }
-        let replacement = match (&totals.replaced, stored.replacement) {
+        let replacement = match (&totals.replaced, replacement) {
             (Some((attempt, _, _, cost)), Some((candidate, receipt))) => {
                 Some(RetainedReplacement {
                     attempt: *attempt,
@@ -1094,6 +1212,13 @@ pub(crate) struct ReservedReplay {
 }
 
 impl ReservedReplay {
+    pub(crate) fn remaining_ms(&self, elapsed_ms: u64) -> u64 {
+        self.plan
+            .request
+            .limits()
+            .deadline_ms
+            .saturating_sub(elapsed_ms)
+    }
     /// NSR-007/NSR-008/NSR-009, the second step: replays the retained
     /// replacement through the checker before it is trusted, and replays
     /// stored witnesses before they are reused. The replay appends nothing to
@@ -1179,23 +1304,6 @@ impl ReservedReplay {
             dropped_witnesses: dropped,
         }))
     }
-}
-
-/// Persisted session data the shell loaded (NSR-007).
-pub(crate) struct Stored<'a> {
-    /// The canonical request record.
-    pub(crate) request: &'a [u8],
-    /// The exact original bytes.
-    pub(crate) original: &'a [u8],
-    /// The ledger, one canonical entry per line.
-    pub(crate) ledger: &'a [u8],
-    /// The separately kept head, if any.
-    pub(crate) head: Option<Head>,
-    /// The latest replacement's candidate and receipt bytes, if retained.
-    pub(crate) replacement: Option<(&'a [u8], &'a [u8])>,
-    /// Stored witnesses, each with its attempt and the candidate bytes it
-    /// names.
-    pub(crate) witnesses: Vec<(u8, Value, Vec<u8>)>,
 }
 
 /// Why resume yields no trusted incumbent (NSR-009).

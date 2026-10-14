@@ -103,7 +103,7 @@ class CompositionGate(unittest.TestCase):
         self.assertTrue(source[start+len(contract):].startswith('\n    pub fn descriptor(&self)'))
         controls = gate.mutations()
         for name, replacement in (
-                ('weaken_descriptor_contract', '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures true,))]'),
+                ('weaken_descriptor_contract', '#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures (result==self.view().0) || true,))]'),
                 ('narrow_descriptor_domain', '#[cfg_attr(verus_keep_ghost,verus_spec(result=>requires false,'
                                              'ensures result==self.view().0,))]')):
             self.assertEqual(controls[name][1], source[:start]+replacement+source[start+len(contract):], name)

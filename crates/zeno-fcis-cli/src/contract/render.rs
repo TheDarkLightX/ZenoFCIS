@@ -139,6 +139,31 @@ const STATE_STEPS_DOC: &str = "\
 /// that nothing but names differ.
 ";
 
+const RECORD_STEPS_TYPES: &str = "\
+/// Closed library program: source fields, input/output domains, nodes and root.
+pub type MigrationProgram<'a> = (&'a [u16], &'a [ScalarDomain], ScalarDomain, &'a [Op], u16);
+/// Complete field source; tag 3 supplies a closed library program.
+pub type MigrationField<'a> = (u16, u8, i128, &'a [(i128, i128)], Option<MigrationProgram<'a>>);
+/// Version-2 state sources and explicit per-channel payload sources.
+pub type RecordStep<'a> = (u32, &'a [MigrationField<'a>], &'a [(u32, &'a [MigrationField<'a>])]);
+";
+
+const RECORD_STEPS_LINEAGE_DOC: &str = "\
+/// Every checked contract version and its exact adoption/evolution/mapping data.
+/// Version-2 payload maps are rechecked by the genuine SQLite lineage.
+pub fn with_lineage<R>(
+    f: impl FnOnce(
+        (
+            &[&catalog::BoundCatalog<'_>],
+            &[&str],
+            &[(u32, &str, &[(u32, &[l::Op<'static>], usize)])],
+            &[(u32, Option<&[(u16, u8, i128, &[(i128, i128)])]>)],
+            &[RecordStep<'_>],
+        ),
+    ) -> R,
+) -> Result<R, catalog::Failure> {
+";
+
 /// One evolution, as the current version's lineage declares it.
 #[derive(Clone, Debug)]
 pub(super) struct RenderedEvolution {
@@ -483,6 +508,8 @@ fn evolved_lineage(text: &mut String, options: Options<'_>) -> Result<(), Contra
         .evolutions
         .iter()
         .any(|evolution| !matches!(evolution.step, RenderedStep::BehaviourChange(_)));
+    let extended = options.evolutions.iter().any(|evolution|
+        matches!(&evolution.step, RenderedStep::Migration { migration, .. } if migration.extended()));
     for (evolution, claims) in &checked_changes {
         for claim in *claims {
             item(
@@ -549,6 +576,9 @@ fn evolved_lineage(text: &mut String, options: Options<'_>) -> Result<(), Contra
                             RenderedStep::BehaviourChange(_) => return None,
                             RenderedStep::Rename => Syntax::path("None"),
                             RenderedStep::Migration { migration, .. } => {
+                                if migration.extended() {
+                                    return None;
+                                }
                                 Syntax::call("Some", vec![migration.syntax()])
                             }
                         };
@@ -560,7 +590,29 @@ fn evolved_lineage(text: &mut String, options: Options<'_>) -> Result<(), Contra
                     .collect(),
             ),
         )?;
-        text.push_str(STATE_STEPS_LINEAGE_DOC);
+        if extended {
+            text.push_str(RECORD_STEPS_TYPES);
+            item(
+                text,
+                Some("Explicit format-2 mappings; historical delivery bytes are unchanged."),
+                "pub const RECORD_STEPS: &[RecordStep<'static>] =",
+                &Syntax::slice(
+                    options
+                        .evolutions
+                        .iter()
+                        .filter_map(|evolution| match &evolution.step {
+                            RenderedStep::Migration { migration, .. } if migration.extended() => {
+                                Some(migration.record_syntax(evolution.version))
+                            }
+                            _ => None,
+                        })
+                        .collect(),
+                ),
+            )?;
+            text.push_str(RECORD_STEPS_LINEAGE_DOC);
+        } else {
+            text.push_str(STATE_STEPS_LINEAGE_DOC);
+        }
     } else {
         text.push_str(EVOLVED_LINEAGE_DOC);
     }
@@ -589,6 +641,9 @@ fn evolved_lineage(text: &mut String, options: Options<'_>) -> Result<(), Contra
     ];
     if moves_state {
         parts.push(Syntax::path("STATE_STEPS"));
+    }
+    if extended {
+        parts.push(Syntax::path("RECORD_STEPS"));
     }
     let lineage = Syntax::tuple(parts);
     let result = Syntax::call("Ok", vec![Syntax::call("f", vec![lineage])]);

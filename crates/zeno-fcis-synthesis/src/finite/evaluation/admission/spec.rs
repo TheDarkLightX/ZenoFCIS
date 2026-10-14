@@ -95,6 +95,24 @@ pub(crate) open spec fn shape(
     else { Err(AdmissionFailure::Shape) }
 }
 
+pub(crate) open spec fn extended_shape_valid(
+    inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: nat, roots: Seq<u16>,
+) -> bool {
+    inputs.len() <= 64
+        && 0 < outputs.len() <= 64
+        && 0 < nodes <= 4096
+        && outputs.len() == roots.len()
+        && valid_domains(inputs)
+        && valid_domains(outputs)
+}
+
+pub(crate) open spec fn extended_shape(
+    inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: nat, roots: Seq<u16>,
+) -> Result<(), AdmissionFailure> {
+    if extended_shape_valid(inputs, outputs, nodes, roots) { Ok(()) }
+    else { Err(AdmissionFailure::Shape) }
+}
+
 pub(crate) open spec fn root_valid(domain: Domain, root: u16, kinds: Seq<bool>) -> bool {
     root < kinds.len() && kinds[root as int] == boolean(domain)
 }
@@ -149,10 +167,25 @@ pub(crate) open spec fn program(
 ) -> Result<(), AdmissionFailure> {
     match shape(inputs, outputs, nodes.len(), roots) {
         Err(error) => Err(error),
-        Ok(()) => match prefix(inputs, nodes, nodes.len()) {
-            Err(error) => Err(error),
-            Ok(kinds) => self::roots(outputs, roots, kinds),
-        },
+        Ok(()) => graph(inputs, outputs, nodes, roots),
+    }
+}
+
+pub(crate) open spec fn extended_program(
+    inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>,
+) -> Result<(), AdmissionFailure> {
+    match extended_shape(inputs, outputs, nodes.len(), roots) {
+        Err(error) => Err(error),
+        Ok(()) => graph(inputs, outputs, nodes, roots),
+    }
+}
+
+pub(crate) open spec fn graph(
+    inputs: Seq<Domain>, outputs: Seq<Domain>, nodes: Seq<Op>, roots: Seq<u16>,
+) -> Result<(), AdmissionFailure> {
+    match prefix(inputs, nodes, nodes.len()) {
+        Err(error) => Err(error),
+        Ok(kinds) => self::roots(outputs, roots, kinds),
     }
 }
 

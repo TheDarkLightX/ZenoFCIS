@@ -74,6 +74,71 @@ class EvidenceAdmission(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "anchors changed"):
             gate.mutation_sources("")
 
+    def test_negative_control_requires_only_intended_semantic_diagnostics(self):
+        report = copy.deepcopy(self.report)
+        report['verus']['toolchain'] = self.pin['rust_toolchain']
+        report['verification-results'].update(success=False, errors=1, **{'encountered-error': True})
+        path, cwd = Path('subject.rs'), Path('/tmp/verus-control-fixture')
+        diagnostic = 'error: postcondition not satisfied\n --> subject.rs:12:1\n'
+        summary = 'error: aborting due to 1 previous error\n'
+        def classify(stderr, current=report, code=1):
+            return gate.semantic_refusal(subprocess.CompletedProcess([], code, '', stderr),
+                current, self.pin, path, cwd, region=(10, 20),
+                target_functions=self.pin['target_functions'])
+        self.assertTrue(classify(diagnostic + summary))
+        self.assertTrue(classify(diagnostic * 2 + 'error: aborting due to 2 previous errors\n'))
+        for wrong in (
+            diagnostic + 'note: SMT result UNKNOWN\n' + summary,
+            diagnostic + 'note: solver returned unknown\n' + summary,
+            diagnostic + 'note: resource limit (rlimit) exceeded\n' + summary,
+            diagnostic + 'note: timeout\n' + summary,
+            diagnostic + 'note: out of memory\n' + summary,
+            diagnostic + 'note: signal 9\n' + summary,
+            diagnostic.replace('subject.rs', 'unrelated/subject.rs') + summary,
+            diagnostic.replace(':12:1', ':9:1') + summary,
+            diagnostic.replace('postcondition not satisfied', 'mismatched types') + summary,
+            diagnostic.replace('error: ', 'error[E0308]: ') + summary,
+            diagnostic, summary, '',
+            diagnostic + 'error: aborting due to 2 previous errors\n',
+        ):
+            with self.subTest(stderr=wrong):
+                self.assertFalse(classify(wrong))
+        for code in (0, 101, 124, -9):
+            self.assertFalse(classify(diagnostic + summary, code=code))
+        for group, key, value in (
+            ('verus', 'version', 'other'), ('verus', 'commit', 'other'),
+            ('verus', 'toolchain', 'other'), ('verification-results', 'verified', True),
+            ('verification-results', 'errors', True), ('verification-results', 'success', True),
+            ('verification-results', 'encountered-error', False),
+            ('verification-results', 'encountered-vir-error', True),
+            ('verification-results', 'is-verifying-entire-crate', False),
+        ):
+            changed = copy.deepcopy(report)
+            changed[group][key] = value
+            self.assertFalse(classify(diagnostic + summary, changed))
+        changed = copy.deepcopy(report)
+        changed['func-details'].pop(self.pin['target_functions'][0])
+        self.assertFalse(classify(diagnostic + summary, changed))
+
+    def test_coverage_fault_success_allows_a_deliberate_count_change(self):
+        report = copy.deepcopy(self.report)
+        report['verus']['toolchain'] = self.pin['rust_toolchain']
+        for count in (1, self.pin['expected_verified'], self.pin['expected_verified'] + 1):
+            report['verification-results']['verified'] = count
+            self.assertTrue(gate.proof_succeeded(report, self.pin))
+        for field, value in (
+            ('verified', 0), ('verified', True), ('errors', False), ('errors', 1),
+            ('success', False), ('encountered-error', True), ('encountered-vir-error', True),
+            ('is-verifying-entire-crate', False),
+        ):
+            changed = copy.deepcopy(report)
+            changed['verification-results'][field] = value
+            self.assertFalse(gate.proof_succeeded(changed, self.pin))
+        for field in ('version', 'commit', 'toolchain'):
+            changed = copy.deepcopy(report)
+            changed['verus'][field] = 'other'
+            self.assertFalse(gate.proof_succeeded(changed, self.pin))
+
 
 class NativeRuntime(unittest.TestCase):
     def test_machine_boundaries_on_the_runtime_toolchain(self):

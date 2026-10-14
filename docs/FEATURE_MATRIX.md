@@ -1,12 +1,36 @@
 # ZenoFCIS feature matrix
 
 This matrix covers the current `zeno-fcis` umbrella source API. The development
-workspace still declares `1.1.0`, but the breaking V2 API below requires a pinned
+workspace declares `2.3.0`, but the breaking V2 API below requires a pinned
 source dependency. The historical `1.1.0` package and its API stability promise
 have their own scope. Use the matching source tag for the public
 [2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md), as described in
 [installation](INSTALLATION.md). Their only advertised host executable is the
-Linux x86_64 GNU CLI; crates.io and other host binaries are not claimed.
+Linux x86_64 GNU CLI, which needs glibc 2.39 or later; crates.io and other host
+binaries are not claimed for them.
+
+## Host platforms
+
+The 2.3.0 release workflow builds two required host executables: Linux
+x86_64 GNU on Ubuntu 24.04 and macOS on Apple silicon
+(`aarch64-apple-darwin`, minimum-version field macOS 11.0) on GitHub's
+macOS 15 arm64 image. Its release-set job requires both host jobs and their
+installed-binary records. The table describes configured workflow checks;
+only a completed run bound to the release source and artifact qualifies a
+host executable.
+
+| Workflow check | Linux x86_64 | macOS arm64 |
+|---|---|---|
+| Build, archive and custody check | yes | yes |
+| Installed-binary journey | yes | yes |
+| Clippy and tests | yes | portable tests only |
+| Contained checker runtime | yes | unavailable (exit 2) |
+| `synth verify` execution | yes | blocked (exit 2) |
+| ATDD, packaged-workspace verification, Verus, Miri, formal tools, Tau kit, OCaml profile | yes | no |
+
+Linux evidence is not claimed for macOS. Intel Macs, Windows and other hosts
+have no executable and are not qualified. See
+[supported hosts](INSTALLATION.md#supported-hosts).
 
 The normal application API is `zeno_fcis::program`, available without optional
 features. It binds complete declarations to the library-owned evaluator and
@@ -50,12 +74,13 @@ provider features also serve the historical reference APIs.
 | `composed-program` | `no_std + alloc` | Historical | Native composed-program authoring is retired |
 
 Start both single- and multi-domain applications with complete declarations
-through `zeno_fcis::program`. V2.2 has the three G1 finite component families;
+through `zeno_fcis::program`. V2.2 has three finite component families;
 V2.3 expands the [catalogue](../core-components/README.md) to ten families,
 77 declared instances and 107,518 raw inputs. Stored references are Identified;
 successful exhaustive replay supports Proved for the closed finite scope under
-the [named trusted base](../core-components/FINITE_PROOFS.md). Coupled applications
-and composition obligations remain work in the V2.3 plan.
+the [named trusted base](../core-components/FINITE_PROOFS.md). Six closed coupled
+application profiles are in `core-apps/`; their combined qualification and
+composition obligations are pending.
 The retired crates do not supply a composed runtime or discharge those obligations.
 
 ## Tooling and mounted runtimes
@@ -128,7 +153,7 @@ graph or production authority.
 ## Common selections
 
 These are alternative dependency declarations against a checkout of
-`v2.3.0-rc.1` at `../ZenoFCIS`. Select one declaration with the features your
+`v2.3.0` at `../ZenoFCIS`. Select one declaration with the features your
 application needs; the current API is not supplied by `version = "=1.1.0"`.
 
 ```toml
@@ -161,7 +186,8 @@ commutativity and sequential-versus-composed parity. Its external evidence
 verifier is a named trust boundary. Native domain and composed-program execution
 are retired; the normal route evaluates one complete checked program.
 
-ZenoFCIS does not yet ship a production parallel component runtime. G10's
-planned parallel exhaustive checker is separate from parallel application
+ZenoFCIS does not yet ship a production parallel component runtime. The
+2.3.0 source includes an offline parallel exhaustive checker whose
+qualification is bound to its release-source checks. That checker is separate from parallel application
 execution. Component composition needs its own coupled invariants, binding and
 atomic publication evidence.

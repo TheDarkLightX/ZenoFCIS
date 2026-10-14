@@ -7,7 +7,7 @@ pub(super) mod spec;
 
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum Kind {
+pub(crate) enum Kind {
     Bool,
     I128,
     U128,
@@ -15,6 +15,7 @@ pub(super) enum Kind {
     Sum(u32),
     Bytes,
     Text,
+    Canonical(u32),
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::domain_kind(domain),))]
 fn domain_kind(domain: Domain<'_>) -> Kind {
@@ -26,6 +27,7 @@ fn domain_kind(domain: Domain<'_>) -> Kind {
         Domain::Sum { type_id, .. } => Kind::Sum(type_id),
         Domain::Bytes => Kind::Bytes,
         Domain::Text => Kind::Text,
+        Domain::Canonical { type_id, .. } => Kind::Canonical(type_id),
     }
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::leaf_kind(*leaf),))]
@@ -48,6 +50,7 @@ fn atom_kind(atom: Atom<'_>) -> Kind {
         Atom::Sum { type_id, .. } => Kind::Sum(type_id),
         Atom::Bytes(_) => Kind::Bytes,
         Atom::Text(_) => Kind::Text,
+        Atom::Canonical(v) => Kind::Canonical(v.type_id()),
     }
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==(a==b),))]
@@ -58,7 +61,9 @@ fn same_kind(a: Kind, b: Kind) -> bool {
         | (Kind::U128, Kind::U128)
         | (Kind::Bytes, Kind::Bytes)
         | (Kind::Text, Kind::Text) => true,
-        (Kind::Enum(a), Kind::Enum(b)) | (Kind::Sum(a), Kind::Sum(b)) => a == b,
+        (Kind::Enum(a), Kind::Enum(b))
+        | (Kind::Sum(a), Kind::Sum(b))
+        | (Kind::Canonical(a), Kind::Canonical(b)) => a == b,
         _ => false,
     }
 }
@@ -222,13 +227,15 @@ fn same_binding(a: Binding, b: Binding) -> bool {
     source
         && match (a.selector, b.selector) {
             (Selector::Root, Selector::Root) => true,
-            (Selector::Field(a), Selector::Field(b)) => a == b,
+            (Selector::Field(a), Selector::Field(b))
+            | (Selector::PayloadField(a), Selector::PayloadField(b)) => a == b,
             _ => false,
         }
 }
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::count(schema),))]
 fn count(schema: Schema<'_>) -> usize {
     match schema {
+        Schema::Original { .. } => 0,
         Schema::Leaf(_) => 1,
         Schema::Record(fields) => fields.len(),
     }
@@ -471,17 +478,17 @@ fn branches(d: &Descriptor<'_>, fields: &[InputField]) -> bool {
     }
     true
 }
-#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::reasons(d.reasons@),))]
-fn reasons(d: &Descriptor<'_>) -> bool {
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::reasons(values@),))]
+fn reasons(values: &[Reason]) -> bool {
     let mut i = 0usize;
-    #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=d.reasons.len(),forall|j:int|0<=j<i==>spec::reason_valid(d.reasons@,j),decreases d.reasons.len()-i,))]
-    while i < d.reasons.len() {
-        if d.reasons[i].id == 0
-            || matches!(d.reasons[i].class, Class::Accept)
-            || (i > 0 && d.reasons[i - 1].id >= d.reasons[i].id)
+    #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=values.len(),forall|j:int|0<=j<i==>spec::reason_valid(values@,j),decreases values.len()-i,))]
+    while i < values.len() {
+        if values[i].id == 0
+            || matches!(values[i].class, Class::Accept)
+            || (i > 0 && values[i - 1].id >= values[i].id)
         {
             #[cfg(verus_keep_ghost)]
-            proof! {assert(!spec::reason_valid(d.reasons@,i as int));}
+            proof! {assert(!spec::reason_valid(values@,i as int));}
             return false;
         }
         i += 1;
@@ -502,20 +509,20 @@ fn channel_fields(fields: &[TypedField<'_>]) -> bool {
     }
     true
 }
-#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::channels(d.channels@),))]
-fn channels(d: &Descriptor<'_>) -> bool {
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==spec::channels(values@),))]
+fn channels(values: &[Channel<'_>]) -> bool {
     let mut i = 0usize;
-    #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=d.channels.len(),forall|j:int|0<=j<i==>spec::channel_valid(d.channels@,j),decreases d.channels.len()-i,))]
-    while i < d.channels.len() {
-        let c = d.channels[i];
+    #[cfg_attr(verus_keep_ghost,verus_spec(invariant i<=values.len(),forall|j:int|0<=j<i==>spec::channel_valid(values@,j),decreases values.len()-i,))]
+    while i < values.len() {
+        let c = values[i];
         if c.id == 0
-            || (i > 0 && d.channels[i - 1].id >= c.id)
+            || (i > 0 && values[i - 1].id >= c.id)
             || !domain_valid(c.destination)
             || !domain_valid(c.idempotency)
             || !channel_fields(c.payload)
         {
             #[cfg(verus_keep_ghost)]
-            proof! {assert(!spec::channel_valid(d.channels@,i as int));}
+            proof! {assert(!spec::channel_valid(values@,i as int));}
             return false;
         }
         i += 1;
@@ -532,15 +539,15 @@ pub(super) fn admitted(d: &Descriptor<'_>) -> bool {
         && ingress::valid(d.context)
         && bindings(d)
         && outputs(d)
-        && super::super::super::evaluation::admission::validate_program(
+        && super::super::super::evaluation::admission::validate_extended_program(
             d.program.inputs,
             d.program.outputs,
             d.program.nodes,
             d.program.roots,
         )
         .is_ok()
-        && reasons(d)
-        && channels(d)
+        && reasons(d.reasons)
+        && channels(d.channels)
         && branches(d, fields)
         && laws::metadata(d.laws, d.required)
         && schema_validation::law_literals(d.laws)
@@ -555,3 +562,5 @@ fn same_class(a: Class, b: Class) -> bool {
             | (Class::CommittedFailure, Class::CommittedFailure)
     )
 }
+
+pub(super) mod numeric;

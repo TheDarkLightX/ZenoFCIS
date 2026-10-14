@@ -45,10 +45,10 @@ pub fn encoded_size(parts: &[Part<'_>]) -> Option<usize> {
 }
 
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result@ == model::word(value),))]
-fn word(value: u128) -> Vec<u8> {
+fn word(value: u128) -> [u8; 16] {
     #[cfg(verus_keep_ghost)]
     proof! {assert((value >> 0u32) == value) by(bit_vector);}
-    alloc::vec![
+    [
         (value >> 120u32) as u8,
         (value >> 112u32) as u8,
         (value >> 104u32) as u8,
@@ -70,17 +70,7 @@ fn word(value: u128) -> Vec<u8> {
 
 #[cfg_attr(verus_keep_ghost, verus_spec(ensures final(out)@ == old(out)@ + bytes@,))]
 fn append(out: &mut Vec<u8>, bytes: &[u8]) {
-    let mut i = 0usize;
-    #[cfg_attr(verus_keep_ghost, verus_spec(invariant i<=bytes.len(),
-        out@ == old(out)@ + bytes@.take(i as int), decreases bytes.len()-i,))]
-    while i < bytes.len() {
-        out.push(bytes[i]);
-        i += 1;
-        #[cfg(verus_keep_ghost)]
-        proof! {assert(bytes@.take(i as int) =~= bytes@.take(i as int-1).push(bytes@[i as int-1]));}
-    }
-    #[cfg(verus_keep_ghost)]
-    proof! {assert(bytes@.take(bytes@.len() as int) =~= bytes@);}
+    out.extend_from_slice(bytes);
 }
 
 /// Encodes Word as 0 followed by 16 big-endian bytes; Bytes as 1, a
@@ -89,8 +79,8 @@ fn append(out: &mut Vec<u8>, bytes: &[u8]) {
     (match result {Some(bytes)=>Some(bytes@),None=>None::<Seq<u8>>}) == model::encode(parts@),
 ))]
 pub fn encode(parts: &[Part<'_>]) -> Option<Vec<u8>> {
-    encoded_size(parts)?;
-    let mut out = Vec::new();
+    let size = encoded_size(parts)?;
+    let mut out = Vec::with_capacity(size);
     let mut i = 0usize;
     #[cfg_attr(verus_keep_ghost, verus_spec(invariant i<=parts.len(),
         model::length(parts@,parts@.len())<=usize::MAX,

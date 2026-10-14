@@ -577,6 +577,10 @@ def semantic_diff(old: Model, new: Model) -> dict:
     return report
 
 
+def assumption_groups(context):
+    return {"supplied_assumptions": {"observations": dict(context)}, "authenticated_facts": []}
+
+
 def replay(model: Model, inputs: list[dict]) -> list[dict]:
     if not isinstance(inputs, list):
         raise Refusal("Trace inputs must be an owned array")
@@ -588,7 +592,8 @@ def replay(model: Model, inputs: list[dict]) -> list[dict]:
         if not isinstance(item, dict) or set(item) != {"event", "context"}:
             raise Refusal("A trace step needs exactly event and context")
         outcome = model.decide(state, item["event"], item["context"])
-        trace.append({"pre": state, "event": item["event"], "context": dict(item["context"]), "outcome": outcome})
+        trace.append({"pre": state, "event": item["event"], "context": dict(item["context"]),
+                      "outcome": outcome, **assumption_groups(item["context"])})
         state = outcome["state"]
     return trace
 
@@ -618,6 +623,7 @@ def explain(model: Model, state: str, event: str, context: dict[str, bool], chec
               "outcome": outcome, "rules": rules, "used_default": outcome["rule"] == "default",
               "frame": "control unchanged" if outcome["class"] == "Reject" else "only control state may change",
               "effects": "none in this profile", "default_reason": model.default,
+              **assumption_groups(context),
               "scope": "Deterministic explanation of one supplied input; context facts are assumptions, not authenticated external truth.",
               "method": "typed AST evaluation; no language model", "authority": "none"}
     if len(canonical(result).encode()) > 512 * 1024:

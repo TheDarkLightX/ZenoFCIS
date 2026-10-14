@@ -175,7 +175,11 @@ impl CompletionProblem {
         )?;
         let evaluator = hash_bytes(
             zeno_fcis_codec::domains::COMPLETION_IR_SOURCE,
-            include_bytes!("ir.rs"),
+            &[
+                include_bytes!("ir.rs").as_slice(),
+                include_bytes!("ir/program.rs").as_slice(),
+            ]
+            .concat(),
         )?;
         let enumeration = hash_bytes(
             zeno_fcis_codec::domains::COMPLETION_SPACE_SOURCE,

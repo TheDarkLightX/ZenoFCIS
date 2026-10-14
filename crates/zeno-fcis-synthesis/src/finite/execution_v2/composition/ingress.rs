@@ -2,18 +2,47 @@
 use super::*;
 #[cfg(verus_keep_ghost)]
 use vstd::prelude::*;
+pub(crate) mod original;
+pub(super) mod shared;
 #[cfg(verus_keep_ghost)]
 pub(super) mod spec;
 
-/// Original canonical scalar root, flat record, or complete checked schema.
+/// Explicit numeric control projection; original values remain complete.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Clone, Copy, Debug)]
+pub enum Projection<'a> {
+    /// Validate the complete value without projecting graph inputs.
+    None,
+    /// Project one complete scalar root domain.
+    Root(&'a Domain<'a>),
+    /// Project an ordered subset of complete scalar field domains.
+    Fields(&'a [input_view::Field<Domain<'a>>]),
+}
+/// Original canonical scalar root, flat record, or complete checked schema.
+#[cfg_attr(verus_keep_ghost, verus_verify)]
+#[derive(Debug)]
 #[non_exhaustive]
-pub enum Schema<'a> {
+pub enum Schema<'a, L = InputLeaf> {
+    /// Complete original schema custody. Admitted by the numeric descriptor family.
+    Original {
+        /// Complete schema already checked against its original bytes.
+        checked: &'a crate::finite::canonical_v2::schema::Checked<'a>,
+        /// Actual original root type for this source.
+        root: u32,
+        /// Selected scalar domains only; never a replacement input schema.
+        projection: Projection<'a>,
+    },
     /// One original primitive, Enum, or payload-free Sum root.
-    Leaf(&'a InputLeaf),
+    Leaf(&'a L),
     /// Every declared field in canonical identifier order.
-    Record(&'a [InputField]),
+    Record(&'a [input_view::Field<L>]),
+}
+impl<L> Copy for Schema<'_, L> {}
+impl<L> Clone for Schema<'_, L> {
+    #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == *self,))]
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 /// Protected input selector; a root is distinct from every record identifier.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
@@ -24,6 +53,8 @@ pub enum Selector {
     Root,
     /// Declared record field.
     Field(u16),
+    /// Actual field read within a root sum payload record.
+    PayloadField(u16),
 }
 /// An actual protected input read, including denied attempts.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
@@ -48,11 +79,11 @@ pub(super) enum Value<'a> {
 /// Typed actual value and scalar ABI values obtained from the same bytes.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
 #[derive(Debug)]
-pub(super) struct Decoded<'a> {
+pub(super) struct Decoded<'a, A = i64> {
     /// Complete typed original value.
     pub value: Value<'a>,
     /// Scalar codes in schema order.
-    pub scalars: Vec<i64>,
+    pub scalars: Vec<A>,
 }
 /// Typed ingress refusal before a candidate can be exposed.
 #[cfg_attr(verus_keep_ghost, verus_verify)]
@@ -74,6 +105,7 @@ pub enum Failure {
 #[cfg_attr(verus_keep_ghost, verus_spec(result => ensures result == spec::schema_valid(schema),))]
 pub(super) fn valid(schema: Schema<'_>) -> bool {
     match schema {
+        Schema::Original { .. } => false,
         Schema::Leaf(leaf) => input_view::validate_leaf(leaf),
         Schema::Record(fields) => input_view::validate_schema(fields),
     }
@@ -173,6 +205,7 @@ fn append_reads(source: u8, attempts: &[super::super::AccessAttempt], reads: &mu
         let r=spec::project(bytes@,schema,source,old(meter).limits.counters@,old(meter).used.counters@);
         (r.0,r.1,old(reads)@+r.2)
     },))]
+#[cfg(any(test, verus_keep_ghost))]
 pub(super) fn project<'a>(
     bytes: &'a [u8],
     schema: Schema<'a>,
@@ -180,56 +213,30 @@ pub(super) fn project<'a>(
     meter: &mut Meter,
     reads: &mut Vec<Read>,
 ) -> Result<Decoded<'a>, Failure> {
-    if !valid(schema) {
-        return Err(Failure::Schema);
-    }
-    match schema {
-        Schema::Record(fields) => {
-            let mut codes = Vec::new();
-            let mut attempts = Vec::new();
-            let projected =
-                input_view::project_into(bytes, fields, meter, &mut codes, &mut attempts);
-            append_reads(source, &attempts, reads);
-            if let Err(e) = projected {
-                return Err(Failure::Record(e));
-            }
-            let Some(values) = reify_fields(fields, &codes) else {
-                return Err(Failure::Reification);
-            };
-            Ok(Decoded {
-                value: Value::Record(values),
-                scalars: codes,
-            })
-        }
-        Schema::Leaf(leaf) => {
-            if let Err(e) = meter.charge(Resource::Byte, bytes.len() as u64) {
-                return Err(Failure::Budget(e));
-            }
-            let charged = meter.charge(Resource::Read, 1);
-            reads.push(Read {
-                source,
-                selector: Selector::Root,
-                permitted: charged.is_ok(),
-            });
-            if let Err(e) = charged {
-                return Err(Failure::Budget(e));
-            }
-            let Some((code, end)) = input_view::decode_scalar(bytes, 0, leaf) else {
-                return Err(Failure::Root);
-            };
-            if end != bytes.len() {
-                return Err(Failure::Root);
-            }
-            let Some(atom) = reify(leaf, code) else {
-                return Err(Failure::Reification);
-            };
-            let scalars = alloc::vec![code];
-            #[cfg(verus_keep_ghost)]
-            proof! {assert(scalars@=~=seq![code]);}
-            Ok(Decoded {
-                value: Value::Leaf(atom),
-                scalars,
-            })
+    #[cfg(verus_keep_ghost)]
+    proof_decl! {let ghost initial_limits=meter.limits.counters@;let ghost initial_used=meter.used.counters@;}
+    #[cfg(verus_keep_ghost)]
+    proof! {shared::spec::legacy_embedding(bytes@,schema,source,initial_limits,initial_used);}
+    let decoded = shared::project(
+        bytes,
+        shared::SchemaView::Legacy(schema),
+        source,
+        meter,
+        reads,
+    )?;
+    #[cfg(verus_keep_ghost)]
+    proof! {
+        if let Ok((value,codes))=spec::project(bytes@,schema,source,initial_limits,initial_used).0 {
+            shared::spec::legacy_lift(codes);
+            assert(decoded.scalars@==input_view::typed::spec::lift(codes));
         }
     }
+    let mut scalars = Vec::new();
+    if !super::super::numeric::project_legacy(&decoded.scalars, &mut scalars) {
+        return Err(Failure::Reification);
+    }
+    Ok(Decoded {
+        value: decoded.value,
+        scalars,
+    })
 }

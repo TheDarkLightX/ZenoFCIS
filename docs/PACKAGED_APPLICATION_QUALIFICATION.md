@@ -1,8 +1,5 @@
 # Packaged application qualification
 
-Base: `e69ac108c4a56afe7f4e0c6384399e3ba9bfe0f3`.
-Branch: `agent/packaged-application-20260907`.
-
 ## Contract and selected change
 
 The existing development journey builds the generator and dependencies from the
@@ -87,9 +84,10 @@ errors. A tiny dependency-free crate under a spaced path checks successful
 compilation/documentation and rejection of a real documentation warning. It uses
 the installed Rust toolchain and removes only its own temporary directory.
 
-Fable 5.1's supplied-source review also identified inherited compiler/wrapper
-overrides, renamed dependency keys missing the early pin checks, and the need
-to recheck the clean commit at the end of assembly. The follow-up removes those
+A separate language-model review of the supplied source also identified
+inherited compiler/wrapper overrides, renamed dependency keys missing the early
+pin checks, and the need to recheck the clean commit at the end of assembly.
+The follow-up removes those
 environment overrides, resolves aliases to their actual package names for pin
 validation and dependency closure, records compiler argument vectors, and
 rechecks the source commit before retaining the final manifest. The regression

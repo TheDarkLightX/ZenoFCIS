@@ -1,0 +1,231 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "equipment-booking",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "available": "pre.100.110",
+    "held": "pre.100.111",
+    "version": "pre.100.112",
+    "phase": "pre.100.113",
+    "last": "pre.100.114",
+    "reached": "pre.100.115",
+    "action": "command.101.120",
+    "expected": "command.101.121",
+    "now": "context.102.130",
+    "authorized": "context.102.131"
+  },
+  "cases": [
+    {
+      "when": "!((phase == 0 && available == 2 && held == 0 && version == 0 && last == 0 && !reached) || (phase == 1 && available == 1 && held == 1 && version == 1 && last == 0 && !reached) || (phase == 2 && available == 1 && held == 1 && version == 2 && last == 0 && !reached) || (phase == 3 && available == 2 && held == 0 && version == 2 && last == 4 && reached))",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now < last",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 151 && phase == 2 && expected == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available",
+        "111": "held",
+        "112": "version",
+        "113": "phase",
+        "114": "last",
+        "115": "reached"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 151 && phase == 2",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 152 && phase == 3 && expected == 1",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available",
+        "111": "held",
+        "112": "version",
+        "113": "phase",
+        "114": "last",
+        "115": "reached"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 152 && phase == 3",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "expected != version",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && phase != 0",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && now >= 4",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available - 1",
+        "111": "held + 1",
+        "112": "version + 1",
+        "113": 1,
+        "114": "last",
+        "115": "reached"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 151 && phase != 1",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 151 && now >= 4",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available",
+        "111": "held",
+        "112": "version + 1",
+        "113": 2,
+        "114": "last",
+        "115": "reached"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "booking",
+          "payload": {
+            "140": "version + 1",
+            "141": 1
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "phase != 1",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now < 4",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available + 1",
+        "111": "held - 1",
+        "112": "version + 1",
+        "113": 3,
+        "114": "now",
+        "115": true
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 2,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0,
+    "115": false
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation",
+    "503": "DebitCreditEffectEquality",
+    "504": "AuthoritySubjectRecipient"
+  },
+  "delivery_laws": {
+    "503": {
+      "max_deliveries": 2,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        },
+        "outbox.104.141": {
+          "channel": 300,
+          "field": 141
+        }
+      }
+    }
+  }
+}

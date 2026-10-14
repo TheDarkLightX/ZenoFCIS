@@ -8,6 +8,7 @@ The receipt is scoped Verus/Z3 evidence, not an authorization or a V2 release.
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import re
 import os
@@ -17,16 +18,23 @@ import subprocess
 import tempfile
 import zipfile
 
+from v2_proof_sources import execution_sources
+from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
-from verus_coverage import require_coverage
+from verus_coverage import profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE = Path("verification/verus/finite-execution.json")
 HARNESS = Path("verification/verus/finite_execution.rs")
 SUBJECT = Path("crates/zeno-fcis-synthesis/src/finite/evaluation/mod.rs")
 ADMISSION = SUBJECT.parent / "admission/mod.rs"
+TYPED = SUBJECT.parent / "typed.rs"
+VALUE = SUBJECT.parent.parent / "value/mod.rs"
 UNIT_SOURCES = (HARNESS, SUBJECT, SUBJECT.parent / "spec.rs", ADMISSION,
-                ADMISSION.parent / "spec.rs")
+                ADMISSION.parent / "spec.rs", TYPED, VALUE)
+# The legacy instructions run on the typed evaluator, whose values include the
+# V2 compound value, so the harness compiles the registered execution closure.
+UNIT_SOURCES = tuple(dict.fromkeys((*UNIT_SOURCES, *execution_sources(ROOT))))
 SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
            Path("verification/verus/finite_execution_tests.rs"),
            Path("verification/verus/admission_baseline.rs"),
@@ -35,8 +43,21 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN,
            Path("tools/check_verus.py"), Path("tools/test_check_finite_execution.py"),
            Path("Cargo.toml"), Path("rust-toolchain.toml"),
            Path("crates/zeno-fcis-synthesis/src/finite/ir.rs"),
+           Path("crates/zeno-fcis-synthesis/src/finite/ir/program.rs"),
            Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
-           Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"))
+           Path("crates/zeno-fcis-synthesis/src/finite_runtime.rs"),
+           Path("crates/zeno-fcis-cli/templates/order-fulfillment/synthesized/transition.rs"),
+           Path("tools/v2_proof_sources.py"), Path("verification/verus/authority_v2_sources.json"),
+           Path("tools/v2_native_dependencies.py"))
+
+SEMANTIC_TARGETS = {
+    'wrong_boolean_encoding': 'legacy_instruction', 'subtract_instead_of_add': 'arithmetic',
+    'invert_equality': 'node', 'swap_select_arms': 'node',
+    'skip_last_eager_node': 'evaluate_nodes', 'wrong_output_projection': 'evaluate_nodes',
+    'bypass_input_domain': 'evaluate_nodes', 'bypass_output_domain': 'evaluate_nodes',
+    'expose_partial_results': 'evaluate_into', 'accept_wrong_operand_kind': 'require_node',
+    'admit_excess_node_count': 'validate_shape', 'accept_wrong_root_kind': 'validate_roots',
+}
 
 
 def snapshot() -> dict[str, str]:
@@ -66,13 +87,27 @@ def final_contract(source: str, replacement: str) -> str:
     return source[:start] + replacement + source[end:]
 
 
-def mutation_sources(execution: str, admission: str) -> dict[str, tuple[Path, str, str]]:
+def mutation_sources(execution: str, admission: str, typed: str, value: str) -> dict[str, tuple[Path, str, str]]:
     mutations = {}
+    # The legacy instruction semantics moved into the typed evaluator and the
+    # width-explicit arithmetic; these controls change the legacy cases there.
+    for name, path, source, before, after in (
+        ("wrong_boolean_encoding", TYPED, typed,
+         "Op::Bool(v) => Instruction::Literal(Atom::I128(if v { 1 } else { 0 }), Kind::Bool),",
+         "Op::Bool(v) => Instruction::Literal(Atom::I128(if v { 0 } else { 1 }), Kind::Bool),"),
+        ("subtract_instead_of_add", VALUE, value,
+         "ArithmeticOp::Add => a.checked_add(b), ArithmeticOp::Sub => a.checked_sub(b), }; "
+         "match computed { Some(value) => {",
+         "ArithmeticOp::Add => a.checked_sub(b), ArithmeticOp::Sub => a.checked_sub(b), }; "
+         "match computed { Some(value) => {"),
+        ("invert_equality", TYPED, typed,
+         "(Atom::I128(a), Atom::I128(b)) => Ok(boolean(encoding, a == b)),",
+         "(Atom::I128(a), Atom::I128(b)) => Ok(boolean(encoding, a != b)),"),
+        ("swap_select_arms", TYPED, typed,
+         "Ok(Atom::I128(if c == 1 { a } else { b }))", "Ok(Atom::I128(if c == 1 { b } else { a }))"),
+    ):
+        mutations[name] = (path, once(source, before, after), "proof")
     for name, before, after in (
-        ("wrong_boolean_encoding", "Op::Bool(value) => Ok(value as i64)", "Op::Bool(value) => Ok(1 - value as i64)"),
-        ("subtract_instead_of_add", "left.checked_add(right)", "left.checked_sub(right)"),
-        ("invert_equality", "Ok((left == right) as i64)", "Ok((left != right) as i64)"),
-        ("swap_select_arms", "if condition == 1 { yes } else { no }", "if condition == 1 { no } else { yes }"),
         ("skip_last_eager_node", "while index < nodes.len() {", "while index + 1 < nodes.len() {"),
         ("wrong_output_projection", "output.push(value);", "output.push(0);"),
         ("bypass_input_domain", "if !admitted(inputs, input) {", "if false {"),
@@ -105,7 +140,53 @@ def final_contract_attribute(source: str) -> str:
                 "    requires input@.len() == 0,\n    ensures match result {")
 
 
-def check(cache: Path, install: bool) -> dict:
+def coverage_control(vir: str, profile: dict, name: str) -> tuple[bool, str | None]:
+    """The exact planned function set and intended contract must change."""
+    try:
+        require_coverage(vir, profile)
+    except ValueError as error:
+        refusal = str(error)
+    else:
+        return False, None
+    actual = profile_inventory(vir, profile)
+    expected = profile['functions']
+    prefix = 'finite_execution::evaluation::'
+    target = prefix + ('unchecked_identity' if name == 'add_uncontracted_function' else 'evaluate_into')
+    if name == 'add_uncontracted_function':
+        intended = (set(actual) == set(expected) | {target} and target not in expected
+                    and target in refusal and actual[target]['mode'] == 'Exec'
+                    and actual[target]['requires'] == 0 and actual[target]['ensures'] == 0)
+    else:
+        field = 'requires_sha256' if name == 'narrow_execution_domain' else 'ensures_sha256'
+        intended = (set(actual) == set(expected) and target in refusal
+                    and actual[target][field] != expected[target][field])
+    return intended, refusal
+
+
+def proof_rejected(proc, report, pin, profile, name, path, changed, specimen):
+    # Normalize the exact pinned loop-entry header; unrelated errors still refuse.
+    stderr = re.sub(r'^error: invariant not satisfied before loop$',
+                    'error: invariant not satisfied', proc.stderr, flags=re.M)
+    diagnostic = subprocess.CompletedProcess(proc.args, proc.returncode, proc.stdout, stderr)
+    return verifier.semantic_refusal(diagnostic, report, pin, path, specimen,
+        region=verifier.function_lines(changed, SEMANTIC_TARGETS[name]),
+        target_functions=profile['target_functions'])
+
+
+def native_tests(directory: Path, pin: dict, environment: dict) -> subprocess.CompletedProcess:
+    """Build and run the harness tests natively against fresh codec/value oracles."""
+    executable = directory / "finite-tests"
+    native_command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
+                      "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)",
+                      *native_dependency_args(ROOT, directory, environment),
+                      str(HARNESS), "-o", str(executable)]
+    verifier.require_success(verifier.run(native_command, ROOT, environment))
+    native = verifier.run([str(executable)], ROOT, environment)
+    verifier.require_success(native)
+    return native
+
+
+def check(cache: Path, install: bool, retained_directory: Path | None = None) -> dict:
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise RuntimeError("this proof profile requires qualified Linux x86-64 tools")
     pin = json.loads((ROOT / verifier.PIN).read_text())
@@ -120,52 +201,60 @@ def check(cache: Path, install: bool) -> dict:
     environment["RUSTUP_TOOLCHAIN"] = pin["rust_toolchain"]
     environment["VERUS_Z3_PATH"] = str(tools / "z3")
     command = [str(tools / "verus"), "--crate-type=lib", "--edition=2024",
-               "--no-cheating", "--no-external-by-default", "--num-threads", "2", "--output-json",
+               "--no-cheating", "--no-external-by-default", "--num-threads", "2", "-V", "spinoff-all", "--output-json",
                "--log", "vir", "--log", "vir-option=no_span+no_type+no_fn_details"]
     mutations = []
-    with tempfile.TemporaryDirectory(prefix="zeno-fcis-finite-proof-") as temporary:
+    context = (nullcontext(str(retained_directory)) if retained_directory is not None
+               else tempfile.TemporaryDirectory(prefix="zeno-fcis-finite-proof-"))
+    with context as temporary:
         directory = Path(temporary)
+        (directory / "source_sha256.json").write_text(json.dumps(before, indent=2, sort_keys=True) + "\n")
         positive_command = [*command, "--log-dir", str(directory / "positive"), str(HARNESS)]
         positive = verifier.run(positive_command, ROOT, environment)
+        (directory / "positive.json").write_text(positive.stdout)
+        (directory / "positive.stderr").write_text(positive.stderr)
+        (directory / "positive-process.json").write_text(json.dumps({
+            "command": positive_command, "cwd": str(ROOT), "returncode": positive.returncode,
+        }, indent=2, sort_keys=True) + "\n")
         verifier.require_success(positive)
         report = json.loads(positive.stdout)
         if not verifier.accepted(report, report_pin):
             raise RuntimeError("finite proof report lacks pinned tool or complete obligation coverage")
         coverage = require_coverage((directory / "positive/crate.vir").read_text(), profile)
-        executable = directory / "finite-tests"
-        native_command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
-                          "--check-cfg", "cfg(verus_keep_ghost)", "--check-cfg", "cfg(test)",
-                          str(HARNESS), "-o", str(executable)]
-        verifier.require_success(verifier.run(native_command, ROOT, environment))
-        native = verifier.run([str(executable)], ROOT, environment)
-        verifier.require_success(native)
+        native = native_tests(directory, pin, environment)
         print(f"Finite execution: {profile['expected_verified']} obligations and native boundaries passed", flush=True)
         for name, (path, changed, expected) in mutation_sources(
-                (ROOT / SUBJECT).read_text(), (ROOT / ADMISSION).read_text()).items():
+                (ROOT / SUBJECT).read_text(), (ROOT / ADMISSION).read_text(),
+                (ROOT / TYPED).read_text(), (ROOT / VALUE).read_text()).items():
             specimen = directory / name
             for unit in UNIT_SOURCES:
                 target = specimen / unit
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
-            mutant = verifier.run([*command, "--log-dir", str(specimen / "logs"), str(HARNESS)],
-                                  specimen, environment)
+            mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(HARNESS)]
+            mutant = verifier.run(mutant_command, specimen, environment)
+            (specimen / "verus.json").write_text(mutant.stdout)
+            (specimen / "verus.stderr").write_text(mutant.stderr)
+            (specimen / "verus-process.json").write_text(json.dumps({
+                "command": mutant_command, "cwd": str(specimen), "returncode": mutant.returncode,
+            }, indent=2, sort_keys=True) + "\n")
             mutant_report = json.loads(mutant.stdout)
             result = mutant_report.get("verification-results", {})
             coverage_error = None
             if expected == "proof":
-                killed = (mutant.returncode != 0 and result.get("success") is False
-                          and type(result.get("errors")) is int and result["errors"] > 0
-                          and result.get("encountered-vir-error") is False)
+                killed = proof_rejected(mutant, mutant_report, pin, profile,
+                    name, path, changed, specimen)
             else:
-                try:
-                    require_coverage((specimen / "logs/crate.vir").read_text(), profile)
-                except ValueError as error:
-                    coverage_error = str(error)
-                killed = (mutant.returncode == 0 and result.get("success") is True
-                          and result.get("errors") == 0 and coverage_error is not None)
+                intended, coverage_error = coverage_control(
+                    (specimen / "logs/crate.vir").read_text(), profile, name)
+                killed = (mutant.returncode == 0 and verifier.proof_succeeded(mutant_report, pin)
+                          and intended
+                          and not verifier.ERROR_HEADER.search(mutant.stderr)
+                          and not verifier.NON_SEMANTIC.search(mutant.stderr))
             mutations.append({"name": name, "expected_failure": expected, "killed": killed,
                               "exit_code": mutant.returncode, "verification_results": result,
-                              "coverage_refusal": coverage_error})
+                              "coverage_refusal": coverage_error, "logs": str(specimen)})
+            (directory / "mutations.json").write_text(json.dumps(mutations, indent=2) + "\n")
             if not killed:
                 raise RuntimeError(f"mutation {name} survived or failed for an unrelated reason")
             print(f"Finite execution: caught {name} ({expected})", flush=True)
@@ -206,17 +295,22 @@ def main() -> int:
     parser.add_argument("--cache", type=Path, default=Path.home() / ".cache/zeno-fcis/verus")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    directory = Path(tempfile.mkdtemp(prefix="finite-execution-run-", dir=args.out.parent))
     try:
-        receipt = check(args.cache.resolve(), args.install)
+        receipt = check(args.cache.resolve(), args.install, directory)
     except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
         receipt = {"schema": "zeno-fcis/finite-execution-evidence/1", "status": "failed", "error": str(error)}
+    receipt["logs"] = str(directory)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
     print(f"Finite execution: {receipt['status']}; receipt: {args.out}")
     if receipt["status"] != "passed":
         print(receipt["error"])
         return 1
-    print(f"20 runtime bodies; 34 obligations; {len(receipt['mutations'])} mutations caught")
+    runtime = sum(record["mode"] == "Exec" for record in receipt["translated_function_coverage"].values())
+    obligations = receipt["verus_report"]["verification-results"]["verified"]
+    print(f"{runtime} runtime bodies; {obligations} obligations; {len(receipt['mutations'])} mutations caught")
     return 0
 
 

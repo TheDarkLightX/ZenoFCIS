@@ -1,0 +1,225 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "reliable-jobs",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "remaining": "pre.100.110",
+    "phase": "pre.100.111",
+    "last": "pre.100.112",
+    "reached": "pre.100.113",
+    "clock": "pre.100.114",
+    "active": "3 - remaining",
+    "action": "command.101.120",
+    "attempt": "command.101.121",
+    "now": "context.102.130",
+    "authorized": "context.102.131"
+  },
+  "cases": [
+    {
+      "when": "!(((last == 0 && !reached) || (last == 4 && reached)) && clock >= last && ((phase == 0 && remaining == 3 && last == 0 && !reached && clock == 0) || (phase != 0 && remaining <= 2)))",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "now < clock",
+      "class": "Reject",
+      "reason": 206,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && phase == 1 && attempt == active",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining",
+        "111": "phase",
+        "112": "last",
+        "113": "reached",
+        "114": "clock"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && phase == 1",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && phase == 3",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && remaining == 0",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && attempt != active + 1",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && phase == 2 && !reached && now < 4",
+      "class": "Reject",
+      "reason": 203,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining - 1",
+        "111": 1,
+        "112": "choose(phase == 2 && !reached, now, last)",
+        "113": "reached || phase == 2",
+        "114": "now"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "worker",
+          "payload": {
+            "140": "active + 1",
+            "141": 1
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "action == 151 && phase != 1",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 151 && attempt != active",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 151",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining",
+        "111": 2,
+        "112": "last",
+        "113": "reached",
+        "114": "now"
+      },
+      "outbox": []
+    },
+    {
+      "when": "phase != 1 && phase != 3",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "attempt != active",
+      "class": "Reject",
+      "reason": 205,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "phase == 3",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining",
+        "111": "phase",
+        "112": "last",
+        "113": "reached",
+        "114": "clock"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "remaining",
+        "111": 3,
+        "112": "last",
+        "113": "reached",
+        "114": "now"
+      },
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 3,
+    "111": 0,
+    "112": 0,
+    "113": false,
+    "114": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "AssetConservation",
+    "503": "DebitCreditEffectEquality",
+    "504": "AuthoritySubjectRecipient"
+  },
+  "delivery_laws": {
+    "503": {
+      "max_deliveries": 2,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        },
+        "outbox.104.141": {
+          "channel": 300,
+          "field": 141
+        }
+      }
+    }
+  }
+}

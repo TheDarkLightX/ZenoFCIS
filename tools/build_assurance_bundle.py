@@ -88,9 +88,15 @@ def main() -> int:
     try:
         source_document, source_content = read_source_manifest(args.source_manifest)
         requested = [parse_artifact(item) for item in args.artifact]
-        labels = [label for label, _ in requested]
+        # Include the built-in evidence in both namespaces. Different labels
+        # can still address the same ZIP member (source-manifest.json).
+        labels = ["source-manifest", *(label for label, _ in requested)]
         if len(labels) != len(set(labels)):
             raise ValueError("artifact labels must be unique")
+        archive_paths = ["evidence/source-manifest.json",
+                         *(f"evidence/{label}" for label, _ in requested)]
+        if len(archive_paths) != len(set(archive_paths)):
+            raise ValueError("artifact archive paths must be unique")
 
         artifacts = [
             Artifact(

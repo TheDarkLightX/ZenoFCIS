@@ -2,7 +2,7 @@
 //! table gets its kind and names exactly its changed items; the document is
 //! deterministic and the kind symmetric; an adoption is a program successor
 //! and the adoption gate refuses every other kind; and against the SQLite
-//! shell's own upgrade module, compiled from its source, the shell's policy
+//! shell's public upgrade module, the shell's policy
 //! comparison accepts exactly the pairs the classifier calls identical or
 //! program successors, and every pair its F6.1 Tier A admission admits is a program
 //! successor.
@@ -13,59 +13,20 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use serde_json::Value;
-use zeno_fcis_codec::{Domain, EncodeError, Hash32, commitment};
-use zeno_fcis_crypto::RustCryptoSha256;
-use zeno_fcis_synthesis::finite::{Op, Program};
+use zeno_fcis_codec::Hash32;
+use zeno_fcis_synthesis::finite::{Op, Program, v2_authority as authority};
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
 use super::*;
 use crate::contract::{AdoptionSources, CheckedCandidate, Usage, program_bytes};
 use crate::transform::{self, DEFAULT_MAX_INPUT_TUPLES, DEFAULT_STEP_LIMIT, Limits};
 
-/// The SQLite shell's pure upgrade decision, compiled from the shell's own
-/// source. It imports `Error` and `hash` from its parent, this module, which
-/// defines both as the shell does, and its sibling `equivalence`.
-#[allow(dead_code, unreachable_pub)]
-#[path = "../../../../zeno-fcis-shell-sqlite/src/v2/upgrade.rs"]
-mod upgrade;
-
-/// The shell's behaviour-change admission and data migration, which
-/// `upgrade` imports from its parent through the actual shell library.
-use crate::shell_v2::{behaviour, migration};
+use crate::shell_v2::upgrade;
+use zeno_fcis_shell_sqlite::v2::Error;
 
 /// The shell's exhaustive program comparison, premise 3 of a succession,
 /// which `upgrade` imports from its parent through the actual shell library.
 use crate::transform::tests::shell_equivalence as equivalence;
-
-/// The shell's error, with the variants its upgrade module uses.
-#[derive(Debug)]
-enum Error {
-    Encoding(EncodeError),
-    Identity,
-    Lineage,
-    Range,
-    Upgrade(upgrade::Refusal),
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Encoding(error) => write!(formatter, "encoding: {error:?}"),
-            other => write!(formatter, "{other:?}"),
-        }
-    }
-}
-
-impl From<EncodeError> for Error {
-    fn from(error: EncodeError) -> Self {
-        Self::Encoding(error)
-    }
-}
-
-/// The shell's domain-separated hash.
-fn hash(domain: Domain<'static>, bytes: &[u8]) -> Result<Hash32, Error> {
-    Ok(commitment::<RustCryptoSha256>(domain, bytes)?)
-}
 
 /// A contract's files: what `Inputs::read` reads from a directory.
 #[derive(Clone, Debug)]
@@ -290,7 +251,7 @@ fn entry_keys(entries: &[Entry]) -> Vec<String> {
 }
 
 /// Whether the changed parts are the ones `kind` allows.
-fn parts_fit(kind: Kind, parts: &[Part]) -> bool {
+fn parts_fit(kind: Kind, parts: &[Part], payload_layout: bool) -> bool {
     let only = |allowed: &[Part]| parts.iter().all(|part| allowed.contains(part));
     match kind {
         Kind::Identical => parts.is_empty(),
@@ -299,9 +260,10 @@ fn parts_fit(kind: Kind, parts: &[Part]) -> bool {
         }
         Kind::Rename => parts == [Part::Names],
         Kind::LayoutChange => {
-            parts.contains(&Part::State)
-                && !parts.contains(&Part::Interface)
-                && !parts.contains(&Part::Channels)
+            payload_layout
+                || (parts.contains(&Part::State)
+                    && !parts.contains(&Part::Interface)
+                    && !parts.contains(&Part::Channels))
         }
         Kind::RuleChange => {
             only(&[
@@ -337,7 +299,7 @@ fn every_planted_pair_gets_its_kind_and_names_exactly_its_changes() {
             assert_eq!(&entry_keys(&diff.notes), expected, "{name}: notes");
         }
         assert!(
-            parts_fit(diff.kind(), &diff.parts),
+            parts_fit(diff.kind(), &diff.parts, diff.payload_layout),
             "{name}: {:?}",
             diff.parts
         );
@@ -631,6 +593,9 @@ fn the_kinds_are_tried_in_their_fixed_precedence() {
         same_channels: false,
         state_differs: false,
         same_rest: false,
+        payload_differs: false,
+        migration_channels: false,
+        same_migration_rest: false,
     };
     let decide = |facts: Facts| {
         Kind::PRECEDENCE
@@ -678,16 +643,18 @@ fn the_kinds_are_tried_in_their_fixed_precedence() {
         state_differs: true,
         same_rest: true,
         same_channels: true,
+        migration_channels: true,
+        same_migration_rest: true,
         ..none
     };
     assert_eq!(decide(layout), Kind::LayoutChange);
     for other in [
         Facts {
-            same_rest: false,
+            same_migration_rest: false,
             ..layout
         },
         Facts {
-            same_channels: false,
+            migration_channels: false,
             ..layout
         },
     ] {

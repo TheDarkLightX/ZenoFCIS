@@ -32,6 +32,16 @@ error: aborting due to 1 previous error
 """
 
 
+def semantic_report():
+    pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+    return {'verus': {'version': pin['version'], 'commit': pin['commit'],
+                     'toolchain': pin['rust_toolchain']},
+            'func-details': {'guarded_laws::intended': {}},
+            'verification-results': {'success': False, 'errors': 1, 'verified': 1,
+                'encountered-error': True, 'encountered-vir-error': False,
+                'is-verifying-entire-crate': True}}
+
+
 class GuardedLawCoverage(unittest.TestCase):
     def test_whole_registered_closure_has_exact_total_contracts_and_raw_bodies(self):
         profile = json.loads((gate.ROOT / gate.PROFILE).read_text())
@@ -45,7 +55,9 @@ class GuardedLawCoverage(unittest.TestCase):
             'laws::evaluate_into', 'laws::evaluate', 'laws::frame::observe',
             'authority::metadata::law_op', 'authority::metadata::law_atom',
             'authority::policy::policy_bytes',
-            'composition::outcome::transition_run', 'composition::outcome::genesis_run']:
+            'composition::outcome::run', 'composition::outcome::impl&%3::execute_family',
+            'composition::outcome::impl&%1::execute', 'composition::outcome::impl&%1::genesis',
+            'composition::outcome::impl&%4::execute', 'composition::outcome::impl&%4::genesis']:
             self.assertTrue(any(name.endswith(suffix) for name in runtime), suffix)
         for suffix in ['laws::spec::node', 'laws::spec::read_observation', 'laws::spec::default_valid', 'laws::spec::default_text_valid',
             'authority::metadata_spec::law_op', 'authority::evaluator::EVALUATOR']:
@@ -95,11 +107,12 @@ class GuardedLawCoverage(unittest.TestCase):
     def test_compile_resource_and_unrelated_failures_cannot_be_semantic_kills(self):
         c = gate.controls()['guard_direction']
         first, _ = gate.target_lines(c['changed'], c['target'])
-        diagnostic = f'error: postcondition not satisfied\n --> {c["path"]}:{first}:1\n'
+        diagnostic = f'error: postcondition not satisfied\n --> {c["path"]}:{first}:1\nerror: aborting due to 1 previous error\n'
         proc = SimpleNamespace(returncode=1, stderr=diagnostic)
-        report = {'verification-results': {'success': False, 'errors': 1, 'encountered-vir-error': False}}
+        report = semantic_report()
         self.assertTrue(gate.semantic_refusal(proc, report, c)[0])
-        for extra in ['error[E0004]: non-exhaustive pattern', 'resource limit exceeded', 'timed out', 'out of memory']:
+        for extra in ['error[E0004]: non-exhaustive pattern', 'resource limit exceeded',
+                      'timed out', 'out of memory', 'solver returned unknown', 'SMT result UNKNOWN']:
             self.assertFalse(gate.semantic_refusal(SimpleNamespace(returncode=1, stderr=diagnostic + extra), report, c)[0])
         for result in [dict(success=True, errors=0, **{'encountered-vir-error': False}),
             dict(success=False, errors=1, **{'encountered-vir-error': True})]:
@@ -147,9 +160,9 @@ class GuardedLawCoverage(unittest.TestCase):
         c = gate.controls()['reset_shared_meter']
         self.assertEqual((c['kind'], c['target']), ('proof', 'evaluate_into'))
         first, last = gate.target_lines(c['changed'], c['target'])
-        report = {'verification-results': {'success': False, 'errors': 1, 'encountered-vir-error': False}}
+        report = semantic_report()
         path = 'verification/verus/../../crates/zeno-fcis-synthesis/src/finite/execution_v2/laws.rs'
-        semantic = f'error: postcondition not satisfied\n   --> {path}:{first + 1}:5\n'
+        semantic = f'error: postcondition not satisfied\n   --> {path}:{first + 1}:5\nerror: aborting due to 1 previous error\n'
         self.assertTrue(gate.semantic_refusal(SimpleNamespace(returncode=1, stderr=semantic), report, c)[0])
         self.assertFalse(gate.semantic_refusal(SimpleNamespace(returncode=1, stderr=EXHAUSTED), report, c)[0])
         for inconclusive in (EXHAUSTED, 'note: verification timed out\n', 'memory allocation failed: out of memory\n',
@@ -162,10 +175,40 @@ class GuardedLawCoverage(unittest.TestCase):
                           'error: postcondition not satisfied\n   --> crates/x/src/unrelated.rs:199:5\n'):
             self.assertFalse(gate.semantic_refusal(SimpleNamespace(returncode=1, stderr=misplaced), report, c)[0])
         # The retained obligations filter still narrows a control that declares one.
-        other = f'error: precondition not satisfied\n   --> {path}:{first + 1}:21\n'
+        other = f'error: precondition not satisfied\n   --> {path}:{first + 1}:21\nerror: aborting due to 1 previous error\n'
         self.assertTrue(gate.semantic_refusal(SimpleNamespace(returncode=1, stderr=other), report, c)[0])
         narrowed = {**c, 'obligations': ('postcondition not satisfied',)}
         self.assertFalse(gate.semantic_refusal(SimpleNamespace(returncode=1, stderr=other), report, narrowed)[0])
+
+    def test_semantic_protocol_requires_exact_pin_whole_report_and_every_intended_error(self):
+        control = gate.controls()['guard_direction']
+        first, _ = gate.target_lines(control['changed'], control['target'])
+        diagnostic = f'error: postcondition not satisfied\n --> {control["path"]}:{first}:1\n'
+        terminal = 'error: aborting due to 1 previous error\n'
+        proc = SimpleNamespace(returncode=1, stderr=diagnostic + terminal)
+        report = semantic_report()
+        self.assertTrue(gate.semantic_refusal(proc, report, control,
+            target_functions=('guarded_laws::intended',))[0])
+        self.assertFalse(gate.semantic_refusal(proc, report, control,
+            target_functions=('guarded_laws::missing',))[0])
+        for code in (0, 2, 101, 124, -9):
+            self.assertFalse(gate.semantic_refusal(SimpleNamespace(returncode=code,
+                stderr=proc.stderr), report, control)[0], code)
+        for section, key, value in [('verus', 'version', 'wrong'),
+                ('verus', 'commit', 'wrong'), ('verus', 'toolchain', 'wrong'),
+                ('verification-results', 'is-verifying-entire-crate', False),
+                ('verification-results', 'encountered-error', False),
+                ('verification-results', 'verified', 0),
+                ('verification-results', 'errors', True)]:
+            wrong = copy.deepcopy(report)
+            wrong[section][key] = value
+            self.assertFalse(gate.semantic_refusal(proc, wrong, control)[0], (section, key))
+        for bad in [diagnostic, diagnostic + terminal.replace('1 previous', '2 previous'),
+                    diagnostic.replace(str(control['path']), 'other/' + control['path'].name) + terminal,
+                    diagnostic + 'error: assertion failed\n --> unrelated.rs:1:1\n'
+                        + terminal.replace('1 previous error', '2 previous errors')]:
+            self.assertFalse(gate.semantic_refusal(SimpleNamespace(returncode=1,
+                stderr=bad), report, control)[0], bad)
 
     def law_order_output(self, line=None):
         if line is None:
@@ -270,6 +313,8 @@ class GuardedLawCoverage(unittest.TestCase):
         require_coverage(vir, profile)
         c = {'target': 'laws::predicate::node', 'field': 'body_sha256'}
         self.assertTrue(gate.coverage_refusal(vir.replace('ReadAttempt 41', 'ReadAttempt 42'), profile, c)[0])
+        extra = '(Function (Fun :path guarded_laws::unexpected) :mode Spec :typ_bounds () :params () :ret () :require () :ensure () :d () :body (Bool true))'
+        self.assertFalse(gate.coverage_refusal(vir.replace('ReadAttempt 41', 'ReadAttempt 42') + extra, profile, c)[0])
         weakened = vir.replace(':ensure ((Bool true))', ':ensure ()')
         with self.assertRaises(ValueError):
             require_coverage(weakened, profile)
@@ -277,6 +322,20 @@ class GuardedLawCoverage(unittest.TestCase):
         wrong['body_covered_functions'] = []
         with self.assertRaises(ValueError):
             require_coverage(vir, wrong)
+
+    def test_uncontracted_control_requires_exact_added_function_and_zero_contract(self):
+        vir = '(Function (Fun :path guarded_laws::execution_v2::laws::evaluate) :mode Exec :typ_bounds () :params () :ret () :require () :ensure ((Bool true)) :d () :body (Bool true))'
+        existing = 'guarded_laws::execution_v2::laws::evaluate'
+        profile = {'namespace': gate.NAMESPACE,
+            'functions': inventory(vir, gate.NAMESPACE, (existing,)),
+            'body_covered_functions': [existing]}
+        added = '(Function (Fun :path guarded_laws::execution_v2::laws::uncontracted_law_probe) :mode Exec :typ_bounds () :params () :ret () :require () :ensure () :d () :body (Const 7))'
+        control = {'target': 'laws::uncontracted_law_probe', 'field': 'inventory'}
+        self.assertTrue(gate.coverage_refusal(vir + added, profile, control)[0])
+        extra = added.replace('uncontracted_law_probe', 'unexpected')
+        self.assertFalse(gate.coverage_refusal(vir + added + extra, profile, control)[0])
+        self.assertFalse(gate.coverage_refusal(added, profile, control)[0])
+        self.assertFalse(gate.coverage_refusal(vir + added.replace(':require ()', ':require ((Bool true))'), profile, control)[0])
 
     def test_source_manifest_includes_actual_metadata_getter_test_and_original_graph(self):
         paths = set(gate.sources())

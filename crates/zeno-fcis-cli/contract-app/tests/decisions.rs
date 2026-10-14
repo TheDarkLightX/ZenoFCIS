@@ -106,6 +106,51 @@ fn examples_run_as_one_persistent_session() {
     println!("session: {}", summary.json());
 }
 
+/// The journey checks every example whatever order the file lists them in:
+/// reordering can change which examples the session reaches, but each one it
+/// leaves is decided on its own. A wrong copy of the first commit from
+/// genesis, listed right after it, is left by the session and still fails
+/// the journey.
+#[cfg(feature = "sqlite")]
+#[test]
+fn the_journey_checks_every_example_in_any_file_order() {
+    let written = examples(EXAMPLES).unwrap_or_else(|error| panic!("{error}"));
+    let directory = std::env::temp_dir().join(format!(
+        "{}-order-{}",
+        env!("CARGO_PKG_NAME"),
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&directory).unwrap_or_else(|error| panic!("{error}"));
+    let journey = |examples: &[application::Example], name: &str| {
+        let path = directory.join(name);
+        let _ = std::fs::remove_file(&path);
+        application::journey(&path, examples)
+    };
+    let mut reversed = written.clone();
+    reversed.reverse();
+    let summary = journey(&reversed, "reversed.sqlite").unwrap_or_else(|error| panic!("{error}"));
+    assert_eq!(summary.examples, written.len());
+    let genesis = genesis_numbers().unwrap_or_else(|error| panic!("{error}"));
+    let first_commit = written.iter().position(|example| {
+        example.inputs.get(..genesis.len()) == Some(genesis.as_slice())
+            && example.class != c::Class::Reject
+    });
+    let planted = first_commit.map(|position| {
+        let mut planted = written.clone();
+        let mut wrong = written[position].clone();
+        wrong.class = c::Class::Reject;
+        planted.insert(position + 1, wrong);
+        journey(&planted, "planted.sqlite")
+    });
+    let _ = std::fs::remove_dir_all(&directory);
+    if let Some(refused) = planted {
+        assert!(
+            matches!(&refused, Err(error) if error.contains("class differs")),
+            "{refused:?}"
+        );
+    }
+}
+
 /// Each example written in the grammar's other forms, line for line: the
 /// inputs split into state, command and context sections; comments
 /// indented; and, when the contract declares one channel, each delivery as
@@ -261,6 +306,129 @@ mod commands {
 
     fn bytes(path: &Path) -> Option<Vec<u8>> {
         std::fs::read(path).ok()
+    }
+
+    #[test]
+    fn scalar_frame_cli_matches_native_decisions_and_refusals() {
+        if run(&["version", "--format", "json"], &[])
+            .stdout
+            .contains("\"host_profile\":null")
+        {
+            expect(&run(&["frame", "--format", "json"], &[]), INVALID, "scalar");
+            return;
+        }
+        let written = examples(EXAMPLES)
+            .unwrap_or_else(|error| panic!("cannot read scalar decision examples: {error}"));
+        let initial = genesis_numbers()
+            .unwrap_or_else(|error| panic!("cannot read scalar genesis numbers: {error}"));
+        let Some(example) = committing(&written, &initial) else {
+            return;
+        };
+        let scratch = Scratch::new("scalar-frame");
+        let direct = scratch.path("direct.sqlite");
+        let framed = scratch.path("framed.sqlite");
+        let frame_path = scratch.path("request.frame");
+        for database in [&direct, &framed] {
+            expect(
+                &run(&["init", path(database), "--format", "json"], &[]),
+                OK,
+                "initialized",
+            );
+        }
+        let contract = v2_contract::Contract::new();
+        let native = application::wire(&contract.descriptor(), &example.inputs)
+            .unwrap_or_else(|error| panic!("cannot encode native scalar envelopes: {error}"));
+        let mut request = b"ZFCISL1\0".to_vec();
+        request.extend_from_slice(&(native[1].len() as u32).to_le_bytes());
+        request.extend_from_slice(&(native[2].len() as u32).to_le_bytes());
+        request.extend_from_slice(&native[1]);
+        request.extend_from_slice(&native[2]);
+        let encoded: String = request.iter().map(|byte| format!("{byte:02x}")).collect();
+        let frame_report = run(&["frame", "--format", "json"], &words(example));
+        assert_eq!(frame_report.exit, OK);
+        assert_eq!(
+            frame_report.stdout,
+            format!(
+                "{{\"schema\":\"zeno-fcis/native-scalar-frame/1\",\"profile\":\"zeno-fcis/native-scalar-consumer/1\",\"frame\":\"{encoded}\"}}\n"
+            )
+        );
+        std::fs::write(&frame_path, &request)
+            .unwrap_or_else(|error| panic!("cannot write scalar request: {error}"));
+        let before = (bytes(&framed), bytes(&journal_path(&framed)));
+        let direct_decision = run(
+            &["decide", path(&direct), "--format", "json"],
+            &words(example),
+        );
+        let framed_decision = run(
+            &[
+                "decide",
+                path(&framed),
+                "--frame",
+                path(&frame_path),
+                "--format",
+                "json",
+            ],
+            &[],
+        );
+        assert_eq!(framed_decision, direct_decision);
+        assert_eq!((bytes(&framed), bytes(&journal_path(&framed))), before);
+        let mut malformed = request.clone();
+        malformed[0] ^= 1;
+        std::fs::write(&frame_path, malformed)
+            .unwrap_or_else(|error| panic!("cannot write malformed scalar request: {error}"));
+        expect(
+            &run(
+                &[
+                    "submit",
+                    path(&framed),
+                    "--frame",
+                    path(&frame_path),
+                    "--format",
+                    "json",
+                ],
+                &[],
+            ),
+            INVALID,
+            "header",
+        );
+        expect(
+            &run(
+                &[
+                    "submit",
+                    path(&framed),
+                    "--frame",
+                    path(&scratch.path("missing")),
+                    "--format",
+                    "json",
+                ],
+                &words(example),
+            ),
+            USAGE,
+            "no NAME=VALUE",
+        );
+        assert_eq!((bytes(&framed), bytes(&journal_path(&framed))), before);
+        std::fs::write(&frame_path, request)
+            .unwrap_or_else(|error| panic!("cannot restore scalar request: {error}"));
+        let direct_commit = run(
+            &["submit", path(&direct), "--format", "json"],
+            &words(example),
+        );
+        let framed_commit = run(
+            &[
+                "submit",
+                path(&framed),
+                "--frame",
+                path(&frame_path),
+                "--format",
+                "json",
+            ],
+            &[],
+        );
+        assert_eq!(framed_commit, direct_commit);
+        assert_eq!(
+            run(&["history", path(&framed), "--format", "json"], &[]),
+            run(&["history", path(&direct), "--format", "json"], &[])
+        );
     }
 
     #[test]

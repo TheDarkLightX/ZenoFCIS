@@ -43,7 +43,7 @@
   <rect x="0" y="0" width="9" height="1000" fill="#a7f3d0"/>
 
   <text x="128" y="72" class="brand">ZENOFCIS</text>
-  <text x="1457" y="72" text-anchor="end" class="release">1.0.0-RC.3</text>
+  <text x="1457" y="72" text-anchor="end" class="release">2.3.0</text>
   <text x="128" y="132" class="eyebrow">EXECUTABLE SEMANTICS</text>
   <text x="128" y="197" class="title">Private work. Canonical merge.</text>
   <text x="128" y="238" class="subtitle">Worker completion order changes; the accepted logical result does not.</text>

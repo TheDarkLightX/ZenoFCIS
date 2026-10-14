@@ -24,6 +24,8 @@ from urllib.parse import quote
 import tomllib
 
 import check_generated_application as generated_application
+import check_release_custody as custody
+import check_release_privacy
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_SET_PATH = ROOT / "release" / "package-set.toml"
@@ -39,7 +41,7 @@ EXPECTED_PROBITY_INTEGRITY = (
     "EBUePD8+S4/kRiqh8K/B0oA=="
 )
 EXPECTED_NPM_LOCK_CANONICAL_SHA256 = (
-    "2ffb98016ee7c29d001ea981067e047a23020043f29a16005731e5215667bcba"
+    "ae97905ed4b70541bbdc089f6ef468a1d23d4aeb96bcb0022cd9ff7e8acb9664"
 )
 FIXED_ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 RUSTDOC_ARCHIVE_NOTICE = """ZenoFCIS offline rustdoc archive
@@ -71,6 +73,17 @@ def parse_args() -> argparse.Namespace:
     verify = subcommands.add_parser("verify-packaged", help="exercise an existing crate set and its generated application")
     verify.add_argument("--packages", type=Path, required=True)
     verify.add_argument("--output", type=Path, required=True)
+    host = subcommands.add_parser("build-host-binary", help="build, archive and record this host's executable only")
+    host.add_argument("--output", type=Path, required=True)
+    merge = subcommands.add_parser("merge-hosts", help="add other hosts' archives and records to a release set")
+    merge.add_argument("--release", type=Path, required=True)
+    merge.add_argument("--host", type=Path, action="append", default=[], help="a build-host-binary output folder")
+    merge.add_argument("--journey", action="append", default=[], metavar="HOST=FILE",
+                       help="an installed-binary journey report for a host already in the set")
+    downloads = subcommands.add_parser("downloads-list", help="write the flat list of published assets the owner signs")
+    downloads.add_argument("--release", type=Path, required=True)
+    downloads.add_argument("--signing-key", type=Path, help=f"the public key to publish as {custody.SIGNING_KEY_NAME}")
+    downloads.add_argument("--out", type=Path, required=True)
     return parser.parse_args()
 
 
@@ -377,7 +390,30 @@ def validate_package_set() -> tuple[dict[str, object], dict[str, object]]:
         package_set(), cargo_metadata(complete=False)
     )
     validate_developer_tooling(require_string(configured, "version"))
+    validate_scaffold_versions(require_string(configured, "version"))
     return configured, metadata
+
+
+def validate_scaffold_versions(version: str, root: Path = ROOT) -> None:
+    """Check emitted dependency pins before any release build or app journey."""
+    package_roots = {
+        str(tomllib.loads(path.read_text())["package"]["name"]): path.parent
+        for path in (root / "crates").glob("*/Cargo.toml")
+    }
+    templates = root / "crates/zeno-fcis-cli/templates"
+    paths = [directory / "Cargo.toml.in" for directory in sorted(templates.iterdir())
+             if directory.is_dir()]
+    if not paths:
+        raise RcError("release has no application templates")
+    paths.append(root / "crates/zeno-fcis-cli/contract-app/Cargo.toml.in")
+    for path in paths:
+        document = tomllib.loads(path.read_text().replace("{version}", version))
+        try:
+            selected = generated_application.generated_dependency_closure(document, package_roots, version)
+        except RuntimeError as error:
+            raise RcError(f"{path.relative_to(root)}: {error}") from error
+        if not selected:
+            raise RcError(f"{path.relative_to(root)}: no library dependency pins")
 
 
 def run_self_test(configured: dict[str, object], metadata: dict[str, object]) -> None:
@@ -822,17 +858,17 @@ def normalize_rustdoc_tree(doc_root: Path) -> None:
     )
 
 
-def deterministic_binary_archive(binary: Path, destination: Path, prefix: str) -> None:
+def deterministic_binary_archive(binary: Path, destination: Path, prefix: str, root: Path = ROOT) -> None:
     members = [
         (binary, binary.name, 0o755),
-        (ROOT / "README.md", "README.md", 0o644),
-        (ROOT / "LICENSE-APACHE", "LICENSE-APACHE", 0o644),
-        (ROOT / "LICENSE-MIT", "LICENSE-MIT", 0o644),
-        (ROOT / "docs" / "INSTALLATION.md", "INSTALLATION.md", 0o644),
+        (root / "README.md", "README.md", 0o644),
+        (root / "LICENSE-APACHE", "LICENSE-APACHE", 0o644),
+        (root / "LICENSE-MIT", "LICENSE-MIT", 0o644),
+        (root / "docs" / "INSTALLATION.md", "INSTALLATION.md", 0o644),
     ]
     with (
         destination.open("wb") as raw,
-        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed,
+        gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=0) as compressed,
         tarfile.open(
             fileobj=compressed, mode="w", format=tarfile.USTAR_FORMAT
         ) as archive,
@@ -920,7 +956,7 @@ def source_archive(destination: Path, prefix: str) -> None:
         raise RcError("git archive did not return bytes")
     with (
         destination.open("wb") as raw,
-        gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed,
+        gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=0) as compressed,
     ):
         compressed.write(content)
 
@@ -1535,10 +1571,445 @@ def verify_packaged(packages: Path, output: Path, version: str) -> None:
     print(f"rc-package: packaged application PASS; receipt: {output / 'PACKAGED-APPLICATION.json'}")
 
 
+DOCUMENT_ARCHIVE_MEMBERS = custody.DOCUMENT_MEMBERS
+
+
+def require_source_state(stage: str, repo: Path = ROOT) -> dict[str, object]:
+    """Custody C1: the working tree, index and ignored files equal the commit, by content."""
+    state = custody.source_state(repo)
+    if not state["passed"]:
+        problems = "; ".join(str(problem) for problem in state["problems"][:5])
+        raise RcError(f"{stage}: the source is not exactly its commit: {problems}")
+    return state
+
+
+def rustc_host() -> tuple[str, str]:
+    verbose_version = run(["rustc", "+1.97.1", "-vV"], capture=True)
+    if not isinstance(verbose_version, str):
+        raise RcError("rustc version output is binary")
+    host_lines = [line.removeprefix("host: ") for line in verbose_version.splitlines() if line.startswith("host: ")]
+    if len(host_lines) != 1:
+        raise RcError("rustc host target is unavailable")
+    return verbose_version, host_lines[0]
+
+
+def rustc_commit_hash(verbose_version: str) -> str:
+    hashes = re.findall(r"^commit-hash: (\S+)$", verbose_version, re.MULTILINE)
+    if len(hashes) != 1:
+        raise RcError("a rustc version record has no single commit-hash")
+    return hashes[0]
+
+
+def holds_marker(path: Path, marker: str) -> bool:
+    """Whether the release privacy scan, given `marker` as a private identifier, finds it."""
+    scan = check_release_privacy.Scan(private_markers=(marker.encode(),))
+    scan.file(path, path.name)
+    report = scan.report()
+    if report["errors"]:
+        raise RcError(f"privacy scan could not read {path.name}")
+    return any(finding["code"] == "private-marker" for finding in report["findings"])
+
+
+def dep_info_records(target: Path) -> tuple[list[str], list[tuple[str, str | None]]]:
+    """Prerequisites of every rustc dep-info file of a release build, and its crates' env-deps."""
+    prerequisites: set[str] = set()
+    environment: set[tuple[str, str | None]] = set()
+    crate_files = sorted((target / "release" / "deps").glob("*.d"))
+    for path in [*crate_files, *sorted((target / "release" / "build").glob("*/*.d"))]:
+        listed = dep_info_prerequisites(path)
+        if listed is None:
+            continue
+        prerequisites.update(listed)
+        if path not in crate_files:
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("# env-dep:"):
+                name, separator, value = line.removeprefix("# env-dep:").partition("=")
+                environment.add((name, value if separator else None))
+    return sorted(prerequisites), sorted(environment, key=lambda item: (item[0], item[1] or ""))
+
+
+def registry_package_files(directory: Path) -> dict[str, bytes]:
+    files = {}
+    for path in sorted(directory.rglob("*")):
+        if path.is_file() and path.name != ".cargo-ok":
+            files[path.relative_to(directory).as_posix()] = path.read_bytes()
+    return files
+
+
+# Cargo sets these to a package's own folder and its build script's output folder.
+BUILD_LOCATION_VARIABLES = frozenset({"CARGO_MANIFEST_DIR", "OUT_DIR"})
+
+
+def names_folder_within(value: str, folder: Path) -> bool:
+    """Whether the absolute path `value` is `folder` or lies inside it, compared component by component."""
+    path = Path(os.path.normpath(value))
+    return path.is_absolute() and path.is_relative_to(folder)
+
+
+def env_dep_record(name: str, value: str | None, *, root: Path, target: Path, home: Path) -> dict[str, object]:
+    """A variable a release crate read, its value shown with the target, source and home folders replaced.
+
+    rustc records every `env!` it expands, even in a branch the build does not take, so reading a
+    folder is not embedding it; the executable scans decide that. Cargo's own build-location
+    variables may name a folder inside the checkout or the target folder. Any other value that
+    names the checkout, the target folder or the home folder is private and fails the build.
+    """
+    if not value:
+        return {"name": name, "value": value, "private": False}
+    located = name in BUILD_LOCATION_VARIABLES and (names_folder_within(value, root)
+                                                     or names_folder_within(value, target))
+    private = not located and any(str(folder) in value for folder in (root, target, home))
+    shown = value.replace(str(target), "<target>").replace(str(root), "<source>").replace(str(home), "<home>")
+    return {"name": name, "value": shown, "private": private}
+
+
+def compiled_inputs_problems(inputs: dict[str, object]) -> list[str]:
+    """Why compiled inputs refuse a release build. It names variables, never their values."""
+    problems = [f"unclassified input {path}" for path in inputs["unclassified"]]
+    problems.extend(f"{entry['name']} names a private path" for entry in inputs["env_deps"] if entry["private"])
+    return problems
+
+
+def record_compiled_inputs(target: Path, host: str, executable: Path, commit: str, version: str, *,
+                           root: Path = ROOT, home: Path | None = None,
+                           cargo_home: Path | None = None) -> dict[str, object]:
+    """Custody C7 at build time: every file the release build's rustc read, classified."""
+    home = home or Path.home()
+    cargo_home = (cargo_home or Path(os.environ.get("CARGO_HOME", home / ".cargo"))).resolve()
+    registry_root = cargo_home / "registry" / "src"
+    target, root = target.resolve(), root.resolve()
+    locked = {(package["name"], package["version"]): package
+              for package in load_toml(LOCK_PATH).get("package", []) if isinstance(package, dict)}
+    prerequisites, environment = dep_info_records(target)
+    workspace, registry_inputs, outputs, unclassified = [], [], [], []
+    packages: dict[str, dict[str, object]] = {}
+    for raw in prerequisites:
+        path = Path(raw)
+        resolved = (path if path.is_absolute() else root / path).resolve()
+        if resolved.is_relative_to(target):
+            outputs.append({"path": resolved.relative_to(target).as_posix(), "sha256": sha256(resolved)})
+        elif resolved.is_relative_to(registry_root) and len(resolved.relative_to(registry_root).parts) >= 3:
+            index, folder, *rest = resolved.relative_to(registry_root).parts
+            directory = registry_root / index / folder
+            if folder not in packages:
+                manifest = load_toml(directory / "Cargo.toml").get("package", {})
+                if not isinstance(manifest, dict):
+                    raise RcError(f"registry package {folder} has no package table")
+                key = (str(manifest.get("name")), str(manifest.get("version")))
+                lock = locked.get(key)
+                files = registry_package_files(directory)
+                packages[folder] = {"name": key[0], "version": key[1],
+                                    "checksum": lock.get("checksum") if isinstance(lock, dict) else None,
+                                    "tree_sha256": custody.tree_digest(files), "files": len(files)}
+            registry_inputs.append({"package": folder, "path": "/".join(rest), "sha256": sha256(resolved)})
+        elif resolved.is_relative_to(root):
+            workspace.append({"path": resolved.relative_to(root).as_posix(), "sha256": sha256(resolved)})
+        else:
+            unclassified.append(str(resolved).replace(str(home), "<home>"))
+    env_deps = [env_dep_record(name, value, root=root, target=target, home=home) for name, value in environment]
+    return {
+        "format": "zeno-fcis/compiled-inputs/1", "host": host, "version": version, "source_commit": commit,
+        "executable": {"name": executable.name, "sha256": sha256(executable)},
+        "workspace_inputs": workspace, "registry_packages": sorted(packages.values(), key=lambda item: (item["name"], item["version"])),
+        "registry_inputs": registry_inputs, "build_outputs": outputs, "env_deps": env_deps,
+        "unclassified": unclassified,
+        "nonclaim": "rustc dep-info of the release build; build-script C sources are covered by their package's "
+                    "whole unpacked tree, not by per-file records; not a reproducible-build proof",
+    }
+
+
+def host_binary_record(*, version: str, commit: str, host: str, rustc: str, archive: Path, prefix: str,
+                       executable: Path, compiler_flags: dict[str, list[str]], commands: list[str]) -> dict[str, object]:
+    members = []
+    with tarfile.open(archive, mode="r:gz") as opened:
+        for member in opened.getmembers():
+            extracted = opened.extractfile(member)
+            if extracted is None:
+                raise RcError(f"{archive.name}: {member.name} is not a regular file")
+            members.append({"name": member.name, "mode": oct(member.mode), "size": member.size,
+                            "sha256": hashlib.sha256(extracted.read()).hexdigest()})
+    return {
+        "format": "zeno-fcis/host-binary/1", "version": version, "source_commit": commit, "host": host,
+        "rustc": rustc, "deployment_target": os.environ.get("MACOSX_DEPLOYMENT_TARGET") if "-apple-" in host else None,
+        "archive": {"name": archive.name, "sha256": sha256(archive), "size": archive.stat().st_size,
+                    "prefix": prefix, "members": members},
+        "executable": {"name": executable.name, "sha256": sha256(executable), "size": executable.stat().st_size},
+        "compiler_flags": compiler_flags, "commands": commands,
+        "nonclaim": "a record of this build; not a signature, attestation or reproducible-build proof",
+    }
+
+
+def build_release_binaries(
+    configured: dict[str, object], version: str, commit: str, build_target: Path, environment: dict[str, str],
+    binaries_dir: Path, records_dir: Path,
+) -> tuple[str, list[dict[str, str]]]:
+    """Build, archive and record the declared executable of this host. Returns the host and inventory."""
+    rustc, host = rustc_host()
+    inventory = binary_artifact_inventory(configured, version, host)
+    if len(inventory) != 1:
+        raise RcError("host records describe exactly one declared executable")
+    # A released `zeno-fcis` records no build directory; `new` then needs `--source`.
+    environment["ZENO_FCIS_BUILD_TREE"] = ""
+    item = inventory[0]
+    run(["cargo", "+1.97.1", "build", "--release", "--locked", "-p", item["package"], "--bin", item["target"]],
+        environment=environment)
+    executable_name = f"{item['target']}.exe" if os.name == "nt" else item["target"]
+    executable = build_target / "release" / executable_name
+    if not executable.is_file():
+        raise RcError(f"release binary {executable_name} is missing")
+    if holds_marker(executable, str(ROOT)):
+        raise RcError("the release executable holds this checkout's path")
+    archive = binaries_dir / item["archive"]
+    deterministic_binary_archive(executable, archive, item["prefix"])
+    records_dir.mkdir(parents=True, exist_ok=True)
+    write_json(records_dir / f"COMPILED-INPUTS-{host}.json",
+               record_compiled_inputs(build_target, host, executable, commit, version))
+    problems = compiled_inputs_problems(load_json_object(records_dir / f"COMPILED-INPUTS-{host}.json"))
+    if problems:
+        raise RcError("the release build read an unclassified input or a private path: " + "; ".join(problems[:5]))
+    write_json(records_dir / "HOST-BINARY.json", host_binary_record(
+        version=version, commit=commit, host=host, rustc=rustc, archive=archive, prefix=item["prefix"],
+        executable=executable, compiler_flags=compiler_flag_evidence(environment, ROOT, "<source>"),
+        commands=["cargo +1.97.1 fetch --locked", item["command"]]))
+    return host, inventory
+
+
+def write_release_index(output: Path, version: str, commit: str) -> int:
+    """RC-MANIFEST.json, SHA256SUMS and the bundle over every other file; returns the artifact count."""
+    manifest_path = output / "RC-MANIFEST.json"
+    checksums_path = output / "SHA256SUMS"
+    bundle_path = output / f"zeno-fcis-{version}-rc-bundle.zip"
+    for path in (manifest_path, checksums_path, bundle_path):
+        if path.exists():
+            path.unlink()
+    entries = artifact_entries(output, {manifest_path, checksums_path, bundle_path})
+    write_json(
+        manifest_path,
+        {
+            "format": "zeno-fcis/release-candidate-manifest/1",
+            "version": version,
+            "source_commit": commit,
+            "rust_toolchain": "1.97.1",
+            "artifacts": entries,
+            "nonclaims": [
+                "not a production deployment authorization",
+                "not an independent audit",
+                "not a signature or SLSA attestation",
+            ],
+        },
+    )
+    checksum_files = [
+        path
+        for path in sorted(item for item in output.rglob("*") if item.is_file())
+        if path not in {checksums_path, bundle_path}
+    ]
+    checksums_path.write_text(
+        "".join(f"{sha256(path)}  {path.relative_to(output).as_posix()}\n" for path in checksum_files),
+        encoding="utf-8",
+    )
+    deterministic_bundle(output, bundle_path)
+    return len(entries)
+
+
+def read_sha256sums(release: Path) -> dict[str, str]:
+    listed: dict[str, str] = {}
+    for line in (release / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
+        digest, separator, name = line.partition("  ")
+        if separator != "  " or re.fullmatch(r"[0-9a-f]{64}", digest) is None or name in listed:
+            raise RcError(f"SHA256SUMS: malformed or repeated line for {name!r}")
+        listed[name] = digest
+    return listed
+
+
+def verify_release_index(release: Path, version: str) -> None:
+    """The set's index is current: every file listed once with its hash, and the manifest agrees."""
+    listed = read_sha256sums(release)
+    bundle = f"zeno-fcis-{version}-rc-bundle.zip"
+    files = {path.relative_to(release).as_posix(): path for path in sorted(release.rglob("*")) if path.is_file()}
+    if set(listed) != set(files) - {"SHA256SUMS", bundle}:
+        raise RcError("SHA256SUMS does not list exactly the set's files: stale index")
+    for name, digest in listed.items():
+        if sha256(files[name]) != digest:
+            raise RcError(f"SHA256SUMS: {name} changed after indexing")
+    manifest = load_json_object(release / "RC-MANIFEST.json")
+    expected = [{"path": name, "sha256": sha256(path), "size": path.stat().st_size} for name, path in files.items()
+                if name not in ("RC-MANIFEST.json", "SHA256SUMS", bundle)]
+    if manifest.get("artifacts") != expected:
+        raise RcError("RC-MANIFEST.json artifacts are stale")
+
+
+class CommittedDocuments:
+    """The committed archive documents, read from git by commit."""
+
+    def __init__(self, repo: Path, commit: str):
+        git = custody.Git(repo)
+        self.blobs = {path: git.run("show", f"{commit}:{path}") for _, path in DOCUMENT_ARCHIVE_MEMBERS}
+
+    def blob(self, path: str) -> bytes:
+        return self.blobs[path]
+
+
+def merge_hosts(release: Path, host_dirs: list[Path], journeys: dict[str, Path], *, repo: Path = ROOT,
+                check_source: bool = True) -> dict[str, object]:
+    manifest = load_json_object(release / "RC-MANIFEST.json")
+    version, commit = str(manifest.get("version")), str(manifest.get("source_commit"))
+    verify_release_index(release, version)
+    if check_source:
+        state = require_source_state("merge-hosts", repo)
+        if state["commit"] != commit:
+            raise RcError("the release set was built from another commit")
+    provenance = load_json_object(release / "PROVENANCE-INPUTS.json")
+    hosts = set(provenance.get("host_targets", []))
+    records = {path.parent.name: load_json_object(path) for path in sorted(release.glob("hosts/*/HOST-BINARY.json"))}
+    if set(records) != hosts or not hosts:
+        raise RcError("every host of the release set needs its host record")
+    reference = rustc_commit_hash(str(records[sorted(hosts)[0]]["rustc"]))
+    documents = CommittedDocuments(repo, commit)
+    added: dict[str, dict[str, object]] = {}
+    for directory in host_dirs:
+        record = load_json_object(directory / "HOST-BINARY.json")
+        host = str(record.get("host"))
+        if host in hosts or host in added:
+            raise RcError(f"duplicate host {host}")
+        if record.get("source_commit") != commit or record.get("version") != version:
+            raise RcError(f"{host}: built from another commit or version")
+        if rustc_commit_hash(str(record.get("rustc"))) != reference:
+            raise RcError(f"{host}: built with another rustc")
+        name = f"zeno-fcis-{version}-{host}.tar.gz"
+        archive = directory / "binaries" / name
+        listing = sorted(path.name for path in (directory / "binaries").iterdir())
+        if record.get("archive", {}).get("name") != name or listing != [name]:
+            raise RcError(f"{host}: the host folder must hold exactly the archive {name}")
+        if (release / "binaries" / name).exists() or (release / "hosts" / host).exists():
+            raise RcError(f"{host}: the set already holds binaries/{name} or hosts/{host}")
+        if sha256(archive) != record["archive"]["sha256"]:
+            raise RcError(f"{host}: the archive differs from its record")
+        problems, _ = custody.binary_archive_problems(archive, version, host, documents, record)
+        if problems:
+            raise RcError(f"{host}: " + "; ".join(problems[:5]))
+        inputs = load_json_object(directory / f"COMPILED-INPUTS-{host}.json")
+        if (inputs.get("host"), inputs.get("source_commit"), inputs.get("version")) != (host, commit, version) or \
+                inputs.get("executable", {}).get("sha256") != record.get("executable", {}).get("sha256"):
+            raise RcError(f"{host}: compiled inputs describe another build")
+        journey = directory / "INSTALLED-JOURNEY.json"
+        if host in journeys:
+            journey = journeys[host]
+        if not journey.is_file():
+            raise RcError(f"{host}: no passed installed-binary journey")
+        problems = custody.journey_problems(load_json_object(journey), host, version, record["archive"]["sha256"])
+        if problems:
+            raise RcError(problems[0])
+        added[host] = {"record": record, "record_path": directory / "HOST-BINARY.json", "archive": archive,
+                       "inputs": directory / f"COMPILED-INPUTS-{host}.json", "journey": journey}
+    existing = {host: journey for host, journey in journeys.items() if host not in added}
+    for host, journey in existing.items():
+        if host not in hosts:
+            raise RcError(f"journey for unknown host {host}")
+        problems = custody.journey_problems(load_json_object(journey), host, version,
+                                            records[host].get("archive", {}).get("sha256"))
+        if problems:
+            raise RcError(problems[0])
+        if (release / "hosts" / host / "INSTALLED-JOURNEY.json").exists():
+            raise RcError(f"{host} already has a journey")
+    joining = [*existing.values(),
+               *(item[key] for item in added.values() for key in ("record_path", "inputs", "journey"))]
+    # Without paths the scan would read the whole checkout instead.
+    findings = privacy_findings(joining) if joining else []
+    if findings:
+        raise RcError("a file joining the set holds private data: " + "; ".join(findings[:5]))
+    # Nothing is copied until every host and journey has been checked.
+    for host, journey in existing.items():
+        shutil.copyfile(journey, release / "hosts" / host / "INSTALLED-JOURNEY.json")
+    for host, item in added.items():
+        destination = release / "hosts" / host
+        destination.mkdir(parents=True)
+        shutil.copyfile(item["archive"], release / "binaries" / Path(item["archive"]).name)
+        # Byte copies: the producing job reported these files' hashes.
+        shutil.copyfile(item["record_path"], destination / "HOST-BINARY.json")
+        shutil.copyfile(item["inputs"], destination / f"COMPILED-INPUTS-{host}.json")
+        shutil.copyfile(item["journey"], destination / "INSTALLED-JOURNEY.json")
+    every = hosts | set(added)
+    if any(not (release / "hosts" / host / "INSTALLED-JOURNEY.json").is_file() for host in every):
+        raise RcError("every host of the merged set needs a passed installed-binary journey")
+    provenance["host_targets"] = sorted(every)
+    details = provenance.get("hosts") if isinstance(provenance.get("hosts"), dict) else {}
+    for host in sorted(every):
+        record = added[host]["record"] if host in added else records[host]
+        details[host] = {"rustc": record.get("rustc"), "deployment_target": record.get("deployment_target"),
+                         "compiler_flags": record.get("compiler_flags"), "commands": record.get("commands")}
+    provenance["hosts"] = details
+    write_json(release / "PROVENANCE-INPUTS.json", provenance)
+    count = write_release_index(release, version, commit)
+    return {"hosts": sorted(every), "added": sorted(added), "artifacts": count}
+
+
+def privacy_findings(paths: list[Path]) -> list[str]:
+    """What the release privacy scan finds in `paths`, by file and code; it never prints the matched data.
+
+    The scan honours ZENO_FCIS_PRIVATE_MARKERS_FILE, as it does at the end of `build`."""
+    completed = subprocess.run([sys.executable, str(ROOT / "tools" / "check_release_privacy.py"), "check",
+                                *(str(path) for path in paths)], cwd=ROOT, capture_output=True, text=True, check=False)
+    try:
+        report = json.loads(completed.stdout)
+    except ValueError:
+        return [f"the privacy scan exited {completed.returncode} without a report"]
+    found = [f"{item.get('location')}: {item.get('code')}" for item in [*report.get("findings", []),
+                                                                        *report.get("errors", [])]]
+    if completed.returncode != 0 and not found:
+        found.append(f"the privacy scan exited {completed.returncode}")
+    return found
+
+
+def downloads_lines(release: Path, signing_key: Path | None = None) -> str:
+    """`<sha256>  <basename>` for every published asset: the host archives, the rustdoc archive, the SBOM
+    and, when given, the signing key."""
+    assets: dict[str, str] = {}
+    for name, digest in read_sha256sums(release).items():
+        if custody.published_asset(name):
+            if sha256(release / name) != digest:
+                raise RcError(f"{name} differs from SHA256SUMS")
+            basename = PurePosixPath(name).name
+            if basename in assets:
+                raise RcError(f"two published assets are named {basename}")
+            assets[basename] = digest
+    if signing_key is not None:
+        if signing_key.name != custody.SIGNING_KEY_NAME:
+            raise RcError(f"the signing key file must be named {custody.SIGNING_KEY_NAME}")
+        if signing_key.name in assets:
+            raise RcError(f"two published assets are named {signing_key.name}")
+        assets[signing_key.name] = sha256(signing_key)
+    return "".join(f"{assets[name]}  {name}\n" for name in sorted(assets))
+
+
+def build_host_binary(output: Path) -> None:
+    configured, _ = validate_package_set()
+    version = require_string(configured, "version")
+    commit = require_clean_commit()
+    require_source_state("build-host-binary start")
+    if output.exists() and any(output.iterdir()):
+        raise RcError("output directory must not exist or must be empty")
+    output.mkdir(parents=True, exist_ok=True)
+    binaries_dir = output / "binaries"
+    binaries_dir.mkdir()
+    build_target = output / ".cargo-target"
+    environment = remapped_compiler_environment(dict(os.environ), ROOT, "/zeno-fcis-source")
+    environment["CARGO_TARGET_DIR"] = str(build_target)
+    run(["cargo", "+1.97.1", "fetch", "--locked"], environment=environment)
+    host, _ = build_release_binaries(configured, version, commit, build_target, environment, binaries_dir, output)
+    shutil.rmtree(build_target)
+    if require_source_state("build-host-binary end")["commit"] != commit:
+        raise RcError("source commit changed while building the host executable")
+    run([sys.executable, "tools/check_release_privacy.py", "check", str(output)])
+    print(f"rc-package: built and recorded the {host} executable at {commit}")
+
+
 def build(output: Path) -> None:
     configured, _ = validate_package_set()
     version = require_string(configured, "version")
     commit = require_clean_commit()
+    require_source_state("build start")
+    run([sys.executable, "tools/check_public_docs.py"])
     run([sys.executable, "tools/check_release_privacy.py", "check"])
     if output.exists() and any(output.iterdir()):
         raise RcError("output directory must not exist or must be empty")
@@ -1613,47 +2084,13 @@ def build(output: Path) -> None:
         f"zeno-fcis-rustdoc-{version}",
     )
 
-    verbose_version = run(["rustc", "+1.97.1", "-vV"], capture=True)
-    if not isinstance(verbose_version, str):
-        raise RcError("rustc version output is binary")
-    host_lines = [
-        line.removeprefix("host: ")
-        for line in verbose_version.splitlines()
-        if line.startswith("host: ")
-    ]
-    if len(host_lines) != 1:
-        raise RcError("rustc host target is unavailable")
-    host = host_lines[0]
+    verbose_version, host = rustc_host()
+    built_host, binary_inventory = build_release_binaries(
+        configured, version, commit, build_target, build_environment, binaries_dir, output / "hosts" / host,
+    )
+    if built_host != host:
+        raise RcError("rustc reported two different hosts")
     host_targets = {host}
-    binary_inventory = binary_artifact_inventory(configured, version, host)
-    # A released `zeno-fcis` records no build directory; `new` then needs `--source`.
-    build_environment["ZENO_FCIS_BUILD_TREE"] = ""
-    for item in binary_inventory:
-        package_name = item["package"]
-        target_name = item["target"]
-        run(
-            [
-                "cargo",
-                "+1.97.1",
-                "build",
-                "--release",
-                "--locked",
-                "-p",
-                package_name,
-                "--bin",
-                target_name,
-            ],
-            environment=build_environment,
-        )
-        executable_name = f"{target_name}.exe" if os.name == "nt" else target_name
-        executable = build_target / "release" / executable_name
-        if not executable.is_file():
-            raise RcError(f"release binary {executable_name} is missing")
-        deterministic_binary_archive(
-            executable,
-            binaries_dir / item["archive"],
-            item["prefix"],
-        )
     actual_binary_archives = sorted(path.name for path in binaries_dir.iterdir())
     expected_binary_archives = sorted(item["archive"] for item in binary_inventory)
     if actual_binary_archives != expected_binary_archives:
@@ -1670,7 +2107,7 @@ def build(output: Path) -> None:
     complete_metadata = cargo_metadata(complete=True)
     sbom_path = output / "SBOM.cdx.json"
     write_json(sbom_path, build_sbom(complete_metadata, commit, version))
-    if require_clean_commit() != commit:
+    if require_clean_commit() != commit or require_source_state("build end")["commit"] != commit:
         raise RcError("source commit changed during release assembly")
 
     provenance_inputs = {
@@ -1678,6 +2115,7 @@ def build(output: Path) -> None:
         "version": version,
         "source_commit": commit,
         "rust_toolchain": "1.97.1",
+        "rustc": verbose_version,
         "host_targets": sorted(host_targets),
         "source_manifest_sha256": sha256(source_manifest),
         "packaged_test_inputs_sha256": sha256(PACKAGED_TEST_INPUTS_PATH),
@@ -1703,42 +2141,11 @@ def build(output: Path) -> None:
     }
     write_json(output / "PROVENANCE-INPUTS.json", provenance_inputs)
 
-    manifest_path = output / "RC-MANIFEST.json"
-    checksums_path = output / "SHA256SUMS"
-    bundle_path = output / f"zeno-fcis-{version}-rc-bundle.zip"
-    entries = artifact_entries(output, {manifest_path, checksums_path, bundle_path})
-    write_json(
-        manifest_path,
-        {
-            "format": "zeno-fcis/release-candidate-manifest/1",
-            "version": version,
-            "source_commit": commit,
-            "rust_toolchain": "1.97.1",
-            "artifacts": entries,
-            "nonclaims": [
-                "not a production deployment authorization",
-                "not an independent audit",
-                "not a signature or SLSA attestation",
-            ],
-        },
-    )
-    checksum_files = [
-        path
-        for path in sorted(item for item in output.rglob("*") if item.is_file())
-        if path not in {checksums_path, bundle_path}
-    ]
-    checksums_path.write_text(
-        "".join(
-            f"{sha256(path)}  {path.relative_to(output).as_posix()}\n"
-            for path in checksum_files
-        ),
-        encoding="utf-8",
-    )
-    deterministic_bundle(output, bundle_path)
+    artifact_count = write_release_index(output, version, commit)
     run([sys.executable, "tools/check_release_privacy.py", "check", str(output)])
     print(
         f"rc-package: built {len(require_string_list(configured, 'publish_order'))} "
-        f"crate packages and {len(entries)} retained artifacts at {commit}"
+        f"crate packages and {artifact_count} retained artifacts at {commit}"
     )
 
 
@@ -1747,6 +2154,7 @@ def main() -> int:
     try:
         configured, _ = validate_package_set()
         if args.command == "check":
+            run([sys.executable, "tools/check_public_docs.py"])
             run([sys.executable, "tools/check_release_privacy.py", "check"])
             print(
                 "rc-package: PASS "
@@ -1756,6 +2164,9 @@ def main() -> int:
             )
         elif args.command == "self-test":
             run([sys.executable, "tools/test_release_privacy.py"])
+            run([sys.executable, "tools/test_check_release_custody.py"])
+            run([sys.executable, "tools/test_release_hosts.py"])
+            run([sys.executable, "tools/test_check_installed_cli.py"])
             run_self_test(configured, cargo_metadata(complete=False))
             run_rustdoc_normalization_self_test()
             run_packaged_layout_self_test()
@@ -1764,10 +2175,28 @@ def main() -> int:
             print(
                 "rc-package: self-test PASS "
                 "(12 hostile mutations rejected; 4 packaged layout controls refused; "
-                "rustdoc, archive modes, and binary inventory verified)"
+                "rustdoc, archive modes, binary inventory, custody, host merging and install blocks verified)"
             )
         elif args.command == "verify-packaged":
             verify_packaged(args.packages.resolve(), args.output.resolve(), require_string(configured, "version"))
+        elif args.command == "build-host-binary":
+            build_host_binary(args.output.resolve())
+        elif args.command == "merge-hosts":
+            journeys: dict[str, Path] = {}
+            for item in args.journey:
+                host, separator, path = item.partition("=")
+                if not separator or not host or not path or host in journeys:
+                    raise RcError("--journey takes HOST=FILE, once per host")
+                journeys[host] = Path(path).resolve()
+            summary = merge_hosts(args.release.resolve(), [path.resolve() for path in args.host], journeys)
+            print(f"rc-package: merged {summary['added']}; the set now holds {summary['hosts']} "
+                  f"and {summary['artifacts']} indexed artifacts")
+        elif args.command == "downloads-list":
+            if args.out.exists():
+                raise RcError(f"{args.out} already exists")
+            key = args.signing_key.resolve() if args.signing_key else None
+            args.out.write_text(downloads_lines(args.release.resolve(), key), encoding="utf-8")
+            print(f"rc-package: wrote {args.out}")
         else:
             build(args.output.resolve())
         return 0
@@ -1779,6 +2208,9 @@ def main() -> int:
         json.JSONDecodeError,
         tomllib.TOMLDecodeError,
         tarfile.TarError,
+        KeyError,
+        TypeError,
+        custody.CustodyError,
     ) as error:
         print(f"rc-package: FAIL: {error}", file=sys.stderr)
         return 2

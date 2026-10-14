@@ -650,6 +650,39 @@ fn rc3_cli_invalid_json_diagnostics_are_versioned_and_ordered() {
 }
 
 #[test]
+fn rc3_cli_refused_new_removes_only_its_own_empty_target() {
+    let root = TempRoot::new("refused-new");
+    let missing_source = root.path().join("missing-source");
+    for existed in [false, true] {
+        let target = root
+            .path()
+            .join(if existed { "preexisting" } else { "new-target" });
+        if existed {
+            fs::create_dir(&target).unwrap_or_else(|error| panic!("create empty target: {error}"));
+        }
+        let refused = run(Command::new(cli())
+            .arg("new")
+            .arg(&target)
+            .args(["--template", "durable-counter", "--source"])
+            .arg(&missing_source));
+        assert!(!refused.status.success());
+        assert_eq!(
+            target.exists(),
+            existed,
+            "refused new changed target ownership: {refused:?}"
+        );
+        if existed {
+            assert_eq!(
+                fs::read_dir(&target)
+                    .unwrap_or_else(|error| panic!("list target: {error}"))
+                    .count(),
+                0
+            );
+        }
+    }
+}
+
+#[test]
 fn rc3_cli_new_refuses_existing_content_and_usage_is_64() {
     let root = TempRoot::new("new");
     let target = root.path().join("target");
@@ -1044,6 +1077,113 @@ fn require_substantive_refuses_vacuous_projects_and_accepts_transition_laws() {
         String::from_utf8_lossy(&accepted.stderr)
     );
     assert!(accepted.stderr.is_empty());
+}
+
+/// A project whose state and command each declare a field `amount`, with
+/// `extra` appended to its declarations.
+fn amount_project(extra: &str) -> String {
+    format!(
+        "zeno 1;\nproject 1 scoped;\nnamespace 10 core;\n\
+         type 100 state State;\ntype 101 command Command;\ntype 102 context Context;\n\
+         type 103 destination Destination;\ntype 104 payload Payload;\ntype 105 int Count;\n\
+         field 110 100 amount 105;\nfield 120 101 amount 105;\nfield 130 102 caller 105;\n\
+         reason 200 invalid precedence 0;\n\
+         component 300 machine {{\n  owns 100;\n  reads pre.100;\n  writes post.100;\n  contexts context.102;\n  budget steps 1024;\n}}\n\
+         merge [300];\n\
+         law 400 bounded = post.100.110 >= 0 && post.100.110 <= 3;\n{extra}"
+    )
+}
+
+#[test]
+fn field_names_are_scoped_to_their_record() {
+    let root = TempRoot::new("scoped-fields");
+    let project = root.path().join("project.zeno");
+    // Two records may each declare a field `amount`.
+    fs::write(&project, amount_project("")).unwrap_or_else(|error| panic!("write: {error}"));
+    let accepted = run(Command::new(cli()).arg("check").arg(&project));
+    assert_eq!(
+        accepted.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&accepted.stderr)
+    );
+    // One record may not declare it twice.
+    fs::write(&project, amount_project("field 111 100 amount 105;\n"))
+        .unwrap_or_else(|error| panic!("write: {error}"));
+    let refused = run(Command::new(cli())
+        .arg("check")
+        .arg(&project)
+        .args(["--format", "json"]));
+    assert_eq!(refused.status.code(), Some(1));
+    let diagnostics = json_stdout(&refused)["diagnostics"].clone();
+    let codes: Vec<&str> = diagnostics
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| item["code"].as_str())
+        .collect();
+    assert_eq!(codes, ["ZENO-E0202"], "{diagnostics}");
+}
+
+#[test]
+fn require_substantive_counts_a_law_scoped_to_some_decisions() {
+    let root = TempRoot::new("scoped-substance");
+    let project = root.path().join("project.zeno");
+    let check = |law: &str| {
+        fs::write(&project, amount_project(law)).unwrap_or_else(|error| panic!("write: {error}"));
+        run(Command::new(cli()).arg("check").arg(&project).args([
+            "--format",
+            "json",
+            "--require-substantive",
+        ]))
+    };
+    // An authorization law on accepts reads only the caller, yet it decides
+    // which decisions may accept.
+    let scoped = check("law 401 caller_may_accept on accept = context.102.130 == 1;\n");
+    assert_eq!(
+        scoped.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&scoped.stdout)
+    );
+    // The same formula on every decision constrains no transition outcome.
+    let unscoped = check("law 401 caller_may_accept = context.102.130 == 1;\n");
+    assert_eq!(unscoped.status.code(), Some(1));
+    assert_eq!(json_stdout(&unscoped)["status"], "vacuous");
+}
+
+#[test]
+fn check_explains_each_unresolved_obligation() {
+    let project = repository_root().join("examples/minimal/project.zeno");
+    let human = run(Command::new(cli()).arg("check").arg(&project));
+    assert_eq!(human.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&human.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+    assert!(lines[0].contains(" unresolved_obligations=2 "), "{stdout}");
+    assert_eq!(
+        lines[1..],
+        [
+            "unresolved obligations: evidence this check does not establish and generated code \
+             cannot discharge; they are not errors:",
+            "  complete-footprint: component 300 needs evidence that it reads and writes only \
+             what its footprint declares",
+            "  sequential-parity: the merge needs evidence that the merged components decide as \
+             they would one after another",
+        ]
+    );
+    let json = json_stdout(&run(Command::new(cli())
+        .arg("check")
+        .arg(&project)
+        .args(["--format", "json"])));
+    let kinds: Vec<&str> = json["obligations"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| item["kind"].as_str())
+        .collect();
+    assert_eq!(kinds, ["complete-footprint", "sequential-parity"]);
+    assert_eq!(json["obligations"][0]["component"], 300);
+    assert_eq!(json["unresolved_obligations"], 2);
 }
 
 #[test]

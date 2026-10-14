@@ -115,7 +115,8 @@ fn an_agent_drives_the_loop_one_candidate_at_a_time_and_resumes() {
         .unwrap_or_default()
         .to_owned();
     assert_eq!(request_id.len(), 64);
-    assert_eq!(report["detail"]["request"]["profile"], "functional-bool-v1");
+    // checked-i64-v1 is the default profile (G12).
+    assert_eq!(report["detail"]["request"]["profile"], "checked-i64-v1");
     assert_eq!(report["detail"]["request"]["policy"]["hosted"], "disabled");
     assert_eq!(report["detail"]["view"]["original"]["nodes"], 16);
     for name in [
@@ -321,6 +322,212 @@ fn the_fake_provider_improves_a_benchmark_case_and_its_claims_change_nothing() {
     assert!(!transcript.contains("SECRET-do-not-leak"));
 }
 
+fn encoded(directory: &Directory, name: &str, program: &Value) -> String {
+    let source = directory.write(&format!("{name}.json"), program.to_string().as_bytes());
+    let target = directory.path(&format!("{name}.zcve"));
+    let (exit, report) = run(&[
+        "loop",
+        "encode",
+        "--program",
+        &source.to_string_lossy(),
+        "--out",
+        &target,
+    ]);
+    assert_eq!(exit, Some(0), "{report}");
+    target
+}
+
+#[test]
+fn work_ceilings_scale_with_the_original_unless_limits_are_given() {
+    let directory = Directory::new();
+    // 100,000 tuples: more check work than the compiled 1,000,000 units.
+    let sum = encoded(
+        &directory,
+        "sum",
+        &json!({
+            "inputs": [{"kind": "Int", "min": "0", "max": "999"}, {"kind": "Int", "min": "0", "max": "99"}],
+            "outputs": [{"kind": "Int", "min": "-9223372036854775808", "max": "9223372036854775807"}],
+            "nodes": [["Input", 0], ["Input", 1], ["Add", 0, 1]],
+            "roots": [2]
+        }),
+    );
+    let scaled = directory.path("scaled");
+    let (exit, report) = open(&scaled, Path::new(&sum), &[]);
+    assert_eq!(exit, Some(0), "{report}");
+    let limits = &report["detail"]["request"]["limits"];
+    let check = limits["check_work"].as_u64().unwrap_or(0);
+    assert!(check > 1_000_000, "{limits}");
+    // Eight attempts in invocations of their own: two checks each plus the
+    // largest intake, preparation and witness replays (4,310,016 units).
+    assert_eq!(
+        limits["session_work"].as_u64(),
+        Some(8 * (2 * check + 4_310_016))
+    );
+    let fixed = directory.path("fixed");
+    let (exit, report) = open(&fixed, Path::new(&sum), &["--check-work", "1000000"]);
+    assert_eq!(exit, Some(1), "{report}");
+    assert_eq!(report["detail"]["reason"], "work-infeasible");
+    assert_eq!(report["detail"]["check_work"], 1_000_000);
+    assert_eq!(report["detail"]["needed"].as_u64(), Some(check));
+}
+
+#[test]
+fn every_attempt_of_the_ceiling_fits_in_an_invocation_of_its_own() {
+    // The MCP route: every attempt is a JSON candidate with provenance in an
+    // invocation of its own, which first replays the incumbent and every stored
+    // counterexample. The default session ceiling funds all eight attempts, and
+    // the session still resumes afterwards.
+    let directory = Directory::new();
+    let program = case_program("B01", "original");
+    let original = encoded(&directory, "original", &program);
+    let session = directory.path("session");
+    let (exit, report) = open(&session, Path::new(&original), &[]);
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["detail"]["request"]["limits"]["attempts"], 8);
+    let provenance = directory.write("provenance.json", br#"{"note": "test"}"#);
+    let provenance = provenance.to_string_lossy().into_owned();
+    for attempt in 0..8_u64 {
+        // Distinct proposals: unused Boolean constants never trap, so they keep
+        // the function; complementing the first output changes it.
+        let mut proposal = program.clone();
+        let nodes = proposal["nodes"]
+            .as_array_mut()
+            .unwrap_or_else(|| panic!("nodes"));
+        for _ in 0..=attempt / 2 {
+            nodes.push(json!(["Bool", true]));
+        }
+        let wrong = attempt % 2 == 0;
+        if wrong {
+            nodes.push(json!(["Not", program["roots"][0]]));
+            proposal["roots"][0] = json!(nodes.len() - 1);
+        }
+        let path = directory.write(
+            &format!("proposal-{attempt}.json"),
+            proposal.to_string().as_bytes(),
+        );
+        let (_, report) = run(&[
+            "loop",
+            "candidate",
+            "--session",
+            &session,
+            "--candidate-json",
+            &path.to_string_lossy(),
+            "--provenance",
+            &provenance,
+        ]);
+        let expected = if wrong {
+            "different"
+        } else {
+            "equivalent-without-improvement:original-cost-guard"
+        };
+        assert_eq!(report["status"], expected, "{report}");
+        assert_eq!(
+            report["detail"]["accounting"]["attempts"],
+            attempt + 1,
+            "{report}"
+        );
+    }
+    let (exit, report) = run(&["loop", "resume", "--session", &session]);
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["detail"]["report"]["accounting"]["attempts"], 8);
+}
+
+#[test]
+fn seeds_are_proposed_first_as_ordinary_attempts() {
+    let directory = Directory::new();
+    // Each seed simplifies one output of the original: the first is a checked
+    // improvement, the second ties it, and the proposer runs after both.
+    let int = |min: &str, max: &str| json!({"kind": "Int", "min": min, "max": max});
+    let full = int("-9223372036854775808", "9223372036854775807");
+    let program = |nodes: Value, roots: Value| {
+        json!({"inputs": [int("0", "15")], "outputs": [full.clone(), full.clone()],
+               "nodes": nodes, "roots": roots})
+    };
+    let original = encoded(
+        &directory,
+        "original",
+        &program(
+            json!([
+                ["Input", 0],
+                ["Int", "7"],
+                ["Sub", 0, 1],
+                ["Add", 2, 1],
+                ["Int", "9"],
+                ["Sub", 0, 4],
+                ["Add", 5, 4]
+            ]),
+            json!([3, 6]),
+        ),
+    );
+    let first = encoded(
+        &directory,
+        "first",
+        &program(
+            json!([["Input", 0], ["Int", "9"], ["Sub", 0, 1], ["Add", 2, 1]]),
+            json!([0, 3]),
+        ),
+    );
+    let second = encoded(
+        &directory,
+        "second",
+        &program(
+            json!([["Input", 0], ["Int", "7"], ["Sub", 0, 1], ["Add", 2, 1]]),
+            json!([3, 0]),
+        ),
+    );
+    let script = directory.write(
+        "script.json",
+        json!({"schema": "zeno-fcis/fake-provider-script/1", "steps": [
+            {"strategy": {"schema": "zeno-fcis/optimize-strategy/1",
+                          "phases": [{"phase": "share", "rounds": 1}], "extractor": "dag-greedy"}}
+        ]})
+        .to_string()
+        .as_bytes(),
+    );
+    let script = script.to_string_lossy().into_owned();
+    let session = directory.path("session");
+    let (exit, report) = open(&session, Path::new(&original), &[]);
+    assert_eq!(exit, Some(0), "{report}");
+    let (exit, report) = run(&[
+        "loop",
+        "run",
+        "--session",
+        &session,
+        "--proposer",
+        "fake",
+        "--script",
+        &script,
+        "--seed",
+        &first,
+        "--seed",
+        &second,
+    ]);
+    assert_eq!(exit, Some(0), "{report}");
+    assert_eq!(report["detail"]["seeds"], 2);
+    let loop_report = &report["detail"]["report"];
+    let outcomes: Vec<&str> = loop_report["attempts"]
+        .as_array()
+        .unwrap_or_else(|| panic!("attempts"))
+        .iter()
+        .map(|attempt| attempt["outcome"].as_str().unwrap_or_default())
+        .collect();
+    assert_eq!(
+        &outcomes[..2],
+        [
+            "checked-improvement",
+            "equivalent-without-improvement:tie-with-incumbent"
+        ]
+    );
+    assert_eq!(
+        outcomes.len(),
+        3,
+        "the proposer's attempt follows the seeds"
+    );
+    assert_eq!(loop_report["incumbent"]["cost"]["nodes"], 4);
+    // Seeds meter no model call; the scripted strategy meters one.
+    assert_eq!(loop_report["accounting"]["model_calls"], 1);
+}
+
 #[test]
 fn the_local_proposer_runs_an_encoded_benchmark_case_to_exhaustion() {
     let directory = Directory::new();
@@ -372,6 +579,11 @@ fn the_local_proposer_runs_an_encoded_benchmark_case_to_exhaustion() {
     let (exit, report) = candidate(&session, &out);
     assert_eq!(exit, Some(2), "{report}");
     assert_eq!(report["status"], "session-closed");
+    // Closure is checked before acquiring any supplied candidate bytes.
+    let (exit, report) = candidate(&session, &directory.path("absent.zcve"));
+    assert_eq!(exit, Some(2), "{report}");
+    assert_eq!(report["status"], "session-closed");
+    assert_eq!(report["detail"]["report"]["accounting"]["attempts"], 1);
     // Garbage is not a program.
     let bad = directory.write(
         "bad.json",
@@ -462,6 +674,22 @@ fn describe_declares_loop_effects() {
             "{}",
             command["name"]
         );
-        assert_eq!(command["effects"]["executes_tools"], false);
+        // Every loop command runs in a transient unit through `systemd-run
+        // --user` and `systemctl --user`, bounded by the caller's CPU limits.
+        assert_eq!(command["effects"]["executes_tools"], true);
+        assert!(
+            command["effects"]["reads"]
+                .as_array()
+                .is_some_and(|reads| reads.contains(&json!("caller-cpu-limits"))),
+            "{}",
+            command["name"]
+        );
+        assert!(
+            command["effects"]["writes"]
+                .as_array()
+                .is_some_and(|writes| writes.contains(&json!("transient-user-unit"))),
+            "{}",
+            command["name"]
+        );
     }
 }

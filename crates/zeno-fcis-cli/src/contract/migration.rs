@@ -1,4 +1,4 @@
-//! Migration files, `zeno-fcis/migration/1`, compiled against the two
+//! Migration files, `zeno-fcis/migration/1` and `/2`, compiled against the two
 //! contracts' declarations into the SQLite shell's migration, and the
 //! shell's own forward simulation run over them.
 //!
@@ -7,7 +7,8 @@
 //! over, under its own or a new name; `{"default": v}` gives an added field
 //! the value `v`; and `{"from": f, "map": {..}}` takes the value from a
 //! table over old field `f`'s values, which is how a field splits into
-//! several. Values are written as the rules file writes them: `true` or
+//! several. Version 2 adds closed library programs and complete, lossless
+//! per-channel payload representation maps. Values are written as the rules file writes them: `true` or
 //! `false`, an integer, or a variant's ID. A table must list every value of
 //! the old field's domain. Compilation checks the file's shape and types;
 //! the simulation, which `generate contract` runs again on every
@@ -15,10 +16,14 @@
 
 use std::collections::BTreeMap;
 
-use zeno_fcis_synthesis::finite::{v2_authority as authority, v2_catalog::BoundCatalog};
+use zeno_fcis_synthesis::finite::{
+    Domain as ScalarDomain, Op, Program, v2_authority as authority, v2_catalog::BoundCatalog,
+};
 
 use super::ContractError;
-use super::declarations::{Declarations, Kind, ROOTS};
+use super::declarations::{Declarations, Input, Kind, ROOTS, Source};
+use super::expr::Ast;
+use super::graph::{Graph, Kind as GraphKind, ScalarGraph};
 use super::layout::Syntax;
 use super::rules::{MigrationFile, MigrationSource, MigrationValue};
 use crate::shell_v2::migration::{self as shell, Observation, Unsimulated};
@@ -30,12 +35,16 @@ pub(crate) enum Field {
     From(u16),
     Value(i128),
     Table(u16, Vec<(i128, i128)>),
+    Expression(Vec<u16>, Program),
 }
 
 /// A compiled migration: every new state field in ID order.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Compiled {
+    pub(crate) format: u8,
     pub(crate) fields: Vec<(u16, Field)>,
+    pub(crate) dropped: Vec<u16>,
+    pub(crate) payloads: Vec<(u32, Vec<(u16, Field)>)>,
 }
 
 impl Compiled {
@@ -44,8 +53,16 @@ impl Compiled {
         &self,
         use_migration: impl FnOnce(&shell::Migration<'_>) -> R,
     ) -> R {
-        let targets: Vec<shell::Target<'_>> = self
-            .fields
+        Self::with_targets(&self.fields, |targets| {
+            use_migration(&shell::Migration { fields: targets })
+        })
+    }
+
+    fn with_targets<'a, R>(
+        fields: &'a [(u16, Field)],
+        use_targets: impl FnOnce(&[shell::Target<'a>]) -> R,
+    ) -> R {
+        let targets: Vec<shell::Target<'_>> = fields
             .iter()
             .map(|(id, field)| shell::Target {
                 id: *id,
@@ -56,10 +73,45 @@ impl Compiled {
                         field: *field,
                         cases,
                     },
+                    Field::Expression(fields, program) => {
+                        shell::Source::Program { fields, program }
+                    }
                 },
             })
             .collect();
-        use_migration(&shell::Migration { fields: &targets })
+        use_targets(&targets)
+    }
+
+    /// Borrows the same compiled programs into the pure shell simulation.
+    pub(crate) fn with_payloads<R>(
+        &self,
+        use_plan: impl FnOnce(&shell::Migration<'_>, &[shell::Payload<'_>]) -> R,
+    ) -> R {
+        let tables = self.payload_targets();
+        let payloads: Vec<shell::Payload<'_>> = tables
+            .iter()
+            .map(|(channel, fields)| shell::Payload {
+                channel: *channel,
+                fields,
+            })
+            .collect();
+        self.with_shell(|migration| use_plan(migration, &payloads))
+    }
+
+    pub(crate) fn payload_targets(&self) -> Vec<(u32, Vec<shell::Target<'_>>)> {
+        self.payloads
+            .iter()
+            .map(|(channel, fields)| {
+                (
+                    *channel,
+                    Self::with_targets(fields, |targets| targets.to_vec()),
+                )
+            })
+            .collect()
+    }
+
+    pub(super) fn extended(&self) -> bool {
+        self.format == 2
     }
 
     /// The migration as the generated contract declares it: each field's ID,
@@ -74,6 +126,7 @@ impl Compiled {
                         Field::From(field) => (0, i128::from(*field), &[]),
                         Field::Value(value) => (1, *value, &[]),
                         Field::Table(field, cases) => (2, i128::from(*field), cases),
+                        Field::Expression(..) => (3, 0, &[]),
                     };
                     Syntax::tuple(vec![
                         Syntax::literal(id),
@@ -92,12 +145,31 @@ impl Compiled {
                 .collect(),
         )
     }
+
+    /// Explicit v2 metadata, leaving legacy STATE_STEPS unchanged.
+    pub(super) fn record_syntax(&self, version: u32) -> Syntax {
+        Syntax::tuple(vec![
+            Syntax::literal(version),
+            fields_syntax(&self.fields),
+            Syntax::slice(
+                self.payloads
+                    .iter()
+                    .map(|(channel, fields)| {
+                        Syntax::tuple(vec![Syntax::literal(channel), fields_syntax(fields)])
+                    })
+                    .collect(),
+            ),
+        ])
+    }
 }
 
 /// The state record's fields by ID, with their names and types.
-fn state_fields(declarations: &Declarations) -> Result<BTreeMap<u16, (&str, u32)>, ContractError> {
+fn record_fields(
+    declarations: &Declarations,
+    root: u32,
+) -> Result<BTreeMap<u16, (&str, u32)>, ContractError> {
     Ok(declarations
-        .fields(ROOTS[0].1)?
+        .fields(root)?
         .iter()
         .map(|field| (field.id, (field.name.as_str(), field.type_id)))
         .collect())
@@ -175,15 +247,72 @@ pub(super) fn compile(
     new: &Declarations,
     place: &str,
 ) -> Result<Compiled, ContractError> {
-    let (old_fields, new_fields) = (state_fields(old)?, state_fields(new)?);
+    let fields = compile_fields(
+        &file.state,
+        &file.dropped,
+        old,
+        ROOTS[0].1,
+        new,
+        ROOTS[0].1,
+        &format!("{place} state"),
+    )?;
+    let mut payloads = BTreeMap::new();
+    for (channel, fields) in &file.payloads {
+        let at = format!("{place} payloads.{channel}");
+        let old_channel = old.channel(*channel)?;
+        let new_channel = new.channel(*channel)?;
+        let compiled = compile_fields(
+            fields,
+            &[],
+            old,
+            old_channel.payload,
+            new,
+            new_channel.payload,
+            &at,
+        )?;
+        if payloads.insert(*channel, compiled).is_some() {
+            return Err(ContractError::new(at, "lists the channel more than once"));
+        }
+    }
+    Ok(Compiled {
+        format: file.format,
+        fields,
+        dropped: file.dropped.clone(),
+        payloads: payloads.into_iter().collect(),
+    })
+}
+
+fn compile_fields(
+    sources: &[(u16, MigrationSource)],
+    dropped: &[u16],
+    old: &Declarations,
+    old_root: u32,
+    new: &Declarations,
+    new_root: u32,
+    place: &str,
+) -> Result<Vec<(u16, Field)>, ContractError> {
+    let (old_fields, new_fields) = (record_fields(old, old_root)?, record_fields(new, new_root)?);
+    for id in dropped {
+        if !old_fields.contains_key(id) {
+            return Err(ContractError::new(
+                place,
+                format!("dropped old state field {id} does not exist"),
+            ));
+        }
+    }
     let mut given: BTreeMap<u16, &MigrationSource> = BTreeMap::new();
-    for (id, source) in &file.state {
-        given.insert(*id, source);
+    for (id, source) in sources {
+        if given.insert(*id, source).is_some() {
+            return Err(ContractError::new(
+                place,
+                format!("lists field {id} more than once"),
+            ));
+        }
     }
     let mut fields = Vec::new();
     let mut carried = std::collections::BTreeSet::new();
     for (id, source) in &given {
-        let at = format!("{place} state.{id}");
+        let at = format!("{place}.{id}");
         let refuse = |reason: String| ContractError::new(&at, reason);
         let Some((name, type_id)) = new_fields.get(id) else {
             return Err(refuse("is not a field of the new state".to_owned()));
@@ -238,24 +367,214 @@ pub(super) fn compile(
                 carried.insert(*field);
                 Field::Table(*field, table.into_iter().collect())
             }
+            MigrationSource::Expression(ast) => {
+                let (inputs, program) = expression(ast, old, &old_fields, kind)
+                    .map_err(|reason| refuse(format!("expr: {reason}")))?;
+                carried.extend(inputs.iter().copied());
+                Field::Expression(inputs, program)
+            }
         };
         fields.push((*id, field));
     }
     if let Some((id, (name, _))) = new_fields.iter().find(|(id, _)| !given.contains_key(id)) {
         return Err(ContractError::new(
-            format!("{place} state"),
+            place,
             format!("gives new state field {id} `{name}` no value"),
         ));
     }
-    if let Some((id, (name, _))) = old_fields.iter().find(|(id, _)| !carried.contains(id)) {
+    if let Some(id) = dropped.iter().find(|id| carried.contains(id)) {
         return Err(ContractError::new(
-            format!("{place} state"),
+            place,
+            format!("declares dropped field {id}, but a new field still uses it"),
+        ));
+    }
+    if let Some((id, (name, _))) = old_fields
+        .iter()
+        .find(|(id, _)| !carried.contains(id) && !dropped.contains(id))
+    {
+        return Err(ContractError::new(
+            place,
             format!(
-                "does not carry old state field {id} `{name}` into the new state; a migration renames, adds and splits fields, and drops none"
+                "does not carry old state field {id} `{name}` into the new state; list it in `drop` in a version 2 state migration; a payload map must carry every old field"
             ),
         ));
     }
-    Ok(Compiled { fields })
+    Ok(fields)
+}
+
+fn expression(
+    ast: &Ast,
+    old: &Declarations,
+    fields: &BTreeMap<u16, (&str, u32)>,
+    target: Kind<'_>,
+) -> Result<(Vec<u16>, Program), String> {
+    fn names(ast: &Ast, found: &mut std::collections::BTreeSet<String>) {
+        match ast {
+            Ast::Name(name) => {
+                found.insert(name.clone());
+            }
+            Ast::Not(inner) | Ast::Neg(inner) => names(inner, found),
+            Ast::Binary(_, left, right) | Ast::Div(_, left, right) => {
+                names(left, found);
+                names(right, found);
+            }
+            Ast::Choose(condition, then, otherwise) => {
+                names(condition, found);
+                names(then, found);
+                names(otherwise, found);
+            }
+            Ast::Bool(_) | Ast::Int(_) => {}
+        }
+    }
+    let mut found = std::collections::BTreeSet::new();
+    names(ast, &mut found);
+    let mut ids = std::collections::BTreeSet::new();
+    for name in found {
+        let id = name
+            .strip_prefix("old.")
+            .and_then(|id| id.parse::<u16>().ok())
+            .ok_or_else(|| format!("`{name}` is not old.<field ID>"))?;
+        if !fields.contains_key(&id) || name != format!("old.{id}") {
+            return Err(format!("`{name}` is not a canonical old record field"));
+        }
+        ids.insert(id);
+    }
+    let ids: Vec<u16> = ids.into_iter().collect();
+    let inputs: Vec<Input> = ids
+        .iter()
+        .map(|id| Input {
+            name: format!("old.{id}"),
+            source: Source::State,
+            field: Some(*id),
+            type_id: fields[id].1,
+        })
+        .collect();
+    let domains = inputs
+        .iter()
+        .map(|input| scalar_domain(old.kind(input.type_id).map_err(|error| error.to_string())?))
+        .collect::<Result<Vec<_>, _>>()?;
+    let output = scalar_domain(target)?;
+    let mut graph = ScalarGraph::new(old, &inputs);
+    let root = graph.compile(ast)?;
+    let root = if matches!(target, Kind::Bool) {
+        if root.kind != GraphKind::Bool {
+            return Err("a Boolean target requires a Boolean expression".to_owned());
+        }
+        root
+    } else {
+        graph.numeric(root)?
+    };
+    let nodes = graph
+        .table
+        .nodes
+        .iter()
+        .map(super::policy::scalar_op)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| error.to_string())?;
+    let root =
+        u16::try_from(root.index).map_err(|_| "the expression has too many nodes".to_owned())?;
+    let program = Program::try_new_extended(domains, vec![output], nodes, vec![root])
+        .map_err(|error| format!("the library refuses the closed expression: {error}"))?;
+    Ok((ids, program))
+}
+
+fn scalar_domain(kind: Kind<'_>) -> Result<ScalarDomain, String> {
+    let (min, max) = match kind {
+        Kind::Bool => return Ok(ScalarDomain::Bool),
+        Kind::I128 { min, max } => (min, max),
+        Kind::Sum(variants) => (
+            i128::from(
+                variants
+                    .iter()
+                    .map(|variant| variant.id)
+                    .min()
+                    .ok_or("empty variant domain")?,
+            ),
+            i128::from(
+                variants
+                    .iter()
+                    .map(|variant| variant.id)
+                    .max()
+                    .ok_or("empty variant domain")?,
+            ),
+        ),
+        Kind::Text => {
+            return Err("text has no supported finite migration expression domain".to_owned());
+        }
+    };
+    Ok(ScalarDomain::Int {
+        min: i64::try_from(min).map_err(|_| "expression domain exceeds checked i64".to_owned())?,
+        max: i64::try_from(max).map_err(|_| "expression domain exceeds checked i64".to_owned())?,
+    })
+}
+
+fn fields_syntax(fields: &[(u16, Field)]) -> Syntax {
+    let domain = |domain: ScalarDomain| match domain {
+        ScalarDomain::Bool => Syntax::path("ScalarDomain::Bool"),
+        ScalarDomain::Int { min, max } => Syntax::record(
+            "ScalarDomain::Int",
+            vec![("min", Syntax::literal(min)), ("max", Syntax::literal(max))],
+        ),
+        _ => Syntax::path("unsupported_migration_domain"),
+    };
+    let op = |op: &Op| {
+        let call = |name: &str, values: &[u16]| {
+            Syntax::call(name, values.iter().map(Syntax::literal).collect())
+        };
+        match *op {
+            Op::Input(value) => call("Op::Input", &[value]),
+            Op::Int(value) => Syntax::call("Op::Int", vec![Syntax::literal(value)]),
+            Op::Bool(value) => Syntax::call("Op::Bool", vec![Syntax::literal(value)]),
+            Op::Add(a, b) => call("Op::Add", &[a, b]),
+            Op::Sub(a, b) => call("Op::Sub", &[a, b]),
+            Op::Eq(a, b) => call("Op::Eq", &[a, b]),
+            Op::Lt(a, b) => call("Op::Lt", &[a, b]),
+            Op::And(a, b) => call("Op::And", &[a, b]),
+            Op::Not(a) => call("Op::Not", &[a]),
+            Op::Select(c, a, b) => call("Op::Select", &[c, a, b]),
+            _ => Syntax::path("unsupported_migration_instruction"),
+        }
+    };
+    Syntax::slice(
+        fields
+            .iter()
+            .map(|(id, field)| {
+                let (tag, operand, table): (u8, i128, &[(i128, i128)]) = match field {
+                    Field::From(field) => (0, i128::from(*field), &[]),
+                    Field::Value(value) => (1, *value, &[]),
+                    Field::Table(field, cases) => (2, i128::from(*field), cases),
+                    Field::Expression(..) => (3, 0, &[]),
+                };
+                let program = match field {
+                    Field::Expression(fields, program) => Syntax::call(
+                        "Some",
+                        vec![Syntax::tuple(vec![
+                            Syntax::slice(fields.iter().map(Syntax::literal).collect()),
+                            Syntax::slice(program.inputs().iter().copied().map(domain).collect()),
+                            domain(program.outputs()[0]),
+                            Syntax::slice(program.nodes().iter().map(op).collect()),
+                            Syntax::literal(program.roots()[0]),
+                        ])],
+                    ),
+                    _ => Syntax::path("None"),
+                };
+                Syntax::tuple(vec![
+                    Syntax::literal(id),
+                    Syntax::literal(tag),
+                    Syntax::literal(operand),
+                    Syntax::slice(
+                        table
+                            .iter()
+                            .map(|(old, new)| {
+                                Syntax::tuple(vec![Syntax::literal(old), Syntax::literal(new)])
+                            })
+                            .collect(),
+                    ),
+                    program,
+                ])
+            })
+            .collect(),
+    )
 }
 
 /// The names of each root's fields, for reports.
@@ -363,6 +682,8 @@ pub(super) fn simulate(
     };
     let (old, new) = (bind(from)?, bind(to)?);
     migration
-        .with_shell(|migration| shell::simulate(from, &old, to, &new, migration))
+        .with_payloads(|migration, payloads| {
+            shell::simulate_with_payloads(from, &old, to, &new, migration, payloads)
+        })
         .map_err(|unsimulated| ContractError::new(place, describe(unsimulated, from, names)))
 }

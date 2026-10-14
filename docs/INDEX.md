@@ -29,6 +29,8 @@
 25. [Security review playbook](SECURITY_REVIEW_PLAYBOOK.md)
 26. [Security hotspot and exploit-chain model](SECURITY_HOTSPOT_MODEL.md)
 27. [Security standards snapshot](SECURITY_STANDARDS_SNAPSHOT.md)
+28. [Changelog](../CHANGELOG.md)
+29. [Contributing](../CONTRIBUTING.md)
 
 ## Project definition and typed construction
 
@@ -49,6 +51,11 @@
 - [Generated typed root reads](GENERATED_TYPED_ROOT_READS.md)
 - [Generated typed root updates](GENERATED_TYPED_ROOT_UPDATES.md)
 - [Generated typed context observations](GENERATED_TYPED_CONTEXT_OBSERVATIONS.md)
+- [Generated command and context envelopes](GENERATED_COMMAND_CONTEXT_ENVELOPES.md)
+- [Generated high-level mutation boundary](GENERATED_NO_RAW_MUTATIONS.md)
+- [Schema-bound admitted envelope](SCHEMA_BOUND_ENVELOPE.md)
+- [Typed adapter code generation](CODEGEN_TYPED_ADAPTERS.md)
+- [Project-neutral umbrella boundary](PROJECT_NEUTRAL_UMBRELLA.md)
 
 ## Composition and production authority
 
@@ -62,6 +69,18 @@
 - [Policy-bound genesis authorization](GENESIS_AUTHORIZATION.md)
 - [Candidate and commit boundary](CANDIDATE_COMMIT_BOUNDARY.md)
 - [Owned footprint sealing](OWNED_FOOTPRINT_SEALING.md)
+- [Immutable transition budget boundary](IMMUTABLE_TRANSITION_BUDGET.md)
+
+## Core components and coupled applications
+
+- [Core component catalogue](../core-components/README.md)
+- [Source-bound finite family certificates](../core-components/FINITE_PROOFS.md)
+- Coupled application profiles: [API quota](../core-apps/api-quota/README.md),
+  [document release](../core-apps/document-release/README.md),
+  [equipment booking](../core-apps/equipment-booking/README.md),
+  [expense approval](../core-apps/expense-approval/README.md),
+  [reliable jobs](../core-apps/reliable-jobs/README.md) and
+  [warehouse reservation](../core-apps/warehouse-reservation/README.md)
 
 ## Formal tools and runtime refinement
 
@@ -82,10 +101,20 @@
 - [Evidence importers](EVIDENCE_IMPORTERS.md)
 - [Mounted ZenoDEX adapter](MOUNTED_ZENODEX_ADAPTER.md)
 - [Mounted ZenoDEX zUSD v1](MOUNTED_ZENODEX_ZUSD_V1.md)
+- [Finite interpreter assurance notes](FINITE_INTERPRETER_ASSURANCE.md)
+- [Optional finite Tau kit](TAU_KIT.md)
 
 ESSO is a private optional checker. Users who have it can implement the public
 backend or evidence traits in a private crate. Lean, SMT/Z3, CVC5, Kani, Flux,
 and other tools can use the same public boundaries.
+
+## Behavior dialogue (ZAL research prototype)
+
+- [ZAL: terminal-first behavior review](zal/README.md)
+- [ZAL specification](zal/SPECIFICATION.md)
+- [`zal/finite-fsm/1` grammar and limits](zal/GRAMMAR.md)
+- [ZAL harness integration](zal/HARNESS_INTEGRATION.md)
+- [ZAL prototype source map](ZAL_SOURCE_MAP.md)
 
 ## Persistence, shells, and security
 
@@ -95,6 +124,7 @@ and other tools can use the same public boundaries.
 - [Authenticated sparse-proof context](AUTHENTICATED_PROOF_CONTEXT.md)
 - [Candidate-bound authenticated authority](AUTHENTICATED_AUTHORITY_BOUNDARY.md)
 - [Persistent collections](PERSISTENT_COLLECTIONS.md)
+- [Fallible persistent-map API](FALLIBLE_PERSISTENT_MAP_API.md)
 - [SHA-256 provider policy](SHA256_PROVIDER_POLICY.md)
 - [Reserved commitment-domain namespace](RESERVED_DOMAIN_NAMESPACE.md)
 - [Secret handling and constant time](SECRET_HANDLING_AND_CONSTANT_TIME.md)
@@ -117,6 +147,12 @@ and other tools can use the same public boundaries.
 
 - [Public documentation policy](PUBLICATION_POLICY.md)
 
+## Integrations and demo site
+
+- [OCaml scalar consumer](../integrations/ocaml/README.md)
+- [Experimental MAP-Elites archive](../integrations/elite_archive/README.md)
+- [Demo site](../site/README.md) and its [browser API](../site/ABI.md)
+
 ## Design records
 
 - [Design record index](adr/README.md)
@@ -124,10 +160,11 @@ and other tools can use the same public boundaries.
 - [0002: Principles for the V2 assurance program](adr/0002-principles.md)
 - [0003: Epistemic status of evidence and witnesses](adr/0003-epistemic-status.md)
 - [0004: V2 ledger of deferred breaking changes](adr/0004-v2-ledger.md)
+- [0005: Library-owned decision gate](adr/0005-decision-gate.md)
 
 ## Status
 
-The workspace is version `1.1.0`. The crates.io `1.1.0` API is the historical
+The workspace is version `2.3.0`. The crates.io `1.1.0` API is the historical
 stable line; the current supported V2 source API ships in the pinned public
 candidates `v2.2.0-rc.1` and `v2.3.0-rc.1` and differs from `1.1.0`. See
 [release candidates](RELEASE_CANDIDATES.md) and
@@ -138,3 +175,5 @@ not claim general deployment qualification, a bundled concurrent runtime, or
 an end-to-end proof for arbitrary downstream projects.
 
 - [Bounded completion and preparation](BOUNDED_COMPLETION.md)
+
+- [Wide values and larger decisions](WIDE_VALUE_EXECUTION.md): development profile support, capacity and assurance boundaries.

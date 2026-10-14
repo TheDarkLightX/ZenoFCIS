@@ -97,9 +97,28 @@ impl<'p> BoundCore<'p> {
                 (result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),
         },))]
     pub fn frame<'a>(&'a self, kind: Kind, original: Raw<'a>, framing: &Framing) -> Outcome<'a> {
+        let result = self.frame_family(kind, original, framing);
+        #[cfg(verus_keep_ghost)]
+        proof! {shared::spec::legacy_framed(self.descriptor_view(),kind,original,framing,
+        self.descriptor_view().limits.view(),Seq::new(8,|_:int|0u64),(Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),
+        (result.view().0,result.view().3,result.view().2,result.view().4,result.view().5));}
+        result
+    }
+}
+impl<'p, D: DescriptorData<'p> + 'p> BoundCore<'p, D> {
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result.kind_view()==kind,
+        result.view().1==match kind{Kind::Genesis=>(original.state@,Seq::<u8>::empty(),Seq::<u8>::empty()),Kind::Transition=>raw_view(original)},
+        shared::spec::framed(&self.descriptor_view().model(),kind,original,framing,descriptor::spec::limits(&self.descriptor_view().model()).view(),Seq::new(8,|_:int|0u64),
+            (Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),(result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),))]
+    pub(crate) fn frame_family<'a>(
+        &'a self,
+        kind: Kind,
+        original: Raw<'a>,
+        framing: &Framing,
+    ) -> Outcome<'a> {
         #[cfg(verus_keep_ghost)]
         proof! {use_type_invariant(self);reveal(BoundCore::descriptor_view);reveal(Outcome::view);reveal(Outcome::kind_view);reveal(Limits::view);reveal(Usage::view);}
-        let mut meter = super::super::meter::new(self.descriptor.limits);
+        let mut meter = super::super::meter::new(self.descriptor.project().limits());
         let mut trace = producer::Trace {
             reads: Vec::new(),
             attempts: Vec::new(),
@@ -111,7 +130,7 @@ impl<'p> BoundCore<'p> {
         let result = match kind {
             Kind::Genesis => match project(original.state, &framing.state, &mut meter) {
                 Err(e) => Err(super::Failure::Frame(0, e)),
-                Ok(p) => outcome::run(
+                Ok(p) => shared::run(
                     self,
                     Kind::Genesis,
                     Raw {
@@ -127,7 +146,7 @@ impl<'p> BoundCore<'p> {
             },
             Kind::Transition => match payloads(original, framing, &mut meter) {
                 Err(e) => Err(e),
-                Ok(raw) => outcome::run(
+                Ok(raw) => shared::run(
                     self,
                     Kind::Transition,
                     raw,
@@ -154,5 +173,15 @@ impl<'p> BoundCore<'p> {
             diagnostics,
             law_reads,
         }
+    }
+}
+impl<'p> BoundCore<'p, NumericDescriptor<'p>> {
+    /// Execute original numeric envelopes through the same checked framing and composition path.
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result.kind_view()==kind,
+        result.view().1==match kind{Kind::Genesis=>(original.state@,Seq::<u8>::empty(),Seq::<u8>::empty()),Kind::Transition=>raw_view(original)},
+        numeric_framed(self.descriptor_view(),kind,original,framing,self.descriptor_view().limits.view(),Seq::new(8,|_:int|0u64),
+            (Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),(result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),))]
+    pub fn frame<'a>(&'a self, kind: Kind, original: Raw<'a>, framing: &Framing) -> Outcome<'a> {
+        self.frame_family(kind, original, framing)
     }
 }

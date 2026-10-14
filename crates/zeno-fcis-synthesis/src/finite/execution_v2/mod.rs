@@ -1,6 +1,6 @@
 //! V2 finite execution with library-owned logical work accounting.
 
-use super::evaluation::{self, Domain, Failure as ScalarFailure, Op};
+use super::evaluation::{Domain, Failure as ScalarFailure, Op};
 use alloc::vec::Vec;
 use meter::Meter;
 
@@ -10,14 +10,18 @@ use vstd::prelude::*;
 pub mod authority;
 pub mod catalog;
 pub mod composition;
+pub(super) mod compound;
 pub mod continuation;
 mod decision;
 mod input_view;
 pub mod laws;
 mod meter;
 #[cfg(verus_keep_ghost)]
+pub(crate) mod nonbinding_step;
+pub(crate) mod numeric;
+#[cfg(verus_keep_ghost)]
 mod spec;
-mod util;
+pub(crate) mod util;
 
 pub use input_view::{
     AccessAttempt, Failure as RecordFailure, Field as InputField, Leaf as InputLeaf,
@@ -137,73 +141,37 @@ fn evaluate_nodes(
     values: &mut Vec<i64>,
     output: &mut Vec<i64>,
 ) -> Result<(), Failure> {
-    #[cfg(verus_keep_ghost)]
-    proof_decl! { let ghost initial_used = meter.used.counters@; }
+    use super::evaluation::typed::Values;
     values.clear();
     output.clear();
-    if !evaluation::admitted(inputs, input) {
-        return Err(Failure::InputDomain);
-    }
-    values.reserve(nodes.len());
-    let mut index = 0usize;
-    #[cfg_attr(verus_keep_ghost, verus_spec(
-        invariant
-            evaluation::spec::admitted(inputs@, input@),
-            meter.limits == old(meter).limits,
-            initial_used == old(meter).used.counters@, initial_used.len() == 8,
-            index <= nodes.len(), values@.len() == index,
-            output@ == Seq::<i64>::empty(),
-            spec::prefix(nodes@, input@, index as nat, meter.limits.counters@,
-                initial_used) == (Ok(values@), meter.used.counters@),
-        decreases nodes.len() - index,
-    ))]
-    while index < nodes.len() {
-        if let Err(error) = meter.charge(Resource::Step, 1) {
-            #[cfg(verus_keep_ghost)]
-            proof! { spec::failure_persists(nodes@, input@, (index + 1) as nat,
-            nodes@.len() as nat, meter.limits.counters@, initial_used,
-            Failure::Budget(error)); }
-            return Err(Failure::Budget(error));
+    let program = numeric::ProgramView::Legacy {
+        inputs,
+        outputs,
+        nodes,
+        roots,
+    };
+    let mut atoms = Vec::new();
+    let mut results = Vec::new();
+    #[cfg(verus_keep_ghost)]
+    proof! { numeric::spec::legacy_execution_embedding(program, input@, meter.limits.counters@, meter.used.counters@); }
+    match numeric::evaluate(
+        program,
+        Values::Legacy(input),
+        meter,
+        &mut atoms,
+        &mut results,
+    ) {
+        Err(numeric::Failure::InputDomain) => return Err(lift(ScalarFailure::InputDomain)),
+        Err(numeric::Failure::Reference) => return Err(lift(ScalarFailure::Reference)),
+        Err(numeric::Failure::Arithmetic | numeric::Failure::Kind) => {
+            return Err(lift(ScalarFailure::Arithmetic));
         }
-        match evaluation::evaluate_node(&nodes[index], input, values) {
-            Ok(value) => values.push(value),
-            Err(error) => {
-                #[cfg(verus_keep_ghost)]
-                proof! { spec::failure_persists(nodes@, input@, (index + 1) as nat,
-                nodes@.len() as nat, meter.limits.counters@, initial_used,
-                spec::scalar_failure(error)); }
-                return Err(lift(error));
-            }
-        }
-        index += 1;
+        Err(numeric::Failure::OutputDomain) => return Err(lift(ScalarFailure::OutputDomain)),
+        Err(numeric::Failure::Budget(error)) => return Err(Failure::Budget(error)),
+        Ok(()) => {}
     }
-    output.reserve(roots.len());
-    let mut root = 0usize;
-    #[cfg_attr(verus_keep_ghost, verus_spec(
-        invariant
-            evaluation::spec::admitted(inputs@, input@),
-            meter.limits == old(meter).limits,
-            initial_used == old(meter).used.counters@, initial_used.len() == 8,
-            spec::prefix(nodes@, input@, nodes@.len() as nat, meter.limits.counters@,
-                initial_used) == (Ok(values@), meter.used.counters@),
-            root <= roots.len(), output@.len() == root,
-            evaluation::spec::projection(values@, roots@, root as nat) == Ok(output@),
-        decreases roots.len() - root,
-    ))]
-    while root < roots.len() {
-        match evaluation::at(values, roots[root]) {
-            Some(value) => output.push(value),
-            None => {
-                #[cfg(verus_keep_ghost)]
-                proof! { evaluation::spec::projection_failure_persists(values@, roots@,
-                (root + 1) as nat, roots@.len() as nat); }
-                return Err(Failure::Reference);
-            }
-        }
-        root += 1;
-    }
-    if !evaluation::admitted(outputs, output) {
-        return Err(Failure::OutputDomain);
+    if !numeric::project_legacy(&atoms, values) || !numeric::project_legacy(&results, output) {
+        return Err(Failure::Arithmetic);
     }
     Ok(())
 }

@@ -32,16 +32,18 @@ named by `--source`, or else the tree the CLI was built from.
   ZenoFCIS package the application needs to that tree. Without it, Cargo
   would resolve the version pins to the crates published under the same
   versions, which are a different release.
-- `Cargo.lock` is the tree's lock, so the external crates are the versions
-  the tree pins. The first build adds this application to it.
+- `Cargo.lock` contains this application's resolved graph, including its own
+  package. Generation runs pinned Cargo metadata offline in private scratch
+  seeded by the tree's lock, and refuses any external package version, source
+  or checksum outside that lock. The first build can use `--locked`.
 - `rust-toolchain.toml`, copied when the tree has one, makes rustup select
   the toolchain the tree pins.
 
 From this directory:
 
 ```sh
-cargo test --offline
-cargo run --offline -- NEW_DATABASE_PATH
+cargo test --locked --offline
+cargo run --locked --offline -- NEW_DATABASE_PATH
 ```
 
 `--offline` builds only from crates already in Cargo's cache; `cargo fetch`
@@ -50,12 +52,17 @@ versions.
 
 `cargo test` checks every example against the Authority's decision and
 publishes the contract's genesis state. With the `sqlite` feature it then
-runs the examples as one session from genesis: each example whose pre-state
-is the current state is published, committed and replayed, and the outbox is
-delivered across a reopen of the database. `cargo run` runs the same session
-in a new database at NEW_DATABASE_PATH and prints its summary: each
-decision's class; `bundles`, the number of committed decisions, genesis not
-counted; the `pending` outbox entries; and the `deliveries` made.
+runs the examples as one session from genesis: while one remains, the first
+example in file order whose pre-state is the current state is published,
+committed and replayed, and the outbox is delivered across a reopen of the
+database. Which examples the session reaches depends on the file's order, so
+each example it does not reach is then decided on its own, as `cargo test`
+decides it; whether an example holds never depends on where the file lists
+it. `cargo run` runs the same session in a new database at NEW_DATABASE_PATH
+and prints its summary: `examples`, the number checked, which is every
+example; each session decision's class; `bundles`, the number of committed
+decisions, genesis not counted; the `pending` outbox entries; and the
+`deliveries` made.
 
 ## Operate it
 
@@ -161,7 +168,8 @@ outbox pending for `--deliver`. Without a file at DATABASE_PATH it starts at
 genesis in a new database. On an existing store, which must run this build's
 version (upgrade it first otherwise), it continues from the store's state:
 while one remains, the first example whose pre-state is that state is
-decided and committed. A store at another version is refused and left as it
+decided and committed, and each example it does not reach is then decided on
+its own. A store at another version is refused and left as it
 was. `--decide` is an aid for acceptance tests and maintenance; the commands
 under "Operate it" are the operational interface. After the
 `transform` checker changes its semantics version, `zeno-fcis contract

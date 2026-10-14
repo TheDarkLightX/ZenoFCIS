@@ -2,13 +2,16 @@
 
 ## Supported versions
 
-ZenoFCIS `1.0.0` starts the supported stable release line. Compatible security
-fixes are issued as patch releases. Older candidates, development branches and
-unqualified downstream deployments are not supported release surfaces.
+ZenoFCIS `1.0.0` started the supported stable release line; `1.1.0` is the
+current stable release. Compatible security fixes are issued as patch
+releases. Release candidates, development branches and unqualified downstream
+deployments are not supported release surfaces.
 
 | Version | Security-fix status |
 | --- | --- |
-| `1.0.x` | Supported stable line; update to the latest patch release |
+| `1.1.x` | Supported stable line; update to the latest patch release |
+| `1.0.x` | Superseded by `1.1.x` |
+| `2.2.0-rc.1`, `2.3.0-rc.1` | Public prereleases, not a supported stable line; report suspected issues against the latest candidate |
 | `1.0.0-rc.*` | Superseded by the stable release |
 | older branches and commits | Unsupported |
 

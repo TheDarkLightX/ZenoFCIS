@@ -64,9 +64,42 @@ review command from `.zeno-fcis/zal/install.json`:
 python3 /path/to/source/integrations/zal/terminal.py review --workspace /path/to/project/.zeno-fcis/zal/workspace.json
 ```
 
+The person can supply independent examples in that terminal. These illustrative
+commands show the format; their labels are not evidence of a real owner's input:
+
+```text
+label approval_allowed pending approve authorized=yes expect Accept approved - "illustrative supplied intent"
+label approval_refused pending approve authorized=no expect Reject pending not_enabled "illustrative supplied intent"
+labels
+```
+
+Supply the expected class, successor, reason (`-` for an Accept) and provenance
+explicitly. Reusing a case ID replaces that supplied case. The bounded corpus is
+preserved across proposals, rejection, acceptance and reload. Comparison replays
+the same unchanged expectations against both meanings, reporting conflicts and
+out-of-domain cases without generating new labels. These are cooperative intent
+assumptions, never authenticated owner identity or approval. Visible conflicts
+remain visible after review; binding a corpus does not claim its cases agree.
+Meaning acceptance and reviewed declaration export may proceed with a displayed
+conflict or out-of-domain case. The receipt binds that supplied corpus; it does
+not certify that the owner examples passed or that Python requirements are proved.
+
 Use `candidate`, then `accept` or `reject`. For the initial model use `show`,
 review the canonical English and checks, then `accept-current`. The coding agent
 refreshes with `zal_read` after the review. Do not let it simulate this gesture.
+
+The preview separates stored check freshness, review bindings and factory
+`not-run`. Reading or reloading does not refresh old checks. Restart after checker
+source drift; run `check` for an explicit preview and review again to bind current
+evidence. Changed examples invalidate old review/export bindings. For a pending
+candidate, propose again with the current corpus, then display and review it.
+For current meaning, use `show` and `accept-current`. Acceptance binds the corpus
+that was displayed, so another client's label change requires a new display.
+Explanation and trace views separate supplied observations from authenticated
+facts; this profile supplies no authenticated facts, even for `authorized=yes`.
+Browser declaration downloads send the displayed revision and example digest.
+Both browser and CLI exports check the review binding and refuse stale review or
+a pending candidate; a disabled browser button is not the export gate.
 
 For the exact reviewed revision shown by `zal_read`:
 
@@ -113,5 +146,6 @@ requires a chosen deployment and credential boundary, not just another skill.
 Wider profiles depend on their own semantics and actual lowering qualification:
 checked integer widths and eager traps; explicit effects; transition requirements
 and independent owner examples; concurrency/event scheduling; temporal scopes.
-Neither these profiles nor authentication are supplied by this addon. G7's
-examples-first contract authoring remains its own 2.2 feature and acceptance list.
+Neither these profiles nor authentication are supplied by this addon.
+Examples-first contract authoring (`contract draft`) is a separate feature with
+its own acceptance scenario.

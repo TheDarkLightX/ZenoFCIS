@@ -13,9 +13,10 @@ cannot state. The template shows four patterns:
   against the tick rules on all 384 inputs, and replays it in Rust, Python,
   and JavaScript;
 - a *certified controller*: the table that step defines, with the vault's
-  contract, was checked by OrbitSynthesis for every input sequence, and
-  `tests/controller.rs` re-checks it with an independent implementation of
-  the same decision procedure;
+  contract, was checked for every input sequence by OrbitSynthesis, an
+  external controller-synthesis tool not distributed with ZenoFCIS, and
+  `tests/controller.rs` in this application re-checks it with an
+  independent implementation of the same decision procedure;
 - a *refinement law*: the law checker requires each concrete tick to make
   the certified table's move and the contract's transition, so the finite
   model's property applies to the running application;
@@ -364,6 +365,8 @@ with Rust 1.97.1, Python 3.12.3, Node.js 22.23.1, OrbitSynthesis at commit
 pinned in the same tools manifest, but there is no Lean export for inductive
 claims yet, so it was not run. Commands run from this application's
 directory unless noted.
+This is a historical record of that 1.1.0 build; a current CLI can print
+different versions, identities and hashes.
 
 1. Generation. `build.rs` lowers `project.zeno` with the reviewed scalar
    bounds and generates the typed schema and project bindings into Cargo's
@@ -396,8 +399,10 @@ directory unless noted.
    the same certificate `ef31358b...` and the same output hash under
    Python 3.12.3 and Node.js v22.23.1.
 
-6. Certification. From the OrbitSynthesis checkout, with `CONTROLLER` set to
-   this application's `controller` directory:
+6. Certification (optional, external). OrbitSynthesis is not distributed
+   with ZenoFCIS; `tests/controller.rs` is the re-check that runs with this
+   application's tests. From an OrbitSynthesis checkout, with `CONTROLLER`
+   set to this application's `controller` directory:
 
    ```sh
    python3 scripts/check_controller.py $CONTROLLER/contract.json $CONTROLLER/strategy.json --contract-pin $CONTROLLER/contract.sha256

@@ -1,0 +1,57 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "reservation-pool",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/reservation-pool.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "d1bce88faa9281637c32439c64ecfdf1035d21d79f1a3dd215d94bd42da8e910"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      150,
+      151,
+      152,
+      153
+    ],
+    [
+      1
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 72,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 2,
+    "Q": 1
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "0ba057e4497bd19a4733f50b6d3dbe6b5c8ebfa5d40b9806e2acfab29f4337b6",
+  "source_sha256": {
+    "examples/c2-q1.txt": "cc4c85a6853fe2cc467d9ab396ce07e8acef3d5ada583fd60d64ae929ac0f88e",
+    "family.json": "5164d70676ac9c165bb7e398c75956c8701e1b5c6b8182d28c928d3d000e264b",
+    "policy.json.in": "0790fe806722c9e3720ed4401b1042cb5e4e95bc791b7916428c5e3670b03546",
+    "project.zeno.in": "8ea2443212d77aa4c7d11b1c58e6c9a1b853c9418780835341bcddbc4cacc36d"
+  },
+  "state_tuples": 9,
+  "version": 1
+}

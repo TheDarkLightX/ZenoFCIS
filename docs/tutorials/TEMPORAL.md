@@ -10,29 +10,33 @@ cargo +1.97.1 run --quiet -p zeno-fcis-spec \
 It prints:
 
 ```text
-finite always true, 3 events: satisfied
-finite eventually false, 3 events: counterexample at step 0
-finite next true, 1 event: counterexample at step 0
-finite next true, 2 events: satisfied
-unbounded always true: proof obligation
+two inert claims; runtime admission and publication have not run
 ```
+
+The example parses and elaborates a two-claim project and checks each claim's
+mode. Claim 2, `eventually true`, is finite with a horizon of three events.
+Claim 3, `always true`, is unbounded. Elaboration evaluates neither claim.
+`zeno-fcis prove` sends finite claims to CVC5 or Z3 (see the
+[formal-tools tutorial](FORMAL_TOOLS.md)), and an unbounded claim becomes a
+proof obligation.
 
 Each step is one logical event. The number does not represent seconds,
 processor cycles, or wall-clock time.
 
-## Read the five results
+## How finite claims are judged
 
-`always true` holds at all three events.
+A finite claim covers every nonempty trace of at most its horizon of events.
 
-`eventually false` has no event where its inner statement becomes true. The
-evaluator returns the first step from which the claim fails.
+`always p` requires `p` at every remaining event.
 
-`next true` needs another event. A one-event trace ends at step 0, so the claim
-fails there. A two-event trace has step 1, where `true` holds.
+`eventually p` requires one remaining event where `p` holds, so
+`eventually false` fails on every trace.
 
-The last line selects the unbounded mode. The built-in evaluator returns a
-request for a proof. It never turns a finite run into a claim about every
-future event.
+`next p` needs another event. On a one-event trace it fails at step 0; on a
+two-event trace it holds at step 0 when `p` holds at step 1.
+
+An unbounded claim has no built-in evaluator. It creates a request for a
+proof, and a finite run is never turned into a claim about every future event.
 
 ## See both modes in `.zeno`
 

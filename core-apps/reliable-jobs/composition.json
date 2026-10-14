@@ -1,0 +1,202 @@
+{
+  "application": "reliable-jobs",
+  "authority": "none",
+  "components": [
+    {
+      "family": "retry-budget",
+      "instance": "components/retry/core-instance.json",
+      "instance_sha256": "1b9804b093b03792401b8fb623bd6ddba109cc08e373bd751adb3ce2bdb4e2d2",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "retry",
+      "owns_fields": [
+        110
+      ],
+      "parameters": {
+        "C": 3
+      },
+      "source_set_sha256": "e730ad96ea84380b6cf3c9dec3479ab4a4e95b694bd53724217f28c0549cf99f",
+      "views": {
+        "command": [
+          "action == 152"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "remaining",
+          "phase == 3"
+        ]
+      }
+    },
+    {
+      "family": "idempotency-slot",
+      "instance": "components/memo/core-instance.json",
+      "instance_sha256": "38265486aa560ee63f25595c6f621b5af72b67d44a9281c5e85d4e7972149fb0",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "memo",
+      "owns_fields": [],
+      "parameters": {
+        "C": 3
+      },
+      "source_set_sha256": "16006ce29ea7d91a5e0b2e3e68373fd0018a68d585861679d05749f4e0721d25",
+      "views": {
+        "command": [
+          "attempt",
+          "1"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "remaining != 3",
+          "active",
+          "1"
+        ]
+      }
+    },
+    {
+      "family": "logical-deadline",
+      "instance": "components/deadline/core-instance.json",
+      "instance_sha256": "ef1db26063119fa6af4c689749b235d1f832f2693a3d2c5285d0212202ef98c0",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "deadline",
+      "owns_fields": [
+        112,
+        113
+      ],
+      "parameters": {
+        "C": 4
+      },
+      "source_set_sha256": "2ac884840b84984bb672007de032a8558698e7dae511c029763fae18900a22ca",
+      "views": {
+        "command": [],
+        "context": [
+          "now",
+          "authorized"
+        ],
+        "state": [
+          "4",
+          "last",
+          "reached"
+        ]
+      }
+    }
+  ],
+  "coordinator": {
+    "assurance": "included in the complete coupled Authority laws and finite comparison",
+    "owner": "application-rules",
+    "owns_fields": [
+      111,
+      114
+    ],
+    "state": [
+      "phase",
+      "clock"
+    ]
+  },
+  "effects": {
+    "channel": 300,
+    "destination": "worker",
+    "max_per_transition": 1,
+    "occurrence": "start",
+    "owner": "retry",
+    "payload": {
+      "140": "active + 1",
+      "141": "1"
+    }
+  },
+  "evidence_status": "pending actual Authority replay, durable journeys, controls and review",
+  "frames": "Remaining frames on failure and exact retries. Deadline pair changes only on the first Waiting Start at threshold four. The memo owns no state: its view reads the retry budget's remaining attempts, so its Record step only checks the attempt number and can change nothing. Coordinator phase/clock use the coupled lifecycle law.",
+  "input_tuples": 96000,
+  "occurrences": [
+    {
+      "name": "start",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Attempt",
+          "component": "retry"
+        }
+      ],
+      "when": "action == 150 && phase != 1"
+    },
+    {
+      "name": "retry-start",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        }
+      ],
+      "when": "action == 150 && phase == 1"
+    },
+    {
+      "name": "deadline",
+      "ordered_steps": [
+        {
+          "command": "Tick",
+          "component": "deadline"
+        }
+      ],
+      "when": "action == 150 && phase == 2 && !reached"
+    },
+    {
+      "name": "fail",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        }
+      ],
+      "when": "action == 151"
+    },
+    {
+      "name": "succeed",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Finish",
+          "component": "retry"
+        }
+      ],
+      "when": "action == 152 && phase == 1"
+    },
+    {
+      "name": "retry-success",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        }
+      ],
+      "when": "action == 152 && phase == 3"
+    }
+  ],
+  "owner_adoption": false,
+  "preconditions": [
+    "coupled-state invariant",
+    "supplied authorization and logical time",
+    "current or next exact attempt",
+    "remaining retry budget",
+    "fixed logical threshold in Waiting"
+  ],
+  "profile": "single-job-three-attempts-fixed-threshold-four/1",
+  "publication": "one complete Authority publication and one SQLite transaction; abort-all on technical refusal",
+  "schema": "zeno-fcis/core-application-composition/1",
+  "state_fields": [
+    110,
+    111,
+    112,
+    113,
+    114
+  ],
+  "stateless_components": [
+    "memo"
+  ]
+}

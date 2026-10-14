@@ -1,0 +1,21 @@
+zeno 1;
+project 1 register_0;
+namespace 2 registers;
+type 100 state Register;
+type 101 command RegisterCommand;
+type 102 context PeerView;
+type 103 int RegisterValue in 0..=7;
+type 105 int Action in 0..=4;
+field 110 100 x 103;
+field 201 101 action 105;
+field 202 102 peer 103;
+reason 300 unchanged precedence 0;
+component 400 register {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  budget steps 4096;
+}
+merge [400];
+law 500 bounded_register on commit, genesis = post.100.110 <= 3;

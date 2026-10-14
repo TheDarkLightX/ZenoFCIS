@@ -1,10 +1,11 @@
 # Zeno Core component catalogue
 
 These ten data packages describe reusable application behavior through the
-existing F1 compiler, library Authority and generated SQLite application. They
-add no Rust decision callback, alternate evaluator or authority API. They are
-V2.2 G1 source work extended for V2.3. Coupled application compositions and the
-remaining V2.3 release gates are separate work.
+existing contract compiler (`generate contract`), library Authority and
+generated SQLite application. They add no Rust decision callback, alternate
+evaluator or authority API. The catalogue started in V2.2 with three families
+and grew to ten in V2.3. Coupled application compositions and the remaining
+V2.3 release gates are separate work.
 
 The [finite certificate route](FINITE_PROOFS.md) covers every declared parameter
 instance and all 107,518 raw inputs, including invalid prestates. It executes the
@@ -54,7 +55,7 @@ python3 tools/instantiate_core.py reservation-pool /tmp/my-pool-contract --param
 
 The instantiator refuses missing, repeated, extra, noninteger or unsupported
 parameters, and refuses an existing output directory. It substitutes integers
-and a derived package name in fixed data templates. The resulting ordinary F1
+and a derived package name in fixed data templates. The resulting ordinary
 contract uses existing export, transform and adoption commands unchanged.
 `core-instance.json` records the exact source set, domains and Identified,
 replay-required certificate reference. Its provenance comment also survives
@@ -87,7 +88,8 @@ and 100,616 inputs for the five other families = 107,518 raw input tuples across
 all 77 instances. Input products include invalid but
 schema-admitted prestates, every supplied authorization value and every command.
 They are not reachable-state samples. There is no synthesis output enumeration:
-ordinary F1 compiles the ordered cases and F2 enumerates actual Authority inputs.
+the contract compiler compiles the ordered cases and `contract review` enumerates
+actual Authority inputs.
 Actual graph sizes, output counts and Step budgets are recorded by execution
 qualification, not inferred from these products. Unsupported parameters fail;
 there is no fallback to boundary sampling or silently narrower schemas.
@@ -204,10 +206,10 @@ python3 tools/check_core_components.py --cli /path/to/zeno-fcis \
   --work-dir /disk/new-seed-check --target-dir /disk/seed-target
 ```
 
-Run it only under the allocated test slot and resource wrapper (4 GiB,
-swap 0, CPU 100%, one Cargo job). It sequentially instantiates all 77 parameter
-values, generates and regeneration-checks, performs full F2 review, requires
-zero technical refusals over every raw tuple and exact agreement with all 107,518
+Run it under a resource limit of 4 GiB of memory, no swap, one CPU and one
+Cargo job. It sequentially instantiates all 77 parameter values, generates and
+regeneration-checks, performs a full `contract review`, requires zero
+technical refusals over every raw tuple and exact agreement with all 107,518
 independent expectations, scaffolds each app, validates the dependency binding,
 and runs its generated tests (genesis, every example, persistent commit/replay,
 and shared parser). It plants seventeen policy faults, including lost reservation

@@ -17,12 +17,15 @@ why (selected object's built-in meaning)
 why STATE EVENT fact=yes (exact local guard/outcome explanation)
 propose FILE [symbolic|english]
 trace submit authorized=no then approve authorized=yes
+labels (retained supplied intent examples, not authenticated owner identity)
+label CASE STATE EVENT fact=yes expect Accept TARGET - "supplied provenance"
+label CASE STATE EVENT fact=no expect Reject STATE REASON "supplied provenance"
 accept | reject (the exact candidate last displayed here)
 show | accept-current (review the current/initial model, with no pending candidate)
 cancel | quit
 Ask/propose in your usual Codex/Claude coding session through the MCP bridge.
 This human loop owns acceptance; tool/command approval does not accept meaning.
-Full-hash accept/reject and JSON-array traces remain available for low-level use.
+Full-hash accept also needs the displayed corpus digest; JSON traces remain available.
 """
 
 
@@ -51,10 +54,31 @@ def command(session, line):
         return None
     name, args = words[0], words[1:]
     if name == "show" and not args:
+        view = session.view()
         return {"revision": session.model.revision, "selected": session.selected,
                 "agreement": session.agreement, "realization": session.realization,
                 "english": session.model.render(True), "symbolic": session.model.render(),
-                "evidence": session.evidence, "object_ids": sorted(session.objects())}
+                "evidence": session.evidence, "object_ids": sorted(session.objects()),
+                **{key: view[key] for key in ["owner_examples", "examples_digest", "example_comparison", "freshness",
+                                             "supplied_assumptions", "authenticated_facts"]}}
+    if name == "labels" and not args:
+        return {"kind": "owner-examples", "example_comparison": session.example_comparison(session.proposal["model"] if session.proposal else None),
+                "freshness": session.freshness()}
+    if name == "label":
+        try:
+            marker = args.index("expect", 3)
+        except ValueError:
+            raise Refusal("Supply label CASE STATE EVENT observations expect CLASS STATE REASON PROVENANCE") from None
+        if len(args) != marker + 5:
+            raise Refusal("Supply expected class, state, reason (- for Accept) and one quoted provenance explicitly")
+        given = trace_inputs(" ".join(args[2:marker]))
+        if len(given) != 1:
+            raise Refusal("Owner example needs one exact input")
+        session.supply_owner_example({"id": args[0], "input": {"state": args[1], **given[0]},
+                "expected": {"class": args[marker + 1], "state": args[marker + 2],
+                             "reason": None if args[marker + 3] == "-" else args[marker + 3]},
+                "provenance": args[marker + 4]}, session.model.revision)
+        return command(session, "labels")
     if name == "select" and len(args) == 1:
         return session.select(args[0], session.model.revision)
     if name == "legend" and not args:
@@ -81,7 +105,7 @@ def command(session, line):
             source = stream.read(65537)
         session.propose_human(source, args[1] if len(args) == 2 else "symbolic", session.model.revision)
         return session.view()["proposal"]
-    if name in {"accept", "reject"} and len(args) == 2:
+    if name == "reject" and len(args) == 2 or name == "accept" and len(args) == 3:
         if name == "accept":
             session.accept_human(*args)
         else:
@@ -117,24 +141,26 @@ class ReviewClient:
             self.displayed = None
         def action(session):
             if words == ["accept-current"]:
-                current = (session.model.revision, checker_identity(), len(session.events))
+                current = (session.model.revision, checker_identity(), session.view()["examples_digest"], len(session.events))
                 if self.current_displayed != current or session.proposal:
                     raise Refusal("Current meaning changed or has not been displayed here; run show and review it first")
-                session.accept_current_human(current[0])
+                session.accept_current_human(current[0], current[2])
                 return {"agreement": session.agreement, "revision": session.model.revision,
                         "evidence": session.evidence, "realization": session.realization}, None, None
             if words in [["accept"], ["reject"]]:
                 proposal = session.proposal
                 current = None if not proposal else (
-                    proposal["base_revision"], proposal["revision"], len(session.events))
+                    proposal["base_revision"], proposal["revision"], len(session.events), session.view()["examples_digest"])
                 if self.displayed is None or self.displayed != current:
                     raise Refusal("Candidate changed or has not been displayed here; run candidate and review it first")
-                return command(session, " ".join([words[0], *self.displayed[:2]])), None, None
+                arguments = [words[0], *self.displayed[:2], *([self.displayed[3]] if words == ["accept"] else [])]
+                return command(session, " ".join(arguments)), None, None
             result = command(session, line)
             displayed = None
             if words and words[0] in {"candidate", "propose"} and session.proposal:
-                displayed = (session.proposal["base_revision"], session.proposal["revision"], len(session.events))
-            current = (session.model.revision, checker_identity(), len(session.events)) if words == ["show"] else None
+                displayed = (session.proposal["base_revision"], session.proposal["revision"], len(session.events), session.view()["examples_digest"])
+            current = ((session.model.revision, checker_identity(), session.view()["examples_digest"], len(session.events))
+                       if words == ["show"] and result["freshness"]["checks"]["status"] != "unavailable" else None)
             return result, displayed, current
         result, displayed, current = self.workspace.use(action)
         if current:
@@ -142,7 +168,7 @@ class ReviewClient:
         if words and words[0] in {"candidate", "propose", "accept", "reject", "cancel"}:
             self.displayed = None
             self.awaiting_display = (canonical(result), displayed) if displayed else None
-        if words and words[0] in {"accept", "reject", "accept-current", "cancel"}:
+        if words and words[0] in {"accept", "reject", "accept-current", "cancel", "label"}:
             self.current_displayed = None
             self.displayed = None
         return result
@@ -174,6 +200,35 @@ def observations(context):
 def outcome(value):
     reason = f"; reason {value['reason']}" if value.get("reason") else ""
     return f"{value['class']} -> {value['state']}{reason}"
+
+
+def freshness_lines(freshness):
+    lines = []
+    for name in ["checks", "review", "factory"]:
+        item = freshness[name]
+        lines.append(f"{name.capitalize()} freshness: {item['status']}")
+        if item.get("reasons"):
+            lines.append("  " + "; ".join(item["reasons"]))
+        lines.append("  " + item["guidance"])
+    if freshness.get("proposal"):
+        item = freshness["proposal"]
+        lines.append(f"Candidate checks freshness: {item['checks']['status']}; owner corpus: {item['corpus']}")
+        lines.append("  " + item["checks"]["guidance"] + " " + item["guidance"])
+    return lines
+
+
+def example_lines(comparison):
+    lines = [f"Supplied owner examples: {len(comparison['cases'])} | corpus {comparison['digest'][:12]}", comparison["scope"]]
+    for case in comparison["cases"]:
+        given = case["input"]
+        lines.append(f"{case['id']}: {given['state']} / {given['event']} ({observations(given['context'])}); expected {outcome(case['expected'])}")
+        lines.append("  Supplied provenance: " + case["provenance"])
+        for revision in ["current", "candidate"]:
+            if revision in case:
+                result = case[revision]
+                lines.append("  " + revision + ": " + result["status"] +
+                             ("; " + outcome(result["actual"]) if "actual" in result else "; " + result["diagnostic"]))
+    return lines
 
 
 def evidence_lines(evidence):
@@ -227,7 +282,12 @@ def _human_text(result):
         lines = ["Trace from the declared initial state (assumed inputs):"]
         lines.extend(f"{i}. {row['pre']} -- {row['event']} ({observations(row['context'])}) --> {outcome(row['outcome'])}"
                      for i, row in enumerate(result, 1))
-        return "\n".join(lines if result else ["Empty trace; no step taken."])
+        lines = lines if result else ["Empty trace; no step taken."]
+        return "\n".join([*lines, "Supplied assumptions: each row's Boolean observations.",
+                          "Authenticated facts: none supplied by this profile."])
+    if result.get("kind") == "owner-examples":
+        return "\n".join([*example_lines(result["example_comparison"]), *freshness_lines(result["freshness"]),
+                          "Authenticated facts: none supplied by this profile."])
     if result.get("kind") == "translation":
         return f"Current meaning {result['revision'][:12]} in {result['syntax']} (deterministic; no LLM):\n{result['surface']}"
     if result.get("kind") == "language-help":
@@ -242,6 +302,8 @@ def _human_text(result):
     if result.get("kind") == "decision-explanation":
         given = result["input"]
         lines = [f"Local explanation at {result['revision'][:12]} (typed logic; no LLM)",
+                 "Supplied assumptions: " + observations(result["supplied_assumptions"]["observations"]),
+                 "Authenticated facts: none supplied by this profile.",
                  f"Input: {given['state']} -- {given['event']} ({observations(given['context'])})",
                  "Outcome: " + outcome(result["outcome"]), "Frame: " + result["frame"]]
         for rule in result["rules"]:
@@ -278,6 +340,10 @@ def _human_text(result):
                 lines.append(f"Witness: from {witness['state']}, {witness['event']} with {observations(witness['context'])}")
                 lines.append(f"  Before: {outcome(witness['before'])}; after: {outcome(witness['after'])}")
         lines.extend(evidence_lines(result["evidence"]))
+        lines.extend(example_lines(result["example_comparison"]))
+        item = result["freshness"]
+        lines.extend([f"Candidate checks freshness: {item['checks']['status']}; owner corpus: {item['corpus']}",
+                      item["checks"]["guidance"], item["guidance"], "Authenticated facts: none supplied by this profile."])
         lines.append("Review the meaning and evidence, then type accept or reject. Any intervening change requires review again.")
         return "\n".join(lines)
     if "english" in result:
@@ -286,7 +352,9 @@ def _human_text(result):
                           if selected.startswith("rule:") and line.startswith("Rule " + selected[5:] + ":")]
         return "\n".join([f"Current meaning {result['revision'][:12]} | agreement: {result['agreement']}",
                           "Selected: " + selected, *selected_lines, "", result["english"].rstrip(), "",
-                          *evidence_lines(result["evidence"]), "Use candidate to review a proposed change."])
+                          *evidence_lines(result["evidence"]), *example_lines(result["example_comparison"]),
+                          *freshness_lines(result["freshness"]), "Supplied assumptions: owner labels and hypothetical Boolean observations.",
+                          "Authenticated facts: none supplied by this profile.", "Use candidate to review a proposed change."])
     if "entries" in result:
         lines = ["Legend: " + result["profile"]]
         for entry in result["entries"]:

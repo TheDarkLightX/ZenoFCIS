@@ -446,11 +446,18 @@ def check(directory: Path) -> dict:
     replayed = upgrades.report(upgrades.run_app(third, ["--audit", str(store_a)]), "audit three")
     upgrades.expect(replayed, {"status": "audited", "contract_version": 3, "commits": 3,
                                "pending": 0, "upgrades": 2}, "audit three segments")
+    # Complete G2's payload representation journey under the same real
+    # generated-app/relay gate, retaining the already-built old binaries.
+    from check_payload_migrate import check as check_payloads
+    payloads = check_payloads(directory / "payload-migration", packages, version,
+                              stores["a"][0], stores["b"][0])
+    from check_template_migrate import check as check_template
+    template = check_template(directory / "template-migration", packages, version)
     return {"schema": "zeno-fcis/contract-migrate-check/1", "status": "passed",
             "authority": "none", "classified": classified["kind"],
             "evolution": evolved["evolution"], "upgrades": upgraded, "delivered": delivered,
             "continued": continued, "audits": audits, "rename": rename, "replayed": replayed,
-            "refusals": refused}
+            "refusals": refused, "payload_migration": payloads, "template_migration": template}
 
 
 def main() -> int:

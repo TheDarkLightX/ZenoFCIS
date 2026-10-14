@@ -9,13 +9,13 @@ use zeno_fcis_codec::{CanonicalEncode, Hash32};
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_schema::ValidationLimits;
 use zeno_fcis_shell::CommitStatus;
-use zeno_fcis_shell_sqlite::{
-    CrashPoint,
-    v2::{CommitReceipt, PublicationSizes, Snapshot, compact_publication, expand_publication},
+use zeno_fcis_shell_sqlite::v2::{
+    CommitReceipt, Error as StoreError, PublicationSizes, Snapshot, compact_publication,
+    expand_publication,
 };
 use zeno_fcis_synthesis::finite::{
     Domain, Op, V2Resource as Resource, V2Usage,
-    v2_authority::PublicationOutcome,
+    v2_authority::{Publication as HistoryPublication, PublicationOutcome},
     v2_composition::{Class, Raw},
     v2_continuation as continuation, v2_zero_limits,
 };
@@ -216,7 +216,34 @@ impl PreparedBatch {
         authority: &Authority<'_>,
         current_allowed: bool,
         byte_limit: usize,
-        crash: Option<CrashPoint>,
+    ) -> AppResult<Publication> {
+        self.publish_with(
+            shell,
+            authority,
+            current_allowed,
+            byte_limit,
+            |shell, version, replay, publication, limit| {
+                shell.commit_bounded_at(version, replay, publication, limit)
+            },
+        )
+    }
+
+    // The private commit seam runs only after all original checks. Unit tests
+    // substitute interruption at the same bounded CAS commit; application
+    // callers cannot replace the commit or supply a decision, usage or receipt.
+    fn publish_with<'a, 'p>(
+        self,
+        shell: &mut Shell<'a, 'p>,
+        authority: &Authority<'_>,
+        current_allowed: bool,
+        byte_limit: usize,
+        commit: impl for<'invocation> FnOnce(
+            &mut Shell<'a, 'p>,
+            u64,
+            Hash32,
+            HistoryPublication<'invocation>,
+            usize,
+        ) -> Result<CommitReceipt, StoreError>,
     ) -> AppResult<Publication> {
         let snapshot = checked(shell.snapshot())?;
         if authority.identity() != snapshot.binding() {
@@ -309,12 +336,12 @@ impl PreparedBatch {
             publication.identity(),
             publication.subject(),
         ))?;
-        let receipt = checked(shell.commit_bounded_at(
+        let receipt = checked(commit(
+            shell,
             snapshot.version(),
             self.replay,
             publication,
             limit,
-            crash,
         ))?;
         Ok(Publication {
             status: receipt.status(),
@@ -372,5 +399,126 @@ impl Publication {
             return Err("exact original replay refused".into());
         };
         checked(shell.commit(self.replay, publication))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{authority, create, v2_contract};
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
+    static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    struct Temp(PathBuf);
+    impl Temp {
+        fn new() -> Self {
+            let p = std::env::temp_dir().join(format!(
+                "prepared-v2-{}-{}",
+                std::process::id(),
+                SEQUENCE.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir(&p).unwrap();
+            Self(p)
+        }
+    }
+    impl Drop for Temp {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn complete(
+        shell: &mut crate::Shell<'_, '_>,
+        authority: &crate::Authority<'_>,
+        deltas: [i128; 3],
+        replay: &str,
+    ) -> PreparedBatch {
+        let mut work = PreparedBatch::start(
+            authority,
+            &shell.snapshot().unwrap(),
+            &command(deltas),
+            true,
+            replay,
+        )
+        .unwrap();
+        work.advance(0, 3).unwrap();
+        work
+    }
+
+    #[test]
+    fn every_original_commit_crash_recovers_all_or_none_through_the_new_checked_path() {
+        use zeno_fcis_shell_sqlite::CrashPoint as P;
+        let data = v2_contract::Contract::new();
+        let definition = data.descriptor();
+        let authority = authority(&definition).unwrap();
+        for crash in [
+            P::BeforeTransaction,
+            P::AfterValidation,
+            P::AfterStateWrite,
+            P::AfterReplayWrite,
+            P::AfterOutboxWrite,
+            P::BeforeCommit,
+            P::AfterCommit,
+        ] {
+            let temp = Temp::new();
+            let path = temp.0.join("state.sqlite");
+            let mut shell = create(&path, &authority).unwrap();
+            let before = shell.snapshot().unwrap();
+            assert!(
+                complete(&mut shell, &authority, [1, 1, 1], "crash")
+                    .publish_with(
+                        &mut shell,
+                        &authority,
+                        true,
+                        MAX_PUBLICATION_BYTES,
+                        |shell, version, replay, publication, limit| {
+                            shell.commit_bounded_with_crash_at(
+                                version,
+                                replay,
+                                publication,
+                                limit,
+                                Some(crash),
+                            )
+                        }
+                    )
+                    .is_err()
+            );
+            drop(shell);
+            let mut reopened = crate::Shell::open(&path, &authority).unwrap();
+            let after = reopened.snapshot().unwrap();
+            if crash == P::AfterCommit {
+                assert_eq!(
+                    (
+                        after.version(),
+                        after.bundle_count(),
+                        after.replay_count(),
+                        after.pending()
+                    ),
+                    (1, 1, 1, 1)
+                );
+                assert_eq!(crate::decode_state(after.state()).unwrap().count.0, 3);
+                let mut destination = zeno_fcis_shell_sqlite::MemoryDestination::default();
+                let pending = reopened.next_pending().unwrap().unwrap();
+                drop(pending.deliver(&mut destination).unwrap());
+                assert_eq!(destination.delivered_count(), 1);
+                drop(reopened);
+                let mut reopened = crate::Shell::open(&path, &authority).unwrap();
+                let pending = reopened.next_pending().unwrap().unwrap();
+                pending
+                    .deliver(&mut destination)
+                    .unwrap()
+                    .acknowledge()
+                    .unwrap();
+                assert!(reopened.next_pending().unwrap().is_none());
+                assert_eq!(destination.delivered_count(), 1);
+                assert_eq!(reopened.snapshot().unwrap().pending(), 0);
+            } else {
+                assert_eq!(after, before);
+            }
+        }
     }
 }

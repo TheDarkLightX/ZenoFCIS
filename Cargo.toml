@@ -35,13 +35,14 @@ members = [
     "crates/zeno-fcis-synthesis",
     "crates/zeno-fcis-backend",
     "crates/zeno-fcis-formal-tools",
+    "crates/zeno-fcis-contract",
     "crates/zeno-fcis-cli",
     "crates/zeno-fcis-shell-sqlite",
     "crates/zeno-fcis-collections",
 ]
 
 [workspace.package]
-version = "1.1.0"
+version = "2.3.0"
 edition = "2024"
 rust-version = "1.97.1"
 license = "MIT OR Apache-2.0"

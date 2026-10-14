@@ -213,7 +213,6 @@ def main() -> int:
 
         permitted = (
             "git status --short",
-            "git commit -m documentation",
             "python3 tools/atdd.py check",
             "cargo +1.97.1 test --workspace --locked",
             (
@@ -239,15 +238,15 @@ def main() -> int:
                 write_after=True,
             )
             require_allow(node, "git commit -m acceptance", transcript=clean)
-            require_allow(node, "git commit -m focused-checks", transcript=stale)
+            require_block(node, "git commit -m stale", transcript=stale)
             empty = Path(directory) / "empty.jsonl"
             empty.write_text("", encoding="utf-8")
-            require_allow(node, "git commit -m documentation", transcript=empty)
+            require_block(node, "git commit -m unchecked", transcript=empty)
 
         print(
             "probity: PASS "
             f"(Node {EXPECTED_NODE[1:]}, Probity {EXPECTED_PROBITY}, "
-            "13 hostile and 8 permitted actions)"
+            "15 hostile and 5 permitted actions)"
         )
         return 0
     except (ProbityCheckError, subprocess.CalledProcessError) as error:

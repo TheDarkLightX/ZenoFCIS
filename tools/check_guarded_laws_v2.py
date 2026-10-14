@@ -20,7 +20,7 @@ import check_laws_v2 as legacy
 from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import once
-from verus_coverage import inventory, require_coverage
+from verus_coverage import inventory, observed_inventory, profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path('verification/verus/guarded_laws.rs')
@@ -56,7 +56,7 @@ def sources():
     return list(dict.fromkeys([*authority.sources(), HARNESS, PROFILE, TEST,
         legacy.DIRECTORY / 'tests.rs', Path('tools/check_laws_v2.py'),
         Path('tools/check_guarded_laws_v2.py'), Path('tools/test_check_guarded_laws_v2.py'),
-        Path('docs/V2_GUARDED_LAWS_STAGE.md'),
+        Path('README.md'),
         Path('crates/zeno-fcis-cli/templates/inventory-reservation/synthesized/program.zcve')]))
 
 
@@ -127,22 +127,10 @@ def controls():
 
 def target_lines(source, name):
     """Exact annotated function region, for matching proof diagnostic source spans."""
-    found = list(re.finditer(r'\bfn\s+([A-Za-z_][A-Za-z_0-9]*)\b', source))
-    hits = [i for i, match in enumerate(found) if match[1] == name]
-    if len(hits) != 1:
-        raise ValueError(f'not one intended executable target: {name}')
-    i = hits[0]
-    start = source.rfind('#[cfg_attr(verus_keep_ghost', 0, found[i].start())
-    end = found[i + 1].start() if i + 1 < len(found) else len(source)
-    if i + 1 < len(found):
-        attr = source.rfind('#[cfg_attr(verus_keep_ghost', found[i].end(), end)
-        if attr >= 0:
-            end = attr
-    return (source.count('\n', 0, max(0, start)) + 1, source.count('\n', 0, end) + 1)
+    return verifier.function_lines(source, name)
 
 
-def semantic_refusal(proc, report, control):
-    result = report.get('verification-results', {})
+def semantic_refusal(proc, report, control, specimen=ROOT, *, target_functions=()):
     lines = target_lines(control['changed'], control['target'])
     # Only actual proof failures count; compiler/VIR/resource failures do not. A control
     # that declares its intended obligations accepts no other failure kind.
@@ -150,10 +138,9 @@ def semantic_refusal(proc, report, control):
     failure = bool(reported) and reported <= set(control.get('obligations', SEMANTIC_FAILURES))
     locations = [int(n) for n in re.findall(re.escape(control['path'].name) + r':(\d+):\d+', proc.stderr)]
     matched = [n for n in locations if lines[0] <= n <= lines[1]]
-    accepted = (proc.returncode != 0 and result.get('success') is False
-        and type(result.get('errors')) is int and result['errors'] > 0
-        and result.get('encountered-vir-error') is False and failure and bool(matched)
-        and not re.search(r'resource limit|timed out|out of memory|error\[E\d+\]', proc.stderr, re.I))
+    pin = json.loads((ROOT / verifier.PIN).read_text())
+    accepted = failure and verifier.semantic_refusal(proc, report, pin,
+        control['path'], specimen, region=lines, target_functions=target_functions)
     return accepted, {'file': str(control['path']), 'function': control['target'],
                       'lines': lines, 'matched_error_lines': matched}
 
@@ -164,13 +151,17 @@ def coverage_refusal(vir, profile, control):
         require_coverage(vir, profile)
     except ValueError as failure:
         error = str(failure)
-    actual = inventory(vir, profile['namespace'], tuple(profile['body_covered_functions']))
+    actual = profile_inventory(vir, profile)
     target = NAMESPACE + 'execution_v2::' + control['target']
     field = control['field']
+    expected = profile['functions']
     if field == 'inventory':
-        matched = target in actual and target not in profile['functions']
+        matched = (set(actual) == set(expected) | {target} and target not in expected
+            and actual[target]['mode'] == 'Exec' and actual[target]['requires'] == 0
+            and actual[target]['ensures'] == 0)
     else:
-        matched = target in actual and target in profile['functions'] and actual[target][field] != profile['functions'][target][field]
+        matched = (set(actual) == set(expected) and target in actual and target in expected
+            and actual[target][field] != expected[target][field])
         if control['target'] == 'laws::predicate::node':
             matched = matched and all(actual[target][key] == profile['functions'][target][key]
                 for key in ('signature_sha256', 'requires_sha256', 'ensures_sha256'))
@@ -291,11 +282,14 @@ def check(out, refresh=False, positive_only=False, selected=None):
         raise ValueError('whole actual-source proof failed')
     vir = (out / 'positive/crate.vir').read_text()
     if refresh:
-        raw = inventory(vir, NAMESPACE)
+        raw, _declarations = observed_inventory(vir, NAMESPACE)
         bodies = [name for name, record in raw.items() if record['mode'] == 'Exec']
-        profile = dict(namespace=NAMESPACE, functions=inventory(vir, NAMESPACE, tuple(bodies)),
+        functions, declarations = observed_inventory(vir, NAMESPACE, tuple(bodies))
+        profile = dict(namespace=NAMESPACE, functions=functions,
             body_covered_functions=bodies, expected_verified=vr['verified'],
             target_functions=sorted(name for name in report['func-details'] if name.startswith(NAMESPACE)))
+        if declarations is not None:
+            profile['abstract_declarations'] = declarations
         (ROOT / PROFILE).write_text(json.dumps(profile, indent=2, sort_keys=True) + '\n')
     profile = json.loads((ROOT / PROFILE).read_text())
     coverage = require_coverage(vir, profile)
@@ -341,11 +335,13 @@ def check(out, refresh=False, positive_only=False, selected=None):
                 proc = saved_run(proof_command(command, out / name), specimen, env, out, name)
                 parsed = json.loads(proc.stdout)
                 if control['kind'] == 'proof':
-                    killed, intended = semantic_refusal(proc, parsed, control)
+                    killed, intended = semantic_refusal(proc, parsed, control, specimen,
+                        target_functions=profile['target_functions'])
                 else:
                     matched, refusal, intended = coverage_refusal((out / name / 'crate.vir').read_text(), profile, control)
-                    r = parsed['verification-results']
-                    killed = proc.returncode == 0 and r.get('success') is True and r.get('errors') == 0 and matched
+                    killed = (proc.returncode == 0 and verifier.proof_succeeded(parsed, pin)
+                        and matched and not verifier.ERROR_HEADER.search(proc.stderr)
+                        and not verifier.NON_SEMANTIC.search(proc.stderr))
                 if control['native']:
                     n = native_commands(out, env, specimen, name, True)
                     killed = killed and n.returncode != 0 and 'test result: FAILED' in n.stdout

@@ -92,6 +92,40 @@ fn inputs_only(name: &str, root: &TempRoot) -> PathBuf {
 }
 
 #[test]
+fn generated_contract_app_builds_locked_offline_with_an_unchanged_lock() {
+    let root = TempRoot::new("locked-app");
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/spend-approval");
+    let app = root.path().join("app");
+    let created = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
+        .arg("new")
+        .arg(&app)
+        .arg("--contract")
+        .arg(&fixture)
+        .arg("--source")
+        .arg(&source)
+        .output()
+        .unwrap_or_else(|error| panic!("create contract app: {error}"));
+    assert!(created.status.success(), "{created:?}");
+    let before = read(app.join("Cargo.lock"));
+    let built = Command::new("cargo")
+        .args(["+1.97.1", "build", "--locked", "--offline"])
+        .arg("--manifest-path")
+        .arg(app.join("Cargo.toml"))
+        .output()
+        .unwrap_or_else(|error| panic!("build contract app: {error}"));
+    assert!(
+        built.status.success(),
+        "locked offline app build: {built:?}"
+    );
+    assert_eq!(
+        read(app.join("Cargo.lock")),
+        before,
+        "locked build changed the generated lock"
+    );
+}
+
+#[test]
 fn every_template_contract_is_current() {
     for name in TEMPLATES {
         let output = contract(&template(name), &["--check", "--format", "json"]);
@@ -128,6 +162,55 @@ fn generation_reproduces_every_template_from_its_inputs() {
             );
         }
     }
+}
+
+/// Every file under `dir` with its bytes, by path.
+fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    let mut files = Vec::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        for entry in fs::read_dir(&next).unwrap_or_else(|error| panic!("list {next:?}: {error}")) {
+            let path = entry
+                .unwrap_or_else(|error| panic!("entry: {error}"))
+                .path();
+            if path.is_dir() {
+                pending.push(path);
+            } else {
+                files.push((path.clone(), read(&path)));
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+#[test]
+fn out_keeps_generated_files_out_of_the_contract_directory() {
+    let root = TempRoot::new("out");
+    let dir = inputs_only("durable-counter", &root);
+    let written = snapshot(&dir);
+    let app = root.path().join("app");
+    let out = app
+        .to_str()
+        .unwrap_or_else(|| panic!("a UTF-8 temporary path"));
+    let output = contract(&dir, &["--out", out]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(snapshot(&dir) == written, "the contract directory changed");
+    for file in OUTPUTS {
+        assert!(
+            read(app.join(file)) == read(template("durable-counter").join(file)),
+            "generated {file} differs from the committed file"
+        );
+    }
+    let checked = contract(&dir, &["--check", "--out", out, "--format", "json"]);
+    assert_eq!(checked.status.code(), Some(0));
+    assert_eq!(json(&checked)["status"], "current");
+    assert!(snapshot(&dir) == written, "the contract directory changed");
 }
 
 #[test]
@@ -289,7 +372,7 @@ fn an_application_built_from_a_contract_is_current_and_complete() {
     )));
     assert!(manifest.contains(&format!("\"={}\"", env!("CARGO_PKG_VERSION"))));
     assert_eq!(contract_check(&app), Some(0));
-    // The binding: this tree's packages, lock and toolchain.
+    // The binding: this tree's packages, external lock identities and toolchain.
     let tree = fs::canonicalize(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))
         .unwrap_or_else(|error| panic!("{error}"));
     let (_, patch) = manifest
@@ -307,12 +390,32 @@ fn an_application_built_from_a_contract_is_current_and_complete() {
         assert!(patch.contains(&entry), "{entry}");
     }
     assert!(!patch.contains("zeno-fcis-cli "));
-    assert!(read(app.join("Cargo.lock")) == read(tree.join("Cargo.lock")));
+    // Contract apps resolve their own graph offline. Independently parse the
+    // locks and require every external identity to come from the source tree.
+    let lock_check = Command::new("python3")
+        .args([
+            "-c",
+            r#"import pathlib, sys, tomllib
+source, app = [tomllib.loads(pathlib.Path(p).read_text()) for p in sys.argv[1:]]
+def external(lock):
+    return {tuple(p.get(k) for k in ('name', 'version', 'source', 'checksum'))
+            for p in lock['package'] if 'source' in p}
+actual, allowed = external(app), external(source)
+assert actual, 'application lock has no external packages'
+assert actual <= allowed, actual - allowed
+assert any(p['name'] == 'dual-approval-v1' and 'source' not in p for p in app['package'])
+"#,
+        ])
+        .arg(tree.join("Cargo.lock"))
+        .arg(app.join("Cargo.lock"))
+        .output()
+        .unwrap_or_else(|error| panic!("inspect application lock: {error}"));
+    assert!(lock_check.status.success(), "{lock_check:?}");
     assert!(read(app.join("rust-toolchain.toml")) == read(tree.join("rust-toolchain.toml")));
     let readme = String::from_utf8(read(app.join("README.md"))).unwrap_or_default();
     assert!(
         readme
-            .contains("```sh\ncargo test --offline\ncargo run --offline -- NEW_DATABASE_PATH\n```")
+            .contains("```sh\ncargo test --locked --offline\ncargo run --locked --offline -- NEW_DATABASE_PATH\n```")
     );
 
     // An existing application is never overwritten, and a template and a
@@ -366,9 +469,8 @@ fn a_source_tree_that_cannot_bind_the_application_is_refused_writing_nothing() {
         assert_eq!(refused.status.code(), Some(1));
         let stderr = String::from_utf8_lossy(&refused.stderr);
         assert!(stderr.contains(&source.display().to_string()), "{stderr}");
-        // Nothing is written: the directory `new` created stays empty.
-        assert_eq!(fs::read_dir(&app).map(Iterator::count).ok(), Some(0));
-        fs::remove_dir(&app).unwrap_or_else(|error| panic!("{error}"));
+        // Nothing is written, and `new` removes its newly created empty directory.
+        assert!(!app.exists());
     }
     // A template application is bound the same way.
     let refused = Command::new(env!("CARGO_BIN_EXE_zeno-fcis"))
@@ -379,12 +481,7 @@ fn a_source_tree_that_cannot_bind_the_application_is_refused_writing_nothing() {
         .output()
         .unwrap_or_else(|error| panic!("run zeno-fcis: {error}"));
     assert_eq!(refused.status.code(), Some(1));
-    assert_eq!(
-        fs::read_dir(root.path().join("counter"))
-            .map(Iterator::count)
-            .ok(),
-        Some(0)
-    );
+    assert!(!root.path().join("counter").exists());
     // The tree itself, named explicitly, binds as the default does.
     let tree = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let named = root.path().join("named");

@@ -1,0 +1,131 @@
+{
+  "application": "api-quota",
+  "assumptions": [
+    "epoch and authorized are supplied, not a clock attestation or authentication",
+    "quota is the rate-limiter W=1, N=3: with a one-unit window the supplied epoch is the window number",
+    "only the most recent key and payload are remembered",
+    "a service intent records a decision, not that the service ran",
+    "contract compiler, finite enumeration, Rust compiler and SQLite shell remain named trusted boundaries"
+  ],
+  "authority": "none",
+  "components": [
+    {
+      "family": "rate-limiter",
+      "instance": "components/quota/core-instance.json",
+      "instance_sha256": "4983991f253802fb7e932517c4c18ce3f57433e36b8235b7f0c7ec4166060e7d",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "quota",
+      "owns_fields": [
+        110,
+        111
+      ],
+      "parameters": {
+        "N": 3,
+        "W": 1
+      },
+      "source_set_sha256": "a5120ce5e55fb3cdb18f9d89739eb671a7905af2109bc63f9fd257bd1a12a794",
+      "views": {
+        "command": [
+          "150"
+        ],
+        "context": [
+          "epoch",
+          "authorized"
+        ],
+        "state": [
+          "window_start",
+          "used"
+        ]
+      }
+    },
+    {
+      "family": "idempotency-slot",
+      "instance": "components/memo/core-instance.json",
+      "instance_sha256": "248cb5f6e01ddf7a037a43137149ce49c01c4a2e0c64ddb88ef2c6e1c80f4cbe",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "memo",
+      "owns_fields": [
+        112,
+        113,
+        114
+      ],
+      "parameters": {
+        "C": 2
+      },
+      "source_set_sha256": "4d80b0bd5011e48d45e39bec853822b5a17280f5af9bb679528a6364242ebe8b",
+      "views": {
+        "command": [
+          "request_key",
+          "request_payload"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "seen",
+          "last_key",
+          "last_payload"
+        ]
+      }
+    }
+  ],
+  "effects": {
+    "channel": 300,
+    "destination": "service",
+    "max_per_transition": 1,
+    "occurrence": "admit",
+    "owner": "quota",
+    "payload": {
+      "140": "epoch",
+      "141": "request_key",
+      "142": "request_payload"
+    }
+  },
+  "evidence_status": "pending complete actual Authority replay, durable journey, controls and review",
+  "frames": "An exact retry frames every field and emits nothing; the quota is not charged. An admitted request records the memo, then charges one quota unit: a later epoch resets the window to that epoch with used 1.",
+  "input_tuples": 63504,
+  "occurrences": [
+    {
+      "name": "retry",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        }
+      ],
+      "when": "seen && last_key == request_key && last_payload == request_payload"
+    },
+    {
+      "name": "admit",
+      "ordered_steps": [
+        {
+          "command": "Record",
+          "component": "memo"
+        },
+        {
+          "command": "Acquire",
+          "component": "quota"
+        }
+      ],
+      "when": "!(seen && last_key == request_key) && epoch >= window_start"
+    }
+  ],
+  "owner_adoption": false,
+  "preconditions": [
+    "complete coupled-state invariant",
+    "supplied authorization",
+    "epoch not before the current window",
+    "fewer than three charges in the current epoch"
+  ],
+  "profile": "single-client-three-per-epoch-seven-epochs/1",
+  "publication": "one ordinary complete Authority publication and one SQLite transaction; abort-all on technical refusal",
+  "schema": "zeno-fcis/core-application-composition/1",
+  "state_fields": [
+    110,
+    111,
+    112,
+    113,
+    114
+  ],
+  "stateless_components": []
+}

@@ -1,0 +1,141 @@
+{
+  "schema": "zeno-fcis/template-declarative-policy/2",
+  "template": "warehouse-reservation",
+  "roots": {
+    "state": 100,
+    "command": 101,
+    "context": 102
+  },
+  "leaf_bindings": {
+    "103": [
+      "Text",
+      1,
+      32
+    ],
+    "108": [
+      "Bool"
+    ]
+  },
+  "variables": {
+    "available": "pre.100.110",
+    "held": "pre.100.111",
+    "phase": "pre.100.112",
+    "quantity": "pre.100.113",
+    "key": "pre.100.114",
+    "action": "command.101.120",
+    "requested": "command.101.121",
+    "request_key": "command.101.122",
+    "authorized": "context.102.130"
+  },
+  "cases": [
+    {
+      "when": "!((phase == 0 && available == 4 && held == 0 && quantity == 0 && key == 0) || (phase == 1 && quantity >= 1 && held == quantity && available + held == 4) || (phase == 2 && quantity >= 1 && held == 0 && available + quantity == 4))",
+      "class": "Reject",
+      "reason": 204,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "!authorized",
+      "class": "Reject",
+      "reason": 200,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "phase != 0 && request_key == key && requested != quantity",
+      "class": "Reject",
+      "reason": 201,
+      "post": {},
+      "outbox": []
+    },
+    {
+      "when": "action == 150 && phase == 0",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available - requested",
+        "111": "held + requested",
+        "112": 1,
+        "113": "requested",
+        "114": "request_key"
+      },
+      "outbox": []
+    },
+    {
+      "when": "action == 151 && phase == 1 && request_key == key && requested == quantity",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available",
+        "111": "held - quantity",
+        "112": 2,
+        "113": "quantity",
+        "114": "key"
+      },
+      "outbox": [
+        {
+          "ordinal": 0,
+          "channel": 300,
+          "destination": "warehouse",
+          "payload": {
+            "140": "quantity",
+            "141": "key"
+          },
+          "idempotency_ordinal": 0
+        }
+      ]
+    },
+    {
+      "when": "phase != 0 && request_key == key && requested == quantity && (action == 150 || phase == 2)",
+      "class": "Accept",
+      "reason": null,
+      "post": {
+        "110": "available",
+        "111": "held",
+        "112": "phase",
+        "113": "quantity",
+        "114": "key"
+      },
+      "outbox": []
+    },
+    {
+      "when": "true",
+      "class": "Reject",
+      "reason": 202,
+      "post": {},
+      "outbox": []
+    }
+  ],
+  "genesis": {
+    "110": 4,
+    "111": 0,
+    "112": 0,
+    "113": 0,
+    "114": 0
+  },
+  "law_kinds": {
+    "500": "StateInvariant",
+    "501": "AuthoritySubjectRecipient",
+    "502": "DebitCreditEffectEquality",
+    "503": "AssetConservation"
+  },
+  "delivery_laws": {
+    "503": {
+      "max_deliveries": 2,
+      "observations": {
+        "outbox.104": {
+          "channel": 300
+        },
+        "outbox.104.140": {
+          "channel": 300,
+          "field": 140
+        },
+        "outbox.104.141": {
+          "channel": 300,
+          "field": 141
+        }
+      }
+    }
+  }
+}

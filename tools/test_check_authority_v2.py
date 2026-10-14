@@ -13,21 +13,57 @@ import check_authority_v2 as gate
 
 
 class GateTests(unittest.TestCase):
+    def test_before_loop_invariant_keeps_source_and_resource_guards(self):
+        pin=json.loads((gate.ROOT/gate.verifier.PIN).read_text())
+        report={'verus':{'version':pin['version'],'commit':pin['commit'],
+                        'toolchain':pin['rust_toolchain']},'func-details':{},
+                'verification-results':{'success':False,'errors':1,'verified':1,
+                    'encountered-error':True,'encountered-vir-error':False,
+                    'is-verifying-entire-crate':True}}
+        path=Path('policy.rs')
+        raw='error: invariant not satisfied before loop\n --> policy.rs:33:77\nerror: aborting due to 1 previous error\n'
+        proc=subprocess.CompletedProcess([],1,'',raw)
+        self.assertTrue(gate.semantic_refusal(proc,report,path,region=(17,65)))
+        self.assertEqual(proc.stderr,raw)
+        self.assertFalse(gate.semantic_refusal(proc,report,path,region=(40,65)))
+        for text in (raw.replace('policy.rs','unrelated.rs'),
+                     raw.replace('before loop','during an unrelated phase'),
+                     raw+'note: Resource limit (rlimit) exceeded\n'):
+            self.assertFalse(gate.semantic_refusal(
+                subprocess.CompletedProcess([],1,'',text),report,path,region=(17,65)))
+
     def test_solver_exhaustion_does_not_count_as_a_semantic_refusal(self):
-        report = {'verification-results': {'success': False, 'errors': 1,
-                                          'encountered-vir-error': False}}
+        pin = json.loads((gate.ROOT / gate.verifier.PIN).read_text())
+        report = {'verus': {'version': pin['version'], 'commit': pin['commit'],
+                           'toolchain': pin['rust_toolchain']},
+                  'func-details': {},
+                  'verification-results': {'success': False, 'errors': 1, 'verified': 1,
+                                          'encountered-error': True,
+                                          'encountered-vir-error': False,
+                                          'is-verifying-entire-crate': True}}
         path = Path('outcome.rs')
-        for diagnostic in ('Resource limit (rlimit) exceeded', 'timed out', 'out of memory'):
-            proc = subprocess.CompletedProcess([], 1, '', f'outcome.rs:64: {diagnostic}')
-            with self.subTest(diagnostic=diagnostic):
+        diagnostic = ('error: postcondition not satisfied\n --> outcome.rs:64:1\n')
+        summary = 'error: aborting due to 1 previous error\n'
+        for refusal in ('Resource limit (rlimit) exceeded', 'timed out', 'out of memory',
+                        'SMT result UNKNOWN', 'solver returned unknown', 'transport error'):
+            proc = subprocess.CompletedProcess([], 1, '', diagnostic + 'note: ' + refusal + '\n' + summary)
+            with self.subTest(diagnostic=refusal):
                 self.assertFalse(gate.semantic_refusal(proc, report, path))
-        proc = subprocess.CompletedProcess([], 1, '', 'outcome.rs:63: postcondition not satisfied')
+        proc = subprocess.CompletedProcess([], 1, '', diagnostic + summary)
         self.assertTrue(gate.semantic_refusal(proc, report, path))
-        proc = subprocess.CompletedProcess([], 1, '', 'unrelated.rs:63: postcondition not satisfied')
+        proc = subprocess.CompletedProcess([], 1, '', diagnostic.replace('outcome.rs', 'unrelated.rs') + summary)
         self.assertFalse(gate.semantic_refusal(proc, report, path))
         report['verification-results']['encountered-vir-error'] = True
         self.assertFalse(gate.semantic_refusal(
             subprocess.CompletedProcess([], 1, '', 'outcome.rs:64: type error'), report, path))
+
+    def test_each_proof_mutation_has_one_exact_annotated_target(self):
+        controls = gate.mutations()
+        self.assertEqual(set(gate.SEMANTIC_TARGETS),
+                         {name for name, row in controls.items() if row[2] == 'proof'})
+        for name, target in gate.SEMANTIC_TARGETS.items():
+            region = gate.verifier.function_lines(controls[name][1], target)
+            self.assertLess(region[0], region[1], name)
 
     def test_mutations_are_distinct_exact_subjects(self):
         controls = gate.mutations()
@@ -56,7 +92,7 @@ class GateTests(unittest.TestCase):
 
     def test_evaluator_matches_complete_approved_generation(self):
         result = gate.check_generated_sources()
-        self.assertEqual(result['paths'], 90)
+        self.assertEqual(result['paths'], 119)
         self.assertEqual(result['pins'], 3)
         self.assertEqual(result['approved_manifest_sha256'], gate.APPROVED_SOURCE_CLOSURE_SHA256)
 
@@ -92,10 +128,108 @@ class GateTests(unittest.TestCase):
         self.assertFalse(killed)
         self.assertEqual(intended['function'], target)
 
+    def test_unchecked_helper_requires_the_exact_added_native_function(self):
+        target = 'authority_v2::execution_v2::authority::canonical::unchecked_authority_probe'
+        existing = 'authority_v2::execution_v2::authority::canonical::encode'
+        record = {'mode': 'Exec', 'requires': 0, 'ensures': 0}
+        profile = {'functions': {existing: {}}, 'namespace': 'authority_v2::',
+                   'body_covered_functions': [existing]}
+        for actual, expected in (
+            ({existing: {}, target: record}, True),
+            ({existing: {}, target: {**record, 'ensures': 1}}, False),
+            ({existing: {}, target: record, 'authority_v2::unexpected': {}}, False),
+            ({target: record}, False),
+        ):
+            with patch.object(gate, 'require_coverage', side_effect=ValueError(target)), \
+                 patch.object(gate, 'inventory', return_value=actual):
+                self.assertEqual(gate.coverage_control('', profile, 'uncontracted_helper')[0], expected)
+
+    def test_coverage_targets_do_not_depend_on_the_first_refusal_message(self):
+        # Real parser/profile comparisons: descriptor metadata is checked first.
+        namespace = 'authority_v2::'
+        authority = namespace + 'execution_v2::authority::'
+        descriptor = namespace + 'execution_v2::composition::descriptor::'
+        def function(name, *, mode='Exec', ensures='true', body='(42)', params=''):
+            return (f'(Function (Fun :path {name}) :mode {mode} :typ_bounds () '
+                    f':params ({params}) :ret () :require () :ensure ({ensures}) '
+                    f':d () :body {body})')
+        declarations = (function(descriptor + 'DescriptorData::model', mode='Spec',
+                                 ensures='', body='None') +
+                        function(descriptor + 'DescriptorData::project', body='None'))
+        concrete = ''.join(function(descriptor + f'impl&%{index}::{method}',
+                                   mode=mode, ensures='' if mode == 'Spec' else 'true')
+                           for index in (2, 3)
+                           for method, mode in (('model', 'Spec'), ('project', 'Exec')))
+        for name, suffix, field in (
+                ('weak_exact_contract', 'bound::impl&%0::replay', 'ensures_sha256'),
+                ('serialize_before_size_check', 'canonical::encode', 'body_sha256'),
+                ('weak_constructor_contract', 'bound::bind', 'ensures_sha256'),
+                ('unchecked_constructor_bypass', 'bound::bind', 'signature_sha256'),
+                ('uncontracted_helper', 'canonical::unchecked_authority_probe', 'inventory')):
+            target = authority + suffix
+            original = function(authority + 'canonical::encoded_size')
+            if field != 'inventory':
+                original += function(target)
+            positive = declarations + concrete + original
+            raw, _ = gate.descriptor_inventory(positive, namespace, descriptor)
+            bodies = [n for n, row in raw.items() if row['mode'] == 'Exec']
+            records, abstract = gate.descriptor_inventory(positive, namespace, descriptor, tuple(bodies))
+            profile = {'namespace': namespace, 'functions': records,
+                       'abstract_declarations': abstract, 'body_covered_functions': bodies}
+            gate.require_coverage(positive, profile)
+            drift = declarations.replace(':ensure (true)', ':ensure (changed-read-id)') + concrete
+            changed = (function(target, ensures='') if field == 'inventory' else
+                       function(target, **{'ensures_sha256': {'ensures': 'weakened'},
+                                           'body_sha256': {'body': '(43)'},
+                                           'signature_sha256': {'params': 'raw-descriptor'}}[field]))
+            intended = (original + changed if field == 'inventory' else
+                        original.replace(function(target), changed))
+            with self.subTest(control=name):
+                caught, refusal, detail = gate.coverage_control(drift + intended, profile, name)
+                self.assertTrue(caught)
+                self.assertEqual(refusal, 'translated descriptor declarations changed')
+                self.assertEqual((detail['function'], detail['field']), (target, field))
+                # Descriptor drift alone never stands in for the intended change.
+                self.assertFalse(gate.coverage_control(drift + original, profile, name)[0])
+                self.assertFalse(gate.coverage_control(positive, profile, name)[0])
+                extra = function(authority + 'unrelated')
+                self.assertFalse(gate.coverage_control(drift + intended + extra, profile, name)[0])
+                missing = intended.replace(function(authority + 'canonical::encoded_size'), '')
+                self.assertFalse(gate.coverage_control(drift + missing, profile, name)[0])
+                if field != 'inventory':
+                    wrong_field = ('body_sha256' if field != 'body_sha256' else 'ensures_sha256')
+                    wrong = function(target, **{'body_sha256': {'body': '(43)'},
+                                               'ensures_sha256': {'ensures': 'wrong'}}[wrong_field])
+                    self.assertFalse(gate.coverage_control(
+                        drift + original.replace(function(target), wrong), profile, name)[0])
+                if name == 'serialize_before_size_check':
+                    for altered in (changed.replace(':ensure (true)', ':ensure (weakened)'),
+                                    changed.replace(':require ()', ':require (narrowed)'),
+                                    changed.replace(':params ()', ':params (different)')):
+                        self.assertFalse(gate.coverage_control(
+                            drift + original.replace(function(target), altered), profile, name)[0])
+
+    def test_late_size_check_control_preserves_complete_allocation_statements(self):
+        source = (gate.ROOT / gate.CANONICAL).read_text()
+        path, changed, expected, native = gate.mutations()['serialize_before_size_check']
+        self.assertEqual((path, expected, native), (gate.CANONICAL, 'coverage', False))
+        # The production allocation now uses the checked size. The late-check
+        # specimen must remove the whole binding and use an independent vector.
+        original = ('let size = encoded_size(parts)?;\n'
+                    '    let mut out = Vec::with_capacity(size);')
+        expected_source = source.replace(original, 'let mut out = Vec::new();', 1)
+        expected_source = expected_source.replace('model::length(parts@,parts@.len())<=usize::MAX,', '', 1)
+        expected_source = expected_source.replace('    Some(out)', '    encoded_size(parts)?;\n    Some(out)', 1)
+        self.assertEqual(changed, expected_source)
+        self.assertEqual(changed.count('encoded_size(parts)?;'), 1)
+        self.assertNotIn('let size =', changed)
+        self.assertLess(changed.index('while i < parts.len()', changed.index('pub fn encode(')),
+                        changed.index('encoded_size(parts)?;'))
+
     def test_unchecked_bypass_changes_only_its_proof_aid_and_keeps_the_bypass(self):
         bound = (gate.ROOT / gate.BOUND).read_text()
-        start = bound.rfind('#[cfg_attr', 0, bound.index("pub fn bind<'p>"))
-        end = bound.index("\n\nimpl<'p> Authority<'p>", start)
+        start = bound.rfind('#[cfg_attr', 0, bound.index("pub fn bind<'p, D:"))
+        end = bound.index("\n\nimpl<'p, D:", start)
         path, changed, expected, native = gate.mutations()['unchecked_constructor_bypass']
         self.assertEqual((path, expected, native), (gate.BOUND, 'coverage', False))
         self.assertTrue(changed.startswith(bound[:start]) and changed.endswith(bound[end:]))
@@ -115,8 +249,8 @@ class GateTests(unittest.TestCase):
         # No assumption, admitted obligation, trusted body, axiom or verifier attribute.
         for escape in (r'\bassume\s*\(', r'\badmit\s*\(', r'\bexternal_(?:body|fn)', r'\baxiom', r'#\[\s*verifier'):
             self.assertIsNone(re.search(escape, replacement), escape)
-        # Reverting only the typed binding and checked assertion reproduces the retained
-        # failed hosted mutant (run 37404295156), so nothing else changed.
+        # The historical raw constructor remains byte-identical. The surrounding
+        # source now uses the closed generic family, and is checked separately above.
         aid = ("    let channel_roots:&[(u32,u32,u32)]=&[];\n"
                "    #[cfg(verus_keep_ghost)]proof!{reveal(Authority::view);"
                "assert(channel_roots@=~=Seq::<(u32,u32,u32)>::empty());}\n"
@@ -124,8 +258,9 @@ class GateTests(unittest.TestCase):
         retained = changed.replace(aid, "    #[cfg(verus_keep_ghost)]proof!{reveal(Authority::view);}\n"
                                         "    Ok(Authority{core,framing,identity,channel_roots:&[]})")
         self.assertEqual(changed.count(aid), 1)
-        self.assertEqual(hashlib.sha256(retained.encode()).hexdigest(),
-                         '4f6705b0a12737af9928bc8604e9fd1b52ebfc2101e2c2a8ecd3b7374e373bed')
+        retained_constructor = retained[start:len(retained) - len(bound) + end]
+        self.assertEqual(hashlib.sha256(retained_constructor.encode()).hexdigest(),
+                         '9860ba879db2c61d6571450fe32c43670ce63c1278b2c8a1cc2f70cc3ad8886c')
 
     def test_unrelated_refusal_cannot_satisfy_the_bypass_coverage_control(self):
         prefix = 'authority_v2::execution_v2::authority::'

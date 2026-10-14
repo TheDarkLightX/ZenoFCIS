@@ -21,18 +21,40 @@ pub struct Outcome<'a> {
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures match result{Ok(c)=>descriptor_admitted(descriptor)&&c.descriptor_view()==descriptor,Err(e)=>!descriptor_admitted(descriptor)&&e==Failure::Metadata},))]
 pub fn bind<'p>(descriptor: &'p Descriptor<'p>) -> Result<BoundCore<'p>, Failure> {
     #[cfg(verus_keep_ghost)]
-    proof! {reveal(BoundCore::descriptor_view);reveal(descriptor_admitted);}
-    if !admission::admitted(descriptor) {
+    proof! {reveal(BoundCore::descriptor_view);reveal(descriptor_admitted);reveal(<Descriptor as DescriptorData>::model);super::descriptor::legacy_admitted(descriptor);}
+    if !descriptor.project().admit() {
         return Err(Failure::Metadata);
     }
     Ok(BoundCore { descriptor })
+}
+/// Admit every declaration of a full-width numeric descriptor.
+/// The bound composition data does not itself grant publication authority.
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures match result{Ok(c)=>numeric_descriptor_admitted(descriptor)&&c.descriptor_view()==descriptor,Err(e)=>!numeric_descriptor_admitted(descriptor)&&e==Failure::Metadata},))]
+pub fn bind_numeric<'p>(
+    descriptor: &'p NumericDescriptor<'p>,
+) -> Result<BoundCore<'p, NumericDescriptor<'p>>, Failure> {
+    #[cfg(verus_keep_ghost)]
+    proof! {reveal(BoundCore::descriptor_view);reveal(numeric_descriptor_admitted);reveal(<NumericDescriptor as DescriptorData>::model);super::descriptor::numeric_admitted(descriptor);}
+    if !descriptor.project().admit() {
+        return Err(Failure::Metadata);
+    }
+    Ok(BoundCore { descriptor })
+}
+impl<'p> BoundCore<'p, NumericDescriptor<'p>> {
+    /// Same actual descriptor reference with complete numeric admission.
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.descriptor_view(),numeric_descriptor_admitted(result),))]
+    pub fn descriptor(&self) -> &'p NumericDescriptor<'p> {
+        #[cfg(verus_keep_ghost)]
+        proof! {use_type_invariant(self);reveal(BoundCore::descriptor_view);reveal(numeric_descriptor_admitted);reveal(<NumericDescriptor as DescriptorData>::model);super::descriptor::numeric_admitted(self.descriptor);}
+        self.descriptor
+    }
 }
 impl<'p> BoundCore<'p> {
     /// Exact immutable bound fields for descriptor identity and independent inspection.
     #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.descriptor_view(),descriptor_admitted(result),))]
     pub fn descriptor(&self) -> &'p Descriptor<'p> {
         #[cfg(verus_keep_ghost)]
-        proof! {use_type_invariant(self);reveal(BoundCore::descriptor_view);reveal(descriptor_admitted);}
+        proof! {use_type_invariant(self);reveal(BoundCore::descriptor_view);reveal(descriptor_admitted);reveal(<Descriptor as DescriptorData>::model);super::descriptor::legacy_admitted(self.descriptor);}
         self.descriptor
     }
     /// Admit originals, execute the graph, construct the complete candidate and evaluate every applicable law.
@@ -42,35 +64,13 @@ impl<'p> BoundCore<'p> {
             (result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),
         result.kind_view()==Kind::Transition,))]
     pub fn execute<'a>(&'a self, raw: Raw<'a>) -> Outcome<'a> {
+        let result = self.execute_family(Kind::Transition, raw);
         #[cfg(verus_keep_ghost)]
-        proof! {reveal(BoundCore::descriptor_view);reveal(Outcome::view);reveal(Outcome::kind_view);reveal(Limits::view);reveal(Usage::view);reveal(execution);}
-        let mut meter = super::super::meter::new(self.descriptor.limits);
-        let mut trace = producer::Trace {
-            reads: Vec::new(),
-            attempts: Vec::new(),
-            ingress: None,
-            decision: None,
-        };
-        let mut diagnostics = Vec::new();
-        let mut law_reads = Vec::new();
-        let result = run(
-            self,
-            Kind::Transition,
-            raw,
-            &mut meter,
-            &mut trace,
-            &mut diagnostics,
-            &mut law_reads,
-        );
-        Outcome {
-            kind: Kind::Transition,
-            result,
-            raw,
-            trace,
-            usage: meter.used,
-            diagnostics,
-            law_reads,
-        }
+        proof! {reveal(BoundCore::descriptor_view);reveal(Outcome::view);reveal(Outcome::kind_view);reveal(Limits::view);reveal(Usage::view);
+        shared::spec::legacy_execution(self.descriptor_view(),Kind::Transition,raw,
+        self.descriptor.limits.view(),Seq::new(8,|_:int|0u64),(Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),
+        (result.view().0,result.view().3,result.view().2,result.view().4,result.view().5));}
+        result
     }
     /// Check the actual initial state, with no invented command or context.
     /// A passing genesis yields the unchanged identity candidate.
@@ -80,40 +80,20 @@ impl<'p> BoundCore<'p> {
             (result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),
         result.kind_view()==Kind::Genesis,))]
     pub fn genesis<'a>(&'a self, initial: &'a [u8]) -> Outcome<'a> {
-        #[cfg(verus_keep_ghost)]
-        proof! {reveal(BoundCore::descriptor_view);reveal(Outcome::view);reveal(Outcome::kind_view);reveal(Limits::view);reveal(Usage::view);reveal(genesis_execution);}
-        let mut meter = super::super::meter::new(self.descriptor.limits);
-        let mut trace = producer::Trace {
-            reads: Vec::new(),
-            attempts: Vec::new(),
-            ingress: None,
-            decision: None,
-        };
-        let mut diagnostics = Vec::new();
-        let mut law_reads = Vec::new();
-        let raw = Raw {
-            state: initial,
-            command: &[],
-            context: &[],
-        };
-        let result = run(
-            self,
+        let result = self.execute_family(
             Kind::Genesis,
-            raw,
-            &mut meter,
-            &mut trace,
-            &mut diagnostics,
-            &mut law_reads,
+            Raw {
+                state: initial,
+                command: &[],
+                context: &[],
+            },
         );
-        Outcome {
-            kind: Kind::Genesis,
-            result,
-            raw,
-            trace,
-            usage: meter.used,
-            diagnostics,
-            law_reads,
-        }
+        #[cfg(verus_keep_ghost)]
+        proof! {reveal(BoundCore::descriptor_view);reveal(Outcome::view);reveal(Outcome::kind_view);reveal(Limits::view);reveal(Usage::view);
+        shared::spec::legacy_execution(self.descriptor_view(),Kind::Genesis,Raw{state:initial,command:&[],context:&[]},
+        self.descriptor.limits.view(),Seq::new(8,|_:int|0u64),(Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),
+        (result.view().0,result.view().3,result.view().2,result.view().4,result.view().5));}
+        result
     }
 }
 impl<'a> Outcome<'a> {
@@ -197,6 +177,7 @@ impl<'a> Outcome<'a> {
 #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures final(meter).limits==old(meter).limits,
     super::spec::evaluated(core.descriptor_view(),kind,raw,old(meter).limits.counters@,old(meter).used.counters@,producer::spec::trace(old(trace)),old(diagnostics)@,old(law_reads)@,
         ((match result{Ok(c)=>Ok(decision::spec::candidate_view(c)),Err(e)=>Err(e)}),final(meter).used.counters@,producer::spec::trace(final(trace)),final(diagnostics)@,final(law_reads)@)),))]
+#[cfg(any(test, verus_keep_ghost))]
 pub(super) fn run<'a>(
     core: &BoundCore<'a>,
     kind: Kind,
@@ -206,156 +187,89 @@ pub(super) fn run<'a>(
     diagnostics: &mut Vec<laws::Diagnostic>,
     law_reads: &mut Vec<laws::ReadAttempt>,
 ) -> Result<Candidate<'a>, Failure> {
-    match kind {
-        Kind::Genesis => genesis_run(core, raw.state, meter, trace, diagnostics, law_reads),
-        Kind::Transition => transition_run(core, raw, meter, trace, diagnostics, law_reads),
+    #[cfg(verus_keep_ghost)]
+    proof! {use_type_invariant(core);reveal(BoundCore::descriptor_view);}
+    let result = shared::run(core, kind, raw, meter, trace, diagnostics, law_reads);
+    #[cfg(verus_keep_ghost)]
+    proof! {shared::spec::legacy_execution(core.descriptor_view(),kind,raw,
+    old(meter).limits.counters@,old(meter).used.counters@,producer::spec::trace(old(trace)),old(diagnostics)@,old(law_reads)@,
+    ((match &result{Ok(c)=>Ok(decision::spec::candidate_view(*c)),Err(e)=>Err(*e)}),meter.used.counters@,producer::spec::trace(trace),diagnostics@,law_reads@));}
+    result
+}
+
+impl<'p, D: DescriptorData<'p> + 'p> BoundCore<'p, D> {
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result.kind_view()==kind,result.view().1==raw_view(raw),
+        shared::spec::evaluated(&self.descriptor_view().model(),kind,raw,descriptor::spec::limits(&self.descriptor_view().model()).view(),Seq::new(8,|_:int|0u64),
+        (Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),(result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),))]
+    pub(crate) fn execute_family<'a>(&'a self, kind: Kind, raw: Raw<'a>) -> Outcome<'a> {
+        let d = self.descriptor.project();
+        let mut meter = super::super::meter::new(d.limits());
+        let mut trace = producer::Trace {
+            reads: Vec::new(),
+            attempts: Vec::new(),
+            ingress: None,
+            decision: None,
+        };
+        let mut diagnostics = Vec::new();
+        let mut law_reads = Vec::new();
+        let result = shared::run(
+            self,
+            kind,
+            raw,
+            &mut meter,
+            &mut trace,
+            &mut diagnostics,
+            &mut law_reads,
+        );
+        Outcome {
+            kind,
+            result,
+            raw,
+            trace,
+            usage: meter.used,
+            diagnostics,
+            law_reads,
+        }
+    }
+}
+impl<'p> BoundCore<'p, NumericDescriptor<'p>> {
+    /// Evaluate the actual full-width numeric descriptor through the shared composition pipeline.
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result.kind_view()==Kind::Transition,result.view().1==raw_view(raw),
+        numeric_execution(self.descriptor_view(),raw,self.descriptor_view().limits.view(),Seq::new(8,|_:int|0u64),
+        (Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),(result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),))]
+    pub fn execute<'a>(&'a self, raw: Raw<'a>) -> Outcome<'a> {
+        self.execute_family(Kind::Transition, raw)
+    }
+    /// Check the original numeric state and applicable initial laws on the same meter.
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result.kind_view()==Kind::Genesis,result.view().1==(initial@,Seq::<u8>::empty(),Seq::<u8>::empty()),
+        numeric_genesis(self.descriptor_view(),initial@,self.descriptor_view().limits.view(),Seq::new(8,|_:int|0u64),
+        (Seq::empty(),Seq::empty(),None,None),Seq::empty(),Seq::empty(),(result.view().0,result.view().3,result.view().2,result.view().4,result.view().5)),))]
+    pub fn genesis<'a>(&'a self, initial: &'a [u8]) -> Outcome<'a> {
+        self.execute_family(
+            Kind::Genesis,
+            Raw {
+                state: initial,
+                command: &[],
+                context: &[],
+            },
+        )
     }
 }
 
-#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures final(meter).limits==old(meter).limits,
-    super::spec::execution(core.descriptor_view(),raw,old(meter).limits.counters@,old(meter).used.counters@,producer::spec::trace(old(trace)),old(diagnostics)@,old(law_reads)@,
-        ((match result{Ok(c)=>Ok(decision::spec::candidate_view(c)),Err(e)=>Err(e)}),final(meter).used.counters@,producer::spec::trace(final(trace)),final(diagnostics)@,final(law_reads)@)),))]
-fn transition_run<'a>(
-    core: &BoundCore<'a>,
-    raw: Raw<'a>,
-    meter: &mut Meter,
-    trace: &mut producer::Trace,
-    diagnostics: &mut Vec<laws::Diagnostic>,
-    law_reads: &mut Vec<laws::ReadAttempt>,
-) -> Result<Candidate<'a>, Failure> {
-    let d = core.descriptor;
-    #[cfg(verus_keep_ghost)]
-    proof! {use_type_invariant(core);reveal(BoundCore::descriptor_view);}
-    let produced = producer::produce(core, raw, meter, trace)?;
-    #[cfg(verus_keep_ghost)]
-    proof_decl! {let ghost middle=(Ok::<producer::spec::ProducedView,Failure>(producer::spec::produced(produced)),meter.used.counters@,producer::spec::trace(trace));}
-    if !schema_validation::candidate(d, &produced.candidate) {
-        #[cfg(verus_keep_ghost)]
-        proof! {assert(super::spec::after_producer(d,middle,old(diagnostics)@,old(law_reads)@,old(meter).limits.counters@,(Err(Failure::Schema),meter.used.counters@,producer::spec::trace(trace),diagnostics@,law_reads@)));}
-        return Err(Failure::Schema);
+#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures match result{Ok(c)=>descriptor.model().admitted()&&c.descriptor_view()==descriptor,Err(e)=>!descriptor.model().admitted()&&e==Failure::Metadata},))]
+pub(crate) fn bind_family<'p, D: DescriptorData<'p> + 'p>(
+    descriptor: &'p D,
+) -> Result<BoundCore<'p, D>, Failure> {
+    if !descriptor.project().admit() {
+        return Err(Failure::Metadata);
     }
-    let candidate = laws::Candidate {
-        class: produced.candidate.class(),
-        reason: produced.candidate.reason(),
-        post: decision::RootView::Record(produced.candidate.post()),
-        patch: produced.candidate.patch(),
-        effects: produced.candidate.effects(),
-        outbox: produced.candidate.outbox(),
-        reads: &trace.reads,
-        attempts: &trace.attempts,
-        usage: meter.used,
-    };
-    let frame = laws::Frame::Transition {
-        pre: decision::RootView::Record(produced.candidate.pre()),
-        command: producer::value(&produced.command),
-        context: producer::value(&produced.context),
-        candidate: &candidate,
-    };
-    #[cfg(verus_keep_ghost)]
-    proof_decl! {let ghost law_limits=meter.limits.counters@;let ghost law_used=meter.used.counters@;
-    let ghost prior_diags=diagnostics@;let ghost prior_reads=law_reads@;}
-    let result = laws::evaluate_into(d.laws, d.required, &frame, meter, diagnostics, law_reads);
-    #[cfg(verus_keep_ghost)]
-    proof! {
-        reveal(Usage::view);
-        assert(law_used==middle.1);
-        assert(producer::spec::trace(trace)==middle.2);
-        let ghost p=producer::spec::produced(produced);
-        let ghost t=producer::spec::trace(trace);
-        assert(super::spec::transition_frame(&frame,p,t,law_used));
-        assert((result,meter.used.counters@,diagnostics@,law_reads@)==laws::law_execution(d.laws@,d.required@,&frame,law_limits,law_used,prior_diags,prior_reads));
-        assert(super::spec::frame_evaluated(d,p,t,law_used,law_limits,prior_diags,prior_reads,(result,meter.used.counters@,diagnostics@,law_reads@)));
-        assert(exists|r:Result<(),laws::Failure>|super::spec::frame_evaluated(d,p,t,law_used,law_limits,prior_diags,prior_reads,(r,meter.used.counters@,diagnostics@,law_reads@)));
-        assert(super::spec::after_producer(d,middle,old(diagnostics)@,old(law_reads)@,old(meter).limits.counters@,
-            ((match result{Ok(())=>Ok(p.0),Err(e)=>Err(Failure::Law(e))}),meter.used.counters@,t,diagnostics@,law_reads@)));
-    }
-    match result {
-        Ok(()) => Ok(produced.candidate),
-        Err(e) => Err(Failure::Law(e)),
-    }
+    Ok(BoundCore { descriptor })
 }
-#[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures final(meter).limits==old(meter).limits,
-    super::spec::genesis(core.descriptor_view(),initial@,old(meter).limits.counters@,old(meter).used.counters@,producer::spec::trace(old(trace)),old(diagnostics)@,old(law_reads)@,
-        ((match result{Ok(c)=>Ok(decision::spec::candidate_view(c)),Err(e)=>Err(e)}),final(meter).used.counters@,producer::spec::trace(final(trace)),final(diagnostics)@,final(law_reads)@)),))]
-fn genesis_run<'i>(
-    core: &BoundCore<'i>,
-    initial: &'i [u8],
-    meter: &mut Meter,
-    trace: &mut producer::Trace,
-    diagnostics: &mut Vec<laws::Diagnostic>,
-    law_reads: &mut Vec<laws::ReadAttempt>,
-) -> Result<Candidate<'i>, Failure> {
-    let d = core.descriptor;
-    #[cfg(verus_keep_ghost)]
-    proof! {use_type_invariant(core);reveal(BoundCore::descriptor_view);}
-    let decoded = match ingress::project(initial, d.state, 0, meter, &mut trace.reads) {
-        Ok(v) => v,
-        Err(e) => return Err(Failure::Ingress(0, e)),
-    };
-    #[cfg(verus_keep_ghost)]
-    proof! {reveal(Usage::view);}
-    trace.ingress = Some(meter.used);
-    let frame = laws::Frame::Genesis {
-        initial: producer::value(&decoded.value),
-    };
-    #[cfg(verus_keep_ghost)]
-    proof_decl! {let ghost law_limits=meter.limits.counters@;let ghost law_used=meter.used.counters@;
-    let ghost prior_diags=diagnostics@;let ghost prior_reads=law_reads@;}
-    let result = laws::evaluate_into(d.laws, d.required, &frame, meter, diagnostics, law_reads);
-    #[cfg(verus_keep_ghost)]
-    proof! {
-        reveal(Usage::view);
-        let ghost s=ingress::spec::decoded(decoded);
-        let ghost p=ingress::spec::project(initial@,d.state,0,old(meter).limits.counters@,old(meter).used.counters@);
-        let ghost t=producer::spec::trace(old(trace));
-        assert(p.0==Ok::<(ingress::spec::ValueView,Seq<i64>),ingress::Failure>(s));
-        assert(law_limits==old(meter).limits.counters@&&law_used==p.1);
-        assert(prior_diags==old(diagnostics)@&&prior_reads==old(law_reads)@);
-        assert(trace.reads@==t.0+p.2&&trace.attempts@==t.1);
-        assert(producer::spec::optional_usage(trace.ingress)==Some(p.1));
-        assert(producer::spec::optional_usage(trace.decision)==t.3);
-        assert(producer::spec::trace(trace)==(t.0+p.2,t.1,Some(p.1),t.3));
-        assert(super::spec::genesis_frame(&frame,s.0));
-        assert((result,meter.used.counters@,diagnostics@,law_reads@)==laws::law_execution(d.laws@,d.required@,&frame,law_limits,law_used,prior_diags,prior_reads));
-        assert(super::spec::genesis_evaluated(d,s.0,law_limits,law_used,prior_diags,prior_reads,(result,meter.used.counters@,diagnostics@,law_reads@)));
-        assert(exists|r:Result<(),laws::Failure>|super::spec::genesis_evaluated(d,s.0,law_limits,law_used,prior_diags,prior_reads,(r,meter.used.counters@,diagnostics@,law_reads@)));
-        assert(admission::spec::admitted(d));
-        let ghost finished=((match result{Ok(())=>Ok::<decision::spec::CandidateView,Failure>(super::spec::identity_candidate(s.0)),Err(e)=>Err(Failure::Law(e))}),meter.used.counters@,producer::spec::trace(trace),diagnostics@,law_reads@);
-        assert(exists|r:Result<(),laws::Failure>|
-            super::spec::genesis_evaluated(d,s.0,law_limits,law_used,prior_diags,prior_reads,(r,finished.1,finished.3,finished.4))
-            &&finished.0==(match r{Ok(())=>Ok(super::spec::identity_candidate(s.0)),Err(e)=>Err(Failure::Law(e))})
-            &&finished.2==(t.0+p.2,t.1,Some(p.1),t.3));
-        assert(exists|r:Result<(),laws::Failure>|
-            super::spec::genesis_evaluated(d,s.0,old(meter).limits.counters@,p.1,old(diagnostics)@,old(law_reads)@,(r,finished.1,finished.3,finished.4))
-            &&finished.0==(match r{Ok(())=>Ok(super::spec::identity_candidate(s.0)),Err(e)=>Err(Failure::Law(e))})
-            &&finished.2==(t.0+p.2,t.1,Some(p.1),t.3));
-        assert(super::spec::genesis(d,initial@,old(meter).limits.counters@,old(meter).used.counters@,t,old(diagnostics)@,old(law_reads)@,finished)) by {
-            reveal(super::spec::genesis);
-            match p.0 {
-                Ok(projected) => {
-                    assert(projected == s);
-                    assert(exists|r:Result<(),laws::Failure>|
-                        super::spec::genesis_evaluated(d,projected.0,old(meter).limits.counters@,p.1,old(diagnostics)@,old(law_reads)@,(r,finished.1,finished.3,finished.4))
-                        &&finished.0==(match r{Ok(())=>Ok(super::spec::identity_candidate(s.0)),Err(e)=>Err(Failure::Law(e))})
-                        &&finished.2==(t.0+p.2,t.1,Some(p.1),t.3));
-                }
-                Err(_) => { assert(false); }
-            }
-        }
-    }
-    match result {
-        Ok(()) => {
-            #[cfg(verus_keep_ghost)]
-            proof_decl! {let ghost s=ingress::spec::decoded(decoded);}
-            let fields = match decoded.value {
-                ingress::Value::Record(fields) => fields,
-                ingress::Value::Leaf(_) => Vec::new(),
-            };
-            let candidate = decision::identity(fields);
-            #[cfg(verus_keep_ghost)]
-            proof! {assert(decision::spec::candidate_view(candidate)==super::spec::identity_candidate(s.0));}
-            Ok(candidate)
-        }
-        Err(e) => Err(Failure::Law(e)),
+impl<'p, D: DescriptorData<'p> + 'p> BoundCore<'p, D> {
+    #[cfg_attr(verus_keep_ghost,verus_spec(result=>ensures result==self.descriptor_view(),result.model().admitted(),))]
+    pub(crate) fn descriptor_data(&self) -> &'p D {
+        #[cfg(verus_keep_ghost)]
+        proof! {use_type_invariant(self);reveal(BoundCore::descriptor_view);}
+        self.descriptor
     }
 }

@@ -1,0 +1,57 @@
+{
+  "authority": "none",
+  "examples_provenance": "independent Root reference from public semantics; not owner labels",
+  "family": "versioned-register",
+  "family_theorem": null,
+  "finite_family_certificate": {
+    "claim_after_replay": "Proved",
+    "evidence_level": "Identified",
+    "path": "core-components/proofs/versioned-register.json",
+    "replay": "python3 tools/prove_core_families.py replay --cli CLI --work-dir NEW_DIR",
+    "replay_required": true,
+    "scope": "closed finite family",
+    "sha256": "af02d6f67c19330a211f6d1322e71617c9747d04dd69b53c1a9d84eab1023420"
+  },
+  "input_domains": [
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      1
+    ]
+  ],
+  "input_tuples": 162,
+  "owner_adoption": false,
+  "parameter_range_evidence": "Identified",
+  "parameters": {
+    "C": 2
+  },
+  "schema": "zeno-fcis/core-seed-instance/1",
+  "source_set_sha256": "463a813825e18c9c592e19e79dbc5dcfbbc0d3183e5298551b832395e751cd5b",
+  "source_sha256": {
+    "examples/c2.txt": "bb58da4965fa0f5d1e80bf9ffe7c19de02158b85749a0b185b913504bd161be6",
+    "family.json": "f7457b884f7117ec61d545fd72cdafc06b68f43cdaf1b4d4aebbc77db7df6542",
+    "policy.json.in": "36cab3b64fe21d3ee97c2756bee59a8185b04e6f4187588beab740b54ffd3a53",
+    "project.zeno.in": "606eed09c7cd8d6eb34775bf53b25e012c03e075ca39c342e6b9af7fe6a497ef"
+  },
+  "state_tuples": 9,
+  "version": 1
+}

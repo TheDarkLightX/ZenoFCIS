@@ -2,7 +2,6 @@
 use serde_json::{Value, json};
 use zeno_fcis_synthesis::finite::{V2Limits, V2Resource, v2_laws as l, v2_zero_limits};
 
-use super::*;
 use crate::contract::review::{
     domain,
     evaluate::{self, Framer, Outcome},
@@ -10,6 +9,10 @@ use crate::contract::review::{
 use crate::contract::{
     self, ContractSources, expr, model::Contract, policy, schema, schema_commitment,
 };
+use zeno_fcis_contract::internals::declarations::Declarations;
+use zeno_fcis_contract::internals::delivery::bind;
+use zeno_fcis_contract::internals::graph::{Graph, Kind, LawGraph, Op};
+use zeno_fcis_contract::internals::rules::Rules;
 
 const PROJECT: &str = include_str!("../../../tests/fixtures/escrow/project.zeno");
 const RULES: &str = include_str!("../../../tests/fixtures/escrow/v2/policy.json");

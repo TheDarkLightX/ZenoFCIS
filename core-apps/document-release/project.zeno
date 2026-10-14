@@ -1,0 +1,54 @@
+zeno 1;
+project 1 document_release;
+namespace 2 core_apps;
+type 100 state Document;
+type 101 command DocumentCommand;
+type 102 context Reviewer;
+type 103 destination Publisher;
+type 104 payload Release;
+type 105 int Tag in 0..=2;
+type 106 int Phase in 0..=2;
+type 107 int PrincipalId in 0..=2;
+type 108 bool Flag;
+type 109 data Action;
+field 110 100 content 105;
+field 111 100 version 105;
+field 112 100 phase 106;
+field 113 100 vote0 108;
+field 114 100 vote1 108;
+field 115 100 vote2 108;
+field 120 101 action 109;
+field 121 101 expected_version 105;
+field 122 101 new_content 105;
+field 130 102 principal 107;
+field 131 102 authorized 108;
+field 140 104 released_content 105;
+field 141 104 released_version 105;
+variant 160 109 Edit none;
+variant 161 109 Submit none;
+variant 162 109 Approve none;
+variant 163 109 Release none;
+reason 204 invalid_coupled_state precedence 0;
+reason 200 not_authorized precedence 1;
+reason 202 wrong_phase precedence 2;
+reason 205 stale_version precedence 3;
+reason 206 version_limit precedence 4;
+reason 201 duplicate_vote precedence 5;
+reason 203 missing_quorum precedence 6;
+channel 300 release destination 103 payload 104;
+// One physical component publishes the complete application atomically.
+// composition.json pins register and review ownership, views and occurrences.
+component 400 document_release {
+  owns 100;
+  reads pre.100;
+  writes post.100;
+  contexts context.102;
+  outbox outbox.300;
+  budget steps 64;
+}
+merge [400];
+law 500 versions_and_review_agree on commit, genesis = (post.100.111 == 0 -> post.100.110 == 0) && (post.100.112 == 0 -> post.100.113 + post.100.114 + post.100.115 == 0) && (post.100.112 == 2 -> post.100.113 + post.100.114 + post.100.115 >= 2);
+law 501 authorized_current_version on accept = context.102.131 == 1 && (command.101.120 != 162 -> command.101.121 == pre.100.111);
+law 502 locked_review_lifecycle on accept = (pre.100.112 != 0 -> post.100.110 == pre.100.110 && post.100.111 == pre.100.111) && (command.101.120 == 160 -> pre.100.112 == 0 && post.100.112 == 0 && post.100.110 == command.101.122 && post.100.111 == pre.100.111 + 1) && (command.101.120 == 161 -> pre.100.112 == 0 && post.100.112 == 1 && post.100.110 == pre.100.110 && post.100.111 == pre.100.111) && (command.101.120 == 162 -> pre.100.112 == 1 && post.100.112 == 1) && (command.101.120 == 163 -> (pre.100.112 == 1 || pre.100.112 == 2) && post.100.112 == 2);
+law 503 release_equals_reviewed_revision on commit = outbox.104 <= 1 && (pre.100.112 == 1 && post.100.112 == 2 -> outbox.104 == 1 && outbox.104.140 == post.100.110 && outbox.104.141 == post.100.111 && post.100.110 == pre.100.110 && post.100.111 == pre.100.111) && (!(pre.100.112 == 1 && post.100.112 == 2) -> outbox.104 == 0 && outbox.104.140 == 0 && outbox.104.141 == 0);
+law 504 votes_conserved on accept = ((command.101.120 == 160 || command.101.120 == 163) -> post.100.113 == pre.100.113 && post.100.114 == pre.100.114 && post.100.115 == pre.100.115) && (command.101.120 == 161 -> post.100.113 + post.100.114 + post.100.115 == 0) && (command.101.120 == 162 -> post.100.113 + post.100.114 + post.100.115 == pre.100.113 + pre.100.114 + pre.100.115 + 1 && (context.102.130 == 0 -> pre.100.113 == 0 && post.100.113 == 1 && post.100.114 == pre.100.114 && post.100.115 == pre.100.115) && (context.102.130 == 1 -> pre.100.114 == 0 && post.100.114 == 1 && post.100.113 == pre.100.113 && post.100.115 == pre.100.115) && (context.102.130 == 2 -> pre.100.115 == 0 && post.100.115 == 1 && post.100.113 == pre.100.113 && post.100.114 == pre.100.114));

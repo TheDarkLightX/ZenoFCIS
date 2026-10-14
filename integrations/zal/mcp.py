@@ -91,9 +91,13 @@ class Bridge:
             if name == "zal_help":
                 return help_topic(session.model, arguments["topic"], checker_identity())
             if name == "zal_trace":
-                return {"revision": revision, "trace": replay(session.model, arguments["inputs"])}
+                trace = replay(session.model, arguments["inputs"])
+                return {"revision": revision, "trace": trace,
+                        "supplied_assumptions": {"steps": [row["supplied_assumptions"] for row in trace]},
+                        "authenticated_facts": []}
             if name == "zal_compare":
-                return semantic_diff(session.model, parse(arguments["surface"], arguments["syntax"]))
+                candidate = parse(arguments["surface"], arguments["syntax"])
+                return {**semantic_diff(session.model, candidate), "owner_examples": session.example_comparison(candidate)}
             session.agent_act({"act": "propose", **arguments})
             return session.view()
         return self.workspace.use(action)

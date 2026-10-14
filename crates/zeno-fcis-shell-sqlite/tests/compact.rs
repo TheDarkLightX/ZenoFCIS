@@ -8,10 +8,9 @@ use zeno_fcis_codec::{CanonicalEncode, DecodeLimits, Envelope, Hash32, commitmen
 use zeno_fcis_crypto::RustCryptoSha256;
 use zeno_fcis_plan::OutboxEntry;
 use zeno_fcis_shell::{CommitStatus, MemoryDestination};
-use zeno_fcis_shell_sqlite::{
-    CrashPoint,
-    v2::{Error, V2SqliteShell, compact_publication, expand_publication},
-};
+#[cfg(feature = "crash-injection")]
+use zeno_fcis_shell_sqlite::CrashPoint;
+use zeno_fcis_shell_sqlite::v2::{Error, V2SqliteShell, compact_publication, expand_publication};
 use zeno_fcis_synthesis::finite::{
     V2Resource as Resource,
     canonical_v2::schema,
@@ -269,13 +268,13 @@ fn all_original_216_outputs_and_all_68_exact_and_one_under_aggregates() {
                                     assert_eq!(sizes.receipt, bundle.receipt().len());
                                     assert_eq!(sizes.outbox, bundle.outbox().len());
                                     assert!(
-                                        matches!(db.commit_bounded_at(version,key,p,required-1,None),Err(Error::Capacity{required:r,declared:d}) if r==required && d==required-1)
+                                        matches!(db.commit_bounded_at(version,key,p,required-1),Err(Error::Capacity{required:r,declared:d}) if r==required && d==required-1)
                                     );
                                     assert_eq!(ok(db.snapshot()), before);
                                     let p = publication(h, raw(&pre, &cmd, &ctx));
                                     let record = p.subject().to_vec();
                                     assert_eq!(
-                                        ok(db.commit_bounded_at(version, key, p, required, None))
+                                        ok(db.commit_bounded_at(version, key, p, required))
                                             .status(),
                                         CommitStatus::Committed
                                     );
@@ -304,6 +303,7 @@ fn all_original_216_outputs_and_all_68_exact_and_one_under_aggregates() {
 }
 
 #[test]
+#[cfg(feature = "crash-injection")]
 fn seven_original_crash_points_restart_all_or_none() {
     with_authority(None, |a, h| {
         let pre = state(0);
@@ -795,7 +795,7 @@ fn aggregate_bundle_matches_every_actual_persisted_column_and_required_copy() {
         let mut db = ok(V2SqliteShell::create(&temp.0, a, genesis(h, &pre)));
         let bundle = ok(db.publication_bundle(0, key, &p));
         let sizes = bundle.sizes();
-        ok(db.commit_bounded_at(0, key, p, ok(sizes.total()), None));
+        ok(db.commit_bounded_at(0, key, p, ok(sizes.total())));
         let connection = ok(Connection::open(&temp.0));
 
         let commit = ok(connection.query_row(
@@ -938,7 +938,7 @@ fn fresh_allowed_operation_after_recurrent_head_has_a_distinct_delivery_id() {
             let required = ok(ok(db.publication_bundle(version, key, &p)).sizes().total());
             assert!(required <= 16_384);
             assert_eq!(
-                ok(db.commit_bounded_at(version, key, p, required, None)).status(),
+                ok(db.commit_bounded_at(version, key, p, required)).status(),
                 CommitStatus::Committed
             );
         }

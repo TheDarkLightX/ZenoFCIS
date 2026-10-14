@@ -16,3 +16,6 @@ Feature: Check every rule case with the pinned solvers when the domain is too la
     And every run asks planted controls that must be refuted, and enumeration decides wherever the domain fits
     And a symbolic transform receipt is never accepted where an exhaustive receipt is required
     And the pinned-solver tests run when both solvers are configured, and are skipped with a documented line otherwise
+    And the checked-certificate journey requires the genuine pinned CVC5 and independently built checker, with no missing-tool skip
+    And all three complete pieces over the full i64 input domain check and replay byte for byte
+    And changed bounds, changed outputs, eager unused overflow, corrupt or missing proofs and receipt tampering produce no accepted receipt

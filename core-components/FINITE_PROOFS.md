@@ -1,8 +1,9 @@
 # Source-bound finite family certificates
 
-This document specifies the new G1 certificate route. Check the actual issued
-artifacts and replay result before asserting a successful proof. It does not
-reclassify the earlier native-test report or add a Lean backend.
+This document specifies the source-bound certificate route for the core
+component families. Check the actual issued artifacts and replay result before
+asserting a successful proof. It does not reclassify the earlier native-test
+report or add a Lean backend.
 
 For each family, the theorem quantifies over every declared parameter instance
 and every member of the entire raw state/command/context product. The original
@@ -45,7 +46,7 @@ claim a new genesis/temporal induction theorem. Issuance verifies identical
 canonical artifacts against that native report, preserving its actual scope.
 
 `tools/prove_core_families.py issue` uses a CLI built from the frozen local source
-and normal F1 generation, regeneration and F2 review. It checks full Cartesian
+and normal contract generation, regeneration and review. It checks full Cartesian
 coverage independently of packet tallies, decodes every actual decision and
 compares exact observations with the separately authored reference, requires
 zero technical refusals over ALL raw inputs, and records positive witnesses.
@@ -113,12 +114,13 @@ trust these advisory references. The internal certificate-construction route
 renders the same rules without a self-referential certificate comment; its
 canonical generated artifacts must be identical to the referenced app's.
 
-Trusted base: the F1 compiler, canonical codecs, mandatory Authority, eager-i64
-and law interpreters, F2 enumeration/framing/reporting, explicit finite-product
-and identity comparisons in this replayer, Python/Rust toolchains/runtime, OS,
-SHA256 and machine execution. These are named assumptions, not a newly proved
-implementation theorem. The independent reference supplies intended finite
-behavior; owner labels and release approval remain absent.
+Trusted base: the contract compiler, canonical codecs, mandatory Authority,
+eager-i64 and law interpreters, review enumeration/framing/reporting, explicit
+finite-product and identity comparisons in this replayer, Python/Rust
+toolchains/runtime, OS, SHA256 and machine execution. These are named
+assumptions, not a newly proved implementation theorem. The independent
+reference supplies intended finite behavior; owner labels and release approval
+remain absent.
 
 Qualification requires seventeen real law-mutant refusals across the ten families, missing-parameter/domain/
 decision/source/binary tampering controls, source freshness and proof references

@@ -85,6 +85,7 @@ pub open spec fn atom<'a>(v:Atom<'a>)->Seq<Part<'a>> {
         Atom::Sum{type_id,variant}=>seq![Part::Word(4),Part::Word(type_id as u128),Part::Word(variant as u128)],
         Atom::Bytes(v)=>seq![Part::Word(5),Part::Bytes(v)],
         Atom::Text(v)=>seq![Part::Word(6),Part::Bytes(v)],
+        Atom::Canonical(v)=>seq![Part::Word(7),Part::Bytes(v.raw().0),Part::Word(v.raw().1 as u128),Part::Bytes(v.raw().2)],
 
     }
 }

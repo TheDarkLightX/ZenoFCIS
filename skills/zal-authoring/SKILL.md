@@ -14,6 +14,15 @@ and `object_ids` bind subsequent calls. After a stale refusal or human acceptanc
 read again. Each context supplies every declared observation as a JSON Boolean;
 a fact named `authorized` is an assumption, not authenticated authorization.
 
+`zal_read` also shows retained owner examples, their corpus digest and separate
+check/review/factory freshness. Show conflicts and out-of-domain cases using the
+same unchanged expected labels in both revisions. Only the person supplies or
+replaces expected values and provenance through the terminal's `label` command;
+never infer owner labels from model outputs or enter them on the person's behalf.
+Labels are cooperative intent assumptions, not authenticated owner identity.
+Explanation/trace results separate supplied assumptions from authenticated facts;
+the current profile supplies none of the latter.
+
 Use `zal_help` with an empty topic for the index, an exact typed ID for an object,
 or `grammar:TOPIC` for grammar. Use `zal_explain` for one complete input and
 `zal_trace` for a hypothetical sequence. Explain their supplied assumptions.
@@ -35,6 +44,15 @@ After acceptance, refresh with `zal_read`. Export through the recorded
 and an absent/empty `--out` directory. Verify the export with `workspace.py verify`
 before passing it to the existing ZenoFCIS generator and actual Authority tests.
 Exports are declarations, not application publication or proof receipts.
+
+Reading preserves old checks. For stale checker evidence, restart if directed,
+then explicitly check and have the person review again. A changed example corpus
+requires a new display/review; restage a pending candidate against the current
+corpus first. Never describe a bound corpus as proof that its labels agree, and
+never refresh a stale agreement on the person's behalf.
+Reviewed meaning/export can retain a displayed example conflict or out-of-domain
+case. State it plainly: corpus binding is not an owner-example pass or a
+machine-proved requirements route.
 
 The current profile is `zal/finite-fsm/1`: flat control labels, enumerated events,
 fresh Boolean observations, fixed targets, explicit rejection and state invariants.

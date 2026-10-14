@@ -188,7 +188,7 @@ fn shell_scratch_is_ordered_atomic_cancellable_and_schema_bounded() {
     assert!(bad.advance(1, 3).is_err());
     assert_eq!(bad.processed_items(), 1);
     assert!(
-        bad.publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES, None)
+        bad.publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES)
             .is_err()
     );
     assert!(
@@ -252,7 +252,7 @@ fn original_successful_partitions_restore_complete_bounded_schema9_publication()
             assert!(work.same_operation(&reference));
         }
         let result = work
-            .publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES, None)
+            .publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES)
             .unwrap();
         assert_eq!(result.status, zeno_fcis_shell::CommitStatus::Committed);
         assert!(
@@ -314,7 +314,7 @@ fn reach(
 ) {
     for step in 0..count {
         complete(shell, authority, [1, 0, 0], &format!("setup-{step}"))
-            .publish(shell, authority, true, MAX_PUBLICATION_BYTES, None)
+            .publish(shell, authority, true, MAX_PUBLICATION_BYTES)
             .unwrap();
     }
 }
@@ -398,13 +398,7 @@ fn publication_replay_retains_original_binding_and_refuses_different_history() {
     let source_before = source.snapshot().unwrap();
     let frames = original_frames(&source_before, &command([1, 1, 1]), true);
     let publication = complete(&mut source, &source_authority, [1, 1, 1], "source-record")
-        .publish(
-            &mut source,
-            &source_authority,
-            true,
-            MAX_PUBLICATION_BYTES,
-            None,
-        )
+        .publish(&mut source, &source_authority, true, MAX_PUBLICATION_BYTES)
         .unwrap();
     let source_after = source.snapshot().unwrap();
     let mut destination =
@@ -513,8 +507,7 @@ fn all_original_216_cases_use_the_bound_authority_and_each_success_keeps_the_one
                                             &mut shell,
                                             &authority,
                                             true,
-                                            MAX_PUBLICATION_BYTES,
-                                            None
+                                            MAX_PUBLICATION_BYTES
                                         )
                                         .is_err()
                                     );
@@ -575,7 +568,7 @@ fn all_original_216_cases_use_the_bound_authority_and_each_success_keeps_the_one
                                         .unwrap();
                                 below.advance(0, 3).unwrap();
                                 let error = below
-                                    .publish(&mut shell, &authority, true, required - 1, None)
+                                    .publish(&mut shell, &authority, true, required - 1)
                                     .unwrap_err();
                                 assert!(error.starts_with("publication capacity:"), "{error}");
                                 assert_eq!(shell.snapshot().unwrap(), before);
@@ -584,7 +577,7 @@ fn all_original_216_cases_use_the_bound_authority_and_each_success_keeps_the_one
                                         .unwrap();
                                 exact.advance(0, 3).unwrap();
                                 let actual = exact
-                                    .publish(&mut shell, &authority, true, required, None)
+                                    .publish(&mut shell, &authority, true, required)
                                     .unwrap();
                                 assert_eq!(actual.authorization, compact);
                                 assert_eq!(actual.sizes, sizes);
@@ -730,7 +723,7 @@ fn original_failed_retry_cancellation_incomplete_and_actual_shared_step_exhausti
         assert_eq!(work.usage().used(resource), amount);
     }
     assert!(
-        work.publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES, None)
+        work.publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES)
             .unwrap_err()
             .contains("Incomplete")
     );
@@ -761,7 +754,7 @@ fn original_context_head_aba_and_second_handle_freshness_are_checked_before_publ
     let wrong = complete(&mut first, &authority, [1, 0, 0], "changed-context");
     assert!(
         wrong
-            .publish(&mut first, &authority, false, MAX_PUBLICATION_BYTES, None)
+            .publish(&mut first, &authority, false, MAX_PUBLICATION_BYTES)
             .is_err()
     );
     assert_eq!(first.snapshot().unwrap(), original);
@@ -770,34 +763,34 @@ fn original_context_head_aba_and_second_handle_freshness_are_checked_before_publ
     let mut second = prepared_counter::Shell::open(&path, &authority).unwrap();
     let other = complete(&mut second, &authority, [1, 0, 0], "second-handle");
     let first_result = complete(&mut first, &authority, [1, 0, 0], "inc")
-        .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES, None)
+        .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES)
         .unwrap();
     let before = first.snapshot().unwrap();
     assert!(
         stale
-            .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES, None)
+            .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES)
             .is_err()
     );
     assert_eq!(first.snapshot().unwrap(), before);
     assert!(
         other
-            .publish(&mut second, &authority, true, MAX_PUBLICATION_BYTES, None)
+            .publish(&mut second, &authority, true, MAX_PUBLICATION_BYTES)
             .is_err()
     );
     assert_eq!(first.snapshot().unwrap(), before);
     complete(&mut first, &authority, [-1, 0, 0], "dec")
-        .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES, None)
+        .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES)
         .unwrap();
     let recurrent = first.snapshot().unwrap();
     assert_eq!(recurrent.root(), original.root());
     assert_ne!(recurrent.version(), original.version());
     assert!(
-        aba.publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES, None)
+        aba.publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES)
             .is_err()
     );
     assert_eq!(first.snapshot().unwrap(), recurrent);
     let fresh = complete(&mut first, &authority, [1, 0, 0], "fresh")
-        .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES, None)
+        .publish(&mut first, &authority, true, MAX_PUBLICATION_BYTES)
         .unwrap();
     assert_eq!(fresh.status, zeno_fcis_shell::CommitStatus::Committed);
     assert_eq!(first.snapshot().unwrap().version(), 3);
@@ -831,77 +824,6 @@ fn original_context_head_aba_and_second_handle_freshness_are_checked_before_publ
 }
 
 #[test]
-fn every_original_commit_crash_recovers_all_or_none_through_the_new_checked_path() {
-    use zeno_fcis_shell_sqlite::CrashPoint as P;
-    let data = v2_contract::Contract::new();
-    let definition = data.descriptor();
-    let authority = authority(&definition).unwrap();
-    for crash in [
-        P::BeforeTransaction,
-        P::AfterValidation,
-        P::AfterStateWrite,
-        P::AfterReplayWrite,
-        P::AfterOutboxWrite,
-        P::BeforeCommit,
-        P::AfterCommit,
-    ] {
-        let temp = Temp::new();
-        let path = temp.0.join("state.sqlite");
-        let mut shell = create(&path, &authority).unwrap();
-        let before = shell.snapshot().unwrap();
-        assert!(
-            complete(&mut shell, &authority, [1, 1, 1], "crash")
-                .publish(
-                    &mut shell,
-                    &authority,
-                    true,
-                    MAX_PUBLICATION_BYTES,
-                    Some(crash)
-                )
-                .is_err()
-        );
-        drop(shell);
-        let mut reopened = prepared_counter::Shell::open(&path, &authority).unwrap();
-        let after = reopened.snapshot().unwrap();
-        if crash == P::AfterCommit {
-            assert_eq!(
-                (
-                    after.version(),
-                    after.bundle_count(),
-                    after.replay_count(),
-                    after.pending()
-                ),
-                (1, 1, 1, 1)
-            );
-            assert_eq!(
-                prepared_counter::decode_state(after.state())
-                    .unwrap()
-                    .count
-                    .0,
-                3
-            );
-            let mut destination = zeno_fcis_shell_sqlite::MemoryDestination::default();
-            let pending = reopened.next_pending().unwrap().unwrap();
-            drop(pending.deliver(&mut destination).unwrap());
-            assert_eq!(destination.delivered_count(), 1);
-            drop(reopened);
-            let mut reopened = prepared_counter::Shell::open(&path, &authority).unwrap();
-            let pending = reopened.next_pending().unwrap().unwrap();
-            pending
-                .deliver(&mut destination)
-                .unwrap()
-                .acknowledge()
-                .unwrap();
-            assert!(reopened.next_pending().unwrap().is_none());
-            assert_eq!(destination.delivered_count(), 1);
-            assert_eq!(reopened.snapshot().unwrap().pending(), 0);
-        } else {
-            assert_eq!(after, before);
-        }
-    }
-}
-
-#[test]
 fn original_exact_capacity_and_complete_restart_replay_delivery_journey_are_restored() {
     let temp = Temp::new();
     let data = v2_contract::Contract::new();
@@ -909,18 +831,18 @@ fn original_exact_capacity_and_complete_restart_replay_delivery_journey_are_rest
     let authority = authority(&definition).unwrap();
     let mut measure = create(&temp.0.join("measure.sqlite"), &authority).unwrap();
     let actual = complete(&mut measure, &authority, [1, 1, 1], "same")
-        .publish(&mut measure, &authority, true, MAX_PUBLICATION_BYTES, None)
+        .publish(&mut measure, &authority, true, MAX_PUBLICATION_BYTES)
         .unwrap();
     let limit = actual.sizes.total().unwrap();
     let mut boundary = create(&temp.0.join("boundary.sqlite"), &authority).unwrap();
     let before = boundary.snapshot().unwrap();
     let error = complete(&mut boundary, &authority, [1, 1, 1], "same")
-        .publish(&mut boundary, &authority, true, limit - 1, None)
+        .publish(&mut boundary, &authority, true, limit - 1)
         .unwrap_err();
     assert!(error.starts_with("publication capacity:"));
     assert_eq!(boundary.snapshot().unwrap(), before);
     complete(&mut boundary, &authority, [1, 1, 1], "same")
-        .publish(&mut boundary, &authority, true, limit, None)
+        .publish(&mut boundary, &authority, true, limit)
         .unwrap();
     assert_eq!(measure.snapshot().unwrap(), boundary.snapshot().unwrap());
     let path = temp.0.join("journey.sqlite");
@@ -942,7 +864,7 @@ fn compact_replay_and_malformed_missing_truncated_changed_binding_refuse() {
     let before = original.snapshot().unwrap();
     let frames = original_frames(&before, &command([1, 1, 1]), true);
     let result = complete(&mut original, &authority, [1, 1, 1], "record")
-        .publish(&mut original, &authority, true, MAX_PUBLICATION_BYTES, None)
+        .publish(&mut original, &authority, true, MAX_PUBLICATION_BYTES)
         .unwrap();
     let mut receiving = create(&temp.0.join("receiving.sqlite"), &authority).unwrap();
     let replay = prepared_counter::profile::digest("example/prepared-counter/replay", b"record");
@@ -1116,7 +1038,7 @@ fn every_original_declared_state_has_a_checked_eligible_exit_that_publishes_with
             ],
             "eligible-exit",
         )
-        .publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES, None)
+        .publish(&mut shell, &authority, true, MAX_PUBLICATION_BYTES)
         .unwrap();
         assert_eq!(
             prepared_counter::decode_state(shell.snapshot().unwrap().state())

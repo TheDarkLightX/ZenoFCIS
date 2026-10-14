@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import tempfile
 import zipfile
@@ -26,18 +27,34 @@ ADMISSION = SUBJECT.parent / "schema/admission.rs"
 SPEC = SUBJECT.parent / "schema/spec.rs"
 CANONICAL = SUBJECT.parent
 CATALOG = "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog.rs"
-# Rejections at the verified catalog callers of `Checked::original`: `original_schema`
-# (postcondition line 67, call line 71) and `bind_checked` (postcondition line 120,
-# call line 149). The omitted contract was observed for this same admission.rs
-# mutation in the canonical-bytes harness on hosted run 37404295156; each control
-# still needs its own selected schema-binding run.
+# Exact verified caller sets observed by the schema harness in retained selected runs.
+# Omission and weakening use rlimit 80; narrowing uses the default solver budget.
+# Contract-only failures leave runtime code unchanged.
 CONTRACT_REJECTIONS = {
-    "omit_original_getter_contract": frozenset({("postcondition not satisfied", CATALOG, 67),
-                                                ("postcondition not satisfied", CATALOG, 120)}),
-    "weaken_original_getter_contract": frozenset({("postcondition not satisfied", CATALOG, 67),
-                                                  ("postcondition not satisfied", CATALOG, 120)}),
-    "narrow_original_getter_domain": frozenset({("precondition not satisfied", CATALOG, 71),
-                                                ("precondition not satisfied", CATALOG, 149)}),
+    "omit_original_getter_contract": frozenset({
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 133),
+        ("postcondition not satisfied", CATALOG, 83),
+        ("postcondition not satisfied", CATALOG, 136),
+        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 345),
+        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs", 63),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/compound.rs", 542),
+    }),
+    "weaken_original_getter_contract": frozenset({
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 133),
+        ("postcondition not satisfied", CATALOG, 83),
+        ("postcondition not satisfied", CATALOG, 136),
+        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 345),
+        ("postcondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs", 63),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/compound.rs", 542),
+    }),
+    "narrow_original_getter_domain": frozenset({
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/authority/numeric_metadata.rs", 131),
+        ("precondition not satisfied", CATALOG, 87),
+        ("precondition not satisfied", CATALOG, 170),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/catalog/matching.rs", 358),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/composition/ingress/original.rs", 104),
+        ("precondition not satisfied", "crates/zeno-fcis-synthesis/src/finite/execution_v2/compound.rs", 540),
+    }),
 }
 UNIT_SOURCES = (HARNESS, *sorted(path.relative_to(ROOT)
     for path in (ROOT / CANONICAL).rglob("*.rs")))
@@ -56,7 +73,7 @@ SOURCES = (*UNIT_SOURCES, *NATIVE_SOURCES, PUBLIC_TEST, PROFILE, verifier.PIN,
     Path("rust-toolchain.toml"), Path("crates/zeno-fcis-synthesis/Cargo.toml"),
     Path("crates/zeno-fcis-authority/Cargo.toml"),
     Path("crates/zeno-fcis-synthesis/src/finite/mod.rs"),
-    Path("docs/V2_SCHEMA_BINDING_STAGE.md"))
+    Path("README.md"))
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
                                 Path("verification/verus/authority_v2_sources.json"))))
@@ -131,6 +148,35 @@ def mutation_sources(source: str, admission: str, spec: str) -> dict[str, tuple[
     return mutations
 
 
+
+# Mutation bodies must fail their changed function, not an unrelated caller or
+# an inconclusive solver/compiler run. Contract-only controls use the separate
+# exact, demonstrated caller map below.
+PROOF_FUNCTIONS = {
+    "skip_original_names": "blob", "wrong_field_type": "field",
+    "wrong_signed_lower_bound": "kind", "wrong_unsigned_upper_bound": "kind",
+    "wrong_sum_payload_flag": "variant", "wrong_unused_unit": "kind",
+    "wrong_original_magic": "schema_end", "admit_trailing_schema": "encoding_matches",
+    "refuse_exact_wire_size": "encoding_matches", "refuse_exact_schema_size": "admit",
+    "accept_bad_first_name_character": "name_valid", "accept_repeated_field_id": "fields_valid",
+    "accept_repeated_variant_id": "variants_valid", "accept_repeated_type_id": "definitions_valid",
+    "accept_duplicate_type_name": "definitions_valid", "accept_reversed_signed_range": "kind_valid",
+    "wrong_original_custody": "original", "skip_encoding_admission": "admit",
+}
+
+
+def proof_rejected(proc, report: dict, pin: dict, profile: dict,
+                   name: str, path: Path, changed: str, specimen: Path) -> bool:
+    # The pinned verifier uses this exact header for a failed loop-entry invariant.
+    # Keep the retained output unchanged and preserve all source/region checks.
+    stderr = re.sub(r'^error: invariant not satisfied before loop$',
+                    'error: invariant not satisfied', proc.stderr, flags=re.M)
+    proc = subprocess.CompletedProcess(proc.args, proc.returncode, proc.stdout, stderr)
+    return verifier.semantic_refusal(proc, report, pin, path, specimen,
+        region=verifier.function_lines(changed, PROOF_FUNCTIONS[name]),
+        target_functions=profile["target_functions"])
+
+
 def native_check(directory: Path, cwd: Path, pin: dict, environment: dict) -> dict:
     executable = directory / "schema-binding-tests"
     command = ["rustc", f"+{pin['runtime_rust']}", "--edition=2024", "--test",
@@ -195,21 +241,23 @@ def check(cache: Path, install: bool, directory: Path) -> dict:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(changed) if unit == path else target.write_bytes((ROOT / unit).read_bytes())
         adjust_specimen_source_lengths(specimen)
-        mutant_command = [*command, "--log-dir", str(specimen / "logs"), str(HARNESS)]
+        rlimit_args = ["--rlimit", "80"] if name in ("omit_original_getter_contract",
+            "weaken_original_getter_contract") else []
+        mutant_command = [*command, *rlimit_args, "--log-dir", str(specimen / "logs"), str(HARNESS)]
         mutant = verifier.run(mutant_command, specimen, environment)
         (specimen / "verus.json").write_text(mutant.stdout)
         (specimen / "verus.stderr").write_text(mutant.stderr)
         try:
-            result = json.loads(mutant.stdout).get("verification-results", {})
+            report_for_control = json.loads(mutant.stdout)
+            result = report_for_control.get("verification-results", {})
         except ValueError:
-            result = {}
+            report_for_control, result = {}, {}
         refusal = None
         mutant_native = None
         outcome = None
         if expected == "proof":
-            killed = (mutant.returncode != 0 and result.get("success") is False
-                and type(result.get("errors")) is int and result["errors"] > 0
-                and result.get("encountered-vir-error") is False)
+            killed = proof_rejected(mutant, report_for_control, pin, profile,
+                name, path, changed, specimen)
             mutant_native = native_check(specimen, specimen, pin, environment)
             killed = killed and mutant_native["build_exit"] == 0 and mutant_native["exit_code"] not in (None, 0)
         elif expected == "proof_contract":

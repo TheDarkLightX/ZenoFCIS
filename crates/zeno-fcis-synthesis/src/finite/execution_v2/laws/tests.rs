@@ -1258,6 +1258,129 @@ fn frame_genesis() -> Frame<'static> {
 }
 
 #[test]
+fn wide_law_arithmetic_uses_exact_products_and_refuses_undefined_results() {
+    use super::atoms::{mul_div, product_compare};
+    let max = u128::MAX;
+    // These products cannot fit U128. Their quotients and comparisons can.
+    assert_eq!(
+        mul_div(false, Atom::U128(max), Atom::U128(max), Atom::U128(max)),
+        Ok(Atom::U128(max))
+    );
+    assert_eq!(
+        mul_div(false, Atom::U128(max), Atom::U128(2), Atom::U128(3)),
+        Ok(Atom::U128((max / 3) * 2))
+    );
+    assert_eq!(
+        mul_div(true, Atom::U128(max - 1), Atom::U128(2), Atom::U128(3)),
+        Ok(Atom::U128((max / 3) * 2))
+    );
+    assert_eq!(
+        product_compare(
+            Atom::U128(max),
+            Atom::U128(max),
+            Atom::U128(max),
+            Atom::U128(max),
+            Atom::U128(max),
+            Atom::U128(max - 1)
+        ),
+        Ok(Atom::Bool(true))
+    );
+    assert_eq!(
+        product_compare(
+            Atom::U128(max),
+            Atom::U128(max),
+            Atom::U128(max - 1),
+            Atom::U128(max),
+            Atom::U128(max),
+            Atom::U128(max)
+        ),
+        Ok(Atom::Bool(false))
+    );
+    for ceiling in [false, true] {
+        for (a, b, den) in [
+            (Atom::U128(1), Atom::U128(1), Atom::U128(0)),
+            (Atom::U128(max), Atom::U128(max), Atom::U128(1)),
+            (Atom::I128(1), Atom::U128(1), Atom::U128(1)),
+            (Atom::U128(1), Atom::Bool(true), Atom::U128(1)),
+        ] {
+            assert_eq!(mul_div(ceiling, a, b, den), Err(Failure::Undefined));
+        }
+    }
+    assert_eq!(
+        product_compare(
+            Atom::U128(1),
+            Atom::U128(1),
+            Atom::Bool(true),
+            Atom::U128(1),
+            Atom::U128(1),
+            Atom::U128(1)
+        ),
+        Err(Failure::Undefined)
+    );
+}
+
+#[test]
+fn wide_law_nodes_keep_eager_refusal_and_shared_step_accounting() {
+    let nodes = [
+        Op::Literal(Atom::U128(u128::MAX)),
+        Op::Literal(Atom::U128(2)),
+        Op::MulDivFloor(0, 0, 0),
+        Op::MulDivCeil(0, 0, 0),
+        Op::ProductsGe([2, 1, 0], [3, 1, 0]),
+    ];
+    let program = Program {
+        nodes: &nodes,
+        root: 4,
+    };
+    assert!(predicate::shape(&program));
+    let mut reads = Vec::new();
+    let mut meter = meter::new(limits());
+    assert_eq!(
+        predicate::evaluate(&program, &frame_genesis(), 70, &mut meter, &mut reads),
+        Ok(())
+    );
+    assert_eq!(meter.used.used(Resource::Step), 5);
+    assert_eq!(meter.used.used(Resource::Read), 0);
+    assert!(reads.is_empty());
+    let mut denied = meter::new(limits().with_limit(Resource::Step, 4));
+    assert!(
+        matches!(predicate::evaluate(&program, &frame_genesis(), 70, &mut denied, &mut reads),
+        Err(Failure::Budget(e)) if e.resource == Resource::Step
+            && e.limit == 4 && e.attempted == 5 && !e.overflow)
+    );
+    assert_eq!(denied.used.used(Resource::Step), 4);
+    assert!(reads.is_empty());
+    let eager = [
+        Op::Literal(Atom::Bool(true)),
+        Op::Literal(Atom::U128(0)),
+        Op::MulDivFloor(1, 1, 1),
+    ];
+    let mut meter = meter::new(limits());
+    assert_eq!(
+        predicate::evaluate(
+            &Program {
+                nodes: &eager,
+                root: 0
+            },
+            &frame_genesis(),
+            70,
+            &mut meter,
+            &mut reads
+        ),
+        Err(Failure::Undefined)
+    );
+    assert_eq!(meter.used.used(Resource::Step), 3);
+    let forward = [
+        Op::Literal(Atom::U128(1)),
+        Op::ProductsGe([0, 0, 1], [0, 0, 0]),
+    ];
+    assert!(!predicate::shape(&Program {
+        nodes: &forward,
+        root: 1
+    }));
+}
+
+#[test]
 fn guarded_true_missing_payload_and_wrong_type_never_use_default() {
     let fields = [Field {
         id: 140,
@@ -1497,4 +1620,66 @@ fn s4_shared_observation_read_trace_root_field_ids_and_denied_retention() {
         assert!(frame::observe(&frame, selector(expected.len())).is_none());
         assert!(frame::observe(&frame, selector(usize::MAX)).is_none());
     }
+}
+
+#[test]
+fn shared_arithmetic_keeps_all_four_law_arms_and_undefined() {
+    for (kind, left, right, expected) in [
+        (
+            0,
+            Atom::I128(i128::MAX),
+            Atom::I128(1),
+            Err(Failure::Undefined),
+        ),
+        (
+            1,
+            Atom::I128(i128::MIN),
+            Atom::I128(1),
+            Err(Failure::Undefined),
+        ),
+        (
+            0,
+            Atom::U128(u128::MAX),
+            Atom::U128(1),
+            Err(Failure::Undefined),
+        ),
+        (1, Atom::U128(0), Atom::U128(1), Err(Failure::Undefined)),
+        (
+            0,
+            Atom::I128(i128::from(i64::MAX)),
+            Atom::I128(1),
+            Ok(Atom::I128(1_i128 << 63)),
+        ),
+        (
+            1,
+            Atom::I128(i128::MIN),
+            Atom::I128(i128::MIN),
+            Ok(Atom::I128(0)),
+        ),
+        (
+            0,
+            Atom::U128(u128::MAX),
+            Atom::U128(0),
+            Ok(Atom::U128(u128::MAX)),
+        ),
+        (
+            1,
+            Atom::U128(u128::MAX),
+            Atom::U128(u128::MAX),
+            Ok(Atom::U128(0)),
+        ),
+        (0, Atom::I128(1), Atom::U128(1), Err(Failure::Undefined)),
+        (
+            1,
+            Atom::Bool(true),
+            Atom::Bool(false),
+            Err(Failure::Undefined),
+        ),
+    ] {
+        assert_eq!(atoms::binary(kind, left, right), expected);
+    }
+    assert_eq!(
+        atoms::binary(2, Atom::I128(1), Atom::U128(1)),
+        Ok(Atom::Bool(false))
+    );
 }

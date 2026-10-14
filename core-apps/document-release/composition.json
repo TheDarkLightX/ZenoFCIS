@@ -1,0 +1,153 @@
+{
+  "application": "document-release",
+  "assumptions": [
+    "authorization and principal reviewer slots are supplied, not authenticated",
+    "content is a three-value tag, not a document digest",
+    "one document and one review cycle; edits during review are refused",
+    "a release intent records a decision, not publication",
+    "contract compiler, finite enumeration, Rust compiler and SQLite shell remain named trusted boundaries"
+  ],
+  "authority": "none",
+  "components": [
+    {
+      "family": "versioned-register",
+      "instance": "components/register/core-instance.json",
+      "instance_sha256": "b4eb60c5dd5e4d6216032ab7bc00cb331ed14cec0e56816c082ad3cc233d42e7",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "register",
+      "owns_fields": [
+        110,
+        111
+      ],
+      "parameters": {
+        "C": 2
+      },
+      "source_set_sha256": "463a813825e18c9c592e19e79dbc5dcfbbc0d3183e5298551b832395e751cd5b",
+      "views": {
+        "command": [
+          "expected_version",
+          "new_content"
+        ],
+        "context": [
+          "authorized"
+        ],
+        "state": [
+          "content",
+          "version"
+        ]
+      }
+    },
+    {
+      "family": "approval-queue",
+      "instance": "components/review/core-instance.json",
+      "instance_sha256": "6d52e774e7e36af94a32e5af4018708b7b59e95d68d1aec95c55e690a60b046f",
+      "local_evidence": "Identified; actual component/app replay required",
+      "name": "review",
+      "owns_fields": [
+        112,
+        113,
+        114,
+        115
+      ],
+      "parameters": {
+        "K": 2
+      },
+      "source_set_sha256": "a2b329091913bbb427c9fff92c2fc9f9fa718103ec63e00a7f2836eb910f0dc7",
+      "views": {
+        "command": [
+          "action - 1"
+        ],
+        "context": [
+          "principal",
+          "authorized"
+        ],
+        "state": [
+          "phase + 150",
+          "v0",
+          "v1",
+          "v2"
+        ]
+      }
+    }
+  ],
+  "effects": {
+    "channel": 300,
+    "destination": "publisher",
+    "max_per_transition": 1,
+    "occurrence": "release",
+    "owner": "review",
+    "payload": {
+      "140": "content",
+      "141": "version"
+    }
+  },
+  "evidence_status": "pending complete actual Authority replay, durable journey, controls and review",
+  "frames": "Edit writes only the register. Submit, Approve and Release change only review fields; from Review on, content and version are locked. The idempotent release retry frames every field and emits nothing.",
+  "input_tuples": 46656,
+  "occurrences": [
+    {
+      "name": "edit",
+      "ordered_steps": [
+        {
+          "command": "Write",
+          "component": "register"
+        }
+      ],
+      "when": "action == 160 && phase == 0"
+    },
+    {
+      "name": "submit",
+      "ordered_steps": [
+        {
+          "command": "Enqueue",
+          "component": "review"
+        }
+      ],
+      "when": "action == 161 && phase == 0"
+    },
+    {
+      "name": "approve",
+      "ordered_steps": [
+        {
+          "command": "Vote",
+          "component": "review"
+        }
+      ],
+      "when": "action == 162 && phase == 1"
+    },
+    {
+      "name": "release",
+      "ordered_steps": [
+        {
+          "command": "Execute",
+          "component": "review"
+        }
+      ],
+      "when": "action == 163 && phase == 1"
+    },
+    {
+      "name": "retry",
+      "ordered_steps": [],
+      "when": "action == 163 && phase == 2 && expected_version == version"
+    }
+  ],
+  "owner_adoption": false,
+  "preconditions": [
+    "complete coupled-state invariant",
+    "supplied authorization and principal",
+    "expected version equals the current version, except for Approve",
+    "two distinct votes before release"
+  ],
+  "profile": "single-document-two-edits-quorum-two/1",
+  "publication": "one ordinary complete Authority publication and one SQLite transaction; abort-all on technical refusal",
+  "schema": "zeno-fcis/core-application-composition/1",
+  "state_fields": [
+    110,
+    111,
+    112,
+    113,
+    114,
+    115
+  ],
+  "stateless_components": []
+}

@@ -1,13 +1,16 @@
 # Bounded completion and ordered preparation
 
-Implementation contract for the optional finite synthesis extension. The
-baseline is `7d950878dbf039fdeafcecbe1f63933f96394f45`.
+Implementation contract for the optional finite synthesis extension.
 
-Enable the existing `synthesis` feature. The runnable example uses public
-umbrella imports and produces a small JSON result for automated consumers:
+Enable the existing `synthesis` feature. The original runnable example, which
+prints a small JSON result for automated consumers, now runs as a private
+kernel-law regression test:
 
 ```sh
-cargo +1.97.1 run -p zeno-fcis --example bounded_completion --features synthesis --locked
+cargo +1.97.1 test --manifest-path verification/Cargo.toml -p zeno-fcis-kernel-laws \
+  --all-features --locked --lib \
+  oracle::tests::bounded_completion::original_bounded_completion_example_runs \
+  -- --exact --nocapture --test-threads=1
 ```
 
 The API entry points are `CompletionProblem::try_new`, `find_completion`,

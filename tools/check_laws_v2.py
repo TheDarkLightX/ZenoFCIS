@@ -17,7 +17,7 @@ from v2_native_dependencies import native_dependency_args
 import check_verus as verifier
 from check_finite_execution import once
 from check_metered_execution import UNIT_SOURCES as METER_SOURCES
-from verus_coverage import require_coverage
+from verus_coverage import profile_inventory, require_coverage
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = Path('verification/verus/laws.rs')
@@ -32,7 +32,7 @@ SOURCES = (*UNIT_SOURCES, PROFILE, verifier.PIN, DIRECTORY/'tests.rs',
            SUBJECT.parent/'tests.rs', SUBJECT.parent/'input_view/tests.rs',SUBJECT.parent/'composition/record_tests.rs',
            Path('tools/check_laws_v2.py'),Path('tools/test_check_laws_v2.py'),
            Path('tools/check_verus.py'),Path('tools/verus_coverage.py'),Path('tools/check_finite_execution.py'),Path('tools/check_metered_execution.py'),
-           Path('docs/V2_LAW_GENESIS_STAGE.md'),Path('crates/zeno-fcis-synthesis/tests/v2_laws.rs'),
+           Path('README.md'),Path('crates/zeno-fcis-synthesis/tests/v2_laws.rs'),
            Path('crates/zeno-fcis-synthesis/src/finite/mod.rs'),Path('Cargo.toml'),Path('rust-toolchain.toml'))
 
 SOURCES = tuple(dict.fromkeys((*SOURCES, Path("tools/v2_proof_sources.py"),
@@ -104,13 +104,67 @@ def mutation_sources():
     source=texts[SUBJECT]
     end=source.index('pub fn evaluate<')
     start=source.rindex('#[cfg_attr(verus_keep_ghost, verus_spec(result =>',0,end)
-    mutations['weaken_entry_contract']=(SUBJECT,source[:start]+'#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n'+source[end:],'coverage')
+    # Weakening the postcondition makes its existing reveals unused. Suppress
+    # that specific ghost-only warning in this specimen, keeping stderr strict.
+    mutations['weaken_entry_contract']=(SUBJECT,source[:start]
+        +'#[cfg_attr(verus_keep_ghost, verifier::allow(dead_reveal))]\n'
+        +'#[cfg_attr(verus_keep_ghost, verus_spec(result => ensures true,))]\n'
+        +source[end:],'coverage')
     mutations['narrow_entry_domain']=(SUBJECT,once(source,'ensures result.view()==law_execution(',
         'requires required@.len() == 0,\n    ensures result.view()==law_execution('),'coverage')
     mutations['uncontracted_executable']=(SUBJECT,source+'\npub fn uncontracted_law_probe() -> bool { true }\n','coverage')
     mutations['changed_specification']=(DIRECTORY/'spec.rs',once(texts[DIRECTORY/'spec.rs'],
         'if v<0{-v}else{v}','if 0>v{-v}else{v}'),'coverage')
     return mutations
+
+SEMANTIC_FUNCTIONS = {
+    'skip_applicable_law': 'applies', 'skip_mandatory_genesis': 'applies',
+    'omit_required_initial_family': 'metadata', 'ignore_required_law': 'metadata',
+    'allow_duplicate_law': 'metadata', 'change_declared_law_order': 'evaluate_into',
+    'reset_shared_meter': 'evaluate_into', 'shrink_delivery_ordinals': 'deliveries_valid',
+    'wrong_original_source': 'observe', 'wrong_complete_candidate': 'observe',
+    'alter_class_observation': 'observe', 'alter_reason_observation': 'observe',
+    'genesis_fixture_substitution': 'observe', 'wrong_outbox_payload': 'observe',
+    'wrong_scalar_root_source': 'observe', 'root_read_alias': 'selector_id',
+    'law_effect_lane': 'effect_entry', 'alias_scalar_root_with_record_field': 'view_field',
+    'false_success': 'evaluate', 'omit_step_charge': 'node', 'omit_read_charge': 'node',
+    'signed_arithmetic_substitution': 'binary', 'wrong_division_rounding': 'divide',
+}
+
+COVERAGE_FIELDS = {
+    'observe_before_read_permission': ('laws::predicate::node', 'body_sha256'),
+    'weaken_entry_contract': ('laws::evaluate', 'ensures_sha256'),
+    'narrow_entry_domain': ('laws::evaluate', 'requires_sha256'),
+    'uncontracted_executable': ('laws::uncontracted_law_probe', 'inventory'),
+    'changed_specification': ('laws::spec::magnitude', 'body_sha256'),
+}
+
+def semantic_refusal(proc, report, name, path, changed, specimen, pin, profile):
+    region = verifier.function_lines(changed, SEMANTIC_FUNCTIONS[name])
+    return verifier.semantic_refusal(proc, report, pin, path, specimen,
+        region=region, target_functions=profile['target_functions'])
+
+def coverage_refusal(vir, profile, name):
+    error = None
+    try:
+        require_coverage(vir, profile)
+    except ValueError as failure:
+        error = str(failure)
+    actual = profile_inventory(vir, profile)
+    suffix, field = COVERAGE_FIELDS[name]
+    target = profile['namespace'] + 'execution_v2::' + suffix
+    expected = profile['functions']
+    if field == 'inventory':
+        matched = (set(actual) == set(expected) | {target} and target not in expected
+            and actual[target]['mode'] == 'Exec' and actual[target]['requires'] == 0
+            and actual[target]['ensures'] == 0)
+    else:
+        matched = (set(actual) == set(expected) and target in actual and target in expected
+            and actual[target][field] != expected[target][field])
+        if name == 'observe_before_read_permission':
+            matched = matched and all(actual[target][key] == expected[target][key]
+                for key in ('signature_sha256', 'requires_sha256', 'ensures_sha256'))
+    return matched and error is not None and target in error, error
 
 def native_checks(directory,pin,environment):
     directory.mkdir(parents=True,exist_ok=True)
@@ -148,7 +202,7 @@ def check(cache,install,evidence):
     tools=verifier.prepare_tools(cache,pin,install)
     env={k:v for k,v in os.environ.items() if not k.startswith(('VERUS_','VARGO_')) and k not in ('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS')}
     env.update(RUSTUP_TOOLCHAIN=pin['rust_toolchain'],VERUS_Z3_PATH=str(tools/'z3'),CARGO_BUILD_JOBS='1',RUST_TEST_THREADS='1')
-    command=[str(tools/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads','2', "-V", "spinoff-all",'--output-json','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
+    command=[str(tools/'verus'),'--crate-type=lib','--edition=2024','--no-cheating','--no-external-by-default','--num-threads','2', "-V", "spinoff-all",'--output-json','--triggers-mode','silent','--log','vir','--log','vir-option=no_span+no_type+no_fn_details']
     positive_command=[*command,'--log-dir',str(evidence/'positive'),str(HARNESS)]
     positive=verifier.run(positive_command,ROOT,env)
     (evidence/'positive.stdout.json').write_text(positive.stdout);(evidence/'positive.stderr').write_text(positive.stderr)
@@ -165,15 +219,15 @@ def check(cache,install,evidence):
             target=specimen/unit;target.parent.mkdir(parents=True,exist_ok=True)
             target.write_text(changed) if unit==path else target.write_bytes((ROOT/unit).read_bytes())
         adjust_specimen_source_lengths(specimen)
-        result=verifier.run([*command,'--log-dir',str(specimen/'logs'),str(HARNESS)],specimen,env)
+        budget_args=['--rlimit','80'] if name=='shrink_delivery_ordinals' else []
+        result=verifier.run([*command,*budget_args,'--log-dir',str(specimen/'logs'),str(HARNESS)],specimen,env)
         (specimen/'stdout.json').write_text(result.stdout);(specimen/'stderr').write_text(result.stderr)
-        actual=json.loads(result.stdout).get('verification-results',{});coverage_error=None
+        parsed=json.loads(result.stdout);actual=parsed.get('verification-results',{});coverage_error=None
         if expected=='proof':
-            killed=result.returncode!=0 and actual.get('success') is False and type(actual.get('errors')) is int and actual['errors']>0 and actual.get('encountered-vir-error') is False
+            killed=semantic_refusal(result,parsed,name,path,changed,specimen,pin,profile)
         else:
-            try:require_coverage((specimen/'logs/crate.vir').read_text(),profile)
-            except ValueError as error:coverage_error=str(error)
-            killed=result.returncode==0 and actual.get('success') is True and actual.get('errors')==0 and coverage_error is not None
+            matched,coverage_error=coverage_refusal((specimen/'logs/crate.vir').read_text(),profile,name)
+            killed=result.returncode==0 and verifier.proof_succeeded(parsed,pin) and not result.stderr.strip() and matched
         entry={'name':name,'expected_failure':expected,'killed':killed,'exit_code':result.returncode,'verification_results':actual,'coverage_refusal':coverage_error,'log_directory':str(specimen)}
         mutations.append(entry)
         (evidence/'mutations.json').write_text(json.dumps(mutations,indent=2)+'\n')

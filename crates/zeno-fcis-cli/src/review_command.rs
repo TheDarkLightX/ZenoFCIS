@@ -7,11 +7,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::contract::review::{self, DEFAULT_MAX_TUPLES, PACKET_SCHEMA, Review, ReviewSources};
 use crate::contract_files::read_input;
-use crate::{FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, USAGE, atomic_replace, print_json};
+use crate::transform::sha256_hex;
+use crate::{
+    FAILURE, INVALID, JSON_SCHEMA, OK, OutputFormat, USAGE, atomic_create, atomic_replace,
+    print_json,
+};
 
 const PROJECT: &str = "project.zeno";
 const RULES: &str = "v2/policy.json";
@@ -33,6 +37,11 @@ pub(super) enum Command {
         /// Summary format, used with --out.
         #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
         format: OutputFormat,
+        /// Write the decision program of every mutant found equivalent over the full domain into
+        /// this new directory, one canonical `<id>.zcve` each, as seed proposals for `optimize
+        /// --with-candidate` and `loop run --seed`; each is marked with the transform checker's verdict.
+        #[arg(long)]
+        mutant_programs: Option<PathBuf>,
     },
 }
 
@@ -43,7 +52,14 @@ pub(super) fn run(command: Command) -> u8 {
             out,
             max_tuples,
             format,
-        } => review_directory(&dir, out.as_deref(), max_tuples, format),
+            mutant_programs,
+        } => review_directory(
+            &dir,
+            out.as_deref(),
+            max_tuples,
+            format,
+            mutant_programs.as_deref(),
+        ),
     }
 }
 
@@ -55,10 +71,22 @@ enum Failure {
     Invalid { place: String, reason: String },
 }
 
-fn review_directory(dir: &Path, out: Option<&Path>, max_tuples: u64, format: OutputFormat) -> u8 {
+fn review_directory(
+    dir: &Path,
+    out: Option<&Path>,
+    max_tuples: u64,
+    format: OutputFormat,
+    mutant_programs: Option<&Path>,
+) -> u8 {
     if max_tuples == 0 {
         eprintln!("--max-tuples must be at least 1");
         return USAGE;
+    }
+    if let Some(path) = mutant_programs
+        && path.symlink_metadata().is_ok()
+    {
+        let message = format!("{} exists; seeds go to a new directory", path.display());
+        return report_failure(dir, Failure::Read(message), format);
     }
     let result = (|| {
         let project = read_text(dir, PROJECT)?;
@@ -68,21 +96,28 @@ fn review_directory(dir: &Path, out: Option<&Path>, max_tuples: u64, format: Out
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(Failure::Read(format!("read {EXAMPLES}: {error}"))),
         };
-        review::review(
-            ReviewSources {
-                project: &project,
-                rules: &rules,
-                examples: examples.as_deref(),
-            },
-            max_tuples,
-        )
-        .map_err(|error| Failure::Invalid {
+        let sources = ReviewSources {
+            project: &project,
+            rules: &rules,
+            examples: examples.as_deref(),
+        };
+        let invalid = |error: crate::contract::ContractError| Failure::Invalid {
             place: error.place().to_owned(),
             reason: error.reason().to_owned(),
-        })
+        };
+        let review = review::review(sources, max_tuples).map_err(invalid)?;
+        let seeds = match mutant_programs {
+            Some(path) => Some(write_seeds(
+                path,
+                review::seeds::equivalent_mutant_programs(sources, review.packet(), max_tuples)
+                    .map_err(invalid)?,
+            )?),
+            None => None,
+        };
+        Ok((review, seeds))
     })();
-    let review = match result {
-        Ok(review) => review,
+    let (review, seeds) = match result {
+        Ok(reviewed) => reviewed,
         Err(failure) => return report_failure(dir, failure, format),
     };
     let summary = review.summary();
@@ -105,28 +140,87 @@ fn review_directory(dir: &Path, out: Option<&Path>, max_tuples: u64, format: Out
                 return report_failure(dir, Failure::Read(message), format);
             }
             match format {
-                OutputFormat::Json => print_json(&json!({
-                    "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
-                    "authority": "none", "evidence": "advisory-review",
-                    "packet": path.display().to_string(), "packet_schema": PACKET_SCHEMA,
-                    "summary": summary.json(),
-                })),
+                OutputFormat::Json => {
+                    let mut report = json!({
+                        "schema": JSON_SCHEMA, "status": status, "path": dir.display().to_string(),
+                        "authority": "none", "evidence": "advisory-review",
+                        "packet": path.display().to_string(), "packet_schema": PACKET_SCHEMA,
+                        "summary": summary.json(),
+                    });
+                    if let Some(seeds) = &seeds {
+                        report["mutant_programs"] = seeds.clone();
+                    }
+                    print_json(&report);
+                }
                 OutputFormat::Human => {
                     for line in lines(&review, status) {
                         println!("{line}");
                     }
                     println!("packet: {}", path.display());
+                    for line in seed_lines(seeds.as_ref()) {
+                        println!("{line}");
+                    }
                 }
             }
         }
         None => {
             print!("{}", review.packet());
-            for line in lines(&review, status) {
+            for line in lines(&review, status)
+                .into_iter()
+                .chain(seed_lines(seeds.as_ref()))
+            {
                 eprintln!("{line}");
             }
         }
     }
     if summary.findings == 0 { OK } else { INVALID }
+}
+
+/// Writes each seed as `<id>.zcve` into the new directory `path` and
+/// describes them; the directory is created whole or the command fails.
+fn write_seeds(path: &Path, seeds: Vec<review::seeds::Seed>) -> Result<Value, Failure> {
+    fs::create_dir_all(
+        path.parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or(Path::new(".")),
+    )
+    .and_then(|()| fs::create_dir(path))
+    .map_err(|error| Failure::Read(format!("create {}: {error}", path.display())))?;
+    let mut programs = Vec::with_capacity(seeds.len());
+    for seed in seeds {
+        let file = path.join(format!("{}.zcve", seed.id));
+        atomic_create(&file, &seed.program)
+            .map_err(|error| Failure::Read(format!("write {}: {error}", file.display())))?;
+        programs.push(json!({
+            "id": seed.id, "path": file.display().to_string(), "bytes": seed.program.len(),
+            "sha256": sha256_hex(&seed.program), "program_equivalent": seed.program_equivalent,
+        }));
+    }
+    Ok(json!({
+        "directory": path.display().to_string(),
+        "kind": "equivalent-over-full-domain mutants, as seed proposals; never evidence",
+        "programs": programs,
+    }))
+}
+
+/// One line per written seed.
+fn seed_lines(seeds: Option<&Value>) -> Vec<String> {
+    seeds
+        .and_then(|seeds| seeds["programs"].as_array())
+        .into_iter()
+        .flatten()
+        .map(|seed| {
+            format!(
+                "seed: {} ({}program-equivalent)",
+                seed["path"].as_str().unwrap_or_default(),
+                if seed["program_equivalent"] == true {
+                    ""
+                } else {
+                    "not "
+                }
+            )
+        })
+        .collect()
 }
 
 /// The human summary.
