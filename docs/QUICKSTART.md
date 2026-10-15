@@ -12,8 +12,9 @@ smallest example:
 cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core
 ```
 
-This development-branch cutover is intentionally breaking. Combined V2
-qualification is tracked separately.
+This V2 cutover is intentionally breaking. The
+[2.3.0 release notes](RELEASE_NOTES.md) state the release's assurance scope
+and limits.
 
 ## Retained V1 compatibility journey
 
@@ -121,7 +122,7 @@ zeno-fcis = { version = "=1.1.0", features = ["bootstrap"] }
 # Crash-atomic SQLite publication
 zeno-fcis = { version = "=1.1.0", features = ["sqlite-shell"] }
 
-# Checked external engines such as an SMT, Lean, CVC5, or private ESSO adapter
+# Checked external engines such as an SMT, Lean, CVC5, or private checker adapter
 zeno-fcis = { version = "=1.1.0", default-features = false, features = ["backend"] }
 ```
 
@@ -243,8 +244,8 @@ the exact reviewed initial state is checked before a shell can be created.
 Formal tools are optional adapters:
 
 - public users can mount Lean, SMT/Z3, CVC5, Kani, Flux, or another checker;
-- private ESSO users can implement the same public verifier/backend traits in a
-  private crate;
+- users of a private checker can implement the same public verifier/backend
+  traits in a private crate;
 - timeout, crash, unsupported input, disagreement, and `unknown` grant no
   authority.
 
@@ -333,13 +334,12 @@ Read [Commit evidence and durable outbox model](COMMIT_EVIDENCE_AND_OUTBOX_MODEL
 
 ZenoFCIS does not currently provide:
 
-- Cargo API stability or a completed official V1 release;
 - a concurrent scheduler, threaded shell, or production parallel runtime;
 - a bundled proof that project-specific footprints written by a person or an
   LLM are complete;
 - automatic invention of project schemas, identifiers, laws, or policies;
-- a bundled universal solver, theorem prover, ESSO installation, or proof of a
-  checker implementation;
+- a bundled universal solver, theorem prover, private checker installation, or
+  proof of a checker implementation;
 - automatic economic correctness, requirement completeness, or deployment
   qualification;
 - general production qualification for authenticated state, SQLite delivery,

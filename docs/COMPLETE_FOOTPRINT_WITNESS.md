@@ -99,7 +99,7 @@ Callers may propose evidence. They do not choose the authority bindings,
 approved verifier, minted witnesses, or successful authorization. The parallel
 authorization API does not accept caller-supplied witnesses.
 
-ESSO is an optional private checker and can implement
+An optional private checker can implement
 `FootprintEvidenceVerifier` in a private adapter. Lean, SMT/Z3, CVC5, Kani,
 Flux, static analyzers, and generated-control-flow checkers can implement the
 same public trait. ZenoFCIS does not require or embed any one checker.
@@ -195,7 +195,8 @@ Permanent tests reject:
   verifier actually provide one.
 - An execution-observed footprint or a passing bounded test suite is not a
   complete static footprint proof.
-- ZenoFCIS does not ship ESSO, Lean, Z3, CVC5, Kani, Flux, or another checker.
+- ZenoFCIS does not ship Lean, Z3, CVC5, Kani, Flux, a private checker, or any
+  other checker.
 - ZenoFCIS does not establish soundness of an external verifier or authenticate
   its binary by itself.
 - The authorization does not prove conflict commutativity or sequential parity;

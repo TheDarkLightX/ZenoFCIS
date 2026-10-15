@@ -1,9 +1,10 @@
 # Public release candidates
 
-The V2.3 candidate packages declare Rust workspace version `2.3.0-rc.1`.
-The 2.3.0 stable release line combines the V2.2 and V2.3 work; published
-artifacts must pass their release-source qualification. See
-[installation](INSTALLATION.md).
+This page records the two public V2 prereleases. The stable 2.3.0 release,
+which combines the V2.2 and V2.3 work, supersedes both; see the
+[2.3.0 release notes](RELEASE_NOTES.md) and the
+[installation guide](INSTALLATION.md). The V2.3 candidate packages declare
+Rust workspace version `2.3.0-rc.1`.
 
 Status: 10 October 2026. Both candidates below are public prereleases. Each
 advertises one host executable: the **Linux x86_64 GNU `zeno-fcis` CLI**, with
@@ -86,9 +87,9 @@ checks, hosted assembly, the installed CLI version check, and the generated
 durable-counter journey passed. A complete hosted CI run and a fresh full
 acceptance run at the binary revision are not claimed.
 
-## Current limits
+## Candidate limits
 
-These are release candidates for the supported subset; they do not complete
+These were release candidates for the supported subset; they did not complete
 the full stable V2.2/V2.3 scope. Finite component certificates do not
 establish a coupled application's state, interference, atomicity, or delivery
 guarantees. No general symbolic certificate chain, universal core correctness,

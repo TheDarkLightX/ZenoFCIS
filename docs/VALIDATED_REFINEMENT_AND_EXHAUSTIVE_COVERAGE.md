@@ -59,7 +59,7 @@ exhaustive evidence. It remains available for compatibility and diagnostics.
 - `zeno-fcis-codec` supplies canonical encodings and domain-separated
   commitments.
 
-No solver, theorem prover, ESSO installation, runtime, filesystem, network, or
+No solver, theorem prover, private checker installation, runtime, filesystem, network, or
 database is embedded in the semantic crate.
 
 ## Deterministic resource bounds
@@ -121,7 +121,7 @@ definition remains a reviewed project protocol choice.
 
 - This boundary does not prove a runtime transition correct merely because one
   or more cases match.
-- It does not prove that an external solver, theorem prover, ESSO checker, or
+- It does not prove that an external solver, theorem prover, private checker, or
   importer is sound; exact independently verified evidence is still required.
 - It does not infer a finite domain from source code.
 - It does not claim unbounded coverage from a bounded manifest.

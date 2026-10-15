@@ -40,7 +40,7 @@ After the schema/code-generation layer is green, separate agents may implement o
 - JMT/sparse-Merkle storage planning behind `CanonicalPatch`;
 - persistent-collection benchmark adapters;
 - Kani, Lean, Z3, CVC5, and translation-validation evidence importers;
-- ESSO synthesis/counterexample integration;
+- private synthesis and counterexample adapters;
 - concrete database, crash-recovery, and outbox refinements;
 - fuzzing, Miri, dependency review, and reproducible release tooling;
 - additional project profiles after ZenoDEX zUSD.

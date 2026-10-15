@@ -44,8 +44,8 @@ Each claim binds an implementation, specification, domain and named trusted
 base. Specification adequacy, external fact authentication, persistence and
 delivery retain their own review and qualification obligations.
 
-The [candidate assurance scope](RELEASE_CANDIDATES.md) identifies the supported
-verified units and the remaining qualification limits. The dependency rings
+The [2.3.0 release notes](RELEASE_NOTES.md) identify the supported verified
+units and the remaining qualification limits. The dependency rings
 below describe the existing library; their presence alone does not establish
 the completed V2 guarantee.
 
@@ -159,7 +159,7 @@ These remain project work:
 - cross-store atomicity;
 - chain deployment qualification.
 
-Concrete Lean, Flux, Kani, SMT, private ESSO, and Morph checkers still require
-separately mounted adapters and exact evidence. These gaps block an official
+Concrete Lean, Flux, Kani, SMT and private checkers still require separately
+mounted adapters and exact evidence. These gaps block an official
 production value-moving profile, but not publication of the reusable core
 library.

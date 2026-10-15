@@ -4,14 +4,16 @@ ZenoFCIS is a Rust library family for high-assurance functional-core /
 imperative-shell systems.
 
 Current workspace version: 2.3.0
-Current status: 2.3.0 is the first stable V2 release version, combining the
-V2.2 and V2.3 source work; artifact qualification and publication are separate.
-crates.io 1.1.0 retains the historical V1 API. Use the matching tagged V2 source.
+Current status: 2.3.0 is the current stable release and the first stable V2
+release, combining the V2.2 and V2.3 source work; docs/RELEASE_NOTES.md states
+its scope and limits. crates.io 1.1.0 retains the historical V1 API. Use the
+matching tagged V2 source.
 Rust toolchain: 1.97.1 for repository validation
 
 ## Start here
 
 - docs/INDEX.md: every guide, grouped by task
+- docs/RELEASE_NOTES.md: the 2.3.0 release, its scope and its limits
 - docs/INSTALLATION.md: exact dependency and source installation
 - docs/QUICKSTART.md: supported project adoption path
 - docs/API_REFERENCE.md: public API entry points and rustdoc
@@ -34,7 +36,7 @@ Rust toolchain: 1.97.1 for repository validation
 - docs/DEVELOPER_GUARDRAILS.md: optional deterministic Probity rules and setup
 - docs/ARCHITECTURE.md: dependency rings
 - docs/BOUNDED_COMPLETION.md: finite exits, bounded plan import and ordered preparation
-- docs/RELEASE_CANDIDATES.md: pinned public candidates, download assets, and the current V2 source line
+- docs/RELEASE_CANDIDATES.md: earlier pinned public candidates and their download assets
 - docs/V1_1_RELEASE_NOTES.md: historical 1.1.0 workflows and compatibility
 - docs/V1_RELEASE_NOTES.md: historical 1.0.0 stable API scope and compatibility limits
 - docs/PACKAGING.md: package authority and retained artifacts
@@ -110,8 +112,8 @@ rules still apply.
 ## Formal tools
 
 The backend and evidence protocols are tool-neutral. Public users may mount
-Lean, SMT/Z3, CVC5, Kani, Flux, or another checker. Private ESSO users may
-implement the same traits in a private crate. Missing tools, timeouts, crashes,
+Lean, SMT/Z3, CVC5, Kani, Flux, or another checker. Users of a private checker
+may implement the same traits in a private crate. Missing tools, timeouts, crashes,
 unknown results, and checker disagreement grant no authority.
 
 ## Deterministic parallelism

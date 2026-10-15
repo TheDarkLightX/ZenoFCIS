@@ -68,10 +68,10 @@ checker semantics, and required coverage. A separate evidence policy selects
 the concrete checker implementation for a release.
 
 Public deployments can mount Lean, Z3, CVC5, Kani, Flux, or another available
-checker. ESSO remains private and optional: users who have it can implement the
-same `LawEvidenceVerifier` interface in a private repository without adding an
-ESSO dependency, source file, stable identifier, or release requirement to
-ZenoFCIS.
+checker. Private checkers remain optional: users who have one can implement
+the same `LawEvidenceVerifier` interface in a private repository without
+adding a dependency, source file, stable identifier, or release requirement
+for it to ZenoFCIS.
 
 Every checker receives:
 
@@ -209,7 +209,7 @@ semantics.
 - A successful executable check is not an unbounded proof.
 - A build hash does not attest the running binary by itself.
 - `StructuralChecker` is not proof authority.
-- ESSO is not bundled, required, or treated as a universal checker.
+- No private checker is bundled, required, or treated as a universal checker.
 - This package does not qualify Solidity, Solana, or other deployment
   interpreters.
 - This package does not repair SQLite row-set integrity, parallel effect

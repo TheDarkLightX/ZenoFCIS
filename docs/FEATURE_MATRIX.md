@@ -1,14 +1,13 @@
 # ZenoFCIS feature matrix
 
-This matrix covers the current `zeno-fcis` umbrella source API. The development
-workspace declares `2.3.0`, and the breaking V2 API below needs a pinned source
-dependency. The historical `1.1.0` package and its API stability promise have
-their own scope. For the public
-[2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md), use the
-matching source tag, as the [installation guide](INSTALLATION.md) describes.
-Their only advertised host executable is the Linux x86_64 GNU CLI, which needs
-glibc 2.39 or later; crates.io and other host binaries are not claimed for
-them.
+This matrix covers the current `zeno-fcis` umbrella source API. The workspace
+declares `2.3.0`, the current stable release, and the breaking V2 API below
+needs a pinned source dependency on the matching tag, as the
+[installation guide](INSTALLATION.md) describes. The historical `1.1.0`
+package and its API stability promise have their own scope. The earlier public
+[2.2.0-rc.1 and 2.3.0-rc.1 candidates](RELEASE_CANDIDATES.md) advertised only
+the Linux x86_64 GNU CLI, which needs glibc 2.39 or later; crates.io and other
+host binaries were not claimed for them.
 
 The normal application API is `zeno_fcis::program`, which needs no optional
 features. It binds complete declarations to the library-owned evaluator and to
@@ -109,7 +108,7 @@ stated bounded refinement evidence.
 | `backend` | `no_std + alloc` protocol | Formal adapter | Synthesis plus checked engine/verifier requests, responses, and certificates |
 
 Public Lean, SMT/Z3, CVC5, Kani, Flux, or other adapters can implement the
-backend protocol. Users with private ESSO access can implement it in a private
+backend protocol. Users with a private checker can implement it in a private
 crate. No backend decides release or commit authority by itself.
 
 Checked transform and optimization commands operate within their declared finite

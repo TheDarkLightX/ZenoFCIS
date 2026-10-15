@@ -1,13 +1,22 @@
 # Installation
 
-The public `2.2.0-rc.1` and `2.3.0-rc.1` candidates each advertise one host
-executable, the **Linux x86_64 GNU CLI**, with offline Rustdoc. The
-[release candidates](RELEASE_CANDIDATES.md) page lists their exact source pins,
-signed checksum assets and qualification limits.
+ZenoFCIS `2.3.0` is the current stable release and the first stable V2
+release. Its release set has a CLI archive for **Linux x86_64 GNU** and one for
+**macOS on Apple silicon**, with offline Rustdoc; the signed
+`DOWNLOADS.sha256` on the release page lists the assets actually published.
+[Supported hosts](#supported-hosts) gives each host's requirements and
+qualification boundary. The [2.3.0 release notes](RELEASE_NOTES.md) describe
+the release's scope.
 
-The stable V2.2/V2.3 scope remains unfinished, and crates.io publication of
-the candidates is not claimed. Rust `1.97.1` is the supported toolchain for
-building the matching source and generated applications.
+Applications use the V2 API from the matching source tag, as
+[Matching source and current library API](#matching-source-and-current-library-api)
+describes. Rust `1.97.1` is the supported toolchain for building the matching
+source and generated applications.
+
+The earlier public `2.2.0-rc.1` and `2.3.0-rc.1` prereleases each advertised
+only the Linux x86_64 GNU CLI, and crates.io publication of the candidates is
+not claimed. The [release candidates](RELEASE_CANDIDATES.md) page keeps their
+exact source pins, signed checksum assets and qualification limits.
 
 ## Supported hosts
 
@@ -29,7 +38,7 @@ building the matching source and generated applications.
 ## Install the 2.3.0 CLI
 
 In the directory where you want to keep the archive and the executable, set
-`export VERSION=2.3.0` for a published 2.3.0 release, then run:
+`export VERSION=2.3.0`, then run:
 
 <!-- installed-journey: x86_64-unknown-linux-gnu -->
 ```bash
@@ -63,9 +72,9 @@ The older prerelease downloads, source pins and signatures stay in the
 
 ## Install on macOS (Apple silicon)
 
-For a published 2.3.0 release whose signed `DOWNLOADS.sha256` lists
-`zeno-fcis-2.3.0-aarch64-apple-darwin.tar.gz`, set `export VERSION=2.3.0`
-in your shell, then run:
+Check that the release's signed `DOWNLOADS.sha256` lists
+`zeno-fcis-2.3.0-aarch64-apple-darwin.tar.gz`. Then set
+`export VERSION=2.3.0` in your shell and run:
 
 <!-- installed-journey: aarch64-apple-darwin -->
 ```bash

@@ -220,8 +220,8 @@ tool proposes or checks one bounded artifact
     -> project promotion or authorization policy
 ```
 
-ESSO is a private optional checker. Owners who have it can implement the
-public backend or law-evidence traits in a private crate. RC3 directly supports
+Private checkers are optional. Owners who have one can implement the public
+backend or law-evidence traits in a private crate. RC3 directly supports
 the qualified CVC5 1.3.3, Z3 4.16.0, and Lean 4.30.0 adapters. Public users can
 also mount Kani or another checker through the protocol. Flux remains a future
 exporter, not an RC3 integration. A timeout, crash, disagreement, unsupported

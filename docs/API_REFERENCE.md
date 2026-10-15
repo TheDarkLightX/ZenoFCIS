@@ -27,8 +27,8 @@ The historical 1.1.0 API reference is available at:
 https://docs.rs/zeno-fcis/1.1.0/zeno_fcis/
 ```
 
-That reference does not document this breaking V2 development API. For the
-current signatures, generate Rustdoc from your exact checkout as shown below.
+That reference does not document the breaking V2 API. For the current
+signatures, generate Rustdoc from your exact checkout as shown below.
 
 ## Local reference
 
@@ -89,10 +89,10 @@ supported V2 route.
 
 ## Stability
 
-This development branch intentionally changes the 1.1.0 execution API. There
-is no stable V2 release yet; the public V2 candidates are prereleases.
+The 2.3.0 release, the first stable V2 release, intentionally changes the
+1.1.0 execution API. The earlier public V2 candidates were prereleases.
 Protocol identifiers remain versioned. SQLite stores use schema 10. A schema-9
 store opens only for an explicit migration after a complete audit, and older
 stores are refused rather than silently migrated. Final application, proof, CI
 and release checks have the limits stated in the
-[candidate record](RELEASE_CANDIDATES.md).
+[2.3.0 release notes](RELEASE_NOTES.md).

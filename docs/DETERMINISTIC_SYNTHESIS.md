@@ -47,9 +47,9 @@ existing ZenoFCIS value encoder.
 
 ## Nonclaims
 
-This crate does not embed ESSO, an SMT solver, a compiler, or an LLM. It is the
-deterministic authority boundary into which a mounted ESSO proposer and
-independent checkers plug. The kernel tests establish bounded enumeration and binding laws. The finite
+This crate does not embed a private synthesis engine, an SMT solver, a
+compiler, or an LLM. It is the deterministic authority boundary into which a
+mounted private proposer and independent checkers plug. The kernel tests establish bounded enumeration and binding laws. The finite
 profile separately checks its entire declared input domain and can replay an
 emitted target through the CLI. Neither layer proves an arbitrary grammar
 complete, an economic specification adequate, or an arbitrary runtime correct.

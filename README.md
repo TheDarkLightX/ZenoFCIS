@@ -57,8 +57,8 @@ must preserve the same assurance whoever produced them. Each guarantee names
 the exact implementation, specification, full supported input domain and
 trusted-base assumptions.
 
-**What is checked today.** The 2.3.0 source uses the supported checked program
-and mandatory Authority route. Its assurance is executable conformance to a
+**What is checked today.** The 2.3.0 release uses the supported checked
+program and mandatory Authority route. Its assurance is executable conformance to a
 reviewed contract across the supported domain, under named trusted
 assumptions. [Release assurance](docs/RELEASE_ASSURANCE.md) states the
 required checks and their scope.
@@ -74,11 +74,12 @@ the imperative shell. A passing stage check is not a release receipt.
 
 ## Release status
 
-This source line prepares **2.3.0**, the first stable V2 release, combining
-the V2.2 and V2.3 work. Its release set requires two host executables: the
+**2.3.0** is the current stable release and the first stable V2 release. It
+combines the V2.2 and V2.3 work; the [2.3.0 release notes](docs/RELEASE_NOTES.md)
+describe it. Its release set has two host executables: the
 **Linux x86_64 GNU CLI** (glibc 2.39 or later) and **macOS on Apple silicon**
-(`aarch64-apple-darwin`). Both archives must pass their host build, custody
-and installed-binary checks before the release is published. See
+(`aarch64-apple-darwin`). The release process requires both archives to pass
+their host build, custody and installed-binary checks before publication. See
 [installation](docs/INSTALLATION.md) and the
 [workflow qualification scope](docs/FEATURE_MATRIX.md#host-platforms).
 
@@ -87,22 +88,21 @@ and trusted assumptions. Source verification and qualification, exact-head
 CI, hosted qualification, packaging, signing and publication remain distinct
 steps.
 
-The public [2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)
+The earlier public [2.2.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.2.0-rc.1)
 and [2.3.0-rc.1](https://github.com/TheDarkLightX/ZenoFCIS/releases/tag/v2.3.0-rc.1)
 prereleases keep their exact sources and limits in the
 [candidate record](docs/RELEASE_CANDIDATES.md). The historical `1.1.0` release
-and its [release notes](docs/V1_1_RELEASE_NOTES.md) have their own scope; the
-2.3.0 source changes the public execution API.
+and its [release notes](docs/V1_1_RELEASE_NOTES.md) have their own scope;
+2.3.0 changes the public execution API.
 
 ## Install and run a first example
 
 The normal V2 library route declares a complete checked program. It is
-available in the 2.3.0 source, both with default features and with
+available in the 2.3.0 release, both with default features and with
 `default-features = false`. The historical `1.1.0` package has its own V1 API.
 
-For a published 2.3.0 release, check out `v2.3.0` as the
-[installation guide](docs/INSTALLATION.md) describes, then bind the dependency
-to that source:
+Check out the `v2.3.0` tag as the [installation guide](docs/INSTALLATION.md)
+describes, then bind the dependency to that source:
 
 ```toml
 [dependencies]
@@ -127,7 +127,7 @@ original schema + complete ProgramDefinition + reviewed policy + framing/channel
 Run the smallest example with
 `cargo +1.97.1 run --locked --offline -p zeno-fcis --example minimal_core`.
 
-The root and prelude cutover is intentionally breaking in the 2.3.0 source.
+The root and prelude cutover is intentionally breaking in 2.3.0.
 Native transition callbacks, public candidate sealing and caller-supplied
 usage have been retired. `zeno_fcis::legacy` retains inert compatibility data
 and standalone evidence utilities. The
@@ -552,7 +552,7 @@ The guarantee depends on four things:
 - **The checker must be correct.** The V1 end-to-end synthesis path trusts its
   interpreter and enumeration. The V2 route has source-bound executable
   interpreter, admission, decision and authority evidence, with the scope and
-  trusted assumptions recorded in the [candidate assurance scope](docs/RELEASE_CANDIDATES.md).
+  trusted assumptions recorded in the [2.3.0 release notes](docs/RELEASE_NOTES.md).
 - **The code around the program needs its own check.** In the durable-counter
   template, `tests/conformance.rs` runs all 64 admitted inputs through the real
   application: admission, the authority, the adapter that turns outputs into
@@ -597,8 +597,8 @@ bytes alone are not publication authority. See the
 Existing package names and optional compatibility data do not enlarge the
 supported V2 execution scope, and historical mounted comparisons do not qualify
 wider compound-value execution. Consult the
-[candidate assurance scope](docs/RELEASE_CANDIDATES.md) and the API migration
-guide before you choose an execution profile.
+[2.3.0 release notes](docs/RELEASE_NOTES.md) and the API migration guide
+before you choose an execution profile.
 
 ## Verification
 
@@ -608,7 +608,7 @@ covers admission, original-byte interpretation, scalar execution, complete
 decisions, laws/genesis and mandatory authority/replay. Per-stage proof runs
 are provisional; final source-bound profiles, controls and integration checks
 must pass together. See [release assurance](docs/RELEASE_ASSURANCE.md) and the
-[candidate record](docs/RELEASE_CANDIDATES.md) for scope and qualification
+[2.3.0 release notes](docs/RELEASE_NOTES.md) for scope and qualification
 limits.
 
 The main local gate is:
@@ -638,7 +638,7 @@ python3 tools/rc_package.py build --output /tmp/zeno-fcis-v1
 `rc_package.py build` writes a full local release package: all public `.crate`
 packages, Rustdoc, source and diagnostic binary archives, checksums, a
 CycloneDX SBOM, and provenance inputs. This is local packaging output. The
-2.3.0 release process requires both host CLI archives and their installed-use
+release process requires both host CLI archives and their installed-use
 records before publication, and the signed release checksum list identifies
 the assets actually published. See the [packaging reference](docs/PACKAGING.md).
 

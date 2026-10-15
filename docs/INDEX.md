@@ -8,7 +8,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [Installation](INSTALLATION.md)
 - [Quickstart](QUICKSTART.md)
 - [ZenoFCIS 2.3.0 release notes](RELEASE_NOTES.md)
-- [Public release candidates](RELEASE_CANDIDATES.md)
+- [Earlier public release candidates](RELEASE_CANDIDATES.md)
 - [V2 normal program API migration](V2_PROGRAM_API_MIGRATION.md)
 
 ## Tutorials
@@ -97,7 +97,7 @@ with [Get started](#get-started), then follow a tutorial.
 - [Rust typestate and checked newtypes skill](../skills/rust-typestate-newtype/SKILL.md)
 - [Optional finite Tau kit](TAU_KIT.md)
 
-ESSO is a private optional checker. Users who have it can implement the public
+Private checkers are optional. Users who have one can implement the public
 backend or evidence traits in a private crate. Lean, SMT/Z3, CVC5, Kani, Flux,
 and other tools can use the same public boundaries.
 
@@ -201,11 +201,13 @@ supported V2 route.
 
 ## Status
 
-The workspace is version `2.3.0`. The crates.io `1.1.0` API is the historical
-stable line. The current supported V2 source API ships in the pinned public
-candidates `v2.2.0-rc.1` and `v2.3.0-rc.1` and differs from `1.1.0`. See
-[release candidates](RELEASE_CANDIDATES.md) and
-[installation](INSTALLATION.md). Neither candidate is a stable V2 release.
+The workspace is version `2.3.0`, the current stable release and the first
+stable V2 release. Its V2 API differs from the historical crates.io `1.1.0`
+API and is used from the matching `v2.3.0` source tag; see
+[installation](INSTALLATION.md) and the
+[2.3.0 release notes](RELEASE_NOTES.md). The earlier public candidates
+`v2.2.0-rc.1` and `v2.3.0-rc.1` were prereleases; their
+[candidate record](RELEASE_CANDIDATES.md) keeps their sources and limits.
 
 The documentation describes implemented APIs and explicit boundaries. It does
 not claim general deployment qualification, a bundled concurrent runtime, or

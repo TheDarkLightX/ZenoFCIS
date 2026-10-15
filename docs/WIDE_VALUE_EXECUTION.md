@@ -1,8 +1,9 @@
 # Wide values and larger decision programs
 
-This document describes the unreleased development source. Final combined
-qualification is pending; the published candidate has its separately stated
-[release scope](RELEASE_CANDIDATES.md).
+This document describes wide values in the 2.3.0 release. The
+[2.3.0 release notes](RELEASE_NOTES.md) state the release's scope and limits;
+the earlier public candidates have their own
+[candidate record](RELEASE_CANDIDATES.md).
 
 The mandatory library route admits a contract, evaluates original input
 bytes, checks its declared laws, and returns a private publication capability

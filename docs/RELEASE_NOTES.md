@@ -1,11 +1,13 @@
 # ZenoFCIS 2.3.0
 
-ZenoFCIS 2.3.0 combines the V2.2 and V2.3 source line into one version, with
-no separate stable 2.2.0 release. V2 deliberately changes the 1.1.0 API.
-These notes describe the source prepared for the stable release; final
-acceptance, hosted platform qualification and stable publication are not
-claimed here. The earlier prereleases retain their
-[candidate records](RELEASE_CANDIDATES.md).
+ZenoFCIS 2.3.0 is the current stable release and the first stable V2
+release. It combines the V2.2 and V2.3 source line into one version, with no
+separate stable 2.2.0 release. V2 deliberately changes the 1.1.0 API. These
+notes describe the release's source changes and locally observed checks. They
+do not themselves claim final acceptance or hosted platform qualification;
+each published artifact's qualification belongs to its release workflow run,
+and the signed `DOWNLOADS.sha256` lists the published assets. The earlier
+prereleases retain their [candidate records](RELEASE_CANDIDATES.md).
 
 An application declares its original schema, decision program, reasons,
 channels and laws as data. The library admits the inputs, computes the
@@ -195,15 +197,15 @@ context are application inputs; ZenoFCIS does not authenticate them.
 
 ## Platforms and upgrading
 
-Binary support is planned for these targets, conditioned on completed
-platform qualification, installation and release-custody checks:
+The release process publishes a binary for each of these targets only after
+its platform qualification, installation and release-custody checks pass:
 
 | Target | Requirements and qualification boundary |
 | --- | --- |
-| Linux x86_64 GNU | Planned glibc 2.39 floor; qualification belongs to the completed matching Linux host run |
+| Linux x86_64 GNU | glibc 2.39 floor; qualification belongs to the completed matching Linux host run |
 | macOS on Apple silicon | `aarch64-apple-darwin`; minimum-version metadata is macOS 11.0; qualification belongs to the completed macOS 15 arm64 run, not every macOS version |
 
-No Windows or Intel macOS binary is planned. Linux-only containment and
+There is no Windows or Intel macOS binary. Linux-only containment and
 emitted-code execution for `synth verify` do not become macOS-qualified
 features. A configured workflow or minimum-version field does not establish
 a qualified host, published executable, notarization or verified download
@@ -222,7 +224,6 @@ becomes `Value::boolean(true)` and `TransitionDecision` becomes
 `PublicationOutcome`. Older databases are not migrated implicitly. See the
 [migration guide](V2_PROGRAM_API_MIGRATION.md) for the exact source changes.
 
-After stable publication, the security policy targets the 2.3.x line and
-supersedes 1.1.x and 1.0.x; candidates remain unsupported. Until then,
-[`SECURITY.md`](../SECURITY.md) states the active policy and private reporting
-route. These notes assert no active 2.3.x support or published signing set.
+The security policy supports the 2.3.x line and supersedes 1.1.x and 1.0.x;
+candidates are unsupported. [`SECURITY.md`](../SECURITY.md) states the policy
+and the private reporting route.
