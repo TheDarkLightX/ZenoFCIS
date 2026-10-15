@@ -735,6 +735,7 @@ fn refusal_json(refusal: &Refusal) -> Value {
 mod terminal_io_tests {
     use super::*;
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn receipt_staging_failure_retains_actual_completed_work_without_verdict() {
         let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -783,6 +784,7 @@ mod terminal_io_tests {
         assert!(report["detail"].get("ordinal").is_none());
         assert!(!receipt.exists());
     }
+    #[cfg(target_os = "linux")]
     #[test]
     fn a_receipt_staged_after_the_deadline_is_dropped_without_handover() {
         let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -820,6 +822,51 @@ mod terminal_io_tests {
             0
         );
         std::fs::remove_dir(directory).unwrap_or_else(|error| panic!("{error}"));
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn offline_parallel_refuses_without_containment_while_serial_check_remains_available() {
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../docs/benchmarks/withdrawal-queue/artifacts");
+        let directory = std::env::temp_dir().join(format!(
+            "zeno-unsupported-containment-{}-{}",
+            std::process::id(),
+            crate::TEMP_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        ));
+        std::fs::create_dir(&directory).unwrap_or_else(|error| panic!("{error}"));
+        let receipt = directory.join("receipt.json");
+        let original = fixtures.join("boolean-kernel-original.zcve");
+        let candidate = fixtures.join("boolean-kernel-candidate.zcve");
+        let limits = Limits {
+            steps: 256,
+            input_tuples: 1000,
+        };
+        let (exit, report) = check(
+            &original,
+            &candidate,
+            limits,
+            Some(&receipt),
+            Some(crate::transform_plan::RunLimits::offline()),
+        );
+        assert_eq!(exit, crate::BLOCKED, "{report}");
+        assert_eq!(report["status"], "inconclusive");
+        assert_eq!(report["authority"], "none");
+        assert_eq!(
+            report["detail"]["reason"],
+            "containment-unavailable:platform"
+        );
+        assert_eq!(
+            std::fs::read_dir(&directory)
+                .unwrap_or_else(|error| panic!("{error}"))
+                .count(),
+            0
+        );
+        let (exit, report) = check(&original, &candidate, limits, Some(&receipt), None);
+        assert_eq!(exit, crate::OK, "{report}");
+        assert_eq!(report["status"], "equivalent");
+        assert!(receipt.is_file());
+        std::fs::remove_dir_all(directory).unwrap_or_else(|error| panic!("{error}"));
     }
 
     #[test]

@@ -1,26 +1,36 @@
 //! Shell tests: the supervisor, the session store, the driver with each
 //! proposer, crash recovery and the hosted adapter's silence.
 
-use super::{OptimizeEngine, Store, drive, strategy_engine, supervise};
+#[cfg(target_os = "linux")]
+use super::drive;
+use super::{OptimizeEngine, Store, strategy_engine, supervise};
+#[cfg(target_os = "linux")]
 use crate::loop_proposers::{Fake, Hosted, HostedConfig, Local, Proposer, SCRIPT_SCHEMA};
 use crate::neural_loop::acquisition::{Acquisition, Mode as AcquisitionMode};
+#[cfg(target_os = "linux")]
 use crate::neural_loop::incumbent::Incumbent;
 use crate::neural_loop::limits::Limits;
 use crate::neural_loop::profiles::Profile;
 use crate::neural_loop::request::{Policy, Request};
-use crate::neural_loop::session::{
-    ResumePlan, ResumeRefusal, Resumed, Session, Status, StopReason, WorkerFailure,
-};
-use crate::neural_loop::strategy::{NoEngine, SearchReport, Strategy, StrategyEngine};
+#[cfg(target_os = "linux")]
+use crate::neural_loop::session::{ResumePlan, ResumeRefusal, Resumed, Status, StopReason};
+use crate::neural_loop::session::{Session, WorkerFailure};
+#[cfg(target_os = "linux")]
+use crate::neural_loop::strategy::NoEngine;
+use crate::neural_loop::strategy::{SearchReport, Strategy, StrategyEngine};
 use crate::optimize::strategy::{DEFAULT_STRATEGY_JSON, Phase};
 use serde_json::{Value, json};
+#[cfg(target_os = "linux")]
 use std::convert::Infallible;
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+// Successful replay requires the Linux containment backend.
+#[cfg(target_os = "linux")]
 #[path = "loop_command_resume_tests.rs"]
 mod resume;
 
@@ -61,6 +71,7 @@ const ORIGINAL: &[u8] = include_bytes!(
 const CANDIDATE: &[u8] = include_bytes!(
     "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-candidate.zcve"
 );
+#[cfg(target_os = "linux")]
 const PADDED: &[u8] = include_bytes!(
     "../../../docs/benchmarks/withdrawal-queue/artifacts/boolean-kernel-padded.zcve"
 );
@@ -75,6 +86,7 @@ fn request() -> Request {
     .unwrap_or_else(|refusal| panic!("{refusal:?}"))
 }
 
+#[cfg(target_os = "linux")]
 fn engine() -> Arc<dyn StrategyEngine + Send + Sync> {
     Arc::new(NoEngine)
 }
@@ -91,6 +103,7 @@ fn open_store(dir: &Path) -> (Store, Session) {
 /// Resumes a stored session in memory. The replay reservation goes to a
 /// write that keeps nothing, so the directory stays exactly as the test left
 /// it; `load_session` is the durable route, which `resume_tests` covers.
+#[cfg(target_os = "linux")]
 fn reopen(dir: &Path) -> Result<Session, ResumeRefusal> {
     let mut acquisition = Acquisition::reserve(AcquisitionMode::Resume);
     let (_, loaded) =
@@ -109,10 +122,12 @@ fn reopen(dir: &Path) -> Result<Session, ResumeRefusal> {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn resumed(dir: &Path) -> Session {
     reopen(dir).unwrap_or_else(|reason| panic!("expected a session: {reason:?}"))
 }
 
+#[cfg(target_os = "linux")]
 fn script(dir: &Directory, steps: Value) -> Fake {
     let value = json!({"schema": SCRIPT_SCHEMA, "steps": steps});
     Fake::from_script(&value, &dir.0).unwrap_or_else(|error| panic!("{error:?}"))
@@ -140,6 +155,7 @@ fn the_supervisor_reports_panics_and_deadlines_without_propagating() {
     assert!(started.elapsed() >= Duration::from_millis(400));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn a_panicking_or_slow_check_worker_leaves_the_incumbent_unchanged() {
     let directory = Directory::new();
@@ -205,6 +221,7 @@ fn a_panicking_or_slow_check_worker_leaves_the_incumbent_unchanged() {
     assert_eq!(resumed.ledger().accounting().attempts, 2);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn the_store_round_trips_a_session_and_keeps_crash_pending_charges() {
     let directory = Directory::new();
@@ -299,6 +316,7 @@ fn the_store_round_trips_a_session_and_keeps_crash_pending_charges() {
     assert_eq!(recovered.report()["accounting"]["complete"], false);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn a_rolled_back_or_edited_ledger_is_refused_on_reopen() {
     let directory = Directory::new();
@@ -342,6 +360,7 @@ fn a_rolled_back_or_edited_ledger_is_refused_on_reopen() {
     ));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn the_local_proposer_drives_to_exhaustion_and_the_hosted_adapter_stays_silent() {
     let directory = Directory::new();
@@ -430,6 +449,7 @@ fn the_local_proposer_drives_to_exhaustion_and_the_hosted_adapter_stays_silent()
     assert_eq!(enabled.unavailable_reason(), "hosted-provider-unapproved");
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn the_fake_provider_is_metered_as_a_model_and_its_claims_are_ignored() {
     let directory = Directory::new();
@@ -544,6 +564,7 @@ fn the_wired_engine_is_the_optimizer_and_admits_exactly_its_phases() {
     assert_eq!(phases.len(), 6);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn an_optimizer_strategy_improves_the_kernel_only_through_the_loops_own_check() {
     let document: Value = serde_json::from_str(DEFAULT_STRATEGY_JSON)
@@ -777,6 +798,7 @@ fn bootstrap_directory_cap_refuses_before_unbounded_collection() {
     );
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn leftover_checker_staging_is_skipped_reported_and_bounded() {
     let directory = Directory::new();
@@ -975,6 +997,7 @@ fn retained_receipt_idempotency_and_oversized_collision_preserve_the_store() {
     assert_eq!(store.stored_bytes, stored_before);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn a_check_finalized_after_its_deadline_cannot_update_the_incumbent() {
     let directory = Directory::new();
@@ -993,4 +1016,59 @@ fn a_check_finalized_after_its_deadline_cannot_update_the_incumbent() {
     let outcome = session.conclude(job, report);
     assert_eq!(outcome.name(), "check-failed:timeout");
     assert!(session.incumbent().replacement().is_none());
+}
+
+#[cfg(not(target_os = "linux"))]
+#[test]
+fn contained_loop_entry_points_refuse_without_a_supported_backend() {
+    type Invocation = fn(&Path, &Path) -> (u8, Value);
+    let entry_points: [(&str, Invocation); 3] = [
+        ("resume", |session, _| super::resume_command(session)),
+        ("candidate", |session, candidate| {
+            super::candidate_command(session, Some(candidate), None, None)
+        }),
+        ("run", |session, _| {
+            super::run_command(session, super::ProposerArg::Local, None, None, &[])
+        }),
+    ];
+    for (name, command) in entry_points {
+        let directory = Directory::new();
+        let session = directory.0.join(name);
+        let original = directory.write("original.zcve", ORIGINAL);
+        let (exit, opened) = super::open(
+            &original,
+            &session,
+            Profile::FunctionalBoolV1,
+            Limits::CEILING,
+        );
+        assert_eq!(exit, crate::OK, "{opened}");
+        assert_eq!(opened["status"], "opened");
+        let candidate = directory.write("candidate.zcve", CANDIDATE);
+        let (exit, report) = command(&session, &candidate);
+        assert_eq!(exit, crate::BLOCKED, "{report}");
+        assert_eq!(report["status"], "resume-inconclusive");
+        assert_eq!(
+            report["detail"]["reason"],
+            "containment-unavailable:platform"
+        );
+        assert_eq!(report["authority"], "none");
+        assert!(report["detail"]["trusted_incumbent"].is_null());
+        let bytes =
+            fs::read(session.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error}"));
+        let ledger = crate::neural_loop::ledger::Ledger::parse_lines(&bytes)
+            .and_then(crate::neural_loop::ledger::Ledger::from_entries)
+            .unwrap_or_else(|error| panic!("{error:?}"));
+        let totals = ledger.accounting();
+        assert_eq!((totals.attempts, totals.checks, totals.replays), (0, 0, 1));
+        assert!(totals.work_reserved > 0);
+        for subdirectory in ["receipts", "artifacts", "witnesses"] {
+            assert_eq!(
+                fs::read_dir(session.join(subdirectory))
+                    .unwrap_or_else(|error| panic!("{error}"))
+                    .count(),
+                0,
+                "{name}: no checked artifact after containment refusal"
+            );
+        }
+    }
 }

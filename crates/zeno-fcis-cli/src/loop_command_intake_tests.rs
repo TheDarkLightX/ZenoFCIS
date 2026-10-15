@@ -1,16 +1,21 @@
 //! Actual candidate entry-point billing and durable refusal boundaries.
-use super::{CANDIDATE, Directory, ORIGINAL};
+#[cfg(target_os = "linux")]
+use super::CANDIDATE;
+use super::{Directory, ORIGINAL};
 use crate::loop_command::{Store, candidate_command, resume_command};
 use crate::neural_loop::canonical_json;
+#[cfg(target_os = "linux")]
 use crate::neural_loop::ledger::{Kind, Ledger, Stage};
 use crate::neural_loop::limits::Limits;
 use crate::neural_loop::profiles::Profile;
+#[cfg(target_os = "linux")]
 use crate::neural_loop::program_json::program_to_json;
 use crate::neural_loop::request::{Policy, Request};
 use crate::neural_loop::session::Session;
 use serde_json::{Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "linux")]
 use zeno_fcis_synthesis::finite_runtime::import_program;
 
 fn must<T, E: std::fmt::Debug>(value: Result<T, E>) -> T {
@@ -35,11 +40,13 @@ fn setup(directory: &Directory, precharged: u64) -> PathBuf {
     path
 }
 
+#[cfg(target_os = "linux")]
 fn ledger(path: &Path) -> Ledger {
     let bytes = must(fs::read(path.join("ledger.jsonl")));
     must(Ledger::from_entries(must(Ledger::parse_lines(&bytes))))
 }
 
+#[cfg(target_os = "linux")]
 fn preparations(ledger: &Ledger) -> Vec<u64> {
     ledger
         .entries()
@@ -54,6 +61,7 @@ fn preparations(ledger: &Ledger) -> Vec<u64> {
         .collect()
 }
 
+#[cfg(target_os = "linux")]
 fn input(directory: &Directory, json_input: bool) -> PathBuf {
     if json_input {
         let program = must(import_program(CANDIDATE));
@@ -74,6 +82,7 @@ fn supply(session: &Path, path: &Path, json_input: bool, provenance: Option<&Pat
     }
 }
 
+#[cfg(target_os = "linux")]
 fn asserted(session: &Path) -> Value {
     let text = must(fs::read_to_string(session.join("transcript.jsonl")));
     text.lines()
@@ -83,6 +92,7 @@ fn asserted(session: &Path) -> Value {
         .clone()
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn four_intake_routes_charge_actual_ledger_and_preserve_serial_receipt() {
     let request = must(Request::admit(
@@ -139,6 +149,7 @@ fn four_intake_routes_charge_actual_ledger_and_preserve_serial_receipt() {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn missing_then_malformed_provenance_keeps_each_actual_reservation() {
     for (json_input, intake) in [(false, 593_920), (true, 2_625_536)] {
@@ -171,6 +182,7 @@ fn missing_then_malformed_provenance_keeps_each_actual_reservation() {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn intake_exact_and_one_short_precede_reads_and_never_refund() {
     for (json_input, present, intake) in [

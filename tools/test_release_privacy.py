@@ -107,6 +107,26 @@ class PrivacyTests(unittest.TestCase):
                 scan.inspect("record", value)
                 self.assertEqual(scan.report()["status"], "passed")
 
+    def test_file_uris_do_not_masquerade_as_windows_drive_paths(self):
+        for uri in [b"file:///Users/runner/work/project", b"file:/Users/runner/work/project",
+                    b"file:///home/runner/work/project"]:
+            for value in [uri, json.dumps({"argv": [uri.decode()]}).encode()]:
+                with self.subTest(value=value):
+                    scan = Scan()
+                    scan.inspect("journey.json", value)
+                    self.assertEqual(scan.report()["status"], "passed")
+        private = b"private-" + b"owner"
+        for value in [b"file:///Users/" + private + b"/project",
+                      b"C:/Users/" + private + b"/project",
+                      b"c:/Users/" + private,
+                      b"file:///C:/Users/" + private + b"/project",
+                      b"C:" + bytes([92]) + b"Users" + bytes([92]) + private]:
+            for encoded in [value, json.dumps({"path": value.decode()}).encode()]:
+                with self.subTest(value=encoded):
+                    scan = Scan()
+                    scan.inspect("journey.json", encoded)
+                    self.assertEqual(scan.report()["status"], "failed")
+
     def test_owner_identifiers_are_literal_private_and_scoped_to_each_scan(self):
         marker = b"owner+private@example.invalid"
         scan = Scan((marker,))
