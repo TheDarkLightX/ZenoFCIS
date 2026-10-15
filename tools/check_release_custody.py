@@ -726,9 +726,14 @@ class Custody:
                 counted["workspace"] += 1
                 source = item["path"]
                 directory = next((d for d in crates if source.startswith(d + "/")), None)
+                member = source[len(directory) + 1:] if directory is not None else None
+                # Cargo normalizes the published manifest; its .orig member
+                # preserves the source manifest used by the workspace build.
+                if member == "Cargo.toml":
+                    member = "Cargo.toml.orig"
                 if source not in self.tree.files or sha256_bytes(self.tree.blob(source)) != item["sha256"]:
                     problems.append(f"{path.name}: {source} is not this commit's blob")
-                elif directory is None or crates[directory].get(source[len(directory) + 1:]) != self.tree.blob(source):
+                elif directory is None or crates[directory].get(member) != self.tree.blob(source):
                     problems.append(f"{path.name}: {source} is not a member of a published crate")
             contents: dict[str, dict[str, bytes]] = {}
             for package in inputs.get("registry_packages", []):

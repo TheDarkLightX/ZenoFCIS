@@ -1043,6 +1043,8 @@ fn contained_loop_entry_points_refuse_without_a_supported_backend() {
         );
         assert_eq!(exit, crate::OK, "{opened}");
         assert_eq!(opened["status"], "opened");
+        let original_ledger =
+            fs::read(session.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error}"));
         let candidate = directory.write("candidate.zcve", CANDIDATE);
         let (exit, report) = command(&session, &candidate);
         assert_eq!(exit, crate::BLOCKED, "{report}");
@@ -1055,12 +1057,16 @@ fn contained_loop_entry_points_refuse_without_a_supported_backend() {
         assert!(report["detail"]["trusted_incumbent"].is_null());
         let bytes =
             fs::read(session.join("ledger.jsonl")).unwrap_or_else(|error| panic!("{error}"));
+        assert_eq!(
+            bytes, original_ledger,
+            "{name}: an empty session has nothing to replay"
+        );
         let ledger = crate::neural_loop::ledger::Ledger::parse_lines(&bytes)
             .and_then(crate::neural_loop::ledger::Ledger::from_entries)
             .unwrap_or_else(|error| panic!("{error:?}"));
         let totals = ledger.accounting();
-        assert_eq!((totals.attempts, totals.checks, totals.replays), (0, 0, 1));
-        assert!(totals.work_reserved > 0);
+        assert_eq!((totals.attempts, totals.checks, totals.replays), (0, 0, 0));
+        assert_eq!(totals.work_reserved, 0);
         for subdirectory in ["receipts", "artifacts", "witnesses"] {
             assert_eq!(
                 fs::read_dir(session.join(subdirectory))

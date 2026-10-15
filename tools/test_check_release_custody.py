@@ -302,6 +302,32 @@ class CustodyTest(unittest.TestCase):
                 self.edit_inputs(fixture.LINUX, change)
                 self.assertIn("C7-compiled-inputs", self.failed(self.check()), label)
 
+    def record_compiled_manifest(self) -> None:
+        source = "crates/demo-core/Cargo.toml"
+        for host in (fixture.LINUX, fixture.MAC):
+            self.edit_inputs(host, lambda d: d["workspace_inputs"].append(
+                {"path": source, "sha256": fixture.sha256(self.source.blob(source))}))
+
+    def test_compiled_manifest_uses_original_archive_member(self):
+        self.record_compiled_manifest()
+        report = self.check()
+        self.assertEqual(report["status"], "passed", self.problems(report, "C7-compiled-inputs"))
+
+    def test_compiled_manifest_refuses_missing_or_changed_original(self):
+        controls = {
+            "missing original": lambda members: members.pop("Cargo.toml.orig"),
+            "edited original": lambda members: members.update({"Cargo.toml.orig": b"# edited\n"}),
+            "normalized manifest as original": lambda members: members.update(
+                {"Cargo.toml.orig": members["Cargo.toml"]}),
+        }
+        for label, change in controls.items():
+            with self.subTest(label):
+                self.renew()
+                self.record_compiled_manifest()
+                self.rebuild_crate("demo-core", change)
+                failed = self.failed(self.check())
+                self.assertTrue({"C5-crate-archives", "C7-compiled-inputs"} <= failed, label)
+
     def test_a_cached_registry_archive_that_differs_fails(self):
         cached = next(self.source.cargo_home.glob("registry/cache/*/extdep-1.0.0.crate"))
         cached.write_bytes(cached.read_bytes() + b"\0")
