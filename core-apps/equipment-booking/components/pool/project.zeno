@@ -35,5 +35,5 @@ law 501 conservation on accept = ((command.101.120 == 150 || command.101.120 == 
 law 502 exact_movement on accept = context.102.130 == 1 && (command.101.120 == 150 -> post.100.110 + command.101.121 == pre.100.110 && post.100.111 == pre.100.111 + command.101.121) && (command.101.120 == 151 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 152 -> post.100.110 == pre.100.110 && post.100.111 + command.101.121 == pre.100.111) && (command.101.120 == 153 -> post.100.110 == pre.100.110 + command.101.121 && post.100.111 == pre.100.111);
 // Core seed reservation-pool/1; parameters {"C": 2, "Q": 1}.
 // Instance source-set SHA256 0ba057e4497bd19a4733f50b6d3dbe6b5c8ebfa5d40b9806e2acfab29f4337b6.
-// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/reservation-pool.json SHA256 42116eaf96f4101080d635766cf70066e27bf4971cef0ff1505f0e2d98deda41; replay required; no KernelChecked claim.
+// Family proof reference: Identified finite certificate in bound source tree core-components/proofs/reservation-pool.json SHA256 01ff3c987462ae14e9d2f0dd30bd6b3008c3e0e07b9ecd3fb83ceb3c48a2ba4c; replay required; no KernelChecked claim.
 // Qualification procedure: tools/check_core_components.py in the source tree.
